@@ -339,14 +339,12 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     } else {
         base_rowid = RowID(segment_id, 0);
         RowID last_rowid = base_rowid;
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
         for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
-            {
-                ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
-                status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
-                if (!status.ok()) {
-                    return status;
-                }
+            ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
+            if (!status.ok()) {
+                return status;
             }
             if (last_rowid != chunk_info_ptr->base_row_id_) {
                 UnrecoverableError("OptimizeIndex: base_row_id is not continuous");

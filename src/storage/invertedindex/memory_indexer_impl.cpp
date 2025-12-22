@@ -317,8 +317,8 @@ size_t MemoryIndexer::CommitOffline(size_t wait_if_empty_ms) {
 }
 
 size_t MemoryIndexer::CommitSync(size_t wait_if_empty_ms) {
-    std::unique_lock lock(mutex_commit_, std::defer_lock);
-    if (!lock.try_lock()) {
+    std::unique_lock commit_lock(mutex_commit_, std::defer_lock);
+    if (!commit_lock.try_lock()) {
         return 0;
     }
     size_t num_generated = 0;
@@ -466,7 +466,7 @@ void MemoryIndexer::Load() {
     std::shared_ptr<FileReader> posting_reader = std::make_shared<FileReader>(posting_file, 1024);
     std::string term;
     TermMeta term_meta;
-    doc_count_ = (u32)posting_reader->ReadVInt();
+    doc_count_ = static_cast<u32>(posting_reader->ReadVInt());
 
     while (dict_reader->Next(term, term_meta)) {
         std::shared_ptr<PostingWriter> posting = GetOrAddPosting(term);
@@ -718,7 +718,7 @@ void MemoryIndexer::PrepareSpillFile() {
         UnrecoverableError(fmt::format("Failed to write to spill file: {}, error: {}", spill_full_path_, strerror(errno)));
     }
 
-    const size_t write_buf_size = 128000;
+    constexpr size_t write_buf_size = 128000;
     buf_writer_ = std::make_unique<BufWriter>(spill_file_handle_, write_buf_size);
 }
 
