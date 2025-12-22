@@ -439,7 +439,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     {
         auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
         if (!status.ok()) {
-            return;
+            // return;
             // // fuck
             // UnrecoverableError(status.message());
         }
