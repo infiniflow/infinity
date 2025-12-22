@@ -110,7 +110,7 @@ void MemIndexAppender::Process() {
                     break;
                 }
                 default: {
-                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
+                    UnrecoverableError(fmt::format("Invalid background task: {}", static_cast<u8>(bg_task->type_)));
                     break;
                 }
             }

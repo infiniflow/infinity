@@ -339,14 +339,12 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     } else {
         base_rowid = RowID(segment_id, 0);
         RowID last_rowid = base_rowid;
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
         for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
             ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
-            {
-                status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
-                if (!status.ok()) {
-                    return status;
-                }
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
+            if (!status.ok()) {
+                return status;
             }
             if (last_rowid != chunk_info_ptr->base_row_id_) {
                 UnrecoverableError("OptimizeIndex: base_row_id is not continuous");
@@ -392,15 +390,15 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 ChunkID old_chunk_id = deprecate_ids[i];
                 ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
 
-                IndexFileWorker *index_file_worker{};
+                IndexFileWorker *old_index_file_worker{};
                 {
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, file_worker);
-                    status = old_chunk_meta.GetFileWorker(index_file_worker);
+                    status = old_chunk_meta.GetFileWorker(old_index_file_worker);
                     if (!status.ok()) {
                         return status;
                     }
                 }
-                old_buffers.emplace_back(row_cnts[i], index_file_worker);
+                old_buffers.emplace_back(row_cnts[i], old_index_file_worker);
             }
 
             // BufferHandle buffer_handle = buffer_obj->Load();
@@ -1082,8 +1080,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
     std::vector<ChunkID> chunk_ids_to_delete;
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
+        std::vector<ChunkID> *chunk_ids_ptr = nullptr;
         std::unordered_set<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
@@ -1250,9 +1248,9 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
-    std::optional<ChunkIndexMeta> chunk_index_meta;
     IndexFileWorker *index_file_worker{};
     {
+        std::optional<ChunkIndexMeta> chunk_index_meta;
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                this,
                                                chunk_id,
@@ -1273,7 +1271,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     {
         IVFIndexInChunk *data_ptr{};
         index_file_worker->Read(data_ptr);
-        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
+        data_ptr->BuildIVFIndex(segment_meta, row_count, std::move(column_def));
         index_file_worker->Write(std::span{data_ptr, 1});
     }
     return Status::OK();
@@ -1320,7 +1318,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     {
         std::shared_ptr<EMVBIndex> data_ptr;
         index_file_worker->Read(data_ptr);
-        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
+        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, std::move(column_def));
         index_file_worker->Write(std::span{data_ptr.get(), 1});
     }
     return Status::OK();

@@ -168,7 +168,7 @@ public:
 
     Status CommitRecovery();
 
-    bool CheckConflictTxnStores(std::shared_ptr<NewTxn> check_txn, std::string &conflict_reason, bool &retry_query);
+    bool CheckConflictTxnStores(std::shared_ptr<NewTxn> &check_txn, std::string &conflict_reason, bool &retry_query);
 
     Status PrepareCommit();
 
