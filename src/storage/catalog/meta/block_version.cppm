@@ -72,18 +72,13 @@ export struct BlockVersion {
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
-    [[nodiscard]] TxnTimeStamp latest_change_ts() const {
-        std::shared_lock<std::shared_mutex> lock(rw_mutex_);
-        return latest_change_ts_;
-    }
-
 private:
     mutable std::shared_mutex rw_mutex_;
-    std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                       // risk to write uninitialized buffer. (ts, rows)
+
     std::vector<TxnTimeStamp> deleted_;
 
-    TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.
+    std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+    // risk to write uninitialized buffer. (ts, rows)
 };
 
 } // namespace infinity

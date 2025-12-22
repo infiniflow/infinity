@@ -268,7 +268,6 @@ void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) co
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     std::unique_lock lock(rw_mutex_);
     created_.emplace_back(commit_ts, row_count);
-    latest_change_ts_ = commit_ts;
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
@@ -287,7 +286,6 @@ Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     //     return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
     // }
     deleted_[offset] = commit_ts;
-    latest_change_ts_ = commit_ts;
     return Status::OK();
 }
 
@@ -342,7 +340,6 @@ void BlockVersion::RestoreFromSnapshot(TxnTimeStamp commit_ts) {
             ts = commit_ts;
         }
     }
-    latest_change_ts_ = commit_ts;
 }
 
 } // namespace infinity
