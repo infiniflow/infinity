@@ -69,6 +69,10 @@ public:
                 Evict(request_space);
             }
             payloads_.push_front(data);
+            if (path_data_map_.contains(path)) {
+                auto &data = path_data_map_[path];
+                delete *data;
+            }
             path_data_map_.emplace(path, payloads_.begin());
             data_path_map_[data] = path;
             memory_map_[path] = request_space;
