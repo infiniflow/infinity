@@ -60,7 +60,6 @@ bool VersionFileWorker::Write(BlockVersion *&data,
 void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     if (!file_handle) {
         data = std::make_unique<BlockVersion>(8192).release();
-        ;
         return;
     }
     auto &path = *rel_file_path_;
@@ -72,7 +71,6 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
         mmap_size_ = file_handle->FileSize();
         if (!mmap_) {
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-        } else {
         }
         BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
         size_t request_space = file_handle->FileSize();
