@@ -29,11 +29,12 @@ SegmentTermPostingQueue::SegmentTermPostingQueue(const std::string &index_dir,
                                                  optionflag_t flag)
     : index_dir_(index_dir), base_names_(base_names), base_rowids_(base_rowids) {
     for (u32 i = 0; i < base_names.size(); ++i) {
-        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_rowids[i], flag);
+        auto segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_rowids[i], flag);
         if (segment_term_posting->HasNext()) {
             segment_term_postings_.push(segment_term_posting);
-        } else
+        } else {
             delete segment_term_posting;
+        }
     }
 }
 

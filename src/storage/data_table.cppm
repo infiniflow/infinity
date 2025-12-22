@@ -100,12 +100,12 @@ public:
 
 public:
     std::shared_ptr<TableDef> definition_ptr_{};
-    size_t row_count_{0};
-    TableType type_{TableType::kInvalid};
-    std::vector<std::shared_ptr<DataBlock>> data_blocks_{};
     std::shared_ptr<std::string> result_msg_{};
-    bool total_hits_count_flag_{false};
+    TableType type_{TableType::kInvalid};
+    std::vector<std::shared_ptr<DataBlock>> data_blocks_;
     size_t total_hits_count_{};
+    size_t row_count_{};
+    bool total_hits_count_flag_{};
 };
 
 } // namespace infinity

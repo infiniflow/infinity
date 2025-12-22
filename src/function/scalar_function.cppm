@@ -318,7 +318,7 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors[0],
+        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors_[0],
                                                                                        output,
                                                                                        input.row_count(),
                                                                                        nullptr,
@@ -335,7 +335,7 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
+        UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors_[0],
                                                                                     output,
                                                                                     input.row_count(),
                                                                                     nullptr,
@@ -353,7 +353,7 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
+        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors_[0],
                                                                                                output,
                                                                                                input.row_count(),
                                                                                                nullptr,
@@ -370,9 +370,9 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        ScalarFunctionData function_data_input(input.column_vectors[0].get());
+        ScalarFunctionData function_data_input(input.column_vectors_[0].get());
         ScalarFunctionData function_data_output(output.get());
-        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
+        UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors_[0],
                                                                                                      output,
                                                                                                      input.row_count(),
                                                                                                      &function_data_input,
@@ -390,7 +390,7 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
+        UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(input.column_vectors_[0],
                                                                                             output,
                                                                                             input.row_count(),
                                                                                             nullptr,
@@ -407,8 +407,8 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(input.column_vectors[0],
-                                                                                                   input.column_vectors[1],
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                   input.column_vectors_[1],
                                                                                                    output,
                                                                                                    input.row_count(),
                                                                                                    nullptr,
@@ -426,8 +426,8 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(input.column_vectors[0],
-                                                                                                input.column_vectors[1],
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                input.column_vectors_[1],
                                                                                                 output,
                                                                                                 input.row_count(),
                                                                                                 nullptr,
@@ -446,8 +446,8 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                           input.column_vectors[1],
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                           input.column_vectors_[1],
                                                                                                            output,
                                                                                                            input.row_count(),
                                                                                                            nullptr,
@@ -466,8 +466,8 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                        input.column_vectors[1],
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                        input.column_vectors_[1],
                                                                                                         output,
                                                                                                         input.row_count(),
                                                                                                         nullptr,
@@ -485,11 +485,11 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        ScalarFunctionData function_data_left(input.column_vectors[0].get());
-        ScalarFunctionData function_data_right(input.column_vectors[1].get());
+        ScalarFunctionData function_data_left(input.column_vectors_[0].get());
+        ScalarFunctionData function_data_right(input.column_vectors_[1].get());
         ScalarFunctionData function_data(output.get());
-        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                                 input.column_vectors[1],
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectVarlenToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                 input.column_vectors_[1],
                                                                                                                  output,
                                                                                                                  input.row_count(),
                                                                                                                  &function_data_left,
@@ -507,9 +507,9 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWrapper<Operation>>(input.column_vectors[0],
-                                                                                                                  input.column_vectors[1],
-                                                                                                                  input.column_vectors[2],
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                  input.column_vectors_[1],
+                                                                                                                  input.column_vectors_[2],
                                                                                                                   output,
                                                                                                                   input.row_count(),
                                                                                                                   nullptr,
@@ -526,9 +526,9 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpWrapper<Operation>>(input.column_vectors[0],
-                                                                                                               input.column_vectors[1],
-                                                                                                               input.column_vectors[2],
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                               input.column_vectors_[1],
+                                                                                                               input.column_vectors_[2],
                                                                                                                output,
                                                                                                                input.row_count(),
                                                                                                                nullptr,
@@ -546,9 +546,9 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                                          input.column_vectors[1],
-                                                                                                                          input.column_vectors[2],
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                          input.column_vectors_[1],
+                                                                                                                          input.column_vectors_[2],
                                                                                                                           output,
                                                                                                                           input.row_count(),
                                                                                                                           nullptr,
@@ -566,9 +566,9 @@ public:
             UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
-        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                                       input.column_vectors[1],
-                                                                                                                       input.column_vectors[2],
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                       input.column_vectors_[1],
+                                                                                                                       input.column_vectors_[2],
                                                                                                                        output,
                                                                                                                        input.row_count(),
                                                                                                                        nullptr,
@@ -585,11 +585,11 @@ public:
         if (!input.Finalized()) {
             UnrecoverableError("Input data block is finalized");
         }
-        ScalarFunctionData function_data_first(input.column_vectors[0].get());
+        ScalarFunctionData function_data_first(input.column_vectors_[0].get());
         ScalarFunctionData function_data(output.get());
-        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpVarlenToVarlenWrapper<Operation>>(input.column_vectors[0],
-                                                                                                                             input.column_vectors[1],
-                                                                                                                             input.column_vectors[2],
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpVarlenToVarlenWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                             input.column_vectors_[1],
+                                                                                                                             input.column_vectors_[2],
                                                                                                                              output,
                                                                                                                              input.row_count(),
                                                                                                                              &function_data_first,

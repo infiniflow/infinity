@@ -126,7 +126,7 @@ protected:
     void CheckFilePaths(std::vector<std::string> &delete_file_paths, std::vector<std::string> &exist_file_paths);
 
 private:
-    // Validate if given path satisfy all of following:
+    // Validate if given path satisfy all following:
     // - The path is a directory or symlink to a directory.
     // - Current user has read, write, and execute permission of the path.
     bool ValidateDirPermission(const char *path_str) {
@@ -192,23 +192,23 @@ export class BaseTestNoParam : public BaseTestWithParam<void> {
 public:
     void SetUp() override {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NULL_CONFIG_PATH);
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 };
@@ -217,23 +217,23 @@ export class NewBaseTestNoParam : public BaseTestWithParam<void> {
 public:
     void SetUp() override {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 };
@@ -242,27 +242,27 @@ export class BaseTestParamStr : public BaseTestWithParam<std::string> {
 public:
     void SetUp() override {
         // Earlier cases may leave a dirty infinity instance. Destroy it first.
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
+        GlobalResourceUsage::Init();
 #endif
         std::string config_path_str = GetParam();
         config_path = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
             config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
         }
-        infinity::InfinityContext::instance().InitPhase1(config_path);
-        infinity::InfinityContext::instance().InitPhase2();
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
     }
 
     void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
+        InfinityContext::instance().UnInit();
         CleanupDbDirs();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
+        GlobalResourceUsage::UnInit();
 #endif
     }
 

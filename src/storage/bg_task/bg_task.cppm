@@ -40,6 +40,11 @@ export struct BGTask {
 #endif
     }
 
+    // BGTask(BGTask&&) noexcept {
+    //
+    // }
+    // BGTask& operator=(BGTask&&) noexcept = default;
+
     virtual ~BGTask() {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("BGTask");
@@ -47,9 +52,9 @@ export struct BGTask {
     }
 
     BGTaskType type_{BGTaskType::kInvalid};
-    bool async_{false};
+    bool async_{};
 
-    bool complete_{false};
+    bool complete_{};
     mutable std::mutex mutex_{};
     std::condition_variable cv_{};
 

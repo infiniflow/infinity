@@ -230,7 +230,7 @@ MemUsageChange ColumnInverter::GeneratePosting() {
             }
             term = GetTermFromNum(i.term_num_);
             posting = posting_writer_provider_(std::string(term.data()));
-            if (modified_writers.find(term) == modified_writers.end()) {
+            if (!modified_writers.contains(term)) {
                 modified_writers[term] = posting.get();
             }
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());

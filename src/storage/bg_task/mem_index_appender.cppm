@@ -21,7 +21,7 @@ import :status;
 namespace infinity {
 
 class NewTxn;
-class BGTask;
+struct BGTask;
 class AppendMemIndexTask;
 
 export class MemIndexAppender {
@@ -41,7 +41,7 @@ private:
     void Process();
 
 private:
-    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"MemIndexAppender"};
+    BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"MemIndexAppender", 65536};
 
     std::thread processor_thread_{};
 

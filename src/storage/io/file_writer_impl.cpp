@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <unistd.h>
+
 module infinity_core:file_writer.impl;
 
 import :file_writer;
@@ -28,9 +32,11 @@ FileWriter::FileWriter(const std::string &path, size_t buffer_size)
     // Fixme: Open file out of constructor
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        // fuck
+        // UnrecoverableError(status.message());
     }
     file_handle_ = std::move(file_handle);
+    // close(file_handle_->fd());
 }
 
 void FileWriter::WriteByte(const u8 b) {

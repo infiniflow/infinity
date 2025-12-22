@@ -256,8 +256,8 @@ void QueryMatchTest::QueryMatch(const std::string &db_name,
                                 const u32 &expected_doc_freq,
                                 const float &expected_matched_freq,
                                 const DocIteratorType &query_type) {
-    Storage *storage = InfinityContext::instance().storage();
-    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *storage = InfinityContext::instance().storage();
+    auto *txn_mgr = storage->new_txn_manager();
 
     auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("query match"), TransactionType::kRead);
     auto [table_info, status] = txn->GetTableInfo(db_name, table_name);

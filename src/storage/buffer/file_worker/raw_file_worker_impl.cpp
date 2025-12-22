@@ -15,6 +15,8 @@
 module;
 
 #include <cassert>
+#include <sys/mman.h>
+#include <unistd.h>
 
 module infinity_core:raw_file_worker.impl;
 
@@ -22,66 +24,64 @@ import :raw_file_worker;
 import :infinity_exception;
 import :local_file_handle;
 import :status;
-import :raw_file_worker;
 
 import std;
 import third_party;
 
 namespace infinity {
 
-RawFileWorker::RawFileWorker(std::shared_ptr<std::string> data_dir,
-                             std::shared_ptr<std::string> temp_dir,
-                             std::shared_ptr<std::string> file_dir,
-                             std::shared_ptr<std::string> file_name,
-                             u32 file_size,
-                             PersistenceManager *persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {}
+RawFileWorker::RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size)
+    : IndexFileWorker(std::move(file_path), {}, {}), buffer_size_(file_size) {}
 
 RawFileWorker::~RawFileWorker() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
+    munmap(mmap_, mmap_size_);
+    mmap_ = nullptr;
 }
 
-void RawFileWorker::AllocateInMemory() {
-    if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
-    }
-    if (buffer_size_ == 0) {
-        UnrecoverableError("Buffer size is 0.");
-    }
-    data_ = static_cast<void *>(new char[buffer_size_]);
-}
+bool RawFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    auto old_mmap_size = mmap_size_;
+    mmap_size_ = buffer_size_;
 
-void RawFileWorker::FreeInMemory() {
-    if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
+    if (mmap_size_ == 0) {
+        prepare_success = true;
+        return true;
     }
-    delete[] static_cast<char *>(data_);
-    data_ = nullptr;
-}
 
-bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    assert(data_ != nullptr && buffer_size_ > 0);
-    auto status = file_handle_->Append(data_, buffer_size_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    auto fd = file_handle->fd();
+    ftruncate(fd, mmap_size_);
+    if (mmap_ == nullptr) {
+        mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+    } else {
+        mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
     }
+
+    size_t offset{};
+    std::memcpy((char *)mmap_ + offset, data.data(), buffer_size_);
+    offset += buffer_size_;
+
     prepare_success = true; // Not run defer_fn
     return true;
 }
 
-void RawFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
-    buffer_size_ = file_handle_->FileSize();
-    data_ = static_cast<void *>(new char[buffer_size_]);
-    auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
-    if (!status1.ok()) {
-        RecoverableError(status1);
+void RawFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    buffer_size_ = file_handle ? file_handle->FileSize() : 0;
+    data = std::make_shared<char[]>(buffer_size_);
+    if (!file_handle) {
+        return;
     }
-    if (nbytes != buffer_size_) {
-        Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
-        RecoverableError(status);
+    if (!mmap_) {
+        // buffer_size_ = file_handle_->FileSize();
+        // data_ = static_cast<void *>(new char[buffer_size_]);
+        auto fd = file_handle->fd();
+        auto [nbytes, status1] = file_handle->Read(data.get(), buffer_size_);
+
+        mmap_size_ = buffer_size_;
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
+        if (mmap_ == MAP_FAILED) {
+            mmap_ = nullptr;
+        }
+    } else {
+        std::memcpy(data.get(), (char *)mmap_, buffer_size_);
     }
 }
 

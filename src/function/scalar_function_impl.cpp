@@ -49,7 +49,7 @@ void ScalarFunction::NoOpFunction(const DataBlock &input, std::shared_ptr<Column
     // TODO: this should be the pointer copy from input to output.
 
     // Fixme: Output reference the data of input
-    output->ShallowCopy(*input.column_vectors[0]);
+    output->ShallowCopy(*input.column_vectors_[0]);
 }
 
 std::string ScalarFunction::ToString() const {

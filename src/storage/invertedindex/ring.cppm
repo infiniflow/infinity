@@ -51,7 +51,7 @@ public:
             }
         }
         if (off == off_ground_)
-            cv_empty_.notify_all();
+            cv_empty_.notify_one();
         // printf("%p Ring::Put off %lu, off_ground_ %lu, off_filled_ %lu, off_ceiling_ %lu\n", this, off, off_ground_, off_filled_, off_ceiling_);
     }
 
@@ -71,7 +71,7 @@ public:
         off_ground_++;
         u64 seq = seq_get_++;
         // printf("%p Ring::Get off_ground_ %lu, off_filled_ %lu, off_ceiling_ %lu\n", this, off_ground_, off_filled_, off_ceiling_);
-        cv_full_.notify_all();
+        cv_full_.notify_one();
         return seq;
     }
 
@@ -94,7 +94,7 @@ public:
         // printf("%p Ring::GetBatch off_ground_ %lu, off_filled_ %lu, off_ceiling_ %lu\n", this, off_ground_, off_filled_, off_ceiling_);
         off_ground_ = off_filled_;
         u64 seq = seq_get_++;
-        cv_full_.notify_all();
+        cv_full_.notify_one();
         return seq;
     }
 

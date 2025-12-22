@@ -88,8 +88,8 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
         return;
     }
 
-    std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors.begin(),
-                                                                     input_block->column_vectors.begin() + group_count);
+    std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors_.begin(),
+                                                                     input_block->column_vectors_.begin() + group_count);
     if (op_state->data_block_array_.empty()) {
         hash_table.Append(input_groupby_columns, 0, input_block->row_count());
         op_state->data_block_array_.emplace_back(std::move(input_block));

@@ -55,7 +55,7 @@ public:
 
     Status InitSet1();
 
-    Status RestoreSet(const ChunkID &next_chunk_id);
+    Status InitSet(const ChunkID &next_chunk_id);
 
     Status LoadSet();
 
