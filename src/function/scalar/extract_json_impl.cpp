@@ -34,12 +34,12 @@ template <typename T, std::tuple<bool, T> (*ExtractFunc)(const JsonTypeDef &, co
 class JsonExtractor {
 public:
     static void Execute(const DataBlock &input_block, std::shared_ptr<ColumnVector> &output_column) {
-        if (input_block.column_vectors.size() != 2) {
+        if (input_block.column_count() != 2) {
             RecoverableError(Status::SyntaxError("JsonExtract: Invalid column size."));
         }
 
-        const auto &json_column = input_block.column_vectors[0];
-        const auto &path_column = input_block.column_vectors[1];
+        const auto &json_column = input_block.column_vectors_[0];
+        const auto &path_column = input_block.column_vectors_[1];
 
         auto rvarchar = path_column->GetVarchar(0);
         auto [is_valid, tokens] = JsonManager::get_json_tokens(std::string(rvarchar.data(), rvarchar.size()));
@@ -47,7 +47,7 @@ public:
             RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
         }
 
-        auto json_column_data = reinterpret_cast<const JsonT *>(json_column->data());
+        auto json_column_data = reinterpret_cast<const JsonT *>(json_column->data().get());
         auto row_count = input_block.row_count();
         const std::shared_ptr<Bitmask> &output_null = output_column->nulls_ptr_;
 
