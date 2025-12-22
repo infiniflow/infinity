@@ -26,6 +26,7 @@ import :infinity_exception;
 import :logger;
 import :persistence_manager;
 import :infinity_context;
+import :fileworker_manager;
 
 import third_party;
 
@@ -35,18 +36,19 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, siz
     : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
-    madvise(mmap_, mmap_size_, MADV_FREE);
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
 
-bool VersionFileWorker::Write(std::span<BlockVersion> data,
+bool VersionFileWorker::Write(BlockVersion *&data,
                               std::unique_ptr<LocalFileHandle> &file_handle,
                               bool &prepare_success,
                               const FileWorkerSaveCtx &base_ctx) {
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data.data()->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
+    bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.Set(*rel_file_path_, data, mmap_size_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -55,12 +57,27 @@ bool VersionFileWorker::Write(std::span<BlockVersion> data,
     return false;
 }
 
-void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     if (!file_handle) {
-        data = std::make_shared<BlockVersion>(8192);
+        data = std::make_unique<BlockVersion>(8192).release();
+        ;
         return;
     }
-    BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
+    auto &path = *rel_file_path_;
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.Pin(path);
+    bool flag = cache_manager.Get(path, data);
+    if (!flag) {
+        auto fd = file_handle->fd();
+        mmap_size_ = file_handle->FileSize();
+        if (!mmap_) {
+            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+        } else {
+        }
+        BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
+        size_t request_space = file_handle->FileSize();
+        cache_manager.Set(path, data, request_space);
+    }
 }
 
 } // namespace infinity

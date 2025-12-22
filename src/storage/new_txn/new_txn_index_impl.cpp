@@ -1083,8 +1083,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
     std::vector<ChunkID> chunk_ids_to_delete;
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
+        std::vector<ChunkID> *chunk_ids_ptr{};
         std::unordered_set<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
@@ -1760,7 +1760,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
     if (!status.ok()) {
         return status;
     }
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+    std::vector<ChunkID> *chunk_ids_ptr{};
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
@@ -1817,6 +1817,8 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                 if (params->lvq_avg) {
                     (hnsw_handler)->Optimize();
                 }
+                auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+                cache_manager.UnPin(*index_file_worker->rel_file_path_);
             }
             if (mem_index) {
                 std::shared_ptr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();

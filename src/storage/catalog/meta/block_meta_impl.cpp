@@ -109,10 +109,12 @@ Status BlockMeta::RestoreSetFromSnapshot() {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    // std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
-
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_file_worker_->rel_file_path_);
     return Status::OK();
 }
 

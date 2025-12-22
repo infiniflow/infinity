@@ -176,64 +176,38 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
     return !is_modified;
 }
 
-void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
+void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     // this will waste a lot of memory....
     auto block_version = std::make_unique<BlockVersion>(8192);
-    if (!mmap_p) {
-        BlockOffset capacity;
-        file_handle->Read(&capacity, sizeof(capacity));
-        block_version->deleted_.resize(capacity);
-        for (BlockOffset i = 0; i < capacity; i++) {
-            file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
-        }
+    size_t offset{};
+    BlockOffset create_size{};
 
-        BlockOffset create_size;
-        file_handle->Read(&create_size, sizeof(create_size));
-        block_version->created_.reserve(create_size);
-        for (BlockOffset i = 0; i < create_size; i++) {
-            block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
-        }
-        LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
+    auto &deleted = block_version->deleted_;
 
-        file_handle->Seek(0);
-        auto fd = file_handle->fd();
-        mmap_size = sizeof(create_size) + sizeof(capacity) + (2 * create_size + capacity) * sizeof(TxnTimeStamp);
-        mmap_p = mmap(nullptr, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
-        if (mmap_p == MAP_FAILED) {
-            std::println("that code version: {}", mmap_size);
-            mmap_p = nullptr;
-        }
-    } else {
-        size_t offset{};
-        BlockOffset create_size{};
-
-        auto &deleted = block_version->deleted_;
-
-        BlockOffset capacity{};
-        std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
-        offset += sizeof(capacity);
-        for (auto &ts : deleted) {
-            // ts =
-            std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
-            offset += sizeof(ts);
-        }
-
-        std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
-        offset += sizeof(create_size);
-
-        auto &created = block_version->created_;
-        created.resize(create_size);
-
-        for (size_t j = 0; j < create_size; ++j) {
-            std::memcpy(&created[j].create_ts_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
-            offset += sizeof(TxnTimeStamp);
-
-            std::memcpy(&created[j].row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
-            offset += sizeof(TxnTimeStamp);
-        }
+    BlockOffset capacity{};
+    std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
+    offset += sizeof(capacity);
+    for (auto &ts : deleted) {
+        // ts =
+        std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
+        offset += sizeof(ts);
     }
-    data = std::move(block_version);
+
+    std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
+    offset += sizeof(create_size);
+
+    auto &created = block_version->created_;
+    created.resize(create_size);
+
+    for (size_t j = 0; j < create_size; ++j) {
+        std::memcpy(&created[j].create_ts_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+
+        std::memcpy(&created[j].row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+    }
+    data = block_version.release();
 }
 
 void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {
