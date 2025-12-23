@@ -1820,6 +1820,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::string data_dir = InfinityContext::instance().config()->DataDir();
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
 
@@ -1848,6 +1849,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
         }
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta);
+            std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
 
             std::shared_ptr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
@@ -1856,73 +1858,99 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 continue;
             }
 
-            NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
-            if (!status.ok()) {
-                return status;
+            {
+                auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
+                auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
+                auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+
+                // Read version info
+                BlockVersion *block_version{};
+                static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
+
+                // Write snapshot file
+                VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
+                auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
+                auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                if (!status.ok()) {
+                    std::string message = fmt::format("Open {} failed: {}", write_path, status.message());
+                    RecoverableError(Status::SyntaxError(message));
+                }
+                bool prepare_success{false};
+                version_file_worker->Write(block_version, handle, prepare_success, ctx);
             }
 
-            std::pair<BlockOffset, BlockOffset> range;
-            BlockOffset row_cnt = 0;
-            while (state.Next(row_cnt, range)) {
-                row_cnt = range.second;
-            }
+            {
+                NewTxnGetVisibleRangeState state;
+                status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
+                if (!status.ok()) {
+                    return status;
+                }
 
-            // {
-            //     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
-            //
-            //     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-            //     auto version_file_path = std::make_shared<std::string>(fmt::format("{}/{}/{}", data_dir, *block_dir_ptr, BlockVersion::PATH));
-            //     auto version_file_worker = std::make_unique<VersionFileWorker>(version_file_path, block_meta.block_capacity());
-            //     auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
-            //
-            //     BlockVersion *block_version{};
-            //     static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
-            //
-            //     version_file_worker_->Write()
-            //
-            //
-            //     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            //
-            //     std::string version_file_path = fmt::format("{}/{}/{}", data_dir, *block_dir_ptr, BlockVersion::PATH);
-            //     BufferObj *version_buffer = buffer_mgr->GetBufferObject(version_file_path);
-            //     if (version_buffer == nullptr) {
-            //         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_path));
-            //     }
-            //
-            //     VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
-            //     version_buffer->SaveSnapshot(table_snapshot_info, use_memory, ctx);
-            // }
-            //
-            // {
-            //     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-            //     std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
-            //     if (!status.ok()) {
-            //         return status;
-            //     }
-            //
-            //     for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
-            //         ColumnMeta column_meta(column_idx, block_meta);
-            //         BufferObj *buffer_obj = nullptr;
-            //         BufferObj *outline_buffer_obj = nullptr;
-            //
-            //         status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
-            //         if (!status.ok()) {
-            //             return status;
-            //         }
-            //
-            //         size_t data_size = 0;
-            //         std::tie(data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
-            //
-            //         if (buffer_obj) {
-            //             buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
-            //         }
-            //
-            //         if (outline_buffer_obj) {
-            //             outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
-            //         }
-            //     }
-            // }
+                std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
+                std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+                if (!status.ok()) {
+                    return status;
+                }
+
+                for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+                    auto column_def = column_defs->at(column_idx);
+
+                    std::pair<BlockOffset, BlockOffset> range;
+                    BlockOffset rel_row_cnt = 0;
+                    while (state.Next(rel_row_cnt, range)) {
+                        rel_row_cnt = range.second;
+                    }
+                    size_t rel_data_size = 0;
+                    ColumnMeta column_meta(column_idx, block_meta);
+                    std::tie(rel_data_size, status) = column_meta.GetColumnSize(rel_row_cnt, column_def);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    {
+                        auto read_path = std::make_shared<std::string>(fmt::format("{}/{}.col", *block_dir_ptr, column_def->id()));
+                        auto data_file_worker = std::make_unique<DataFileWorker>(read_path, rel_data_size);
+                        auto data_file_worker_ = fileworker_mgr->data_map_.EmplaceFileWorker(std::move(data_file_worker));
+
+                        // Read data file
+                        std::shared_ptr<char[]> data{nullptr};
+                        static_cast<FileWorker *>(data_file_worker_)->Read(data);
+
+                        // Write snapshot file
+                        auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
+                        auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                        if (!status.ok()) {
+                            std::string message = fmt::format("Open {} failed: {}", write_path, status.message());
+                            RecoverableError(Status::SyntaxError(message));
+                        }
+
+                        bool prepare_success{false};
+                        std::span<char> data_span(data.get(), rel_data_size);
+                        data_file_worker_->Write(data_span, handle, prepare_success, {});
+                    }
+
+                    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
+                    if (buffer_type == VectorBufferType::kVarBuffer) {
+                        auto read_path = std::make_shared<std::string>(fmt::format("{}/col_{}_out", *block_dir_ptr, column_def->id()));
+                        auto var_file_worker = std::make_unique<VarFileWorker>(read_path, 0);
+                        auto var_file_worker_ = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(var_file_worker));
+
+                        std::shared_ptr<VarBuffer> var_buffer{nullptr};
+                        static_cast<FileWorker *>(var_file_worker_)->Read(var_buffer);
+
+                        // Write snapshot file
+                        auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
+                        auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                        if (!status.ok()) {
+                            std::string message = fmt::format("Open {} failed: {}", write_path, status.message());
+                            RecoverableError(Status::SyntaxError(message));
+                        }
+
+                        bool prepare_success{false};
+                        var_file_worker_->Write({var_buffer.get(), 1}, handle, prepare_success, {});
+                    }
+                }
+            }
         }
     }
 
