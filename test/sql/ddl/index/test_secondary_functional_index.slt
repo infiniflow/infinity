@@ -1,0 +1,62 @@
+statement ok
+DROP TABLE IF EXISTS test_secondary_functional_index;
+
+statement ok
+CREATE TABLE test_secondary_functional_index (c1 integer, c2 varchar);
+
+statement ok
+INSERT INTO test_secondary_functional_index values(1, 'hello world');
+
+statement ok
+INSERT INTO test_secondary_functional_index values(2, 'thank you');
+
+statement ok
+CREATE INDEX idx_c1 ON test_secondary_functional_index (sqrt(c1));
+
+statement ok
+SHOW TABLE test_secondary_functional_index INDEX idx_c1;
+
+statement ok
+INSERT INTO test_secondary_functional_index values(3, 'hello world');
+
+statement ok
+INSERT INTO test_secondary_functional_index values(4, 'thank you');
+
+statement ok
+DUMP INDEX idx_c1 on test_secondary_functional_index;
+
+statement ok
+OPTIMIZE test_secondary_functional_index;
+
+statement ok
+DROP INDEX idx_c1 ON test_secondary_functional_index;
+
+statement ok
+CREATE INDEX idx_c1 ON test_secondary_functional_index (c1 + 5);
+
+statement ok
+DROP INDEX idx_c1 ON test_secondary_functional_index;
+
+statement ok
+CREATE INDEX idx_c2 ON test_secondary_functional_index (substring(c2, 0, 5)) USING SECONDARY WITH(cardinality=low);
+
+statement ok
+DROP INDEX idx_c2 ON test_secondary_functional_index;
+
+statement ok
+CREATE INDEX idx_c1 ON test_secondary_functional_index (round(c1, cast(1 as bigint)));
+
+statement ok
+DROP INDEX idx_c1 ON test_secondary_functional_index;
+
+statement error
+CREATE INDEX idx_error ON test_secondary_functional_index (abs(1));
+
+statement error
+CREATE INDEX idx_error ON test_secondary_functional_index (c1+c2);
+
+statement error
+CREATE INDEX idx_error ON test_secondary_functional_index (sum(c1));
+
+statement ok
+DROP TABLE test_secondary_functional_index;

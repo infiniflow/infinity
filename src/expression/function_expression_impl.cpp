@@ -69,6 +69,27 @@ std::string FunctionExpression::ToString() const {
     return ss.str();
 }
 
+nlohmann::json FunctionExpression::Serialize() const {
+    nlohmann::json j;
+    j["type"] = "Function";
+
+    if (!alias_.empty()) {
+        j["alias"] = alias_;
+    }
+
+    nlohmann::json args_json = nlohmann::json::array();
+    if (!nullary_) {
+        for (const auto &arg_expr : this->arguments_) {
+            args_json.push_back(arg_expr->Serialize());
+        }
+        j["arguments"] = args_json;
+    }
+
+    j["func_name"] = func_.name();
+
+    return j;
+}
+
 u64 FunctionExpression::Hash() const {
     u64 h = 0;
 

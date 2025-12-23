@@ -45,6 +45,9 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kDiskAnn: {
             return "DISKANN";
         }
+        case IndexType::kSecondaryFunctional: {
+            return "SECONDARYFUNCTIONAL";
+        }
         case IndexType::kInvalid: {
             ParserError("Invalid conflict type.");
         }
@@ -67,6 +70,8 @@ IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
         return IndexType::kBMP;
     } else if (index_type_str == "DISKANN") {
         return IndexType::kDiskAnn;
+    } else if (index_type_str == "SECONDARYFUNCTIONAL") {
+        return IndexType::kSecondaryFunctional;
     } else {
         return IndexType::kInvalid;
     }
@@ -116,7 +121,11 @@ std::string CreateIndexInfo::ToString() const {
         ss << index_name_;
     }
     ss << " ON " << table_name_ << "(";
-    ss << index_info_->column_name_;
+    if (index_info_->function_expr_ != nullptr) {
+        ss << "(" << index_info_->function_expr_->ToString() << ")";
+    } else {
+        ss << index_info_->column_name_;
+    }
     ss << " USING " << IndexInfo::IndexTypeToString(index_info_->index_type_);
     if (index_info_->index_param_list_ != nullptr && !index_info_->index_param_list_->empty()) {
         ss << " WITH(";

@@ -47,6 +47,22 @@ std::string ReferenceExpression::ToString() const {
     }
 }
 
+nlohmann::json ReferenceExpression::Serialize() const {
+    nlohmann::json j;
+    j["type"] = "Reference";
+
+    if (!alias_.empty()) {
+        j["alias"] = alias_;
+    }
+
+    j["data_type"] = data_type_.Serialize().dump();
+    j["table_name"] = table_name_;
+    j["column_name"] = column_name_;
+    j["column_index"] = column_index_;
+
+    return j;
+}
+
 u64 ReferenceExpression::Hash() const {
     u64 h = 0;
     h ^= std::hash<std::string>{}(table_name_);

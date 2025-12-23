@@ -38,6 +38,7 @@ import :logical_match_scan_base;
 import :logical_fusion;
 import :logical_unnest;
 import :logical_unnest_aggregate;
+import :logical_create_index;
 import :aggregate_expression;
 import :between_expression;
 import :case_expression;
@@ -183,6 +184,14 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kIndexScan: {
             // always keep the original expression
+            break;
+        }
+        case LogicalNodeType::kCreateIndex: {
+            auto &node = (LogicalCreateIndex &)op;
+            std::shared_ptr<BaseExpression> func_expr = node.function_expression_;
+
+            VisitExpression(func_expr);
+
             break;
         }
         default: {
