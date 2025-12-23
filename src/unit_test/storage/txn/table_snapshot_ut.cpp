@@ -140,6 +140,14 @@ public:
         }
 
         {
+            auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("cleanup"), TransactionType::kCleanup);
+            Status status = txn->Cleanup();
+            EXPECT_TRUE(status.ok());
+            status = txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        {
             std::string sql = fmt::format("show snapshot {}", *table_snapshot_name);
             std::unique_ptr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(sql);

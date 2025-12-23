@@ -28,6 +28,8 @@ import :defer_op;
 import :utility;
 import :block_version;
 import :fst.fst;
+import :version_file_worker;
+import :fileworker_manager;
 
 import std.compat;
 import third_party;
@@ -544,18 +546,32 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         }
 
         std::string dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
+        std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
+        std::string tmp_file_dir = VirtualStore::GetParentPath(tmp_file_path);
+        if (!VirtualStore::Exists(tmp_file_dir)) {
+            VirtualStore::MakeDirectory(tmp_file_dir);
+        }
+        Status status = VirtualStore::Copy(tmp_file_path, src_file_path);
+        if (!status.ok()) {
+            LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, tmp_file_path, status.message()));
+            continue;
+        }
+
+        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
+        [[maybe_unused]] auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
 
         if (persistence_manager != nullptr) {
             // Use persistence manager to restore files
-            // Create a temporary file path for the source file
-            std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), StringTransform(src_file_path, "/", "_"));
-
-            // Copy source file to temporary location first
-            Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
-            if (!copy_status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
-                continue;
-            }
+            // // Create a temporary file path for the source file
+            // std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), StringTransform(src_file_path, "/", "_"));
+            //
+            // // Copy source file to temporary location first
+            // Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
+            // if (!copy_status.ok()) {
+            //     LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
+            //     continue;
+            // }
 
             // Use persistence manager to persist the file
             PersistResultHandler handler(persistence_manager);
@@ -575,19 +591,14 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
 
             LOG_TRACE(fmt::format("Restored file via persistence manager: {} -> {}", src_file_path, dst_file_path));
         } else {
-            // Fallback to direct file copying when no persistence manager
-            // Create destination directory
-            // no race as unique table/db_id_str
             std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
             if (!VirtualStore::Exists(dst_dir)) {
                 VirtualStore::MakeDirectory(dst_dir);
             }
-            // there exists empty files getting deleted, so we need to ignore them
-            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
-            if (!copy_status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy file: {}", copy_status.message()));
+            status = VirtualStore::Copy(dst_file_path, tmp_file_path);
+            if (!status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", tmp_file_path, dst_file_path, status.message()));
             } else {
-                // Add the destination file path to the output vector
                 restored_file_paths.push_back(modified_file);
             }
         }
