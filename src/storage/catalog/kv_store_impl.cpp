@@ -249,7 +249,8 @@ Status KVStore::Init(const std::string &db_path) {
 
     txn_options_.set_snapshot = true;
 
-    txn_db_options_.transaction_lock_timeout = 100;
+    // txn_db_options_.transaction_lock_timeout = 100;
+    txn_db_options_.transaction_lock_timeout = 2000;
 
     auto *config = InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
