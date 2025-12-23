@@ -64,6 +64,7 @@ import :kv_utility;
 import :mem_index;
 import :catalog_cache;
 import :meta_cache;
+import :file_worker;
 
 import std.compat;
 import third_party;
@@ -1851,12 +1852,25 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             BlockMeta block_meta(block_id, segment_meta);
             std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
 
+            NewTxnGetVisibleRangeState state;
+            status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
+            if (!status.ok()) {
+                return status;
+            }
+
             std::shared_ptr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
             if (!status.ok()) {
                 LOG_TRACE(fmt::format("NewTxn::CreateTableSnapshotFile segment_id {}, block_id {}, got no BlockLock", segment_id, block_id));
                 continue;
             }
+            BlockOffset rel_row_cnt = 0;
+            std::pair<BlockOffset, BlockOffset> range;
+            while (state.Next(rel_row_cnt, range)) {
+                rel_row_cnt = range.second;
+            }
+
+            std::unique_lock lock(block_lock->mtx_);
 
             {
                 auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
@@ -1868,24 +1882,20 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
 
                 // Write snapshot file
-                VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!status.ok()) {
                     std::string message = fmt::format("Open {} failed: {}", write_path, status.message());
                     RecoverableError(Status::SyntaxError(message));
                 }
-                bool prepare_success{false};
-                version_file_worker->Write(block_version, handle, prepare_success, ctx);
+
+                void *mmap{nullptr};
+                size_t mmap_size{0};
+                block_version->SaveToFile(mmap, mmap_size, write_path, option.checkpoint_ts_, *handle);
+                // close(handle->fd());
             }
 
             {
-                NewTxnGetVisibleRangeState state;
-                status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
-                if (!status.ok()) {
-                    return status;
-                }
-
                 std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
                 std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
                 if (!status.ok()) {
@@ -1895,11 +1905,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     auto column_def = column_defs->at(column_idx);
 
-                    std::pair<BlockOffset, BlockOffset> range;
-                    BlockOffset rel_row_cnt = 0;
-                    while (state.Next(rel_row_cnt, range)) {
-                        rel_row_cnt = range.second;
-                    }
                     size_t rel_data_size = 0;
                     ColumnMeta column_meta(column_idx, block_meta);
                     std::tie(rel_data_size, status) = column_meta.GetColumnSize(rel_row_cnt, column_def);
@@ -1926,7 +1931,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         bool prepare_success{false};
                         std::span<char> data_span(data.get(), rel_data_size);
-                        data_file_worker_->Write(data_span, handle, prepare_success, {});
+                        data_file_worker_->WriteSnapshot(data_span, handle, prepare_success, {});
                     }
 
                     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
@@ -1935,6 +1940,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         auto var_file_worker = std::make_unique<VarFileWorker>(read_path, 0);
                         auto var_file_worker_ = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(var_file_worker));
 
+                        // Read variable data file
                         std::shared_ptr<VarBuffer> var_buffer{nullptr};
                         static_cast<FileWorker *>(var_file_worker_)->Read(var_buffer);
 
@@ -1947,7 +1953,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         }
 
                         bool prepare_success{false};
-                        var_file_worker_->Write({var_buffer.get(), 1}, handle, prepare_success, {});
+                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, prepare_success, {});
                     }
                 }
             }
@@ -1964,16 +1970,16 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 PersistResultHandler pm_handler(pm);
                 PersistReadResult result = pm->GetObjCache(file);
 
-                DeferFn defer_fn([&]() {
-                    auto res = pm->PutObjCache(file);
-                    pm_handler.HandleWriteResult(res);
-                });
-
                 const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
                 if (!obj_addr.Valid()) {
                     LOG_INFO(fmt::format("Failed to find object for local path {}", file));
                     return Status::OK();
                 }
+
+                DeferFn defer_fn([&]() {
+                    auto res = pm->PutObjCache(file);
+                    pm_handler.HandleWriteResult(res);
+                });
 
                 std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
@@ -1986,12 +1992,14 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
                 if (!read_open_status.ok()) {
-                    UnrecoverableError(read_open_status.message());
+                    LOG_INFO(fmt::format("Open {} failed: {}", read_path, read_open_status.message()));
+                    return Status::OK();
                 }
 
                 auto seek_status = read_handle->Seek(obj_addr.part_offset_);
                 if (!seek_status.ok()) {
-                    UnrecoverableError(seek_status.message());
+                    LOG_INFO(fmt::format("Seek {} failed: {}", read_path, read_open_status.message()));
+                    return Status::OK();
                 }
 
                 auto file_size = obj_addr.part_size_;
@@ -2000,12 +2008,14 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!write_open_status.ok()) {
-                    UnrecoverableError(write_open_status.message());
+                    LOG_INFO(fmt::format("Open {} failed: {}", write_path, write_open_status.message()));
+                    return Status::OK();
                 }
 
                 Status write_status = write_handle->Append(buffer.get(), file_size);
                 if (!write_status.ok()) {
-                    UnrecoverableError(write_status.message());
+                    LOG_INFO(fmt::format("Append {} failed: {}", write_path, write_status.message()));
+                    return Status::OK();
                 }
                 write_handle->Sync();
             } else {
@@ -2015,7 +2025,8 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 Status status = VirtualStore::Copy(write_path, read_path);
                 if (!status.ok()) {
-                    UnrecoverableError(status.message());
+                    LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
+                    return Status::OK();
                 }
             }
 
