@@ -249,6 +249,8 @@ Status KVStore::Init(const std::string &db_path) {
 
     txn_options_.set_snapshot = true;
 
+    txn_db_options_.transaction_lock_timeout = 100;
+
     auto *config = InfinityContext::instance().config();
     if (config != nullptr && config->StorageType() == StorageType::kMinio) {
         options_.listeners.emplace_back(std::make_shared<FlushListener>());
