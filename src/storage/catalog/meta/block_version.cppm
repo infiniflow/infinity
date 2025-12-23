@@ -51,6 +51,7 @@ export struct BlockVersion {
     i64 GetRowCount() const;
 
     bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
 
     static void LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 

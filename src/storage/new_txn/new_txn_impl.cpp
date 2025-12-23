@@ -1889,9 +1889,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                     RecoverableError(Status::SyntaxError(message));
                 }
 
-                void *mmap{nullptr};
-                size_t mmap_size{0};
-                block_version->SaveToFile(mmap, mmap_size, write_path, option.checkpoint_ts_, *handle);
+                block_version->SaveToFile(option.checkpoint_ts_, *handle);
                 // close(handle->fd());
             }
 

@@ -176,6 +176,44 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
     return !is_modified;
 }
 
+bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
+    bool is_modified = false;
+    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+
+    BlockOffset capacity = deleted_.size();
+    file_handle.Append(&capacity, sizeof(capacity));
+    TxnTimeStamp dump_ts = 0;
+    u32 deleted_row_count = 0;
+    for (const auto &ts : deleted_) {
+        if (ts <= checkpoint_ts) {
+            ++deleted_row_count;
+            file_handle.Append(&ts, sizeof(ts));
+        } else {
+            is_modified = true;
+            file_handle.Append(&dump_ts, sizeof(dump_ts));
+        }
+    }
+
+    BlockOffset create_size = created_.size();
+    while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
+        --create_size;
+        is_modified = true;
+    }
+
+    file_handle.Append(&create_size, sizeof(create_size));
+    for (size_t j = 0; j < create_size; ++j) {
+        created_[j].SaveToFile(&file_handle);
+    }
+
+    LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
+                          checkpoint_ts,
+                          create_size,
+                          deleted_row_count,
+                          is_modified));
+
+    return !is_modified;
+}
+
 void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     // this will waste a lot of memory....
