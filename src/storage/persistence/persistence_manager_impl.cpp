@@ -307,7 +307,6 @@ PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
     auto status = kv_store_->Get(pm_fp_key, value);
     if (!status.ok()) {
         LOG_WARN(fmt::format("GetObjCache Failed to find object for local path {}: {}", local_path, status.message()));
-        // LOG_TRACE(fmt::format("All key-value pairs in kv_store: \n{}", kv_store_->ToString()));
         return result;
     }
     ObjAddr obj_addr;
