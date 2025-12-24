@@ -49,6 +49,7 @@ bool VersionFileWorker::Write(BlockVersion *&data,
     bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
     cache_manager.Set(*rel_file_path_, data, mmap_size_);
+    cache_manager.UnPin(*rel_file_path_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file

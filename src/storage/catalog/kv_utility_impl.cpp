@@ -177,6 +177,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
         cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
+    // UnPin???
     return row_cnt;
 }
 
