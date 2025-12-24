@@ -4964,8 +4964,8 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
     auto check_data = [&]() {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        TxnTimeStamp commit_ts = txn->CommitTS();
+        auto begin_ts = txn->BeginTS();
+        auto commit_ts = txn->CommitTS();
 
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
@@ -4979,7 +4979,7 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
 
             SegmentMeta segment_meta(segment_id, *table_meta);
 
-            std::vector<BlockID> *block_ids_ptr = nullptr;
+            std::vector<BlockID> *block_ids_ptr{};
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, std::vector<BlockID>({0, 1}));
@@ -5025,7 +5025,7 @@ TEST_P(TestTxnDelete, test_delete_and_append) {
         }
     };
 
-    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    auto default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
     //    t1      delete      commit (success)

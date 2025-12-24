@@ -5,7 +5,7 @@
 The Python scripts in the current directory provides the examples of the infinity SDK API. Before running these scripts, please ensure that the correct version of infinity SDK is installed. If you are using the server version of Infinity, you can use the following command to install it
 
 ```shell
-pip install infinity-sdk==0.6.12
+pip install infinity-sdk==0.6.13
 ```
 
 To use Infinity locally as a Python module, install the Infinity Embedded SDK:
