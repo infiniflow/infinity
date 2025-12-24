@@ -27,7 +27,7 @@ class ConnectionPool(object):
         for i in range(max_size):
             self._create_conn()
 
-    def _del__(self):
+    def __del__(self):
         self.destroy()
 
     def _create_conn(self):
