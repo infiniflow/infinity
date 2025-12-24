@@ -121,6 +121,7 @@ class TestAlter:
             res = table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
             assert res.error_code == ErrorCode.OK
 
+
             res = table_obj.drop_columns(["c2"])
             assert res.error_code == ErrorCode.OK
 
