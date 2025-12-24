@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+
 export module infinity_core:fileworker_manager;
 
 import :bmp_index_file_worker;
@@ -88,8 +92,19 @@ private:
                 payloads_.erase(std::next(iter.base(), -1));
                 path_data_map_.erase(path);
                 data_path_map_.erase(data);
+
+                if constexpr (std::same_as<DataT, HnswHandlerPtr>) {
+                    // munmap(mmap_, mmap_size_);
+                    // mmap_ = nullptr;
+                    auto mem_usage = data->MemUsage();
+                    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+                    if (memindex_tracer != nullptr) {
+                        memindex_tracer->DecreaseMemUsed(mem_usage);
+                    }
+                }
                 delete data;
                 // ClearData();
+
                 if (IsAccomodatable(request_space)) {
                     return;
                 }
