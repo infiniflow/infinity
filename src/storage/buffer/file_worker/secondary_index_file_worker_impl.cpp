@@ -42,6 +42,7 @@ bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<HighCardinalityTag> 
                                      std::unique_ptr<LocalFileHandle> &file_handle,
                                      bool &prepare_success,
                                      const FileWorkerSaveCtx &ctx) {
+    std::unique_lock l(mutex_);
     auto index = data;
     index->SaveIndexInner(*file_handle);
     prepare_success = true;
@@ -55,6 +56,7 @@ bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<LowCardinalityTag> *
                                      std::unique_ptr<LocalFileHandle> &file_handle,
                                      bool &prepare_success,
                                      const FileWorkerSaveCtx &ctx) {
+    std::unique_lock l(mutex_);
     auto index = data;
     index->SaveIndexInner(*file_handle);
     prepare_success = true;
@@ -67,6 +69,7 @@ bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<LowCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
+    std::unique_lock l(mutex_);
     auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
     // data = std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(index);
     data = index;
@@ -80,6 +83,7 @@ void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<LowCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
+    std::unique_lock l(mutex_);
     auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
     data = index;
     if (!file_handle) {

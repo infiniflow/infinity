@@ -88,7 +88,7 @@ public:
     virtual ~FileWorker() = default;
 
     bool Write(auto data, const FileWorkerSaveCtx &ctx = {}) {
-        boost::unique_lock l(boost_rw_mutex_);
+        // boost::unique_lock l(boost_rw_mutex_);
 
         [[maybe_unused]] auto tmp = GetFilePathTemp();
         auto [file_handle, status] = VirtualStore::Open(GetFilePathTemp(), FileAccessMode::kReadWrite);
@@ -105,110 +105,110 @@ public:
     }
 
     void Read(auto &data) {
-        boost::upgrade_lock l(boost_rw_mutex_);
-        if (mmap_) {
-            size_t file_size = 0;
+        // boost::upgrade_lock l(boost_rw_mutex_);
+        // if (mmap_) {
+        //     size_t file_size = 0;
+        //
+        //     auto temp_path = GetFilePathTemp();
+        //     auto data_path = GetFilePath();
+        //     std::string file_path;
+        //     if (VirtualStore::Exists(temp_path)) { // branchless
+        //         file_path = temp_path;
+        //         auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+        //         if (!status.ok()) {
+        //             std::unique_ptr<LocalFileHandle> file_handle;
+        //             Read(data, file_handle, file_size);
+        //             // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+        //             return;
+        //         }
+        //         file_size = file_handle->FileSize();
+        //         Read(data, file_handle, file_size);
+        //         close(file_handle->fd());
+        //     } else if (persistence_manager_) {
+        //         file_path = data_path;
+        //         auto result = persistence_manager_->GetObjCache(file_path);
+        //         obj_addr_ = result.obj_addr_;
+        //         auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
+        //         auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
+        //         if (!status.ok()) {
+        //             std::unique_ptr<LocalFileHandle> file_handle;
+        //             Read(data, file_handle, file_size);
+        //             // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+        //             return;
+        //         }
+        //         file_handle->Seek(obj_addr_.part_offset_);
+        //         file_size = obj_addr_.part_size_;
+        //         Read(data, file_handle, file_size);
+        //         close(file_handle->fd());
+        //     } else if (VirtualStore::Exists(data_path, true)) {
+        //         file_path = data_path;
+        //         auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+        //         if (!status.ok()) {
+        //             std::unique_ptr<LocalFileHandle> file_handle;
+        //             Read(data, file_handle, file_size);
+        //             // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+        //             return;
+        //         }
+        //         file_size = file_handle->FileSize();
+        //         Read(data, file_handle, file_size);
+        //         close(file_handle->fd());
+        //     } else {
+        //         std::unique_ptr<LocalFileHandle> file_handle;
+        //         Read(data, file_handle, file_size);
+        //     }
+        // } else {
+        // boost::upgrade_to_unique_lock ll(l);
+        size_t file_size = 0;
 
-            auto temp_path = GetFilePathTemp();
-            auto data_path = GetFilePath();
-            std::string file_path;
-            if (VirtualStore::Exists(temp_path)) { // branchless
-                file_path = temp_path;
-                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_size = file_handle->FileSize();
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else if (persistence_manager_) {
-                file_path = data_path;
-                auto result = persistence_manager_->GetObjCache(file_path);
-                obj_addr_ = result.obj_addr_;
-                auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
-                auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_handle->Seek(obj_addr_.part_offset_);
-                file_size = obj_addr_.part_size_;
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else if (VirtualStore::Exists(data_path, true)) {
-                file_path = data_path;
-                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_size = file_handle->FileSize();
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else {
+        auto temp_path = GetFilePathTemp();
+        auto data_path = GetFilePath();
+        std::string file_path;
+        if (VirtualStore::Exists(temp_path)) { // branchless
+            file_path = temp_path;
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+            if (!status.ok()) {
                 std::unique_ptr<LocalFileHandle> file_handle;
                 Read(data, file_handle, file_size);
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                return;
             }
+            file_size = file_handle->FileSize();
+            Read(data, file_handle, file_size);
+            close(file_handle->fd());
+        } else if (persistence_manager_) {
+            file_path = data_path;
+            auto result = persistence_manager_->GetObjCache(file_path);
+            obj_addr_ = result.obj_addr_;
+            auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
+            auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
+            if (!status.ok()) {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                Read(data, file_handle, file_size);
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                return;
+            }
+            file_handle->Seek(obj_addr_.part_offset_);
+            file_size = obj_addr_.part_size_;
+            Read(data, file_handle, file_size);
+            close(file_handle->fd());
+        } else if (VirtualStore::Exists(data_path, true)) {
+            file_path = data_path;
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+            if (!status.ok()) {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                Read(data, file_handle, file_size);
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                return;
+            }
+            file_size = file_handle->FileSize();
+            Read(data, file_handle, file_size);
+            close(file_handle->fd());
         } else {
-            boost::upgrade_to_unique_lock ll(l);
-            size_t file_size = 0;
-
-            auto temp_path = GetFilePathTemp();
-            auto data_path = GetFilePath();
-            std::string file_path;
-            if (VirtualStore::Exists(temp_path)) { // branchless
-                file_path = temp_path;
-                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_size = file_handle->FileSize();
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else if (persistence_manager_) {
-                file_path = data_path;
-                auto result = persistence_manager_->GetObjCache(file_path);
-                obj_addr_ = result.obj_addr_;
-                auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
-                auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_handle->Seek(obj_addr_.part_offset_);
-                file_size = obj_addr_.part_size_;
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else if (VirtualStore::Exists(data_path, true)) {
-                file_path = data_path;
-                auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_size = file_handle->FileSize();
-                Read(data, file_handle, file_size);
-                close(file_handle->fd());
-            } else {
-                std::unique_ptr<LocalFileHandle> file_handle;
-                Read(data, file_handle, file_size);
-            }
+            std::unique_ptr<LocalFileHandle> file_handle;
+            Read(data, file_handle, file_size);
         }
     }
+    // }
 
     // void PickForCleanup();
 
@@ -288,12 +288,15 @@ protected:
     virtual void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
-    mutable boost::shared_mutex boost_rw_mutex_;
+    // mutable boost::shared_mutex boost_rw_mutex_;
+    mutable std::mutex mutex_;
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
     FileWorkerManager *file_worker_manager_{};
     ObjAddr obj_addr_;
     void *mmap_{};
+    // std::atomic_uintptr_t mmap_;
     size_t mmap_size_{};
+    // std::atomic_size_t mmap_size_;
 };
 } // namespace infinity

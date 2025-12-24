@@ -44,6 +44,7 @@ bool VersionFileWorker::Write(BlockVersion *&data,
                               std::unique_ptr<LocalFileHandle> &file_handle,
                               bool &prepare_success,
                               const FileWorkerSaveCtx &base_ctx) {
+    std::unique_lock l(mutex_);
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
     bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
@@ -69,6 +70,7 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
         auto fd = file_handle->fd();
+        std::unique_lock l(mutex_);
         mmap_size_ = file_handle->FileSize();
         if (!mmap_) {
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);

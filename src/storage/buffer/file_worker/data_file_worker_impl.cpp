@@ -50,7 +50,8 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     // - footer: checksum
 
     // auto old_mmap_size = mmap_size_;
-    // buffer_size_ += data.size()
+    // buffer_size_ += data.size();
+    std::unique_lock l(mutex_);
     mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     if (mmap_size_ == 0) {
         prepare_success = true;
@@ -93,6 +94,7 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
+    std::unique_lock l(mutex_);
     data = std::make_shared<char[]>(buffer_size_);
     if (!file_handle) {
         return;
