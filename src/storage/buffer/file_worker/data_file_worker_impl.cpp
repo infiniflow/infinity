@@ -62,32 +62,36 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
     if (mmap_ == nullptr) {
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
+        size_t offset{};
+
+        u64 magic_number = 0x00dd3344;
+        std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
+        offset += sizeof(u64);
+
+        std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
+        offset += sizeof(buffer_size_);
+
+        data_size_ = data.size();
+        // data_size = 99 * 16;
+        std::memcpy((char *)mmap_ + offset, data.data(), data_size_); // data size in span
+        offset += data_size_;
+
+        size_t unused_size = buffer_size_ - data_size_;
+        if (unused_size > 0) {
+            // std::string str(unused_size, '\0');
+            // std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
+            offset += unused_size;
+        }
+
+        u64 checksum{};
+        std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
+        offset += sizeof(u64);
+    } else {
+        size_t offset = sizeof(u64) + sizeof(buffer_size_) + data_size_;
+        size_t append_data_size = data.size() - data_size_;
+        std::memcpy((char *)mmap_ + offset, data.data() + data_size_, append_data_size); // data size in span
+        data_size_ += append_data_size;
     }
-    size_t offset{};
-
-    u64 magic_number = 0x00dd3344;
-    std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
-    offset += sizeof(u64);
-
-    std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
-    offset += sizeof(buffer_size_);
-
-    size_t data_size = data.size();
-    // data_size = 99 * 16;
-    std::memcpy((char *)mmap_ + offset, data.data(), data_size); // data size in span
-    offset += data_size;
-
-    size_t unused_size = buffer_size_ - data_size;
-    if (unused_size > 0) {
-        // std::string str(unused_size, '\0');
-        // std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
-        offset += unused_size;
-    }
-
-    u64 checksum{};
-    std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
-    offset += sizeof(u64);
-
     prepare_success = true; // Not run defer_fn
     return true;
 }
