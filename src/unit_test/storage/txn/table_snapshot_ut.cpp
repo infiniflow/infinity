@@ -601,7 +601,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
 TEST_P(TableSnapshotTest, test_create_snapshot_insert_data) {
     using namespace infinity;
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
+    [[maybe_unused]] auto file_worker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     {
         std::string restore_sql = "restore table snapshot tb1_snapshot";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();

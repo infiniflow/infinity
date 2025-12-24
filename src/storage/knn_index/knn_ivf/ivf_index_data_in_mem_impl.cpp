@@ -233,7 +233,7 @@ public:
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         index_file_worker_ = std::move(index_file_worker);
-        index_file_worker_->Write(std::span{data_ptr, 1});
+        index_file_worker_->Write(data_ptr);
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,

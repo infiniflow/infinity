@@ -915,8 +915,6 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         // auto *block_version = std::make_unique<BlockVersion>(block_meta.block_capacity()).release();
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, version_file_worker_save_ctx);
     }
@@ -998,8 +996,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             undo_block_offsets.push_back(block_offset);
         }
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
         version_file_worker->Write(block_version, version_file_worker_save_ctx);
     }
@@ -1789,8 +1785,6 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(save_ts, block_info.row_count_);
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
 
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
@@ -1813,8 +1807,6 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->CommitAppend(save_ts, commit_ts);
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
 
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
 

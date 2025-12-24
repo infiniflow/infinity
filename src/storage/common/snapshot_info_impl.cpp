@@ -161,8 +161,8 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
     json_res["segment_dir"] = segment_dir_;
     json_res["first_delete_ts"] = first_delete_ts_;
     json_res["deprecate_ts"] = deprecate_ts_;
-    json_res["row_count"] = row_count_;
-    json_res["actual_row_count"] = actual_row_count_;
+    // json_res["row_count"] = row_count_;
+    // json_res["actual_row_count"] = actual_row_count_;
     json_res["segment_status"] = status_;
 
     for (const auto &block_snapshot : block_snapshots_) {
@@ -178,8 +178,8 @@ std::shared_ptr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nloh
 
     segment_snapshot->first_delete_ts_ = segment_json["first_delete_ts"];
     segment_snapshot->deprecate_ts_ = segment_json["deprecate_ts"];
-    segment_snapshot->row_count_ = segment_json["row_count"];
-    segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
+    // segment_snapshot->row_count_ = segment_json["row_count"];
+    // segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
     segment_snapshot->status_ = static_cast<SegmentStatus>(segment_json["segment_status"]);
 
     for (const auto &block_json : segment_json["blocks"]) {
@@ -557,9 +557,11 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
             continue;
         }
 
-        FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-        auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
-        [[maybe_unused]] auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+        if (size_t pos = modified_file.find("version"); pos != std::string::npos) {
+            FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
+            fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+        }
 
         if (persistence_manager != nullptr) {
             // Use persistence manager to restore files

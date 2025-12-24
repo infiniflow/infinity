@@ -449,10 +449,11 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             IVFIndexInChunk *data_ptr{};
             index_file_worker->Read(data_ptr);
             data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
-            index_file_worker->Write(std::span{data_ptr, 1});
+            index_file_worker->Write(data_ptr);
             break;
         }
         case IndexType::kHnsw:
+            [[fallthrough]];
         case IndexType::kBMP: {
             SegmentMeta segment_meta(segment_id, table_meta);
             std::shared_ptr<ColumnDef> column_def;
@@ -1274,7 +1275,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
         IVFIndexInChunk *data_ptr{};
         index_file_worker->Read(data_ptr);
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
-        index_file_worker->Write(std::span{data_ptr, 1});
+        index_file_worker->Write(data_ptr);
     }
     return Status::OK();
 }
@@ -2063,6 +2064,10 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
             BlockID block_id = block_ids[i];
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;
+            status = block_meta.RestoreSetFromSnapshot();
+            if (!status.ok()) {
+                return status;
+            }
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok() || block_row_cnt == block_offset) {
                 return status;

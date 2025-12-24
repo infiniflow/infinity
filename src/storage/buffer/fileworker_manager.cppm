@@ -41,10 +41,12 @@ public:
     void UnPin(std::string path) {
         // std::lock_guard l(ref_cnt_mutex_);
         std::unique_lock l(rw_mutex_);
-        auto &cnt = ref_cnt_map_[path];
-        --cnt;
-        if (!cnt) {
-            ref_cnt_map_.erase(path);
+        if (auto ref_cnt_iter = ref_cnt_map_.find(path); ref_cnt_iter != ref_cnt_map_.end()) {
+            auto &cnt = ref_cnt_iter->second;
+            --cnt;
+            if (!cnt) {
+                ref_cnt_map_.erase(path);
+            }
         }
     }
 
@@ -64,6 +66,7 @@ public:
         std::unique_lock l(rw_mutex_);
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
+            *payloads_.begin() = data;
         } else {
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
@@ -159,7 +162,7 @@ struct FileWorkerMap : FileWorkerMapInjectHelper<FileWorkerT> {
     mutable std::shared_mutex rw_clean_mtx_;
     std::vector<FileWorkerT *> cleans_;
 };
-
+// [[maybe_unused]] auto file_worker_mgr = InfinityContext::instance().storage()->FileWorkerManager();
 export class FileWorkerManager {
 public:
     explicit FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir);
