@@ -2392,7 +2392,7 @@ Status NewTxn::PrepareCommit() {
     // TODO: CreateIndex has populated wal_entry_ via PopulateIndex(). Need to unify the way.
     if (base_txn_store_.get() != nullptr && GetTxnType() != TransactionType::kCreateIndex) {
         wal_entry_ = base_txn_store_->ToWalEntry(CommitTS());
-        LOG_TRACE(fmt::format("ToWalEntry: {}", wal_entry_->ToString()));
+        // LOG_TRACE(fmt::format("ToWalEntry: {}", wal_entry_->ToString()));
     }
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
@@ -3202,7 +3202,9 @@ bool NewTxn::CheckConflictTxnStore(NewTxn *previous_txn, std::string &cause, boo
         case TransactionType::kCleanup: {
             return CheckConflictTxnStore(static_cast<const CleanupTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
         }
-        case TransactionType::kNewCheckpoint:
+        case TransactionType::kNewCheckpoint: {
+            return CheckConflictTxnStore(static_cast<const CheckpointTxnStore &>(*base_txn_store_), previous_txn, cause, retry_query);
+        }
         default: {
             return false;
         }
@@ -4766,6 +4768,22 @@ bool NewTxn::CheckConflictTxnStores(std::shared_ptr<NewTxn> check_txn, std::stri
     bool conflict = this->CheckConflictTxnStore(check_txn.get(), conflict_reason, retry_query);
     if (conflict) {
         // conflicted_txn_ = check_txn;
+        return true;
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictTxnStore(const CheckpointTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
+    bool conflict = false;
+    switch (previous_txn->base_txn_store_->type_) {
+        case TransactionType::kNewCheckpoint: {
+            conflict = true;
+            break;
+        }
+        default: {
+        }
+    }
+    if (conflict) {
         return true;
     }
     return false;
