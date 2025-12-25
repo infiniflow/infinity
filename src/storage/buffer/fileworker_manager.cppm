@@ -49,8 +49,9 @@ public:
             auto &cnt = ref_cnt_iter->second;
             if (cnt <= 1) {
                 ref_cnt_map_.erase(path.data());
+            } else {
+                --cnt;
             }
-            --cnt;
         }
     }
 
