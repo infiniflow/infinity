@@ -760,8 +760,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         }
         case IndexType::kSecondaryFunctional: {
             std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
-            const IndexSecondaryFunctional *functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
-            auto cardinality = functional_index->GetSecondaryIndexCardinality();
+            const IndexSecondaryFunctional *secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+            auto cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
             std::tie(memory_secondary_index, status) = GetSecondaryIndexInMem(segment_index_meta, base_row_id, mem_index, cardinality);
             if (!status.ok()) {
                 return status;
@@ -772,9 +772,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 return status;
             }
 
-            auto output_column = ExecuteFunctionExpression(functional_index, col, column_def->id());
+            auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_def->id());
             if (output_column == nullptr) {
-                return Status::InvalidExpression(*functional_index->function_expression_str_);
+                return Status::InvalidExpression(*secondary_functional_index->function_expression_json_str_);
             }
             memory_secondary_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
             break;
@@ -1573,6 +1573,9 @@ Status NewTxn::PopulateFunctionalIndexInner(std::shared_ptr<IndexBase> index_bas
         }
 
         auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_id);
+        if (output_column == nullptr) {
+            return Status::InvalidExpression(*secondary_functional_index->function_expression_json_str_);
+        }
 
         memory_functional_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
         if (!status.ok()) {
@@ -1620,23 +1623,24 @@ Status NewTxn::PopulateFunctionalIndexInner(std::shared_ptr<IndexBase> index_bas
 }
 
 std::shared_ptr<ColumnVector>
-NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *functional_index, const ColumnVector &col, const ColumnID column_id) {
-    if (functional_index->function_expression_str_->empty()) {
-        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Function expression is empty: {}", *functional_index->function_expression_str_));
+NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *secondary_functional_index, const ColumnVector &col, const ColumnID column_id) {
+    if (secondary_functional_index->function_expression_json_str_->empty()) {
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Function expression is empty: {}",
+                              *secondary_functional_index->function_expression_json_str_));
         return nullptr;
     }
 
-    std::shared_ptr<BaseExpression> base_expr = BaseExpression::Deserialize(*functional_index->function_expression_str_);
+    std::shared_ptr<BaseExpression> base_expr = BaseExpression::Deserialize(*secondary_functional_index->function_expression_json_str_);
     if (base_expr == nullptr) {
         LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to deserialize function expression: {}",
-                              *functional_index->function_expression_str_));
+                              *secondary_functional_index->function_expression_json_str_));
         return nullptr;
     }
 
     std::shared_ptr<FunctionExpression> function_expression = std::dynamic_pointer_cast<FunctionExpression>(base_expr);
     if (function_expression == nullptr) {
-        LOG_ERROR(
-            fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}", *functional_index->function_expression_str_));
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}",
+                              *secondary_functional_index->function_expression_json_str_));
         return nullptr;
     }
 

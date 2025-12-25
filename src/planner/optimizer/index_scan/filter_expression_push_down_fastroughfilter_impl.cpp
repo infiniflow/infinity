@@ -230,7 +230,7 @@ class FastRoughFilterExpressionPushDownMethod {
                     auto SolveForExpr1 = [](std::shared_ptr<BaseExpression> &col_expr,
                                             std::shared_ptr<BaseExpression> &val_expr) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
-                        auto [column_id, value, compare_type] =
+                        auto [column_id, value, _, compare_type] =
                             FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), FilterCompareType::kEqual);
                         switch (compare_type) {
                             case FilterCompareType::kEqual: {
@@ -308,7 +308,7 @@ class FastRoughFilterExpressionPushDownMethod {
                                             std::shared_ptr<BaseExpression> &val_expr,
                                             FilterCompareType initial_compare_type) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
-                        auto [column_id, value, compare_type] =
+                        auto [column_id, value, _, compare_type] =
                             FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
                         switch (compare_type) {
                             case FilterCompareType::kLessEqual:

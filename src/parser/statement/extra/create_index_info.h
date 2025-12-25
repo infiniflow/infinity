@@ -45,6 +45,7 @@ struct IndexInfo {
     std::string column_name_{};
     std::vector<InitParameter *> *index_param_list_{nullptr};
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
+    std::string func_col_params_str_{};
     ParsedExpr *function_expr_{nullptr};
 
     static std::string IndexTypeToString(IndexType index_type);

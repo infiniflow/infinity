@@ -26,10 +26,10 @@ import serialize;
 
 namespace infinity {
 
-void IndexSecondaryFunctional::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
-                                                      const std::string &column_name,
-                                                      DataType &return_type,
-                                                      SecondaryIndexCardinality secondary_index_cardinality) {
+void IndexSecondaryFunctional::ValidateColumnAndReturnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                                               const std::string &column_name,
+                                                               DataType &return_type,
+                                                               SecondaryIndexCardinality secondary_index_cardinality) {
     auto &column_names_vector = *(base_table_ref->column_names_);
     size_t column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
@@ -48,7 +48,9 @@ void IndexSecondaryFunctional::ValidateColumnDataType(const std::shared_ptr<Base
 i32 IndexSecondaryFunctional::GetSizeInBytes() const {
     i32 size = IndexBase::GetSizeInBytes();
 
-    size_t function_expression_str_size = function_expression_str_->length();
+    size_t func_col_params_size = func_col_params_->length();
+    size += sizeof(int32_t) + func_col_params_size;
+    size_t function_expression_str_size = function_expression_json_str_->length();
     size += sizeof(int32_t) + function_expression_str_size;
     size += sizeof(SecondaryIndexCardinality);
     return size;
@@ -57,22 +59,25 @@ i32 IndexSecondaryFunctional::GetSizeInBytes() const {
 void IndexSecondaryFunctional::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
 
-    WriteBufAdv(ptr, *function_expression_str_);
+    WriteBufAdv(ptr, *func_col_params_);
+    WriteBufAdv(ptr, *function_expression_json_str_);
     WriteBufAdv(ptr, u8(secondary_index_cardinality_));
 }
 
 nlohmann::json IndexSecondaryFunctional::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
 
-    res["function_expression"] = nlohmann::json::parse(*function_expression_str_);
+    res["func_col_params"] = *func_col_params_;
+    res["function_expression"] = nlohmann::json::parse(*function_expression_json_str_);
     res["cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
 
     return res;
 }
 std::string IndexSecondaryFunctional::ToString() const {
     std::stringstream ss;
-    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", name: " << *index_name_
-       << ", function_expression: " << *function_expression_str_;
+    ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", name: " << *index_name_ << ", func_col_params: " << *func_col_params_
+       << ", function_expression: " << *function_expression_json_str_
+       << ", cardinality: " << (secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high");
     return ss.str();
 }
 

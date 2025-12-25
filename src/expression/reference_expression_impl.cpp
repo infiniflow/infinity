@@ -55,7 +55,7 @@ nlohmann::json ReferenceExpression::Serialize() const {
         j["alias"] = alias_;
     }
 
-    j["data_type"] = data_type_.Serialize().dump();
+    j["data_type"] = data_type_.Serialize();
     j["table_name"] = table_name_;
     j["column_name"] = column_name_;
     j["column_index"] = column_index_;

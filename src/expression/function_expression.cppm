@@ -40,6 +40,8 @@ public:
 
     bool Eq(const BaseExpression &other) const override;
 
+    std::string ExtractFunctionInfo();
+
 public:
     ScalarFunction func_;
     bool nullary_{false};

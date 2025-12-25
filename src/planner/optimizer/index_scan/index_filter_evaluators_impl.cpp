@@ -37,6 +37,7 @@ import :mem_index;
 import :file_worker;
 import :index_file_worker;
 import :index_secondary;
+import :index_secondary_functional;
 
 import std;
 import third_party;
@@ -914,12 +915,19 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
     std::optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
     auto [index_base, index_status] = new_secondary_index_->GetIndexBase();
-    if (!index_status.ok() || index_base->index_type_ != IndexType::kSecondary) {
+    if (!index_status.ok() || (index_base->index_type_ != IndexType::kSecondary && index_base->index_type_ != IndexType::kSecondaryFunctional)) {
         UnrecoverableError("Fail to get index definition");
     }
-    const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+
     // Check cardinality to determine which execution path to use
-    auto cardinality = secondary_index->GetSecondaryIndexCardinality();
+    SecondaryIndexCardinality cardinality;
+    if (index_base->index_type_ == IndexType::kSecondary) {
+        const auto secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+        cardinality = secondary_index->GetSecondaryIndexCardinality();
+    } else {
+        const auto secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+        cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+    }
 
     Bitmask result(segment_row_count);
     result.SetAllFalse();

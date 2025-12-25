@@ -63,7 +63,7 @@ std::shared_ptr<BaseExpression> BaseExpression::Deserialize(std::string_view exp
         }
         case ExpressionType::kReference: {
             std::string alias = j.contains("alias") ? j["alias"].get<std::string>() : "";
-            auto data_type = DataType::Deserialize(j["data_type"].get<std::string>());
+            auto data_type = DataType::Deserialize(j["data_type"].get<nlohmann::json>().dump());
             std::string table_name = j["table_name"].get<std::string>();
             std::string column_name = j["column_name"].get<std::string>();
             i64 column_index = j["column_index"].get<i64>();

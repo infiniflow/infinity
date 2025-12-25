@@ -167,10 +167,16 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             break;
         }
         case IndexType::kSecondaryFunctional: {
+            std::shared_ptr<std::string> func_col_params = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
             std::shared_ptr<std::string> function_expression_str = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
             SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
-            res =
-                std::make_shared<IndexSecondaryFunctional>(index_name, index_comment, file_name, column_names, function_expression_str, cardinality);
+            res = std::make_shared<IndexSecondaryFunctional>(index_name,
+                                                             index_comment,
+                                                             file_name,
+                                                             column_names,
+                                                             func_col_params,
+                                                             function_expression_str,
+                                                             cardinality);
             break;
         }
         case IndexType::kEMVB: {
@@ -321,11 +327,13 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
                 }
             }
 
+            std::string func_col_params_str = doc["func_col_params"].get<std::string>();
             std::string function_expression_str = doc["function_expression"].get<nlohmann::json>().dump();
             res = std::make_shared<IndexSecondaryFunctional>(index_name,
                                                              index_comment,
                                                              file_name,
                                                              std::move(column_names),
+                                                             std::make_shared<std::string>(func_col_params_str),
                                                              std::make_shared<std::string>(function_expression_str),
                                                              secondary_index_cardinality);
             break;

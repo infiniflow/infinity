@@ -188,10 +188,10 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kCreateIndex: {
             auto &node = (LogicalCreateIndex &)op;
-            std::shared_ptr<BaseExpression> func_expr = node.function_expression_;
-
-            VisitExpression(func_expr);
-
+            if (node.function_expression_) {
+                std::shared_ptr<BaseExpression> func_expr = node.function_expression_;
+                VisitExpression(func_expr);
+            }
             break;
         }
         default: {

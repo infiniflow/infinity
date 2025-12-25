@@ -29,12 +29,14 @@ public:
                                            std::shared_ptr<std::string> index_comment,
                                            const std::string &file_name,
                                            std::vector<std::string> column_names,
+                                           std::shared_ptr<std::string> func_col_params,
                                            std::shared_ptr<std::string> function_expression_str,
                                            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality) {
         return std::make_shared<IndexSecondaryFunctional>(index_name,
                                                           index_comment,
                                                           file_name,
                                                           std::move(column_names),
+                                                          func_col_params,
                                                           function_expression_str,
                                                           secondary_index_cardinality);
     }
@@ -43,11 +45,13 @@ public:
                                            std::shared_ptr<std::string> index_comment,
                                            const std::string &file_name,
                                            std::vector<std::string> column_names,
+                                           std::shared_ptr<std::string> func_col_params,
                                            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality) {
         return std::make_shared<IndexSecondaryFunctional>(index_name,
                                                           index_comment,
                                                           file_name,
                                                           std::move(column_names),
+                                                          func_col_params,
                                                           nullptr,
                                                           secondary_index_cardinality);
     }
@@ -56,10 +60,12 @@ public:
                              std::shared_ptr<std::string> index_comment,
                              const std::string &file_name,
                              std::vector<std::string> column_names,
+                             std::shared_ptr<std::string> func_col_params,
                              std::shared_ptr<std::string> function_expression_str,
                              SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality)
         : IndexBase(IndexType::kSecondaryFunctional, index_name, index_comment, file_name, std::move(column_names)),
-          secondary_index_cardinality_(secondary_index_cardinality), function_expression_str_(function_expression_str) {}
+          secondary_index_cardinality_(secondary_index_cardinality), func_col_params_(func_col_params),
+          function_expression_json_str_(function_expression_str) {}
 
     ~IndexSecondaryFunctional() final = default;
 
@@ -75,14 +81,15 @@ public:
 
     inline SecondaryIndexCardinality GetSecondaryIndexCardinality() const { return secondary_index_cardinality_; }
 
-    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
-                                       const std::string &column_name,
-                                       DataType &data_type,
-                                       SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
+    static void ValidateColumnAndReturnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                                const std::string &column_name,
+                                                DataType &data_type,
+                                                SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
 
 public:
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
-    std::shared_ptr<std::string> function_expression_str_{};
+    std::shared_ptr<std::string> func_col_params_{};
+    std::shared_ptr<std::string> function_expression_json_str_{};
 };
 
 } // namespace infinity

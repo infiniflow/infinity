@@ -17,6 +17,9 @@ module;
 module infinity_core:function_expression.impl;
 
 import :function_expression;
+import :column_expression;
+import :value_expression;
+import :cast_expression;
 
 import :expression_type;
 import :scalar_function;
@@ -117,6 +120,54 @@ bool FunctionExpression::Eq(const BaseExpression &other_base) const {
         }
     }
     return true;
+}
+
+// e.g. substring(c1,1,2) -> "substring_COL0_1_2"
+std::string FunctionExpression::ExtractFunctionInfo() {
+    auto extract_expr_info = [&](const std::shared_ptr<BaseExpression> &expr, std::string &param_str, auto &&self) -> void {
+        if (!expr) {
+            return;
+        }
+
+        switch (expr->type()) {
+            case ExpressionType::kColumn: {
+                auto col_expr = std::static_pointer_cast<ColumnExpression>(expr);
+                ColumnID col_idx = col_expr->binding().column_idx;
+                param_str += "COL" + std::to_string(col_idx);
+                break;
+            }
+            case ExpressionType::kValue: {
+                auto val_expr = std::static_pointer_cast<ValueExpression>(expr);
+                const auto &val = val_expr->GetValue();
+                param_str += val.ToString();
+                break;
+            }
+            case ExpressionType::kCast: {
+                auto cast_expr = std::static_pointer_cast<CastExpression>(expr);
+                self(cast_expr->arguments()[0], param_str, self);
+                break;
+            }
+            default: {
+                RecoverableError(
+                    Status::NotSupport(fmt::format("Not implemented ExtractFunctionInfo for expression type: {}", ExpressionType2Str(expr->type()))));
+                break;
+            }
+        }
+    };
+
+    std::string func_name = ScalarFunctionName();
+    std::string col_params_str;
+    const auto &func_args = arguments();
+
+    for (size_t i = 0; i < func_args.size(); ++i) {
+        if (i > 0)
+            col_params_str += "_";
+        extract_expr_info(func_args[i], col_params_str, extract_expr_info);
+    }
+
+    std::ostringstream oss;
+    oss << func_name << "_" << col_params_str;
+    return oss.str();
 }
 
 } // namespace infinity
