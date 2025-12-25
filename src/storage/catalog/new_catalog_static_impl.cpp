@@ -64,13 +64,6 @@ namespace infinity {
 
 // } // namespace
 
-NewTxnGetVisibleRangeState::~NewTxnGetVisibleRangeState() {
-    if (version_file_worker_) {
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker_->rel_file_path_);
-    }
-}
-
 void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
                                       VersionFileWorker *version_file_worker,
                                       TxnTimeStamp begin_ts,
@@ -85,8 +78,8 @@ void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
         BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker_->rel_file_path_);
+        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+        cache_manager.UnPin(*version_file_worker_->rel_file_path_);
     }
 }
 
@@ -117,8 +110,8 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         }
     }
     visible_range = {block_offset_begin, row_idx};
-    // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    // cache_manager.UnPin(*version_file_worker_->rel_file_path_);
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_file_worker_->rel_file_path_);
     return block_offset_begin < row_idx;
 }
 

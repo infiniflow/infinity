@@ -45,10 +45,12 @@ public:
     void UnPin(std::string_view path) {
         // std::lock_guard l(ref_cnt_mutex_);
         std::lock_guard l(mutex_);
-        auto &cnt = ref_cnt_map_[path.data()];
-        --cnt;
-        if (!cnt) {
-            ref_cnt_map_.erase(path.data());
+        if (auto ref_cnt_iter = ref_cnt_map_.find(path.data()); ref_cnt_iter != ref_cnt_map_.end()) {
+            auto &cnt = ref_cnt_iter->second;
+            if (cnt <= 1) {
+                ref_cnt_map_.erase(path.data());
+            }
+            --cnt;
         }
     }
 

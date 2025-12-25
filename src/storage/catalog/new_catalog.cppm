@@ -98,8 +98,6 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    ~NewTxnGetVisibleRangeState();
-
     void Init(std::shared_ptr<BlockLock> block_lock, VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range);

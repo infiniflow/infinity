@@ -64,32 +64,39 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
         size_t offset{};
 
+        l.unlock();
         u64 magic_number = 0x00dd3344;
         std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
         offset += sizeof(u64);
 
+        l.lock();
         std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
+        l.unlock();
         offset += sizeof(buffer_size_);
 
-        data_size_ = data.size();
-        // data_size = 99 * 16;
-        std::memcpy((char *)mmap_ + offset, data.data(), data_size_); // data size in span
-        offset += data_size_;
+        auto data_size = data.size();
+        std::memcpy((char *)mmap_ + offset, data.data(), data_size); // data size in span
+        offset += data_size;
 
-        size_t unused_size = buffer_size_ - data_size_;
-        if (unused_size > 0) {
-            // std::string str(unused_size, '\0');
-            // std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
-            offset += unused_size;
-        }
+        size_t unused_size = buffer_size_ - data_size;
+        offset += unused_size;
 
         u64 checksum{};
         std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
         offset += sizeof(u64);
+
+        l.lock();
+        data_size_ = data_size;
     } else {
-        size_t offset = sizeof(u64) + sizeof(buffer_size_) + data_size_;
-        size_t append_data_size = data.size() - data_size_;
-        std::memcpy((char *)mmap_ + offset, data.data() + data_size_, append_data_size); // data size in span
+        auto data_size = data_size_;
+        // l.unlock();
+        if (data_size == data.size()) {
+            data_size -= 8;
+        }
+        size_t offset = sizeof(u64) + sizeof(buffer_size_) + data_size;
+        size_t append_data_size = data.size() - data_size;
+        std::memcpy((char *)mmap_ + offset, data.data() + data_size, append_data_size); // data size in span
+        // l.lock();
         data_size_ += append_data_size;
     }
     prepare_success = true; // Not run defer_fn

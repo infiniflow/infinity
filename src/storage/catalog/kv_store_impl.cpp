@@ -199,7 +199,7 @@ public:
         // sst
         const auto &output_files = info.output_files;
         const auto &input_files = info.input_files;
-        auto *config = infinity::InfinityContext::instance().config();
+        auto *config = InfinityContext::instance().config();
         const auto &catalog_path = config->CatalogDir();
 
         for (const auto &absolute_file_path : output_files) {
