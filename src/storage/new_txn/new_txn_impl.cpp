@@ -2391,7 +2391,8 @@ Status NewTxn::PrepareCommit() {
     // TODO: for replayed transaction, meta data need to check if there is duplicated operation.
     // TODO: CreateIndex has populated wal_entry_ via PopulateIndex(). Need to unify the way.
     if (base_txn_store_.get() != nullptr && GetTxnType() != TransactionType::kCreateIndex) {
-        wal_entry_ = base_txn_store_->ToWalEntry(this->CommitTS());
+        wal_entry_ = base_txn_store_->ToWalEntry(CommitTS());
+        LOG_TRACE(fmt::format("ToWalEntry: {}", wal_entry_->ToString()));
     }
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();

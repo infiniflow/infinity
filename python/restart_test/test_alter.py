@@ -121,7 +121,6 @@ class TestAlter:
             res = table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
             assert res.error_code == ErrorCode.OK
 
-
             res = table_obj.drop_columns(["c2"])
             assert res.error_code == ErrorCode.OK
 
@@ -132,9 +131,6 @@ class TestAlter:
 
             res = table_obj.add_columns({"c5": {"type": "int", "default": 0}})
             assert res.error_code == ErrorCode.OK
-
-            if flush:
-                infinity_obj.flush_data()
 
         @decorator
         def part2(infinity_obj):
