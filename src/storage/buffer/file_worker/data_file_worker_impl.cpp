@@ -64,14 +64,14 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
         size_t offset{};
 
-        l.unlock();
+        // l.unlock();
         u64 magic_number = 0x00dd3344;
         std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
         offset += sizeof(u64);
 
-        l.lock();
+        // l.lock();
         std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
-        l.unlock();
+        // l.unlock();
         offset += sizeof(buffer_size_);
 
         auto data_size = data.size();
@@ -85,13 +85,13 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
         std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
         offset += sizeof(u64);
 
-        l.lock();
+        // l.lock();
         data_size_ = data_size;
     } else {
         auto data_size = data_size_;
         // l.unlock();
         if (data_size == data.size()) {
-            data_size -= 8;
+            data_size -= 1;
         }
         size_t offset = sizeof(u64) + sizeof(buffer_size_) + data_size;
         size_t append_data_size = data.size() - data_size;
