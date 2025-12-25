@@ -38,58 +38,29 @@ IVFIndexFileWorker::~IVFIndexFileWorker() {
     mmap_ = nullptr;
 }
 
-bool IVFIndexFileWorker::Write(IVFIndexInChunk *&data,
+bool IVFIndexFileWorker::Write(std::span<IVFIndexInChunk> data,
                                std::unique_ptr<LocalFileHandle> &file_handle,
                                bool &prepare_success,
                                const FileWorkerSaveCtx &ctx) {
-    auto *index = data;
+    auto *index = data.data();
     index->SaveIndexInner(*file_handle);
-    auto fd = file_handle->fd();
-    mmap_size_ = file_handle->FileSize();
-    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.cache_manager_;
-    cache_manager.Set(*rel_file_path_, data, mmap_size_);
+
     prepare_success = true;
     file_handle->Sync();
     LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
-    cache_manager.UnPin(*rel_file_path_);
+
     return true;
 }
 
 void IVFIndexFileWorker::Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    auto *index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
+    // data = std::shared_ptr<IVFIndexInChunk>(index);
+    data = index;
     if (!file_handle) {
-        auto *index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-        data = index;
         return;
     }
-    auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.cache_manager_;
-    cache_manager.Pin(path);
-    bool flag = cache_manager.Get(path, data);
-    if (!flag) {
-        auto *index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
-        // data = std::shared_ptr<IVFIndexInChunk>(index);
-        data = index;
-
-        auto fd = file_handle->fd();
-        mmap_size_ = file_handle->FileSize();
-        if (!mmap_) {
-            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-        }
-        data->ReadIndexInner(*file_handle);
-        LOG_TRACE("Finished Read().");
-        size_t request_space = file_handle->FileSize();
-        cache_manager.Set(path, data, request_space);
-        // data = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
-        // auto fd = file_handle->fd();
-        // mmap_size_ = file_handle->FileSize();
-        // if (!mmap_) {
-        //     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-        // }
-        // data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
-        // size_t request_space = file_handle->FileSize();
-        // cache_manager.Set(path, data, request_space);
-    }
+    data->ReadIndexInner(*file_handle);
+    LOG_TRACE("Finished Read().");
 }
 
 } // namespace infinity

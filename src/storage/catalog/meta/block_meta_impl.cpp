@@ -99,11 +99,14 @@ Status BlockMeta::RestoreSetFromSnapshot() {
 
         Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
     }
-    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    //  auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
-    auto *version_file_worker = fileworker_mgr->version_map_.EmplaceFileWorker(std::make_unique<VersionFileWorker>(rel_file_path, block_capacity()));
-    version_file_worker_ = version_file_worker;
+    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
+
+    version_file_worker_ = version_file_worker.get();
+    // auto *version_file_worker = fileworker_mgr->version_map_.EmplaceFileWorker(std::make_unique<VersionFileWorker>(rel_file_path,
+    // block_capacity())); version_file_worker_ = version_file_worker;
     if (!version_file_worker_) {
         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
     }
