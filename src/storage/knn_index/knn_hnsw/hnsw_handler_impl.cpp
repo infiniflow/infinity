@@ -559,12 +559,10 @@ void HnswHandler::CompressToRabitq() {
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
-    size_t mem_usage{};
+    size_t mem_usage = hnsw_handler_->MemUsage();
     if (own_memory_ && hnsw_handler_ != nullptr) {
-        mem_usage = hnsw_handler_->MemUsage();
         delete hnsw_handler_;
     }
-    // delete hnsw_handler_;
 
     auto *storage = InfinityContext::instance().storage();
     if (storage == nullptr) {
