@@ -97,7 +97,7 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
         size_t append_data_size = data.size() - data_size;
         std::memcpy((char *)mmap_ + offset, data.data() + data_size, append_data_size); // data size in span
         // l.lock();
-        data_size_ += append_data_size;
+        data_size_ = data_size + append_data_size;
     }
     prepare_success = true; // Not run defer_fn
     return true;
