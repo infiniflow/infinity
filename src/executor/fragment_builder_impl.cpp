@@ -178,7 +178,9 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             }
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left(), current_fragment_ptr);
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            if (current_fragment_ptr->GetFragmentType() != FragmentType::kSerialMaterialize) {
+                current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            }
             break;
         }
         case PhysicalOperatorType::kUpdate:

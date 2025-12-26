@@ -119,7 +119,8 @@ class ThriftInfinityClient:
         # version: 0.6.0.dev7 and 0.6.0 and 0.6.1 and 0.6.2 and 0.6.3 and 0.6.4 and 0.6.5 and 0.6.6 and 0.6.7, client_version: 32
         # version: 0.6.8 and 0.6.9 and 0.6.10, client_version: 33
         # version: 0.6.13, client_version: 34
-        res = self.client.Connect(ConnectRequest(client_version=34))  # 0.6.13
+        # version: 0.6.14, client_version: 35
+        res = self.client.Connect(ConnectRequest(client_version=35))  # 0.6.14
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -309,7 +310,7 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def explain(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
-                where_expr, group_by_list, limit_expr, offset_expr, explain_type):
+                where_expr, group_by_list, limit_expr, offset_expr, sort_list, explain_type):
         return self.client.Explain(ExplainRequest(session_id=self.session_id,
                                                   db_name=db_name,
                                                   table_name=table_name,
@@ -320,6 +321,7 @@ class ThriftInfinityClient:
                                                   group_by_list=group_by_list,
                                                   limit_expr=limit_expr,
                                                   offset_expr=offset_expr,
+                                                  order_by_list=sort_list,
                                                   explain_type=explain_type
                                                   ))
 
