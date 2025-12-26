@@ -49,10 +49,6 @@ public:
     size_t GetMemUsed() const;
     RowID GetBeginRowID();
     size_t GetRowCount();
-    bool IsCleared() {
-        std::lock_guard l(mtx_);
-        return is_cleared_;
-    }
 
     const BaseMemIndex *GetBaseMemIndex() const;
 
@@ -88,7 +84,6 @@ private:
     std::condition_variable cv_;
     bool is_dumping_{};
     bool is_updating_{};
-    bool is_cleared_{};
 
     std::shared_ptr<HnswIndexInMem> memory_hnsw_index_;
     std::shared_ptr<IVFIndexInMem> memory_ivf_index_;

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <sys/mman.h>
+
 export module infinity_core:fileworker_manager;
 
 import :bmp_index_file_worker;
@@ -31,27 +35,30 @@ namespace infinity {
 export template <typename DataT>
 class FileWorkerCacheManager {
 public:
-    void Pin(std::string path) {
+    void Pin(std::string_view path) {
         // std::lock_guard l(ref_cnt_mutex_);
-        std::unique_lock l(rw_mutex_);
-        auto &cnt = ref_cnt_map_[path];
+        std::lock_guard l(mutex_);
+        auto &cnt = ref_cnt_map_[path.data()];
         ++cnt;
     }
 
-    void UnPin(std::string path) {
+    void UnPin(std::string_view path) {
         // std::lock_guard l(ref_cnt_mutex_);
-        std::unique_lock l(rw_mutex_);
-        auto &cnt = ref_cnt_map_[path];
-        --cnt;
-        if (!cnt) {
-            ref_cnt_map_.erase(path);
+        std::lock_guard l(mutex_);
+        if (auto ref_cnt_iter = ref_cnt_map_.find(path.data()); ref_cnt_iter != ref_cnt_map_.end()) {
+            auto &cnt = ref_cnt_iter->second;
+            if (cnt <= 1) {
+                ref_cnt_map_.erase(path.data());
+            } else {
+                --cnt;
+            }
         }
     }
 
-    bool Get(std::string path, DataT &data) {
+    bool Get(std::string_view path, DataT &data) {
         {
-            std::unique_lock l(rw_mutex_);
-            if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
+            std::lock_guard l(mutex_);
+            if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
                 payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
                 data = *map_iter->second;
                 return true;
@@ -60,40 +67,54 @@ public:
         return false;
     }
 
-    void Set(std::string path, DataT data, size_t request_space) {
-        std::unique_lock l(rw_mutex_);
-        if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
+    void Set(std::string_view path, DataT data, size_t request_space) {
+        std::lock_guard l(mutex_);
+        // if (!request_space) {
+        //     std::println("????? 0 request_space");
+        //     UnrecoverableError("????? 0 request_space");
+        // }
+        if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
+            current_mem_usage_ -= memory_map_[path.data()];
+            if (!IsAccomodatable(request_space)) {
+                Evict(request_space);
+            }
+            memory_map_[path.data()] = request_space;
+            current_mem_usage_ += request_space;
+            // current_mem_usage_ += request_space - memory_map_[path.data()];
+            // memory_map_[path.data()] = request_space;
         } else {
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
             }
             payloads_.push_front(data);
-            if (path_data_map_.contains(path)) {
-                auto &data = path_data_map_[path];
-                delete *data;
-            }
             path_data_map_.emplace(path, payloads_.begin());
             data_path_map_[data] = path;
-            memory_map_[path] = request_space;
+            memory_map_[path.data()] = request_space;
             current_mem_usage_ += request_space;
         }
     }
 
 private:
     void Evict(size_t request_space) {
-        for (auto iter = payloads_.rbegin(); iter != payloads_.rend(); ++iter) {
-            auto data = *iter;
+        for (auto rev_iter = payloads_.rbegin(); rev_iter != payloads_.rend(); ++rev_iter) {
+            auto data = *rev_iter;
             auto &path = data_path_map_[data];
+            auto &iter = path_data_map_[path];
 
             if (!ref_cnt_map_.contains(path)) { // not pin
+                auto &ref_cnt = memory_map_[path];
+                LOG_DEBUG(fmt::format("Evicting: {}, space: {}byte", path, ref_cnt));
                 current_mem_usage_ -= memory_map_[path];
                 ref_cnt_map_.erase(path);
-                payloads_.erase(std::next(iter.base(), -1));
+                payloads_.erase(iter);
                 path_data_map_.erase(path);
                 data_path_map_.erase(data);
+                memory_map_.erase(path);
+
                 delete data;
                 // ClearData();
+
                 if (IsAccomodatable(request_space)) {
                     return;
                 }
@@ -114,8 +135,8 @@ private:
     //     delete data_;
     // }
 
-    mutable std::shared_mutex rw_mutex_;
-    // mutable std::mutex ref_cnt_mutex_;
+    // mutable std::shared_mutex rw_mutex_;
+    mutable std::mutex mutex_;
     // static constexpr size_t MAX_BUCKET_NUM_ = 42;
     size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
     size_t current_mem_usage_{};

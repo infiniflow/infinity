@@ -119,9 +119,6 @@ void MemIndexAppender::Process() {
         for (auto memory_indexer : memory_indexers) {
             auto *append_mem_index_batch = memory_indexer_map[memory_indexer].get();
             append_mem_index_batch->WaitForCompletion();
-            if (append_mem_index_batch->append_tasks_[0]->mem_index_->IsCleared()) {
-                continue;
-            }
             memory_indexer->CommitSync();
             for (auto &append_task : append_mem_index_batch->append_tasks_) {
                 append_task->Complete();

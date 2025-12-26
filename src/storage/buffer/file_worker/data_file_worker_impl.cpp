@@ -50,7 +50,8 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     // - footer: checksum
 
     // auto old_mmap_size = mmap_size_;
-    // buffer_size_ += data.size()
+    // buffer_size_ += data.size();
+    std::unique_lock l(mutex_);
     mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
     if (mmap_size_ == 0) {
         prepare_success = true;
@@ -61,38 +62,50 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
     if (mmap_ == nullptr) {
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
-    }
-    size_t offset{};
+        size_t offset{};
 
-    u64 magic_number = 0x00dd3344;
-    std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
-    offset += sizeof(u64);
+        // l.unlock();
+        u64 magic_number = 0x00dd3344;
+        std::memcpy((char *)mmap_ + offset, &magic_number, sizeof(u64));
+        offset += sizeof(u64);
 
-    std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
-    offset += sizeof(buffer_size_);
+        // l.lock();
+        std::memcpy((char *)mmap_ + offset, &buffer_size_, sizeof(buffer_size_));
+        // l.unlock();
+        offset += sizeof(buffer_size_);
 
-    size_t data_size = data.size();
-    // data_size = 99 * 16;
-    std::memcpy((char *)mmap_ + offset, data.data(), data_size); // data size in span
-    offset += data_size;
+        auto data_size = data.size();
+        std::memcpy((char *)mmap_ + offset, data.data(), data_size); // data size in span
+        offset += data_size;
 
-    size_t unused_size = buffer_size_ - data_size;
-    if (unused_size > 0) {
-        // std::string str(unused_size, '\0');
-        // std::memcpy((char *)mmap_ + offset, str.c_str(), unused_size);
+        size_t unused_size = buffer_size_ - data_size;
         offset += unused_size;
+
+        u64 checksum{};
+        std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
+        offset += sizeof(u64);
+
+        // l.lock();
+        data_size_ = data_size;
+    } else {
+        auto data_size = data_size_;
+        // l.unlock();
+        if (data_size == data.size()) {
+            data_size -= 1;
+        }
+        size_t offset = sizeof(u64) + sizeof(buffer_size_) + data_size;
+        size_t append_data_size = data.size() - data_size;
+        std::memcpy((char *)mmap_ + offset, data.data() + data_size, append_data_size); // data size in span
+        // l.lock();
+        data_size_ = data_size + append_data_size;
     }
-
-    u64 checksum{};
-    std::memcpy((char *)mmap_ + offset, &checksum, sizeof(checksum));
-    offset += sizeof(u64);
-
     prepare_success = true; // Not run defer_fn
     return true;
 }
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
+    std::unique_lock l(mutex_);
     data = std::make_shared<char[]>(buffer_size_);
     if (!file_handle) {
         return;
