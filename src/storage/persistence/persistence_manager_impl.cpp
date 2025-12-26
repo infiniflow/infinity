@@ -501,7 +501,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             obj_stat = object_stats_->GetNoCount(object_addr.obj_key_);
             assert(obj_stat != nullptr);
         } else {
-            UnrecoverableError(fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_));
+            // UnrecoverableError(fmt::format("CleanupNoLock Failed to find object {}", object_addr.obj_key_));
             return;
         }
     }
