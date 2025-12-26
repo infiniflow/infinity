@@ -174,8 +174,8 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
             auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
             row_cnt += commit_cnt;
         }
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
+        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
     // UnPin???
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;

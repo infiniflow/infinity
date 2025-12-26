@@ -69,6 +69,10 @@ bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle
     std::unique_lock l(mutex_);
     auto fd = file_handle->fd();
     mmap_size_ = file_handle->FileSize();
+    if (mmap_size_ == 0) {
+        std::println("what's fuck?");
+        UnrecoverableError("1");
+    }
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
     cache_manager.Set(*rel_file_path_, data, mmap_size_);

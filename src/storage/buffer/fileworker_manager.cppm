@@ -69,8 +69,20 @@ public:
 
     void Set(std::string_view path, DataT data, size_t request_space) {
         std::lock_guard l(mutex_);
+        // if (!request_space) {
+        //     std::println("????? 0 request_space");
+        //     UnrecoverableError("????? 0 request_space");
+        // }
         if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
+            current_mem_usage_ -= memory_map_[path.data()];
+            if (!IsAccomodatable(request_space)) {
+                Evict(request_space);
+            }
+            memory_map_[path.data()] = request_space;
+            current_mem_usage_ += request_space;
+            // current_mem_usage_ += request_space - memory_map_[path.data()];
+            // memory_map_[path.data()] = request_space;
         } else {
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
@@ -85,16 +97,20 @@ public:
 
 private:
     void Evict(size_t request_space) {
-        for (auto iter = payloads_.rbegin(); iter != payloads_.rend(); ++iter) {
-            auto data = *iter;
+        for (auto rev_iter = payloads_.rbegin(); rev_iter != payloads_.rend(); ++rev_iter) {
+            auto data = *rev_iter;
             auto &path = data_path_map_[data];
+            auto &iter = path_data_map_[path];
 
             if (!ref_cnt_map_.contains(path)) { // not pin
+                auto &ref_cnt = memory_map_[path];
+                LOG_DEBUG(fmt::format("Evicting: {}, space: {}byte", path, ref_cnt));
                 current_mem_usage_ -= memory_map_[path];
                 ref_cnt_map_.erase(path);
-                payloads_.erase(std::next(iter.base(), -1));
+                payloads_.erase(iter);
                 path_data_map_.erase(path);
                 data_path_map_.erase(data);
+                memory_map_.erase(path);
 
                 if constexpr (std::same_as<DataT, HnswHandlerPtr>) {
                     // munmap(mmap_, mmap_size_);
