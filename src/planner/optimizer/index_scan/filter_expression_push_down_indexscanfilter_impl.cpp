@@ -146,7 +146,7 @@ struct ExpressionIndexScanInfo {
 
             } else if (index_base->index_type_ == IndexType::kSecondaryFunctional) {
                 IndexSecondaryFunctional *functional_index = reinterpret_cast<IndexSecondaryFunctional *>(index_base.get());
-                auto func_col_params = functional_index->func_col_params_;
+                auto func_col_params = functional_index->GetFuncColParams();
                 if (new_candidate_functional_index_map_.contains(*func_col_params)) {
                     LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Function {} has multiple secondary functional indexes. Skipping one.",
                                           *func_col_params));
@@ -517,9 +517,8 @@ private:
                 };
 
                 auto SolveForFuncVal =
-                    [&](std::shared_ptr<BaseExpression> &func_expr,
-                        std::shared_ptr<BaseExpression> &val_expr,
-                        FilterCompareType initial_compare_type) -> std::tuple<ColumnID, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
+                    [&](std::shared_ptr<BaseExpression> &func_expr, std::shared_ptr<BaseExpression> &val_expr, FilterCompareType initial_compare_type)
+                    -> std::tuple<ColumnID, FunctionExpression *, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
                     auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                     auto [column_id, value, base_expression, compare_type] =
                         FilterExpressionPushDownHelper::UnwindCast(func_expr, std::move(val_right), initial_compare_type);
@@ -528,10 +527,11 @@ private:
                     std::string func_col_params = scalar_func_expression->ExtractFunctionInfo();
                     std::shared_ptr<TableIndexMeta> secondary_functional_index_meta =
                         tree_info_.new_candidate_functional_index_map_.at(func_col_params);
-                    return std::make_tuple(column_id, value, compare_type, secondary_functional_index_meta);
+                    return std::make_tuple(column_id, scalar_func_expression, value, compare_type, secondary_functional_index_meta);
                 };
 
                 ColumnID column_id;
+                FunctionExpression *scalar_func_expression{nullptr};
                 Value value = Value::MakeNull();
                 FilterCompareType compare_type;
                 std::shared_ptr<TableIndexMeta> table_index_meta;
@@ -551,14 +551,14 @@ private:
                         break;
                     }
                     case Enum::kSecondaryFunctionalIndexValueCompareExpr: {
-                        std::tie(column_id, value, compare_type, table_index_meta) =
+                        std::tie(column_id, scalar_func_expression, value, compare_type, table_index_meta) =
                             SolveForFuncVal(function_expression->arguments()[0],
                                             function_expression->arguments()[1],
                                             PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
                         break;
                     }
                     case Enum::kValueSecondaryFunctionalIndexCompareExpr: {
-                        std::tie(column_id, value, compare_type, table_index_meta) =
+                        std::tie(column_id, scalar_func_expression, value, compare_type, table_index_meta) =
                             SolveForFuncVal(function_expression->arguments()[1],
                                             function_expression->arguments()[0],
                                             PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
@@ -574,7 +574,12 @@ private:
                     case FilterCompareType::kEqual:
                     case FilterCompareType::kLessEqual:
                     case FilterCompareType::kGreaterEqual: {
-                        return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, table_index_meta, compare_type, value);
+                        return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                   column_id,
+                                                                   scalar_func_expression,
+                                                                   table_index_meta,
+                                                                   compare_type,
+                                                                   value);
                     }
                     case FilterCompareType::kAlwaysTrue: {
                         return std::make_unique<IndexFilterEvaluatorAllTrue>();

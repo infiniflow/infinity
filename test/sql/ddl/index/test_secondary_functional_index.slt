@@ -11,10 +11,10 @@ statement ok
 INSERT INTO test_secondary_functional_index values(2, 'thank you');
 
 statement ok
-CREATE INDEX idx_c1 ON test_secondary_functional_index (sqrt(c1));
+CREATE INDEX idx1 ON test_secondary_functional_index (sqrt(c1));
 
 statement ok
-SHOW TABLE test_secondary_functional_index INDEX idx_c1;
+CREATE INDEX idx2 ON test_secondary_functional_index (substring(c2, 0, 5));
 
 statement ok
 INSERT INTO test_secondary_functional_index values(3, 'hello world');
@@ -22,32 +22,96 @@ INSERT INTO test_secondary_functional_index values(3, 'hello world');
 statement ok
 INSERT INTO test_secondary_functional_index values(4, 'thank you');
 
+query I
+SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 0;
+----
+1 hello world
+2 thank you
+3 hello world
+4 thank you
+
 statement ok
-DUMP INDEX idx_c1 on test_secondary_functional_index;
+DUMP INDEX idx1 on test_secondary_functional_index;
+
+statement ok
+DUMP INDEX idx2 on test_secondary_functional_index;
+
+query I
+SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1;
+----
+2 thank you
+3 hello world
+4 thank you
+
+query I
+SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 2;
+----
+
+query I
+SELECT * FROM test_secondary_functional_index WHERE substring(c2, 0, 5) = 'hello';
+----
+1 hello world
+3 hello world
+
+query I
+SELECT * FROM test_secondary_functional_index WHERE 1 < sqrt(c1) AND 'hello' = substring(c2, 0, 5);
+----
+3 hello world
+
+query I
+SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1.5 OR substring(c2, 0, 5) = 'hello';
+----
+1 hello world
+3 hello world
+4 thank you
+
+query I
+EXPLAIN SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1 AND substring(c2, 0, 5) = 'hello';
+----
+PROJECT (4)
+ - table index: #4
+  - expressions: [c1 (#0), c2 (#1)]
+ -> INDEX SCAN (6)
+    - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
+    - table index: #1
+    - filter: (sqrt(c1 (#1.0)) > CAST(1 AS Double)) AND (substring(c2 (#1.1), 0, 5) = hello)
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1 AND substring(c2, 1, 5) = 'hello';
+----
+PROJECT (4)
+  - table index: #4
+  - expressions: [c1 (#1), c2 (#0)]
+-> FILTER (3)
+    - filter: substring(c2 (#0), 1, 5) = hello
+    - output columns: [c2, __rowid]
+-> INDEX SCAN (6)
+    - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
+    - table index: #1
+    - filter: sqrt(c1 (#1.0)) > CAST(1 AS Double)
+    - output_columns: [__rowid]
 
 statement ok
 OPTIMIZE test_secondary_functional_index;
 
 statement ok
-DROP INDEX idx_c1 ON test_secondary_functional_index;
+DROP INDEX idx1 ON test_secondary_functional_index;
 
 statement ok
-CREATE INDEX idx_c1 ON test_secondary_functional_index (c1 + 5);
+DROP INDEX idx2 ON test_secondary_functional_index;
 
 statement ok
-DROP INDEX idx_c1 ON test_secondary_functional_index;
+CREATE INDEX idx1 ON test_secondary_functional_index (c1 + 5);
 
 statement ok
-CREATE INDEX idx_c2 ON test_secondary_functional_index (substring(c2, 0, 5)) USING SECONDARY WITH(cardinality=low);
+DROP INDEX idx1 ON test_secondary_functional_index;
 
 statement ok
-DROP INDEX idx_c2 ON test_secondary_functional_index;
+CREATE INDEX idx1 ON test_secondary_functional_index (round(c1, cast(1 as bigint)));
 
 statement ok
-CREATE INDEX idx_c1 ON test_secondary_functional_index (round(c1, cast(1 as bigint)));
-
-statement ok
-DROP INDEX idx_c1 ON test_secondary_functional_index;
+DROP INDEX idx1 ON test_secondary_functional_index;
 
 statement error
 CREATE INDEX idx_error ON test_secondary_functional_index (abs(1));
@@ -57,6 +121,9 @@ CREATE INDEX idx_error ON test_secondary_functional_index (c1+c2);
 
 statement error
 CREATE INDEX idx_error ON test_secondary_functional_index (sum(c1));
+
+statement error
+CREATE INDEX idx_error ON test_secondary_functional_index (abs(c1 + 1));
 
 statement ok
 DROP TABLE test_secondary_functional_index;

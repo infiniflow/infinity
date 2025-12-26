@@ -748,10 +748,15 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateBegin mem_index {:p}, is_null {}", static_cast<void *>(mem_index.get()), is_null));
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
+            auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+            if (!status.ok()) {
+                return status;
+            }
             std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
             const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
             auto cardinality = secondary_index->GetSecondaryIndexCardinality();
-            std::tie(memory_secondary_index, status) = GetSecondaryIndexInMem(segment_index_meta, base_row_id, mem_index, cardinality);
+            std::tie(memory_secondary_index, status) =
+                GetSecondaryIndexInMem(segment_index_meta, *column_def->type(), base_row_id, mem_index, cardinality);
             if (!status.ok()) {
                 return status;
             }
@@ -761,8 +766,10 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kSecondaryFunctional: {
             std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
             const IndexSecondaryFunctional *secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+            auto index_data_type = secondary_functional_index->GetFuncReturnType();
             auto cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-            std::tie(memory_secondary_index, status) = GetSecondaryIndexInMem(segment_index_meta, base_row_id, mem_index, cardinality);
+            std::tie(memory_secondary_index, status) =
+                GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
             if (!status.ok()) {
                 return status;
             }
@@ -774,7 +781,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
             auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_def->id());
             if (output_column == nullptr) {
-                return Status::InvalidExpression(*secondary_functional_index->function_expression_json_str_);
+                return Status::InvalidExpression(*secondary_functional_index->GetFunctionExpressionJsonStr());
             }
             memory_secondary_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
             break;
@@ -994,8 +1001,13 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
             break;
         }
         case IndexType::kSecondaryFunctional: {
-            auto status =
-                PopulateFunctionalIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+            auto status = PopulateSecondaryFunctionalIndexInner(index_base,
+                                                                *segment_index_meta,
+                                                                segment_meta,
+                                                                segment_row_cnt,
+                                                                column_id,
+                                                                column_def,
+                                                                new_chunk_ids);
             if (!status.ok()) {
                 return status;
             }
@@ -1479,7 +1491,8 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
         RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
         const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
         auto cardinality = secondary_index->GetSecondaryIndexCardinality();
-        std::tie(memory_secondary_index, status) = GetSecondaryIndexInMem(segment_index_meta, base_row_id, mem_index, cardinality);
+        std::tie(memory_secondary_index, status) =
+            GetSecondaryIndexInMem(segment_index_meta, *column_def->type(), base_row_id, mem_index, cardinality);
         if (!status.ok()) {
             return status;
         }
@@ -1529,13 +1542,13 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
     return Status::OK();
 }
 
-Status NewTxn::PopulateFunctionalIndexInner(std::shared_ptr<IndexBase> index_base,
-                                            SegmentIndexMeta &segment_index_meta,
-                                            SegmentMeta &segment_meta,
-                                            size_t segment_row_cnt,
-                                            ColumnID column_id,
-                                            std::shared_ptr<ColumnDef> column_def,
-                                            std::vector<ChunkID> &new_chunk_ids) {
+Status NewTxn::PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> index_base,
+                                                     SegmentIndexMeta &segment_index_meta,
+                                                     SegmentMeta &segment_meta,
+                                                     size_t segment_row_cnt,
+                                                     ColumnID column_id,
+                                                     std::shared_ptr<ColumnDef> column_def,
+                                                     std::vector<ChunkID> &new_chunk_ids) {
     auto mem_index = std::make_shared<MemIndex>();
     std::shared_ptr<SecondaryIndexInMem> memory_functional_index;
 
@@ -1565,16 +1578,16 @@ Status NewTxn::PopulateFunctionalIndexInner(std::shared_ptr<IndexBase> index_bas
         SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
         RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
         const IndexSecondaryFunctional *secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
-
+        auto index_data_type = secondary_functional_index->GetFuncReturnType();
         auto cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-        std::tie(memory_functional_index, status) = GetSecondaryIndexInMem(segment_index_meta, base_row_id, mem_index, cardinality);
+        std::tie(memory_functional_index, status) = GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
         if (!status.ok()) {
             return status;
         }
 
         auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_id);
         if (output_column == nullptr) {
-            return Status::InvalidExpression(*secondary_functional_index->function_expression_json_str_);
+            return Status::InvalidExpression(*secondary_functional_index->GetFunctionExpressionJsonStr());
         }
 
         memory_functional_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
@@ -1624,23 +1637,21 @@ Status NewTxn::PopulateFunctionalIndexInner(std::shared_ptr<IndexBase> index_bas
 
 std::shared_ptr<ColumnVector>
 NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *secondary_functional_index, const ColumnVector &col, const ColumnID column_id) {
-    if (secondary_functional_index->function_expression_json_str_->empty()) {
-        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Function expression is empty: {}",
-                              *secondary_functional_index->function_expression_json_str_));
+    auto function_expression_json_str = secondary_functional_index->GetFunctionExpressionJsonStr();
+    if (function_expression_json_str->empty()) {
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Function expression is empty: {}", *function_expression_json_str));
         return nullptr;
     }
 
-    std::shared_ptr<BaseExpression> base_expr = BaseExpression::Deserialize(*secondary_functional_index->function_expression_json_str_);
+    std::shared_ptr<BaseExpression> base_expr = BaseExpression::Deserialize(*function_expression_json_str);
     if (base_expr == nullptr) {
-        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to deserialize function expression: {}",
-                              *secondary_functional_index->function_expression_json_str_));
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to deserialize function expression: {}", *function_expression_json_str));
         return nullptr;
     }
 
     std::shared_ptr<FunctionExpression> function_expression = std::dynamic_pointer_cast<FunctionExpression>(base_expr);
     if (function_expression == nullptr) {
-        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}",
-                              *secondary_functional_index->function_expression_json_str_));
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}", *function_expression_json_str));
         return nullptr;
     }
 
@@ -1666,16 +1677,13 @@ NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *secondary_func
 }
 
 std::tuple<std::shared_ptr<SecondaryIndexInMem>, Status> NewTxn::GetSecondaryIndexInMem(SegmentIndexMeta &segment_index_meta,
+                                                                                        DataType index_data_type,
                                                                                         RowID base_row_id,
                                                                                         std::shared_ptr<MemIndex> mem_index,
                                                                                         SecondaryIndexCardinality cardinality) {
     std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
     if (mem_index->IsNull()) {
-        auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-        memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
+        memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(index_data_type, base_row_id, cardinality);
         mem_index->SetSecondaryIndex(memory_secondary_index);
     } else {
         memory_secondary_index = mem_index->GetSecondaryIndex();

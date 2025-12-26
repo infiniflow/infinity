@@ -50,6 +50,7 @@ i32 IndexSecondaryFunctional::GetSizeInBytes() const {
 
     size_t func_col_params_size = func_col_params_->length();
     size += sizeof(int32_t) + func_col_params_size;
+    size += func_return_type_.GetSizeInBytes();
     size_t function_expression_str_size = function_expression_json_str_->length();
     size += sizeof(int32_t) + function_expression_str_size;
     size += sizeof(SecondaryIndexCardinality);
@@ -60,6 +61,7 @@ void IndexSecondaryFunctional::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
 
     WriteBufAdv(ptr, *func_col_params_);
+    func_return_type_.WriteAdv(ptr);
     WriteBufAdv(ptr, *function_expression_json_str_);
     WriteBufAdv(ptr, u8(secondary_index_cardinality_));
 }
@@ -68,6 +70,7 @@ nlohmann::json IndexSecondaryFunctional::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
 
     res["func_col_params"] = *func_col_params_;
+    res["func_return_type"] = func_return_type_.Serialize();
     res["function_expression"] = nlohmann::json::parse(*function_expression_json_str_);
     res["cardinality"] = secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high";
 
@@ -76,7 +79,7 @@ nlohmann::json IndexSecondaryFunctional::Serialize() const {
 std::string IndexSecondaryFunctional::ToString() const {
     std::stringstream ss;
     ss << "IndexBase: " << IndexInfo::IndexTypeToString(index_type_) << ", name: " << *index_name_ << ", func_col_params: " << *func_col_params_
-       << ", function_expression: " << *function_expression_json_str_
+       << ", func_return_type: " << func_return_type_.ToString() << ", function_expression: " << *function_expression_json_str_
        << ", cardinality: " << (secondary_index_cardinality_ == SecondaryIndexCardinality::kLowCardinality ? "low" : "high");
     return ss.str();
 }

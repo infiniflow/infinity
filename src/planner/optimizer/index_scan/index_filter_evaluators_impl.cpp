@@ -414,19 +414,27 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 
 std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                                    ColumnID column_id,
+                                                                                   FunctionExpression *scalar_function_expr,
                                                                                    std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                                    FilterCompareType compare_type,
                                                                                    const Value &val) {
-    ColumnDef *column_def;
-    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    LogicalType index_data_type;
+    auto [index_base, index_status] = new_secondary_index->GetIndexBase();
+    if (index_base->index_type_ == IndexType::kSecondary) {
+        ColumnDef *column_def;
+        auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        column_def = column_def_ptr.get();
+        if (column_def->id() != static_cast<i64>(column_id)) {
+            UnrecoverableError("Invalid column id");
+        }
+        index_data_type = column_def->type()->type();
+    } else {
+        index_data_type = scalar_function_expr->Type().type();
     }
-    column_def = column_def_ptr.get();
-    if (column_def->id() != static_cast<i64>(column_id)) {
-        UnrecoverableError("Invalid column id");
-    }
-    switch (column_def->type()->type()) {
+    switch (index_data_type) {
         case LogicalType::kTinyInt: {
             return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
@@ -465,7 +473,7 @@ std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Ma
             return {};
         }
         default: {
-            UnrecoverableError(fmt::format("Unexpected type for secondary index: {}", column_def->type()->ToString()));
+            UnrecoverableError(fmt::format("Unexpected type for secondary index: {}", LogicalType2Str(index_data_type)));
             return {};
         }
     }

@@ -895,7 +895,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
                 RecoverableError(Status::NotSupport("Invalid function expression for secondary functional index"));
                 break;
             }
-            index_info->func_col_params_str_ = function_expression_ptr->ExtractFunctionInfo();
 
             DataType return_type = function_expression_ptr->Type();
             IndexSecondaryFunctional::ValidateColumnAndReturnDataType(base_table_ref,
@@ -907,7 +906,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
                                                             index_comment,
                                                             index_filename,
                                                             {index_info->column_name_},
-                                                            std::make_shared<std::string>(index_info->func_col_params_str_),
+                                                            std::make_shared<std::string>(function_expression_ptr->ExtractFunctionInfo()),
+                                                            function_expression_ptr->Type(),
                                                             index_info->secondary_index_cardinality_);
 
             break;
@@ -951,8 +951,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         column_remapper->ApplyToPlan(query_context_ptr_, logical_node);
 
         std::shared_ptr<IndexSecondaryFunctional> index_secondary_functional = std::dynamic_pointer_cast<IndexSecondaryFunctional>(base_index_ptr);
-        index_secondary_functional->function_expression_json_str_ =
-            std::make_shared<std::string>(logical_create_index_operator->function_expression_->Serialize().dump());
+        index_secondary_functional->SetFunctionExpressionJsonStr(
+            std::make_shared<std::string>(logical_create_index_operator->function_expression_->Serialize().dump()));
     }
 
     this->logical_plan_ = logical_create_index_operator;

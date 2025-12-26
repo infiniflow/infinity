@@ -1632,25 +1632,6 @@ Value Value::StringToValue(const std::string &str, const DataType &data_type) {
             value.value_.float64 = val;
             break;
         }
-
-        case LogicalType::kFloat16: {
-            FloatT val;
-            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
-            if (ec != std::errc() || ptr != str.data() + str.size()) {
-                UnrecoverableError(fmt::format("Invalid Float16 string: {}", str));
-            }
-            value.value_.float16 = static_cast<Float16T>(val);
-            break;
-        }
-        case LogicalType::kBFloat16: {
-            FloatT val;
-            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
-            if (ec != std::errc() || ptr != str.data() + str.size()) {
-                UnrecoverableError(fmt::format("Invalid BFloat16 string: {}", str));
-            }
-            value.value_.bfloat16 = static_cast<BFloat16T>(val);
-            break;
-        }
         case LogicalType::kDate: {
             DateT date;
             date.FromString(str);
