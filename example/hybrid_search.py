@@ -17,7 +17,7 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
-from infinity.table import ExplainType
+# from infinity.table import ExplainType
 import sys
 import polars as pl
 
