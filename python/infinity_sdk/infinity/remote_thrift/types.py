@@ -95,34 +95,70 @@ def bf16_bytes_to_float32_list(column_vector):
     return list(view_float32)
 
 
-def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
+def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors, null_bitmap: list[bool] = None) -> \
         list[Any, ...]:
     column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
-            return list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            data = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            # if null_bitmap and len(null_bitmap) == len(data):
+            #     data = [pd.NA if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnInt64:
-            return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            data = list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnFloat32:
-            return list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+            data = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnFloat64:
-            return list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+            data = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnFloat16:
-            return list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+            data = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnBFloat16:
-            return bf16_bytes_to_float32_list(column_vector)
+            data = bf16_bytes_to_float32_list(column_vector)
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnVarchar:
-            return list(parse_bytes(column_vector))
+            data = list(parse_bytes(column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [None if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnJson:
-            return list(parse_bytes(column_vector))
+            data = list(parse_bytes(column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [None if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnBool:
-            return list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+            data = list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnInt8:
-            return list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+            data = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnInt16:
-            return list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+            data = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnRowID:
-            return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            data = list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [np.nan if is_null else value for value, is_null in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnEmbedding:
             dimension = column_data_type.physical_type.embedding_type.dimension
             if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementUInt8:
@@ -535,8 +571,9 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         column_type = column_field.column_type
         column_data_type = column_def.data_type
         column_vectors = column_field.column_vectors
+        column_bitmasks = column_field.bitmasks
 
-        data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
+        data_list = column_vector_to_list(column_type, column_data_type, column_vectors, column_bitmasks)
         # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type

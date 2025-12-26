@@ -17,23 +17,35 @@ module;
 export module infinity_core:json_manager;
 
 import :logger;
+import :value;
 
 import std.compat;
 import third_party;
 
 namespace infinity {
 
-export using JsonType = nlohmann::json;
+export using JsonTypeDef = nlohmann::json;
 
 export class JsonManager {
 public:
     static std::string escapeQuotes(const std::string &input);
     static std::string unescapeQuotes(const std::string &input);
     static bool valid_json(const std::string &json_str);
-    static JsonType parse(std::string &json_str);
-    static JsonType from_bson(const std::vector<uint8_t> &bson_data);
-    static std::string dump(const JsonType &json_obj);
-    static std::vector<uint8_t> to_bson(const JsonType &json_obj);
+    static JsonTypeDef parse(std::string &json_str);
+    static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
+    static std::string dump(const JsonTypeDef &json_obj);
+    static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
+
+    static bool check_json_path(const std::string &json_path);
+    static bool check_json_path(const std::string_view &json_path);
+    static std::tuple<bool, std::vector<std::string>> get_json_tokens(const std::string &json_path);
+
+    static std::tuple<bool, std::string> json_extract(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_exists_path(JsonTypeDef &data, const std::vector<std::string> &tokens);
 };
 
 } // namespace infinity

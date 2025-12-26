@@ -40,6 +40,7 @@ import third_party;
 
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 

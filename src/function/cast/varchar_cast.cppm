@@ -20,6 +20,7 @@ import :infinity_exception;
 import :column_vector;
 import :vector_buffer;
 import :status;
+import :json_manager;
 
 import data_type;
 import internal_types;
@@ -430,9 +431,13 @@ inline bool TryCastVarcharVectorToJson::Run(const VarcharT &input,
     auto len = data.size();
     std::string substr(data.data(), len);
 
-    Value value = Value::MakeJson(substr, nullptr);
-    target_vector->AppendValue(value);
-    return true;
+    if (JsonManager::valid_json(substr)) {
+        Value value = Value::MakeJson(substr, nullptr);
+        target_vector->AppendValue(value);
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace infinity

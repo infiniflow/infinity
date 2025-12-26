@@ -65,6 +65,10 @@ ConstantExpr::~ConstantExpr() {
             free(date_value_);
             break;
         }
+        case LiteralType::kJson: {
+            free(json_value_);
+            break;
+        }
         default:
             break;
     }

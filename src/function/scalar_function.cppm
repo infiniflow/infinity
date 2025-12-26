@@ -31,6 +31,7 @@ import :null_value;
 
 import data_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -267,6 +268,7 @@ struct TernaryTryOpVarlenToVarlenWrapper {
 };
 
 using ScalarFunctionTypePtr = void (*)(const DataBlock &, std::shared_ptr<ColumnVector> &);
+using JsonFunctionTypePtr = void (*)(std::shared_ptr<BaseExtraInfo>, const DataBlock &, std::shared_ptr<ColumnVector> &);
 
 export class ScalarFunction final : public Function {
 public:
@@ -285,8 +287,10 @@ public:
 public:
     std::vector<DataType> parameter_types_{};
     DataType return_type_;
-
     ScalarFunctionTypePtr function_{};
+
+    std::shared_ptr<BaseExtraInfo> extra_info_{nullptr};
+    JsonFunctionTypePtr json_function_{};
 
 public:
     // No argument function without any failure.

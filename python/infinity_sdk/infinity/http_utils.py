@@ -49,6 +49,13 @@ functions = [
     "avg",
     "trunc",
     "datepart",
+    "json_extract",
+    "json_extract_string",
+    "json_extract_int",
+    "json_extract_double",
+    "json_extract_bool",
+    "json_extract_isnull",
+    "json_exists_path",
 ]
 
 bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
@@ -99,6 +106,14 @@ def function_return_type(function_name, param_type):
         return dtype("int64")
     elif function_name == "avg":
         return dtype("float64")
+    elif function_name == "json_extract" or function_name == "json_extract_string":
+        return dtype("str")
+    elif function_name == "json_extract_int":
+        return dtype("int32")
+    elif function_name == "json_extract_double":
+        return dtype("float64")
+    elif function_name == "json_extract_bool" or function_name == "json_extract_isnull" or function_name == "json_exists_path":
+        return dtype("bool")
     else:
         return param_type
 

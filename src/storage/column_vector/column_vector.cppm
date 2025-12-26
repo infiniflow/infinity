@@ -629,6 +629,21 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
 }
 
 template <>
+inline void
+ColumnVector::CopyFrom<JsonT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, size_t count, const Selection &input_select) {
+    std::shared_ptr<char[]> src;
+    src_buf->GetData(src);
+    std::shared_ptr<char[]> dst;
+    dst_buf->GetData(dst);
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
+        JsonT *dst_ptr = &(((JsonT *)dst.get())[idx]);
+        const JsonT *src_ptr = &(((const JsonT *)src.get())[row_id]);
+        CopyJson(*dst_ptr, dst_buf, *src_ptr, src_buf);
+    }
+}
+
+template <>
 inline void ColumnVector::CopyFrom<MultiVectorT>(const VectorBuffer *__restrict src_buf,
                                                  VectorBuffer *__restrict dst_buf,
                                                  size_t count,

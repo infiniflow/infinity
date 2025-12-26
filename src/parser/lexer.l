@@ -230,6 +230,7 @@ WHERE           { return WHERE; }
 WITH            { return WITH; }
 YEAR            { return YEAR; }
 YEARS           { return YEARS; }
+PARSE_JSON      { return PARSE_JSON; }
 
 "=="            { return EQUAL; }
 "!="            { return NOT_EQ; }

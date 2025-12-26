@@ -54,6 +54,8 @@ import :expression_type;
 import :meta_info;
 import :column_vector;
 import :new_catalog;
+import :json_manager;
+import :extract_json;
 
 import std;
 import third_party;
@@ -81,6 +83,7 @@ import data_type;
 import embedding_info;
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -417,6 +420,9 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantE
         }
         case LiteralType::kJson: {
             std::string json_value(expr.json_value_);
+            if (!JsonManager::valid_json(json_value)) {
+                RecoverableError(Status::SyntaxError("JSON validation failed."));
+            }
             Value value = Value::MakeJson(json_value, nullptr);
             return std::make_shared<ValueExpression>(std::move(value));
         }
@@ -514,6 +520,20 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             }
 
             std::shared_ptr<FunctionExpression> function_expr_ptr = std::make_shared<FunctionExpression>(scalar_function, arguments);
+
+            if (std::strncmp(scalar_function.name().c_str(), "json_extract", strlen("json_extract")) == 0) {
+                if (arguments.size() != 2) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression size."));
+                }
+                if (arguments[0]->type() != ExpressionType::kColumn || arguments[1]->type() != ExpressionType::kValue) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression type."));
+                }
+                auto value_expr = std::static_pointer_cast<ValueExpression>(arguments[1]);
+                std::string_view value_view(value_expr->GetValue().GetVarchar());
+                if (!JsonManager::check_json_path(value_view)) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
+                }
+            }
 
             // Special handling for FDE function - adjust return type based on target dimension parameter
             if (scalar_function.name() == "FDE" && arguments.size() >= 2) {

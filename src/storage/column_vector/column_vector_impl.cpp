@@ -364,6 +364,21 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             }
             case LogicalType::kJson: {
                 CopyFrom<JsonT>(other.buffer_.get(), this->buffer_.get(), tail_index, input_select);
+
+                // auto src_buf = other.buffer_.get();
+                // auto dst_buf = this->buffer_.get();
+                // auto count = tail_index;
+                //
+                // const char *src = src_buf->GetData();
+                // char *dst = dst_buf->GetDataMut();
+                // for (size_t idx = 0; idx < count; ++idx) {
+                //     size_t row_id = input_select[idx];
+                //     auto &dst_type = ((JsonT *)(dst))[idx];
+                //     auto &src_type = ((const JsonT *)(src))[row_id];
+                //     dst_type.length_ = src_type.length_;
+                //     const auto data = src_buf->GetVarchar(src_type.file_offset_, src_type.length_);
+                //     dst_type.file_offset_ = dst_buf->AppendVarchar(data, src_type.length_);
+                // }
                 break;
             }
             case LogicalType::kMultiVector: {
@@ -880,8 +895,7 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kJson: {
             const auto &json = reinterpret_cast<const JsonT *>(data_ptr_.get())[row_index];
             auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            std::vector<uint8_t> bson(json.length_);
-            memcpy(bson.data(), data, json.length_);
+            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json.length_);
             auto res = JsonManager::from_bson(bson);
             return res.dump();
         }
