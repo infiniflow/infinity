@@ -1577,7 +1577,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
     }
 
     base_txn_store_ = std::make_shared<RestoreDatabaseTxnStore>();
-    RestoreDatabaseTxnStore *txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
+    auto txn_store = static_cast<RestoreDatabaseTxnStore *>(base_txn_store_.get());
     txn_store->db_name_ = db_name;
     txn_store->snapshot_name_ = database_snapshot_info->snapshot_name_;
     txn_store->db_id_str_ = db_id_str;
@@ -1937,7 +1937,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                     }
 
                     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
-                    if (buffer_type == VectorBufferType::kVarBuffer) {
+                    if (buffer_type == VectorBufferType::kVarBuffer && rel_row_cnt != 0) {
                         auto read_path = std::make_shared<std::string>(fmt::format("{}/col_{}_out", *block_dir_ptr, column_def->id()));
                         auto var_file_worker = std::make_unique<VarFileWorker>(read_path, 0);
                         auto var_file_worker_ = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(var_file_worker));
@@ -1972,75 +1972,75 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-            Status status = VirtualStore::Copy(write_path, read_path);
-            if (!status.ok()) {
-                LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
-                return Status::OK();
-            }
-
-            // if (pm != nullptr) {
-            //     PersistResultHandler pm_handler(pm);
-            //     PersistReadResult result = pm->GetObjCache(file);
-            //
-            //     const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
-            //     if (!obj_addr.Valid()) {
-            //         LOG_INFO(fmt::format("Failed to find object for local path {}", file));
-            //         return Status::OK();
-            //     }
-            //
-            //     DeferFn defer_fn([&]() {
-            //         auto res = pm->PutObjCache(file);
-            //         pm_handler.HandleWriteResult(res);
-            //     });
-            //
-            //     std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
-            //     std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-            //     LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
-            //
-            //     std::string write_dir = VirtualStore::GetParentPath(write_path);
-            //     if (!VirtualStore::Exists(write_dir)) {
-            //         VirtualStore::MakeDirectory(write_dir);
-            //     }
-            //
-            //     auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
-            //     if (!read_open_status.ok()) {
-            //         LOG_INFO(fmt::format("Open {} failed: {}", read_path, read_open_status.message()));
-            //         return Status::OK();
-            //     }
-            //
-            //     auto seek_status = read_handle->Seek(obj_addr.part_offset_);
-            //     if (!seek_status.ok()) {
-            //         LOG_INFO(fmt::format("Seek {} failed: {}", read_path, read_open_status.message()));
-            //         return Status::OK();
-            //     }
-            //
-            //     auto file_size = obj_addr.part_size_;
-            //     auto buffer = std::make_unique<char[]>(file_size);
-            //     auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
-            //
-            //     auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-            //     if (!write_open_status.ok()) {
-            //         LOG_INFO(fmt::format("Open {} failed: {}", write_path, write_open_status.message()));
-            //         return Status::OK();
-            //     }
-            //
-            //     Status write_status = write_handle->Append(buffer.get(), file_size);
-            //     if (!write_status.ok()) {
-            //         LOG_INFO(fmt::format("Append {} failed: {}", write_path, write_status.message()));
-            //         return Status::OK();
-            //     }
-            //     write_handle->Sync();
-            // } else {
-            //     std::string read_path = fmt::format("{}/{}", data_dir, file);
-            //     std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
-            //     LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
-            //
-            //     Status status = VirtualStore::Copy(write_path, read_path);
-            //     if (!status.ok()) {
-            //         LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
-            //         return Status::OK();
-            //     }
+            // Status status = VirtualStore::Copy(write_path, read_path);
+            // if (!status.ok()) {
+            //     LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
+            //     return Status::OK();
             // }
+
+            if (pm != nullptr) {
+                PersistResultHandler pm_handler(pm);
+                PersistReadResult result = pm->GetObjCache(file);
+
+                const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
+                if (!obj_addr.Valid()) {
+                    LOG_INFO(fmt::format("Failed to find object for local path {}", file));
+                    return Status::OK();
+                }
+
+                DeferFn defer_fn([&]() {
+                    auto res = pm->PutObjCache(file);
+                    pm_handler.HandleWriteResult(res);
+                });
+
+                std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
+
+                std::string write_dir = VirtualStore::GetParentPath(write_path);
+                if (!VirtualStore::Exists(write_dir)) {
+                    VirtualStore::MakeDirectory(write_dir);
+                }
+
+                auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+                if (!read_open_status.ok()) {
+                    LOG_INFO(fmt::format("Open {} failed: {}", read_path, read_open_status.message()));
+                    return Status::OK();
+                }
+
+                auto seek_status = read_handle->Seek(obj_addr.part_offset_);
+                if (!seek_status.ok()) {
+                    LOG_INFO(fmt::format("Seek {} failed: {}", read_path, read_open_status.message()));
+                    return Status::OK();
+                }
+
+                auto file_size = obj_addr.part_size_;
+                auto buffer = std::make_unique<char[]>(file_size);
+                auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+
+                auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                if (!write_open_status.ok()) {
+                    LOG_INFO(fmt::format("Open {} failed: {}", write_path, write_open_status.message()));
+                    return Status::OK();
+                }
+
+                Status write_status = write_handle->Append(buffer.get(), file_size);
+                if (!write_status.ok()) {
+                    LOG_INFO(fmt::format("Append {} failed: {}", write_path, write_status.message()));
+                    return Status::OK();
+                }
+                write_handle->Sync();
+            } else {
+                std::string read_path = fmt::format("{}/{}", data_dir, file);
+                std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+                LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
+
+                Status status = VirtualStore::Copy(write_path, read_path);
+                if (!status.ok()) {
+                    LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
+                    return Status::OK();
+                }
+            }
 
             return Status::OK();
         };

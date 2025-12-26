@@ -546,34 +546,34 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         }
 
         std::string dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
-        std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
-        std::string tmp_file_dir = VirtualStore::GetParentPath(tmp_file_path);
-        if (!VirtualStore::Exists(tmp_file_dir)) {
-            VirtualStore::MakeDirectory(tmp_file_dir);
-        }
-        Status status = VirtualStore::Copy(tmp_file_path, src_file_path);
-        if (!status.ok()) {
-            LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, tmp_file_path, status.message()));
-            continue;
-        }
-
-        if (size_t pos = modified_file.find("version"); pos != std::string::npos) {
-            FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-            auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
-            fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
-        }
+        // std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
+        // std::string tmp_file_dir = VirtualStore::GetParentPath(tmp_file_path);
+        // if (!VirtualStore::Exists(tmp_file_dir)) {
+        //     VirtualStore::MakeDirectory(tmp_file_dir);
+        // }
+        // Status status = VirtualStore::Copy(tmp_file_path, src_file_path);
+        // if (!status.ok()) {
+        //     LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, tmp_file_path, status.message()));
+        //     continue;
+        // }
+        //
+        // if (size_t pos = modified_file.find("version"); pos != std::string::npos) {
+        //     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        //     auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
+        //     fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+        // }
 
         if (persistence_manager != nullptr) {
             // Use persistence manager to restore files
-            // // Create a temporary file path for the source file
-            // std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), StringTransform(src_file_path, "/", "_"));
-            //
-            // // Copy source file to temporary location first
-            // Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
-            // if (!copy_status.ok()) {
-            //     LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
-            //     continue;
-            // }
+            // Create a temporary file path for the source file
+            std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), StringTransform(src_file_path, "/", "_"));
+
+            // Copy source file to temporary location first
+            Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
+                continue;
+            }
 
             // Use persistence manager to persist the file
             PersistResultHandler handler(persistence_manager);
@@ -597,9 +597,9 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
             if (!VirtualStore::Exists(dst_dir)) {
                 VirtualStore::MakeDirectory(dst_dir);
             }
-            status = VirtualStore::Copy(dst_file_path, tmp_file_path);
+            Status status = VirtualStore::Copy(dst_file_path, src_file_path);
             if (!status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", tmp_file_path, dst_file_path, status.message()));
+                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
             } else {
                 restored_file_paths.push_back(modified_file);
             }

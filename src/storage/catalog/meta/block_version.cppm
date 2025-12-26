@@ -71,7 +71,7 @@ export struct BlockVersion {
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
-    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
+    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible) const;
 
 private:
     mutable std::shared_mutex rw_mutex_;

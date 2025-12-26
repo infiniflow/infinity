@@ -314,7 +314,7 @@ bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
 }
 
-Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) {
+Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) const {
     i32 row_count = 0;
     std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
     for (const auto &created_range : created_) {
