@@ -351,7 +351,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
     }
 
     if (select_statement->group_by_list_ != nullptr) {
-        std::string group_by = std::string(intent_size, ' ') + "groupby: ";
+        std::string group_by = std::string(intent_size, ' ') + "group_by: ";
         size_t group_count = select_statement->group_by_list_->size();
         for (size_t idx = 0; idx < group_count - 1; ++idx) {
             group_by += select_statement->group_by_list_->at(idx)->ToString() + ", ";
@@ -366,7 +366,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
     }
 
     if (select_statement->order_by_list_ != nullptr) {
-        std::string order_str = std::string(intent_size, ' ') + "groupby: ";
+        std::string order_str = std::string(intent_size, ' ') + "order_by: ";
         size_t order_count = select_statement->order_by_list_->size();
         for (size_t idx = 0; idx < order_count - 1; ++idx) {
             OrderByExpr *order_expr = select_statement->order_by_list_->at(idx);

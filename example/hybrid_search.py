@@ -17,7 +17,13 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
+from infinity.table import ExplainType
 import sys
+import polars as pl
+
+pl.Config.set_tbl_rows(1000)
+pl.Config.set_tbl_cols(100)
+pl.Config.set_fmt_str_lengths(100)
 
 try:
     # open a local directory(default = "/var/infinity") or connect to server(default = NetworkAddress("127.0.0.1", 23817)) to store the data
@@ -98,24 +104,23 @@ try:
     print(res)
 
     print("============================")
-
+    builder = table_instance.output(
+        ["num", "body", "vec", "sparse", "year", "tensor", "score()"]
+    )
+    order_by_expr_list = list()
+    order_by_expr_list.append(("num", infinity.common.SortType.Asc))
+    builder.match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+    builder.match_sparse(
+        "sparse", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3
+    )
+    builder = builder.match_text("body", "blooms", 10).filter("year < 2024").fusion(
+        method="match_tensor", topn=3,
+        fusion_params={"field": "tensor", "element_type": "float",
+                       "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
+    ).sort(order_by_expr_list).limit(3)
+    # print(builder.explain(explain_type=ExplainType.Fragment))
     result, extra_result = (
-        table_instance.output(
-            ["num", "body", "vec", "sparse", "year", "tensor", "score()"]
-        )
-        .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-        .match_sparse(
-            "sparse", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3
-        )
-        .match_text("body", "blooms", 10)
-        .filter("year < 2024")
-        .fusion(
-            method="match_tensor", topn=3,
-            fusion_params={"field": "tensor", "element_type": "float",
-                           "query_tensor": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
-        )
-        .to_pl()
-        # .explain(explain_type=infinity.table.ExplainType.UnOpt)
+        builder.to_pl()
     )
     if extra_result is not None:
         print(extra_result)

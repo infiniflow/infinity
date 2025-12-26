@@ -105,7 +105,7 @@ private:
 
     std::unique_ptr<FragmentContext> context_{};
 
-    FragmentType fragment_type_{FragmentType::kSerialMaterialize};
+    FragmentType fragment_type_{FragmentType::kInvalid};
 };
 
 } // namespace infinity
