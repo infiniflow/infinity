@@ -340,6 +340,11 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         return status;
     }
 
+    if (select_statement->search_expr_ != nullptr) {
+        std::string search_str = std::string(intent_size, ' ') + select_statement->search_expr_->ToString();
+        result->emplace_back(std::make_shared<std::string>(search_str));
+    }
+
     if (select_statement->where_expr_ != nullptr) {
         std::string filter_str = std::string(intent_size, ' ') + "filter: " + select_statement->where_expr_->ToString();
         result->emplace_back(std::make_shared<std::string>(filter_str));

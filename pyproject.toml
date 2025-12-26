@@ -1,6 +1,6 @@
 [project]
 name = "infinity-sdk"
-version = "0.6.12"
+version = "0.6.13"
 description = "infinity"
 readme = "python/infinity_sdk/README.md"
 requires-python = ">=3.11,<3.15"
