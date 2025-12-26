@@ -566,6 +566,7 @@ class RemoteTable():
                                  group_by_list=None,
                                  limit_expr=query.limit,
                                  offset_expr=query.offset,
+                                 sort_list=query.sort,
                                  explain_type=query.explain_type.to_ttype())
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
