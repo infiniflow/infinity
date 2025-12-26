@@ -74,6 +74,33 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
     return true;
 }
 
+bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
+                                  std::unique_ptr<LocalFileHandle> &file_handle,
+                                  bool &prepare_success,
+                                  const FileWorkerSaveCtx &ctx) {
+    if (data.data() == nullptr) {
+        RecoverableError(Status::SyntaxError("VarFileWorker::WriteSnapshot: Data is empty."));
+    }
+
+    const auto *buffer = static_cast<const VarBuffer *>(data.data());
+    auto total_size = buffer->TotalSize();
+    if (total_size == 0) {
+        return false;
+    }
+
+    auto buffer_data = std::make_unique<char[]>(total_size);
+    char *ptr = buffer_data.get();
+    buffer->Write(ptr, total_size);
+
+    Status status = file_handle->Append(buffer_data.get(), total_size);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    prepare_success = true;
+    return true;
+}
+
 void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     data = std::make_shared<VarBuffer>(this);
     if (!file_handle) {

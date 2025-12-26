@@ -372,10 +372,10 @@ std::tuple<std::shared_ptr<SegmentSnapshotInfo>, Status> SegmentMeta::MapMetaToS
         return {nullptr, status};
     }
 
-    std::tie(segment_snapshot_info->row_count_, status) = GetRowCnt1();
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    // std::tie(segment_snapshot_info->row_count_, status) = GetRowCnt1();
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
 
     std::vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = GetBlockIDs1();

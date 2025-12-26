@@ -43,7 +43,7 @@ public:
 
     std::string Path() const { return path_; }
 
-private:
+public:
     Status Close();
 
 private:

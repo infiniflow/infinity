@@ -29,9 +29,9 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
-protected:
     bool
     Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool WriteSnapshot(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
     void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 };

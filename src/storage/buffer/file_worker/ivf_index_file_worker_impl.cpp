@@ -27,6 +27,7 @@ import :index_base;
 import :ivf_index_data;
 import :infinity_exception;
 import :persistence_manager;
+import :fileworker_manager;
 
 import third_party;
 

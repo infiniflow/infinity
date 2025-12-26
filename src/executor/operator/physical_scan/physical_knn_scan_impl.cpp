@@ -653,6 +653,8 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                         IVFIndexInChunk *ivf_chunk{};
                         index_file_worker->Read(ivf_chunk);
                         ivf_result_handler->Search(ivf_chunk);
+                        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.cache_manager_;
+                        // cache_manager.UnPin(*index_file_worker->rel_file_path_);
                     }
                     if (mem_index) {
                         auto memory_ivf_index = mem_index->GetIVFIndex();
