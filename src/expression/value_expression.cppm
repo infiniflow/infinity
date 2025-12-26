@@ -31,6 +31,8 @@ public:
 
     std::string ToString() const override;
 
+    nlohmann::json Serialize() const override;
+
     inline DataType Type() const override { return value_.type(); }
 
     inline void AppendToChunk(std::shared_ptr<ColumnVector> &column_vector) { column_vector->AppendValue(value_); }

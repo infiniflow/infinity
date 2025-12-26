@@ -1563,6 +1563,119 @@ std::string Value::ToString() const {
     return {};
 }
 
+Value Value::StringToValue(const std::string &str, const DataType &data_type) {
+    Value value(data_type);
+    value.type_ = data_type;
+
+    switch (data_type.type()) {
+        case LogicalType::kBoolean: {
+            if (str == "true") {
+                value.value_.boolean = true;
+            } else if (str == "false") {
+                value.value_.boolean = false;
+            } else {
+                UnrecoverableError(fmt::format("Invalid boolean string: {}", str));
+            }
+            break;
+        }
+        case LogicalType::kTinyInt: {
+            TinyIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid TinyInt string: {}", str));
+            }
+            value.value_.tiny_int = val;
+            break;
+        }
+        case LogicalType::kSmallInt: {
+            SmallIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid SmallInt string: {}", str));
+            }
+            value.value_.small_int = val;
+            break;
+        }
+        case LogicalType::kInteger: {
+            IntegerT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Integer string: {}", str));
+            }
+            value.value_.integer = val;
+            break;
+        }
+        case LogicalType::kBigInt: {
+            BigIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid BigInt string: {}", str));
+            }
+            value.value_.big_int = val;
+            break;
+        }
+        case LogicalType::kFloat: {
+            FloatT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Float string: {}", str));
+            }
+            value.value_.float32 = val;
+            break;
+        }
+        case LogicalType::kDouble: {
+            DoubleT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Double string: {}", str));
+            }
+            value.value_.float64 = val;
+            break;
+        }
+        case LogicalType::kDate: {
+            DateT date;
+            date.FromString(str);
+            value.value_.date = date;
+            break;
+        }
+        case LogicalType::kTime: {
+            TimeT time;
+            time.FromString(str);
+            value.value_.time = time;
+            break;
+        }
+        case LogicalType::kDateTime: {
+            DateTimeT datetime;
+            datetime.FromString(str);
+            value.value_.datetime = datetime;
+            break;
+        }
+        case LogicalType::kTimestamp: {
+            TimestampT timestamp;
+            timestamp.FromString(str);
+            value.value_.timestamp = timestamp;
+            break;
+        }
+        case LogicalType::kVarchar: {
+            value.value_info_ = std::make_shared<StringValueInfo>(str);
+            break;
+        }
+        case LogicalType::kJson: {
+            auto json = nlohmann::json::parse(str);
+            auto bson = JsonManager::to_bson(json);
+            value.value_info_ = std::make_shared<JsonValueInfo>(bson);
+            break;
+        }
+        default: {
+            RecoverableError(
+                Status::NotSupport(fmt::format("StringToValue() is not implemented for data type: {}, str: {}", data_type.ToString(), str)));
+            break;
+        }
+    }
+
+    return value;
+}
+
 void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {

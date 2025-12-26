@@ -64,10 +64,16 @@ public:
 
     inline std::vector<std::shared_ptr<BaseExpression>> &arguments() { return arguments_; }
 
-    SourcePosition source_position_{};
-    std::string alias_{};
-
     [[nodiscard]] virtual std::string ToString() const = 0;
+
+    virtual nlohmann::json Serialize() const {
+        const std::type_info &type_info = typeid(*this);
+        std::string class_name = type_info.name();
+        RecoverableError(Status::NotSupport(fmt::format("Serialize() is not implemented in class: {}", class_name)));
+        return nlohmann::json();
+    }
+
+    static std::shared_ptr<BaseExpression> Deserialize(std::string_view expression_str);
 
     virtual u64 Hash() const {
         UnrecoverableError(fmt::format("Not implemented {}'s Hash", int(type_)));
@@ -78,6 +84,9 @@ public:
         UnrecoverableError(fmt::format("Not implemented {}'s Eq", int(type_)));
         return false;
     }
+
+public:
+    std::string alias_{};
 
 protected:
     ExpressionType type_{};

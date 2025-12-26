@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "expr/parsed_expr.h"
 #include "extra_ddl_info.h"
 #include "statement/statement_common.h"
 
@@ -32,6 +33,7 @@ enum class IndexType {
     kBMP,
     kFullText,
     kSecondary,
+    kSecondaryFunctional,
     kEMVB,
     kInvalid,
     kDiskAnn,
@@ -43,6 +45,7 @@ struct IndexInfo {
     std::string column_name_{};
     std::vector<InitParameter *> *index_param_list_{nullptr};
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
+    ParsedExpr *function_expr_{nullptr};
 
     static std::string IndexTypeToString(IndexType index_type);
     static IndexType StringToIndexType(const std::string &index_type_str);

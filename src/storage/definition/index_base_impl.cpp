@@ -20,6 +20,7 @@ import :index_hnsw;
 import :index_diskann;
 import :index_full_text;
 import :index_secondary;
+import :index_secondary_functional;
 import :index_emvb;
 import :index_bmp;
 import :bmp_util;
@@ -165,6 +166,21 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality);
             break;
         }
+        case IndexType::kSecondaryFunctional: {
+            std::shared_ptr<std::string> func_col_params = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+            auto func_return_type = DataType::ReadAdv(ptr, maxbytes);
+            std::shared_ptr<std::string> function_expression_str = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+            SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
+            res = std::make_shared<IndexSecondaryFunctional>(index_name,
+                                                             index_comment,
+                                                             file_name,
+                                                             column_names,
+                                                             func_col_params,
+                                                             *func_return_type,
+                                                             function_expression_str,
+                                                             cardinality);
+            break;
+        }
         case IndexType::kEMVB: {
             u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
             u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
@@ -220,27 +236,22 @@ nlohmann::json IndexBase::Serialize() const {
 }
 
 std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str) {
-    simdjson::padded_string index_def_json(index_def_str);
-    simdjson::parser parser;
-    simdjson::document doc = parser.iterate(index_def_json);
+    nlohmann::json doc = nlohmann::json::parse(index_def_str.begin(), index_def_str.end());
 
     std::shared_ptr<IndexBase> res = nullptr;
     std::string index_type_name = doc["index_type"].get<std::string>();
     IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
     std::shared_ptr<std::string> index_name = std::make_shared<std::string>(doc["index_name"].get<std::string>());
 
-    std::shared_ptr<std::string> index_comment;
-    if (std::string index_comment_json; doc["index_comment"].get<std::string>(index_comment_json) == simdjson::SUCCESS) {
-        index_comment = std::make_shared<std::string>(index_comment_json);
-    } else {
-        index_comment = std::make_shared<std::string>();
-    }
+    std::shared_ptr<std::string> index_comment = (doc.contains("index_comment") && doc["index_comment"].is_string())
+                                                     ? std::make_shared<std::string>(doc["index_comment"].get<std::string>())
+                                                     : std::make_shared<std::string>();
 
     std::string file_name = doc["file_name"].get<std::string>();
     std::vector<std::string> column_names = doc["column_names"].get<std::vector<std::string>>();
     switch (index_type) {
         case IndexType::kIVF: {
-            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(doc["ivf_option"].raw_json());
+            const auto ivf_option = IndexIVF::DeserializeIndexIVFOption(doc["ivf_option"].dump());
             res = std::make_shared<IndexIVF>(index_name, index_comment, file_name, std::move(column_names), ivf_option);
             break;
         }
@@ -251,12 +262,12 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             MetricType metric_type = StringToMetricType(doc["metric_type"].get<std::string>());
             HnswEncodeType encode_type = StringToHnswEncodeType(doc["encode_type"].get<std::string>());
             HnswBuildType build_type = HnswBuildType::kPlain;
-            if (std::string build_type_json; doc["build_type"].get<std::string>(build_type_json) == simdjson::SUCCESS) {
-                build_type = StringToHnswBuildType(build_type_json);
+            if (doc.contains("build_type") && doc["build_type"].is_string()) {
+                build_type = StringToHnswBuildType(doc["build_type"].get<std::string>());
             }
             std::optional<LSGConfig> lsg_config = std::nullopt;
-            if (std::string lsg_config_json; doc["lsg_config"].get<std::string>(lsg_config_json) == simdjson::SUCCESS) {
-                lsg_config = LSGConfig::FromString(lsg_config_json);
+            if (doc.contains("lsg_config") && doc["lsg_config"].is_string()) {
+                lsg_config = LSGConfig::FromString(doc["lsg_config"].get<std::string>());
             }
             res = std::make_shared<IndexHnsw>(index_name,
                                               index_comment,
@@ -293,10 +304,8 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
         case IndexType::kFullText: {
             std::string analyzer = doc["analyzer"].get<std::string>();
             auto ft_res = std::make_shared<IndexFullText>(index_name, index_comment, file_name, std::move(column_names), analyzer);
-            u8 flag_json;
-            simdjson::error_code error = doc["flag"].get<u8>(flag_json);
-            if (error == simdjson::SUCCESS) {
-                u8 flag = flag_json;
+            if (doc.contains("flag") && doc["flag"].is_number_unsigned()) {
+                u8 flag = static_cast<u8>(doc["flag"].get<uint64_t>());
                 ft_res->flag_ = flag;
             }
             res = ft_res;
@@ -304,12 +313,33 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
         }
         case IndexType::kSecondary: {
             SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
-            if (std::string cardinality_json; doc["cardinality"].get<std::string>(cardinality_json) == simdjson::SUCCESS) {
-                if (cardinality_json == "low") {
+            if (doc.contains("cardinality") && doc["cardinality"].is_string()) {
+                if (doc["cardinality"].get<std::string>() == "low") {
                     secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
                 }
             }
             res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
+            break;
+        }
+        case IndexType::kSecondaryFunctional: {
+            SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality;
+            if (doc.contains("cardinality") && doc["cardinality"].is_string()) {
+                if (doc["cardinality"].get<std::string>() == "low") {
+                    secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
+                }
+            }
+
+            std::string func_col_params_str = doc["func_col_params"].get<std::string>();
+            auto func_return_type = DataType::Deserialize(doc["func_return_type"].get<nlohmann::json>().dump());
+            std::string function_expression_str = doc["function_expression"].get<nlohmann::json>().dump();
+            res = std::make_shared<IndexSecondaryFunctional>(index_name,
+                                                             index_comment,
+                                                             file_name,
+                                                             std::move(column_names),
+                                                             std::make_shared<std::string>(func_col_params_str),
+                                                             *func_return_type,
+                                                             std::make_shared<std::string>(function_expression_str),
+                                                             secondary_index_cardinality);
             break;
         }
         case IndexType::kEMVB: {

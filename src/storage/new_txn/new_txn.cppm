@@ -98,6 +98,8 @@ struct RestoreDatabaseTxnStore;
 struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
 class IndexBase;
+class IndexSecondaryFunctional;
+class SecondaryIndexInMem;
 struct DataBlock;
 class TableDef;
 struct TableInfo;
@@ -524,6 +526,23 @@ private:
                                        ColumnID column_id,
                                        std::shared_ptr<ColumnDef> column_def,
                                        std::vector<ChunkID> &new_chunk_ids);
+
+    Status PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> index_base,
+                                                 SegmentIndexMeta &segment_index_meta,
+                                                 SegmentMeta &segment_meta,
+                                                 size_t segment_row_cnt,
+                                                 ColumnID column_id,
+                                                 std::shared_ptr<ColumnDef> column_def,
+                                                 std::vector<ChunkID> &new_chunk_ids);
+
+    std::shared_ptr<ColumnVector>
+    ExecuteFunctionExpression(const IndexSecondaryFunctional *functional_index, const ColumnVector &col, ColumnID column_id);
+
+    std::tuple<std::shared_ptr<SecondaryIndexInMem>, Status> GetSecondaryIndexInMem(SegmentIndexMeta &segment_index_meta,
+                                                                                    DataType secondary_index_type,
+                                                                                    RowID base_row_id,
+                                                                                    std::shared_ptr<MemIndex> mem_index,
+                                                                                    SecondaryIndexCardinality cardinality);
 
     Status PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
