@@ -370,6 +370,8 @@ public:
 
     [[nodiscard]] std::string ToString() const;
 
+    static Value StringToValue(const std::string &str, const DataType &target_type);
+
     [[nodiscard]] i64 ToInteger() const;
 
     [[nodiscard]] f32 ToFloat() const;
