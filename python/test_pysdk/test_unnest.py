@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 from common import common_values
 import infinity
-from numpy import dtype
 from infinity.common import ConflictType, Array
 
 from infinity.infinity_http import infinity_http

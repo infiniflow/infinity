@@ -2,7 +2,6 @@ import numpy as np
 import time
 import pandas as pd
 import pytest
-from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
