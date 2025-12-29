@@ -125,7 +125,8 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         auto index_dir = segment_index_meta_.GetSegmentIndexDir();
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
         switch (index_base->index_type_) {
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kSecondaryFunctional: {
                 auto index_file_name = IndexFileName(chunk_id_);
                 auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
                 auto index_file_worker = std::make_unique<SecondaryIndexFileWorker>(rel_file_path, index_base, column_def, chunk_info.row_cnt_);
@@ -209,7 +210,8 @@ Status ChunkIndexMeta::LoadSet() {
     auto index_dir = segment_index_meta_.GetSegmentIndexDir();
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
             auto index_file_worker = std::make_unique<SecondaryIndexFileWorker>(rel_file_path, index_base, column_def, row_count);
@@ -432,6 +434,7 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         case IndexType::kEMVB:
         case IndexType::kIVF:
         case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional:
         case IndexType::kBMP: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
@@ -468,7 +471,8 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
         return index_status;
     }
     switch (index_def->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_file_worker_ = fileworker_mgr->secondary_map_.GetFileWorker(index_filepath);

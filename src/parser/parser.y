@@ -4229,6 +4229,49 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
     $$->column_name_ = $2;
     free($2);
 }
+| '(' function_expr ')' {
+    $$ = new infinity::IndexInfo();
+    $$->index_type_ = infinity::IndexType::kSecondaryFunctional;
+    $$->function_expr_ = $2;
+}
+
+| '(' function_expr ')' USING IDENTIFIER with_index_param_list {
+ParserHelper::ToLower($5);
+    infinity::IndexType index_type = infinity::IndexType::kInvalid;
+    if(strcmp($5, "secondary") == 0){
+        index_type = infinity::IndexType::kSecondary;
+        free($5);
+    } else {
+        free($5);
+        free($2);
+        delete $6;
+        yyerror(&yyloc, scanner, result, "functional index must be secondary index");
+        YYERROR;
+    }
+
+    $$ = new infinity::IndexInfo();
+    $$->index_type_ = infinity::IndexType::kSecondaryFunctional;
+    $$->function_expr_ = $2;
+    $$->index_param_list_ = $6;
+
+    // Handle secondary index cardinality parameter
+    if (index_type == infinity::IndexType::kSecondary && $$->index_param_list_ != nullptr) {
+        for (auto *param : *($$->index_param_list_)) {
+            if (strcasecmp(param->param_name_.c_str(), "cardinality") == 0) {
+                if (strcasecmp(param->param_value_.c_str(), "high") == 0) {
+                    $$->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kHighCardinality;
+                } else if (strcasecmp(param->param_value_.c_str(), "low") == 0) {
+                    $$->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kLowCardinality;
+                } else {
+                    delete $6;
+                    free($2);
+                    yyerror(&yyloc, scanner, result, "Invalid cardinality value. Must be 'high' or 'low'");
+                    YYERROR;
+                }
+            }
+        }
+    }
+}
 
 
 %%

@@ -71,6 +71,14 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
             VisitNodeExpression(op);
             break;
         }
+        case LogicalNodeType::kCreateIndex: {
+            bindings_ = op.GetColumnBindings();
+            output_types_ = op.GetOutputTypes();
+            VisitNodeChildren(op);
+            load_func();
+            VisitNodeExpression(op);
+            break;
+        }
         default: {
             VisitNodeChildren(op);
             load_func();
