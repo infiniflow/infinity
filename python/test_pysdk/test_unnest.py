@@ -49,9 +49,7 @@ class TestInfinity:
         )
 
         res, extra_result = table_obj.output(["unnest(c2)"]).to_df()
-        gt = pd.DataFrame({"unnest(c2)": [0, 0, 0, 1, 1, 2, 2, 2, 3, 3]}).astype(
-            dtype("int32")
-        )
+        gt = pd.DataFrame({"unnest(c2)": [0, 0, 0, 1, 1, 2, 2, 2, 3, 3]}).astype('Int32')
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True), gt
         )
@@ -62,7 +60,7 @@ class TestInfinity:
                 "c1": [1, 1, 2, 2, 3, 3, 3, 4, 4, 4],
                 "unnest(c2)": [0, 1, 2, 3, 0, 1, 2, 0, 2, 3],
             }
-        ).astype({"c1": dtype("int32"), "unnest(c2)": dtype("int32")})
+        ).astype({"c1": 'Int32', "unnest(c2)": 'Int32'})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True), gt
         )
@@ -85,7 +83,7 @@ class TestInfinity:
                 ],
                 "unnest(c2)": [0, 1, 2, 3, 0, 1, 2, 0, 2, 3],
             }
-        ).astype({"c1": dtype("int32"), "unnest(c2)": dtype("int32")})
+        ).astype({"c1": 'Int32', "unnest(c2)": 'Int32'})
         pd.testing.assert_frame_equal(res, gt)
 
         res, extra_result = (
@@ -96,7 +94,7 @@ class TestInfinity:
                 "c1": [3, 3, 3, 4, 4, 4],
                 "uc2": [0, 1, 2, 0, 2, 3],
             }
-        ).astype({"c1": dtype("int32"), "uc2": dtype("int32")})
+        ).astype({"c1": 'Int32', "uc2": 'Int32'})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True), gt
         )
@@ -109,7 +107,7 @@ class TestInfinity:
                 "c1": [2, 2, 3, 4, 4],
                 "uc2": [2, 3, 2, 2, 3],
             }
-        ).astype({"c1": dtype("int32"), "uc2": dtype("int32")})
+        ).astype({"c1": 'Int32', "uc2": 'Int32'})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True), gt
         )
@@ -122,7 +120,7 @@ class TestInfinity:
                 "uc2": [0, 1, 2, 3],
                 "sum(c1)": [8, 4, 9, 6],
             }
-        ).astype({"uc2": dtype("int32"), "sum(c1)": dtype("int64")})
+        ).astype({"uc2": 'Int32', "sum(c1)": 'Int64'})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True), gt
         )

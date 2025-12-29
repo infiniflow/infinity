@@ -56,6 +56,10 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "json_extract_bool"
     elif binary_expr_key == "jsonextractisnull":
         return "json_extract_isnull"
+    elif binary_expr_key == "jsonexistspath":
+        return "json_exists_path"
+    elif binary_expr_key == "jsoncontains":
+        return "json_contains"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
 
