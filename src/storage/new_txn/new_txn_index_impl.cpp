@@ -1650,7 +1650,7 @@ NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *secondary_func
     }
 
     std::shared_ptr<FunctionExpression> function_expression = std::dynamic_pointer_cast<FunctionExpression>(base_expr);
-    if (function_expression == nullptr) {
+    if (!function_expression) {
         LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}", *function_expression_json_str));
         return nullptr;
     }

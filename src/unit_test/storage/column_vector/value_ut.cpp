@@ -19,6 +19,7 @@ module;
 module infinity_core:ut.value;
 
 import :ut.base_test;
+import :json_manager;
 
 using namespace infinity;
 
@@ -98,6 +99,17 @@ TEST_F(ValueStringTest, test_tostring) {
 
         Value empty_val = Value::MakeVarchar("");
         EXPECT_EQ(empty_val.ToString(), "");
+    }
+
+    // Test JSON object
+    {
+        auto json = nlohmann::json::parse("{\"key\": \"value\", \"number\": 42}");
+        auto bson = JsonManager::to_bson(json);
+        Value val = Value::MakeJson(bson, nullptr);
+
+        std::string json_str = val.ToString();
+        auto parsed_json = nlohmann::json::parse(json_str);
+        EXPECT_EQ(parsed_json, json);
     }
 }
 
@@ -206,5 +218,15 @@ TEST_F(ValueStringTest, test_stringtovalue) {
         TimestampT expected_timestamp;
         expected_timestamp.FromString("2023-12-25 14:30:45");
         EXPECT_EQ(val.GetValue<TimestampT>(), expected_timestamp);
+    }
+
+    // Test JSON object
+    {
+        Value val = Value::StringToValue("{\"key\": \"value\", \"number\": 42}", DataType(LogicalType::kJson));
+        // Parse and stringify to compare
+        auto json = nlohmann::json::parse("{\"key\": \"value\", \"number\": 42}");
+        auto bson = JsonManager::to_bson(json);
+        Value expected_val = Value::MakeJson(bson, nullptr);
+        EXPECT_EQ(val, expected_val);
     }
 }

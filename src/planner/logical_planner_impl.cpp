@@ -891,7 +891,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             auto expression_binder = std::make_shared<ExpressionBinder>(query_context_ptr_);
             auto base_expression = expression_binder->BuildFuncExpr(*function_expr, bind_context_ptr.get(), 0, true);
             function_expression_ptr = std::dynamic_pointer_cast<FunctionExpression>(base_expression);
-            if (function_expression_ptr == nullptr) {
+            if (!function_expression_ptr) {
                 RecoverableError(Status::NotSupport("Invalid function expression for secondary functional index"));
                 break;
             }
@@ -951,8 +951,10 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         column_remapper->ApplyToPlan(query_context_ptr_, logical_node);
 
         std::shared_ptr<IndexSecondaryFunctional> index_secondary_functional = std::dynamic_pointer_cast<IndexSecondaryFunctional>(base_index_ptr);
-        index_secondary_functional->SetFunctionExpressionJsonStr(
-            std::make_shared<std::string>(logical_create_index_operator->function_expression_->Serialize().dump()));
+        if (index_secondary_functional) {
+            index_secondary_functional->SetFunctionExpressionJsonStr(
+                std::make_shared<std::string>(logical_create_index_operator->function_expression_->Serialize().dump()));
+        }
     }
 
     this->logical_plan_ = logical_create_index_operator;
