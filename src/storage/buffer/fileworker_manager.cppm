@@ -146,10 +146,11 @@ private:
     // }
 
     // mutable std::shared_mutex rw_mutex_;
-    mutable std::mutex mutex_;
+    inline static std::mutex mutex_;
     // static constexpr size_t MAX_BUCKET_NUM_ = 42;
-    size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
-    size_t current_mem_usage_{};
+    // size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
+    inline static size_t MAX_CAPACITY_ = 8 * 1024 * 1024 * 1024ull;
+    inline static size_t current_mem_usage_{};
     std::list<DataT> payloads_;
     std::unordered_map<DataT, std::string> data_path_map_;
     std::unordered_map<std::string, decltype(payloads_.begin())> path_data_map_;
