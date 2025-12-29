@@ -94,75 +94,115 @@ void JsonExtractExistPath(const DataBlock &input, std::shared_ptr<ColumnVector> 
     JsonExtractor<BooleanT, JsonManager::json_extract_exists_path, Value::MakeBool>::Execute(input, output);
 }
 
+void JsonContains(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    if (input.column_count() != 2) {
+        RecoverableError(Status::SyntaxError("JsonContains: Invalid column size."));
+    }
+
+    const auto &json_column = input.column_vectors_[0];
+    const auto &path_column = input.column_vectors_[1];
+
+    auto rvarchar = path_column->GetVarchar(0);
+    auto token = std::string(rvarchar.data(), rvarchar.size());
+
+    auto json_column_data = reinterpret_cast<const JsonT *>(json_column->data().get());
+    auto row_count = input.row_count();
+
+    if (json_column->vector_type() == ColumnVectorType::kFlat) {
+        for (size_t row_index = 0; row_index < row_count; row_index++) {
+            const auto json_info = json_column_data[row_index];
+            auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(json_data), reinterpret_cast<const uint8_t *>(json_data) + json_info.length_);
+            auto json = JsonManager::from_bson(bson);
+            BooleanT flag = JsonManager::json_contains(json, token);
+            Value v = Value::MakeBool(flag);
+            output->AppendValue(v);
+        }
+        output->Finalize(row_count);
+    } else {
+        RecoverableError(Status::SyntaxError("JsonContains: Invalid column type."));
+    }
+}
+
 void RegisterJsonFunction(NewCatalog *catalog_ptr) {
     {
         std::string func_name = "json_extract";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kVarchar),
-                                    JsonExtractString);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kVarchar),
+                                     JsonExtractString);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_string";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kVarchar),
-                                    JsonExtractString);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kVarchar),
+                                     JsonExtractString);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_int";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kInteger),
-                                    JsonExtractInt);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kInteger),
+                                     JsonExtractInt);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_double";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kDouble),
-                                    JsonExtractDouble);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kDouble),
+                                     JsonExtractDouble);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_bool";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kBoolean),
-                                    JsonExtractBool);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kBoolean),
+                                     JsonExtractBool);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_extract_isnull";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kBoolean),
-                                    JsonExtractIsNull);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kBoolean),
+                                     JsonExtractIsNull);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
     {
         std::string func_name = "json_exists_path";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_extract(func_name,
-                                    {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                    DataType(LogicalType::kBoolean),
-                                    JsonExtractExistPath);
-        function_set_ptr->AddFunction(json_extract);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kBoolean),
+                                     JsonExtractExistPath);
+        function_set_ptr->AddFunction(json_function);
+        NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
+    }
+    {
+        std::string func_name = "json_contains";
+        std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+        ScalarFunction json_function(func_name,
+                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                     DataType(LogicalType::kBoolean),
+                                     JsonContains);
+        function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
 }

@@ -314,4 +314,11 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &da
     return {true, true};
 }
 
+BooleanT JsonManager::json_contains(JsonTypeDef &data, const std::string &token) {
+    if (data.is_array()) {
+        return std::find(data.begin(), data.end(), token) != data.end();
+    }
+    return false;
+}
+
 } // namespace infinity

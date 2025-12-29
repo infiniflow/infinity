@@ -31,5 +31,5 @@ export void JsonExtractDouble(std::shared_ptr<BaseExtraInfo> extract_ptr, const 
 export void JsonExtractBool(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
 export void JsonExtractIsNull(std::shared_ptr<BaseExtraInfo> extract_ptr, const DataBlock &, std::shared_ptr<ColumnVector> &);
 export void RegisterJsonFunction(NewCatalog *catalog_ptr);
-
+export void JsonContains(const DataBlock &input, std::shared_ptr<ColumnVector> &output);
 } // namespace infinity
