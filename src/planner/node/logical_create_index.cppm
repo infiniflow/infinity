@@ -19,6 +19,7 @@ import :column_binding;
 import :logical_node;
 import :base_table_ref;
 import :index_base;
+import :function_expression;
 
 import internal_types;
 import extra_ddl_info;
@@ -42,9 +43,10 @@ public:
     inline LogicalCreateIndex(u64 node_id,
                               std::shared_ptr<BaseTableRef> base_table_ref,
                               std::shared_ptr<IndexBase> index_base,
-                              ConflictType conflict_type)
+                              ConflictType conflict_type,
+                              std::shared_ptr<FunctionExpression> function_expression)
         : LogicalNode(node_id, LogicalNodeType::kCreateIndex), base_table_ref_(base_table_ref), index_definition_(index_base),
-          conflict_type_(conflict_type) {}
+          conflict_type_(conflict_type), function_expression_(std::move(function_expression)) {}
 
 public:
     [[nodiscard]] inline std::shared_ptr<BaseTableRef> base_table_ref() const { return base_table_ref_; }
@@ -53,9 +55,14 @@ public:
 
     [[nodiscard]] inline ConflictType conflict_type() const { return conflict_type_; }
 
+    [[nodiscard]] inline std::shared_ptr<FunctionExpression> function_expression() const { return function_expression_; }
+
 private:
     std::shared_ptr<BaseTableRef> base_table_ref_{};
     std::shared_ptr<IndexBase> index_definition_{};
     ConflictType conflict_type_{ConflictType::kInvalid};
+
+public:
+    std::shared_ptr<FunctionExpression> function_expression_{};
 };
 } // namespace infinity

@@ -25,6 +25,7 @@ import :file_worker;
 import :logger;
 import :index_base;
 import :index_secondary;
+import :index_secondary_functional;
 import :secondary_index_data;
 import :infinity_exception;
 import :persistence_manager;
@@ -67,7 +68,7 @@ bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<LowCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
-    auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
+    auto index = GetSecondaryIndexData(std::make_shared<DataType>(index_data_type_), row_count_, false);
     // data = std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(index);
     data = index;
     if (!file_handle) {
@@ -80,7 +81,7 @@ void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<LowCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
-    auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
+    auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
     data = index;
     if (!file_handle) {
         return;
