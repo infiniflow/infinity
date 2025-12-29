@@ -112,15 +112,16 @@ private:
                 data_path_map_.erase(data);
                 memory_map_.erase(path);
 
-                if constexpr (std::same_as<DataT, HnswHandlerPtr>) {
-                    // munmap(mmap_, mmap_size_);
-                    // mmap_ = nullptr;
-                    auto mem_usage = data->MemUsage();
-                    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-                    if (memindex_tracer != nullptr) {
-                        memindex_tracer->DecreaseMemUsed(mem_usage);
-                    }
-                }
+                // if constexpr (std::is_same_v<DataT, HnswHandler *>) {
+                //     // munmap(mmap_, mmap_size_);
+                //     // mmap_ = nullptr;
+                //     auto mem_usage = data->MemUsage();
+                //     std::println("decrease {}", mem_usage);
+                //     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+                //     if (memindex_tracer != nullptr) {
+                //         memindex_tracer->DecreaseMemUsed(mem_usage);
+                //     }
+                // }
                 delete data;
                 // ClearData();
 
