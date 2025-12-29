@@ -50,7 +50,7 @@ null
 0.123000
 null
 
-query V
+query VI
 SELECT json_extract_bool(c3, '$.2') FROM test_json_filter;
 ----
 null
@@ -60,7 +60,7 @@ null
 null
 true
 
-query VI
+query VII
 SELECT json_extract_isnull(c3, '$.1') FROM test_json_filter;
 ----
  null
@@ -69,6 +69,68 @@ SELECT json_extract_isnull(c3, '$.1') FROM test_json_filter;
  true
  false
  null
+
+statement ok
+INSERT INTO test_json_filter VALUES (6, 'g', '[1,2.3,null,"i am string",true]')
+
+statement ok
+INSERT INTO test_json_filter VALUES (7, 'h', '["电商", "美妆", "母婴"]')
+
+statement ok
+INSERT INTO test_json_filter VALUES (8, 'i', '[{"name":"张三", "age":25}, {"name":"李四", "age":30}]')
+
+query VIII
+SELECT * FROM test_json_filter WHERE json_contains(c3, '"美妆"');
+----
+7 h ["电商","美妆","母婴"]
+
+query IX
+SELECT c1, json_extract(c3, '$[0]') FROM test_json_filter;
+----
+0 null
+1 null
+2 null
+3 null
+4 null
+5 null
+6 1
+7 "电商"
+8 {"age":25,"name":"张三"}
+
+query X
+SELECT parse_json('{"k1": "100"}');
+----
+{"k1":"100"}
+
+query XI
+SELECT CAST(json_extract(c3, '$.1') AS INT) FROM test_json_filter;
+----
+null
+123
+null
+null
+  0
+null
+null
+null
+null
+
+statement ok
+INSERT INTO test_json_filter VALUES (9, 'j', '{"a":[{"aa":111,"bb":222},null,"zpf"]}')
+
+query XII
+SELECT json_extract(c3, '$.a[0]') FROM test_json_filter;
+----
+null
+null
+null
+null
+null
+null
+null
+null
+null
+{"aa":111,"bb":222}
 
 statement ok
 DROP TABLE test_json_filter;

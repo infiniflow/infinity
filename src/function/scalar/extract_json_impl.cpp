@@ -30,7 +30,7 @@ namespace infinity {
 
 void JsonExtractBase(const DataBlock &, std::shared_ptr<ColumnVector> &) {}
 
-template <typename T, std::tuple<bool, T> (*ExtractFunc)(JsonTypeDef &, const std::vector<std::string> &), Value (*MakeValueFunc)(T)>
+template <typename T, std::tuple<bool, T> (*ExtractFunc)(JsonTypeDef &, const std::vector<JsonTokenInfo> &), Value (*MakeValueFunc)(T)>
 class JsonExtractor {
 public:
     static void Execute(const DataBlock &input_block, std::shared_ptr<ColumnVector> &output_column) {

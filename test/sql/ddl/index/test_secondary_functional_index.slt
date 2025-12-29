@@ -69,9 +69,9 @@ query I
 EXPLAIN SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1 AND substring(c2, 0, 5) = 'hello';
 ----
 PROJECT (4)
- - table index: #4
+  - table index: #4
   - expressions: [c1 (#0), c2 (#1)]
- -> INDEX SCAN (6)
+-> INDEX SCAN (6)
     - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
     - table index: #1
     - filter: (sqrt(c1 (#1.0)) > CAST(1 AS Double)) AND (substring(c2 (#1.1), 0, 5) = hello)

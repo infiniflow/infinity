@@ -91,8 +91,8 @@ bool JsonManager::check_json_path(const std::string_view &json_path) {
     return true;
 }
 
-std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const std::string &json_path) {
-    std::vector<std::string> json_tokens;
+std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get_json_tokens(const std::string &json_path) {
+    std::vector<std::pair<JsonType, std::string>> json_tokens;
 
     if (!JsonManager::check_json_path(json_path)) {
         return {false, {}};
@@ -126,7 +126,7 @@ std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const st
             }
 
             if (is_numeric_index) {
-                json_tokens.emplace_back(index_content);
+                json_tokens.emplace_back(std::make_pair(JsonType::kJsonArray, index_content));
             } else {
                 return {false, {}};
             }
@@ -144,7 +144,7 @@ std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const st
             if (token_end > pos) {
                 std::string_view token = remaining.substr(pos, token_end - pos);
                 if (!token.empty()) {
-                    json_tokens.emplace_back(token);
+                    json_tokens.emplace_back(std::make_pair(JsonType::kJsonObject, token));
                 }
                 pos = token_end;
             } else {
@@ -156,12 +156,14 @@ std::tuple<bool, std::vector<std::string>> JsonManager::get_json_tokens(const st
     return {true, std::move(json_tokens)};
 }
 
-std::tuple<bool, std::string> JsonManager::json_extract(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, std::string> JsonManager::json_extract(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token.second);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -170,8 +172,8 @@ std::tuple<bool, std::string> JsonManager::json_extract(JsonTypeDef &data, const
             } catch (const std::exception &e) {
                 return {false, "null"};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {false, "null"};
         }
@@ -179,12 +181,14 @@ std::tuple<bool, std::string> JsonManager::json_extract(JsonTypeDef &data, const
     return {true, current.dump()};
 }
 
-std::tuple<bool, IntegerT> JsonManager::json_extract_int(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, IntegerT> JsonManager::json_extract_int(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token_value);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -193,8 +197,8 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(JsonTypeDef &data, cons
             } catch (const std::exception &e) {
                 return {false, 0};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {false, 0};
         }
@@ -207,12 +211,14 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(JsonTypeDef &data, cons
     }
 }
 
-std::tuple<bool, DoubleT> JsonManager::json_extract_double(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, DoubleT> JsonManager::json_extract_double(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token_value);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -221,8 +227,8 @@ std::tuple<bool, DoubleT> JsonManager::json_extract_double(JsonTypeDef &data, co
             } catch (const std::exception &e) {
                 return {false, 0.0};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {false, 0.0};
         }
@@ -235,12 +241,14 @@ std::tuple<bool, DoubleT> JsonManager::json_extract_double(JsonTypeDef &data, co
     }
 }
 
-std::tuple<bool, BooleanT> JsonManager::json_extract_bool(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, BooleanT> JsonManager::json_extract_bool(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token_value);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -249,8 +257,8 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_bool(JsonTypeDef &data, con
             } catch (const std::exception &e) {
                 return {false, false};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {false, false};
         }
@@ -263,12 +271,14 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_bool(JsonTypeDef &data, con
     }
 }
 
-std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token_value);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -277,8 +287,8 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(JsonTypeDef &data, 
             } catch (const std::exception &e) {
                 return {false, false};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {false, false};
         }
@@ -291,12 +301,14 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_is_null(JsonTypeDef &data, 
     }
 }
 
-std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &data, const std::vector<std::string> &tokens) {
+std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     JsonTypeDef &current = data;
     for (const auto &token : tokens) {
-        if (current.is_array() && token.find_first_not_of("0123456789") == std::string::npos) {
+        const auto &token_type = token.first;
+        const auto &token_value = token.second;
+        if (current.is_array() && token_type == JsonType::kJsonArray) {
             try {
-                size_t index = std::stoul(token);
+                size_t index = std::stoul(token_value);
                 if (index < current.size()) {
                     current = current[index];
                 } else {
@@ -305,8 +317,8 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &da
             } catch (const std::exception &e) {
                 return {true, false};
             }
-        } else if (current.is_object() && current.contains(token)) {
-            current = current[token];
+        } else if (current.is_object() && token_type == JsonType::kJsonObject && current.contains(token_value)) {
+            current = current[token_value];
         } else {
             return {true, false};
         }

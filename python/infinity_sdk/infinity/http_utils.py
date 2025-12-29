@@ -144,21 +144,21 @@ type_transfrom = {
 def type_to_dtype(type):
     match type.lower():
         case "bool":
-            return dtype("bool")
+            return 'boolean'
         case "boolean":
-            return dtype("bool")
+            return 'boolean'
         case "tinyint":
-            return dtype("int8")
+            return 'Int8'
         case "smallint":
-            return dtype("int16")
+            return 'Int16'
         case "integer":
-            return dtype("int32")
+            return 'Int32'
         case "int":
-            return dtype("int32")
+            return 'Int32'
         case "int32":
-            return dtype("int32")
+            return 'Int32'
         case "bigint":
-            return dtype("int64")
+            return 'Int64'
         case "float":
             return dtype("float32")
         case "float32":

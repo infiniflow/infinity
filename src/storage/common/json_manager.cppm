@@ -25,6 +25,8 @@ import third_party;
 namespace infinity {
 
 export using JsonTypeDef = nlohmann::json;
+export enum class JsonType : uint8_t { kInvalid, kJsonObject, kJsonArray };
+export using JsonTokenInfo = std::pair<JsonType, std::string>;
 
 export class JsonManager {
 public:
@@ -45,17 +47,17 @@ public:
     static bool check_json_path(const std::string_view &json_path);
 
     // Parse json path
-    static std::tuple<bool, std::vector<std::string>> get_json_tokens(const std::string &json_path);
+    static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::string &json_path);
 
     /* extract json
      * return: arg1: is_null, arg2: result
      */
-    static std::tuple<bool, std::string> json_extract(JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, IntegerT> json_extract_int(JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, DoubleT> json_extract_double(JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_bool(JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_is_null(JsonTypeDef &data, const std::vector<std::string> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_exists_path(JsonTypeDef &data, const std::vector<std::string> &tokens);
+    static std::tuple<bool, std::string> json_extract(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_exists_path(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
 
     static BooleanT json_contains(JsonTypeDef &data, const std::string &token);
 };
