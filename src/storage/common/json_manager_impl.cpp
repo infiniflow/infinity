@@ -316,7 +316,17 @@ std::tuple<bool, BooleanT> JsonManager::json_extract_exists_path(JsonTypeDef &da
 
 BooleanT JsonManager::json_contains(JsonTypeDef &data, const std::string &token) {
     if (data.is_array()) {
-        return std::find(data.begin(), data.end(), token) != data.end();
+        JsonTypeDef parsed_value = JsonTypeDef::parse(token);
+        if (parsed_value.is_string()) {
+            std::string_view token_view = std::string_view(token).substr(1, token.size() - 2);
+            auto it = std::find_if(data.begin(), data.end(), [&token_view](const JsonTypeDef &element) {
+                return element.is_string() && (element.get<std::string>() == token_view);
+            });
+            return it != data.end();
+        } else {
+            auto it = std::find_if(data.begin(), data.end(), [&token](const JsonTypeDef &element) { return element.dump() == token; });
+            return it != data.end();
+        }
     }
     return false;
 }
