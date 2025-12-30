@@ -908,9 +908,19 @@ ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnVal
     Bitmask part_result(segment_row_count);
     part_result.SetAllFalse();
     for (auto &trunk_reader : trunk_readers) {
-        // Set the range for LowCardinality processing
-        auto *typed_reader = static_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get());
-        typed_reader->SetRange(interval_range);
+        // Set the range for TrunkReaderT
+        if (auto *typed_reader_t = dynamic_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get())) {
+            typed_reader_t->SetRange(interval_range);
+        }
+        // Initialize result_cache_ for TrunkReaderM before calling OutPut
+        if (auto *typed_reader_m = dynamic_cast<TrunkReaderM<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get())) {
+            const auto [begin_val, end_val] = interval_range;
+            std::tuple<u32,
+                       typename TrunkReader<ColumnValueType, LowCardinalityTag>::SecondaryIndexOrderedT,
+                       typename TrunkReader<ColumnValueType, LowCardinalityTag>::SecondaryIndexOrderedT>
+                arg_tuple = {typed_reader_m->segment_row_count_, begin_val, end_val};
+            typed_reader_m->result_cache_ = typed_reader_m->memory_secondary_index_->RangeQuery(&arg_tuple);
+        }
         // directly output without GetResultCnt optimization
         trunk_reader->OutPut(part_result);
     }
