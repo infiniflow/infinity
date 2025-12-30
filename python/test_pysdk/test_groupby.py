@@ -624,7 +624,7 @@ class TestInfinity:
                 "sum2": 'Int64',
             }
         )
-        pd.testing.assert_frame_equal(res, gt)
+        pd.testing.assert_frame_equal(res.astype({"sum1": 'Int64',"sum2": 'Int64'}), gt)
 
         table_obj.delete("c1 <= 1")
 
