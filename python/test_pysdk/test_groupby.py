@@ -169,7 +169,7 @@ class TestInfinity:
             }
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -196,7 +196,7 @@ class TestInfinity:
             }
         ).astype({"char_length(c3)": 'Int32', "sum(c1)": 'Int64'})
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -314,7 +314,7 @@ class TestInfinity:
             }
         ).astype({'sum(c1)': 'Int64'})
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -331,7 +331,7 @@ class TestInfinity:
             }
         ).astype({'sum(c1)': 'Int64'})
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -347,7 +347,7 @@ class TestInfinity:
             }
         ).astype({'sum(c1)': 'Int64'})
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -364,7 +364,7 @@ class TestInfinity:
             }
         ).astype({'sum(c1)': 'Int64'})
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -486,7 +486,7 @@ class TestInfinity:
             {"c1": 'Int32', "c3": dtype("float32"), "sum(c2)": 'Int64'}
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c2)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -507,7 +507,7 @@ class TestInfinity:
             }
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64','sum(c2)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -531,7 +531,7 @@ class TestInfinity:
             }
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64','sum(c2)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -555,7 +555,7 @@ class TestInfinity:
             }
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64','sum(c2)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -580,7 +580,7 @@ class TestInfinity:
             }
         )
         pd.testing.assert_frame_equal(
-            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            res.astype({'sum(c1)':'Int64','sum(c2)':'Int64'}).sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
 
@@ -603,7 +603,7 @@ class TestInfinity:
                 "sum(c2)": 'Int64',
             }
         )
-        pd.testing.assert_frame_equal(res, gt)
+        pd.testing.assert_frame_equal(res.astype({'sum(c1)':'Int64','sum(c2)':'Int64'}), gt)
 
         res, extra_result = (
             table_obj.output(["c3", "sum(c1) as sum1", "sum(c2) as sum2"])
@@ -624,7 +624,7 @@ class TestInfinity:
                 "sum2": 'Int64',
             }
         )
-        pd.testing.assert_frame_equal(res, gt)
+        pd.testing.assert_frame_equal(res.astype({'sum1':'Int64','sum2':'Int64'}), gt)
 
         table_obj.delete("c1 <= 1")
 

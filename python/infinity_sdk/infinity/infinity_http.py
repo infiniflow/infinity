@@ -1128,12 +1128,21 @@ class table_http_result:
             for col in res:
                 col_name = next(iter(col))
                 v = col[col_name]
+
+                bitmap = col_name + '_bitmap'
+                bitmap_value = col.get(bitmap)
+                if bitmap_value is not None and not bitmap_value:
+                    v = None
+
                 if col_name not in df_dict:
                     df_dict[col_name] = ()
                 tup = df_dict[col_name]
                 if len(tup) == line_i + 1:
                     continue
-                if isinstance(v, (int, float)):
+
+                if v is None:
+                    new_tup = tup + (v,)
+                elif isinstance(v, (int, float)):
                     new_tup = tup + (v,)
                 elif is_list(v):
                     new_tup = tup + (ast.literal_eval(v),)
@@ -1195,7 +1204,7 @@ class table_http_result:
                     if (function_name in functions):
                         df_type[k] = function_return_type(function_name, None)
                     if (function_name in bool_functions):
-                        df_type[k] = dtype('bool')
+                        df_type[k] = 'boolean'
                         break
 
         end_process = time.perf_counter()

@@ -83,13 +83,13 @@ def function_return_type(function_name, param_type):
         or function_name == "and"
         or function_name == "not"
     ):
-        return dtype("bool")
+        return 'boolean'
     elif function_name == "trunc":
         return dtype("str_")
     elif function_name == "datepart":
-        return dtype("int64")
+        return 'Int64'
     elif function_name == "char_length":
-        return dtype("int32")
+        return 'Int32'
     elif function_name == "sum":
         if (
             param_type == dtype("int8")
@@ -97,23 +97,23 @@ def function_return_type(function_name, param_type):
             or param_type == dtype("int32")
             or param_type == dtype("int64")
         ):
-            return dtype("int64")
+            return 'Int64'
         else:
             return dtype("float64")
     elif function_name == "min" or function_name == "max":
         return param_type
     elif function_name == "count":
-        return dtype("int64")
+        return 'Int64'
     elif function_name == "avg":
         return dtype("float64")
     elif function_name == "json_extract" or function_name == "json_extract_string":
         return dtype("str")
     elif function_name == "json_extract_int":
-        return dtype("int32")
+        return 'Int32'
     elif function_name == "json_extract_double":
         return dtype("float64")
-    elif function_name == "json_extract_bool" or function_name == "json_extract_isnull" or function_name == "json_exists_path":
-        return dtype("bool")
+    elif function_name == "json_extract_bool" or function_name == "json_extract_isnull" or function_name == "json_exists_path" or function_name == "json_contains":
+        return 'boolean'
     else:
         return param_type
 
