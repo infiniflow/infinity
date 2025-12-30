@@ -44,16 +44,6 @@ BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta)
     : begin_ts_(segment_meta.begin_ts()), commit_ts_(segment_meta.commit_ts()), kv_instance_(segment_meta.kv_instance()), segment_meta_(segment_meta),
       block_id_(block_id) {}
 
-Status BlockMeta::GetBlockLock(std::shared_ptr<BlockLock> &block_lock) {
-    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    auto block_lock_key = GetBlockTag("lock");
-    auto status = new_catalog->GetBlockLock(block_lock_key, block_lock);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
     std::string block_key = KeyEncode::CatalogTableSegmentBlockKey(segment_meta_.table_meta().db_id_str(),
                                                                    segment_meta_.table_meta().table_id_str(),
@@ -68,19 +58,6 @@ TxnTimeStamp BlockMeta::GetCreateTimestampFromKV() const {
 }
 
 Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
-    {
-        auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        std::string block_lock_key = GetBlockTag("lock");
-        Status status;
-        if (checkpoint_ts == 0) {
-            status = new_catalog->AddBlockLock(std::move(block_lock_key));
-        } else {
-            status = new_catalog->AddBlockLock(std::move(block_lock_key), checkpoint_ts);
-        }
-        if (!status.ok()) {
-            return status;
-        }
-    }
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
@@ -93,12 +70,6 @@ Status BlockMeta::InitOrLoadSet(TxnTimeStamp checkpoint_ts) {
 
 Status BlockMeta::RestoreSetFromSnapshot() {
     // TODO: need to fix this
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    {
-        std::string block_lock_key = GetBlockTag("lock");
-
-        Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
-    }
     // auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
@@ -119,16 +90,6 @@ Status BlockMeta::RestoreSetFromSnapshot() {
 }
 
 Status BlockMeta::UninitSet(UsageFlag usage_flag) {
-    if (usage_flag == UsageFlag::kOther) {
-        auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        {
-            std::string block_lock_key = GetBlockTag("lock");
-            LOG_TRACE(fmt::format("UninitSet: dropping block lock for block key: {}", block_lock_key));
-            if (auto status = new_catalog->DropBlockLockByBlockKey(block_lock_key); !status.ok()) {
-                return status;
-            }
-        }
-    }
     {
         std::string filter_key = GetBlockTag("fast_rough_filter");
         LOG_TRACE(fmt::format("UninitSet: fast rough filter key: {}", filter_key));
@@ -150,7 +111,7 @@ Status BlockMeta::UninitSet(UsageFlag usage_flag) {
 }
 
 std::tuple<VersionFileWorker *, Status> BlockMeta::GetVersionFileWorker() {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (!version_file_worker_) {
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 

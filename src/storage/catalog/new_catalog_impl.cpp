@@ -82,58 +82,6 @@ Status NewCatalog::Init(KVStore *kv_store) {
     return Status::OK();
 }
 
-Status NewCatalog::AddBlockLock(std::string block_key) {
-    bool insert_success = false;
-    std::unordered_map<std::string, std::shared_ptr<BlockLock>>::iterator iter;
-    {
-        std::unique_lock lock(block_lock_mtx_);
-        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), std::make_shared<BlockLock>());
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::AddBlockLock(std::string block_key, TxnTimeStamp checkpoint_ts) {
-    bool insert_success = false;
-    std::unordered_map<std::string, std::shared_ptr<BlockLock>>::iterator iter;
-    {
-        std::unique_lock lock(block_lock_mtx_);
-        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), std::make_shared<BlockLock>(checkpoint_ts));
-    }
-    if (!insert_success) {
-        return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetBlockLock(const std::string &block_key, std::shared_ptr<BlockLock> &block_lock) {
-    block_lock = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
-        if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
-            block_lock = iter->second;
-        }
-    }
-    if (block_lock == nullptr) {
-        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::DropBlockLockByBlockKey(const std::string &block_key) {
-    bool delete_success = false;
-    {
-        std::unique_lock lock(block_lock_mtx_);
-        delete_success = block_lock_map_.erase(block_key) > 0;
-    }
-    if (!delete_success) {
-        LOG_WARN(fmt::format("Block key: {} not found", block_key));
-    }
-    return Status::OK();
-}
-
 std::shared_ptr<MemIndex> NewCatalog::GetMemIndex(const std::string &mem_index_key, bool for_update) {
     std::shared_ptr<MemIndex> mem_index = nullptr;
     std::unique_lock<std::shared_mutex> lck(mem_index_mtx_);

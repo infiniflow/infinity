@@ -76,34 +76,34 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnNewCatalog,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnNewCatalog, test_block_lock) {
-    using namespace infinity;
-
-    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    std::string db_id_str = "0";
-    std::string table_id_str = "0";
-    SegmentID segment_id = 0;
-    BlockID block_id = 0;
-    std::string block_key1 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
-    std::string block_key2 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id + 1, "lock");
-
-    Status status = new_catalog->AddBlockLock(block_key1);
-    EXPECT_TRUE(status.ok());
-    status = new_catalog->AddBlockLock(block_key1);
-    EXPECT_FALSE(status.ok());
-    {
-        std::shared_ptr<BlockLock> block_lock;
-        status = new_catalog->GetBlockLock(block_key1, block_lock);
-        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
-        EXPECT_TRUE(status.ok());
-    }
-    status = new_catalog->DropBlockLockByBlockKey(block_key1);
-    EXPECT_TRUE(status.ok());
-    status = new_catalog->DropBlockLockByBlockKey(block_key1);
-    EXPECT_TRUE(status.ok());
-    {
-        std::shared_ptr<BlockLock> block_lock;
-        status = new_catalog->GetBlockLock(block_key1, block_lock);
-        EXPECT_FALSE(status.ok());
-    }
-}
+// TEST_P(TestTxnNewCatalog, test_block_lock) {
+//     using namespace infinity;
+//
+//     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+//     std::string db_id_str = "0";
+//     std::string table_id_str = "0";
+//     SegmentID segment_id = 0;
+//     BlockID block_id = 0;
+//     std::string block_key1 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+//     std::string block_key2 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id + 1, "lock");
+//
+//     Status status = new_catalog->AddBlockLock(block_key1);
+//     EXPECT_TRUE(status.ok());
+//     status = new_catalog->AddBlockLock(block_key1);
+//     EXPECT_FALSE(status.ok());
+//     {
+//         std::shared_ptr<BlockLock> block_lock;
+//         status = new_catalog->GetBlockLock(block_key1, block_lock);
+//         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+//         EXPECT_TRUE(status.ok());
+//     }
+//     status = new_catalog->DropBlockLockByBlockKey(block_key1);
+//     EXPECT_TRUE(status.ok());
+//     status = new_catalog->DropBlockLockByBlockKey(block_key1);
+//     EXPECT_TRUE(status.ok());
+//     {
+//         std::shared_ptr<BlockLock> block_lock;
+//         status = new_catalog->GetBlockLock(block_key1, block_lock);
+//         EXPECT_FALSE(status.ok());
+//     }
+// }

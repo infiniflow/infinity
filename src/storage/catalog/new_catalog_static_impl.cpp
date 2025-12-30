@@ -64,16 +64,11 @@ namespace infinity {
 
 // } // namespace
 
-void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
-                                      VersionFileWorker *version_file_worker,
-                                      TxnTimeStamp begin_ts,
-                                      TxnTimeStamp commit_ts) {
-    block_lock_ = std::move(block_lock);
+void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     version_file_worker_ = std::move(version_file_worker);
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
     {
-        std::shared_lock lock(block_lock_->mtx_);
         // std::shared_ptr<BlockVersion> block_version;
         BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
@@ -99,7 +94,6 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return commit_cnt;
     }
 
-    std::shared_lock lock(block_lock_->mtx_);
     while (block_offset_begin < block_offset_end_ && block_version->CheckDelete(block_offset_begin, begin_ts_)) {
         ++block_offset_begin;
     }
@@ -1111,14 +1105,7 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
         return status;
     }
 
-    std::shared_ptr<BlockLock> block_lock;
-    {
-        status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    state.Init(std::move(block_lock), std::move(version_file_worker), begin_ts, commit_ts);
+    state.Init(std::move(version_file_worker), begin_ts, commit_ts);
     return Status::OK();
 }
 
@@ -1130,17 +1117,11 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
     if (!status.ok()) {
         return status;
     }
-    std::shared_ptr<BlockLock> block_lock;
-    status = block_meta.GetBlockLock(block_lock);
-    if (!status.ok()) {
-        return status;
-    }
 
     // std::shared_ptr<BlockVersion> block_version;
     BlockVersion *block_version{};
     static_cast<FileWorker *>(version_buffer)->Read(block_version);
     {
-        std::shared_lock lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
     }
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
@@ -1156,17 +1137,11 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     if (!status.ok()) {
         return status;
     }
-    std::shared_ptr<BlockLock> block_lock;
-    status = block_meta.GetBlockLock(block_lock);
-    if (!status.ok()) {
-        return status;
-    }
 
     // std::shared_ptr<BlockVersion> block_version;
     BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     {
-        std::shared_lock lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);
     }
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
