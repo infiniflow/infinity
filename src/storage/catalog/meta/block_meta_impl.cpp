@@ -177,11 +177,6 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
 #else
     Status status;
 
-    std::shared_ptr<BlockLock> block_lock;
-    status = this->GetBlockLock(block_lock);
-    if (!status.ok()) {
-        return {0, status};
-    }
     FileWorker *version_buffer;
     std::tie(version_buffer, status) = this->GetVersionFileWorker();
     if (!status.ok()) {
@@ -190,11 +185,7 @@ std::tuple<size_t, Status> BlockMeta::GetRowCnt1() {
 
     const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer->GetData());
 
-    size_t row_cnt = 0;
-    {
-        std::shared_lock lock(block_lock->mtx_);
-        row_cnt = block_version->GetRowCount(begin_ts_);
-    }
+    size_t row_cnt = block_version->GetRowCount(begin_ts_);
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
 #endif
