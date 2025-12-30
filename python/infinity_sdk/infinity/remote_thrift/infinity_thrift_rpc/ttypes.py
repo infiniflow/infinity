@@ -395,8 +395,9 @@ class IndexType(object):
     FullText = 2
     BMP = 3
     Secondary = 4
-    EMVB = 5
-    DiskAnn = 6
+    SecondaryFunctional = 5
+    EMVB = 6
+    DiskAnn = 7
 
     _VALUES_TO_NAMES = {
         0: "IVF",
@@ -404,8 +405,9 @@ class IndexType(object):
         2: "FullText",
         3: "BMP",
         4: "Secondary",
-        5: "EMVB",
-        6: "DiskAnn",
+        5: "SecondaryFunctional",
+        6: "EMVB",
+        7: "DiskAnn",
     }
 
     _NAMES_TO_VALUES = {
@@ -414,8 +416,9 @@ class IndexType(object):
         "FullText": 2,
         "BMP": 3,
         "Secondary": 4,
-        "EMVB": 5,
-        "DiskAnn": 6,
+        "SecondaryFunctional": 5,
+        "EMVB": 6,
+        "DiskAnn": 7,
     }
 
 
@@ -5132,19 +5135,21 @@ class IndexInfo(object):
      - column_name
      - index_type
      - index_param_list
+     - function_expr
 
     """
     thrift_spec = None
 
 
     def __init__(self, column_name = None, index_type = None, index_param_list = [
-    ],):
+    ], function_expr = None,):
         self.column_name = column_name
         self.index_type = index_type
         if index_param_list is self.thrift_spec[3][4]:
             index_param_list = [
             ]
         self.index_param_list = index_param_list
+        self.function_expr = function_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -5176,6 +5181,12 @@ class IndexInfo(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRUCT:
+                    self.function_expr = FunctionExpr()
+                    self.function_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -5201,6 +5212,10 @@ class IndexInfo(object):
             for iter300 in self.index_param_list:
                 iter300.write(oprot)
             oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.function_expr is not None:
+            oprot.writeFieldBegin('function_expr', TType.STRUCT, 4)
+            self.function_expr.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -5555,6 +5570,7 @@ class ShowIndexResponse(object):
      - index_type
      - index_column_names
      - index_column_ids
+     - index_function_info
      - other_parameters
      - store_dir
      - segment_index_count
@@ -5563,7 +5579,7 @@ class ShowIndexResponse(object):
     thrift_spec = None
 
 
-    def __init__(self, error_code = None, error_msg = None, db_name = None, table_name = None, index_name = None, index_comment = None, index_type = None, index_column_names = None, index_column_ids = None, other_parameters = None, store_dir = None, segment_index_count = None,):
+    def __init__(self, error_code = None, error_msg = None, db_name = None, table_name = None, index_name = None, index_comment = None, index_type = None, index_column_names = None, index_column_ids = None, index_function_info = None, other_parameters = None, store_dir = None, segment_index_count = None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_name = db_name
@@ -5573,6 +5589,7 @@ class ShowIndexResponse(object):
         self.index_type = index_type
         self.index_column_names = index_column_names
         self.index_column_ids = index_column_ids
+        self.index_function_info = index_function_info
         self.other_parameters = other_parameters
         self.store_dir = store_dir
         self.segment_index_count = segment_index_count
@@ -5633,15 +5650,20 @@ class ShowIndexResponse(object):
                     iprot.skip(ftype)
             elif fid == 10:
                 if ftype == TType.STRING:
-                    self.other_parameters = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.index_function_info = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 11:
                 if ftype == TType.STRING:
-                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                    self.other_parameters = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 12:
+                if ftype == TType.STRING:
+                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 13:
                 if ftype == TType.STRING:
                     self.segment_index_count = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
@@ -5693,16 +5715,20 @@ class ShowIndexResponse(object):
             oprot.writeFieldBegin('index_column_ids', TType.STRING, 9)
             oprot.writeString(self.index_column_ids.encode('utf-8') if sys.version_info[0] == 2 else self.index_column_ids)
             oprot.writeFieldEnd()
+        if self.index_function_info is not None:
+            oprot.writeFieldBegin('index_function_info', TType.STRING, 10)
+            oprot.writeString(self.index_function_info.encode('utf-8') if sys.version_info[0] == 2 else self.index_function_info)
+            oprot.writeFieldEnd()
         if self.other_parameters is not None:
-            oprot.writeFieldBegin('other_parameters', TType.STRING, 10)
+            oprot.writeFieldBegin('other_parameters', TType.STRING, 11)
             oprot.writeString(self.other_parameters.encode('utf-8') if sys.version_info[0] == 2 else self.other_parameters)
             oprot.writeFieldEnd()
         if self.store_dir is not None:
-            oprot.writeFieldBegin('store_dir', TType.STRING, 11)
+            oprot.writeFieldBegin('store_dir', TType.STRING, 12)
             oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
             oprot.writeFieldEnd()
         if self.segment_index_count is not None:
-            oprot.writeFieldBegin('segment_index_count', TType.STRING, 12)
+            oprot.writeFieldBegin('segment_index_count', TType.STRING, 13)
             oprot.writeString(self.segment_index_count.encode('utf-8') if sys.version_info[0] == 2 else self.segment_index_count)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -10941,6 +10967,7 @@ IndexInfo.thrift_spec = (
     (2, TType.I32, 'index_type', None, None, ),  # 2
     (3, TType.LIST, 'index_param_list', (TType.STRUCT, [InitParameter, None], False), [
     ], ),  # 3
+    (4, TType.STRUCT, 'function_expr', [FunctionExpr, None], None, ),  # 4
 )
 all_structs.append(CreateIndexRequest)
 CreateIndexRequest.thrift_spec = (
@@ -10982,9 +11009,10 @@ ShowIndexResponse.thrift_spec = (
     (7, TType.STRING, 'index_type', 'UTF8', None, ),  # 7
     (8, TType.STRING, 'index_column_names', 'UTF8', None, ),  # 8
     (9, TType.STRING, 'index_column_ids', 'UTF8', None, ),  # 9
-    (10, TType.STRING, 'other_parameters', 'UTF8', None, ),  # 10
-    (11, TType.STRING, 'store_dir', 'UTF8', None, ),  # 11
-    (12, TType.STRING, 'segment_index_count', 'UTF8', None, ),  # 12
+    (10, TType.STRING, 'index_function_info', 'UTF8', None, ),  # 10
+    (11, TType.STRING, 'other_parameters', 'UTF8', None, ),  # 11
+    (12, TType.STRING, 'store_dir', 'UTF8', None, ),  # 12
+    (13, TType.STRING, 'segment_index_count', 'UTF8', None, ),  # 13
 )
 all_structs.append(OptimizeRequest)
 OptimizeRequest.thrift_spec = (

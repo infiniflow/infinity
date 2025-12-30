@@ -1301,6 +1301,22 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         size_t column_id = 0;
         {
+            Value value = Value::MakeVarchar("function_info");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*table_index_info->function_info_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);
+        }
+    }
+
+    {
+        size_t column_id = 0;
+        {
             Value value = Value::MakeVarchar("other_parameters");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors_[column_id]);

@@ -146,15 +146,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
                         BlockID block_id,
                         TxnTimeStamp begin_ts,
                         TxnTimeStamp commit_ts) {
-
-    auto *new_catalog = InfinityContext::instance().storage()->new_catalog();
     auto block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
-
-    std::shared_ptr<BlockLock> block_lock;
-    Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
-    if (!status.ok()) {
-        UnrecoverableError("Failed to get block lock");
-    }
 
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     auto rel_version_filepath = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}", db_id_str, table_id_str, segment_id, block_id, BlockVersion::PATH);
@@ -169,7 +161,6 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
     size_t row_cnt = 0;
     if (block_version) {
         {
-            std::shared_lock lock(block_lock->mtx_);
             row_cnt = block_version->GetRowCount(begin_ts);
             auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
             row_cnt += commit_cnt;

@@ -72,15 +72,15 @@ export struct TableLockForMemIndex {
     size_t append_count_{0};
 };
 
-export struct BlockLock {
-    BlockLock() = default;
-    BlockLock(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
-
-    std::shared_mutex mtx_;
-    TxnTimeStamp min_ts_{};
-    TxnTimeStamp max_ts_{};
-    TxnTimeStamp checkpoint_ts_{};
-};
+// export struct BlockLock {
+//     BlockLock() = default;
+//     BlockLock(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
+//
+//     std::shared_mutex mtx_;
+//     TxnTimeStamp min_ts_{};
+//     TxnTimeStamp max_ts_{};
+//     TxnTimeStamp checkpoint_ts_{};
+// };
 
 export struct SegmentIndexFtInfo {
     u64 ft_column_len_sum_{}; // increase only
@@ -98,7 +98,7 @@ export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
 
-    void Init(std::shared_ptr<BlockLock> block_lock, VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
+    void Init(VersionFileWorker *version_file_worker, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts_);
 
     bool Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range);
 
@@ -111,7 +111,6 @@ public:
     bool end() const { return end_; }
 
 private:
-    std::shared_ptr<BlockLock> block_lock_;
     VersionFileWorker *version_file_worker_{};
     TxnTimeStamp begin_ts_ = 0;
     TxnTimeStamp commit_ts_ = 0;
@@ -161,15 +160,8 @@ private:
 
     std::unordered_map<u64, std::shared_ptr<std::unordered_map<u64, std::shared_ptr<TableCache>>>> table_cache_map_{};
 
-public:
-    Status AddBlockLock(std::string block_key);
-    Status AddBlockLock(std::string block_key, TxnTimeStamp checkpoint_ts);
-    Status GetBlockLock(const std::string &block_key, std::shared_ptr<BlockLock> &block_lock);
-    Status DropBlockLockByBlockKey(const std::string &block_key);
-
 private:
     std::shared_mutex block_lock_mtx_{};
-    std::unordered_map<std::string, std::shared_ptr<BlockLock>> block_lock_map_{};
 
 public:
     std::shared_ptr<MemIndex> GetMemIndex(const std::string &mem_index_key, bool for_update);
