@@ -33,7 +33,7 @@ public:
     static std::string escapeQuotes(const std::string &input);
     static std::string unescapeQuotes(const std::string &input);
     static bool valid_json(const std::string &json_str);
-    static JsonTypeDef parse(std::string &json_str);
+    static JsonTypeDef parse(const std::string &json_str);
 
     // json --> string
     static std::string dump(const JsonTypeDef &json_obj);
@@ -52,14 +52,20 @@ public:
     /* extract json
      * return: arg1: is_null, arg2: result
      */
-    static std::tuple<bool, std::string> json_extract(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, IntegerT> json_extract_int(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, DoubleT> json_extract_double(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_bool(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_is_null(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, BooleanT> json_extract_exists_path(JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_exists_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
 
-    static BooleanT json_contains(JsonTypeDef &data, const std::string &token);
+    static BooleanT json_contains(const JsonTypeDef &data, const std::string &token);
+
+private:
+    // Helper template for traversing JSON path tokens
+    template <typename Func>
+    static std::invoke_result_t<Func, const JsonTypeDef &>
+    traverse_json_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens, Func &&on_success);
 };
 
 } // namespace infinity
