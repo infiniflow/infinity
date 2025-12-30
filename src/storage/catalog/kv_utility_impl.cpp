@@ -158,22 +158,28 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
 
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     auto rel_version_filepath = fmt::format("db_{}/tbl_{}/seg_{}/blk_{}/{}", db_id_str, table_id_str, segment_id, block_id, BlockVersion::PATH);
-    auto *version_buffer = fileworker_mgr->version_map_.GetFileWorker(rel_version_filepath);
-    if (version_buffer == nullptr) {
+    auto *version_file_worker = fileworker_mgr->version_map_.GetFileWorker(rel_version_filepath);
+    if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Get version buffer failed: {}", rel_version_filepath));
     }
 
-    std::shared_ptr<BlockVersion> block_version;
-    static_cast<FileWorker *>(version_buffer)->Read(block_version);
-
+    // std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
+    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     size_t row_cnt = 0;
-    {
-        std::shared_lock lock(block_lock->mtx_);
-        row_cnt = block_version->GetRowCount(begin_ts);
-        auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
-        row_cnt += commit_cnt;
+    if (block_version) {
+        {
+            std::shared_lock lock(block_lock->mtx_);
+            row_cnt = block_version->GetRowCount(begin_ts);
+            auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
+            row_cnt += commit_cnt;
+        }
+        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
-
+    // UnPin???
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_file_worker->rel_file_path_);
     return row_cnt;
 }
 

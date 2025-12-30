@@ -46,6 +46,7 @@ import :utility;
 import :version_file_worker;
 import :index_secondary;
 import :memory_indexer;
+import :fileworker_manager;
 
 import std;
 import third_party;
@@ -72,10 +73,13 @@ void NewTxnGetVisibleRangeState::Init(std::shared_ptr<BlockLock> block_lock,
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
     {
-        std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-        std::shared_ptr<BlockVersion> block_version;
+        std::shared_lock lock(block_lock_->mtx_);
+        // std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
+        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+        cache_manager.UnPin(*version_file_worker_->rel_file_path_);
     }
 }
 
@@ -84,7 +88,8 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    // std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
 
     if (block_offset_begin == block_offset_end_) {
@@ -94,7 +99,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return commit_cnt;
     }
 
-    std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
+    std::shared_lock lock(block_lock_->mtx_);
     while (block_offset_begin < block_offset_end_ && block_version->CheckDelete(block_offset_begin, begin_ts_)) {
         ++block_offset_begin;
     }
@@ -105,6 +110,8 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         }
     }
     visible_range = {block_offset_begin, row_idx};
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_file_worker_->rel_file_path_);
     return block_offset_begin < row_idx;
 }
 
@@ -125,12 +132,11 @@ std::optional<BlockOffset> NewTxnBlockVisitor::Next() {
 }
 
 Status NewCatalog::InitCatalog(MetaCache *meta_cache, KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
-    Status status;
 
     std::vector<std::string> *db_id_strs_ptr;
     std::vector<std::string> *db_names_ptr = nullptr;
     CatalogMeta catalog_meta(kv_instance, meta_cache);
-    status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
+    auto status = catalog_meta.GetDBIDs(db_id_strs_ptr, &db_names_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1130,12 +1136,15 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    // std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_buffer)->Read(block_version);
     {
-        std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+        std::shared_lock lock(block_lock->mtx_);
         block_version->GetCreateTS(offset, size, column_vector);
     }
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_buffer->rel_file_path_);
     return Status::OK();
 }
 
@@ -1153,12 +1162,15 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    // std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     {
-        std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+        std::shared_lock lock(block_lock->mtx_);
         block_version->GetDeleteTS(offset, size, column_vector);
     }
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.UnPin(*version_file_worker->rel_file_path_);
     return Status::OK();
 }
 
