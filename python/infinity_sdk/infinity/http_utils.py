@@ -256,8 +256,9 @@ index_type_transfrom = {
     2: "HNSW",
     3: "FULLTEXT",
     4: "SECONDARY",
-    5: "EMVB",
-    6: "BMP",
+    5: "SECONDARYFUNCTIONAL",
+    6: "EMVB",
+    7: "BMP",
 }
 
 baseResponse = {

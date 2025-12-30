@@ -67,6 +67,7 @@ export struct TableIndexInfo {
     std::shared_ptr<std::string> index_other_params_{};
     std::shared_ptr<std::string> index_column_ids_{};
     std::shared_ptr<std::string> index_column_names_{};
+    std::shared_ptr<std::string> function_info_{};
 };
 
 export struct SegmentInfo {

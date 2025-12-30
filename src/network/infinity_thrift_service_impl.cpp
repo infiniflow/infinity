@@ -1465,6 +1465,17 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
 
     index_info_to_use->column_name_ = request.index_info.column_name;
 
+    if (index_info_to_use->index_type_ == IndexType::kSecondaryFunctional) {
+        Status function_expr_status;
+        index_info_to_use->function_expr_ = GetFunctionExprFromProto(function_expr_status, request.index_info.function_expr);
+        if (!function_expr_status.ok()) {
+            delete index_info_to_use;
+            index_info_to_use = nullptr;
+            ProcessStatus(response, function_expr_status);
+            return;
+        }
+    }
+
     auto *index_param_list = new std::vector<InitParameter *>();
     for (auto &index_param : request.index_info.index_param_list) {
         auto init_parameter = new InitParameter();
@@ -1540,7 +1551,7 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
     if (result.IsOk()) {
         std::shared_ptr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 10) {
+        if (row_count != 11) {
             UnrecoverableError("ShowIndex: query result is invalid.");
         }
 
@@ -1581,21 +1592,21 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
 
         {
             Value value = data_block->GetValue(1, 7);
-            response.other_parameters = value.GetVarchar();
+            response.index_function_info = value.GetVarchar();
         }
 
         {
             Value value = data_block->GetValue(1, 8);
-            response.store_dir = value.GetVarchar();
+            response.other_parameters = value.GetVarchar();
         }
-
-        //        {
-        //            Value value = data_block->GetValue(1, 9);
-        //            response.store_size = value.GetVarchar();
-        //        }
 
         {
             Value value = data_block->GetValue(1, 9);
+            response.store_dir = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 10);
             response.segment_index_count = value.GetVarchar();
         }
 
@@ -2091,6 +2102,8 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kFullText;
         case infinity_thrift_rpc::IndexType::Secondary:
             return IndexType::kSecondary;
+        case infinity_thrift_rpc::IndexType::SecondaryFunctional:
+            return IndexType::kSecondaryFunctional;
         case infinity_thrift_rpc::IndexType::EMVB:
             return IndexType::kEMVB;
         case infinity_thrift_rpc::IndexType::BMP:

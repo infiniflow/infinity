@@ -2,7 +2,8 @@ import os
 import infinity
 import time
 import infinity.index as index
-import pandas
+import pandas as pd
+from numpy import dtype
 import pytest
 from common import common_values
 from common import common_index
@@ -183,7 +184,58 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_secondary" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # drop non-existent index
+    def test_create_index_secondary_functional(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_secondary_functional" + suffix, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_index_secondary_functional" + suffix, {
+                "c1": {"type": "int"},
+                "c2": {"type": "varchar"}
+            }, ConflictType.Error)
+        assert table_obj is not None
+
+        table_obj.insert([{"c1": 1, "c2": "hello world"}])
+        table_obj.insert([{"c1": 4, "c2": "thank you"}])
+
+        res = table_obj.create_index("idx_sqrt_c1", index.IndexInfo("sqrt(c1)", index.IndexType.SecondaryFunctional),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res, extra_result = table_obj.output(["c1", "sqrt(c1)"]).filter("sqrt(c1)>1").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4], 'sqrt(c1)': [2.0]})
+                                      .astype({'c1': dtype('int32'), 'sqrt(c1)': dtype('float64')}))
+
+        res = table_obj.create_index("idx_substring_c2",
+                                     index.IndexInfo("substring(c2, 0, 5)", index.IndexType.SecondaryFunctional),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res, extra_result = table_obj.output(["c2", "substring(c2, 0, 5) AS c2_sub"]).filter(
+            "c2_sub == 'hello'").to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': ['hello world'], 'c2_sub': ['hello']})
+                                      .astype({'c2': dtype('str'), 'c2_sub': dtype('str')}))
+
+        res = table_obj.show_index("idx_sqrt_c1")
+        print(res)
+
+        res = table_obj.show_index("idx_substring_c2")
+        print(res)
+
+        with pytest.raises(InfinityException) as e:
+            table_obj.create_index("idx_error",
+                                   index.IndexInfo("abc(c2)", index.IndexType.SecondaryFunctional),
+                                   ConflictType.Error)
+        assert e.type == InfinityException
+
+        res_drop1 = table_obj.drop_index("idx_sqrt_c1")
+        assert res_drop1.error_code == ErrorCode.OK
+
+        res_drop2 = table_obj.drop_index("idx_substring_c2")
+        assert res_drop2.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_index_secondary_functional" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_create_index_emvb(self, suffix):
         # CREATE INDEX idx_emvb ON t(c2) USING EMVB;
@@ -590,10 +642,10 @@ class TestInfinity:
     def test_insert_data_fulltext_index_search(self, file_format, suffix):
         # prepare data for insert
         column_names = ["doctitle", "docdate", "body"]
-        df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
-                             delimiter="\t",
-                             header=None,
-                             names=column_names)
+        df = pd.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
+                         delimiter="\t",
+                         header=None,
+                         names=column_names)
         data = {key: list(value.values())
                 for key, value in df.to_dict().items()}
 
@@ -642,10 +694,10 @@ class TestInfinity:
     def test_empty_fulltext_index(self, file_format, suffix, offline):
         # prepare data for insert
         column_names = ["doctitle", "docdate", "body"]
-        df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
-                             delimiter="\t",
-                             header=None,
-                             names=column_names)
+        df = pd.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
+                         delimiter="\t",
+                         header=None,
+                         names=column_names)
         data = {key: list(value.values())
                 for key, value in df.to_dict().items()}
 
