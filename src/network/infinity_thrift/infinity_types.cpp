@@ -299,10 +299,16 @@ std::string to_string(const ColumnType::type &val) {
     }
 }
 
-int _kIndexTypeValues[] =
-    {IndexType::IVF, IndexType::Hnsw, IndexType::FullText, IndexType::BMP, IndexType::Secondary, IndexType::EMVB, IndexType::DiskAnn};
-const char *_kIndexTypeNames[] = {"IVF", "Hnsw", "FullText", "BMP", "Secondary", "EMVB", "DiskAnn"};
-const std::map<int, const char *> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(7, _kIndexTypeValues, _kIndexTypeNames),
+int _kIndexTypeValues[] = {IndexType::IVF,
+                           IndexType::Hnsw,
+                           IndexType::FullText,
+                           IndexType::BMP,
+                           IndexType::Secondary,
+                           IndexType::SecondaryFunctional,
+                           IndexType::EMVB,
+                           IndexType::DiskAnn};
+const char *_kIndexTypeNames[] = {"IVF", "Hnsw", "FullText", "BMP", "Secondary", "SecondaryFunctional", "EMVB", "DiskAnn"};
+const std::map<int, const char *> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(8, _kIndexTypeValues, _kIndexTypeNames),
                                                              ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream &operator<<(std::ostream &out, const IndexType::type &val) {
@@ -8799,6 +8805,8 @@ void IndexInfo::__set_column_name(const std::string &val) { this->column_name = 
 void IndexInfo::__set_index_type(const IndexType::type val) { this->index_type = val; }
 
 void IndexInfo::__set_index_param_list(const std::vector<InitParameter> &val) { this->index_param_list = val; }
+
+void IndexInfo::__set_function_expr(const FunctionExpr &val) { this->function_expr = val; }
 std::ostream &operator<<(std::ostream &out, const IndexInfo &obj) {
     obj.printTo(out);
     return out;
@@ -8859,6 +8867,14 @@ uint32_t IndexInfo::read(::apache::thrift::protocol::TProtocol *iprot) {
                     xfer += iprot->skip(ftype);
                 }
                 break;
+            case 4:
+                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+                    xfer += this->function_expr.read(iprot);
+                    this->__isset.function_expr = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
             default:
                 xfer += iprot->skip(ftype);
                 break;
@@ -8895,6 +8911,10 @@ uint32_t IndexInfo::write(::apache::thrift::protocol::TProtocol *oprot) const {
     }
     xfer += oprot->writeFieldEnd();
 
+    xfer += oprot->writeFieldBegin("function_expr", ::apache::thrift::protocol::T_STRUCT, 4);
+    xfer += this->function_expr.write(oprot);
+    xfer += oprot->writeFieldEnd();
+
     xfer += oprot->writeFieldStop();
     xfer += oprot->writeStructEnd();
     return xfer;
@@ -8905,6 +8925,7 @@ void swap(IndexInfo &a, IndexInfo &b) {
     swap(a.column_name, b.column_name);
     swap(a.index_type, b.index_type);
     swap(a.index_param_list, b.index_param_list);
+    swap(a.function_expr, b.function_expr);
     swap(a.__isset, b.__isset);
 }
 
@@ -8915,6 +8936,8 @@ bool IndexInfo::operator==(const IndexInfo &rhs) const {
         return false;
     if (!(index_param_list == rhs.index_param_list))
         return false;
+    if (!(function_expr == rhs.function_expr))
+        return false;
     return true;
 }
 
@@ -8922,12 +8945,14 @@ IndexInfo::IndexInfo(const IndexInfo &other371) {
     column_name = other371.column_name;
     index_type = other371.index_type;
     index_param_list = other371.index_param_list;
+    function_expr = other371.function_expr;
     __isset = other371.__isset;
 }
 IndexInfo &IndexInfo::operator=(const IndexInfo &other372) {
     column_name = other372.column_name;
     index_type = other372.index_type;
     index_param_list = other372.index_param_list;
+    function_expr = other372.function_expr;
     __isset = other372.__isset;
     return *this;
 }
@@ -8937,6 +8962,7 @@ void IndexInfo::printTo(std::ostream &out) const {
     out << "column_name=" << to_string(column_name);
     out << ", " << "index_type=" << to_string(index_type);
     out << ", " << "index_param_list=" << to_string(index_param_list);
+    out << ", " << "function_expr=" << to_string(function_expr);
     out << ")";
 }
 
@@ -9474,7 +9500,7 @@ ShowIndexResponse::~ShowIndexResponse() noexcept {}
 
 ShowIndexResponse::ShowIndexResponse() noexcept
     : error_code(0), error_msg(), db_name(), table_name(), index_name(), index_comment(), index_type(), index_column_names(), index_column_ids(),
-      other_parameters(), store_dir(), segment_index_count() {}
+      index_function_info(), other_parameters(), store_dir(), segment_index_count() {}
 
 void ShowIndexResponse::__set_error_code(const int64_t val) { this->error_code = val; }
 
@@ -9493,6 +9519,8 @@ void ShowIndexResponse::__set_index_type(const std::string &val) { this->index_t
 void ShowIndexResponse::__set_index_column_names(const std::string &val) { this->index_column_names = val; }
 
 void ShowIndexResponse::__set_index_column_ids(const std::string &val) { this->index_column_ids = val; }
+
+void ShowIndexResponse::__set_index_function_info(const std::string &val) { this->index_function_info = val; }
 
 void ShowIndexResponse::__set_other_parameters(const std::string &val) { this->other_parameters = val; }
 
@@ -9596,13 +9624,21 @@ uint32_t ShowIndexResponse::read(::apache::thrift::protocol::TProtocol *iprot) {
                 break;
             case 10:
                 if (ftype == ::apache::thrift::protocol::T_STRING) {
+                    xfer += iprot->readString(this->index_function_info);
+                    this->__isset.index_function_info = true;
+                } else {
+                    xfer += iprot->skip(ftype);
+                }
+                break;
+            case 11:
+                if (ftype == ::apache::thrift::protocol::T_STRING) {
                     xfer += iprot->readString(this->other_parameters);
                     this->__isset.other_parameters = true;
                 } else {
                     xfer += iprot->skip(ftype);
                 }
                 break;
-            case 11:
+            case 12:
                 if (ftype == ::apache::thrift::protocol::T_STRING) {
                     xfer += iprot->readString(this->store_dir);
                     this->__isset.store_dir = true;
@@ -9610,7 +9646,7 @@ uint32_t ShowIndexResponse::read(::apache::thrift::protocol::TProtocol *iprot) {
                     xfer += iprot->skip(ftype);
                 }
                 break;
-            case 12:
+            case 13:
                 if (ftype == ::apache::thrift::protocol::T_STRING) {
                     xfer += iprot->readString(this->segment_index_count);
                     this->__isset.segment_index_count = true;
@@ -9671,15 +9707,19 @@ uint32_t ShowIndexResponse::write(::apache::thrift::protocol::TProtocol *oprot) 
     xfer += oprot->writeString(this->index_column_ids);
     xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldBegin("other_parameters", ::apache::thrift::protocol::T_STRING, 10);
+    xfer += oprot->writeFieldBegin("index_function_info", ::apache::thrift::protocol::T_STRING, 10);
+    xfer += oprot->writeString(this->index_function_info);
+    xfer += oprot->writeFieldEnd();
+
+    xfer += oprot->writeFieldBegin("other_parameters", ::apache::thrift::protocol::T_STRING, 11);
     xfer += oprot->writeString(this->other_parameters);
     xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldBegin("store_dir", ::apache::thrift::protocol::T_STRING, 11);
+    xfer += oprot->writeFieldBegin("store_dir", ::apache::thrift::protocol::T_STRING, 12);
     xfer += oprot->writeString(this->store_dir);
     xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldBegin("segment_index_count", ::apache::thrift::protocol::T_STRING, 12);
+    xfer += oprot->writeFieldBegin("segment_index_count", ::apache::thrift::protocol::T_STRING, 13);
     xfer += oprot->writeString(this->segment_index_count);
     xfer += oprot->writeFieldEnd();
 
@@ -9699,6 +9739,7 @@ void swap(ShowIndexResponse &a, ShowIndexResponse &b) {
     swap(a.index_type, b.index_type);
     swap(a.index_column_names, b.index_column_names);
     swap(a.index_column_ids, b.index_column_ids);
+    swap(a.index_function_info, b.index_function_info);
     swap(a.other_parameters, b.other_parameters);
     swap(a.store_dir, b.store_dir);
     swap(a.segment_index_count, b.segment_index_count);
@@ -9724,6 +9765,8 @@ bool ShowIndexResponse::operator==(const ShowIndexResponse &rhs) const {
         return false;
     if (!(index_column_ids == rhs.index_column_ids))
         return false;
+    if (!(index_function_info == rhs.index_function_info))
+        return false;
     if (!(other_parameters == rhs.other_parameters))
         return false;
     if (!(store_dir == rhs.store_dir))
@@ -9743,6 +9786,7 @@ ShowIndexResponse::ShowIndexResponse(const ShowIndexResponse &other379) {
     index_type = other379.index_type;
     index_column_names = other379.index_column_names;
     index_column_ids = other379.index_column_ids;
+    index_function_info = other379.index_function_info;
     other_parameters = other379.other_parameters;
     store_dir = other379.store_dir;
     segment_index_count = other379.segment_index_count;
@@ -9758,6 +9802,7 @@ ShowIndexResponse &ShowIndexResponse::operator=(const ShowIndexResponse &other38
     index_type = other380.index_type;
     index_column_names = other380.index_column_names;
     index_column_ids = other380.index_column_ids;
+    index_function_info = other380.index_function_info;
     other_parameters = other380.other_parameters;
     store_dir = other380.store_dir;
     segment_index_count = other380.segment_index_count;
@@ -9776,6 +9821,7 @@ void ShowIndexResponse::printTo(std::ostream &out) const {
     out << ", " << "index_type=" << to_string(index_type);
     out << ", " << "index_column_names=" << to_string(index_column_names);
     out << ", " << "index_column_ids=" << to_string(index_column_ids);
+    out << ", " << "index_function_info=" << to_string(index_function_info);
     out << ", " << "other_parameters=" << to_string(other_parameters);
     out << ", " << "store_dir=" << to_string(store_dir);
     out << ", " << "segment_index_count=" << to_string(segment_index_count);
