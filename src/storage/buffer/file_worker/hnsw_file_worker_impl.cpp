@@ -65,17 +65,26 @@ HnswFileWorker::~HnswFileWorker() {
 }
 
 bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+    std::unique_lock l(mutex_);
     data->SaveToPtr(*file_handle);
+
     auto fd = file_handle->fd();
     mmap_size_ = file_handle->FileSize();
+    if (mmap_size_ == 0) {
+        std::println("what's fuck?");
+        UnrecoverableError("1");
+    }
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    cache_manager.Set(*rel_file_path_, data, mmap_size_);
+    // cache_manager.Set(*rel_file_path_, data, mmap_size_);
+    cache_manager.Set(*rel_file_path_, data, data->MemUsage());
+    cache_manager.UnPin(*rel_file_path_);
     prepare_success = true;
     return true;
 }
 
 void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    std::unique_lock l(mutex_);
     if (!file_handle) {
         return;
     }
@@ -86,13 +95,14 @@ void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle>
     if (!flag) {
         data = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
         auto fd = file_handle->fd();
-        mmap_size_ = file_handle->FileSize();
+
         if (!mmap_) {
+            mmap_size_ = file_handle->FileSize();
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         }
         data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
-        size_t request_space = file_handle->FileSize();
-        cache_manager.Set(path, data, request_space);
+        // cache_manager.Set(path, data, mmap_size_);
+        cache_manager.Set(*rel_file_path_, data, data->MemUsage());
     }
 }
 
