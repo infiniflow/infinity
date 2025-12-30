@@ -21,6 +21,7 @@ import :kv_store;
 import :table_meta;
 import :kv_code;
 import :index_base;
+import :index_secondary_functional;
 import :meta_info;
 import :new_catalog;
 import :infinity_context;
@@ -245,6 +246,13 @@ Status TableIndexMeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
     table_index_info.index_other_params_ = std::make_shared<std::string>(index_def_->BuildOtherParamsString());
     table_index_info.index_column_names_ = std::make_shared<std::string>(column_def->name_);
     table_index_info.index_column_ids_ = std::make_shared<std::string>(std::to_string(column_def->id_));
+
+    if (index_def_->index_type_ == IndexType::kSecondaryFunctional) {
+        auto functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_def_);
+        table_index_info.function_info_ = std::make_shared<std::string>(*functional_index->GetFuncColParams());
+    } else {
+        table_index_info.function_info_ = std::make_shared<std::string>("");
+    }
 
     return Status::OK();
 }

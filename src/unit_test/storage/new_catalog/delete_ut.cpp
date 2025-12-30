@@ -193,12 +193,9 @@ TEST_P(TestTxnDelete, test_delete) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        SegmentID segment_id = 0;
-        NewTxnGetVisibleRangeState state;
-
-        SegmentMeta segment_meta(segment_id, *table_meta);
-
         {
+            SegmentID segment_id = 0;
+            SegmentMeta segment_meta(segment_id, *table_meta);
             TxnTimeStamp first_delete_ts = 0;
             Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
             EXPECT_TRUE(status.ok());
@@ -6328,15 +6325,14 @@ TEST_P(TestTxnDelete, test_delete_and_compact) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr{};
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
         EXPECT_EQ(segment_ids_ptr->size(), 1);
         SegmentMeta segment_meta(segment_ids_ptr->at(0), *table_meta);
 
-        NewTxnGetVisibleRangeState state;
-        std::vector<BlockID> *block_ids_ptr = nullptr;
+        std::vector<BlockID> *block_ids_ptr{};
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_EQ(block_ids_ptr->size(), 2);
     };

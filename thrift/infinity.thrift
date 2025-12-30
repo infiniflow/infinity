@@ -452,6 +452,7 @@ Hnsw,
 FullText,
 BMP,
 Secondary,
+SecondaryFunctional,
 EMVB,
 DiskAnn,
 }
@@ -460,6 +461,7 @@ struct IndexInfo {
 1: string column_name,
 2: IndexType index_type,
 3: list<InitParameter> index_param_list = [],
+4: FunctionExpr function_expr,
 }
 
 struct CreateIndexRequest {
@@ -497,9 +499,10 @@ struct ShowIndexResponse {
 7: string index_type,
 8: string index_column_names,
 9: string index_column_ids,
-10: string other_parameters,
-11: string store_dir,
-12: string segment_index_count,
+10: string index_function_info,
+11: string other_parameters,
+12: string store_dir,
+13: string segment_index_count,
 }
 
 struct OptimizeRequest {

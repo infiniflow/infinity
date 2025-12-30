@@ -42,8 +42,6 @@ public:
 
     std::shared_ptr<std::string> GetBlockDir();
 
-    Status GetBlockLock(std::shared_ptr<BlockLock> &block_lock);
-
     Status InitOrLoadSet(TxnTimeStamp checkpoint_ts = 0);
 
     Status RestoreSetFromSnapshot();

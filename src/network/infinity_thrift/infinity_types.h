@@ -193,7 +193,7 @@ std::ostream &operator<<(std::ostream &out, const ColumnType::type &val);
 std::string to_string(const ColumnType::type &val);
 
 struct IndexType {
-    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, EMVB = 5, DiskAnn = 6 };
+    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, SecondaryFunctional = 5, EMVB = 6, DiskAnn = 7 };
 };
 
 extern const std::map<int, const char *> _IndexType_VALUES_TO_NAMES;
@@ -2583,10 +2583,11 @@ void swap(GetTableRequest &a, GetTableRequest &b);
 std::ostream &operator<<(std::ostream &out, const GetTableRequest &obj);
 
 typedef struct _IndexInfo__isset {
-    _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true) {}
+    _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true), function_expr(false) {}
     bool column_name : 1;
     bool index_type : 1;
     bool index_param_list : 1;
+    bool function_expr : 1;
 } _IndexInfo__isset;
 
 class IndexInfo : public virtual ::apache::thrift::TBase {
@@ -2603,6 +2604,7 @@ public:
      */
     IndexType::type index_type;
     std::vector<InitParameter> index_param_list;
+    FunctionExpr function_expr;
 
     _IndexInfo__isset __isset;
 
@@ -2611,6 +2613,8 @@ public:
     void __set_index_type(const IndexType::type val);
 
     void __set_index_param_list(const std::vector<InitParameter> &val);
+
+    void __set_function_expr(const FunctionExpr &val);
 
     bool operator==(const IndexInfo &rhs) const;
     bool operator!=(const IndexInfo &rhs) const { return !(*this == rhs); }
@@ -2782,7 +2786,8 @@ std::ostream &operator<<(std::ostream &out, const ShowIndexRequest &obj);
 typedef struct _ShowIndexResponse__isset {
     _ShowIndexResponse__isset()
         : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_comment(false), index_type(false),
-          index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
+          index_column_names(false), index_column_ids(false), index_function_info(false), other_parameters(false), store_dir(false),
+          segment_index_count(false) {}
     bool error_code : 1;
     bool error_msg : 1;
     bool db_name : 1;
@@ -2792,6 +2797,7 @@ typedef struct _ShowIndexResponse__isset {
     bool index_type : 1;
     bool index_column_names : 1;
     bool index_column_ids : 1;
+    bool index_function_info : 1;
     bool other_parameters : 1;
     bool store_dir : 1;
     bool segment_index_count : 1;
@@ -2813,6 +2819,7 @@ public:
     std::string index_type;
     std::string index_column_names;
     std::string index_column_ids;
+    std::string index_function_info;
     std::string other_parameters;
     std::string store_dir;
     std::string segment_index_count;
@@ -2836,6 +2843,8 @@ public:
     void __set_index_column_names(const std::string &val);
 
     void __set_index_column_ids(const std::string &val);
+
+    void __set_index_function_info(const std::string &val);
 
     void __set_other_parameters(const std::string &val);
 

@@ -624,7 +624,7 @@ class table_http:
 
         fields = []
         create_index_info = {}
-        fields.append(index_info.column_name)
+        fields.append(index_info.target_name)
         create_index_info["type"] = index_type_transfrom[index_info.index_type.value]
         if index_info.params is not None:
             for key, value in index_info.params.items():

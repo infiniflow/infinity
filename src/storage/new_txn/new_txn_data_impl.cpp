@@ -885,20 +885,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
     if (!status.ok()) {
         return status;
     }
-
-    std::shared_ptr<BlockLock> block_lock;
-    {
-        status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     {
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-        std::unique_lock lock(block_lock->mtx_);
-
-        block_lock->min_ts_ = std::min(block_lock->min_ts_, commit_ts);
-        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
 
         // append in column file
         for (size_t column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
@@ -978,12 +966,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
 
     {
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-        std::shared_ptr<BlockLock> block_lock;
-        status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-        std::unique_lock lock(block_lock->mtx_);
 
         // delete in version file
         // std::shared_ptr<BlockVersion> block_version;
@@ -997,7 +979,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             }
             undo_block_offsets.push_back(block_offset);
         }
-        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
         // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
         // cache_manager.UnPin(*version_file_worker->rel_file_path_);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
@@ -1019,13 +1000,6 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
     }
 
     {
-        std::shared_ptr<BlockLock> block_lock;
-        Status status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-        std::unique_lock lock(block_lock->mtx_);
-
         // delete in version file
         // std::shared_ptr<BlockVersion> block_version;
         BlockVersion *block_version{};
@@ -1050,13 +1024,6 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
 
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     {
-        std::shared_ptr<BlockLock> block_lock;
-        status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-        std::unique_lock lock(block_lock->mtx_);
-
         // delete in version file
         // std::shared_ptr<BlockVersion> block_version;
         BlockVersion *block_version{};
@@ -1287,16 +1254,6 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
                         block_meta.segment_meta().segment_id(),
                         block_meta.block_id(),
                         block_row_count));
-    }
-
-    std::shared_ptr<BlockLock> block_lock;
-    status = block_meta.GetBlockLock(block_lock);
-    if (!status.ok()) {
-        return status;
-    }
-    {
-        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
-        block_lock->max_ts_ = CommitTS();
     }
 
     return Status::OK();
@@ -1756,20 +1713,6 @@ Status NewTxn::CommitCheckpointTableData(TableMeta &table_meta, TxnTimeStamp che
         if (!block_status.ok()) {
             return block_status;
         }
-        for (BlockID block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta);
-
-            std::shared_ptr<BlockLock> block_lock;
-            status = block_meta.GetBlockLock(block_lock);
-            if (!status.ok()) {
-                return status;
-            }
-
-            {
-                std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
-                block_lock->checkpoint_ts_ = checkpoint_ts;
-            }
-        }
     }
 
     return Status::OK();
@@ -1817,18 +1760,6 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         // cache_manager.UnPin(*version_file_worker->rel_file_path_);
 
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
-
-        std::shared_ptr<BlockLock> block_lock;
-        status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-        {
-            std::unique_lock lock(block_lock->mtx_);
-            block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
-            block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
-            block_lock->checkpoint_ts_ = commit_ts;
-        }
     }
 
     return Status::OK();
