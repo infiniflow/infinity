@@ -92,10 +92,10 @@ def function_return_type(function_name, param_type):
         return 'Int32'
     elif function_name == "sum":
         if (
-            param_type == dtype("int8")
-            or param_type == dtype("int16")
-            or param_type == dtype("int32")
-            or param_type == dtype("int64")
+            param_type == 'Int8'
+            or param_type == 'Int16'
+            or param_type == 'Int32'
+            or param_type == 'Int64'
         ):
             return 'Int64'
         else:

@@ -1191,7 +1191,7 @@ class table_http_result:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif col.strip().isdigit() and df_type.get(k) != dtype('float64'):
-                    df_type[k] = dtype('int32')
+                    df_type[k] = 'Int32'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):
                     df_type[k] = dtype('float64')
