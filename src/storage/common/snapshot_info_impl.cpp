@@ -28,6 +28,8 @@ import :defer_op;
 import :utility;
 import :block_version;
 import :fst.fst;
+import :version_file_worker;
+import :fileworker_manager;
 
 import std.compat;
 import third_party;
@@ -159,8 +161,8 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
     json_res["segment_dir"] = segment_dir_;
     json_res["first_delete_ts"] = first_delete_ts_;
     json_res["deprecate_ts"] = deprecate_ts_;
-    json_res["row_count"] = row_count_;
-    json_res["actual_row_count"] = actual_row_count_;
+    // json_res["row_count"] = row_count_;
+    // json_res["actual_row_count"] = actual_row_count_;
     json_res["segment_status"] = status_;
 
     for (const auto &block_snapshot : block_snapshots_) {
@@ -176,8 +178,8 @@ std::shared_ptr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nloh
 
     segment_snapshot->first_delete_ts_ = segment_json["first_delete_ts"];
     segment_snapshot->deprecate_ts_ = segment_json["deprecate_ts"];
-    segment_snapshot->row_count_ = segment_json["row_count"];
-    segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
+    // segment_snapshot->row_count_ = segment_json["row_count"];
+    // segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
     segment_snapshot->status_ = static_cast<SegmentStatus>(segment_json["segment_status"]);
 
     for (const auto &block_json : segment_json["blocks"]) {
@@ -544,6 +546,22 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         }
 
         std::string dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
+        // std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
+        // std::string tmp_file_dir = VirtualStore::GetParentPath(tmp_file_path);
+        // if (!VirtualStore::Exists(tmp_file_dir)) {
+        //     VirtualStore::MakeDirectory(tmp_file_dir);
+        // }
+        // Status status = VirtualStore::Copy(tmp_file_path, src_file_path);
+        // if (!status.ok()) {
+        //     LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, tmp_file_path, status.message()));
+        //     continue;
+        // }
+        //
+        // if (size_t pos = modified_file.find("version"); pos != std::string::npos) {
+        //     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        //     auto version_file_worker = std::make_unique<VersionFileWorker>(std::make_shared<std::string>(modified_file), 8192);
+        //     fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+        // }
 
         if (persistence_manager != nullptr) {
             // Use persistence manager to restore files
@@ -575,19 +593,14 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
 
             LOG_TRACE(fmt::format("Restored file via persistence manager: {} -> {}", src_file_path, dst_file_path));
         } else {
-            // Fallback to direct file copying when no persistence manager
-            // Create destination directory
-            // no race as unique table/db_id_str
             std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
             if (!VirtualStore::Exists(dst_dir)) {
                 VirtualStore::MakeDirectory(dst_dir);
             }
-            // there exists empty files getting deleted, so we need to ignore them
-            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
-            if (!copy_status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy file: {}", copy_status.message()));
+            Status status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
             } else {
-                // Add the destination file path to the output vector
                 restored_file_paths.push_back(modified_file);
             }
         }

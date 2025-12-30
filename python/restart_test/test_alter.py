@@ -134,7 +134,6 @@ class TestAlter:
 
             if flush:
                 infinity_obj.flush_data()
-
         @decorator
         def part2(infinity_obj):
             time.sleep(1) # wait some time or match_text is not available

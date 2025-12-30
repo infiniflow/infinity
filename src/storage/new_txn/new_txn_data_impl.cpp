@@ -1791,7 +1791,6 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         block_version->Append(save_ts, block_info.row_count_);
         auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
         cache_manager.UnPin(*version_file_worker->rel_file_path_);
-
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
     return Status::OK();
@@ -1815,7 +1814,6 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         block_version->CommitAppend(save_ts, commit_ts);
         auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
         cache_manager.UnPin(*version_file_worker->rel_file_path_);
-
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
 
         std::shared_ptr<BlockLock> block_lock;

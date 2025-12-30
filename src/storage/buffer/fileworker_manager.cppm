@@ -64,6 +64,7 @@ public:
         std::unique_lock l(rw_mutex_);
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
+            *payloads_.begin() = data;
         } else {
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
@@ -159,7 +160,7 @@ struct FileWorkerMap : FileWorkerMapInjectHelper<FileWorkerT> {
     mutable std::shared_mutex rw_clean_mtx_;
     std::vector<FileWorkerT *> cleans_;
 };
-
+// [[maybe_unused]] auto file_worker_mgr = InfinityContext::instance().storage()->FileWorkerManager();
 export class FileWorkerManager {
 public:
     explicit FileWorkerManager(std::shared_ptr<std::string> data_dir, std::shared_ptr<std::string> temp_dir);
