@@ -49,7 +49,7 @@ public:
     }
 
     void SetupDatabase() {
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
         for (size_t i = 0; i < 2; i++) {
             auto db_name = std::make_shared<std::string>(fmt::format("db_{}", i));
@@ -159,8 +159,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(DatabaseSnapshotTest, test_restore_database_rollback_basic) {
-    LOG_INFO("--test_restore_database_rollback_basic--");
-    NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
     // Test restore database
     {
@@ -246,10 +245,10 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_create_database_multithreaded
     LOG_INFO("--test_restore_database_create_database_multithreaded--");
 
     auto thread_restore_database = [this]() {
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
         {
-            std::lock_guard<std::mutex> lock(mtx_);
+            std::lock_guard lock(mtx_);
             ready_ = true;
             cv_.notify_one();
         }
@@ -285,10 +284,10 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_create_database_multithreaded
     };
 
     auto thread_create_database = [this]() {
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
         {
-            std::unique_lock<std::mutex> lock(mtx_);
+            std::unique_lock lock(mtx_);
             cv_.wait(lock, [this] { return ready_; });
             ready_ = false;
         }
@@ -318,8 +317,8 @@ TEST_P(DatabaseSnapshotTest, test_create_snapshot_same_name_multithreaded) {
     LOG_INFO("--test_create_snapshot_same_name_multithreaded--");
 
     auto thread_create_snapshot1 = [this]() {
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
         {
+            NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("restore database"), TransactionType::kRestoreDatabase);
 
             std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
@@ -364,7 +363,7 @@ TEST_P(DatabaseSnapshotTest, test_create_snapshot_same_name_multithreaded) {
 
     auto thread_create_snapshot2 = [this]() {
         {
-            std::unique_lock<std::mutex> lock(mtx_);
+            std::unique_lock lock(mtx_);
             cv_.wait(lock, [this] { return ready_; });
             ready_ = false;
         }
