@@ -34,7 +34,6 @@ namespace infinity {
 VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {}
 
 VarFileWorker::~VarFileWorker() {
-    madvise(mmap_, mmap_size_, MADV_FREE);
     munmap(mmap_, mmap_size_);
     mmap_ = nullptr;
 }
@@ -43,6 +42,7 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
                           std::unique_ptr<LocalFileHandle> &file_handle,
                           bool &prepare_success,
                           const FileWorkerSaveCtx &ctx) {
+    std::unique_lock l(mutex_);
     const auto *buffer = data.data();
     auto old_mmap_size = mmap_size_;
     mmap_size_ = buffer->TotalSize();
@@ -102,6 +102,7 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
 }
 
 void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    std::unique_lock l(mutex_);
     data = std::make_shared<VarBuffer>(this);
     if (!file_handle) {
         return;

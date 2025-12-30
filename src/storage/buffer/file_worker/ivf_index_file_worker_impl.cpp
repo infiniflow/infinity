@@ -42,6 +42,7 @@ bool IVFIndexFileWorker::Write(std::span<IVFIndexInChunk> data,
                                std::unique_ptr<LocalFileHandle> &file_handle,
                                bool &prepare_success,
                                const FileWorkerSaveCtx &ctx) {
+    std::unique_lock l(mutex_);
     auto *index = data.data();
     index->SaveIndexInner(*file_handle);
 
@@ -53,6 +54,7 @@ bool IVFIndexFileWorker::Write(std::span<IVFIndexInChunk> data,
 }
 
 void IVFIndexFileWorker::Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    std::unique_lock l(mutex_);
     auto *index = IVFIndexInChunk::GetNewIVFIndexInChunk(index_base_.get(), column_def_.get());
     // data = std::shared_ptr<IVFIndexInChunk>(index);
     data = index;

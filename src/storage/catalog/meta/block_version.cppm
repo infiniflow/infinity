@@ -50,7 +50,7 @@ export struct BlockVersion {
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
 
-    bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
+    bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler);
     bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
 
     static void LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
@@ -71,7 +71,7 @@ export struct BlockVersion {
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
-    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible) const;
+    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
 private:
     mutable std::shared_mutex rw_mutex_;
@@ -80,6 +80,10 @@ private:
 
     std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
     // risk to write uninitialized buffer. (ts, rows)
+
+    std::map<size_t, TxnTimeStamp> dirty_deleted_;
+
+    size_t append_cnt_{};
 };
 
 } // namespace infinity

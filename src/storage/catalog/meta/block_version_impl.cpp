@@ -114,7 +114,7 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
                               size_t &mmap_size,
                               const std::string &rel_path,
                               TxnTimeStamp checkpoint_ts,
-                              LocalFileHandle &file_handle) const {
+                              LocalFileHandle &file_handle) {
     bool is_modified = false;
     std::unique_lock lock(rw_mutex_);
 
@@ -227,7 +227,6 @@ void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&m
     std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
     offset += sizeof(capacity);
     for (auto &ts : deleted) {
-        // ts =
         std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
         offset += sizeof(ts);
     }
@@ -280,6 +279,7 @@ void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) co
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     std::unique_lock lock(rw_mutex_);
     created_.emplace_back(commit_ts, row_count);
+    ++append_cnt_;
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
@@ -293,30 +293,32 @@ void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
 }
 
 Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
-    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    std::unique_lock lock(rw_mutex_);
     // if (deleted_[offset] != 0) {
     //     return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
     // }
     deleted_[offset] = commit_ts;
+    // dirty_deleted_.emplace(offset, commit_ts);
     return Status::OK();
 }
 
 void BlockVersion::RollbackDelete(i32 offset) {
-    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    std::unique_lock lock(rw_mutex_);
     deleted_[offset] = 0;
+    // dirty_deleted_.erase(offset);
 } // FIXME latest_change_ts_ ?
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
-    std::shared_lock<std::shared_mutex> lock(rw_mutex_);
+    std::shared_lock lock(rw_mutex_);
     if (static_cast<size_t>(offset) >= deleted_.size()) {
         return false;
     }
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
 }
 
-Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) const {
+Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) {
     i32 row_count = 0;
-    std::shared_lock<std::shared_mutex> lock_created(rw_mutex_);
+    std::shared_lock lock_created(rw_mutex_);
     for (const auto &created_range : created_) {
         if (offset < row_count + created_range.row_count_) {
             if (ignore_invisible) {
