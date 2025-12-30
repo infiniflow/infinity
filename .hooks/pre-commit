@@ -5,7 +5,7 @@ import subprocess
 
 def get_files():
     return subprocess.check_output(['git', 'diff-index', '--cached',
-                                    '--name-only', 'HEAD']).split()
+                                    '--name-only', 'HEAD', '--diff-filter=d']).split()
 
 
 def apply_code_style():
