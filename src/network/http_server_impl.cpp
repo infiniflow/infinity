@@ -2006,11 +2006,13 @@ public:
                 std::string_view func_sv(func_json_str);
 
                 std::vector<ParsedExpr *> *func_expr = HTTPSearch::ParseOutput(func_sv, http_status, json_response);
-                if (func_expr->size() > 0) {
+                if (func_expr == nullptr) {
+                    UnrecoverableError("Parse function expression in index definition failed");
+                } else if (func_expr->size() > 0) {
                     index_info->function_expr_ = (*func_expr)[0];
                 } else {
                     json_response["error_code"] = ErrorCode::kInvalidIndexDefinition;
-                    json_response["error_msg"] = fmt::format("Invalid function {} in index definition", func_str);
+                    json_response["error_msg"] = fmt::format("Invalid function expression {} in index definition", func_str);
                     http_status = HTTPStatus::CODE_500;
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }

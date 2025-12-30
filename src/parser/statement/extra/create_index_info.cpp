@@ -86,6 +86,11 @@ IndexInfo::~IndexInfo() {
         delete index_param_list_;
         index_param_list_ = nullptr;
     }
+
+    if (function_expr_ != nullptr) {
+        delete function_expr_;
+        function_expr_ = nullptr;
+    }
 }
 
 CreateIndexInfo::~CreateIndexInfo() {
