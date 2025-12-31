@@ -223,7 +223,7 @@ class TestInfinity:
             {'json_extract_string(c3, $.2)': dtype('str')}))
         res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
-            {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype(
+            {'json_extract_int(c3, $.2)': (3232, None)}).astype(
             {'json_extract_int(c3, $.2)': 'Int32'}))
         res, extra_res = table_obj.output(["json_extract_double(c3,'$.4')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('float64')), pd.DataFrame(
@@ -285,7 +285,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$.name')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $.name)': ('"测试"',)}).astype(dtype('str'))
+            pd.DataFrame({'json_extract_string(c3, $.name)': ('"测试"',)})
         )
 
         res, _ = table_obj.output(["json_extract_double(c3,'$.value')"]).to_pl()
@@ -444,7 +444,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_isnull(c3,'$.nonexistent')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('boolean'),
-            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, pd.NA)}).astype('boolean')
+            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, None)}).astype('boolean')
         )
 
         # Test 5: Array of objects - extract objects and their properties

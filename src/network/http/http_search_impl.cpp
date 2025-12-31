@@ -320,7 +320,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                 break;
                             }
                             default: {
-                                json_result_cell[column_name] = value.ToString();
+                                json_result_cell[column_name] = data_block->column_vectors_[col]->ToString(row);
                                 break;
                             }
                         }
