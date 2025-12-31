@@ -58,7 +58,7 @@ export struct BlockColumnSnapshotInfo {
 
 export struct BlockSnapshotInfo {
     BlockID block_id_;
-    size_t row_count_;
+    // size_t row_count_;
     size_t row_capacity_;
     std::string block_dir_;
     TxnTimeStamp create_ts_;
@@ -76,8 +76,8 @@ export struct SegmentSnapshotInfo {
     TxnTimeStamp first_delete_ts_;
     TxnTimeStamp deprecate_ts_;
     TxnTimeStamp create_ts_;
-    TxnTimeStamp row_count_;
-    TxnTimeStamp actual_row_count_;
+    // TxnTimeStamp row_count_;
+    // TxnTimeStamp actual_row_count_;
     std::vector<std::shared_ptr<BlockSnapshotInfo>> block_snapshots_;
 
     nlohmann::json Serialize();

@@ -457,6 +457,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             break;
         }
         case IndexType::kHnsw:
+            [[fallthrough]];
         case IndexType::kBMP: {
             SegmentMeta segment_meta(segment_id, table_meta);
             std::shared_ptr<ColumnDef> column_def;
@@ -2248,6 +2249,10 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
             BlockID block_id = block_ids[i];
             BlockMeta block_meta(block_id, segment_meta);
             size_t block_row_cnt = 0;
+            // status = block_meta.RestoreSetFromSnapshot();
+            // if (!status.ok()) {
+            //     return status;
+            // }
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok() || block_row_cnt == block_offset) {
                 return status;
@@ -2541,11 +2546,11 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeta &table_meta, const std:
             // Calculate next_chunk_id from existing chunk infos
             ChunkID next_chunk_id = 0;
             if (!segment_index.chunk_infos_.empty()) {
-                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(),
-                                                 segment_index.chunk_infos_.end(),
-                                                 [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
-                                    ->chunk_id_ +
-                                1;
+                next_chunk_id =
+                    std::ranges::max_element(segment_index.chunk_infos_,
+                                             [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
+                        ->chunk_id_ +
+                    1;
             }
             if (!is_link_files) {
                 status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);

@@ -103,6 +103,47 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     return true;
 }
 
+bool DataFileWorker::WriteSnapshot(std::span<char> data,
+                                   std::unique_ptr<LocalFileHandle> &file_handle,
+                                   bool &prepare_success,
+                                   const FileWorkerSaveCtx &ctx) {
+    // File structure:
+    // - header: magic number
+    // - header: buffer size
+    // - data buffer
+    // - footer: checksum
+
+    u64 magic_number = 0x00dd3344;
+    Status status = file_handle->Append(&magic_number, sizeof(magic_number));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    status = file_handle->Append(const_cast<size_t *>(&buffer_size_), sizeof(buffer_size_));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    status = file_handle->Append(data.data(), data.size());
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    size_t unused_size = buffer_size_ - data.size();
+    if (unused_size > 0) {
+        std::string str(unused_size, '\0');
+        file_handle->Append(str, unused_size);
+    }
+
+    u64 checksum{};
+    status = file_handle->Append(&checksum, sizeof(checksum));
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    prepare_success = true;
+    return true;
+}
+
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
     std::unique_lock l(mutex_);
