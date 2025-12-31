@@ -73,12 +73,10 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     // auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::shared_ptr<std::string> block_dir_ptr = GetBlockDir();
     auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
-    auto version_file_worker = std::make_unique<VersionFileWorker>(rel_file_path, block_capacity());
 
-    version_file_worker_ = version_file_worker.get();
-    if (!version_file_worker_) {
-        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
-    }
+    auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto *version_file_worker = fileworker_mgr->version_map_.EmplaceFileWorker(std::make_unique<VersionFileWorker>(rel_file_path, block_capacity()));
+    version_file_worker_ = version_file_worker;
 
     // std::shared_ptr<BlockVersion> block_version;
     BlockVersion *block_version{};
@@ -139,7 +137,7 @@ std::vector<std::string> BlockMeta::FilePaths() {
 }
 
 std::shared_ptr<std::string> BlockMeta::GetBlockDir() {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (block_dir_ == nullptr) {
         TableMeta &table_meta = segment_meta_.table_meta();
         block_dir_ = std::make_shared<std::string>(
@@ -292,10 +290,10 @@ std::tuple<std::shared_ptr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapS
 
     block_snapshot_info->create_ts_ = GetCreateTimestampFromKV();
     // Get row count
-    std::tie(block_snapshot_info->row_count_, status) = GetRowCnt1();
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    // std::tie(block_snapshot_info->row_count_, status) = GetRowCnt1();
+    // if (!status.ok()) {
+    //     return {nullptr, status};
+    // }
     block_snapshot_info->row_capacity_ = this->block_capacity();
 
     // Get block dir

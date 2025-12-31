@@ -211,6 +211,7 @@ Status ChunkIndexMeta::LoadSet() {
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     switch (index_base->index_type_) {
         case IndexType::kSecondary:
+            [[fallthrough]];
         case IndexType::kSecondaryFunctional: {
             auto index_file_name = IndexFileName(chunk_id_);
             auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
@@ -283,13 +284,13 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
         return index_status;
     }
 
-    std::shared_ptr<ColumnDef> column_def;
+    // std::shared_ptr<ColumnDef> column_def;
     {
         auto [col_def, status] = table_index_meta.GetColumnDef();
         if (!status.ok()) {
             return status;
         }
-        column_def = std::move(col_def);
+        // column_def = std::move(col_def);
     }
 
     auto status = LoadSet();
