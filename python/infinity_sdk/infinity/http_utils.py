@@ -56,6 +56,7 @@ functions = [
     "json_extract_bool",
     "json_extract_isnull",
     "json_exists_path",
+    "json_contains",
 ]
 
 bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
