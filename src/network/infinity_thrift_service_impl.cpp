@@ -348,16 +348,7 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         insert_row->columns_ = std::move(field.column_names);
         insert_row->values_.reserve(field.parse_exprs.size());
         for (auto &expr : field.parse_exprs) {
-            ParsedExpr *parsed_expr = nullptr;
-
-            // Handle different expression types
-            if (expr.type.__isset.constant_expr) {
-                parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
-            } else if (expr.type.__isset.function_expr) {
-                parsed_expr = GetFunctionExprFromProto(constant_status, *expr.type.function_expr);
-            } else {
-                constant_status = Status::InvalidParsedExprType();
-            }
+            ParsedExpr *parsed_expr = GetParsedExprFromProto(constant_status, expr);
 
             if (!constant_status.ok()) {
                 ProcessStatus(response, constant_status);
