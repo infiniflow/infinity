@@ -899,8 +899,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         }
 
         // append in version file.
-        BlockVersion *block_version{};
-        // auto *block_version = std::make_unique<BlockVersion>(block_meta.block_capacity()).release();
+        std::shared_ptr<BlockVersion> block_version;
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
         // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
@@ -968,8 +967,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
         // delete in version file
-        // std::shared_ptr<BlockVersion> block_version;
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_file_worker->Read(block_version);
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
@@ -979,8 +977,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             }
             undo_block_offsets.push_back(block_offset);
         }
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
         version_file_worker->Write(block_version, version_file_worker_save_ctx);
     }
@@ -1001,14 +997,11 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
 
     {
         // delete in version file
-        // std::shared_ptr<BlockVersion> block_version;
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_file_worker->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
         }
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
     return Status::OK();
 }
@@ -1025,8 +1018,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     {
         // delete in version file
-        // std::shared_ptr<BlockVersion> block_version;
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         version_file_worker->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
@@ -1034,8 +1026,6 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
                 return status;
             }
         }
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
     return Status::OK();
 }
@@ -1728,12 +1718,9 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         if (!status.ok()) {
             return status;
         }
-        // std::shared_ptr<BlockVersion> block_version;
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(save_ts, block_info.row_count_);
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
 
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
@@ -1751,13 +1738,9 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         if (!status.ok()) {
             return status;
         }
-        // auto block_version = std::make_shared<BlockVersion>(block_meta.block_capacity());
-        // auto *block_version = std::make_unique<BlockVersion>(block_meta.block_capacity()).release();
-        BlockVersion *block_version{};
+        std::shared_ptr<BlockVersion> block_version;
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->CommitAppend(save_ts, commit_ts);
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
 
         static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
     }

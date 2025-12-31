@@ -706,14 +706,11 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
     }
-    // std::shared_ptr<BlockVersion> block_version;
-    BlockVersion *block_version{};
+    std::shared_ptr<BlockVersion> block_version;
     static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     size_t row_cnt = block_version->GetRowCount();
 
     size_t segment_row_count = (block_count - 1) * DEFAULT_BLOCK_CAPACITY + row_cnt;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    cache_manager.UnPin(*version_file_worker->rel_file_path_);
     return segment_row_count;
 }
 
