@@ -8,7 +8,7 @@ import time
 python_executable = sys.executable
 
 
-def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = ""):
+def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = "", use_http: bool = False):
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
@@ -23,8 +23,11 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str, test_case: str = "")
         "-x",
         "-m",
         pytest_mark,
-        # f"{python_test_dir}/test_pysdk",
     ]
+    if use_http:
+        args.append("--http")
+    # f"{python_test_dir}/test_pysdk",
+    args.append("")  # placeholder to maintain list structure
     quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
     print(" ".join(quoted_args))
 
@@ -57,6 +60,11 @@ if __name__ == "__main__":
         type=str,
         required=False,
     )
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Use HTTP mode for testing",
+    )
     args = parser.parse_args()
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
@@ -68,9 +76,12 @@ if __name__ == "__main__":
 
 
     print("Start Python SDK testing...")
+    if args.http:
+        os.environ["INFINITY_HTTP_MODE"] = "1"
+        print("HTTP mode enabled")
     start = time.time()
     try:
-        python_sdk_test(python_test_dir, args.pytest_mark, test_case)
+        python_sdk_test(python_test_dir, args.pytest_mark, test_case, use_http=args.http)
     except Exception as e:
         print(e)
         sys.exit(-1)
