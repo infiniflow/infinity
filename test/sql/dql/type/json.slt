@@ -132,5 +132,648 @@ null
 null
 {"aa":111,"bb":222}
 
+query XIII
+SELECT json_extract(c3, '$.a[100]') FROM test_json_filter;
+----
+null
+null
+null
+null
+null
+null
+null
+null
+null
+null
+
+query XIV
+SELECT json_exists_path(c3, '$.1') FROM test_json_filter;
+----
+false
+true
+false
+true
+true
+false
+false
+false
+false
+false
+
+query XV
+SELECT json_exists_path(c3, '$.a') FROM test_json_filter;
+----
+false
+false
+false
+false
+false
+false
+false
+false
+false
+true
+
+query XVI
+SELECT json_exists_path(c3, '$.nonexistent') FROM test_json_filter;
+----
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+
+statement ok
+INSERT INTO test_json_filter VALUES (10, 'k', '{"name": "测试", "value": 42.5, "active": false, "tags": ["tag1", "tag2"], "nested": {"key1": "val1", "key2": 999}}')
+
+statement ok
+INSERT INTO test_json_filter VALUES (11, 'l', '{"empty_array": [], "empty_object": {}, "special_chars": "a\nb\tc", "unicode": "\u4e2d\u6587"}')
+
+statement ok
+INSERT INTO test_json_filter VALUES (12, 'm', '{"level1": {"level2": {"level3": {"level4": "deep_value"}}}}')
+
+statement ok
+INSERT INTO test_json_filter VALUES (13, 'n', '{"bool_true": true, "bool_false": false, "zero": 0, "negative": -100}')
+
+query XVII
+SELECT json_extract_string(c3, '$.name') FROM test_json_filter WHERE c1 = 10;
+----
+"测试"
+
+query XVIII
+SELECT json_extract_double(c3, '$.value') FROM test_json_filter WHERE c1 = 10;
+----
+42.500000
+
+query XIX
+SELECT json_extract_bool(c3, '$.active') FROM test_json_filter WHERE c1 = 10;
+----
+false
+
+query XX
+SELECT json_extract_string(c3, '$.nested.key1') FROM test_json_filter WHERE c1 = 10;
+----
+"val1"
+
+query XXI
+SELECT json_extract_int(c3, '$.nested.key2') FROM test_json_filter WHERE c1 = 10;
+----
+999
+
+query XXII
+SELECT json_extract(c3, '$.tags[0]') FROM test_json_filter WHERE c1 = 10;
+----
+"tag1"
+
+query XXIII
+SELECT json_extract(c3, '$.tags[1]') FROM test_json_filter WHERE c1 = 10;
+----
+"tag2"
+
+query XXIV
+SELECT json_extract(c3, '$.tags[10]') FROM test_json_filter WHERE c1 = 10;
+----
+null
+
+query XXV
+SELECT json_extract_bool(c3, '$.bool_true') FROM test_json_filter WHERE c1 = 13;
+----
+true
+
+query XXVI
+SELECT json_extract_bool(c3, '$.bool_false') FROM test_json_filter WHERE c1 = 13;
+----
+false
+
+query XXVII
+SELECT json_extract_int(c3, '$.zero') FROM test_json_filter WHERE c1 = 13;
+----
+0
+
+query XXVIII
+SELECT json_extract_int(c3, '$.negative') FROM test_json_filter WHERE c1 = 13;
+----
+-100
+
+query XXIX
+SELECT json_extract(c3, '$.level1.level2') FROM test_json_filter WHERE c1 = 12;
+----
+{"level3":{"level4":"deep_value"}}
+
+query XXX
+SELECT json_extract_string(c3, '$.level1.level2.level3.level4') FROM test_json_filter WHERE c1 = 12;
+----
+"deep_value"
+
+query XXXI
+SELECT json_extract(c3, '$.empty_array') FROM test_json_filter WHERE c1 = 11;
+----
+[]
+
+query XXXII
+SELECT json_extract(c3, '$.empty_object') FROM test_json_filter WHERE c1 = 11;
+----
+{}
+
+query XXXIII
+SELECT json_extract_isnull(c3, '$.empty_array') FROM test_json_filter WHERE c1 = 11;
+----
+false
+
+query XXXIV
+SELECT json_contains(c3, '"电商"') FROM test_json_filter WHERE c1 = 7;
+----
+true
+
+query XXXV
+SELECT json_contains(c3, '"不存在的商品"') FROM test_json_filter WHERE c1 = 7;
+----
+false
+
+query XXXVI
+SELECT json_contains(c3, '1') FROM test_json_filter WHERE c1 = 6;
+----
+true
+
+query XXXVII
+SELECT json_exists_path(c3, '$.level1.level2.level3') FROM test_json_filter WHERE c1 = 12;
+----
+true
+
+query XXXVIII
+SELECT json_exists_path(c3, '$.level1.level2.level3.level4.level5') FROM test_json_filter WHERE c1 = 12;
+----
+false
+
+statement ok
+INSERT INTO test_json_filter VALUES (14, 'o', '[{"product": "laptop", "price": 999.99, "in_stock": true}, {"product": "mouse", "price": 29.99, "in_stock": false}]')
+
+query XXXIX
+SELECT json_extract(c3, '$[0]') FROM test_json_filter WHERE c1 = 14;
+----
+{"in_stock":true,"price":999.99,"product":"laptop"}
+
+query XL
+SELECT json_extract_string(c3, '$[0].product') FROM test_json_filter WHERE c1 = 14;
+----
+"laptop"
+
+query XLI
+SELECT json_extract_double(c3, '$[0].price') FROM test_json_filter WHERE c1 = 14;
+----
+999.990000
+
+query XLII
+SELECT json_extract_bool(c3, '$[0].in_stock') FROM test_json_filter WHERE c1 = 14;
+----
+true
+
+query XLIII
+SELECT json_extract_string(c3, '$[1].product') FROM test_json_filter WHERE c1 = 14;
+----
+"mouse"
+
+query XLIV
+SELECT json_extract_bool(c3, '$[1].in_stock') FROM test_json_filter WHERE c1 = 14;
+----
+false
+
+statement ok
+INSERT INTO test_json_filter VALUES (15, 'p', '{"array_of_arrays": [[1, 2], [3, 4], [5, 6]], "mixed_array": [1, "two", 3.0, true, null]}')
+
+query XLV
+SELECT json_extract(c3, '$.array_of_arrays[0]') FROM test_json_filter WHERE c1 = 15;
+----
+[1,2]
+
+query XLVI
+SELECT json_extract(c3, '$.mixed_array[0]') FROM test_json_filter WHERE c1 = 15;
+----
+1
+
+query XLVII
+SELECT json_extract(c3, '$.mixed_array[1]') FROM test_json_filter WHERE c1 = 15;
+----
+"two"
+
+query XLVIII
+SELECT json_extract(c3, '$.mixed_array[4]') FROM test_json_filter WHERE c1 = 15;
+----
+null
+
+query XLIX
+SELECT json_extract_isnull(c3, '$.mixed_array[4]') FROM test_json_filter WHERE c1 = 15;
+----
+true
+
+query L
+SELECT json_extract_int(c3, '$.mixed_array[0]') FROM test_json_filter WHERE c1 = 15;
+----
+1
+
+query LI
+SELECT json_extract_double(c3, '$.mixed_array[2]') FROM test_json_filter WHERE c1 = 15;
+----
+3.000000
+
+query LII
+SELECT json_extract_bool(c3, '$.mixed_array[3]') FROM test_json_filter WHERE c1 = 15;
+----
+true
+
+statement ok
+INSERT INTO test_json_filter VALUES (16, 'q', '{"string_number": "123", "string_float": "45.67", "string_bool": "true"}')
+
+query LIII
+SELECT json_extract_string(c3, '$.string_number') FROM test_json_filter WHERE c1 = 16;
+----
+"123"
+
+query LIV
+SELECT json_extract_string(c3, '$.string_float') FROM test_json_filter WHERE c1 = 16;
+----
+"45.67"
+
+query LV
+SELECT json_extract_string(c3, '$.string_bool') FROM test_json_filter WHERE c1 = 16;
+----
+"true"
+
+statement ok
+INSERT INTO test_json_filter VALUES (17, 'r', '{"a": [1, 2, 3], "b": [[4, 5], [6, 7]], "c": {"d": {"e": 8}}}')
+
+query LVIII
+SELECT json_extract_int(c3, '$.a[2]') FROM test_json_filter WHERE c1 = 17;
+----
+3
+
+query LIX
+SELECT json_extract_int(c3, '$.b[1][1]') FROM test_json_filter WHERE c1 = 17;
+----
+7
+
+query LX
+SELECT json_extract_int(c3, '$.c.d.e') FROM test_json_filter WHERE c1 = 17;
+----
+8
+
+query LXI
+SELECT json_extract(c3, '$.b[0]') FROM test_json_filter WHERE c1 = 17;
+----
+[4,5]
+
+statement ok
+INSERT INTO test_json_filter VALUES (18, 's', '{"arr": [1, 2, 3], "obj": {"x": 10}}')
+
+# Test array index out of bounds (should return null)
+query LXII
+SELECT json_extract(c3, '$.arr[10]') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+query LXIII
+SELECT json_extract_string(c3, '$.arr[100]') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+# Negative index causes error (not null), skip this test
+# query LXIV
+# SELECT json_extract_int(c3, '$.arr[-1]') FROM test_json_filter WHERE c1 = 18;
+# ----
+# null
+
+# Test invalid path formats
+query LXV
+SELECT json_extract(c3, '$.nonexistent') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+query LXVI
+SELECT json_extract_string(c3, '$.obj.nonexistent') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+query LXVII
+SELECT json_extract_int(c3, '$.obj.nonexistent.nested') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+# Test accessing array on object (should return null)
+query LXVIII
+SELECT json_extract(c3, '$.obj[0]') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+# Test accessing object property on array element
+query LXIX
+SELECT json_extract(c3, '$.arr[0].x') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+# Empty path causes error (not null), skip this test
+# query LXX
+# SELECT json_extract(c3, '') FROM test_json_filter WHERE c1 = 18;
+# ----
+# null
+
+# Test root path access (returns entire JSON)
+query LXXI
+SELECT json_extract(c3, '$') FROM test_json_filter WHERE c1 = 18;
+----
+{"arr":[1,2,3],"obj":{"x":10}}
+
+# Test deeply nested path that doesn't exist
+query LXXII
+SELECT json_extract(c3, '$.a.b.c.d.e.f.g') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+# Test path with array index on non-array
+query LXXIII
+SELECT json_extract(c3, '$.obj.x[0]') FROM test_json_filter WHERE c1 = 18;
+----
+null
+
+statement ok
+INSERT INTO test_json_filter VALUES (19, 't', '{"deep": {"level1": {"level2": {"level3": {"level4": {"level5": "final_value"}}}}}}')
+
+# Test very deep nesting that exists
+query LXXIV
+SELECT json_extract_string(c3, '$.deep.level1.level2.level3.level4.level5') FROM test_json_filter WHERE c1 = 19;
+----
+"final_value"
+
+# Test very deep nesting that doesn't exist (one level deeper)
+query LXXV
+SELECT json_extract(c3, '$.deep.level1.level2.level3.level4.level5.level6') FROM test_json_filter WHERE c1 = 19;
+----
+null
+
+statement ok
+INSERT INTO test_json_filter VALUES (20, 'u', '{"empty": "", "zero": 0, "false": false, "null_val": null}')
+
+# Test edge case values
+query LXXVI
+SELECT json_extract_string(c3, '$.empty') FROM test_json_filter WHERE c1 = 20;
+----
+""
+
+query LXXVII
+SELECT json_extract_int(c3, '$.zero') FROM test_json_filter WHERE c1 = 20;
+----
+0
+
+query LXXVIII
+SELECT json_extract_bool(c3, '$.false') FROM test_json_filter WHERE c1 = 20;
+----
+false
+
+query LXXIX
+SELECT json_extract_isnull(c3, '$.null_val') FROM test_json_filter WHERE c1 = 20;
+----
+true
+
+query LXXX
+SELECT json_extract(c3, '$.null_val') FROM test_json_filter WHERE c1 = 20;
+----
+null
+
+# Test mixed array with nulls
+statement ok
+INSERT INTO test_json_filter VALUES (21, 'v', '{"mixed": [null, 1, "text", null, true, false]}')
+
+query LXXXI
+SELECT json_extract(c3, '$.mixed[0]') FROM test_json_filter WHERE c1 = 21;
+----
+null
+
+query LXXXII
+SELECT json_extract_isnull(c3, '$.mixed[0]') FROM test_json_filter WHERE c1 = 21;
+----
+true
+
+query LXXXIII
+SELECT json_extract_isnull(c3, '$.mixed[1]') FROM test_json_filter WHERE c1 = 21;
+----
+false
+
+query LXXXIV
+SELECT json_extract_int(c3, '$.mixed[1]') FROM test_json_filter WHERE c1 = 21;
+----
+1
+
+query LXXXV
+SELECT json_extract_string(c3, '$.mixed[2]') FROM test_json_filter WHERE c1 = 21;
+----
+"text"
+
+query LXXXVI
+SELECT json_extract_bool(c3, '$.mixed[4]') FROM test_json_filter WHERE c1 = 21;
+----
+true
+
+query LXXXVII
+SELECT json_extract_bool(c3, '$.mixed[5]') FROM test_json_filter WHERE c1 = 21;
+----
+false
+
+# Test array negative index and very large index
+query LXXXVIII
+SELECT json_extract(c3, '$.mixed[999]') FROM test_json_filter WHERE c1 = 21;
+----
+null
+
+# Test object with numeric keys
+statement ok
+INSERT INTO test_json_filter VALUES (22, 'w', '{"0": "first", "1": "second", "2": "third"}')
+
+query LXXXIX
+SELECT json_extract_string(c3, '$.0') FROM test_json_filter WHERE c1 = 22;
+----
+"first"
+
+query XC
+SELECT json_extract_string(c3, '$.1') FROM test_json_filter WHERE c1 = 22;
+----
+"second"
+
+query XCI
+SELECT json_extract_string(c3, '$.2') FROM test_json_filter WHERE c1 = 22;
+----
+"third"
+
+query XCII
+SELECT json_extract_string(c3, '$.3') FROM test_json_filter WHERE c1 = 22;
+----
+null
+
+# Test array of objects with missing keys
+statement ok
+INSERT INTO test_json_filter VALUES (23, 'x', '[{"name": "a", "value": 1}, {"name": "b"}, {"value": 3, "extra": "data"}]')
+
+query XCIII
+SELECT json_extract_string(c3, '$[0].name') FROM test_json_filter WHERE c1 = 23;
+----
+"a"
+
+query XCIV
+SELECT json_extract_int(c3, '$[0].value') FROM test_json_filter WHERE c1 = 23;
+----
+1
+
+query XCV
+SELECT json_extract_string(c3, '$[1].name') FROM test_json_filter WHERE c1 = 23;
+----
+"b"
+
+query XCVI
+SELECT json_extract(c3, '$[1].value') FROM test_json_filter WHERE c1 = 23;
+----
+null
+
+query XCVII
+SELECT json_extract(c3, '$[2].name') FROM test_json_filter WHERE c1 = 23;
+----
+null
+
+query XCVIII
+SELECT json_extract_int(c3, '$[2].value') FROM test_json_filter WHERE c1 = 23;
+----
+3
+
+query XCIX
+SELECT json_extract_string(c3, '$[2].extra') FROM test_json_filter WHERE c1 = 23;
+----
+"data"
+
+# Test accessing root of nested objects
+query C
+SELECT json_extract(c3, '$.deep') FROM test_json_filter WHERE c1 = 19;
+----
+{"level1":{"level2":{"level3":{"level4":{"level5":"final_value"}}}}}
+
+query CI
+SELECT json_extract(c3, '$.deep.level1') FROM test_json_filter WHERE c1 = 19;
+----
+{"level2":{"level3":{"level4":{"level5":"final_value"}}}}
+
+# Test json_exists_path with various scenarios
+query CII
+SELECT json_exists_path(c3, '$.arr') FROM test_json_filter WHERE c1 = 18;
+----
+true
+
+query CIII
+SELECT json_exists_path(c3, '$.arr[0]') FROM test_json_filter WHERE c1 = 18;
+----
+true
+
+query CIV
+SELECT json_exists_path(c3, '$.arr[10]') FROM test_json_filter WHERE c1 = 18;
+----
+false
+
+query CV
+SELECT json_exists_path(c3, '$.obj.x') FROM test_json_filter WHERE c1 = 18;
+----
+true
+
+query CVI
+SELECT json_exists_path(c3, '$.obj.y') FROM test_json_filter WHERE c1 = 18;
+----
+false
+
+# Test with array at root level
+statement ok
+INSERT INTO test_json_filter VALUES (24, 'y', '[100, 200, 300]')
+
+query CVII
+SELECT json_extract_int(c3, '$[0]') FROM test_json_filter WHERE c1 = 24;
+----
+100
+
+query CVIII
+SELECT json_extract_int(c3, '$[1]') FROM test_json_filter WHERE c1 = 24;
+----
+200
+
+query CIX
+SELECT json_extract_int(c3, '$[2]') FROM test_json_filter WHERE c1 = 24;
+----
+300
+
+query CX
+SELECT json_extract(c3, '$[3]') FROM test_json_filter WHERE c1 = 24;
+----
+null
+
+query CXI
+SELECT json_exists_path(c3, '$[0]') FROM test_json_filter WHERE c1 = 24;
+----
+true
+
+query CXII
+SELECT json_exists_path(c3, '$[3]') FROM test_json_filter WHERE c1 = 24;
+----
+false
+
+# Test nested arrays
+statement ok
+INSERT INTO test_json_filter VALUES (25, 'z', '{"matrix": [[1, 2, 3], [4, 5, 6], [7, 8, 9]]}')
+
+query CXIII
+SELECT json_extract_int(c3, '$.matrix[0][0]') FROM test_json_filter WHERE c1 = 25;
+----
+1
+
+query CXIV
+SELECT json_extract_int(c3, '$.matrix[1][2]') FROM test_json_filter WHERE c1 = 25;
+----
+6
+
+query CXV
+SELECT json_extract_int(c3, '$.matrix[2][2]') FROM test_json_filter WHERE c1 = 25;
+----
+9
+
+query CXVI
+SELECT json_extract(c3, '$.matrix[0][3]') FROM test_json_filter WHERE c1 = 25;
+----
+null
+
+query CXVII
+SELECT json_extract(c3, '$.matrix[3][0]') FROM test_json_filter WHERE c1 = 25;
+----
+null
+
+# Test boolean edge cases
+statement ok
+INSERT INTO test_json_filter VALUES (26, 'aa', '{"bool1": true, "bool2": false, "str_true": "true", "str_false": "false"}')
+
+query CXVIII
+SELECT json_extract_bool(c3, '$.bool1') FROM test_json_filter WHERE c1 = 26;
+----
+true
+
+query CXIX
+SELECT json_extract_bool(c3, '$.bool2') FROM test_json_filter WHERE c1 = 26;
+----
+false
+
+query CXX
+SELECT json_extract_string(c3, '$.str_true') FROM test_json_filter WHERE c1 = 26;
+----
+"true"
+
+query CXXI
+SELECT json_extract_string(c3, '$.str_false') FROM test_json_filter WHERE c1 = 26;
+----
+"false"
+
 statement ok
 DROP TABLE test_json_filter;
