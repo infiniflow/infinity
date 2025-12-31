@@ -2546,11 +2546,11 @@ Status NewTxn::RestoreTableIndexesFromSnapshot(TableMeta &table_meta, const std:
             // Calculate next_chunk_id from existing chunk infos
             ChunkID next_chunk_id = 0;
             if (!segment_index.chunk_infos_.empty()) {
-                next_chunk_id = std::max_element(segment_index.chunk_infos_.begin(),
-                                                 segment_index.chunk_infos_.end(),
-                                                 [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
-                                    ->chunk_id_ +
-                                1;
+                next_chunk_id =
+                    std::ranges::max_element(segment_index.chunk_infos_,
+                                             [](const WalChunkIndexInfo &a, const WalChunkIndexInfo &b) { return a.chunk_id_ < b.chunk_id_; })
+                        ->chunk_id_ +
+                    1;
             }
             if (!is_link_files) {
                 status = new_catalog_->RestoreNewSegmentIndex1(*table_index_meta, this, segment_index.segment_id_, segment_index_meta, next_chunk_id);

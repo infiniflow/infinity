@@ -177,10 +177,9 @@ TxnTimeStamp SegmentMeta::GetCreateTimestampFromKV() const {
 Status SegmentMeta::Init() { return Status::OK(); }
 
 Status SegmentMeta::AddBlockWithID(TxnTimeStamp commit_ts, BlockID block_id) {
-    Status status;
     std::string block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
     std::string commit_ts_str = fmt::format("{}", commit_ts);
-    status = kv_instance_.Put(block_id_key, commit_ts_str);
+    Status status = kv_instance_.Put(block_id_key, commit_ts_str);
     if (!status.ok()) {
         return status;
     }

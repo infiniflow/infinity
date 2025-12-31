@@ -505,7 +505,6 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
                                           std::vector<std::string> &restored_file_paths,
                                           bool ignore_table_id) {
     Config *config = InfinityContext::instance().config();
-    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
     // Start timing for file restoration
     auto file_restore_start = std::chrono::high_resolution_clock::now();
@@ -545,7 +544,7 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
             }
         }
 
-        std::string dst_file_path = fmt::format("{}/{}", config->DataDir(), modified_file);
+        std::string dst_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
         // std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
         // std::string tmp_file_dir = VirtualStore::GetParentPath(tmp_file_path);
         // if (!VirtualStore::Exists(tmp_file_dir)) {
@@ -563,46 +562,15 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         //     fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
         // }
 
-        if (persistence_manager != nullptr) {
-            // Use persistence manager to restore files
-            // Create a temporary file path for the source file
-            std::string tmp_file_path = fmt::format("{}/{}", config->TempDir(), StringTransform(src_file_path, "/", "_"));
-
-            // Copy source file to temporary location first
-            Status copy_status = VirtualStore::Copy(tmp_file_path, src_file_path);
-            if (!copy_status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy file to temp: {}", copy_status.message()));
-                continue;
-            }
-
-            // Use persistence manager to persist the file
-            PersistResultHandler handler(persistence_manager);
-
-            // Check if this is an index file (in idx_* subdirectory) and disable composition
-            bool try_compose = true;
-            if (dst_file_path.find("/idx_") != std::string::npos) {
-                try_compose = false;
-                LOG_DEBUG(fmt::format("Index file detected, disabling composition: {}", dst_file_path));
-            }
-
-            PersistWriteResult persist_result = persistence_manager->Persist(dst_file_path, tmp_file_path, try_compose);
-            handler.HandleWriteResult(persist_result);
-
-            // Add the destination file path to the output vector
-            restored_file_paths.push_back(modified_file);
-
-            LOG_TRACE(fmt::format("Restored file via persistence manager: {} -> {}", src_file_path, dst_file_path));
+        std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
+        if (!VirtualStore::Exists(dst_dir)) {
+            VirtualStore::MakeDirectory(dst_dir);
+        }
+        Status status = VirtualStore::Copy(dst_file_path, src_file_path);
+        if (!status.ok()) {
+            LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
         } else {
-            std::string dst_dir = VirtualStore::GetParentPath(dst_file_path);
-            if (!VirtualStore::Exists(dst_dir)) {
-                VirtualStore::MakeDirectory(dst_dir);
-            }
-            Status status = VirtualStore::Copy(dst_file_path, src_file_path);
-            if (!status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
-            } else {
-                restored_file_paths.push_back(modified_file);
-            }
+            restored_file_paths.push_back(modified_file);
         }
     }
 
