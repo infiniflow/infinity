@@ -223,8 +223,7 @@ class TestInfinity:
             {'json_extract_string(c3, $.2)': dtype('str')}))
         res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
-            {'json_extract_int(c3, $.2)': (3232, None)}).astype(
-            {'json_extract_int(c3, $.2)': 'Int32'}))
+            {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype('Int32'))
         res, extra_res = table_obj.output(["json_extract_double(c3,'$.4')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('float64')), pd.DataFrame(
             {'json_extract_double(c3, $.4)': (1.123, 1.123)}).astype(
@@ -233,27 +232,23 @@ class TestInfinity:
         res, extra_res = table_obj.output(["json_extract_isnull(c3,'$.1')"]).to_pl()
         print(res)
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_extract_isnull(c3, $.1)': (pd.NA, True)}).astype(
-            {'json_extract_isnull(c3, $.1)': 'boolean'}))
+            {'json_extract_isnull(c3, $.1)': (pd.NA, True)}).astype('boolean'))
 
         res, extra_res = table_obj.output(["json_exists_path(c3,'$.1')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_exists_path(c3, $.1)': (False,True)}).astype(
-            {'json_exists_path(c3, $.1)': 'boolean'}))
+            {'json_exists_path(c3, $.1)': (False, True)}).astype('boolean'))
 
         table_obj.insert([{"c1": 111, "c2": 'aaa',
                            "c3": '{"1":null,"2":"10","3":12,"4":true}'}])
         res, extra_res = table_obj.output(["json_extract_bool(c3,'$.4')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_extract_bool(c3, $.4)': (pd.NA, pd.NA, True)}).astype(
-            {'json_extract_bool(c3, $.4)': 'boolean'}))
+            {'json_extract_bool(c3, $.4)': (pd.NA, pd.NA, True)}).astype('boolean'))
 
         table_obj.insert([{"c1": 111, "c2": 'aaa',
                            "c3": '[1,null,"a",1.23,true]'}])
         res, extra_res = table_obj.output(["json_contains(c3,'null')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_contains(c3, null)': (False,False,False,True)}).astype(
-            {'json_contains(c3, null)': 'boolean'}))
+            {'json_contains(c3, null)': (False, False, False, True)}).astype('boolean'))
 
     def test_select_json_comprehensive(self, suffix):
         """
@@ -317,26 +312,26 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$[0]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[0])': (None, '"电商"')})
+            pd.DataFrame({'json_extract_string(c3, $[0])': (pd.NA, '"电商"')})
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (None, '"美妆"')})
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"')})
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[2])': (None, '"母婴"')})
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"')})
         )
 
         # Test out of bounds index
         res, _ = table_obj.output(["json_extract_string(c3,'$[10]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[10])': (None, None)})
+            pd.DataFrame({'json_extract_string(c3, $[10])': (pd.NA, pd.NA)})
         )
 
         # Test json_contains on arrays
@@ -400,14 +395,14 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (None, '"美妆"', None, '"two"')})
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"', pd.NA, '"two"')})
         )
 
-        # Use json_extract_string for double to avoid None conversion issues
+        # Use json_extract_string for double to avoid pd.NA conversion issues
         res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[2])': (None, '"母婴"', None, '3.0')})
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"', pd.NA, '3.0')})
         )
 
         res, _ = table_obj.output(["json_extract_bool(c3,'$[3]')"]).to_pl()
@@ -444,7 +439,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_isnull(c3,'$.nonexistent')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('boolean'),
-            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, None)}).astype('boolean')
+            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, pd.NA)}).astype('boolean')
         )
 
         # Test 5: Array of objects - extract objects and their properties
@@ -458,7 +453,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$[0].name')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[0].name)': (None, None, None, None, '"张三"')})
+            pd.DataFrame({'json_extract_string(c3, $[0].name)': (pd.NA, pd.NA, pd.NA, pd.NA, '"张三"')})
         )
 
         res, _ = table_obj.output(["json_extract_int(c3,'$[0].age')"]).to_pl()
@@ -471,7 +466,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$[1].name')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1].name)': (None, None, None, None, '"李四"')})
+            pd.DataFrame({'json_extract_string(c3, $[1].name)': (pd.NA, pd.NA, pd.NA, pd.NA, '"李四"')})
         )
 
         res, _ = table_obj.output(["json_extract_int(c3,'$[1].age')"]).to_pl()
@@ -583,7 +578,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$.matrix[0]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $.matrix[0])': (None, None, None, None, None, None, None, '[1,2,3]')})
+            pd.DataFrame({'json_extract_string(c3, $.matrix[0])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, '[1,2,3]')})
         )
 
         # Test 8b: Empty arrays and objects
@@ -606,7 +601,7 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$.level1.level2.level3.level4')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $.level1.level2.level3.level4)': (None, None, None, None, None, None, None, None, None, '"deep_value"')})
+            pd.DataFrame({'json_extract_string(c3, $.level1.level2.level3.level4)': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, '"deep_value"')})
         )
 
         res, _ = table_obj.output(["json_exists_path(c3,'$.level1.level2.level3')"]).to_pl()
