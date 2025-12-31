@@ -23,6 +23,10 @@ import std.compat;
 
 namespace infinity {
 
+enum class ExtraInfoType { kInvalid = 0, kJsonToString, kJsonToInt, kJsonToDouble, kJsonToBool, kJsonToIsNull };
+class BaseExtraInfo;
+class JsonExtraInfo;
+
 class FunctionExpr : public ParsedExpr {
 public:
     explicit FunctionExpr() : ParsedExpr(ParsedExprType::kFunction) {}
@@ -35,6 +39,37 @@ public:
     std::string func_name_{};
     std::vector<ParsedExpr *> *arguments_{nullptr};
     bool distinct_{false};
+
+    std::shared_ptr<BaseExtraInfo> extra_info_{nullptr};
+};
+
+class BaseExtraInfo {
+public:
+    BaseExtraInfo() = default;
+    explicit BaseExtraInfo(ExtraInfoType type) : type_(type) {}
+    virtual ~BaseExtraInfo() = default;
+
+    virtual bool Init() = 0;
+
+    bool initialized_{false};
+    ExtraInfoType type_{ExtraInfoType::kInvalid};
+};
+
+class JsonExtraInfo : public BaseExtraInfo {
+public:
+    explicit JsonExtraInfo(ExtraInfoType type, char *json_extra_info) : BaseExtraInfo(type), json_extra_info_(json_extra_info) {}
+    ~JsonExtraInfo() override {
+        if (json_extra_info_ != nullptr) {
+            free(json_extra_info_);
+            json_extra_info_ = nullptr;
+        }
+        json_tokens_.clear();
+    }
+
+    bool Init() override;
+
+    char *json_extra_info_{nullptr};
+    std::vector<std::string> json_tokens_{};
 };
 
 } // namespace infinity

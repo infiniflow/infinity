@@ -341,7 +341,8 @@ struct SQL_LTYPE {
     CLEAN = 465,                   /* CLEAN  */
     CHECKPOINT = 466,              /* CHECKPOINT  */
     IMPORT = 467,                  /* IMPORT  */
-    NUMBER = 468                   /* NUMBER  */
+    PARSE_JSON = 468,              /* PARSE_JSON  */
+    NUMBER = 469                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -431,7 +432,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 435 "parser.h"
+#line 436 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

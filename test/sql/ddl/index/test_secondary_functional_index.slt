@@ -69,28 +69,28 @@ query I
 EXPLAIN SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1 AND substring(c2, 0, 5) = 'hello';
 ----
 PROJECT (4)
- - table index: #4
+  - table index: #4
   - expressions: [c1 (#0), c2 (#1)]
- -> INDEX SCAN (6)
-    - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
-    - table index: #1
-    - filter: (sqrt(c1 (#1.0)) > CAST(1 AS Double)) AND (substring(c2 (#1.1), 0, 5) = hello)
-    - output_columns: [__rowid]
+-> INDEX SCAN (6)
+   - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
+   - table index: #1
+   - filter: (sqrt(c1 (#1.0)) > CAST(1 AS Double)) AND (substring(c2 (#1.1), 0, 5) = hello)
+   - output_columns: [__rowid]
 
-query I
+query II
 EXPLAIN SELECT * FROM test_secondary_functional_index WHERE sqrt(c1) > 1 AND substring(c2, 1, 5) = 'hello';
 ----
 PROJECT (4)
   - table index: #4
   - expressions: [c1 (#1), c2 (#0)]
 -> FILTER (3)
-    - filter: substring(c2 (#0), 1, 5) = hello
-    - output columns: [c2, __rowid]
--> INDEX SCAN (6)
-    - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
-    - table index: #1
-    - filter: sqrt(c1 (#1.0)) > CAST(1 AS Double)
-    - output_columns: [__rowid]
+   - filter: substring(c2 (#0), 1, 5) = hello
+   - output columns: [c2, __rowid]
+  -> INDEX SCAN (6)
+     - table name: test_secondary_functional_index(default_db.test_secondary_functional_index)
+     - table index: #1
+     - filter: sqrt(c1 (#1.0)) > CAST(1 AS Double)
+     - output_columns: [__rowid]
 
 statement ok
 OPTIMIZE test_secondary_functional_index;

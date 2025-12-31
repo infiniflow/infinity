@@ -331,6 +331,7 @@ struct ColumnField {
 1: ColumnType column_type,
 2: list<binary> column_vectors = [],
 3: string column_name,
+4: list<bool> bitmasks = [],
 }
 
 struct ImportOption {

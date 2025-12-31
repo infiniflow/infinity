@@ -15,6 +15,7 @@
 import struct
 import json
 import numpy as np
+import pandas as pd
 from infinity.common import VEC, SparseVector, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import (
     ColumnExpr,
@@ -40,15 +41,15 @@ import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 def logic_type_to_dtype(ttype: ttypes.DataType):
     match ttype.logic_type:
         case ttypes.LogicType.Boolean:
-            return dtype('bool')
+            return 'boolean'
         case ttypes.LogicType.TinyInt:
-            return dtype('int8')
+            return 'Int8'
         case ttypes.LogicType.SmallInt:
-            return dtype('int16')
+            return 'Int16'
         case ttypes.LogicType.Integer:
-            return dtype('int32')
+            return 'Int32'
         case ttypes.LogicType.BigInt:
-            return dtype('int64')
+            return 'Int64'
         case ttypes.LogicType.Float:
             return dtype('float32')
         case ttypes.LogicType.Double:
@@ -95,32 +96,73 @@ def bf16_bytes_to_float32_list(column_vector):
     return list(view_float32)
 
 
-def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
+def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors, null_bitmap: list[bool] = None) -> \
         list[Any, ...]:
     column_vector = b''.join(column_vectors)
     match column_type:
         case ttypes.ColumnType.ColumnInt32:
-            return list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 4:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            return data
         case ttypes.ColumnType.ColumnInt64:
-            return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 8:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
+            return data
         case ttypes.ColumnType.ColumnFloat32:
-            return list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 4:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
+            return data
         case ttypes.ColumnType.ColumnFloat64:
-            return list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 8:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+            return data
         case ttypes.ColumnType.ColumnFloat16:
-            return list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 2:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+            return data
         case ttypes.ColumnType.ColumnBFloat16:
-            return bf16_bytes_to_float32_list(column_vector)
+            data = bf16_bytes_to_float32_list(column_vector)
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [value if is_valid else pd.NA for value, is_valid in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnVarchar:
-            return list(parse_bytes(column_vector))
+            data = list(parse_bytes(column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [value if is_valid else pd.NA for value, is_valid in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnJson:
-            return list(parse_bytes(column_vector))
+            data = list(parse_bytes(column_vector))
+            if null_bitmap and len(null_bitmap) == len(data):
+                data = [value if is_valid else pd.NA for value, is_valid in zip(data, null_bitmap)]
+            return data
         case ttypes.ColumnType.ColumnBool:
-            return list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector):
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}?'.format(len(column_vector)), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}?'.format(len(column_vector)), column_vector))
+            return data
         case ttypes.ColumnType.ColumnInt8:
-            return list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector):
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}b'.format(len(column_vector)), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
+            return data
         case ttypes.ColumnType.ColumnInt16:
-            return list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+            if null_bitmap and len(null_bitmap) == len(column_vector) // 2:
+                data = [value if is_valid else pd.NA for value, is_valid in zip(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector), null_bitmap)]
+            else:
+                data = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
+            return data
         case ttypes.ColumnType.ColumnRowID:
             return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnEmbedding:
@@ -535,8 +577,9 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         column_type = column_field.column_type
         column_data_type = column_def.data_type
         column_vectors = column_field.column_vectors
+        column_bitmasks = column_field.bitmasks
 
-        data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
+        data_list = column_vector_to_list(column_type, column_data_type, column_vectors, column_bitmasks)
         # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type

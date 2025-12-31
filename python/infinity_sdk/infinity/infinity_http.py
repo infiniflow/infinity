@@ -10,6 +10,7 @@ from .http_utils import (
     index_type_transfrom, ExplainType_transfrom, is_list, is_date, is_time, is_datetime,
     is_sparse, str2sparse, type_to_dtype, function_return_type, is_float, functions, bool_functions
 )
+
 from infinity.common import ConflictType, InfinityException, SparseVector, SortType, FDE
 from typing import Optional, Any
 from infinity.errors import ErrorCode
@@ -23,6 +24,20 @@ from typing import List
 from dataclasses import dataclass
 from collections import namedtuple
 
+def is_json_function(col_name: str) -> bool:
+    """Check if column name is a JSON extraction function"""
+    json_functions = [
+        'json_extract',
+        'json_extract_string',
+        'json_extract_int',
+        'json_extract_double',
+        'json_extract_bool',
+        'json_extract_isnull',
+        'json_exists_path',
+        'json_contains'
+    ]
+    col_name_lower = col_name.lower()
+    return any(col_name_lower.startswith(func) for func in json_functions)
 
 class http_network_util:
     header_dict = baseHeader
@@ -1128,14 +1143,24 @@ class table_http_result:
             for col in res:
                 col_name = next(iter(col))
                 v = col[col_name]
+
+                bitmap = col_name + '_bitmap'
+                bitmap_value = col.get(bitmap)
+                if bitmap_value is not None and not bitmap_value:
+                    v = None
+
                 if col_name not in df_dict:
                     df_dict[col_name] = ()
                 tup = df_dict[col_name]
                 if len(tup) == line_i + 1:
                     continue
-                if isinstance(v, (int, float)):
+
+                if v is None:
                     new_tup = tup + (v,)
-                elif is_list(v):
+                elif isinstance(v, (int, float)):
+                    new_tup = tup + (v,)
+                elif is_list(v) and not is_json_function(col_name):
+                    # Don't parse lists for JSON extraction functions - keep them as strings
                     new_tup = tup + (ast.literal_eval(v),)
                 elif is_date(v):
                     new_tup = tup + (v,)
@@ -1151,6 +1176,8 @@ class table_http_result:
                         v = True
                     elif v.lower() == 'false':
                         v = False
+                    elif v.lower() == 'none':  # Convert string "None" to Python None
+                        v = None
                     new_tup = tup + (v,)
                 df_dict[col_name] = new_tup
             line_i += 1
@@ -1182,7 +1209,7 @@ class table_http_result:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif col.strip().isdigit() and df_type.get(k) != dtype('float64'):
-                    df_type[k] = dtype('int32')
+                    df_type[k] = 'Int32'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):
                     df_type[k] = dtype('float64')
@@ -1195,7 +1222,7 @@ class table_http_result:
                     if (function_name in functions):
                         df_type[k] = function_return_type(function_name, None)
                     if (function_name in bool_functions):
-                        df_type[k] = dtype('bool')
+                        df_type[k] = 'boolean'
                         break
 
         end_process = time.perf_counter()
@@ -1223,7 +1250,16 @@ class table_http_result:
 
         # Time DataFrame construction
         start_df = time.perf_counter()
-        df = pd.DataFrame(df_dict).astype(df_type)
+
+        # Convert Unicode string dtype to object to preserve None values
+        df_type_fixed = {}
+        for k, v in df_type.items():
+            if isinstance(v, dtype) and v.kind == 'U':  # Unicode string type
+                df_type_fixed[k] = object  # Use object to preserve None
+            else:
+                df_type_fixed[k] = v
+
+        df = pd.DataFrame(df_dict).astype(df_type_fixed)
         end_df = time.perf_counter()
 
         df_time = (end_df - start_df) * 1000

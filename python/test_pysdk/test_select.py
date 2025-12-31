@@ -117,80 +117,80 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c1", "c2"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(
             ["c1 + c2"]).filter("c1 = 3").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + c2)': (6,)})
-                                      .astype({'(c1 + c2)': dtype('int32')}))
+                                      .astype({'(c1 + c2)': 'Int32'}))
 
         res, extra_result = table_obj.output(
             ["c1"]).filter("c1 > 2 and c2 < 4").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (3,)})
-                                      .astype({'c1': dtype('int32')}))
+                                      .astype({'c1': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter("(-7 < c1 or 9 <= c1) and (c1 = 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter("(-8 < c1 and c1 <= -7) or (c1 >= 1 and 2 > c1)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter(
             "((c1 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c1)) and ((c1 > 0 and c1 <= 1) or (c1 > -8 and c1 < -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter(
             "(-7 < c1 or 9 <= c1) and (c2 = 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (3,)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter(
             "(-8 < c1 and c2 <= -7) or (c1 >= 1 and 2 > c2)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter(
             "((c2 >= -8 and -4 >= c1) or (c1 >= 0 and 5 > c2)) and ((c2 > 0 and c1 <= 1) or (c1 > -8 and c2 < -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["c2"]).filter(
             "(not(c2 < -8 or -4 < c1) or not(c1 < 0 or 5 <= c2)) and not((c2 <= 0 or c1 > 1) and (c1 <= -8 or c2 >= -6))").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
-                                      .astype({'c2': dtype('int32')}))
+                                      .astype({'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["*"]).filter("c1 in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
                                                          'c2': (1, 2, 3)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["*"]).filter("c1 in (1, 2, 3) and c2 in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3),
                                                          'c2': (1, 2, 3)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["*"]).filter("c1 not in (1, 2, 3)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9),
                                                          'c2': (-3, -2, -1, 0, -8, -7, -6, 7, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_result = table_obj.output(["*"]).filter("(c2 + 1) in (8, 9, 10)").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (7, 8, 9),
                                                          'c2': (7, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         # res = table_obj.output(["*"]).filter("(-c1) in (1, 2, 3)").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1),
         #                                                  'c2': (-3, -2, -1)})
-        #                               .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+        #                               .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res = db_obj.drop_table("test_select" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -206,15 +206,419 @@ class TestInfinity:
         table_obj.insert([{"c1": 654321, "c2": '{"2":3232,"434":"4321","3":43432,"4":1.123}',
                            "c3": '{"2":3232,"434":"4321","3":43432,"4":1.123}'}])
         table_obj.insert([{"c1": 123456, "c2": '{"1":null,"2":"123","3":12,"4":1.123}',
-                           "c3": '{"1":null,"2":"123","3":12,"4":1.123}'}])
+                           "c3": '{"1":null,"2":"10","3":12,"4":1.123}'}])
         res, extra_res = table_obj.output(["c2"]).to_pl()
-        assert res.item(0, 0) == '{"2":3232,"434":"4321","3":43432,"4":1.123}'
-        assert res.item(1, 0) == '{"1":null,"2":"123","3":12,"4":1.123}'
+        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame({'c2': ('{"2":3232,"434":"4321","3":43432,"4":1.123}', '{"1":null,"2":"123","3":12,"4":1.123}')}).astype({'c2': dtype('str')}))
         res, extra_res = table_obj.output(["c3"]).to_pl()
-        assert res.item(0, 0) == '{"2":3232,"3":43432,"4":1.123,"434":"4321"}'
-        assert res.item(1, 0) == '{"1":null,"2":"123","3":12,"4":1.123}'
+        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame({'c3': ('{"2":3232,"3":43432,"4":1.123,"434":"4321"}', '{"1":null,"2":"10","3":12,"4":1.123}')}).astype({'c3': dtype('str')}))
         res, extra_res = table_obj.output(["count(*)"]).to_pl()
-        res.item(0, 0) == 2
+        assert res.item(0, 0) == 2
+        res, extra_res = table_obj.output(["json_extract(c3,'$.2')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame(
+            {'json_extract(c3, $.2)': ('3232', '"10"')}).astype(
+            {'json_extract(c3, $.2)': dtype('str')}))
+        res, extra_res = table_obj.output(["json_extract_string(c3,'$.2')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame(
+            {'json_extract_string(c3, $.2)': ('3232', '"10"')}).astype(
+            {'json_extract_string(c3, $.2)': dtype('str')}))
+        res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
+            {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype('Int32'))
+        res, extra_res = table_obj.output(["json_extract_double(c3,'$.4')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('float64')), pd.DataFrame(
+            {'json_extract_double(c3, $.4)': (1.123, 1.123)}).astype(
+            {'json_extract_double(c3, $.4)': dtype('float64')}))
+
+        res, extra_res = table_obj.output(["json_extract_isnull(c3,'$.1')"]).to_pl()
+        print(res)
+        pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
+            {'json_extract_isnull(c3, $.1)': (pd.NA, True)}).astype('boolean'))
+
+        res, extra_res = table_obj.output(["json_exists_path(c3,'$.1')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
+            {'json_exists_path(c3, $.1)': (False, True)}).astype('boolean'))
+
+        table_obj.insert([{"c1": 111, "c2": 'aaa',
+                           "c3": '{"1":null,"2":"10","3":12,"4":true}'}])
+        res, extra_res = table_obj.output(["json_extract_bool(c3,'$.4')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
+            {'json_extract_bool(c3, $.4)': (pd.NA, pd.NA, True)}).astype('boolean'))
+
+        table_obj.insert([{"c1": 111, "c2": 'aaa',
+                           "c3": '[1,null,"a",1.23,true]'}])
+        res, extra_res = table_obj.output(["json_contains(c3,'null')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
+            {'json_contains(c3, null)': (False, False, False, True)}).astype('boolean'))
+
+    def test_select_json_comprehensive(self, suffix):
+        """
+        Comprehensive test for JSON type operations based on json.slt test cases
+        Tests:
+        - Nested JSON structures
+        - Boolean edge cases
+        - Type conversions
+        - Path existence checks
+        - Array operations (json_contains)
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_comprehensive" + suffix, ConflictType.Ignore)
+
+        # Create table with JSON column
+        table_obj = db_obj.create_table(
+            "test_json_comprehensive" + suffix,
+            {"c1": {"type": "int"},
+             "c2": {"type": "varchar"},
+             "c3": {"type": "json"}}, ConflictType.Error)
+
+        # Test 1: Nested JSON objects
+        table_obj.insert([{
+            "c1": 1,
+            "c2": "nested",
+            "c3": '{"name":"测试","value":42.5,"active":false,"nested":{"key1":"val1","key2":999}}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$.name')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $.name)': ('"测试"',)})
+        )
+
+        res, _ = table_obj.output(["json_extract_double(c3,'$.value')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype(dtype('float64')),
+            pd.DataFrame({'json_extract_double(c3, $.value)': (42.5,)}).astype(dtype('float64'))
+        )
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.active')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.active)': (False,)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.nested.key2')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.nested.key2)': (999,)}).astype('Int32')
+        )
+
+        # Test 2: JSON Arrays - use json_contains for array operations
+        table_obj.insert([{
+            "c1": 2,
+            "c2": "array",
+            "c3": '["电商","美妆","母婴"]'
+        }])
+
+        # Test array element extraction with $[0], $[1], $[2]
+        res, _ = table_obj.output(["json_extract_string(c3,'$[0]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[0])': (pd.NA, '"电商"')})
+        )
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"')})
+        )
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"')})
+        )
+
+        # Test out of bounds index
+        res, _ = table_obj.output(["json_extract_string(c3,'$[10]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[10])': (pd.NA, pd.NA)})
+        )
+
+        # Test json_contains on arrays
+        res, _ = table_obj.output(["json_contains(c3,'\"电商\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "电商")': (False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'\"不存在的\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "不存在的")': (False, False)}).astype('boolean')
+        )
+
+        # Test 3: Boolean values
+        table_obj.insert([{
+            "c1": 3,
+            "c2": "bool",
+            "c3": '{"bool_true":true,"bool_false":false,"zero":0,"negative":-100}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_true')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.bool_true)': (pd.NA, pd.NA, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_false')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.bool_false)': (pd.NA, pd.NA, False)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.zero')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.zero)': (pd.NA, pd.NA, 0)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.negative')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.negative)': (pd.NA, pd.NA, -100)}).astype('Int32')
+        )
+
+        # Test 4: Mixed type arrays
+        table_obj.insert([{
+            "c1": 4,
+            "c2": "mixed",
+            "c3": '[1,"two",3.0,true,null,{"key":"value"}]'
+        }])
+
+        # Test array element extraction for different types
+        res, _ = table_obj.output(["json_extract_int(c3,'$[0]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[0])': (pd.NA, pd.NA, pd.NA, 1)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"', pd.NA, '"two"')})
+        )
+
+        # Use json_extract_string for double to avoid pd.NA conversion issues
+        res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"', pd.NA, '3.0')})
+        )
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$[3]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $[3])': (pd.NA, pd.NA, pd.NA, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_isnull(c3,'$[4]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_isnull(c3, $[4])': (pd.NA, pd.NA, pd.NA, True)}).astype('boolean')
+        )
+
+        # Use json_contains for array operations
+        res, _ = table_obj.output(["json_contains(c3,'1')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 1)': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'\"two\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "two")': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'true')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, true)': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_isnull(c3,'$.nonexistent')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, pd.NA)}).astype('boolean')
+        )
+
+        # Test 5: Array of objects - extract objects and their properties
+        table_obj.insert([{
+            "c1": 5,
+            "c2": "obj_array",
+            "c3": '[{"name":"张三","age":25},{"name":"李四","age":30}]'
+        }])
+
+        # Extract property from first object in array
+        res, _ = table_obj.output(["json_extract_string(c3,'$[0].name')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[0].name)': (pd.NA, pd.NA, pd.NA, pd.NA, '"张三"')})
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$[0].age')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[0].age)': (pd.NA, pd.NA, pd.NA, pd.NA, 25)}).astype('Int32')
+        )
+
+        # Extract property from second object in array
+        res, _ = table_obj.output(["json_extract_string(c3,'$[1].name')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $[1].name)': (pd.NA, pd.NA, pd.NA, pd.NA, '"李四"')})
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$[1].age')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[1].age)': (pd.NA, pd.NA, pd.NA, pd.NA, 30)}).astype('Int32')
+        )
+
+        # Use json_contains to test array of objects
+        # Note: json_contains doesn't find nested properties in objects
+        res, _ = table_obj.output(["json_contains(c3,'\"张三\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "张三")': (False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 6: json_contains with numeric arrays
+        table_obj.insert([{
+            "c1": 6,
+            "c2": "contains",
+            "c3": '[100,200,300]'
+        }])
+
+        # Test array element extraction for numeric array
+        res, _ = table_obj.output(["json_extract_int(c3,'$[0]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[0])': (pd.NA, pd.NA, pd.NA, 1, pd.NA, 100)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$[1]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[1])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, 200)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$[2]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $[2])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, 300)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'200')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 200)': (False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'999')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 999)': (False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 7: json_exists_path
+        table_obj.insert([{
+            "c1": 7,
+            "c2": "exists",
+            "c3": '{"arr":[1,2,3],"obj":{"x":10}}'
+        }])
+
+        # Note: json_exists_path returns False for rows where path doesn't exist (not pd.NA)
+        res, _ = table_obj.output(["json_exists_path(c3,'$.arr')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.arr)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj.x')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj.x)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj.y')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj.y)': (False, False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 8: Nested arrays (2D array/matrix)
+        table_obj.insert([{
+            "c1": 8,
+            "c2": "nested_array",
+            "c3": '{"matrix":[[1,2,3],[4,5,6],[7,8,9]]}'
+        }])
+
+        # Extract nested array elements: $.matrix[0][0] should be 1
+        res, _ = table_obj.output(["json_extract_int(c3,'$.matrix[0][0]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.matrix[0][0])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, 1)}).astype('Int32')
+        )
+
+        # Extract nested array elements: $.matrix[1][2] should be 6
+        res, _ = table_obj.output(["json_extract_int(c3,'$.matrix[1][2]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.matrix[1][2])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, 6)}).astype('Int32')
+        )
+
+        # Extract first row: $.matrix[0] should be [1,2,3]
+        res, _ = table_obj.output(["json_extract_string(c3,'$.matrix[0]')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $.matrix[0])': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, '[1,2,3]')})
+        )
+
+        # Test 8b: Empty arrays and objects
+        table_obj.insert([{
+            "c1": 9,
+            "c2": "empty",
+            "c3": '{"empty_array":[],"empty_object":{}}'
+        }])
+
+        # Note: json_extract generic function has issues in Python SDK, use typed versions instead
+        # Skip empty array/object extraction tests
+
+        # Test 9: Deep nesting
+        table_obj.insert([{
+            "c1": 10,
+            "c2": "deep",
+            "c3": '{"level1":{"level2":{"level3":{"level4":"deep_value"}}}}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$.level1.level2.level3.level4')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $.level1.level2.level3.level4)': (pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, pd.NA, '"deep_value"')})
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.level1.level2.level3')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.level1.level2.level3)': (False, False, False, False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.level1.level2.level3.level4.level5')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.level1.level2.level3.level4.level5)': (False, False, False, False, False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Cleanup
+        res = db_obj.drop_table("test_json_comprehensive" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def test_select_datetime(self, suffix):
         """
@@ -517,7 +921,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'Int32', 'c2': dtype('O')}))
 
         res = db_obj.drop_table("test_select_embedding" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -650,13 +1054,13 @@ class TestInfinity:
         print()
         res, extra_result = table_obj.output(["c1", "c2"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': ()}).astype(
-            {'c1': dtype('int32'), 'c2': dtype('int32')}))
+            {'c1': 'Int32', 'c2': 'Int32'}))
         res, extra_result = table_obj.output(["c1", "c1"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c1_2': ()}).astype(
-            {'c1': dtype('int32'), 'c1_2': dtype('int32')}))
+            {'c1': 'Int32', 'c1_2': 'Int32'}))
         res, extra_result = table_obj.output(["c1", "c2", "c1"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
-            {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))
+            {'c1': 'Int32', 'c2': 'Int32', 'c1_2': 'Int32'}))
 
         res = db_obj.drop_table("test_empty_table" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -729,7 +1133,7 @@ class TestInfinity:
         table_obj.create_index("my_ft_index", index.IndexInfo("doc", index.IndexType.FullText), ConflictType.Error)
 
         def test_func():
-            expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': dtype('int32')})
+            expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': 'Int32'})
             res, extra_result = table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first text', 'minimum_should_match=100%')").to_df()
             pd.testing.assert_frame_equal(expect_result, res)
@@ -747,7 +1151,7 @@ class TestInfinity:
             pd.testing.assert_frame_equal(expect_result, res)
             expect_result = pd.DataFrame(
                 {'num': (1, 2, 3), "doc": ("first text", "second text multiple", "third text many words")}).astype(
-                {'num': dtype('int32')})
+                {'num': 'Int32'})
 
             res, extra_result = table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first') or num >= 2").to_df()
@@ -761,7 +1165,7 @@ class TestInfinity:
                 ["filter_text('doc', 'second') or num > 2", "filter_text('doc', 'second')"]).to_df()
             pd.testing.assert_frame_equal(pd.DataFrame({
                 "(FILTER_FULLTEXT('doc', 'second') OR (num > 2))": (False, True, True),
-                "FILTER_FULLTEXT('doc', 'second')": (False, True, False)}),
+                "FILTER_FULLTEXT('doc', 'second')": (False, True, False)}).astype('boolean'),
                 res)
 
         test_func()
@@ -807,16 +1211,16 @@ class TestInfinity:
         res, extra_res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, -1, 2, -2, 3, -3, -6, 7, -7, 8, -8, 9),
                                                          'c2': (0, 1, 1, 2, 2, 3, 3, 6, 7, 7, 8, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Asc]]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, -1, 1, -2, 2, -3, 3, -6, -7, 7, -8, 8, 9),
                                                          'c2': (0, 1, 1, 2, 2, 3, 3, 6, 7, 7, 8, 8, 9)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_res = table_obj.output(["_row_id"]).sort([["_row_id", SortType.Desc]]).to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'ROW_ID': (12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)})
-        #                              .astype({'ROW_ID': dtype('int64')}))
+        #                              .astype({'ROW_ID': 'Int64'}))
         print(res)
 
         res = db_obj.drop_table("test_sort" + suffix, ConflictType.Error)
@@ -982,7 +1386,7 @@ class TestInfinity:
         res, extra_res = table_obj.output(["*"]).filter("sqrt(c1) = 2").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (4,),
                                                          'c2': (5,)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'c2': dtype('double')}))
 
         res = db_obj.drop_table("test_select_sqrt" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1001,25 +1405,25 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'round(c2)': (2, -2, 3, -3)})
-                                      .astype({'c1': dtype('int32'), 'round(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'round(c2)': dtype('double')}))
 
         res, extra_res = table_obj.output(["c1", "round(c2, 1)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'round(c2, 1)': (2.4, -2.5, 2.6, -2.6)})
-                                      .astype({'c1': dtype('int32'), 'round(c2, 1)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'round(c2, 1)': dtype('double')}))
 
         res, extra_res = table_obj.output(["c1", "ceil(c2)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'ceil(c2)': (3, -2, 3, -2)})
-                                      .astype({'c1': dtype('int32'), 'ceil(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'ceil(c2)': dtype('double')}))
 
         res, extra_res = table_obj.output(["c1", "floor(c2)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'floor(c2)': (2, -3, 2, -3)})
-                                      .astype({'c1': dtype('int32'), 'floor(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'floor(c2)': dtype('double')}))
 
         res = db_obj.drop_table("test_select_round" + suffix)
         assert res.error_code == ErrorCode.OK

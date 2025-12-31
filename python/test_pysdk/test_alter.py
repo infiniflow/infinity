@@ -45,7 +45,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2]}).astype(
-                {"c1": dtype("int32"), "c2": dtype("int32")}
+                {"c1": 'Int32', "c2": 'Int32'}
             )
         )
 
@@ -62,7 +62,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["default"]}).astype(
-                {"c1": dtype("int32"), "c2": dtype("int32"), "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
             )
         )
 
@@ -74,7 +74,7 @@ class TestInfinity:
             pd.DataFrame(
                 {"c1": [1, 2], "c2": [2, 3], "c3": ["default", "test"]}
             ).astype(
-                {"c1": dtype("int32"), "c2": dtype("int32"), "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
             ),
         )
 
@@ -101,7 +101,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["test"]}).astype(
-                {"c1": dtype("int32"), "c2": dtype("int32"), "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
             ),
         )
 
@@ -115,7 +115,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"]}).astype(
-                {"c1": dtype("int32"), "c3": dtype("object")}
+                {"c1": 'Int32', "c3": dtype("object")}
             ),
         )
 
@@ -125,7 +125,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1, 2], "c3": ["test", "test2"]}).astype(
-                {"c1": dtype("int32"), "c3": dtype("object")}
+                {"c1": 'Int32', "c3": dtype("object")}
             ),
         )
 
@@ -196,7 +196,7 @@ class TestInfinity:
                 }
             ).astype(
                 {
-                    "num": dtype("int32"),
+                    "num": 'Int32',
                     "body": dtype("object"),
                     "vec": dtype("object"),
                     "column_name2": dtype("float32"),
@@ -243,7 +243,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"], "c2": ["test"]}).astype(
-                {"c1": dtype("int32"), "c3": dtype("object"), "c2": dtype("object")}
+                {"c1": 'Int32', "c3": dtype("object"), "c2": dtype("object")}
             ),
         )
 
@@ -255,7 +255,7 @@ class TestInfinity:
             pd.DataFrame(
                 {"c1": [1, 1], "c3": ["test", "t2"], "c2": ["test", "t1"]}
             ).astype(
-                {"c1": dtype("int32"), "c3": dtype("object"), "c2": dtype("object")}
+                {"c1": 'Int32', "c3": dtype("object"), "c2": dtype("object")}
             ),
         )
 
