@@ -958,11 +958,9 @@ void ExecuteHnswSearch(QueryContext *query_context,
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        HnswHandlerPtr hnsw_handler{};
+        std::shared_ptr<HnswHandler> hnsw_handler;
         index_file_worker->Read(hnsw_handler);
-        hnsw_search(hnsw_handler, false);
-        auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-        cache_manager.UnPin(*index_file_worker->rel_file_path_);
+        hnsw_search(hnsw_handler.get(), false);
     }
     if (mem_index) {
         auto memory_hnsw_index = mem_index->GetHnswIndex();

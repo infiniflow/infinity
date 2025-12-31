@@ -64,7 +64,10 @@ HnswFileWorker::~HnswFileWorker() {
     mmap_ = nullptr;
 }
 
-bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
+                           std::unique_ptr<LocalFileHandle> &file_handle,
+                           bool &prepare_success,
+                           const FileWorkerSaveCtx &ctx) {
     std::unique_lock l(mutex_);
     data->SaveToPtr(*file_handle);
 
@@ -76,24 +79,21 @@ bool HnswFileWorker::Write(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle
     }
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    // cache_manager.Set(*rel_file_path_, data, mmap_size_);
     cache_manager.Set(*rel_file_path_, data, data->MemUsage());
-    cache_manager.UnPin(*rel_file_path_);
     prepare_success = true;
     return true;
 }
 
-void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     std::unique_lock l(mutex_);
     if (!file_handle) {
         return;
     }
     auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    cache_manager.Pin(path);
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
-        data = HnswHandlerPtr{HnswHandler::Make(index_base_.get(), column_def_).release()};
+        data = HnswHandler::Make(index_base_.get(), column_def_);
         auto fd = file_handle->fd();
 
         if (!mmap_) {
@@ -101,7 +101,6 @@ void HnswFileWorker::Read(HnswHandlerPtr &data, std::unique_ptr<LocalFileHandle>
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         }
         data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
-        // cache_manager.Set(path, data, mmap_size_);
         cache_manager.Set(*rel_file_path_, data, data->MemUsage());
     }
 }

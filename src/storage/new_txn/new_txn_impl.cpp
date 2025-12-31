@@ -1871,11 +1871,8 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
 
                 // Read version info
-                BlockVersion *block_version{};
+                std::shared_ptr<BlockVersion> block_version;
                 static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
-
-                auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-                cache_manager.UnPin(*read_path);
 
                 // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);

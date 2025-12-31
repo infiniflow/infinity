@@ -155,8 +155,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
         UnrecoverableError(fmt::format("Get version buffer failed: {}", rel_version_filepath));
     }
 
-    // std::shared_ptr<BlockVersion> block_version;
-    BlockVersion *block_version{};
+    std::shared_ptr<BlockVersion> block_version;
     static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     size_t row_cnt = 0;
     if (block_version) {
@@ -165,12 +164,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
             auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts);
             row_cnt += commit_cnt;
         }
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
     }
-    // UnPin???
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    cache_manager.UnPin(*version_file_worker->rel_file_path_);
     return row_cnt;
 }
 

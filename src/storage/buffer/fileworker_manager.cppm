@@ -35,27 +35,7 @@ namespace infinity {
 export template <typename DataT>
 class FileWorkerCacheManager {
 public:
-    void Pin(std::string_view path) {
-        // std::lock_guard l(ref_cnt_mutex_);
-        std::lock_guard l(mutex_);
-        auto &cnt = ref_cnt_map_[path.data()];
-        ++cnt;
-    }
-
-    void UnPin(std::string_view path) {
-        // std::lock_guard l(ref_cnt_mutex_);
-        std::lock_guard l(mutex_);
-        if (auto ref_cnt_iter = ref_cnt_map_.find(path.data()); ref_cnt_iter != ref_cnt_map_.end()) {
-            auto &cnt = ref_cnt_iter->second;
-            if (cnt <= 1) {
-                ref_cnt_map_.erase(path.data());
-            } else {
-                --cnt;
-            }
-        }
-    }
-
-    bool Get(std::string_view path, DataT &data) {
+    bool Get(std::string_view path, std::shared_ptr<DataT> &data) {
         {
             std::lock_guard l(mutex_);
             if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
@@ -67,12 +47,8 @@ public:
         return false;
     }
 
-    void Set(std::string_view path, DataT data, size_t request_space) {
+    void Set(std::string_view path, std::shared_ptr<DataT> data, size_t request_space) {
         std::lock_guard l(mutex_);
-        // if (!request_space) {
-        //     std::println("????? 0 request_space");
-        //     UnrecoverableError("????? 0 request_space");
-        // }
         if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
             current_mem_usage_ -= memory_map_[path.data()];
@@ -101,49 +77,23 @@ private:
             auto data = *rev_iter;
             auto &path = data_path_map_[data];
             auto &iter = path_data_map_[path];
+            auto &memory_size = memory_map_[path];
+            LOG_DEBUG(fmt::format("Evicting: {}, space: {}byte", path, memory_size));
 
-            if (!ref_cnt_map_.contains(path)) { // not pin
-                auto &ref_cnt = memory_map_[path];
-                LOG_DEBUG(fmt::format("Evicting: {}, space: {}byte", path, ref_cnt));
-                current_mem_usage_ -= memory_map_[path];
-                ref_cnt_map_.erase(path);
-                payloads_.erase(iter);
-                path_data_map_.erase(path);
-                data_path_map_.erase(data);
-                memory_map_.erase(path);
+            current_mem_usage_ -= memory_map_[path];
+            payloads_.erase(iter);
+            path_data_map_.erase(path);
+            data_path_map_.erase(data);
+            memory_map_.erase(path);
 
-                // if constexpr (std::is_same_v<DataT, HnswHandler *>) {
-                //     // munmap(mmap_, mmap_size_);
-                //     // mmap_ = nullptr;
-                //     auto mem_usage = data->MemUsage();
-                //     std::println("decrease {}", mem_usage);
-                //     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-                //     if (memindex_tracer != nullptr) {
-                //         memindex_tracer->DecreaseMemUsed(mem_usage);
-                //     }
-                // }
-                delete data;
-                // ClearData();
-
-                if (IsAccomodatable(request_space)) {
-                    return;
-                }
+            if (IsAccomodatable(request_space)) {
+                return;
             }
         }
         UnrecoverableError("Buffer manager's memory size is too small.");
     }
 
     bool IsAccomodatable(size_t request_space) { return current_mem_usage_ + request_space <= MAX_CAPACITY_; }
-    // void ClearData() { // should implement as a hook
-    //     munmap(mmap_, mmap_size_);
-    //     mmap_ = nullptr;
-    //     auto mem_usage = data_->MemUsage();
-    //     auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-    //     if (memindex_tracer != nullptr) {
-    //         memindex_tracer->DecreaseMemUsed(mem_usage);
-    //     }
-    //     delete data_;
-    // }
 
     // mutable std::shared_mutex rw_mutex_;
     inline static std::mutex mutex_;
@@ -151,10 +101,9 @@ private:
     // size_t MAX_CAPACITY_ = InfinityContext::instance().config()->BufferManagerSize();
     inline static size_t MAX_CAPACITY_ = 8 * 1024 * 1024 * 1024ull;
     inline static size_t current_mem_usage_{};
-    std::list<DataT> payloads_;
-    std::unordered_map<DataT, std::string> data_path_map_;
+    std::list<std::shared_ptr<DataT>> payloads_;
+    std::unordered_map<std::shared_ptr<DataT>, std::string> data_path_map_;
     std::unordered_map<std::string, decltype(payloads_.begin())> path_data_map_;
-    std::unordered_map<std::string, size_t> ref_cnt_map_;
     std::unordered_map<std::string, size_t> memory_map_;
 };
 
@@ -163,7 +112,7 @@ struct FileWorkerMapInjectHelper {};
 
 export template <typename FileWorkerT>
 struct FileWorkerMapInjectHelper<FileWorkerT, true> {
-    using data_t = std::remove_cvref_t<decltype(std::declval<FileWorkerT>().has_cache_manager_)>;
+    using data_t = std::remove_pointer_t<std::remove_cvref_t<decltype(std::declval<FileWorkerT>().has_cache_manager_)>>;
     FileWorkerCacheManager<data_t> cache_manager_;
 };
 

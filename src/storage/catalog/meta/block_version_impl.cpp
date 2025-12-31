@@ -214,14 +214,13 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     return !is_modified;
 }
 
-void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
+void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
     // std::unique_lock<std::shared_mutex> lock(rw_mutex_);
     // this will waste a lot of memory....
-    auto block_version = std::make_unique<BlockVersion>(8192);
     size_t offset{};
     BlockOffset create_size{};
 
-    auto &deleted = block_version->deleted_;
+    auto &deleted = data->deleted_;
 
     BlockOffset capacity{};
     std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
@@ -234,7 +233,7 @@ void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&m
     std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
     offset += sizeof(create_size);
 
-    auto &created = block_version->created_;
+    auto &created = data->created_;
     created.resize(create_size);
 
     for (size_t j = 0; j < create_size; ++j) {
@@ -244,7 +243,6 @@ void BlockVersion::LoadFromFile(BlockVersion *&data, size_t &mmap_size, void *&m
         std::memcpy(&created[j].row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
     }
-    data = block_version.release();
 }
 
 void BlockVersion::GetCreateTS(size_t offset, size_t size, ColumnVector &res) const {

@@ -40,7 +40,7 @@ VersionFileWorker::~VersionFileWorker() {
     mmap_ = nullptr;
 }
 
-bool VersionFileWorker::Write(BlockVersion *&data,
+bool VersionFileWorker::Write(std::shared_ptr<BlockVersion> &data,
                               std::unique_ptr<LocalFileHandle> &file_handle,
                               bool &prepare_success,
                               const FileWorkerSaveCtx &base_ctx) {
@@ -50,7 +50,6 @@ bool VersionFileWorker::Write(BlockVersion *&data,
     bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
     cache_manager.Set(*rel_file_path_, data, mmap_size_);
-    cache_manager.UnPin(*rel_file_path_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
         // if the version file is full, return true to spill to file
@@ -59,14 +58,14 @@ bool VersionFileWorker::Write(BlockVersion *&data,
     return false;
 }
 
-void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     if (!file_handle) {
-        data = std::make_unique<BlockVersion>(8192).release();
+        data = std::make_shared<BlockVersion>(8192);
         return;
     }
+
     auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    cache_manager.Pin(path);
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
         auto fd = file_handle->fd();
@@ -75,6 +74,7 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
         if (!mmap_) {
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         }
+        data = std::make_shared<BlockVersion>(8192);
         BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
         size_t request_space = file_handle->FileSize();
         cache_manager.Set(path, data, request_space);
