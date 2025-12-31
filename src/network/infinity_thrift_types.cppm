@@ -102,6 +102,7 @@ export using infinity_thrift_rpc::IndexType;
 export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
 export using infinity_thrift_rpc::InExpr;
+export using infinity_thrift_rpc::CastExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
 export using infinity_thrift_rpc::MatchSparseExpr;

@@ -36,17 +36,14 @@ export inline BoundCastFunc BindJsonCast(const DataType &source, const DataType 
     }
     switch (target.type()) {
         case LogicalType::kVarchar: {
-            break;
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorVarlenWithType<JsonT, VarcharT, TryCastJson>);
         }
-        case LogicalType::kInteger: {
-            break;
-        }
-        case LogicalType::kDouble: {
-            break;
-        }
-        case LogicalType::kBoolean: {
-            break;
-        }
+        case LogicalType::kInteger:
+            [[fallthrough]];
+        case LogicalType::kDouble:
+            [[fallthrough]];
+        case LogicalType::kBoolean:
+            [[fallthrough]];
         default: {
             RecoverableError(Status::SyntaxError("BindJsonCast: Invalid target type"));
         }

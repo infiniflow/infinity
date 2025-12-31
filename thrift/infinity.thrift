@@ -142,6 +142,7 @@ union ParsedExprType {
 9: FusionExpr & fusion_expr,
 10: SearchExpr & search_expr,
 11 : InExpr & in_expr,
+12: CastExpr & cast_expr,
 }
 
 struct ParsedExpr {
@@ -274,6 +275,11 @@ struct InExpr {
 1: ParsedExpr left_operand,
 2: list<ParsedExpr> arguments,
 3: bool in_type,
+}
+
+struct CastExpr {
+1: ParsedExpr expr,
+2: DataType data_type,
 }
 
 struct ColumnDef {

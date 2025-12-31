@@ -268,6 +268,8 @@ class OrderByExpr;
 
 class InExpr;
 
+class CastExpr;
+
 class ColumnDef;
 
 class Field;
@@ -793,7 +795,7 @@ std::ostream &operator<<(std::ostream &out, const DataType &obj);
 typedef struct _ParsedExprType__isset {
     _ParsedExprType__isset()
         : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_sparse_expr(false),
-          match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false) {}
+          match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false), cast_expr(false) {}
     bool constant_expr : 1;
     bool column_expr : 1;
     bool function_expr : 1;
@@ -805,6 +807,7 @@ typedef struct _ParsedExprType__isset {
     bool fusion_expr : 1;
     bool search_expr : 1;
     bool in_expr : 1;
+    bool cast_expr : 1;
 } _ParsedExprType__isset;
 
 class ParsedExprType : public virtual ::apache::thrift::TBase {
@@ -825,6 +828,7 @@ public:
     ::std::shared_ptr<FusionExpr> fusion_expr;
     ::std::shared_ptr<SearchExpr> search_expr;
     ::std::shared_ptr<InExpr> in_expr;
+    ::std::shared_ptr<CastExpr> cast_expr;
 
     _ParsedExprType__isset __isset;
 
@@ -849,6 +853,8 @@ public:
     void __set_search_expr(::std::shared_ptr<SearchExpr> val);
 
     void __set_in_expr(::std::shared_ptr<InExpr> val);
+
+    void __set_cast_expr(::std::shared_ptr<CastExpr> val);
 
     bool operator==(const ParsedExprType &rhs) const;
     bool operator!=(const ParsedExprType &rhs) const { return !(*this == rhs); }
@@ -1677,6 +1683,43 @@ public:
 void swap(InExpr &a, InExpr &b);
 
 std::ostream &operator<<(std::ostream &out, const InExpr &obj);
+
+typedef struct _CastExpr__isset {
+    _CastExpr__isset() : expr(false), data_type(false) {}
+    bool expr : 1;
+    bool data_type : 1;
+} _CastExpr__isset;
+
+class CastExpr : public virtual ::apache::thrift::TBase {
+public:
+    CastExpr(const CastExpr &);
+    CastExpr &operator=(const CastExpr &);
+    CastExpr() noexcept;
+
+    virtual ~CastExpr() noexcept;
+    ParsedExpr expr;
+    DataType data_type;
+
+    _CastExpr__isset __isset;
+
+    void __set_expr(const ParsedExpr &val);
+
+    void __set_data_type(const DataType &val);
+
+    bool operator==(const CastExpr &rhs) const;
+    bool operator!=(const CastExpr &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const CastExpr &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(CastExpr &a, CastExpr &b);
+
+std::ostream &operator<<(std::ostream &out, const CastExpr &obj);
 
 typedef struct _ColumnDef__isset {
     _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false), comment(false) {}

@@ -238,6 +238,11 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
             {'json_exists_path(c3, $.1)': (False, True)}).astype('boolean'))
 
+        res, extra_res = table_obj.output(["Cast(c3 AS Varchar)"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('str')), pd.DataFrame(
+            {'Cast(c3 AS Varchar)': ('{"2":3232,"3":43432,"4":1.123,"434":"4321"}','{"1":null,"2":"10","3":12,"4":1.123}')}).astype(
+            {'Cast(c3 AS Varchar)': dtype('str')}))
+
         table_obj.insert([{"c1": 111, "c2": 'aaa',
                            "c3": '{"1":null,"2":"10","3":12,"4":true}'}])
         res, extra_res = table_obj.output(["json_extract_bool(c3,'$.4')"]).to_pl()
