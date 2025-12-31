@@ -263,7 +263,7 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data
     }
 
     if (current->is_number_integer()) {
-        return {true, current->get<int>()};
+        return {true, current->get<IntegerT>()};
     }
     return {false, 0};
 }
@@ -291,7 +291,7 @@ std::tuple<bool, DoubleT> JsonManager::json_extract_double(const JsonTypeDef &da
         }
     }
 
-    if (current->is_number_float()) {
+    if (current->is_number()) {
         return {true, current->get<double>()};
     }
     return {false, 0.0};

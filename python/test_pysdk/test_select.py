@@ -255,6 +255,246 @@ class TestInfinity:
             {'json_contains(c3, null)': (False,False,False,True)}).astype(
             {'json_contains(c3, null)': 'boolean'}))
 
+    def test_select_json_comprehensive(self, suffix):
+        """
+        Comprehensive test for JSON type operations based on json.slt test cases
+        Tests:
+        - Nested JSON structures
+        - Boolean edge cases
+        - Type conversions
+        - Path existence checks
+        - Array operations (json_contains)
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_comprehensive" + suffix, ConflictType.Ignore)
+
+        # Create table with JSON column
+        table_obj = db_obj.create_table(
+            "test_json_comprehensive" + suffix,
+            {"c1": {"type": "int"},
+             "c2": {"type": "varchar"},
+             "c3": {"type": "json"}}, ConflictType.Error)
+
+        # Test 1: Nested JSON objects
+        table_obj.insert([{
+            "c1": 1,
+            "c2": "nested",
+            "c3": '{"name":"测试","value":42.5,"active":false,"nested":{"key1":"val1","key2":999}}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$.name')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $.name)': ('"测试"',)}).astype(dtype('str'))
+        )
+
+        res, _ = table_obj.output(["json_extract_double(c3,'$.value')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype(dtype('float64')),
+            pd.DataFrame({'json_extract_double(c3, $.value)': (42.5,)}).astype(dtype('float64'))
+        )
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.active')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.active)': (False,)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.nested.key2')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.nested.key2)': (999,)}).astype('Int32')
+        )
+
+        # Test 2: JSON Arrays - use json_contains for array operations
+        table_obj.insert([{
+            "c1": 2,
+            "c2": "array",
+            "c3": '["电商","美妆","母婴"]'
+        }])
+
+        # Test json_contains on arrays
+        res, _ = table_obj.output(["json_contains(c3,'\"电商\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "电商")': (False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'\"不存在的\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "不存在的")': (False, False)}).astype('boolean')
+        )
+
+        # Test 3: Boolean values
+        table_obj.insert([{
+            "c1": 3,
+            "c2": "bool",
+            "c3": '{"bool_true":true,"bool_false":false,"zero":0,"negative":-100}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_true')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.bool_true)': (pd.NA, pd.NA, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_false')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_bool(c3, $.bool_false)': (pd.NA, pd.NA, False)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.zero')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.zero)': (pd.NA, pd.NA, 0)}).astype('Int32')
+        )
+
+        res, _ = table_obj.output(["json_extract_int(c3,'$.negative')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('Int32'),
+            pd.DataFrame({'json_extract_int(c3, $.negative)': (pd.NA, pd.NA, -100)}).astype('Int32')
+        )
+
+        # Test 4: Mixed type arrays
+        table_obj.insert([{
+            "c1": 4,
+            "c2": "mixed",
+            "c3": '[1,"two",3.0,true,null,{"key":"value"}]'
+        }])
+
+        # Use json_contains for array operations
+        res, _ = table_obj.output(["json_contains(c3,'1')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 1)': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'\"two\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "two")': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'true')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, true)': (False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_extract_isnull(c3,'$.nonexistent')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_extract_isnull(c3, $.nonexistent)': (pd.NA, pd.NA, pd.NA, pd.NA)}).astype('boolean')
+        )
+
+        # Test 5: Array of objects - can't test array indexing in Python SDK
+        # Skip this test or use alternative approach
+        table_obj.insert([{
+            "c1": 5,
+            "c2": "obj_array",
+            "c3": '[{"name":"张三","age":25},{"name":"李四","age":30}]'
+        }])
+
+        # Use json_contains to test array of objects
+        # Note: json_contains doesn't find nested properties in objects
+        res, _ = table_obj.output(["json_contains(c3,'\"张三\"')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, "张三")': (False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 6: json_contains with numeric arrays
+        table_obj.insert([{
+            "c1": 6,
+            "c2": "contains",
+            "c3": '[100,200,300]'
+        }])
+
+        res, _ = table_obj.output(["json_contains(c3,'200')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 200)': (False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_contains(c3,'999')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_contains(c3, 999)': (False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 7: json_exists_path
+        table_obj.insert([{
+            "c1": 7,
+            "c2": "exists",
+            "c3": '{"arr":[1,2,3],"obj":{"x":10}}'
+        }])
+
+        # Note: json_exists_path returns False for rows where path doesn't exist (not pd.NA)
+        res, _ = table_obj.output(["json_exists_path(c3,'$.arr')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.arr)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj.x')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj.x)': (False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.obj.y')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.obj.y)': (False, False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Test 8: Empty arrays and objects
+        table_obj.insert([{
+            "c1": 8,
+            "c2": "empty",
+            "c3": '{"empty_array":[],"empty_object":{}}'
+        }])
+
+        # Note: json_extract generic function has issues in Python SDK, use typed versions instead
+        # Skip empty array/object extraction tests
+
+        # Test 9: Deep nesting
+        table_obj.insert([{
+            "c1": 9,
+            "c2": "deep",
+            "c3": '{"level1":{"level2":{"level3":{"level4":"deep_value"}}}}'
+        }])
+
+        res, _ = table_obj.output(["json_extract_string(c3,'$.level1.level2.level3.level4')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas(),
+            pd.DataFrame({'json_extract_string(c3, $.level1.level2.level3.level4)': (None, None, None, None, None, None, None, None, '"deep_value"')})
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.level1.level2.level3')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.level1.level2.level3)': (False, False, False, False, False, False, False, False, True)}).astype('boolean')
+        )
+
+        res, _ = table_obj.output(["json_exists_path(c3,'$.level1.level2.level3.level4.level5')"]).to_pl()
+        pd.testing.assert_frame_equal(
+            res.to_pandas().astype('boolean'),
+            pd.DataFrame({'json_exists_path(c3, $.level1.level2.level3.level4.level5)': (False, False, False, False, False, False, False, False, False)}).astype('boolean')
+        )
+
+        # Cleanup
+        res = db_obj.drop_table("test_json_comprehensive" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_select_datetime(self, suffix):
         """
         target: test table select apis
