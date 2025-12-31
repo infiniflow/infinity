@@ -1990,7 +1990,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                 if (!status.ok()) {
                     return status;
                 }
-                HnswHandlerPtr hnsw_handler{};
+                std::shared_ptr<HnswHandler> hnsw_handler;
                 index_file_worker->Read(hnsw_handler);
                 if (params->compress_to_lvq) {
                     (hnsw_handler)->CompressToLVQ();
@@ -2000,8 +2000,6 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                 if (params->lvq_avg) {
                     (hnsw_handler)->Optimize();
                 }
-                auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-                cache_manager.UnPin(*index_file_worker->rel_file_path_);
             }
             if (mem_index) {
                 std::shared_ptr<HnswIndexInMem> memory_hnsw_index = mem_index->GetHnswIndex();
