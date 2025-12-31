@@ -276,7 +276,7 @@ class TestInsertImport:
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
             for idx in indexes:
-                table_obj.create_index(f"idx_{idx.column_name}", idx)
+                table_obj.create_index(f"idx_{idx.target_name}", idx)
 
         part1()
 
