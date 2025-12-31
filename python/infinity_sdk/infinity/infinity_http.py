@@ -11,6 +11,18 @@ from .http_utils import (
     is_sparse, str2sparse, type_to_dtype, function_return_type, is_float, functions, bool_functions
 )
 
+from infinity.common import ConflictType, InfinityException, SparseVector, SortType, FDE
+from typing import Optional, Any
+from infinity.errors import ErrorCode
+from infinity.utils import deprecated_api
+import numpy as np
+import pandas as pd
+import polars as pl
+import pyarrow as pa
+from infinity.table import ExplainType
+from typing import List
+from dataclasses import dataclass
+from collections import namedtuple
 
 def is_json_function(col_name: str) -> bool:
     """Check if column name is a JSON extraction function"""
@@ -26,19 +38,6 @@ def is_json_function(col_name: str) -> bool:
     ]
     col_name_lower = col_name.lower()
     return any(col_name_lower.startswith(func) for func in json_functions)
-from infinity.common import ConflictType, InfinityException, SparseVector, SortType, FDE
-from typing import Optional, Any
-from infinity.errors import ErrorCode
-from infinity.utils import deprecated_api
-import numpy as np
-import pandas as pd
-import polars as pl
-import pyarrow as pa
-from infinity.table import ExplainType
-from typing import List
-from dataclasses import dataclass
-from collections import namedtuple
-
 
 class http_network_util:
     header_dict = baseHeader
