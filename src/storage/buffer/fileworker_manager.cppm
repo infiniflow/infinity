@@ -35,10 +35,10 @@ namespace infinity {
 export template <typename DataT>
 class FileWorkerCacheManager {
 public:
-    bool Get(std::string_view path, std::shared_ptr<DataT> &data) {
+    bool Get(std::string path, std::shared_ptr<DataT> &data) {
         {
             std::lock_guard l(mutex_);
-            if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
+            if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
                 payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
                 data = *map_iter->second;
                 return true;
@@ -47,44 +47,76 @@ public:
         return false;
     }
 
-    void Set(std::string_view path, std::shared_ptr<DataT> data, size_t request_space) {
+    void Set(std::string path, std::shared_ptr<DataT> data, size_t request_space) {
         std::lock_guard l(mutex_);
-        if (auto map_iter = path_data_map_.find(path.data()); map_iter != path_data_map_.end()) {
+        std::println("??? {}", request_space);
+        if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
+            std::println("??? 1 {}", request_space);
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
-            current_mem_usage_ -= memory_map_[path.data()];
+            current_mem_usage_ -= memory_map_[path];
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
             }
-            memory_map_[path.data()] = request_space;
+            memory_map_[path] = request_space;
             current_mem_usage_ += request_space;
-            // current_mem_usage_ += request_space - memory_map_[path.data()];
-            // memory_map_[path.data()] = request_space;
         } else {
+            std::println("??? 2 {}", request_space);
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
             }
+            std::println("---cnt 1: {}", data.use_count());
             payloads_.push_front(data);
+            std::println("---cnt 2: {}", data.use_count());
             path_data_map_.emplace(path, payloads_.begin());
+            std::println("---cnt 3: {}", data.use_count());
             data_path_map_[data] = path;
-            memory_map_[path.data()] = request_space;
+            std::println("---cnt 4: {}", data.use_count());
+            memory_map_[path] = request_space;
+            std::println("---cnt 5: {}", data.use_count());
             current_mem_usage_ += request_space;
         }
+    }
+
+    bool Evict(const std::string &path) {
+        std::lock_guard l(mutex_);
+
+        auto map_it = path_data_map_.find(path);
+        if (map_it == path_data_map_.end()) {
+            return false;
+        }
+
+        auto payload_iter = map_it->second;
+
+        auto mem_used = memory_map_[path];
+        LOG_INFO(fmt::format("Evicting: {}, space: {}byte", path, mem_used));
+
+        path_data_map_.erase(map_it);
+        data_path_map_.erase(*payload_iter);
+        memory_map_.erase(path);
+
+        if (payloads_.erase(payload_iter) != payloads_.end()) {
+            current_mem_usage_ -= mem_used;
+        }
+
+        return true;
     }
 
 private:
     void Evict(size_t request_space) {
         for (auto rev_iter = payloads_.rbegin(); rev_iter != payloads_.rend(); ++rev_iter) {
-            auto data = *rev_iter;
-            auto &path = data_path_map_[data];
-            auto &iter = path_data_map_[path];
-            auto &memory_size = memory_map_[path];
+            const auto path = data_path_map_[*rev_iter];
+            auto memory_size = memory_map_[path];
+
             LOG_DEBUG(fmt::format("Evicting: {}, space: {}byte", path, memory_size));
 
-            current_mem_usage_ -= memory_map_[path];
-            payloads_.erase(iter);
+            current_mem_usage_ -= memory_size;
+
             path_data_map_.erase(path);
-            data_path_map_.erase(data);
+            data_path_map_.erase(*rev_iter);
             memory_map_.erase(path);
+
+            auto fwd_iter = std::next(rev_iter).base();
+            payloads_.erase(fwd_iter);
 
             if (IsAccomodatable(request_space)) {
                 return;

@@ -98,8 +98,8 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
 
 export struct HnswHandler {
 public:
-    HnswHandler() : hnsw_(nullptr) {}
-    virtual ~HnswHandler() {}
+    // HnswHandler() : hnsw_(nullptr) {}
+    // virtual ~HnswHandler() {}
     HnswHandler(const HnswHandler &) = delete;
     HnswHandler &operator=(const HnswHandler &) = delete;
 

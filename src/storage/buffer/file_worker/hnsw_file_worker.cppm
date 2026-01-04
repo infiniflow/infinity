@@ -31,7 +31,7 @@ namespace infinity {
 
 export class HnswFileWorker : public IndexFileWorker {
 public:
-    static constexpr HnswHandlerPtr has_cache_manager_{};
+    static constexpr HnswHandler *has_cache_manager_{};
     explicit HnswFileWorker(std::shared_ptr<std::string> file_path,
                             std::shared_ptr<IndexBase> index_base,
                             std::shared_ptr<ColumnDef> column_def,

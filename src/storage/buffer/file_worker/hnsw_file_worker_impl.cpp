@@ -72,6 +72,7 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
     data->SaveToPtr(*file_handle);
 
     auto fd = file_handle->fd();
+    std::println("fuck 3");
     mmap_size_ = file_handle->FileSize();
     if (mmap_size_ == 0) {
         std::println("what's fuck?");
@@ -79,6 +80,7 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
     }
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+    std::println("~~~~path: {}", *rel_file_path_);
     cache_manager.Set(*rel_file_path_, data, data->MemUsage());
     prepare_success = true;
     return true;
@@ -90,10 +92,12 @@ void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<Lo
         return;
     }
     auto &path = *rel_file_path_;
+    std::println("fuck 2");
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
         data = HnswHandler::Make(index_base_.get(), column_def_);
+        std::println("fuck 1");
         auto fd = file_handle->fd();
 
         if (!mmap_) {
