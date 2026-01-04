@@ -44,6 +44,22 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "/"
     elif binary_expr_key == "mod":
         return "%"
+    elif binary_expr_key == "jsonextract":
+        return "json_extract"
+    elif binary_expr_key == "jsonextractstring":
+        return "json_extract_string"
+    elif binary_expr_key == "jsonextractint":
+        return "json_extract_int"
+    elif binary_expr_key == "jsonextractdouble":
+        return "json_extract_double"
+    elif binary_expr_key == "jsonextractbool":
+        return "json_extract_bool"
+    elif binary_expr_key == "jsonextractisnull":
+        return "json_extract_isnull"
+    elif binary_expr_key == "jsonexistspath":
+        return "json_exists_path"
+    elif binary_expr_key == "jsoncontains":
+        return "json_contains"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
 

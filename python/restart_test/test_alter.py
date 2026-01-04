@@ -65,7 +65,7 @@ class TestAlter:
                     }
                 ).astype(
                     {
-                        "c1": dtype("int32"),
+                        "c1": 'Int32',
                         "c3": dtype("object"),
                         "c4": dtype("object"),
                     }
@@ -153,11 +153,11 @@ class TestAlter:
                     }
                 ).astype(
                     {
-                        "c1": dtype("int32"),
+                        "c1": 'Int32',
                         "c3": dtype("object"),
                         "c4": dtype("object"),
                         "c2": dtype("float32"),
-                        "c5": dtype("int32"),
+                        "c5": 'Int32',
                     }
                 ),
             )

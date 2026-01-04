@@ -17,23 +17,55 @@ module;
 export module infinity_core:json_manager;
 
 import :logger;
+import :value;
 
 import std.compat;
 import third_party;
 
 namespace infinity {
 
-export using JsonType = nlohmann::json;
+export using JsonTypeDef = nlohmann::json;
+export enum class JsonType : uint8_t { kInvalid, kJsonObject, kJsonArray };
+export using JsonTokenInfo = std::pair<JsonType, std::string>;
 
 export class JsonManager {
 public:
     static std::string escapeQuotes(const std::string &input);
     static std::string unescapeQuotes(const std::string &input);
     static bool valid_json(const std::string &json_str);
-    static JsonType parse(std::string &json_str);
-    static JsonType from_bson(const std::vector<uint8_t> &bson_data);
-    static std::string dump(const JsonType &json_obj);
-    static std::vector<uint8_t> to_bson(const JsonType &json_obj);
+    static JsonTypeDef parse(const std::string &json_str);
+
+    // json --> string
+    static std::string dump(const JsonTypeDef &json_obj);
+
+    // bson --> json
+    static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
+    // json --> bson
+    static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
+
+    static bool check_json_path(const std::string &json_path);
+    static bool check_json_path(const std::string_view &json_path);
+
+    // Parse json path
+    static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::string &json_path);
+
+    /* extract json
+     * return: arg1: is_null, arg2: result
+     */
+    static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_bool(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_is_null(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BooleanT> json_extract_exists_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+
+    static BooleanT json_contains(const JsonTypeDef &data, const std::string &token);
+
+private:
+    // Helper template for traversing JSON path tokens
+    template <typename Func>
+    static std::invoke_result_t<Func, const JsonTypeDef &>
+    traverse_json_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens, Func &&on_success);
 };
 
 } // namespace infinity

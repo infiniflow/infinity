@@ -21,5 +21,7 @@ export module function_expr;
 namespace infinity {
 
 export using infinity::FunctionExpr;
-
-}
+export using infinity::BaseExtraInfo;
+export using infinity::JsonExtraInfo;
+export using infinity::ExtraInfoType;
+} // namespace infinity

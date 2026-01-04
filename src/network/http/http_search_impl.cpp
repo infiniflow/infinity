@@ -296,6 +296,13 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                         nlohmann::json json_result_cell;
                         Value value = data_block->GetValue(col, row);
                         const std::string &column_name = result.result_table_->GetColumnNameById(col);
+
+                        const auto &nulls_ptr = data_block->column_vectors_[col]->nulls_ptr_;
+                        if (nulls_ptr != nullptr && !nulls_ptr->IsAllTrue()) {
+                            std::string column_bitmap = fmt::format("{}_bitmap", column_name);
+                            json_result_cell[column_bitmap] = nulls_ptr->IsTrue(row);
+                        }
+
                         switch (value.type().type()) {
                             case LogicalType::kTinyInt:
                             case LogicalType::kSmallInt:
@@ -313,7 +320,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                 break;
                             }
                             default: {
-                                json_result_cell[column_name] = value.ToString();
+                                json_result_cell[column_name] = data_block->column_vectors_[col]->ToString(row);
                                 break;
                             }
                         }
