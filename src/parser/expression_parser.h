@@ -210,69 +210,70 @@ struct EXPRESSION_LTYPE {
     DATE = 355,                    /* DATE  */
     TIME = 356,                    /* TIME  */
     DATETIME = 357,                /* DATETIME  */
-    TIMESTAMP = 358,               /* TIMESTAMP  */
-    UUID = 359,                    /* UUID  */
-    POINT = 360,                   /* POINT  */
-    LINE = 361,                    /* LINE  */
-    LSEG = 362,                    /* LSEG  */
-    BOX = 363,                     /* BOX  */
-    PATH = 364,                    /* PATH  */
-    POLYGON = 365,                 /* POLYGON  */
-    CIRCLE = 366,                  /* CIRCLE  */
-    BLOB = 367,                    /* BLOB  */
-    BITMAP = 368,                  /* BITMAP  */
-    EMBEDDING = 369,               /* EMBEDDING  */
-    VECTOR = 370,                  /* VECTOR  */
-    BIT = 371,                     /* BIT  */
-    SPARSE = 372,                  /* SPARSE  */
-    PRIMARY = 373,                 /* PRIMARY  */
-    KEY = 374,                     /* KEY  */
-    UNIQUE = 375,                  /* UNIQUE  */
-    NULLABLE = 376,                /* NULLABLE  */
-    IS = 377,                      /* IS  */
-    TRUE = 378,                    /* TRUE  */
-    FALSE = 379,                   /* FALSE  */
-    INTERVAL = 380,                /* INTERVAL  */
-    SECOND = 381,                  /* SECOND  */
-    SECONDS = 382,                 /* SECONDS  */
-    MINUTE = 383,                  /* MINUTE  */
-    MINUTES = 384,                 /* MINUTES  */
-    HOUR = 385,                    /* HOUR  */
-    HOURS = 386,                   /* HOURS  */
-    DAY = 387,                     /* DAY  */
-    DAYS = 388,                    /* DAYS  */
-    MONTH = 389,                   /* MONTH  */
-    MONTHS = 390,                  /* MONTHS  */
-    YEAR = 391,                    /* YEAR  */
-    YEARS = 392,                   /* YEARS  */
-    EQUAL = 393,                   /* EQUAL  */
-    NOT_EQ = 394,                  /* NOT_EQ  */
-    LESS_EQ = 395,                 /* LESS_EQ  */
-    GREATER_EQ = 396,              /* GREATER_EQ  */
-    BETWEEN = 397,                 /* BETWEEN  */
-    AND = 398,                     /* AND  */
-    OR = 399,                      /* OR  */
-    EXTRACT = 400,                 /* EXTRACT  */
-    LIKE = 401,                    /* LIKE  */
-    DATA = 402,                    /* DATA  */
-    LOG = 403,                     /* LOG  */
-    BUFFER = 404,                  /* BUFFER  */
-    KNN = 405,                     /* KNN  */
-    USING = 406,                   /* USING  */
-    SESSION = 407,                 /* SESSION  */
-    GLOBAL = 408,                  /* GLOBAL  */
-    OFF = 409,                     /* OFF  */
-    EXPORT = 410,                  /* EXPORT  */
-    PROFILE = 411,                 /* PROFILE  */
-    CONFIGS = 412,                 /* CONFIGS  */
-    PROFILES = 413,                /* PROFILES  */
-    STATUS = 414,                  /* STATUS  */
-    VAR = 415,                     /* VAR  */
-    SEARCH = 416,                  /* SEARCH  */
-    MATCH = 417,                   /* MATCH  */
-    QUERY = 418,                   /* QUERY  */
-    FUSION = 419,                  /* FUSION  */
-    NUMBER = 420                   /* NUMBER  */
+    JSON = 358,                    /* JSON  */
+    TIMESTAMP = 359,               /* TIMESTAMP  */
+    UUID = 360,                    /* UUID  */
+    POINT = 361,                   /* POINT  */
+    LINE = 362,                    /* LINE  */
+    LSEG = 363,                    /* LSEG  */
+    BOX = 364,                     /* BOX  */
+    PATH = 365,                    /* PATH  */
+    POLYGON = 366,                 /* POLYGON  */
+    CIRCLE = 367,                  /* CIRCLE  */
+    BLOB = 368,                    /* BLOB  */
+    BITMAP = 369,                  /* BITMAP  */
+    EMBEDDING = 370,               /* EMBEDDING  */
+    VECTOR = 371,                  /* VECTOR  */
+    BIT = 372,                     /* BIT  */
+    SPARSE = 373,                  /* SPARSE  */
+    PRIMARY = 374,                 /* PRIMARY  */
+    KEY = 375,                     /* KEY  */
+    UNIQUE = 376,                  /* UNIQUE  */
+    NULLABLE = 377,                /* NULLABLE  */
+    IS = 378,                      /* IS  */
+    TRUE = 379,                    /* TRUE  */
+    FALSE = 380,                   /* FALSE  */
+    INTERVAL = 381,                /* INTERVAL  */
+    SECOND = 382,                  /* SECOND  */
+    SECONDS = 383,                 /* SECONDS  */
+    MINUTE = 384,                  /* MINUTE  */
+    MINUTES = 385,                 /* MINUTES  */
+    HOUR = 386,                    /* HOUR  */
+    HOURS = 387,                   /* HOURS  */
+    DAY = 388,                     /* DAY  */
+    DAYS = 389,                    /* DAYS  */
+    MONTH = 390,                   /* MONTH  */
+    MONTHS = 391,                  /* MONTHS  */
+    YEAR = 392,                    /* YEAR  */
+    YEARS = 393,                   /* YEARS  */
+    EQUAL = 394,                   /* EQUAL  */
+    NOT_EQ = 395,                  /* NOT_EQ  */
+    LESS_EQ = 396,                 /* LESS_EQ  */
+    GREATER_EQ = 397,              /* GREATER_EQ  */
+    BETWEEN = 398,                 /* BETWEEN  */
+    AND = 399,                     /* AND  */
+    OR = 400,                      /* OR  */
+    EXTRACT = 401,                 /* EXTRACT  */
+    LIKE = 402,                    /* LIKE  */
+    DATA = 403,                    /* DATA  */
+    LOG = 404,                     /* LOG  */
+    BUFFER = 405,                  /* BUFFER  */
+    KNN = 406,                     /* KNN  */
+    USING = 407,                   /* USING  */
+    SESSION = 408,                 /* SESSION  */
+    GLOBAL = 409,                  /* GLOBAL  */
+    OFF = 410,                     /* OFF  */
+    EXPORT = 411,                  /* EXPORT  */
+    PROFILE = 412,                 /* PROFILE  */
+    CONFIGS = 413,                 /* CONFIGS  */
+    PROFILES = 414,                /* PROFILES  */
+    STATUS = 415,                  /* STATUS  */
+    VAR = 416,                     /* VAR  */
+    SEARCH = 417,                  /* SEARCH  */
+    MATCH = 418,                   /* MATCH  */
+    QUERY = 419,                   /* QUERY  */
+    FUSION = 420,                  /* FUSION  */
+    NUMBER = 421                   /* NUMBER  */
   };
   typedef enum expressiontokentype expressiontoken_kind_t;
 #endif
@@ -291,8 +292,9 @@ union EXPRESSIONSTYPE
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
+    infinity::ColumnType*             column_type_t;
 
-#line 296 "expression_parser.h"
+#line 298 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;
