@@ -135,6 +135,7 @@ struct EXPRESSION_LTYPE {
 %token DATA LOG BUFFER
 %token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES STATUS VAR
 %token SEARCH MATCH QUERY FUSION
+%token PARSE_JSON
 
 %token NUMBER
 
@@ -198,7 +199,6 @@ expr : operand
 | in_expr
 | between_expr
 | conjunction_expr
-| cast_expr;
 
 operand: '(' expr ')' {
    $$ = $2;
@@ -211,6 +211,42 @@ operand: '(' expr ')' {
 | match_expr
 | query_expr
 | fusion_expr
+| cast_expr
+
+cast_expr: CAST '(' expr AS column_type ')' {
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($5), std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete $5;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
+    }
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
+}
+| PARSE_JSON '(' expr ')' {
+    auto column_type_ptr = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid};
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*column_type_ptr, std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete column_type_ptr;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
+    }
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
+};
+
+column_type :
+BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| VARCHAR { $$ = new infinity::ColumnType{infinity::LogicalType::kVarchar, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INT { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DOUBLE { $$ = new infinity::ColumnType{infinity::LogicalType::kDouble, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; };
+
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();
@@ -260,27 +296,6 @@ fusion_expr : FUSION '(' STRING ')' {
     free($5);
     $$ = fusion_expr;
 }
-
-cast_expr: CAST '(' expr AS column_type ')' {
-    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($5), std::vector<std::unique_ptr<infinity::InitParameter>>{});
-    delete $5;
-    if (!data_type_result) {
-        yyerror(&yyloc, scanner, result, fail_reason.c_str());
-        delete $3;
-        YYERROR;
-    }
-    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
-    cast_expr->expr_ = $3;
-    $$ = cast_expr;
-}
-
-column_type :
-BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| VARCHAR { $$ = new infinity::ColumnType{infinity::LogicalType::kVarchar, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| INT { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DOUBLE { $$ = new infinity::ColumnType{infinity::LogicalType::kDouble, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; };
 
 function_expr : IDENTIFIER '(' ')' {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();

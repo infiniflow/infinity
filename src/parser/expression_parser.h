@@ -273,7 +273,8 @@ struct EXPRESSION_LTYPE {
     MATCH = 418,                   /* MATCH  */
     QUERY = 419,                   /* QUERY  */
     FUSION = 420,                  /* FUSION  */
-    NUMBER = 421                   /* NUMBER  */
+    PARSE_JSON = 421,              /* PARSE_JSON  */
+    NUMBER = 422                   /* NUMBER  */
   };
   typedef enum expressiontokentype expressiontoken_kind_t;
 #endif
@@ -294,7 +295,7 @@ union EXPRESSIONSTYPE
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
     infinity::ColumnType*             column_type_t;
 
-#line 298 "expression_parser.h"
+#line 299 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;

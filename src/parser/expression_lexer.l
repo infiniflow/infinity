@@ -46,6 +46,8 @@ BOOLEAN         { return BOOLEAN; }
 INTEGER         { return INTEGER; }
 INT             { return INT; }
 DOUBLE          { return DOUBLE; }
+PARSE_JSON      { return PARSE_JSON; }
+
 "=="            { return EQUAL; }
 "!="            { return NOT_EQ; }
 "<>"            { return NOT_EQ; }
