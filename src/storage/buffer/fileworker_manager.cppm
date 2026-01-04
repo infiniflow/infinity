@@ -49,9 +49,7 @@ public:
 
     void Set(std::string path, std::shared_ptr<DataT> data, size_t request_space) {
         std::lock_guard l(mutex_);
-        std::println("??? {}", request_space);
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
-            std::println("??? 1 {}", request_space);
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
             current_mem_usage_ -= memory_map_[path];
             if (!IsAccomodatable(request_space)) {
@@ -60,19 +58,18 @@ public:
             memory_map_[path] = request_space;
             current_mem_usage_ += request_space;
         } else {
-            std::println("??? 2 {}", request_space);
             if (!IsAccomodatable(request_space)) {
                 Evict(request_space);
             }
-            std::println("---cnt 1: {}", data.use_count());
+
             payloads_.push_front(data);
-            std::println("---cnt 2: {}", data.use_count());
+
             path_data_map_.emplace(path, payloads_.begin());
-            std::println("---cnt 3: {}", data.use_count());
+
             data_path_map_[data] = path;
-            std::println("---cnt 4: {}", data.use_count());
+
             memory_map_[path] = request_space;
-            std::println("---cnt 5: {}", data.use_count());
+
             current_mem_usage_ += request_space;
         }
     }
