@@ -628,19 +628,19 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
     own_memory_ = false;
     index_file_worker_ = std::move(index_file_worker);
     auto hnsw_handler = std::shared_ptr<HnswHandler>(hnsw_handler_);
+
+    size_t mem_usage = hnsw_handler_->MemUsage();
+
+    auto *storage = InfinityContext::instance().storage();
+    if (storage == nullptr) {
+        return;
+    }
+    auto *memindex_tracer = storage->memindex_tracer();
+    if (memindex_tracer != nullptr) {
+        memindex_tracer->DecreaseMemUsed(mem_usage);
+    }
+
     index_file_worker_->Write(std::move(hnsw_handler));
-    // if (own_memory_ && hnsw_handler_ != nullptr) {
-    //     size_t mem_usage = hnsw_handler_->MemUsage();
-    //     delete hnsw_handler_;
-    //     auto *storage = InfinityContext::instance().storage();
-    //     if (storage == nullptr) {
-    //         return;
-    //     }
-    //     auto *memindex_tracer = storage->memindex_tracer();
-    //     if (memindex_tracer != nullptr) {
-    //         memindex_tracer->DecreaseMemUsed(mem_usage);
-    //     }
-    // }
 }
 
 size_t
