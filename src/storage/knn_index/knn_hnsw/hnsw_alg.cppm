@@ -51,7 +51,6 @@ export struct KnnSearchOption {
 export template <typename VecStoreType, typename LabelType, bool OwnMem>
 class KnnHnswBase {
 public:
-    using This = KnnHnswBase<VecStoreType, LabelType, OwnMem>;
     using DataType = typename VecStoreType::DataType;
     using QueryVecType = typename VecStoreType::QueryVecType;
     using QueryType = typename VecStoreType::QueryType;
@@ -70,11 +69,11 @@ public:
 
 public:
     KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
-    KnnHnswBase(This &&other)
+    KnnHnswBase(KnnHnswBase &&other) noexcept
         : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), mult_(std::exchange(other.mult_, 0.0)),
           data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)),
           prefetch_step_(L1_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes()) {}
-    This &operator=(This &&other) {
+    KnnHnswBase &operator=(KnnHnswBase &&other) noexcept {
         if (this != &other) {
             M_ = std::exchange(other.M_, 0);
             ef_construction_ = std::exchange(other.ef_construction_, 0);
@@ -97,21 +96,9 @@ public:
     }
 
     void SaveToPtr(LocalFileHandle &file_handle) const {
-        // size_t cur_vec_num = data_store_->cur_vec_num();
-        // size_t mmap_size = sizeof(M_) + sizeof(ef_construction_) + sizeof(cur_vec_num);
-
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));
         data_store_.SaveToPtr(file_handle);
-
-        // size_t cur_vec_num = this->cur_vec_num();
-        //
-        // file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
-        // this->vec_store_meta_.Save(file_handle);
-        // this->graph_store_meta_.Save(file_handle, cur_vec_num); // could get
-        //
-        // auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
-        // Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
     }
 
 protected:
@@ -127,7 +114,7 @@ protected:
     template <LogicalType ColumnLogicalType>
     using SearchLayerReturnParam3T = std::conditional_t<ColumnLogicalType == LogicalType::kEmbedding, VertexType, LabelType>;
 
-    // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
+    // Return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     template <bool WithLock,
               FilterConcept<LabelType> Filter = std::nullopt_t,
               LogicalType ColumnLogicalType = LogicalType::kEmbedding,
@@ -507,7 +494,6 @@ public:
 export template <typename VecStoreType, typename LabelType, bool OwnMem = true>
 class KnnHnsw : public KnnHnswBase<VecStoreType, LabelType, OwnMem> {
 public:
-    using This = KnnHnsw<VecStoreType, LabelType, OwnMem>;
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = typename VecStoreType::Distance;
     using CompressLVQVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
@@ -523,14 +509,14 @@ public:
     }
 
 public:
-    static std::unique_ptr<This> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
-        auto [Mmax0, Mmax] = This::GetMmax(M);
+    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
+        auto [Mmax0, Mmax] = KnnHnsw::GetMmax(M);
         auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static std::unique_ptr<This> Load(LocalFileHandle &file_handle) {
+    static std::unique_ptr<KnnHnsw> Load(LocalFileHandle &file_handle) {
         size_t M;
         file_handle.Read(&M, sizeof(M));
         size_t ef_construction;
@@ -539,10 +525,10 @@ public:
         auto data_store = DataStore::Load(file_handle);
         Distance distance(data_store.dim());
 
-        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static std::unique_ptr<This> LoadFromPtr(void *&m_mmap, size_t &mmap_size, LocalFileHandle &file_handle, size_t size) {
+    static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, LocalFileHandle &file_handle, size_t size) {
         auto *buffer = static_cast<char *>(m_mmap);
         const char *ptr = buffer;
         size_t M = ReadBufAdv<size_t>(ptr);
@@ -552,12 +538,12 @@ public:
         if (size_t diff = ptr - buffer; diff != size) {
             UnrecoverableError("LoadFromPtr failed");
         }
-        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
     std::unique_ptr<KnnHnsw<CompressLVQVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressLVQVecStoreType>) {
-            return std::make_unique<This>(std::move(*this));
+            return std::make_unique<KnnHnsw>(std::move(*this));
         } else {
             using CompressedDistance = typename CompressLVQVecStoreType::Distance;
             CompressedDistance distance = std::move(this->distance_).ToLVQDistance(this->data_store_.dim());
@@ -571,7 +557,7 @@ public:
 
     std::unique_ptr<KnnHnsw<CompressRabitqVecStoreType, LabelType>> CompressToRabitq() && {
         if constexpr (std::is_same_v<VecStoreType, CompressRabitqVecStoreType>) {
-            return std::make_unique<This>(std::move(*this));
+            return std::make_unique<KnnHnsw>(std::move(*this));
         } else {
             using CompressedDistance = typename CompressRabitqVecStoreType::Distance;
             CompressedDistance distance = std::move(this->distance_).ToRabitqDistance(this->data_store_.dim());
@@ -587,7 +573,6 @@ public:
 export template <typename VecStoreType, typename LabelType>
 class KnnHnsw<VecStoreType, LabelType, false> : public KnnHnswBase<VecStoreType, LabelType, false> {
 public:
-    using This = KnnHnsw<VecStoreType, LabelType, false>;
     using DataStore = DataStore<VecStoreType, LabelType, false>;
     using Distance = typename VecStoreType::Distance;
     constexpr static bool kOwnMem = false;
@@ -599,8 +584,8 @@ public:
         this->data_store_ = std::move(data_store);
         this->distance_ = std::move(distance);
     }
-    KnnHnsw(This &&other) : KnnHnswBase<VecStoreType, LabelType, false>(std::move(other)) {}
-    KnnHnsw &operator=(This &&other) {
+    KnnHnsw(KnnHnsw &&other) noexcept : KnnHnswBase<VecStoreType, LabelType, false>(std::move(other)) {}
+    KnnHnsw &operator=(KnnHnsw &&other) noexcept {
         if (this != &other) {
             KnnHnswBase<VecStoreType, LabelType, false>::operator=(std::move(other));
         }
@@ -608,7 +593,7 @@ public:
     }
 
 public:
-    static std::unique_ptr<This> LoadFromPtr(const char *&ptr, size_t size) {
+    static std::unique_ptr<KnnHnsw> LoadFromPtr(const char *&ptr, size_t size) {
         const char *ptr_end = ptr + size;
         size_t M = ReadBufAdv<size_t>(ptr);
         size_t ef_construction = ReadBufAdv<size_t>(ptr);
@@ -617,7 +602,7 @@ public:
         if (size_t diff = ptr_end - ptr; diff != 0) {
             UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end, diff));
         }
-        return std::make_unique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 };
 
