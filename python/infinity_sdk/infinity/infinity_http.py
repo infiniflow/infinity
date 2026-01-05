@@ -39,6 +39,35 @@ def is_json_function(col_name: str) -> bool:
     col_name_lower = col_name.lower()
     return any(col_name_lower.startswith(func) for func in json_functions)
 
+
+def _parse_cast_target_type(cast_expr: str) -> Optional[str]:
+    if not cast_expr.lower().startswith("cast("):
+        return None
+
+    match = re.search(r'\)\s*AS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
+    if not match:
+        return None
+
+    target_type = match.group(1).upper()
+
+    # Map SQL types to pandas dtypes
+    type_mapping = {
+        'VARCHAR': 'string',
+        'INTEGER': 'Int32',
+        'INT': 'Int32',
+        'BIGINT': 'Int64',
+        'TINYINT': 'Int8',
+        'SMALLINT': 'Int16',
+        'FLOAT': 'Float32',
+        'FLOAT32': 'Float32',
+        'FLOAT64': 'Float64',
+        'DOUBLE': 'Float64',
+        'BOOLEAN': 'boolean',
+        'BOOL': 'boolean',
+    }
+
+    return type_mapping.get(target_type, None)
+
 class http_network_util:
     header_dict = baseHeader
     response_dict = baseResponse
@@ -1190,10 +1219,16 @@ class table_http_result:
 
         df_type = {}
         for k in df_dict:
+            # Check if it's a CAST expression first
+            cast_dtype = _parse_cast_target_type(k)
+            if cast_dtype is not None:
+                df_type[k] = cast_dtype
+                continue
+
             if k in col_types:  # might be object
                 df_type[k] = type_to_dtype(col_types[k])
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
-                df_type[k] = dtype('float32')
+                df_type[k] = 'Float32'
             # "(c1 + c2)", "sqrt(c1), round(c1)"
             k1 = k.replace("(", " ")
             k1 = k1.replace(")", " ")
@@ -1208,14 +1243,14 @@ class table_http_result:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
-                elif col.strip().isdigit() and df_type.get(k) != dtype('float64'):
+                elif col.strip().isdigit() and df_type.get(k) != 'Float64':
                     df_type[k] = 'Int32'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):
-                    df_type[k] = dtype('float64')
+                    df_type[k] = 'Float64'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif col == "/":
-                    df_type[k] = dtype('float64')
+                    df_type[k] = 'Float64'
                     break
                 else:
                     function_name = col.strip().lower()

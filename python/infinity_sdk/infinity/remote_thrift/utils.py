@@ -28,6 +28,53 @@ from infinity.common import InfinityException, SparseVector, Array
 from infinity.errors import ErrorCode
 
 
+def map_sqlglot_type_to_infinity_type(type_name: str) -> ttypes.DataType:
+    """
+    Map sqlglot type names to Infinity DataType.
+
+    Args:
+        type_name: Type name from sqlglot (e.g., 'TEXT', 'INT', 'FLOAT', etc.)
+
+    Returns:
+        DataType object with the corresponding LogicType
+    """
+    data_type = ttypes.DataType()
+
+    # Map sqlglot type names to Infinity LogicType
+    type_mapping = {
+        'TEXT': ttypes.LogicType.Varchar,
+        'INT': ttypes.LogicType.Integer,
+        'INTEGER': ttypes.LogicType.Integer,
+        'TINYINT': ttypes.LogicType.TinyInt,
+        'SMALLINT': ttypes.LogicType.SmallInt,
+        'BIGINT': ttypes.LogicType.BigInt,
+        'HUGEINT': ttypes.LogicType.HugeInt,
+        'FLOAT': ttypes.LogicType.Float,
+        'DOUBLE': ttypes.LogicType.Double,
+        'DECIMAL': ttypes.LogicType.Decimal,
+        'VARCHAR': ttypes.LogicType.Varchar,
+        'BOOL': ttypes.LogicType.Boolean,
+        'BOOLEAN': ttypes.LogicType.Boolean,
+        'DATE': ttypes.LogicType.Date,
+        'TIME': ttypes.LogicType.Time,
+        'DATETIME': ttypes.LogicType.DateTime,
+        'TIMESTAMP': ttypes.LogicType.Timestamp,
+        'INTERVAL': ttypes.LogicType.Interval,
+        'ARRAY': ttypes.LogicType.Array,
+        'JSON': ttypes.LogicType.Json,
+    }
+
+    type_name_upper = type_name.upper()
+    if type_name_upper not in type_mapping:
+        raise InfinityException(
+            ErrorCode.INVALID_DATA_TYPE,
+            f"Unknown type for CAST: {type_name}"
+        )
+
+    data_type.logic_type = type_mapping[type_name_upper]
+    return data_type
+
+
 def column_expr_to_string(column_expr: ttypes.ColumnExpr) -> str:
     if column_expr.column_name:
         return str(".".join(column_expr.column_name))
@@ -324,6 +371,31 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
 
     elif isinstance(cons, exp.Paren):
         return traverse_conditions(cons.this)
+    elif isinstance(cons, exp.Cast):
+        # Handle CAST expressions: CAST(expr AS type)
+        # Must check before exp.Func since exp.Cast is a subclass of exp.Func
+
+        # Parse the expression being cast
+        expr_arg = parse_expr(cons.args['this'])
+
+        # Get the target type
+        target_type = cons.args['to']
+        type_name = target_type.this
+        if hasattr(type_name, 'name'):
+            type_name = type_name.name
+
+        # Map sqlglot type to Infinity LogicType
+        data_type = map_sqlglot_type_to_infinity_type(type_name)
+
+        # Create CastExpr
+        cast_expr = ttypes.CastExpr(
+            expr=expr_arg,
+            data_type=data_type
+        )
+
+        expr_type = ttypes.ParsedExprType(cast_expr=cast_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
     elif isinstance(cons, exp.Neg):
         func_expr = ttypes.FunctionExpr(
             function_name='-',

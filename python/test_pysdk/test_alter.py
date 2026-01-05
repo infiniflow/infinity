@@ -1,4 +1,3 @@
-from numpy import dtype
 import pytest
 from common import common_values
 import infinity
@@ -62,7 +61,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["default"]}).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": 'string'}
             )
         )
 
@@ -74,7 +73,7 @@ class TestInfinity:
             pd.DataFrame(
                 {"c1": [1, 2], "c2": [2, 3], "c3": ["default", "test"]}
             ).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": 'string'}
             ),
         )
 
@@ -101,7 +100,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["test"]}).astype(
-                {"c1": 'Int32', "c2": 'Int32', "c3": dtype("object")}
+                {"c1": 'Int32', "c2": 'Int32', "c3": 'string'}
             ),
         )
 
@@ -115,7 +114,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"]}).astype(
-                {"c1": 'Int32', "c3": dtype("object")}
+                {"c1": 'Int32', "c3": 'string'}
             ),
         )
 
@@ -125,7 +124,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1, 2], "c3": ["test", "test2"]}).astype(
-                {"c1": 'Int32', "c3": dtype("object")}
+                {"c1": 'Int32', "c3": 'string'}
             ),
         )
 
@@ -197,10 +196,10 @@ class TestInfinity:
             ).astype(
                 {
                     "num": 'Int32',
-                    "body": dtype("object"),
-                    "vec": dtype("object"),
-                    "column_name2": dtype("float32"),
-                    "column_name3": dtype("object"),
+                    "body": 'string',
+                    "vec": object,
+                    "column_name2": 'Float32',
+                    "column_name3": 'string',
                 }
             ),
         )
@@ -243,7 +242,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(
             res,
             pd.DataFrame({"c1": [1], "c3": ["test"], "c2": ["test"]}).astype(
-                {"c1": 'Int32', "c3": dtype("object"), "c2": dtype("object")}
+                {"c1": 'Int32', "c3": "string", "c2": "string"}
             ),
         )
 
@@ -255,7 +254,7 @@ class TestInfinity:
             pd.DataFrame(
                 {"c1": [1, 1], "c3": ["test", "t2"], "c2": ["test", "t1"]}
             ).astype(
-                {"c1": 'Int32', "c3": dtype("object"), "c2": dtype("object")}
+                {"c1": 'Int32', "c3": "string", "c2": "string"}
             ),
         )
 

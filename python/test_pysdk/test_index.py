@@ -3,7 +3,6 @@ import infinity
 import time
 import infinity.index as index
 import pandas as pd
-from numpy import dtype
 import pytest
 from common import common_values
 from common import common_index
@@ -204,7 +203,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["c1", "sqrt(c1)"]).filter("sqrt(c1)>1").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4], 'sqrt(c1)': [2.0]})
-                                      .astype({'c1': 'Int32', 'sqrt(c1)': dtype('float64')}))
+                                      .astype({'c1': 'Int32', 'sqrt(c1)': 'Float64'}))
 
         res = table_obj.create_index("idx_substring_c2",
                                      index.IndexInfo("substring(c2, 0, 5)", index.IndexType.SecondaryFunctional),
@@ -213,8 +212,10 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["c2", "substring(c2, 0, 5) AS c2_sub"]).filter(
             "c2_sub == 'hello'").to_df()
+        # Convert object dtype to string for HTTP mode compatibility
+        res = res.astype({'c2': 'string', 'c2_sub': 'string'})
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': ['hello world'], 'c2_sub': ['hello']})
-                                      .astype({'c2': dtype('str'), 'c2_sub': dtype('str')}))
+                                      .astype({'c2': 'string', 'c2_sub': 'string'}))
 
         res = table_obj.show_index("idx_sqrt_c1")
         print(res)

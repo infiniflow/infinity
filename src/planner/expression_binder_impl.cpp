@@ -574,7 +574,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     std::shared_ptr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
-    return CastExpression::AddCastToType(source_expr_ptr, expr.data_type_);
+    if (!source_expr_ptr) {
+        return nullptr;
+    }
+    auto result = CastExpression::AddCastToType(source_expr_ptr, expr.data_type_);
+    if (!result) {
+        LOG_ERROR(fmt::format("Cannot cast {} to {}", source_expr_ptr->Type().ToString(), expr.data_type_.ToString()));
+        return nullptr;
+    }
+    return result;
 }
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {

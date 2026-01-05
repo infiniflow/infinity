@@ -32,7 +32,6 @@ from collections import defaultdict
 from typing import Any, Optional
 from datetime import date, time, datetime, timedelta
 
-from numpy import dtype
 from infinity.errors import ErrorCode
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -51,17 +50,17 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
         case ttypes.LogicType.BigInt:
             return 'Int64'
         case ttypes.LogicType.Float:
-            return dtype('float32')
+            return 'Float32'
         case ttypes.LogicType.Double:
-            return dtype('float64')
+            return 'Float64'
         case ttypes.LogicType.Float16:
-            return dtype('float32')
+            return 'Float32'
         case ttypes.LogicType.BFloat16:
-            return dtype('float32')
+            return 'Float32'
         case ttypes.LogicType.Varchar:
-            return dtype('str')
+            return 'string'
         case ttypes.LogicType.Json:
-            return dtype('str')
+            return 'string'
         case ttypes.LogicType.Embedding:
             return object
         case ttypes.LogicType.MultiVector:

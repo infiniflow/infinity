@@ -1,7 +1,6 @@
 import pandas as pd
 import pytest
 import numpy as np
-from numpy import dtype
 from common import common_values
 import infinity
 import infinity.index as index
@@ -101,7 +100,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 2), 'c2': (True, False)}).astype(
-            {'c1': dtype('float32'), 'c2': 'boolean'}))
+            {'c1': 'Float32', 'c2': 'boolean'}))
         res = db_obj.drop_table("python_test_bool_insert" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         db_obj.drop_table("python_test_bool_insert_default" + suffix, ConflictType.Ignore)
@@ -128,8 +127,8 @@ class TestInfinity:
             {'c1': (1,), 'c2': (0,), 'c3': (0,), 'c4': (0,), 'c5': (0,), 'c6': (0,), 'c7': ("Tom",), 'c8': (1.0,),
              'c9': (1.0,), 'c10': (1.0,), 'c11': (1.0,), 'c12': (False,)}).astype(
             {'c1': 'Int8', 'c2': 'Int16', 'c3': 'Int32', 'c4': 'Int32',
-             'c5': 'Int32', 'c6': 'Int64', 'c7': dtype('object'), 'c8': dtype('float32'),
-             'c9': dtype('float32'), 'c10': dtype('float64'), 'c11': dtype('float64'), 'c12': 'boolean'}))
+             'c5': 'Int32', 'c6': 'Int64', 'c7': 'string', 'c8': 'Float32',
+             'c9': 'Float32', 'c10': 'Float64', 'c11': 'Float64', 'c12': 'boolean'}))
         res = db_obj.drop_table("python_test_bool_insert_default" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -153,7 +152,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (-1, 2, -3, 4, -5), 'c2': (1, -2, 3, -4, 5), 'c3': (-1, 2, -3, 4, -5)}).astype(
-            {'c1': dtype('float32'), 'c2': dtype('float32'), 'c3': dtype('float32')}))
+            {'c1': 'Float32', 'c2': 'Float32', 'c3': 'Float32'}))
         res = db_obj.drop_table("python_test_fp16_bf16" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -177,7 +176,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
-                                                                "^789$ test insert varchar")}))
+                                                                "^789$ test insert varchar")}, dtype='string'))
         res = db_obj.drop_table("test_insert_varchar" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -198,7 +197,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1': ["test_insert_big_varchar" * 1000] * 100}))
+            {'c1': ["test_insert_big_varchar" * 1000] * 100}, dtype='string'))
 
         res = db_obj.drop_table("test_insert_big_varchar" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -743,7 +742,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'num': (33, 33, 33), 'body': ("", "DEF", "ABC"), 'vec': ([1.0], [2.0], [4.0])}).astype(
-            {'num': 'Int32'}))
+            {'num': 'Int32', 'body': 'string'}))
         res = db_obj.drop_table("python_test_insert_rows_mismatch" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 

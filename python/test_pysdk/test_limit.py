@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 from common import common_values
 import infinity
-from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, SortType
 
@@ -127,7 +126,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         res, extra_result = (
@@ -149,7 +148,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         db_obj.drop_table(table_name)

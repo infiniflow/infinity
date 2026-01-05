@@ -35,6 +35,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import in_expr;
+import cast_expr;
 import knn_expr;
 import match_sparse_expr;
 import match_tensor_expr;
@@ -225,6 +226,8 @@ private:
     static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr);
 
     static InExpr *GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr);
+
+    static CastExpr *GetCastExprFromProto(Status &status, const infinity_thrift_rpc::CastExpr &cast_expr);
 
     static ParsedExpr *GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr);
 

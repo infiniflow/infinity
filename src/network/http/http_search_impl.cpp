@@ -302,7 +302,6 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                             std::string column_bitmap = fmt::format("{}_bitmap", column_name);
                             json_result_cell[column_bitmap] = nulls_ptr->IsTrue(row);
                         }
-
                         switch (value.type().type()) {
                             case LogicalType::kTinyInt:
                             case LogicalType::kSmallInt:

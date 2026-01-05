@@ -91,6 +91,7 @@ struct EXPRESSION_LTYPE {
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
+    infinity::ColumnType*             column_type_t;
 }
 
 %destructor {
@@ -111,6 +112,10 @@ struct EXPRESSION_LTYPE {
     delete ($$);
 } <const_expr_t>
 
+%destructor {
+    delete ($$);
+} <column_type_t>
+
 %token <str_value>              IDENTIFIER STRING
 %token <double_value>           DOUBLE_VALUE
 %token <long_value>             LONG_VALUE
@@ -122,7 +127,7 @@ struct EXPRESSION_LTYPE {
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMNS INDEXES
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
-%token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
+%token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME JSON
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT SPARSE
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
@@ -130,6 +135,7 @@ struct EXPRESSION_LTYPE {
 %token DATA LOG BUFFER
 %token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES STATUS VAR
 %token SEARCH MATCH QUERY FUSION
+%token PARSE_JSON
 
 %token NUMBER
 
@@ -138,7 +144,8 @@ struct EXPRESSION_LTYPE {
 %type <expr_t>                  expr expr_alias column_expr function_expr operand
 %type <expr_t>                  in_expr between_expr
 %type <expr_t>                  conjunction_expr
-%type <expr_t>                  match_expr query_expr fusion_expr
+%type <expr_t>                  match_expr query_expr fusion_expr cast_expr
+%type <column_type_t>           column_type
 %type <const_expr_t>            constant_expr interval_expr
 %type <const_expr_t>            long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <expr_array_t>            expr_array
@@ -191,7 +198,7 @@ expr_alias : expr AS IDENTIFIER {
 expr : operand
 | in_expr
 | between_expr
-| conjunction_expr;
+| conjunction_expr
 
 operand: '(' expr ')' {
    $$ = $2;
@@ -204,6 +211,42 @@ operand: '(' expr ')' {
 | match_expr
 | query_expr
 | fusion_expr
+| cast_expr
+
+cast_expr: CAST '(' expr AS column_type ')' {
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($5), std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete $5;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
+    }
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
+}
+| PARSE_JSON '(' expr ')' {
+    auto column_type_ptr = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid};
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*column_type_ptr, std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete column_type_ptr;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
+    }
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
+};
+
+column_type :
+BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| VARCHAR { $$ = new infinity::ColumnType{infinity::LogicalType::kVarchar, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INT { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DOUBLE { $$ = new infinity::ColumnType{infinity::LogicalType::kDouble, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; };
+
 
 match_expr : MATCH '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_expr = new infinity::MatchExpr();

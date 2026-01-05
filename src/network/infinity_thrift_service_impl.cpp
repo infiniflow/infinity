@@ -44,6 +44,7 @@ import embedding_info;
 import sparse_info;
 import array_info;
 import in_expr;
+import cast_expr;
 import constant_expr;
 import column_expr;
 import function_expr;
@@ -347,16 +348,7 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         insert_row->columns_ = std::move(field.column_names);
         insert_row->values_.reserve(field.parse_exprs.size());
         for (auto &expr : field.parse_exprs) {
-            ParsedExpr *parsed_expr = nullptr;
-
-            // Handle different expression types
-            if (expr.type.__isset.constant_expr) {
-                parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
-            } else if (expr.type.__isset.function_expr) {
-                parsed_expr = GetFunctionExprFromProto(constant_status, *expr.type.function_expr);
-            } else {
-                constant_status = Status::InvalidParsedExprType();
-            }
+            ParsedExpr *parsed_expr = GetParsedExprFromProto(constant_status, expr);
 
             if (!constant_status.ok()) {
                 ProcessStatus(response, constant_status);
@@ -2539,6 +2531,23 @@ InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity
     return parsed_expr.release();
 }
 
+CastExpr *InfinityThriftService::GetCastExprFromProto(Status &status, const infinity_thrift_rpc::CastExpr &cast_expr) {
+    auto data_type_ptr = GetColumnTypeFromProto(cast_expr.data_type);
+    if (data_type_ptr->type() == infinity::LogicalType::kInvalid) {
+        LOG_ERROR("GetCastExprFromProto: Invalid data type");
+        status = Status::InvalidDataType();
+        return nullptr;
+    }
+    auto *expr = new CastExpr(*data_type_ptr);
+    expr->expr_ = GetParsedExprFromProto(status, cast_expr.expr);
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("GetCastExprFromProto: Failed to parse inner expr: {}", status.message()));
+        delete expr;
+        return nullptr;
+    }
+    return expr;
+}
+
 ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr) {
     ParsedExpr *result = nullptr;
     if (expr.type.__isset.column_expr == true) {
@@ -2555,6 +2564,8 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
         result = GetFusionExprFromProto(*expr.type.fusion_expr);
     } else if (expr.type.__isset.in_expr == true) {
         result = GetInExprFromProto(status, *expr.type.in_expr);
+    } else if (expr.type.__isset.cast_expr == true) {
+        result = GetCastExprFromProto(status, *expr.type.cast_expr);
     } else {
         status = Status::InvalidParsedExprType();
     }
