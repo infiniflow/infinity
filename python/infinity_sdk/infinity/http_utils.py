@@ -108,7 +108,7 @@ def function_return_type(function_name, param_type):
     elif function_name == "avg":
         return 'Float64'
     elif function_name == "json_extract" or function_name == "json_extract_string":
-        return dtype("str")
+        return 'string'
     elif function_name == "json_extract_int":
         return 'Int32'
     elif function_name == "json_extract_double":

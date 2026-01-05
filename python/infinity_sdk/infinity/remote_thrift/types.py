@@ -32,7 +32,6 @@ from collections import defaultdict
 from typing import Any, Optional
 from datetime import date, time, datetime, timedelta
 
-from numpy import dtype
 from infinity.errors import ErrorCode
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
