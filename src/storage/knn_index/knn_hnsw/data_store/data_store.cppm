@@ -48,10 +48,9 @@ export template <typename VecStoreT, typename LabelType, bool OwnMem>
 class DataStoreBase {
 public:
     using This = DataStoreBase<VecStoreT, LabelType, OwnMem>;
-    using QueryVecType = typename VecStoreT::QueryVecType;
-    using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
+    using QueryVecType = VecStoreT::QueryVecType;
+    using VecStoreMeta = VecStoreT::template Meta<OwnMem>;
 
-public:
     template <typename T, typename = void>
     struct has_compress_type : std::false_type {};
 
@@ -93,11 +92,11 @@ class DataStore : public DataStoreBase<VecStoreT, LabelType, OwnMem> {
 public:
     using This = DataStore<VecStoreT, LabelType, OwnMem>;
     using Base = DataStoreBase<VecStoreT, LabelType, OwnMem>;
-    using DataType = typename VecStoreT::DataType;
-    using QueryVecType = typename VecStoreT::QueryVecType;
+    using DataType = VecStoreT::DataType;
+    using QueryVecType = VecStoreT::QueryVecType;
     using Inner = DataStoreInner<VecStoreT, LabelType, OwnMem>;
-    using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
-    using VecStoreInner = typename VecStoreT::template Inner<OwnMem>;
+    using VecStoreMeta = VecStoreT::template Meta<OwnMem>;
+    using VecStoreInner = VecStoreT::template Inner<OwnMem>;
 
     friend class DataStoreChunkIter<VecStoreT, LabelType>;
     friend class DataStoreIter<VecStoreT, LabelType>;
@@ -546,6 +545,8 @@ public:
                           size_t last_chunk_size) {
         std::vector<const typename VecStoreInner::Base *> vec_store_inners;
         std::vector<const typename GraphStoreInner::Base *> graph_store_inners;
+        vec_store_inners.reserve(chunk_num);
+        graph_store_inners.reserve(chunk_num);
         for (size_t i = 0; i < chunk_num; ++i) {
             vec_store_inners.emplace_back(&inners[i].vec_store_inner_);
             graph_store_inners.emplace_back(&inners[i].graph_store_inner_);

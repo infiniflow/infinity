@@ -20,20 +20,19 @@ import std.compat;
 #endif
 
 namespace infinity {
-// using String = std::string;
 
 template <typename T>
 concept POD = std::is_trivial_v<T> && std::is_standard_layout_v<T>;
 
 template <typename T>
 inline int32_t GetSizeInBytes(const T &) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     return sizeof(T);
 }
 
 template <typename T>
 inline T ReadBuf(const char *buf) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     T value;
     std::memcpy(&value, buf, sizeof(T));
     return value;
@@ -41,7 +40,7 @@ inline T ReadBuf(const char *buf) {
 
 template <typename T>
 inline T ReadBufAdv(const char *&buf) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     T value;
     std::memcpy(static_cast<void *>(&value), buf, sizeof(T));
     buf += sizeof(T);
@@ -50,7 +49,7 @@ inline T ReadBufAdv(const char *&buf) {
 
 template <>
 inline std::string ReadBuf<std::string>(const char *buf) {
-    int32_t size = ReadBuf<int32_t>(buf);
+    auto size = ReadBuf<int32_t>(buf);
     std::string str(buf + sizeof(int32_t), size);
     return str;
 }
@@ -67,12 +66,12 @@ inline std::tuple<> ReadBufAdv<std::tuple<>>(const char *&buf) {
 
 template <>
 inline std::string ReadBufAdv<std::string>(const char *&buf) {
-    int32_t size = ReadBufAdv<int32_t>(buf);
+    auto size = ReadBufAdv<int32_t>(buf);
 
     // Add bounds checking to prevent heap buffer overflow
     if (size < 0 || size > 1024 * 1024 * 1024) { // Max 1GB string size
         // Return empty string for corrupted data
-        return std::string();
+        return {};
     }
 
     std::string str(buf, size);
@@ -82,7 +81,7 @@ inline std::string ReadBufAdv<std::string>(const char *&buf) {
 
 template <typename T>
 const T *ReadBufVecAdv(const char *&buf, size_t size) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     T *data = reinterpret_cast<T *>(const_cast<char *>(buf));
     buf += sizeof(T) * size;
     return data;
@@ -90,13 +89,13 @@ const T *ReadBufVecAdv(const char *&buf, size_t size) {
 
 template <typename T>
 inline void WriteBuf(char *const buf, const T &value) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     std::memcpy(buf, &value, sizeof(T));
 }
 
 template <typename T>
 inline void WriteBufAdv(char *&buf, const T &value) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     std::memcpy(buf, &value, sizeof(T));
     buf += sizeof(T);
 }
@@ -124,14 +123,14 @@ inline void WriteBufAdv<std::tuple<>>(char *&buf, const std::tuple<> &) {}
 
 template <typename T>
 inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     memcpy(buf, data, sizeof(T) * size);
     buf += sizeof(T) * size;
 }
 
 template <typename T>
 void GetSizeInBytesAligned(char *&start) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(start);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
@@ -141,7 +140,7 @@ void GetSizeInBytesAligned(char *&start) {
 
 template <typename T>
 void GetSizeInBytesVecAligned(char *&start, size_t size) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(start);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
@@ -151,7 +150,7 @@ void GetSizeInBytesVecAligned(char *&start, size_t size) {
 
 template <typename T>
 T ReadBufAdvAligned(const char *&buf) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(buf);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
@@ -161,7 +160,7 @@ T ReadBufAdvAligned(const char *&buf) {
 
 template <typename T>
 const T *ReadBufVecAdvAligned(const char *&buf, size_t size) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(buf);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
@@ -171,7 +170,7 @@ const T *ReadBufVecAdvAligned(const char *&buf, size_t size) {
 
 template <typename T>
 void WriteBufAdvAligned(char *&buf, const T &value) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(buf);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
@@ -182,7 +181,7 @@ void WriteBufAdvAligned(char *&buf, const T &value) {
 
 template <typename T>
 void WriteBufVecAdvAligned(char *&buf, const T *data, size_t size) {
-    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     auto ptr = reinterpret_cast<uintptr_t>(buf);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);

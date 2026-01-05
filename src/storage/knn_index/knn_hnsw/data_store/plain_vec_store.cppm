@@ -44,13 +44,6 @@ private:
 
 public:
     PlainVecStoreMeta() : dim_(0) {}
-    // PlainVecStoreMeta(This &&other) : dim_(std::exchange(other.dim_, 0)) {}
-    // PlainVecStoreMeta &operator=(This &&other) {
-    //     if (this != &other) {
-    //         dim_ = std::exchange(other.dim_, 0);
-    //     }
-    //     return *this;
-    // }
 
     static This Make(size_t dim) { return This(dim); }
     static This Make(size_t dim, bool) { return This(dim); }
@@ -91,7 +84,6 @@ public:
     using Meta = PlainVecStoreMeta<OtherDataType>;
     using Base = PlainVecStoreInnerBase<OtherDataType, OwnMem>;
 
-public:
     PlainVecStoreInnerBase() = default;
 
     size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return sizeof(OtherDataType) * cur_vec_num * meta.dim(); }

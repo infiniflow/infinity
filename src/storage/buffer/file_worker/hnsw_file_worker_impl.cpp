@@ -96,7 +96,7 @@ void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<Lo
             mmap_size_ = file_handle->FileSize();
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         }
-        data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
+        data->LoadFromPtr(mmap_, mmap_size_, file_size);
         cache_manager.Set(*rel_file_path_, data, data->MemUsage());
     }
 }

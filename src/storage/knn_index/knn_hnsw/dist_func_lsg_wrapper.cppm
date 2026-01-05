@@ -86,7 +86,7 @@ private:
     }
 
 private:
-    float *avg_ = nullptr;
+    float *avg_{};
     float alpha_ = 1.0;
     Dist dist_;
 };
