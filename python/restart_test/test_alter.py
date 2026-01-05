@@ -6,7 +6,6 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 import pandas as pd
-from numpy import dtype
 import infinity.index as index
 
 

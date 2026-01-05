@@ -1,4 +1,3 @@
-from numpy import dtype
 import pytest
 from common import common_values
 import infinity

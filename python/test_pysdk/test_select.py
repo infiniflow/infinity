@@ -4,7 +4,6 @@ import pytest
 from common import common_values
 import infinity
 import infinity.index as index
-from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, SortType
 

@@ -3,7 +3,6 @@ import infinity
 import time
 import infinity.index as index
 import pandas as pd
-from numpy import dtype
 import pytest
 from common import common_values
 from common import common_index
