@@ -64,7 +64,7 @@ bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
 
 def function_return_type(function_name, param_type):
     if function_name == "sqrt":
-        return dtype("float64")
+        return 'Float64'
     elif (
         function_name == "round" or function_name == "ceil" or function_name == "floor"
     ):
@@ -76,7 +76,7 @@ def function_return_type(function_name, param_type):
         ):
             return param_type
         else:
-            return dtype("float64")
+            return 'Float64'
     elif (
         function_name == "filter_text"
         or function_name == "filter_fulltext"
@@ -100,19 +100,19 @@ def function_return_type(function_name, param_type):
         ):
             return 'Int64'
         else:
-            return dtype("float64")
+            return 'Float64'
     elif function_name == "min" or function_name == "max":
         return param_type
     elif function_name == "count":
         return 'Int64'
     elif function_name == "avg":
-        return dtype("float64")
+        return 'Float64'
     elif function_name == "json_extract" or function_name == "json_extract_string":
         return dtype("str")
     elif function_name == "json_extract_int":
         return 'Int32'
     elif function_name == "json_extract_double":
-        return dtype("float64")
+        return 'Float64'
     elif function_name == "json_extract_bool" or function_name == "json_extract_isnull" or function_name == "json_exists_path" or function_name == "json_contains":
         return 'boolean'
     else:
@@ -161,17 +161,17 @@ def type_to_dtype(type):
         case "bigint":
             return 'Int64'
         case "float":
-            return dtype("float32")
+            return 'Float32'
         case "float32":
-            return dtype("float32")
+            return 'Float32'
         case "float64":
-            return dtype("float64")
+            return 'Float64'
         case "float16":
-            return dtype("float32")
+            return 'Float32'
         case "bfloat16":
-            return dtype("float32")
+            return 'Float32'
         case "double":
-            return dtype("float64")
+            return 'Float64'
         case "varchar":
             return dtype("str")
         case "json":

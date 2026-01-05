@@ -204,7 +204,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["c1", "sqrt(c1)"]).filter("sqrt(c1)>1").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4], 'sqrt(c1)': [2.0]})
-                                      .astype({'c1': 'Int32', 'sqrt(c1)': dtype('float64')}))
+                                      .astype({'c1': 'Int32', 'sqrt(c1)': 'Float64'}))
 
         res = table_obj.create_index("idx_substring_c2",
                                      index.IndexInfo("substring(c2, 0, 5)", index.IndexType.SecondaryFunctional),

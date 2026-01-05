@@ -223,16 +223,16 @@ class TestInfinity:
             {'json_extract_string(c3, $.2)': dtype('str')}))
         res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
-            {'json_extract_int(c3, $.2)': (3232, None)}).astype('Int32'))
+            {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype('Int32'))
         res, extra_res = table_obj.output(["json_extract_double(c3,'$.4')"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('float64')), pd.DataFrame(
+        pd.testing.assert_frame_equal(res.to_pandas().astype('Float64'), pd.DataFrame(
             {'json_extract_double(c3, $.4)': (1.123, 1.123)}).astype(
-            {'json_extract_double(c3, $.4)': dtype('float64')}))
+            {'json_extract_double(c3, $.4)': 'Float64'}))
 
         res, extra_res = table_obj.output(["json_extract_isnull(c3,'$.1')"]).to_pl()
         print(res)
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_extract_isnull(c3, $.1)': (None, True)}).astype('boolean'))
+            {'json_extract_isnull(c3, $.1)': (pd.NA, True)}).astype('boolean'))
 
         res, extra_res = table_obj.output(["json_exists_path(c3,'$.1')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
@@ -247,7 +247,7 @@ class TestInfinity:
                            "c3": '{"1":null,"2":"10","3":12,"4":true}'}])
         res, extra_res = table_obj.output(["json_extract_bool(c3,'$.4')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
-            {'json_extract_bool(c3, $.4)': (None, None, True)}).astype('boolean'))
+            {'json_extract_bool(c3, $.4)': (pd.NA, pd.NA, True)}).astype('boolean'))
 
         table_obj.insert([{"c1": 111, "c2": 'aaa',
                            "c3": '[1,null,"a",1.23,true]'}])
@@ -290,8 +290,8 @@ class TestInfinity:
 
         res, _ = table_obj.output(["json_extract_double(c3,'$.value')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas().astype(dtype('float64')),
-            pd.DataFrame({'json_extract_double(c3, $.value)': (42.5,)}).astype(dtype('float64'))
+            res.to_pandas().astype('Float64'),
+            pd.DataFrame({'json_extract_double(c3, $.value)': (42.5,)}).astype('Float64')
         )
 
         res, _ = table_obj.output(["json_extract_bool(c3,'$.active')"]).to_pl()
@@ -317,26 +317,26 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_string(c3,'$[0]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[0])': (None, '"电商"')})
+            pd.DataFrame({'json_extract_string(c3, $[0])': (pd.NA, '"电商"')})
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (None, '"美妆"')})
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"')})
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[2])': (None, '"母婴"')})
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"')})
         )
 
         # Test out of bounds index
         res, _ = table_obj.output(["json_extract_string(c3,'$[10]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[10])': (None, None)})
+            pd.DataFrame({'json_extract_string(c3, $[10])': (pd.NA, pd.NA)})
         )
 
         # Test json_contains on arrays
@@ -362,25 +362,25 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_true')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('boolean'),
-            pd.DataFrame({'json_extract_bool(c3, $.bool_true)': (None, None, True)}).astype('boolean')
+            pd.DataFrame({'json_extract_bool(c3, $.bool_true)': (pd.NA, pd.NA, True)}).astype('boolean')
         )
 
         res, _ = table_obj.output(["json_extract_bool(c3,'$.bool_false')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('boolean'),
-            pd.DataFrame({'json_extract_bool(c3, $.bool_false)': (None, None, False)}).astype('boolean')
+            pd.DataFrame({'json_extract_bool(c3, $.bool_false)': (pd.NA, pd.NA, False)}).astype('boolean')
         )
 
         res, _ = table_obj.output(["json_extract_int(c3,'$.zero')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('Int32'),
-            pd.DataFrame({'json_extract_int(c3, $.zero)': (None, None, 0)}).astype('Int32')
+            pd.DataFrame({'json_extract_int(c3, $.zero)': (pd.NA, pd.NA, 0)}).astype('Int32')
         )
 
         res, _ = table_obj.output(["json_extract_int(c3,'$.negative')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('Int32'),
-            pd.DataFrame({'json_extract_int(c3, $.negative)': (None, None, -100)}).astype('Int32')
+            pd.DataFrame({'json_extract_int(c3, $.negative)': (pd.NA, pd.NA, -100)}).astype('Int32')
         )
 
         # Test 4: Mixed type arrays
@@ -394,13 +394,13 @@ class TestInfinity:
         res, _ = table_obj.output(["json_extract_int(c3,'$[0]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas().astype('Int32'),
-            pd.DataFrame({'json_extract_int(c3, $[0])': (None, None, None, 1)}).astype('Int32')
+            pd.DataFrame({'json_extract_int(c3, $[0])': (pd.NA, pd.NA, pd.NA, 1)}).astype('Int32')
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
             res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (None, '"美妆"', None, '"two"')})
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"', pd.NA, '"two"')})
         )
 
         # Use json_extract_string for double to avoid None conversion issues
@@ -654,42 +654,42 @@ class TestInfinity:
         res, _ = table_obj.output(["CAST(json_extract_int(c3,'$.age') AS INTEGER)"]).to_pl()
         result_df = res.to_pandas().astype('Int32')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [30, None, None]}).astype('Int32')
+        expected_df = pd.DataFrame({col_name: [30, pd.NA, pd.NA]}).astype('Int32')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 2: CAST json_extract_int to DOUBLE
         res, _ = table_obj.output(["CAST(json_extract_int(c3,'$.age') AS DOUBLE)"]).to_pl()
-        result_df = res.to_pandas().astype(dtype('float64'))
+        result_df = res.to_pandas().astype('Float64')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [30.0, None, None]}).astype(dtype('float64'))
+        expected_df = pd.DataFrame({col_name: [30.0, pd.NA, pd.NA]}).astype('Float64')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 3: CAST json_extract_double to DOUBLE
         res, _ = table_obj.output(["CAST(json_extract_double(c3,'$.score') AS DOUBLE)"]).to_pl()
-        result_df = res.to_pandas().astype(dtype('float64'))
+        result_df = res.to_pandas().astype('Float64')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [95.5, None, None]}).astype(dtype('float64'))
+        expected_df = pd.DataFrame({col_name: [95.5, pd.NA, pd.NA]}).astype('Float64')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 4: CAST json_extract_double to INTEGER (rounding)
         res, _ = table_obj.output(["CAST(json_extract_double(c3,'$.score') AS INTEGER)"]).to_pl()
         result_df = res.to_pandas().astype('Int32')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [96, None, None]}).astype('Int32')
+        expected_df = pd.DataFrame({col_name: [96, pd.NA, pd.NA]}).astype('Int32')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 5: CAST json_extract_int on nested path to INTEGER
         res, _ = table_obj.output(["CAST(json_extract_int(c3,'$.nested.value') AS INTEGER)"]).to_pl()
         result_df = res.to_pandas().astype('Int32')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [None, None, 42]}).astype('Int32')
+        expected_df = pd.DataFrame({col_name: [pd.NA, pd.NA, 42]}).astype('Int32')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 6: CAST json_extract_int on nested path to DOUBLE
         res, _ = table_obj.output(["CAST(json_extract_int(c3,'$.nested.value') AS DOUBLE)"]).to_pl()
-        result_df = res.to_pandas().astype(dtype('float64'))
+        result_df = res.to_pandas().astype('Float64')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [None, None, 42.0]}).astype(dtype('float64'))
+        expected_df = pd.DataFrame({col_name: [pd.NA, pd.NA, 42.0]}).astype('Float64')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Test 7: Multiple CAST operations with json_extract functions
@@ -701,21 +701,24 @@ class TestInfinity:
         col1_name = result_df.columns[0]
         col2_name = result_df.columns[1]
         expected_df = pd.DataFrame({
-            col1_name: [30.0, None, None],
-            col2_name: [96, None, None]
-        }).astype({col2_name : 'Int32'})
-        pd.testing.assert_frame_equal(result_df.astype({col2_name : 'Int32'}), expected_df)
+            col1_name: [30.0, pd.NA, pd.NA],
+            col2_name: [96, pd.NA, pd.NA]
+        })
+        # Convert both columns to proper dtypes
+        result_df = result_df.astype({col1_name: 'Float64', col2_name: 'Int32'})
+        expected_df = expected_df.astype({col1_name: 'Float64', col2_name: 'Int32'})
+        pd.testing.assert_frame_equal(result_df, expected_df)
 
         res, _ = table_obj.output(["CAST(json_extract_string(c3,'$.nested.value') AS DOUBLE)"]).to_pl()
-        result_df = res.to_pandas().astype(dtype('float64'))
+        result_df = res.to_pandas().astype('Float64')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [None, None, 42.0]}).astype(dtype('float64'))
+        expected_df = pd.DataFrame({col_name: [pd.NA, pd.NA, 42.0]}).astype('Float64')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         res, _ = table_obj.output(["CAST(json_extract_string(c3,'$.nested.value') AS Int)"]).to_pl()
         result_df = res.to_pandas().astype('Int32')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [None, None, 42]}).astype('Int32')
+        expected_df = pd.DataFrame({col_name: [pd.NA, pd.NA, 42]}).astype('Int32')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         table_obj.insert([{"c1": 3, "c2": "test3",
@@ -724,7 +727,7 @@ class TestInfinity:
         res, _ = table_obj.output(["CAST(json_extract_string(c3,'$.nested.value') AS Boolean)"]).to_pl()
         result_df = res.to_pandas().astype('boolean')
         col_name = res.columns[0]
-        expected_df = pd.DataFrame({col_name: [None, None, None, True]}).astype('boolean')
+        expected_df = pd.DataFrame({col_name: [pd.NA, pd.NA, pd.NA, True]}).astype('boolean')
         pd.testing.assert_frame_equal(result_df, expected_df)
 
         # Cleanup
@@ -1086,7 +1089,7 @@ class TestInfinity:
                                           [0.1, 0.2, 0.3, -0.2], [0.2,
                                                                   0.1, 0.3, 0.4],
                                           [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])})
-                                      .astype({'c1': dtype('float32'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'Float32', 'c2': dtype('O')}))
 
         res = db_obj.drop_table(
             "test_select_embedding_float" + suffix, ConflictType.Error)
@@ -1293,7 +1296,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["-abs(num) - 1"]).filter("-abs(num) >= -2").to_df()
         pd.testing.assert_frame_equal(res,
-                                      pd.DataFrame({"(-(ABS(num)) - 1)": (-2.0, -3.0)}))
+                                      pd.DataFrame({"(-(ABS(num)) - 1)": (-2.0, -3.0)}, dtype='Float64'))
         res = db_obj.drop_table("test_neg_func" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -1497,7 +1500,7 @@ class TestInfinity:
         res, extra_res = table_obj.output(["*"]).filter("sqrt(c1) = 2").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (4,),
                                                          'c2': (5,)})
-                                      .astype({'c1': 'Int32', 'c2': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Float64'}))
 
         res = db_obj.drop_table("test_select_sqrt" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1516,25 +1519,25 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'round(c2)': (2, -2, 3, -3)})
-                                      .astype({'c1': 'Int32', 'round(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'round(c2)': 'Float64'}))
 
         res, extra_res = table_obj.output(["c1", "round(c2, 1)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'round(c2, 1)': (2.4, -2.5, 2.6, -2.6)})
-                                      .astype({'c1': 'Int32', 'round(c2, 1)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'round(c2, 1)': 'Float64'}))
 
         res, extra_res = table_obj.output(["c1", "ceil(c2)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'ceil(c2)': (3, -2, 3, -2)})
-                                      .astype({'c1': 'Int32', 'ceil(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'ceil(c2)': 'Float64'}))
 
         res, extra_res = table_obj.output(["c1", "floor(c2)"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
                                                          'floor(c2)': (2, -3, 2, -3)})
-                                      .astype({'c1': 'Int32', 'floor(c2)': dtype('double')}))
+                                      .astype({'c1': 'Int32', 'floor(c2)': 'Float64'}))
 
         res = db_obj.drop_table("test_select_round" + suffix)
         assert res.error_code == ErrorCode.OK

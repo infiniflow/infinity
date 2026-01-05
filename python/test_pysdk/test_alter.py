@@ -199,7 +199,7 @@ class TestInfinity:
                     "num": 'Int32',
                     "body": dtype("object"),
                     "vec": dtype("object"),
-                    "column_name2": dtype("float32"),
+                    "column_name2": 'Float32',
                     "column_name3": dtype("object"),
                 }
             ),

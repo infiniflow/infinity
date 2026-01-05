@@ -55,7 +55,7 @@ class TestInfinity:
         # test agg sum
         res, extra_result = table_obj.output(["c1", "sum(c2)"]).group_by("c1").to_df()
         gt = pd.DataFrame({"c1": (1, 2), "sum(c2)": (9.0, 6.0)}).astype(
-            {"c1": 'Int32', "sum(c2)": dtype("float64")}
+            {"c1": 'Int32', "sum(c2)": 'Float64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -65,7 +65,7 @@ class TestInfinity:
         # test agg min
         res, extra_result = table_obj.output(["c1", "min(c2)"]).group_by("c1").to_df()
         gt = pd.DataFrame({"c1": (1, 2), "min(c2)": (1.0, 2.0)}).astype(
-            {"c1": 'Int32', "min(c2)": dtype("float32")}
+            {"c1": 'Int32', "min(c2)": 'Float32'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -75,7 +75,7 @@ class TestInfinity:
         # test agg max
         res, extra_result = table_obj.output(["c1", "max(c2)"]).group_by("c1").to_df()
         gt = pd.DataFrame({"c1": (1, 2), "max(c2)": (5.0, 4.0)}).astype(
-            {"c1": 'Int32', "max(c2)": dtype("float32")}
+            {"c1": 'Int32', "max(c2)": 'Float32'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -95,7 +95,7 @@ class TestInfinity:
         # test agg avg
         res, extra_result = table_obj.output(["c1", "avg(c2)"]).group_by("c1").to_df()
         gt = pd.DataFrame({"c1": (1, 2), "(sum(c2) / count(c2))": (3.0, 3.0)}).astype(
-            {"c1": 'Int32', "(sum(c2) / count(c2))": dtype("float64")}
+            {"c1": 'Int32', "(sum(c2) / count(c2))": 'Float64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -165,7 +165,7 @@ class TestInfinity:
             {
                 "c3": dtype("object"),
                 "sum(c1)": 'Int64',
-                "sum(c2)": dtype("float64"),
+                "sum(c2)": 'Float64',
             }
         )
         pd.testing.assert_frame_equal(
@@ -409,7 +409,7 @@ class TestInfinity:
                 "sum(c3)": [8.0, 8.0, 4.0, 6.0, 10.0, 10.0],
             }
         ).astype(
-            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": dtype("float64")}
+            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": 'Float64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -424,7 +424,7 @@ class TestInfinity:
                 "(c1 + c2)": [2, 3, 4, 5],
                 "sum(c3)": [8.0, 14.0, 14.0, 10.0],
             }
-        ).astype({"(c1 + c2)": 'Int32', "sum(c3)": dtype("float64")})
+        ).astype({"(c1 + c2)": 'Int32', "sum(c3)": 'Float64'})
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
@@ -445,7 +445,7 @@ class TestInfinity:
             {
                 "abs((c1 - c2))": 'Int32',
                 "(c1 + c2)": 'Int32',
-                "sum(c3)": dtype("float64"),
+                "sum(c3)": 'Float64',
             }
         )
         pd.testing.assert_frame_equal(
@@ -466,7 +466,7 @@ class TestInfinity:
                 "sum(c3)": [6.0, 10.0, 10.0],
             }
         ).astype(
-            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": dtype("float64")}
+            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": 'Float64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -483,7 +483,7 @@ class TestInfinity:
                 "sum(c2)": [4, 5, 2, 1, 3, 4, 3, 2],
             }
         ).astype(
-            {"c1": 'Int32', "c3": dtype("float32"), "sum(c2)": 'Int64'}
+            {"c1": 'Int32', "c3": 'Float32', "sum(c2)": 'Int64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
@@ -501,7 +501,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "sum(c1)": 'Int64',
                 "sum(c2)": 'Int64',
             }
@@ -525,7 +525,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "sum(c1)": 'Int64',
                 "sum(c2)": 'Int64',
             }
@@ -549,7 +549,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "sum(c1)": 'Int64',
                 "sum(c2)": 'Int64',
             }
@@ -573,7 +573,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "count(c3)": 'Int64',
                 "sum(c1)": 'Int64',
                 "sum(c2)": 'Int64',
@@ -598,7 +598,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "sum(c1)": 'Int64',
                 "sum(c2)": 'Int64',
             }
@@ -619,7 +619,7 @@ class TestInfinity:
             }
         ).astype(
             {
-                "c3": dtype("float32"),
+                "c3": 'Float32',
                 "sum1": 'Int64',
                 "sum2": 'Int64',
             }
@@ -641,7 +641,7 @@ class TestInfinity:
                 "sum(c3)": [6.0, 10.0, 10.0],
             }
         ).astype(
-            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": dtype("float64")}
+            {"c1": 'Int32', "c2": 'Int32', "sum(c3)": 'Float64'}
         )
         pd.testing.assert_frame_equal(
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),

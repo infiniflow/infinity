@@ -115,12 +115,12 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
-            {'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            {'c1': 'Int32', 'DISTANCE': 'Float32'}))
         res, extra_result = table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "uint8", "l2", 10,
                                                                               {"threshold": "200"}).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5), 'DISTANCE': (29.0, 149.0)}).astype(
-            {'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            {'c1': 'Int32', 'DISTANCE': 'Float32'}))
         with pytest.raises(InfinityException):
             table_obj.create_index("invalid_lvq", index.IndexInfo("c2", index.IndexType.Hnsw,
                                                                   {
@@ -141,12 +141,12 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
-            {'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            {'c1': 'Int32', 'DISTANCE': 'Float32'}))
         res, extra_result = table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "uint8", "l2", 10,
                                                                               {"threshold": "200"}).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5), 'DISTANCE': (29.0, 149.0)}).astype(
-            {'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            {'c1': 'Int32', 'DISTANCE': 'Float32'}))
         with pytest.raises(InfinityException):
             table_obj.output(["c1", "_distance"]).match_dense('c2', [0, 0, 0], "int8", "l2", 10).to_result()
         res = db_obj.drop_table("test_knn_u8" + suffix, ConflictType.Error)
@@ -179,7 +179,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
-            {'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            {'c1': 'Int32', 'DISTANCE': 'Float32'}))
         res = db_obj.drop_table("test_knn_fp16_bf16" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -694,13 +694,13 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res,
                                       pd.DataFrame(
                                           {'SCORE': [26.354809, 26.176298, 24.788311, 17.842297, 17.755081]}).astype(
-                                          {'SCORE': dtype('float32')}))
+                                          {'SCORE': 'Float32'}))
         res, extra_result = table_obj.output(["_score"]).match_text("body^5", "TO BE OR NOT", 5,
                                                                     {"operator": "or",
                                                                      "threshold": "20"}).to_df()
         pd.testing.assert_frame_equal(res,
                                       pd.DataFrame({'SCORE': [26.354809, 26.176298, 24.788311]}).astype(
-                                          {'SCORE': dtype('float32')}))
+                                          {'SCORE': 'Float32'}))
         print('Test fulltext operator AND for query "TO BE OR NOT":')
 
         res, extra_result = table_obj.output(["*", "_row_id", "_score"]).match_text("body^5", "TO BE OR NOT", 5,
@@ -711,13 +711,13 @@ class TestInfinity:
                                                                     {"operator": "and"}).to_df()
         pd.testing.assert_frame_equal(res,
                                       pd.DataFrame({'SCORE': [26.354809, 26.176298, 24.788311]}).astype(
-                                          {'SCORE': dtype('float32')}))
+                                          {'SCORE': 'Float32'}))
         res, extra_result = table_obj.output(["_score"]).match_text("body^5", "TO BE OR NOT", 5,
                                                                     {"operator": "and",
                                                                      "threshold": "25"}).to_df()
         pd.testing.assert_frame_equal(res,
                                       pd.DataFrame({'SCORE': [26.354809, 26.176298]}).astype(
-                                          {'SCORE': dtype('float32')}))
+                                          {'SCORE': 'Float32'}))
         # expect throw
         print('No operator option for query "TO BE OR NOT", expect throw:')
         with pytest.raises(InfinityException) as e_info:
@@ -1012,7 +1012,7 @@ class TestInfinity:
                                                                                                             3.0]}),
                                                                                  "ip", 3).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
                                                                                  SparseVector(**{"indices": [0, 20, 80],
@@ -1020,7 +1020,7 @@ class TestInfinity:
                                                                                                             3.0]}),
                                                                                  "ip", 3, {"threshold": "10"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2], 'SIMILARITY': [16.0, 12.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res = db_obj.drop_table("test_sparse_scan" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1059,7 +1059,7 @@ class TestInfinity:
                                                                                  "ip", 3, {"alpha": "1.0",
                                                                                            "beta": "1.0"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
                                                                                  SparseVector(**{"indices": [0, 20, 80],
@@ -1069,7 +1069,7 @@ class TestInfinity:
                                                                                  {"alpha": "1.0", "beta": "1.0",
                                                                                   "threshold": "10"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2], 'SIMILARITY': [16.0, 12.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res = table_obj.drop_index("idx1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1825,12 +1825,12 @@ class TestInfinity:
         if suffix == "_http":
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1': (0, 1, 2), 'c2': ('[0100000000000000]', '[0000000000000001]', '[0000000000000011]'),
-                 'DISTANCE': (1.0, 1.0, 2.0)}).astype({'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+                 'DISTANCE': (1.0, 1.0, 2.0)}).astype({'c1': 'Int32', 'DISTANCE': 'Float32'}))
         else:
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1': (0, 1, 2), 'c2': (['0100000000000000'], ['0000000000000001'], ['0000000000000011']),
                  'DISTANCE': (1.0, 1.0, 2.0)}
-            ).astype({'c1': 'Int32', 'DISTANCE': dtype('float32')}))
+            ).astype({'c1': 'Int32', 'DISTANCE': 'Float32'}))
         db_obj.drop_table("test_binary_knn_hamming_distance" + suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
@@ -1872,7 +1872,7 @@ class TestInfinity:
                                                                                  {"alpha": "1.0", "beta": "1.0",
                                                                                   "index_name": "idx1"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         res, extra_result = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
                                                                                  SparseVector(**{"indices": [0, 20, 80],
@@ -1883,7 +1883,7 @@ class TestInfinity:
                                                                                   "threshold": "10",
                                                                                   "index_name": "idx2"}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2], 'SIMILARITY': [16.0, 12.0]}).astype(
-            {'c1': 'Int32', 'SIMILARITY': dtype('float32')}))
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
 
         # non-existent index
         with pytest.raises(InfinityException) as e:

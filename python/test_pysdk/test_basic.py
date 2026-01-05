@@ -159,13 +159,13 @@ class TestInfinity:
         res, extra_result = table_obj.output(["c1 + 0.1"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + 0.1)': (1.1, 2.1)}).astype(
-            {'(c1 + 0.1)': dtype('float64')}))
+            {'(c1 + 0.1)': 'Float64'}))
 
         res, extra_result = table_obj.output(
             ["*"]).filter("c1 > 1").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
-            {'c1': 'Int32', 'c2': dtype('float32')}))
+            {'c1': 'Int32', 'c2': 'Float32'}))
 
         res = db_obj.drop_table("my_table3"+suffix)
         assert res.error_code == ErrorCode.OK

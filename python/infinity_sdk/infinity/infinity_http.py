@@ -1193,7 +1193,7 @@ class table_http_result:
             if k in col_types:  # might be object
                 df_type[k] = type_to_dtype(col_types[k])
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
-                df_type[k] = dtype('float32')
+                df_type[k] = 'Float32'
             # "(c1 + c2)", "sqrt(c1), round(c1)"
             k1 = k.replace("(", " ")
             k1 = k1.replace(")", " ")
@@ -1208,14 +1208,14 @@ class table_http_result:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
-                elif col.strip().isdigit() and df_type.get(k) != dtype('float64'):
+                elif col.strip().isdigit() and df_type.get(k) != 'Float64':
                     df_type[k] = 'Int32'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif is_float(col.strip()):
-                    df_type[k] = dtype('float64')
+                    df_type[k] = 'Float64'
                     df_type[k] = function_return_type(function_name, df_type[k])
                 elif col == "/":
-                    df_type[k] = dtype('float64')
+                    df_type[k] = 'Float64'
                     break
                 else:
                     function_name = col.strip().lower()
