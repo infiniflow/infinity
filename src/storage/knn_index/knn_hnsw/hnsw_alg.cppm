@@ -526,7 +526,7 @@ public:
     }
 
     static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
-        auto *buffer = static_cast<const char *>(m_mmap);
+        auto *buffer = static_cast<char *>(m_mmap);
         const char *ptr = buffer;
         size_t M = ReadBufAdv<size_t>(ptr);
         size_t ef_construction = ReadBufAdv<size_t>(ptr);

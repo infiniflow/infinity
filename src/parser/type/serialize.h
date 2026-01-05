@@ -22,9 +22,6 @@ import std.compat;
 namespace infinity {
 
 template <typename T>
-concept POD = std::is_trivial_v<T> && std::is_standard_layout_v<T>;
-
-template <typename T>
 inline int32_t GetSizeInBytes(const T &) {
     static_assert(std::is_standard_layout_v<T>, "T must have standard layout");
     return sizeof(T);
