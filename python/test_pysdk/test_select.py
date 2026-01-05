@@ -208,19 +208,19 @@ class TestInfinity:
         table_obj.insert([{"c1": 123456, "c2": '{"1":null,"2":"123","3":12,"4":1.123}',
                            "c3": '{"1":null,"2":"10","3":12,"4":1.123}'}])
         res, extra_res = table_obj.output(["c2"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame({'c2': ('{"2":3232,"434":"4321","3":43432,"4":1.123}', '{"1":null,"2":"123","3":12,"4":1.123}')}).astype({'c2': dtype('str')}))
+        pd.testing.assert_frame_equal(res.to_pandas().astype('string'), pd.DataFrame({'c2': ('{"2":3232,"434":"4321","3":43432,"4":1.123}', '{"1":null,"2":"123","3":12,"4":1.123}')}).astype({'c2': 'string'}))
         res, extra_res = table_obj.output(["c3"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame({'c3': ('{"2":3232,"3":43432,"4":1.123,"434":"4321"}', '{"1":null,"2":"10","3":12,"4":1.123}')}).astype({'c3': dtype('str')}))
+        pd.testing.assert_frame_equal(res.to_pandas().astype('string'), pd.DataFrame({'c3': ('{"2":3232,"3":43432,"4":1.123,"434":"4321"}', '{"1":null,"2":"10","3":12,"4":1.123}')}).astype({'c3': 'string'}))
         res, extra_res = table_obj.output(["count(*)"]).to_pl()
         assert res.item(0, 0) == 2
         res, extra_res = table_obj.output(["json_extract(c3,'$.2')"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame(
+        pd.testing.assert_frame_equal(res.to_pandas().astype('string'), pd.DataFrame(
             {'json_extract(c3, $.2)': ('3232', '"10"')}).astype(
-            {'json_extract(c3, $.2)': dtype('str')}))
+            {'json_extract(c3, $.2)': 'string'}))
         res, extra_res = table_obj.output(["json_extract_string(c3,'$.2')"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas(), pd.DataFrame(
+        pd.testing.assert_frame_equal(res.to_pandas().astype('string'), pd.DataFrame(
             {'json_extract_string(c3, $.2)': ('3232', '"10"')}).astype(
-            {'json_extract_string(c3, $.2)': dtype('str')}))
+            {'json_extract_string(c3, $.2)': 'string'}))
         res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
             {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype('Int32'))
@@ -239,9 +239,9 @@ class TestInfinity:
             {'json_exists_path(c3, $.1)': (False, True)}).astype('boolean'))
 
         res, extra_res = table_obj.output(["Cast(c3 AS Varchar)"]).to_pl()
-        pd.testing.assert_frame_equal(res.to_pandas().astype(dtype('str')), pd.DataFrame(
+        pd.testing.assert_frame_equal(res.to_pandas().astype('string'), pd.DataFrame(
             {'Cast(c3 AS Varchar)': ('{"2":3232,"3":43432,"4":1.123,"434":"4321"}','{"1":null,"2":"10","3":12,"4":1.123}')}).astype(
-            {'Cast(c3 AS Varchar)': dtype('str')}))
+            {'Cast(c3 AS Varchar)': 'string'}))
 
         table_obj.insert([{"c1": 111, "c2": 'aaa',
                            "c3": '{"1":null,"2":"10","3":12,"4":true}'}])
@@ -316,27 +316,27 @@ class TestInfinity:
         # Test array element extraction with $[0], $[1], $[2]
         res, _ = table_obj.output(["json_extract_string(c3,'$[0]')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[0])': (pd.NA, '"电商"')})
+            res.to_pandas().astype('string'),
+            pd.DataFrame({'json_extract_string(c3, $[0])': (pd.NA, '"电商"')}, dtype='string')
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"')})
+            res.to_pandas().astype('string'),
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"')}, dtype='string')
         )
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[2]')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"')})
+            res.to_pandas().astype('string'),
+            pd.DataFrame({'json_extract_string(c3, $[2])': (pd.NA, '"母婴"')}, dtype='string')
         )
 
         # Test out of bounds index
         res, _ = table_obj.output(["json_extract_string(c3,'$[10]')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[10])': (pd.NA, pd.NA)})
+            res.to_pandas().astype('string'),
+            pd.DataFrame({'json_extract_string(c3, $[10])': (pd.NA, pd.NA)}, dtype='string')
         )
 
         # Test json_contains on arrays
@@ -399,8 +399,8 @@ class TestInfinity:
 
         res, _ = table_obj.output(["json_extract_string(c3,'$[1]')"]).to_pl()
         pd.testing.assert_frame_equal(
-            res.to_pandas(),
-            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"', pd.NA, '"two"')})
+            res.to_pandas().astype('string'),
+            pd.DataFrame({'json_extract_string(c3, $[1])': (pd.NA, '"美妆"', pd.NA, '"two"')}, dtype='string')
         )
 
         # Use json_extract_string for double to avoid None conversion issues
@@ -963,15 +963,15 @@ class TestInfinity:
                                                                 'l', 'm'),
                                                          'c2': ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
                                                                 'l', 'm')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res, extra_result = table_obj.output(
             ["c1", "c2"]).filter("c1 = 'a'").to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a',), 'c2': ('a',)}).astype(
-            {'c1': dtype('O'), 'c2': dtype('O')}))
+            {'c1': 'string', 'c2': 'string'}))
 
         res, extra_result = table_obj.output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': 'string'}))
         res = db_obj.drop_table("test_select_varchar" + suffix)
         assert res.error_code == ErrorCode.OK
 
@@ -1035,7 +1035,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
-                                      .astype({'c1': 'Int32', 'c2': dtype('O')}))
+                                      .astype({'c1': 'Int32', 'c2': object}))
 
         res = db_obj.drop_table("test_select_embedding" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1089,7 +1089,7 @@ class TestInfinity:
                                           [0.1, 0.2, 0.3, -0.2], [0.2,
                                                                   0.1, 0.3, 0.4],
                                           [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])})
-                                      .astype({'c1': 'Float32', 'c2': dtype('O')}))
+                                      .astype({'c1': 'Float32', 'c2': object}))
 
         res = db_obj.drop_table(
             "test_select_embedding_float" + suffix, ConflictType.Error)
@@ -1247,7 +1247,7 @@ class TestInfinity:
         table_obj.create_index("my_ft_index", index.IndexInfo("doc", index.IndexType.FullText), ConflictType.Error)
 
         def test_func():
-            expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': 'Int32'})
+            expect_result = pd.DataFrame({'num': (1,), "doc": "first text"}).astype({'num': 'Int32', 'doc': 'string'})
             res, extra_result = table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first text', 'minimum_should_match=100%')").to_df()
             pd.testing.assert_frame_equal(expect_result, res)
@@ -1265,7 +1265,7 @@ class TestInfinity:
             pd.testing.assert_frame_equal(expect_result, res)
             expect_result = pd.DataFrame(
                 {'num': (1, 2, 3), "doc": ("first text", "second text multiple", "third text many words")}).astype(
-                {'num': 'Int32'})
+                {'num': 'Int32', 'doc': 'string'})
 
             res, extra_result = table_obj.output(["*"]).filter(
                 "filter_text('doc', 'first') or num >= 2").to_df()
@@ -1356,13 +1356,13 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd'),
                                                          'c2': ('a', 'b', 'c', 'd')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res, extra_res = table_obj.output(["*"]).filter("char_length(c1) = 3").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('abc', 'bbc', 'cbc', 'dbc'),
                                                          'c2': ('abc', 'bbc', 'cbc', 'dbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_varchar_length" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1383,7 +1383,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('abc', 'bbc', 'cbc', 'dbc'),
                                                          'c2': ('abc', 'bbc', 'cbc', 'dbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_regex" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1404,7 +1404,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd', 'abc'),
                                                          'c2': ('A', 'B', 'C', 'D', 'ABC')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_upper_lower" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1425,7 +1425,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('bbcc', 'cbcc', 'dbcc'),
                                                          'c2': ('bbc', 'cbc', 'dbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_substring" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1446,19 +1446,19 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (' a', ' b', ' c'),
                                                          'c2': ('a', 'b', 'c')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res, extra_res = table_obj.output(["*"]).filter("rtrim(c1) = c2").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('ab ', 'bcc ', 'cbc '),
                                                          'c2': ('ab', 'bcc', 'cbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res, extra_res = table_obj.output(["*"]).filter("trim(c1) = c2").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (' a', ' b', ' c', 'ab ', 'bcc ', 'cbc ', ' dbc '),
                                                          'c2': ('a', 'b', 'c', 'ab', 'bcc', 'cbc', 'dbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_trim" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1479,7 +1479,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('bbcc', 'cbcc', 'dbcc'),
                                                          'c2': ('bbc', 'cbc', 'dbc')})
-                                      .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+                                      .astype({'c1': 'string', 'c2': 'string'}))
 
         res = db_obj.drop_table("test_select_position" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1556,11 +1556,13 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["trunc(c1, 14)",  "trunc(c2, 2)", "trunc(c3, 2)"]).to_df()
         print(res)
+        # Convert object dtype to string for HTTP mode compatibility
+        res = res.astype('string')
         pd.testing.assert_frame_equal(res, pd.DataFrame({'trunc(c1, 14)': ("2.12300000000000", "-2.12300000000000", "2.00000000000000", "2.10000000000000"),
                                                          'trunc(c2, 2)': ("2.12", "-2.12", "2.00", "2.10"),
                                                          'trunc(c3, 2)': ("2.12", "-2.12", "2.00", "2.10")
                                                          })
-                                      .astype({'trunc(c1, 14)': dtype('object'), 'trunc(c2, 2)': dtype('object'), 'trunc(c3, 2)': dtype('object')}))
+                                      .astype({'trunc(c1, 14)': 'string', 'trunc(c2, 2)': 'string', 'trunc(c3, 2)': 'string'}))
 
 
         res = db_obj.drop_table("test_select_truncate" + suffix)
@@ -1581,7 +1583,7 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
                                                          'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
-                                      .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
+                                      .astype({'reverse(c1)': 'string', 'reverse(c2)': 'string'}))
 
         res = db_obj.drop_table("test_select_reverse" + suffix)
         assert res.error_code == ErrorCode.OK

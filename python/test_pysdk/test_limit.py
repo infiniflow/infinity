@@ -127,7 +127,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         res, extra_result = (
@@ -149,7 +149,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         db_obj.drop_table(table_name)

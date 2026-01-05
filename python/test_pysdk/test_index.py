@@ -213,8 +213,10 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["c2", "substring(c2, 0, 5) AS c2_sub"]).filter(
             "c2_sub == 'hello'").to_df()
+        # Convert object dtype to string for HTTP mode compatibility
+        res = res.astype({'c2': 'string', 'c2_sub': 'string'})
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': ['hello world'], 'c2_sub': ['hello']})
-                                      .astype({'c2': dtype('str'), 'c2_sub': dtype('str')}))
+                                      .astype({'c2': 'string', 'c2_sub': 'string'}))
 
         res = table_obj.show_index("idx_sqrt_c1")
         print(res)

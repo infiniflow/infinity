@@ -173,9 +173,9 @@ def type_to_dtype(type):
         case "double":
             return 'Float64'
         case "varchar":
-            return dtype("str")
+            return 'string'
         case "json":
-            return dtype("str")
+            return 'string'
         case _:
             return object
 

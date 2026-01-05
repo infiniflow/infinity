@@ -59,9 +59,9 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
         case ttypes.LogicType.BFloat16:
             return 'Float32'
         case ttypes.LogicType.Varchar:
-            return dtype('str')
+            return 'string'
         case ttypes.LogicType.Json:
-            return dtype('str')
+            return 'string'
         case ttypes.LogicType.Embedding:
             return object
         case ttypes.LogicType.MultiVector:

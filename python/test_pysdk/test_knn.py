@@ -977,13 +977,13 @@ class TestInfinity:
                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
                                                                      query_elem_t, 3).to_df()
         pd.testing.assert_frame_equal(res,
-                                      pd.DataFrame({'title': ["test22", "test55", "test66"]}))
+                                      pd.DataFrame({'title': ["test22", "test55", "test66"]}, dtype='string'))
 
         res, extra_result = table_obj.output(["title"]).match_tensor('t',
                                                                      [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
                                                                      query_elem_t, 3, {"threshold": "300"}).to_df()
         pd.testing.assert_frame_equal(res,
-                                      pd.DataFrame({'title': ["test22"]}))
+                                      pd.DataFrame({'title': ["test22"]}, dtype='string'))
         res = db_obj.drop_table("test_tensor_scan" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
