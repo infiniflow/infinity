@@ -167,6 +167,14 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         }
+        case LogicalType::kJson: {
+            switch (target.type()) {
+                case LogicalType::kVarchar:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         default: {
             UnrecoverableError(fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString()));
         }

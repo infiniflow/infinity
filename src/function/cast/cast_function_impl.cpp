@@ -28,6 +28,7 @@ import :multi_vector_cast;
 import :empty_array_cast;
 import :array_cast;
 import :sparse_cast;
+import :json_cast;
 
 import logical_type;
 import internal_types;
@@ -74,6 +75,9 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case LogicalType::kVarchar: {
             return BindVarcharCast(source, target);
         }
+        case LogicalType::kJson: {
+            return BindJsonCast(source, target);
+        }
         case LogicalType::kEmbedding: {
             return BindEmbeddingCast(source, target);
         }
@@ -112,7 +116,6 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case LogicalType::kMixed:
         case LogicalType::kNull:
         case LogicalType::kMissing:
-        case LogicalType::kJson:
         case LogicalType::kInvalid: {
             UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
             break;

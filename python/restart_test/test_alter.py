@@ -6,7 +6,6 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 import pandas as pd
-from numpy import dtype
 import infinity.index as index
 
 
@@ -66,8 +65,8 @@ class TestAlter:
                 ).astype(
                     {
                         "c1": 'Int32',
-                        "c3": dtype("object"),
-                        "c4": dtype("object"),
+                        "c3": 'string',
+                        "c4": 'string',
                     }
                 ),
             )
@@ -155,9 +154,9 @@ class TestAlter:
                 ).astype(
                     {
                         "c1": 'Int32',
-                        "c3": dtype("object"),
-                        "c4": dtype("object"),
-                        "c2": dtype("float32"),
+                        "c3": 'string',
+                        "c4": 'string',
+                        "c2": 'Float32',
                         "c5": 'Int32',
                     }
                 ),

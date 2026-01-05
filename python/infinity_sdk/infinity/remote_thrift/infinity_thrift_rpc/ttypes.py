@@ -1152,12 +1152,13 @@ class ParsedExprType(object):
      - fusion_expr
      - search_expr
      - in_expr
+     - cast_expr
 
     """
     thrift_spec = None
 
 
-    def __init__(self, constant_expr = None, column_expr = None, function_expr = None, between_expr = None, knn_expr = None, match_sparse_expr = None, match_tensor_expr = None, match_expr = None, fusion_expr = None, search_expr = None, in_expr = None,):
+    def __init__(self, constant_expr = None, column_expr = None, function_expr = None, between_expr = None, knn_expr = None, match_sparse_expr = None, match_tensor_expr = None, match_expr = None, fusion_expr = None, search_expr = None, in_expr = None, cast_expr = None,):
         self.constant_expr = constant_expr
         self.column_expr = column_expr
         self.function_expr = function_expr
@@ -1169,6 +1170,7 @@ class ParsedExprType(object):
         self.fusion_expr = fusion_expr
         self.search_expr = search_expr
         self.in_expr = in_expr
+        self.cast_expr = cast_expr
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1245,6 +1247,12 @@ class ParsedExprType(object):
                     self.in_expr.read(iprot)
                 else:
                     iprot.skip(ftype)
+            elif fid == 12:
+                if ftype == TType.STRUCT:
+                    self.cast_expr = CastExpr()
+                    self.cast_expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1299,6 +1307,10 @@ class ParsedExprType(object):
         if self.in_expr is not None:
             oprot.writeFieldBegin('in_expr', TType.STRUCT, 11)
             self.in_expr.write(oprot)
+            oprot.writeFieldEnd()
+        if self.cast_expr is not None:
+            oprot.writeFieldBegin('cast_expr', TType.STRUCT, 12)
+            self.cast_expr.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -3219,6 +3231,78 @@ class InExpr(object):
         if self.in_type is not None:
             oprot.writeFieldBegin('in_type', TType.BOOL, 3)
             oprot.writeBool(self.in_type)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class CastExpr(object):
+    """
+    Attributes:
+     - expr
+     - data_type
+
+    """
+    thrift_spec = None
+
+
+    def __init__(self, expr = None, data_type = None,):
+        self.expr = expr
+        self.data_type = data_type
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.expr = ParsedExpr()
+                    self.expr.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRUCT:
+                    self.data_type = DataType()
+                    self.data_type.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        self.validate()
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CastExpr')
+        if self.expr is not None:
+            oprot.writeFieldBegin('expr', TType.STRUCT, 1)
+            self.expr.write(oprot)
+            oprot.writeFieldEnd()
+        if self.data_type is not None:
+            oprot.writeFieldBegin('data_type', TType.STRUCT, 2)
+            self.data_type.write(oprot)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -10674,6 +10758,7 @@ ParsedExprType.thrift_spec = (
     (9, TType.STRUCT, 'fusion_expr', [FusionExpr, None], None, ),  # 9
     (10, TType.STRUCT, 'search_expr', [SearchExpr, None], None, ),  # 10
     (11, TType.STRUCT, 'in_expr', [InExpr, None], None, ),  # 11
+    (12, TType.STRUCT, 'cast_expr', [CastExpr, None], None, ),  # 12
 )
 all_structs.append(ParsedExpr)
 ParsedExpr.thrift_spec = (
@@ -10819,6 +10904,12 @@ InExpr.thrift_spec = (
     (1, TType.STRUCT, 'left_operand', [ParsedExpr, None], None, ),  # 1
     (2, TType.LIST, 'arguments', (TType.STRUCT, [ParsedExpr, None], False), None, ),  # 2
     (3, TType.BOOL, 'in_type', None, None, ),  # 3
+)
+all_structs.append(CastExpr)
+CastExpr.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'expr', [ParsedExpr, None], None, ),  # 1
+    (2, TType.STRUCT, 'data_type', [DataType, None], None, ),  # 2
 )
 all_structs.append(ColumnDef)
 ColumnDef.thrift_spec = (

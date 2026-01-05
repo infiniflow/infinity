@@ -31,6 +31,7 @@ static thread_local std::stringstream string_buffer;
 AND             { return AND; }
 AS              { return AS; }
 BETWEEN         { return BETWEEN; }
+CAST            { return CAST; }
 FALSE           { return FALSE; }
 IN              { return IN; }
 IS              { return IS; }
@@ -39,6 +40,13 @@ NOT             { return NOT; }
 NULL            { return NULLABLE; }
 OR              { return OR; }
 TRUE            { return TRUE; }
+JSON            { return JSON; }
+VARCHAR         { return VARCHAR; }
+BOOLEAN         { return BOOLEAN; }
+INTEGER         { return INTEGER; }
+INT             { return INT; }
+DOUBLE          { return DOUBLE; }
+PARSE_JSON      { return PARSE_JSON; }
 
 "=="            { return EQUAL; }
 "!="            { return NOT_EQ; }
