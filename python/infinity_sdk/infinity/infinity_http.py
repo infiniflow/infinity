@@ -41,28 +41,10 @@ def is_json_function(col_name: str) -> bool:
 
 
 def _parse_cast_target_type(cast_expr: str) -> Optional[str]:
-    """
-    Parse CAST expression and extract target dtype.
-
-    Args:
-        cast_expr: CAST expression like "CAST(c1 AS VARCHAR)" or "cast(c1 as INTEGER)"
-
-    Returns:
-        pandas dtype string or None if not a CAST expression
-
-    Examples:
-        >>> _parse_cast_target_type("CAST(c1 AS VARCHAR)")
-        'string'
-        >>> _parse_cast_target_type("cast(c1 as INTEGER)")
-        'Int32'
-        >>> _parse_cast_target_type("CAST(c1 AS DOUBLE)")
-        'Float64'
-    """
     if not cast_expr.lower().startswith("cast("):
         return None
 
-    # Extract "AS type" part using regex
-    match = re.search(r'\sAS\s+(\w+)', cast_expr, re.IGNORECASE)
+    match = re.search(r'\)\s*AS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
     if not match:
         return None
 

@@ -75,7 +75,7 @@ def function_return_type(function_name, param_type):
     if function_name == "sqrt":
         return 'Float64'
     elif function_name in ["round", "ceil", "floor"]:
-        if param_type in [dtype("int8"), dtype("int16"), dtype("int32"), dtype("int64")]:
+        if param_type in ['Int8', 'Int16', 'Int32', 'Int64']:
             return param_type
         else:
             return 'Float64'
