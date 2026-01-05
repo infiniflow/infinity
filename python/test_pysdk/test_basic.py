@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from numpy import dtype
 import pytest
 from common import common_values
 import infinity

@@ -10,7 +10,6 @@ import pandas as pd
 import polars as pl
 from polars.testing import assert_frame_equal as pl_assert_frame_equal
 from polars.testing import assert_frame_not_equal as pl_assert_frame_not_equal
-from numpy import dtype
 
 from infinity.infinity_http import infinity_http
 
