@@ -39,6 +39,53 @@ def is_json_function(col_name: str) -> bool:
     col_name_lower = col_name.lower()
     return any(col_name_lower.startswith(func) for func in json_functions)
 
+
+def _parse_cast_target_type(cast_expr: str) -> Optional[str]:
+    """
+    Parse CAST expression and extract target dtype.
+
+    Args:
+        cast_expr: CAST expression like "CAST(c1 AS VARCHAR)" or "cast(c1 as INTEGER)"
+
+    Returns:
+        pandas dtype string or None if not a CAST expression
+
+    Examples:
+        >>> _parse_cast_target_type("CAST(c1 AS VARCHAR)")
+        'string'
+        >>> _parse_cast_target_type("cast(c1 as INTEGER)")
+        'Int32'
+        >>> _parse_cast_target_type("CAST(c1 AS DOUBLE)")
+        'Float64'
+    """
+    if not cast_expr.lower().startswith("cast("):
+        return None
+
+    # Extract "AS type" part using regex
+    match = re.search(r'\sAS\s+(\w+)', cast_expr, re.IGNORECASE)
+    if not match:
+        return None
+
+    target_type = match.group(1).upper()
+
+    # Map SQL types to pandas dtypes
+    type_mapping = {
+        'VARCHAR': 'string',
+        'INTEGER': 'Int32',
+        'INT': 'Int32',
+        'BIGINT': 'Int64',
+        'TINYINT': 'Int8',
+        'SMALLINT': 'Int16',
+        'FLOAT': 'Float32',
+        'FLOAT32': 'Float32',
+        'FLOAT64': 'Float64',
+        'DOUBLE': 'Float64',
+        'BOOLEAN': 'boolean',
+        'BOOL': 'boolean',
+    }
+
+    return type_mapping.get(target_type, None)
+
 class http_network_util:
     header_dict = baseHeader
     response_dict = baseResponse
@@ -1190,11 +1237,24 @@ class table_http_result:
 
         df_type = {}
         for k in df_dict:
-            if k in col_types:  # might be object
-                df_type[k] = type_to_dtype(col_types[k])
+            # Priority 1: Special columns (DISTANCE, SCORE, SIMILARITY)
             if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
                 df_type[k] = 'Float32'
-            # "(c1 + c2)", "sqrt(c1), round(c1)"
+                continue
+
+            # Priority 2: Direct table columns
+            if k in col_types:
+                df_type[k] = type_to_dtype(col_types[k])
+                continue
+
+            # Priority 3: CAST expressions - explicit type specification
+            cast_dtype = _parse_cast_target_type(k)
+            if cast_dtype is not None:
+                df_type[k] = cast_dtype
+                continue
+
+            # Priority 4: Expression parsing (function calls, arithmetic, etc.)
+            # Parse "(c1 + c2)", "sqrt(c1)", "round(c1)"
             k1 = k.replace("(", " ")
             k1 = k1.replace(")", " ")
             k1 = k1.replace("+", " ")
@@ -1204,26 +1264,41 @@ class table_http_result:
             cols = [col for col in cols if col != ""]
 
             function_name = ""
+            inferred_type = None
+
             for col in cols:
                 if col.strip() in col_types:
-                    df_type[k] = type_to_dtype(col_types[col.strip()])
-                    df_type[k] = function_return_type(function_name, df_type[k])
-                elif col.strip().isdigit() and df_type.get(k) != 'Float64':
-                    df_type[k] = 'Int32'
-                    df_type[k] = function_return_type(function_name, df_type[k])
+                    # Found a table column in the expression
+                    inferred_type = type_to_dtype(col_types[col.strip()])
+                    inferred_type = function_return_type(function_name, inferred_type)
+                    break
+                elif col.strip().isdigit():
+                    # Integer literal
+                    if inferred_type != 'Float64':
+                        inferred_type = 'Int32'
+                        inferred_type = function_return_type(function_name, inferred_type)
                 elif is_float(col.strip()):
-                    df_type[k] = 'Float64'
-                    df_type[k] = function_return_type(function_name, df_type[k])
+                    # Float literal - highest priority for literals
+                    inferred_type = 'Float64'
+                    inferred_type = function_return_type(function_name, inferred_type)
+                    break
                 elif col == "/":
-                    df_type[k] = 'Float64'
+                    # Division always results in float
+                    inferred_type = 'Float64'
                     break
                 else:
+                    # Check if it's a function name
                     function_name = col.strip().lower()
-                    if (function_name in functions):
-                        df_type[k] = function_return_type(function_name, None)
-                    if (function_name in bool_functions):
-                        df_type[k] = 'boolean'
+                    if function_name in functions and inferred_type is None:
+                        # Function with no parameters yet
+                        inferred_type = function_return_type(function_name, None)
+                    if function_name in bool_functions:
+                        inferred_type = 'boolean'
                         break
+
+            # Apply inferred type if found
+            if inferred_type is not None:
+                df_type[k] = inferred_type
 
         end_process = time.perf_counter()
         process_time = (end_process - start_process) * 1000
