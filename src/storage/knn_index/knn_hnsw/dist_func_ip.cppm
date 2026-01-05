@@ -48,8 +48,8 @@ private:
 
 public:
     PlainIPDist() : SIMDFunc(nullptr) {}
-    PlainIPDist(PlainIPDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    PlainIPDist &operator=(PlainIPDist &&other) {
+    PlainIPDist(PlainIPDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainIPDist &operator=(PlainIPDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -154,8 +154,8 @@ private:
 
 public:
     LVQIPDist() : SIMDFunc(nullptr) {}
-    LVQIPDist(LVQIPDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    LVQIPDist &operator=(LVQIPDist &&other) {
+    LVQIPDist(LVQIPDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQIPDist &operator=(LVQIPDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -219,8 +219,8 @@ private:
 
 public:
     RabitqIPDist() : SIMDFunc(nullptr) {}
-    RabitqIPDist(RabitqIPDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    RabitqIPDist &operator=(RabitqIPDist &&other) {
+    RabitqIPDist(RabitqIPDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    RabitqIPDist &operator=(RabitqIPDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
