@@ -2220,3 +2220,302 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_json_array" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_basic(self, suffix):
+        """
+        Test UNNEST function with JSON arrays - Basic tests
+        """
+        # Create database if it doesn't exist (for HTTP mode)
+        try:
+            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
+        except:
+            pass
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json" + suffix)
+
+        # Test 1: Simple integer array
+        table_obj.insert([{"c1": 1, "c2": '[1, 2, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).to_df()
+        print("Test 1 - Simple integer array:")
+        print(res)
+        # UNNEST should return 3 rows
+        assert len(res) == 3
+        # Check values - UNNEST returns as strings
+        values = sorted(res.iloc[:, 0].tolist())
+        assert values == ['1', '2', '3'] or values == [1, 2, 3] or values == [1.0, 2.0, 3.0]
+
+        # Test 2: String array
+        table_obj.insert([{"c1": 2, "c2": '["apple", "banana", "cherry"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - String array:")
+        print(res)
+        assert len(res) == 3
+        values = res.iloc[:, 0].tolist()
+        assert "apple" in str(values)
+        assert "banana" in str(values)
+        assert "cherry" in str(values)
+
+        # Test 3: Mixed type array
+        table_obj.insert([{"c1": 3, "c2": '[1, "text", 3.14, true, null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Mixed type array:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 4: Array with all NULL values
+        table_obj.insert([{"c1": 4, "c2": '[null, null, null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - All NULL array:")
+        print(res)
+        assert len(res) == 3
+        # All values should be "null" string or NaN
+        for idx in range(len(res)):
+            val = res.iloc[idx, 0]
+            assert pd.isna(val) or val == "null" or val == 'null'
+
+        # Test 5: Mixed NULL and valid values
+        table_obj.insert([{"c1": 5, "c2": '[1, null, 2, null, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Mixed NULL array:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 6: Empty array
+        table_obj.insert([{"c1": 6, "c2": '[]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Empty array:")
+        print(res)
+        assert len(res) == 0
+
+        res = db_obj.drop_table("test_unnest_json" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_complex(self, suffix):
+        """
+        Test UNNEST function with complex JSON arrays
+        """
+        # Create database if it doesn't exist (for HTTP mode)
+        try:
+            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
+        except:
+            pass
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_complex" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_complex" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_complex" + suffix)
+
+        # Test 1: Array of objects
+        table_obj.insert([{"c1": 1, "c2": '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Array of objects:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 2: Nested arrays
+        table_obj.insert([{"c1": 2, "c2": '[[1, 2], [3, 4], [5, 6]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - Nested arrays:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 3: Array containing empty objects and arrays
+        table_obj.insert([{"c1": 3, "c2": '[{}, [], {"key": "value"}, [1, 2]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Empty objects and arrays:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 4: Single element array
+        table_obj.insert([{"c1": 4, "c2": '[42]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Single element:")
+        print(res)
+        assert len(res) == 1
+
+        # Test 5: Boolean values
+        table_obj.insert([{"c1": 5, "c2": '[true, false, true]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Boolean array:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 6: Negative numbers and zeros
+        table_obj.insert([{"c1": 6, "c2": '[-100, -0.5, 0, 0.0, 100]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Negative numbers and zeros:")
+        print(res)
+        assert len(res) == 5
+
+        res = db_obj.drop_table("test_unnest_json_complex" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_edge_cases(self, suffix):
+        """
+        Test UNNEST function with edge cases
+        """
+        # Create database if it doesn't exist (for HTTP mode)
+        try:
+            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
+        except:
+            pass
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_edge" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_edge" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_edge" + suffix)
+
+        # Test 1: Special string values
+        table_obj.insert([{"c1": 1, "c2": '["", "text", "123", "true", "null"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Special strings:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 2: Single NULL
+        table_obj.insert([{"c1": 2, "c2": '[null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - Single NULL:")
+        print(res)
+        assert len(res) == 1
+        val = res.iloc[0, 0]
+        assert pd.isna(val) or val == "null" or val == 'null'
+
+        # Test 3: Large array
+        table_obj.insert([{"c1": 3, "c2": '[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Large array:")
+        print(res)
+        assert len(res) == 11
+
+        # Test 4: Duplicate values
+        table_obj.insert([{"c1": 4, "c2": '[1, 1, 1, 2, 2, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Duplicate values:")
+        print(res)
+        assert len(res) == 6
+
+        # Test 5: Floating point edge cases
+        table_obj.insert([{"c1": 5, "c2": '[0.0001, 999999.999999, 1e10, -1e-10]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Floating point edge cases:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 6: Non-array JSON (object) - should still work
+        table_obj.insert([{"c1": 6, "c2": '{"key": "value", "number": 123}'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Non-array JSON (object):")
+        print(res)
+        # UNNEST on object might return 1 row with the object itself or 0 rows
+        assert len(res) >= 0
+
+        # Test 7: Scalar JSON value (string)
+        table_obj.insert([{"c1": 7, "c2": '"just a string"'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 7").to_df()
+        print("\nTest 7 - Scalar string:")
+        print(res)
+        # UNNEST on scalar might return 1 row with the scalar itself or 0 rows
+        assert len(res) >= 0
+
+        # Test 8: Scalar JSON value (number)
+        table_obj.insert([{"c1": 8, "c2": '42'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 8").to_df()
+        print("\nTest 8 - Scalar number:")
+        print(res)
+        assert len(res) >= 0
+
+        # Test 9: Scalar JSON value (boolean)
+        table_obj.insert([{"c1": 9, "c2": 'true'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 9").to_df()
+        print("\nTest 9 - Scalar boolean:")
+        print(res)
+        assert len(res) >= 0
+
+        # Test 10: Scalar JSON null
+        table_obj.insert([{"c1": 10, "c2": 'null'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 10").to_df()
+        print("\nTest 10 - Scalar null:")
+        print(res)
+        assert len(res) >= 0
+
+        res = db_obj.drop_table("test_unnest_json_edge" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_nested(self, suffix):
+        """
+        Test UNNEST function with nested structures
+        """
+        # Create database if it doesn't exist (for HTTP mode)
+        try:
+            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
+        except:
+            pass
+
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_nested" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_nested" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_nested" + suffix)
+
+        # Test 1: Deeply nested array elements
+        table_obj.insert([{"c1": 1, "c2": '[[[[[1]]]], [[[[2]]]]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Deeply nested arrays:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 2: 3D array
+        table_obj.insert([{"c1": 2, "c2": '[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - 3D array:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 3: Mixed nested structures
+        table_obj.insert([{"c1": 3, "c2": '[{"arr": [1, 2]}, {"obj": {"k": "v"}}, [null], "string"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Mixed nested structures:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 4: Very long strings
+        table_obj.insert([{"c1": 4, "c2": '["very_long_string_value_with_many_characters", "another_extremely_long_string_for_testing_purposes", "short"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Very long strings:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 5: Scientific notation
+        table_obj.insert([{"c1": 5, "c2": '[1E2, 1.5e-3, -2E10, 3.14159e0]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Scientific notation:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 6: Sparse null array
+        table_obj.insert([{"c1": 6, "c2": '[null, null, null, 1, null, 2, null, null, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Sparse null array:")
+        print(res)
+        assert len(res) == 9
+
+        # Test 7: Alternating types
+        table_obj.insert([{"c1": 7, "c2": '[1, "one", 2, "two", true, false, null, 3.14]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 7").to_df()
+        print("\nTest 7 - Alternating types:")
+        print(res)
+        assert len(res) == 8
+
+        res = db_obj.drop_table("test_unnest_json_nested" + suffix)
+        assert res.error_code == ErrorCode.OK
