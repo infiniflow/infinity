@@ -402,16 +402,6 @@ public:
     static This Make(size_t origin_dim) { return This(origin_dim); }
     static This Make(size_t origin_dim, bool normalize) { return This(origin_dim); }
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t origin_dim;
-        file_handle.Read(&origin_dim, sizeof(origin_dim));
-        This meta(origin_dim);
-        size_t dim = meta.dim_;
-        file_handle.Read(meta.rom_.get(), dim * dim * sizeof(DataType));
-        file_handle.Read(meta.rot_centroid_.get(), dim * sizeof(DataType));
-        return meta;
-    }
-
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);
         This meta(origin_dim);

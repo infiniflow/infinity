@@ -55,12 +55,6 @@ public:
 
     void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t dim;
-        file_handle.Read(&dim, sizeof(dim));
-        return This(dim);
-    }
-
     static This LoadFromPtr(const char *&ptr) {
         size_t dim = ReadBufAdv<size_t>(ptr);
         return This(dim);

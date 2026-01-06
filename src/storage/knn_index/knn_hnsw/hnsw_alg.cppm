@@ -513,18 +513,6 @@ public:
         return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
-    static std::unique_ptr<KnnHnsw> Load(LocalFileHandle &file_handle) {
-        size_t M;
-        file_handle.Read(&M, sizeof(M));
-        size_t ef_construction;
-        file_handle.Read(&ef_construction, sizeof(ef_construction));
-
-        auto data_store = DataStore::Load(file_handle);
-        Distance distance(data_store.dim());
-
-        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
-    }
-
     static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
         auto *buffer = static_cast<char *>(m_mmap);
         const char *ptr = buffer;

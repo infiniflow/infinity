@@ -82,10 +82,10 @@ public:
 
 public:
     LVQVecStoreMetaBase() : dim_(0), compress_data_size_(0), normalize_(false) {}
-    LVQVecStoreMetaBase(This &&other)
+    LVQVecStoreMetaBase(This &&other) noexcept
         : dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)), mean_(std::move(other.mean_)),
           global_cache_(std::exchange(other.global_cache_, GlobalCacheType())), normalize_(other.normalize_) {}
-    LVQVecStoreMetaBase &operator=(This &&other) {
+    LVQVecStoreMetaBase &operator=(This &&other) noexcept {
         if (this != &other) {
             dim_ = std::exchange(other.dim_, 0);
             compress_data_size_ = std::exchange(other.compress_data_size_, 0);
@@ -188,7 +188,7 @@ protected:
     ArrayPtr<MeanType, OwnMem> mean_;
     GlobalCacheType global_cache_;
 
-    bool normalize_{false};
+    bool normalize_{};
 
 public:
     void Dump(std::ostream &os) const {
@@ -226,17 +226,6 @@ public:
         This ret(dim);
         ret.normalize_ = normalize;
         return ret;
-    }
-
-    static This Load(LocalFileHandle &file_handle) {
-        size_t dim;
-        file_handle.Read(&dim, sizeof(dim));
-        This meta(dim);
-        file_handle.Read(meta.mean_.get(), sizeof(MeanType) * dim);
-        if constexpr (!std::is_same_v<GlobalCacheType, std::tuple<>>) {
-            file_handle.Read(&meta.global_cache_, sizeof(GlobalCacheType));
-        }
-        return meta;
     }
 
     static This LoadFromPtr(const char *&ptr) {

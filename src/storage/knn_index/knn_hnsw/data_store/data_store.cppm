@@ -187,34 +187,6 @@ public:
         Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
     }
 
-    static This Load(LocalFileHandle &file_handle, size_t max_chunk_n = 0) {
-        size_t chunk_size;
-        file_handle.Read(&chunk_size, sizeof(chunk_size));
-        size_t max_chunk_n1;
-        file_handle.Read(&max_chunk_n1, sizeof(max_chunk_n1));
-        if (max_chunk_n == 0) {
-            max_chunk_n = max_chunk_n1;
-        }
-        assert(max_chunk_n >= max_chunk_n1);
-
-        size_t cur_vec_num;
-        file_handle.Read(&cur_vec_num, sizeof(cur_vec_num));
-        VecStoreMeta vec_store_meta = VecStoreMeta::Load(file_handle);
-        GraphStoreMeta graph_store_meta = GraphStoreMeta::Load(file_handle);
-
-        This ret = This(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
-        ret.cur_vec_num_ = cur_vec_num;
-
-        size_t mem_usage = 0;
-        auto [chunk_num, last_chunk_size] = ret.ChunkInfo(cur_vec_num);
-        for (size_t i = 0; i < chunk_num; ++i) {
-            size_t cur_chunk_size = (i < chunk_num - 1) ? chunk_size : last_chunk_size;
-            ret.inners_[i] = Inner::Load(file_handle, cur_chunk_size, chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
-        }
-        ret.mem_usage_.store(mem_usage);
-        return ret;
-    }
-
     static This LoadFromPtr(const char *&ptr) {
         size_t cur_vec_num = ReadBufAdv<size_t>(ptr);
         VecStoreMeta vec_store_meta = VecStoreMeta::LoadFromPtr(ptr);
@@ -634,19 +606,6 @@ public:
         auto vec_store_inner = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage);
         auto graph_store_inner = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage);
         return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
-    }
-
-    static This Load(LocalFileHandle &file_handle,
-                     size_t cur_vec_num,
-                     size_t chunk_size,
-                     VecStoreMeta &vec_store_meta,
-                     GraphStoreMeta &graph_store_meta,
-                     size_t &mem_usage) {
-        auto vec_store_inner = VecStoreInner::Load(file_handle, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
-        auto graph_store_iner = GraphStoreInner::Load(file_handle, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
-        This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_iner));
-        file_handle.Read(ret.labels_.get(), sizeof(LabelType) * cur_vec_num);
-        return ret;
     }
 
     static This LoadFromPtr(const char *&ptr,

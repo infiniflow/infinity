@@ -45,12 +45,6 @@ public:
 
     void Save(LocalFileHandle &file_handle) const { file_handle.Append(&max_dim_, sizeof(max_dim_)); }
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t max_dim;
-        file_handle.Read(&max_dim, sizeof(max_dim));
-        return This(max_dim);
-    }
-
     // Get size of vector in search
     size_t GetVecSizeInBytes() const { return sizeof(DataType) * max_dim_; }
 

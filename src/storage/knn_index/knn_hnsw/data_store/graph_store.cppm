@@ -79,21 +79,6 @@ public:
         file_handle.Append(&enterpoint_, sizeof(enterpoint_));
     }
 
-    static GraphStoreMeta Load(LocalFileHandle &file_handle) {
-        size_t Mmax0, Mmax;
-        file_handle.Read(&Mmax0, sizeof(Mmax0));
-        file_handle.Read(&Mmax, sizeof(Mmax));
-
-        GraphStoreMeta meta(Mmax0, Mmax);
-        i32 max_layer;
-        VertexType enterpoint;
-        file_handle.Read(&max_layer, sizeof(max_layer));
-        file_handle.Read(&enterpoint, sizeof(enterpoint));
-        meta.max_layer_ = max_layer;
-        meta.enterpoint_ = enterpoint;
-        return meta;
-    }
-
     static GraphStoreMeta LoadFromPtr(const char *&ptr) {
         size_t Mmax0 = ReadBufAdv<size_t>(ptr);
         size_t Mmax = ReadBufAdv<size_t>(ptr);
