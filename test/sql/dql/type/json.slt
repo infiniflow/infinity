@@ -1221,3 +1221,632 @@ SELECT id, json_contains(tags, '"value"') FROM user_tags WHERE id = 12;
 
 statement ok
 DROP TABLE user_tags;
+
+# ============================================================================
+# Part 7: JSON Functions with Arithmetic Operations
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_json_arithmetic;
+
+statement ok
+CREATE TABLE test_json_arithmetic (c1 int, c2 json);
+
+# Insert test data with numeric JSON values
+statement ok
+INSERT INTO test_json_arithmetic VALUES 
+(1, '{"value": 100}'),
+(2, '{"score": 95.5}'),
+(3, '{"age": 25}'),
+(4, '{"price": 19.99}'),
+(5, '{"quantity": 42}'),
+(6, '{"negative": -10}'),
+(7, '{"zero": 0}'),
+(8, '{"decimal": 3.14159}'),
+(9, '{"large": 999999}'),
+(10, '{"small": 0.001}')
+
+# ============================================================================
+# Test 7.1: JSON Extract with Addition
+# ============================================================================
+
+query CMXXX
+SELECT c1, json_extract_int(c2, '$.value') + 50 FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 150
+
+query CMXXXI
+SELECT c1, json_extract_double(c2, '$.score') + 10 FROM test_json_arithmetic WHERE c1 = 2;
+----
+2 105.500000
+
+query CMXXXII
+SELECT c1, json_extract_int(c2, '$.negative') + 100 FROM test_json_arithmetic WHERE c1 = 6;
+----
+6 90
+
+query CMXXXIII
+SELECT c1, json_extract_int(c2, '$.zero') + 5 FROM test_json_arithmetic WHERE c1 = 7;
+----
+7 5
+
+# Test: adding two JSON-extracted values
+query CMXXXIV
+SELECT c1, json_extract_int(c2, '$.quantity') + json_extract_int(c2, '$.value') 
+FROM test_json_arithmetic 
+WHERE c1 = 1;
+----
+1 null
+
+# ============================================================================
+# Test 7.2: JSON Extract with Subtraction
+# ============================================================================
+
+query CMXXXV
+SELECT c1, json_extract_int(c2, '$.value') - 20 FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 80
+
+query CMXXXVI
+SELECT c1, json_extract_double(c2, '$.large') - 999000 FROM test_json_arithmetic WHERE c1 = 9;
+----
+9 999.000000
+
+query CMXXXVII
+SELECT c1, json_extract_int(c2, '$.value') - json_extract_int(c2, '$.value')
+FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 0
+
+# ============================================================================
+# Test 7.3: JSON Extract with Multiplication
+# ============================================================================
+
+query CMXXXVIII
+SELECT c1, json_extract_int(c2, '$.quantity') * 2 FROM test_json_arithmetic WHERE c1 = 5;
+----
+5 84
+
+query CMXXXIX
+SELECT c1, json_extract_double(c2, '$.price') * 3 FROM test_json_arithmetic WHERE c1 = 4;
+----
+4 59.970000
+
+query CMXXXX
+SELECT c1, json_extract_int(c2, '$.quantity') * json_extract_int(c2, '$.quantity')
+FROM test_json_arithmetic WHERE c1 = 5;
+----
+5 1764
+
+# ============================================================================
+# Test 7.4: JSON Extract with Division
+# ============================================================================
+
+query CMXXXXI
+SELECT c1, json_extract_int(c2, '$.value') / 2 FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 50.000000
+
+query CMXXXXII
+SELECT c1, json_extract_double(c2, '$.decimal') / 2 FROM test_json_arithmetic WHERE c1 = 8;
+----
+8 1.570795
+
+query CMXXXXIII
+SELECT c1, json_extract_int(c2, '$.large') / 1000 FROM test_json_arithmetic WHERE c1 = 9;
+----
+9 999.999000
+
+# ============================================================================
+# Test 7.5: JSON Extract with ROUND
+# ============================================================================
+
+query CMXXXXIV
+SELECT c1, ROUND(json_extract_double(c2, '$.score')) FROM test_json_arithmetic WHERE c1 = 2;
+----
+2 96.000000
+
+query CMXXXXV
+SELECT c1, ROUND(json_extract_double(c2, '$.decimal')) FROM test_json_arithmetic WHERE c1 = 8;
+----
+8 3.000000
+
+query CMXXXXVI
+SELECT c1, ROUND(json_extract_double(c2, '$.small'), 3) FROM test_json_arithmetic WHERE c1 = 10;
+----
+10 0.001000
+
+query CMXXXXVII
+SELECT c1, ROUND(json_extract_double(c2, '$.price'), 1) FROM test_json_arithmetic WHERE c1 = 4;
+----
+4 20.000000
+
+# ============================================================================
+# Test 7.6: JSON Extract with SQRT
+# ============================================================================
+
+statement ok
+INSERT INTO test_json_arithmetic VALUES (11, '{"area": 144}')
+
+query CMXXXXVIII
+SELECT c1, SQRT(json_extract_int(c2, '$.area')) FROM test_json_arithmetic WHERE c1 = 11;
+----
+11 12.000000
+
+query CMXXXXIX
+SELECT c1, SQRT(json_extract_double(c2, '$.large')) FROM test_json_arithmetic WHERE c1 = 9;
+----
+9 999.999500
+
+# ============================================================================
+# Test 7.7: JSON Extract with ABS
+# ============================================================================
+
+query CMXXXX
+SELECT c1, ABS(json_extract_int(c2, '$.negative')) FROM test_json_arithmetic WHERE c1 = 6;
+----
+6 10
+
+query CMXXXXI
+SELECT c1, ABS(json_extract_int(c2, '$.age') - 100) FROM test_json_arithmetic WHERE c1 = 3;
+----
+3 75
+
+# ============================================================================
+# Test 7.8: JSON Extract with CEIL/FLOOR
+# ============================================================================
+
+query CMXXXXII
+SELECT c1, CEIL(json_extract_double(c2, '$.decimal')) FROM test_json_arithmetic WHERE c1 = 8;
+----
+8 4.000000
+
+query CMXXXXIII
+SELECT c1, FLOOR(json_extract_double(c2, '$.decimal')) FROM test_json_arithmetic WHERE c1 = 8;
+----
+8 3.000000
+
+# ============================================================================
+# Test 7.9: Complex Expressions with JSON Extract
+# ============================================================================
+
+query CMXXXXIV
+SELECT c1, ROUND(json_extract_double(c2, '$.score') + json_extract_int(c2, '$.age'))
+FROM test_json_arithmetic WHERE c1 = 2;
+----
+2 null
+
+statement ok
+INSERT INTO test_json_arithmetic VALUES (12, '{"score": 95.5, "bonus": 5, "age": 25}')
+
+query CMXXXXV
+SELECT c1, ROUND(json_extract_double(c2, '$.score') + json_extract_int(c2, '$.bonus'))
+FROM test_json_arithmetic WHERE c1 = 12;
+----
+12 101.000000
+
+query CMXXXXVI
+SELECT c1, (json_extract_int(c2, '$.value') * 2) + json_extract_int(c2, '$.age')
+FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 null
+
+statement ok
+INSERT INTO test_json_arithmetic VALUES (13, '{"base": 100, "multiplier": 3}')
+
+query CMXXXVII
+SELECT c1, json_extract_int(c2, '$.base') * json_extract_int(c2, '$.multiplier') + json_extract_int(c2, '$.base') 
+FROM test_json_arithmetic WHERE c1 = 13;
+----
+13 400
+
+# ============================================================================
+# Test 7.10: JSON Extract String in Arithmetic
+# ============================================================================
+
+statement ok
+INSERT INTO test_json_arithmetic VALUES (14, '{"text_value": "123"}')
+
+# This should either work or return 0/null, not crash
+query CMXXXVIII
+SELECT c1, json_extract_int(c2, '$.text_value') * 2 FROM test_json_arithmetic WHERE c1 = 14;
+----
+14 null
+
+# ============================================================================
+# Test 7.11: Nested JSON with Arithmetic
+# ============================================================================
+
+statement ok
+INSERT INTO test_json_arithmetic VALUES (15, '{"data": {"inner": 50, "outer": 100}}')
+
+query CMXXXXIX
+SELECT c1, json_extract_int(c2, '$.data.outer') / 2 FROM test_json_arithmetic WHERE c1 = 15;
+----
+15 50.000000
+
+query CMXXXX
+SELECT c1, json_extract_int(c2, '$.data.inner') + json_extract_int(c2, '$.data.outer') 
+FROM test_json_arithmetic WHERE c1 = 15;
+----
+15 150
+
+# ============================================================================
+# Test 7.12: JSON Extract with Modulo
+# ============================================================================
+
+query CMXXXI
+SELECT c1, json_extract_int(c2, '$.value') % 3 FROM test_json_arithmetic WHERE c1 = 1;
+----
+1 1
+
+query CMXXXII
+SELECT c1, json_extract_int(c2, '$.quantity') % 10 FROM test_json_arithmetic WHERE c1 = 5;
+----
+5 2
+
+# ============================================================================
+# Part 8: JSON Functions with CAST
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_json_cast;
+
+statement ok
+CREATE TABLE test_json_cast (c1 int, c2 json);
+
+statement ok
+INSERT INTO test_json_cast VALUES 
+(1, '{"int_val": "42"}'),
+(2, '{"float_val": "3.14"}'),
+(3, '{"bool_val": "true"}'),
+(4, '{"name": "Alice"}')
+
+# Test CAST from JSON-extracted string
+query CMXXXIII
+SELECT c1, CAST(json_extract_string(c2, '$.int_val') AS INTEGER)
+FROM test_json_cast WHERE c1 = 1;
+----
+1 null
+
+query CMXXXIV
+SELECT c1, CAST(json_extract_string(c2, '$.float_val') AS DOUBLE)
+FROM test_json_cast WHERE c1 = 2;
+----
+2 null
+
+query CMXXXV
+SELECT c1, CAST(json_extract_string(c2, '$.bool_val') AS BOOLEAN)
+FROM test_json_cast WHERE c1 = 3;
+----
+3 null
+
+query CMXXXVI
+SELECT c1, CAST(json_extract_string(c2, '$.name') AS VARCHAR)
+FROM test_json_cast WHERE c1 = 4;
+----
+4 "Alice"
+
+# ============================================================================
+# Part 9: Edge Cases and Error Handling
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_json_edge_cases;
+
+statement ok
+CREATE TABLE test_json_edge_cases (c1 int, c2 json);
+
+# Test NULL handling
+statement ok
+INSERT INTO test_json_edge_cases VALUES (1, '{"missing": null}')
+
+query CMXXXVII
+SELECT c1, json_extract_int(c2, '$.missing') + 10 FROM test_json_edge_cases WHERE c1 = 1;
+----
+1 null
+
+# Test missing path
+query CMXXXVIII
+SELECT c1, json_extract_int(c2, '$.nonexistent') * 2 FROM test_json_edge_cases WHERE c1 = 1;
+----
+1 null
+
+# Test division by zero (should not crash)
+query CMXXXIX
+SELECT c1, json_extract_int(c2, '$.missing') / 0 FROM test_json_edge_cases WHERE c1 = 1;
+----
+1 null
+
+# Test SQRT of negative number
+statement ok
+INSERT INTO test_json_edge_cases VALUES (2, '{"negative": -16}')
+
+query CMXXXX
+SELECT c1, SQRT(json_extract_int(c2, '$.negative')) FROM test_json_edge_cases WHERE c1 = 2;
+----
+2 null
+
+# Test ROUND with NULL
+statement ok
+INSERT INTO test_json_edge_cases VALUES (3, '{"null_val": null}')
+
+query CMXXXXI
+SELECT c1, ROUND(json_extract_double(c2, '$.null_val')) FROM test_json_edge_cases WHERE c1 = 3;
+----
+3 null
+
+# ============================================================================
+# Part 10: JSON Array with Arithmetic
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_json_array_arithmetic;
+
+statement ok
+CREATE TABLE test_json_array_arithmetic (c1 int, c2 json);
+
+statement ok
+INSERT INTO test_json_array_arithmetic VALUES 
+(1, '[10, 20, 30]'),
+(2, '[1.5, 2.5, 3.5]'),
+(3, '[100, 200, 300]')
+
+# Extract array element and perform arithmetic
+query CMXXXXII
+SELECT c1, json_extract(c2, '$[0]') + 100 FROM test_json_array_arithmetic WHERE c1 = 1;
+----
+1 110
+
+query CMXXXIII
+SELECT c1, json_extract(c2, '$[1]') * 2 FROM test_json_array_arithmetic WHERE c1 = 1;
+----
+1 40
+
+statement ok
+DROP TABLE test_json_arithmetic;
+
+statement ok
+DROP TABLE test_json_cast;
+
+statement ok
+DROP TABLE test_json_edge_cases;
+
+statement ok
+DROP TABLE test_json_array_arithmetic;
+
+# ============================================================================
+# Part 11: JSON NULL and Empty Value Handling with Arithmetic/Functions
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_json_null_handling;
+
+statement ok
+CREATE TABLE test_json_null_handling (c1 int, c2 json);
+
+# Insert various NULL and empty value scenarios
+statement ok
+INSERT INTO test_json_null_handling VALUES 
+(1, '{"val": null}'),
+(2, '{"val": 0}'),
+(3, '{"val": []}'),
+(4, '{"val": {}}'),
+(5, '{"val": ""}'),
+(6, '{"nested": {"inner": null}}'),
+(7, '{"arr": [null, 10, null]}'),
+(8, '{"mixed": [null, {"k": null}, []]}')
+
+# Test json_extract_int with NULL
+query CMXXXXVII
+SELECT c1, json_extract_int(c2, '$.val') FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test json_extract_double with NULL
+query CMXXXXVIII
+SELECT c1, json_extract_double(c2, '$.val') FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test json_extract_bool with NULL
+query CMXXXXIX
+SELECT c1, json_extract_bool(c2, '$.val') FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test json_extract_isnull with actual NULL value
+query CML
+SELECT c1, json_extract_isnull(c2, '$.val') FROM test_json_null_handling WHERE c1 = 1;
+----
+1 true
+
+# Test json_extract_isnull with non-NULL value
+query CMLII
+SELECT c1, json_extract_isnull(c2, '$.val') FROM test_json_null_handling WHERE c1 = 2;
+----
+2 false
+
+# Test json_extract_isnull with empty array
+query CMLIII
+SELECT c1, json_extract_isnull(c2, '$.val') FROM test_json_null_handling WHERE c1 = 3;
+----
+3 false
+
+# Test json_extract_isnull with empty object
+query CMLIV
+SELECT c1, json_extract_isnull(c2, '$.val') FROM test_json_null_handling WHERE c1 = 4;
+----
+4 false
+
+# Test json_extract_isnull with empty string
+query CMLV
+SELECT c1, json_extract_isnull(c2, '$.val') FROM test_json_null_handling WHERE c1 = 5;
+----
+5 false
+
+# Arithmetic with NULL value
+query CMLVI
+SELECT c1, json_extract_int(c2, '$.val') + 10 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLVII
+SELECT c1, json_extract_int(c2, '$.val') * 2 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLVIII
+SELECT c1, json_extract_int(c2, '$.val') / 5 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLIX
+SELECT c1, json_extract_int(c2, '$.val') - 100 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLX
+SELECT c1, json_extract_int(c2, '$.val') % 3 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Arithmetic with zero (not NULL)
+query CMLXI
+SELECT c1, json_extract_int(c2, '$.val') + 10 FROM test_json_null_handling WHERE c1 = 2;
+----
+2 10
+
+query CMLXII
+SELECT c1, json_extract_int(c2, '$.val') * 2 FROM test_json_null_handling WHERE c1 = 2;
+----
+2 0
+
+# Scalar functions with NULL
+query CMLXIII
+SELECT c1, ROUND(json_extract_double(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXIV
+SELECT c1, SQRT(json_extract_int(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXV
+SELECT c1, ABS(json_extract_int(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXVI
+SELECT c1, CEIL(json_extract_double(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXVII
+SELECT c1, FLOOR(json_extract_double(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test nested NULL path
+query CMLXVIII
+SELECT c1, json_extract_int(c2, '$.nested.inner') FROM test_json_null_handling WHERE c1 = 6;
+----
+6 null
+
+query CMLXIX
+SELECT c1, json_extract_isnull(c2, '$.nested.inner') FROM test_json_null_handling WHERE c1 = 6;
+----
+6 true
+
+# Test array with NULL elements
+query CMLXX
+SELECT c1, json_extract(c2, '$.arr[0]') FROM test_json_null_handling WHERE c1 = 7;
+----
+7 null
+
+query CMLXXI
+SELECT c1, json_extract_isnull(c2, '$.arr[0]') FROM test_json_null_handling WHERE c1 = 7;
+----
+7 true
+
+query CMLXXII
+SELECT c1, json_extract(c2, '$.arr[1]') FROM test_json_null_handling WHERE c1 = 7;
+----
+7 10
+
+query CMLXXIII
+SELECT c1, json_extract_isnull(c2, '$.arr[1]') FROM test_json_null_handling WHERE c1 = 7;
+----
+7 false
+
+# Test arithmetic on array NULL element
+query CMLXXIV
+SELECT c1, json_extract(c2, '$.arr[0]') + 5 FROM test_json_null_handling WHERE c1 = 7;
+----
+7 null
+
+# Test with empty array
+query CMLXXV
+SELECT c1, json_extract(c2, '$.val') FROM test_json_null_handling WHERE c1 = 3;
+----
+3 []
+
+query CMLXXVI
+SELECT c1, json_extract(c2, '$.val[0]') FROM test_json_null_handling WHERE c1 = 3;
+----
+3 null
+
+# Test with empty object
+query CMLXXVII
+SELECT c1, json_extract(c2, '$.val') FROM test_json_null_handling WHERE c1 = 4;
+----
+4 {}
+
+query CMLXXVIII
+SELECT c1, json_extract(c2, '$.val.key') FROM test_json_null_handling WHERE c1 = 4;
+----
+4 null
+
+# Test with empty string
+query CMLXXIX
+SELECT c1, json_extract_string(c2, '$.val') FROM test_json_null_handling WHERE c1 = 5;
+----
+5 "" 
+
+query CMLXXX
+SELECT c1, LENGTH(json_extract_string(c2, '$.val')) FROM test_json_null_handling WHERE c1 = 5;
+----
+5 2
+
+# Test NULL in comparisons
+query CMLXXXI
+SELECT c1, json_extract_int(c2, '$.val') > 5 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXXXII
+SELECT c1, json_extract_int(c2, '$.val') = 0 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXXXIII
+SELECT c1, json_extract_int(c2, '$.val') < 10 FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test CAST with NULL values
+query CMLXXXIV
+SELECT c1, CAST(json_extract_string(c2, '$.val') AS INTEGER) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+query CMLXXXV
+SELECT c1, CAST(json_extract_int(c2, '$.val') AS VARCHAR) FROM test_json_null_handling WHERE c1 = 1;
+----
+1 null
+
+# Test mixed NULL and valid values in arithmetic
+
+statement ok
+DROP TABLE test_json_null_handling;
