@@ -2222,15 +2222,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_select_unnest_json_basic(self, suffix):
-        """
-        Test UNNEST function with JSON arrays - Basic tests
-        """
-        # Create database if it doesn't exist (for HTTP mode)
-        try:
-            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
-        except:
-            pass
-
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_unnest_json" + suffix, ConflictType.Ignore)
         db_obj.create_table("test_unnest_json" + suffix,
@@ -2296,15 +2287,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_select_unnest_json_complex(self, suffix):
-        """
-        Test UNNEST function with complex JSON arrays
-        """
-        # Create database if it doesn't exist (for HTTP mode)
-        try:
-            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
-        except:
-            pass
-
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_unnest_json_complex" + suffix, ConflictType.Ignore)
         db_obj.create_table("test_unnest_json_complex" + suffix,
@@ -2358,15 +2340,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_select_unnest_json_edge_cases(self, suffix):
-        """
-        Test UNNEST function with edge cases
-        """
-        # Create database if it doesn't exist (for HTTP mode)
-        try:
-            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
-        except:
-            pass
-
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_unnest_json_edge" + suffix, ConflictType.Ignore)
         db_obj.create_table("test_unnest_json_edge" + suffix,
@@ -2452,15 +2425,6 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     def test_select_unnest_json_nested(self, suffix):
-        """
-        Test UNNEST function with nested structures
-        """
-        # Create database if it doesn't exist (for HTTP mode)
-        try:
-            self.infinity_obj.create_database("default_db", ConflictType.Ignore)
-        except:
-            pass
-
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_unnest_json_nested" + suffix, ConflictType.Ignore)
         db_obj.create_table("test_unnest_json_nested" + suffix,
