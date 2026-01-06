@@ -185,8 +185,8 @@ public:
     using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
     using QueryVecType = const DataType *;
     using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
-    using StoreType = typename MetaType::StoreType;
-    using QueryType = typename MetaType::QueryType;
+    using StoreType = MetaType::StoreType;
+    using QueryType = MetaType::QueryType;
     using Distance = std::conditional_t<LSG, LVQL2LSGDist<DataType, CompressType, LVQCacheType>, LVQL2Dist<DataType, CompressType>>;
 
     static constexpr bool HasOptimize = true;
@@ -237,8 +237,8 @@ public:
     using Inner = RabitqVecStoreInner<DataType, OwnMem>;
     using QueryVecType = const DataType *;
     using MetaType = RabitqVecStoreMetaType<DataType>;
-    using StoreType = typename MetaType::StoreType;
-    using QueryType = typename MetaType::QueryType;
+    using StoreType = MetaType::StoreType;
+    using QueryType = MetaType::QueryType;
     using Distance = std::conditional_t<LSG, RabitqCosLSGDist<DataType>, RabitqCosDist<DataType>>;
 
     static constexpr bool HasOptimize = true;

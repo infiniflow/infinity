@@ -69,13 +69,19 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
                            bool &prepare_success,
                            const FileWorkerSaveCtx &ctx) {
     std::unique_lock l(mutex_);
-    data->SaveToPtr(*file_handle);
 
     auto fd = file_handle->fd();
-    mmap_size_ = file_handle->FileSize();
+    mmap_size_ = data->CalcSize();
+    ftruncate(fd, mmap_size_);
+
     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+
+    size_t offset{};
+    data->SaveToPtr(mmap_, offset);
+
+    auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    cache_manager.Set(*rel_file_path_, data, data->MemUsage());
+    cache_manager.Set(path, data, data->MemUsage());
     prepare_success = true;
     return true;
 }
@@ -90,14 +96,13 @@ void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<Lo
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
         data = HnswHandler::Make(index_base_.get(), column_def_);
-        auto fd = file_handle->fd();
-
         if (!mmap_) {
             mmap_size_ = file_handle->FileSize();
+            auto fd = file_handle->fd();
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
         }
-        data->LoadFromPtr(mmap_, mmap_size_, *file_handle, file_size);
-        cache_manager.Set(*rel_file_path_, data, data->MemUsage());
+        data->LoadFromPtr(mmap_, mmap_size_, file_size);
+        cache_manager.Set(path, data, data->MemUsage());
     }
 }
 
