@@ -53,7 +53,7 @@ public:
     // Get size of vector in search
     size_t GetVecSizeInBytes() const { return sizeof(DataType) * dim_; }
 
-    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
+    void SaveToPtr(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
 
     static This LoadFromPtr(const char *&ptr) {
         size_t dim = ReadBufAdv<size_t>(ptr);

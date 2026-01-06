@@ -112,7 +112,7 @@ private:
 
 public:
     DataStore() = default;
-    DataStore(DataStore &&other) : Base(std::move(other)) {
+    DataStore(DataStore &&other) noexcept : Base(std::move(other)) {
         chunk_size_ = std::exchange(other.chunk_size_, 0);
         max_chunk_n_ = std::exchange(other.max_chunk_n_, 0);
         chunk_shift_ = std::exchange(other.chunk_shift_, 0);
@@ -120,7 +120,7 @@ public:
         inners_ = std::exchange(other.inners_, nullptr);
         mem_usage_ = other.mem_usage_.exchange(0);
     }
-    DataStore &operator=(DataStore &&other) {
+    DataStore &operator=(DataStore &&other) noexcept {
         if (this != &other) {
             Base::operator=(std::move(other));
             chunk_size_ = std::exchange(other.chunk_size_, 0);
@@ -160,28 +160,12 @@ public:
         return ret;
     }
 
-    void Save(LocalFileHandle &file_handle) const {
-        size_t cur_vec_num = this->cur_vec_num();
-        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
-
-        file_handle.Append(&chunk_size_, sizeof(chunk_size_));
-        file_handle.Append(&max_chunk_n_, sizeof(max_chunk_n_));
-
-        file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
-        this->vec_store_meta_.Save(file_handle);
-        this->graph_store_meta_.Save(file_handle, cur_vec_num);
-        for (size_t i = 0; i < chunk_num; ++i) {
-            size_t chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
-            inners_[i].Save(file_handle, chunk_size, this->vec_store_meta_, this->graph_store_meta_);
-        }
-    }
-
     void SaveToPtr(LocalFileHandle &file_handle) const {
         size_t cur_vec_num = this->cur_vec_num();
 
         file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
-        this->vec_store_meta_.Save(file_handle);
-        this->graph_store_meta_.Save(file_handle, cur_vec_num);
+        this->vec_store_meta_.SaveToPtr(file_handle);
+        this->graph_store_meta_.SaveToPtr(file_handle, cur_vec_num);
 
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
         Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);

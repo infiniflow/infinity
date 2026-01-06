@@ -167,11 +167,11 @@ public:
 
 public:
     RabitqVecStoreMetaBase() : origin_dim_(0), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
-    RabitqVecStoreMetaBase(This &&other)
+    RabitqVecStoreMetaBase(This &&other) noexcept
         : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), rot_centroid_(std::move(other.rot_centroid_)),
           dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
           compress_query_size_(std::exchange(other.compress_query_size_, 0)) {}
-    RabitqVecStoreMetaBase &operator=(This &&other) {
+    RabitqVecStoreMetaBase &operator=(This &&other) noexcept {
         if (this != &other) {
             origin_dim_ = std::exchange(other.origin_dim_, 0);
             rom_ = std::move(other.rom_);
@@ -183,7 +183,7 @@ public:
         return *this;
     }
 
-    void Save(LocalFileHandle &file_handle) const {
+    void SaveToPtr(LocalFileHandle &file_handle) const {
         file_handle.Append(&origin_dim_, sizeof(origin_dim_));
         file_handle.Append(rom_.get(), sizeof(DataType) * dim_ * dim_);
         file_handle.Append(rot_centroid_.get(), sizeof(DataType) * dim_);

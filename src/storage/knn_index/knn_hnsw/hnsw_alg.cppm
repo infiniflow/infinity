@@ -88,12 +88,6 @@ public:
 
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
-    void Save(LocalFileHandle &file_handle) const {
-        file_handle.Append(&M_, sizeof(M_));
-        file_handle.Append(&ef_construction_, sizeof(ef_construction_));
-        data_store_.Save(file_handle);
-    }
-
     void SaveToPtr(LocalFileHandle &file_handle) const {
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));

@@ -43,7 +43,7 @@ public:
     static This Make(size_t max_dim) { return This(max_dim); }
     static This Make(size_t max_dim, bool) { return This(max_dim); }
 
-    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&max_dim_, sizeof(max_dim_)); }
+    void SaveToPtr(LocalFileHandle &file_handle) const { file_handle.Append(&max_dim_, sizeof(max_dim_)); }
 
     // Get size of vector in search
     size_t GetVecSizeInBytes() const { return sizeof(DataType) * max_dim_; }

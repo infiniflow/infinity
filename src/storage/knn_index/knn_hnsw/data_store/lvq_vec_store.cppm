@@ -101,7 +101,7 @@ public:
     // Get size of vector in search
     size_t GetVecSizeInBytes() const { return compress_data_size_; }
 
-    void Save(LocalFileHandle &file_handle) const {
+    void SaveToPtr(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));
         file_handle.Append(mean_.get(), sizeof(MeanType) * dim_);
         if constexpr (!std::same_as<GlobalCacheType, std::tuple<>>) {

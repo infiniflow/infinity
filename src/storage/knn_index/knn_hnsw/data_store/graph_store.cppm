@@ -71,7 +71,7 @@ public:
 
     size_t GetSizeInBytes() const { return sizeof(Mmax0_) + sizeof(Mmax_) + sizeof(max_layer_) + sizeof(enterpoint_); }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num) const {
+    void SaveToPtr(LocalFileHandle &file_handle, size_t cur_vec_num) const {
         file_handle.Append(&Mmax0_, sizeof(Mmax0_));
         file_handle.Append(&Mmax_, sizeof(Mmax_));
 
