@@ -25,6 +25,7 @@ import :graph_store;
 import :infinity_exception;
 import :data_store_util;
 import :plain_vec_store;
+import :utility;
 
 import std;
 
@@ -160,15 +161,33 @@ public:
         return ret;
     }
 
-    void SaveToPtr(LocalFileHandle &file_handle) const {
+    size_t CalcSize() const {
         size_t cur_vec_num = this->cur_vec_num();
 
-        file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
-        this->vec_store_meta_.SaveToPtr(file_handle);
-        this->graph_store_meta_.SaveToPtr(file_handle, cur_vec_num);
+        size_t ret{};
+
+        ret += sizeof(cur_vec_num);
+
+        ret += this->vec_store_meta_.CalcSize();
+        ret += this->graph_store_meta_.CalcSize(cur_vec_num);
 
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
-        Inner::SaveToPtr(file_handle, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
+        ret += Inner::CalcSize(inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        size_t cur_vec_num = this->cur_vec_num();
+
+        // AlignOffset<decltype(cur_vec_num)>(offset);
+        std::memcpy((char *)mmap_p + offset, &cur_vec_num, sizeof(cur_vec_num));
+        offset += sizeof(cur_vec_num);
+
+        this->vec_store_meta_.SaveToPtr(mmap_p, offset);
+        this->graph_store_meta_.SaveToPtr(mmap_p, offset, cur_vec_num);
+
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+        Inner::SaveToPtr(mmap_p, offset, inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
     }
 
     static This LoadFromPtr(const char *&ptr) {
@@ -492,7 +511,31 @@ public:
         file_handle.Append(this->labels_.get(), sizeof(LabelType) * cur_vec_num);
     }
 
-    static void SaveToPtr(LocalFileHandle &file_handle,
+    static size_t CalcSize(const This *inners,
+                           const VecStoreMeta &vec_store_meta,
+                           const GraphStoreMeta &graph_store_meta,
+                           size_t ck_size,
+                           size_t chunk_num,
+                           size_t last_chunk_size) {
+        size_t ret{};
+
+        std::vector<const typename GraphStoreInner::Base *> graph_store_inners;
+        graph_store_inners.reserve(chunk_num);
+        for (size_t i = 0; i < chunk_num; ++i) {
+            graph_store_inners.emplace_back(&inners[i].graph_store_inner_);
+        }
+        ret += VecStoreInner::CalcSize(vec_store_meta, ck_size, chunk_num, last_chunk_size);
+        ret += GraphStoreInner::CalcSize(graph_store_inners, graph_store_meta, ck_size, chunk_num, last_chunk_size);
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            ret += sizeof(LabelType) * chunk_size;
+        }
+
+        return ret;
+    }
+
+    static void SaveToPtr(void *&mmap_p,
+                          size_t &offset,
                           const This *inners,
                           const VecStoreMeta &vec_store_meta,
                           const GraphStoreMeta &graph_store_meta,
@@ -507,11 +550,12 @@ public:
             vec_store_inners.emplace_back(&inners[i].vec_store_inner_);
             graph_store_inners.emplace_back(&inners[i].graph_store_inner_);
         }
-        VecStoreInner::SaveToPtr(file_handle, vec_store_inners, vec_store_meta, ck_size, chunk_num, last_chunk_size);
-        GraphStoreInner::SaveToPtr(file_handle, graph_store_inners, graph_store_meta, ck_size, chunk_num, last_chunk_size);
+        VecStoreInner::SaveToPtr(mmap_p, offset, vec_store_inners, vec_store_meta, ck_size, chunk_num, last_chunk_size);
+        GraphStoreInner::SaveToPtr(mmap_p, offset, graph_store_inners, graph_store_meta, ck_size, chunk_num, last_chunk_size);
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
-            file_handle.Append(inners[i].labels_.get(), sizeof(LabelType) * chunk_size);
+            std::memcpy((char *)mmap_p + offset, inners[i].labels_.get(), sizeof(LabelType) * chunk_size);
+            offset += sizeof(LabelType) * chunk_size;
         }
     }
 

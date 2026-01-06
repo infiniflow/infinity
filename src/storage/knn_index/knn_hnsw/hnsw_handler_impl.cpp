@@ -403,7 +403,7 @@ void HnswHandler::Check() const {
         hnsw_);
 }
 
-void HnswHandler::SaveToPtr(LocalFileHandle &file_handle) const {
+void HnswHandler::SaveToPtr(void *&mmap_p, size_t &offset) const {
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -412,13 +412,34 @@ void HnswHandler::SaveToPtr(LocalFileHandle &file_handle) const {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index->SaveToPtr(file_handle);
+                    index->SaveToPtr(mmap_p, offset);
                 } else {
                     static_assert(true, "Invalid index type.");
                 }
             }
         },
         hnsw_);
+}
+
+size_t HnswHandler::CalcSize() const {
+    size_t ret{};
+
+    std::visit(
+        [&](auto &&index) mutable {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                static_assert(true, "Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    ret += index->CalcSize();
+                } else {
+                    static_assert(true, "Invalid index type.");
+                }
+            }
+        },
+        hnsw_);
+    return ret;
 }
 
 void HnswHandler::LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size) {

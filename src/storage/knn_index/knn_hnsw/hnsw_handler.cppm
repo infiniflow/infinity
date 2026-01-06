@@ -293,10 +293,9 @@ public:
 
 public:
     // hnsw_ data operator
-    void SaveToPtr(LocalFileHandle &file_handle) const;
-    void Load(LocalFileHandle &file_handle);
+    size_t CalcSize() const;
+    void SaveToPtr(void *&mmap_p, size_t &offset) const;
     void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
-    void LoadFromPtr(LocalFileHandle &file_handle, const char *ptr, size_t size);
     void Build(VertexType vertex_i);
     void Optimize();
     void CompressToLVQ();

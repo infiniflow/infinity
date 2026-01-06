@@ -88,10 +88,26 @@ public:
 
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
-    void SaveToPtr(LocalFileHandle &file_handle) const {
-        file_handle.Append(&M_, sizeof(M_));
-        file_handle.Append(&ef_construction_, sizeof(ef_construction_));
-        data_store_.SaveToPtr(file_handle);
+    size_t CalcSize() const {
+        size_t ret{};
+
+        ret += sizeof(M_);
+        ret += sizeof(ef_construction_);
+        ret += data_store_.CalcSize();
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        // AlignOffset<decltype(M_)>(offset);
+        std::memcpy((char *)mmap_p + offset, &M_, sizeof(M_));
+        offset += sizeof(M_);
+
+        // AlignOffset<decltype(ef_construction_)>(offset);
+        std::memcpy((char *)mmap_p + offset, &ef_construction_, sizeof(ef_construction_));
+        offset += sizeof(ef_construction_);
+
+        data_store_.SaveToPtr(mmap_p, offset);
     }
 
 protected:

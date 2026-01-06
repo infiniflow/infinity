@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
 #include <random>
 
 #include <common/simd/simd_functions.h>
@@ -183,10 +182,25 @@ public:
         return *this;
     }
 
-    void SaveToPtr(LocalFileHandle &file_handle) const {
-        file_handle.Append(&origin_dim_, sizeof(origin_dim_));
-        file_handle.Append(rom_.get(), sizeof(DataType) * dim_ * dim_);
-        file_handle.Append(rot_centroid_.get(), sizeof(DataType) * dim_);
+    size_t CalcSize() const {
+        size_t ret{};
+
+        ret += sizeof(origin_dim_);
+        ret += sizeof(DataType) * dim_ * dim_;
+        ret += sizeof(DataType) * dim_;
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        std::memcpy((char *)mmap_p + offset, &origin_dim_, sizeof(origin_dim_));
+        offset += sizeof(origin_dim_);
+
+        std::memcpy((char *)mmap_p + offset, rom_.get(), sizeof(DataType) * dim_ * dim_);
+        offset += sizeof(DataType) * dim_ * dim_;
+
+        std::memcpy((char *)mmap_p + offset, rot_centroid_.get(), sizeof(DataType) * dim_);
+        offset += sizeof(DataType) * dim_;
     }
 
     QueryType MakeQuery(const DataType *vec) const {
@@ -513,11 +527,19 @@ public:
 
     size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
-        file_handle.Append(ptr_.get(), cur_vec_num * meta.compress_data_size());
+    static size_t CalcSize(const Meta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+        size_t ret{};
+
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            ret += chunk_size * meta.compress_data_size();
+        }
+
+        return ret;
     }
 
-    static void SaveToPtr(LocalFileHandle &file_handle,
+    static void SaveToPtr(void *&mmap_p,
+                          size_t &offset,
                           const std::vector<const This *> &inners,
                           const Meta &meta,
                           size_t ck_size,
@@ -525,7 +547,9 @@ public:
                           size_t last_chunk_size) {
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
-            file_handle.Append(inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
+
+            std::memcpy((char *)mmap_p + offset, inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
+            offset += chunk_size * meta.compress_data_size();
         }
     }
 
