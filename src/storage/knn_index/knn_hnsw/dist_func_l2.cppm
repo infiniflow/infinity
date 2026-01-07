@@ -51,8 +51,8 @@ private:
 
 public:
     PlainL2Dist() : SIMDFunc(nullptr) {}
-    PlainL2Dist(PlainL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    PlainL2Dist &operator=(PlainL2Dist &&other) {
+    PlainL2Dist(PlainL2Dist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainL2Dist &operator=(PlainL2Dist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -148,8 +148,8 @@ private:
 
 public:
     LVQL2Dist() : SIMDFunc(nullptr) {}
-    LVQL2Dist(LVQL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    LVQL2Dist &operator=(LVQL2Dist &&other) {
+    LVQL2Dist(LVQL2Dist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQL2Dist &operator=(LVQL2Dist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -211,8 +211,8 @@ private:
 
 public:
     RabitqL2Dist() : SIMDFunc(nullptr) {}
-    RabitqL2Dist(RabitqL2Dist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    RabitqL2Dist &operator=(RabitqL2Dist &&other) {
+    RabitqL2Dist(RabitqL2Dist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    RabitqL2Dist &operator=(RabitqL2Dist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }

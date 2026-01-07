@@ -47,11 +47,11 @@ private:
 
 public:
     GraphStoreMeta() : Mmax0_(0), Mmax_(0), level0_size_(0), levelx_size_(0), max_layer_(-1), enterpoint_(-1) {}
-    GraphStoreMeta(GraphStoreMeta &&other)
+    GraphStoreMeta(GraphStoreMeta &&other) noexcept
         : Mmax0_(std::exchange(other.Mmax0_, 0)), Mmax_(std::exchange(other.Mmax_, 0)), level0_size_(std::exchange(other.level0_size_, 0)),
           levelx_size_(std::exchange(other.levelx_size_, 0)), max_layer_(std::exchange(other.max_layer_, -1)),
           enterpoint_(std::exchange(other.enterpoint_, -1)) {}
-    GraphStoreMeta &operator=(GraphStoreMeta &&other) {
+    GraphStoreMeta &operator=(GraphStoreMeta &&other) noexcept {
         Mmax0_ = std::exchange(other.Mmax0_, 0);
         Mmax_ = std::exchange(other.Mmax_, 0);
         level0_size_ = std::exchange(other.level0_size_, 0);
@@ -71,27 +71,29 @@ public:
 
     size_t GetSizeInBytes() const { return sizeof(Mmax0_) + sizeof(Mmax_) + sizeof(max_layer_) + sizeof(enterpoint_); }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num) const {
-        file_handle.Append(&Mmax0_, sizeof(Mmax0_));
-        file_handle.Append(&Mmax_, sizeof(Mmax_));
+    size_t CalcSize(size_t cur_vec_num) const {
+        size_t ret{};
 
-        file_handle.Append(&max_layer_, sizeof(max_layer_));
-        file_handle.Append(&enterpoint_, sizeof(enterpoint_));
+        ret += sizeof(Mmax0_);
+        ret += sizeof(Mmax_);
+        ret += sizeof(max_layer_);
+        ret += sizeof(enterpoint_);
+
+        return ret;
     }
 
-    static GraphStoreMeta Load(LocalFileHandle &file_handle) {
-        size_t Mmax0, Mmax;
-        file_handle.Read(&Mmax0, sizeof(Mmax0));
-        file_handle.Read(&Mmax, sizeof(Mmax));
+    void SaveToPtr(void *&mmap_p, size_t &offset, size_t cur_vec_num) const {
+        std::memcpy((char *)mmap_p + offset, &Mmax0_, sizeof(Mmax0_));
+        offset += sizeof(Mmax0_);
 
-        GraphStoreMeta meta(Mmax0, Mmax);
-        i32 max_layer;
-        VertexType enterpoint;
-        file_handle.Read(&max_layer, sizeof(max_layer));
-        file_handle.Read(&enterpoint, sizeof(enterpoint));
-        meta.max_layer_ = max_layer;
-        meta.enterpoint_ = enterpoint;
-        return meta;
+        std::memcpy((char *)mmap_p + offset, &Mmax_, sizeof(Mmax_));
+        offset += sizeof(Mmax_);
+
+        std::memcpy((char *)mmap_p + offset, &max_layer_, sizeof(max_layer_));
+        offset += sizeof(max_layer_);
+
+        std::memcpy((char *)mmap_p + offset, &enterpoint_, sizeof(enterpoint_));
+        offset += sizeof(enterpoint_);
     }
 
     static GraphStoreMeta LoadFromPtr(const char *&ptr) {
@@ -154,22 +156,32 @@ public:
 
     GraphStoreInnerBase() = default;
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vertex_n, const GraphStoreMeta &meta) const {
+    static size_t
+    CalcSize(const std::vector<const This *> &inners, const GraphStoreMeta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+        size_t ret{};
+
         size_t layer_sum = 0;
-        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
-            layer_sum += GetLevel0(vertex_i, meta)->layer_n_;
+        ret += sizeof(layer_sum);
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            ret += chunk_size * meta.level0_size();
         }
-        file_handle.Append(&layer_sum, sizeof(layer_sum));
-        file_handle.Append(graph_.get(), cur_vertex_n * meta.level0_size());
-        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
-            const VertexL0 *v = GetLevel0(vertex_i, meta);
-            if (v->layer_n_) {
-                file_handle.Append(v->layers_p_, meta.levelx_size() * v->layer_n_);
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            const auto &inner = inners[i];
+            for (VertexType vertex_i = 0; vertex_i < (VertexType)chunk_size; ++vertex_i) {
+                const VertexL0 *v = inner->GetLevel0(vertex_i, meta);
+                if (v->layer_n_) {
+                    ret += meta.levelx_size() * v->layer_n_;
+                }
             }
         }
+
+        return ret;
     }
 
-    static void SaveToPtr(LocalFileHandle &file_handle,
+    static void SaveToPtr(void *&mmap_p,
+                          size_t &offset,
                           const std::vector<const This *> &inners,
                           const GraphStoreMeta &meta,
                           size_t ck_size,
@@ -193,7 +205,8 @@ public:
             }
             layers_ptrs_off_vec.emplace_back(std::move(layers_ptrs_off));
         }
-        file_handle.Append(&layer_sum, sizeof(layer_sum));
+        std::memcpy((char *)mmap_p + offset, &layer_sum, sizeof(layer_sum));
+        offset += sizeof(layer_sum);
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
             const auto &inner = inners[i];
@@ -203,7 +216,8 @@ public:
                 char *ptr = buffer.get() + ptr_off;
                 *reinterpret_cast<size_t *>(ptr) = offset;
             }
-            file_handle.Append(buffer.get(), chunk_size * meta.level0_size());
+            std::memcpy((char *)mmap_p + offset, buffer.get(), chunk_size * meta.level0_size());
+            offset += chunk_size * meta.level0_size();
         }
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
@@ -212,7 +226,8 @@ public:
                 const VertexL0 *v = inner->GetLevel0(vertex_i, meta);
                 if (v->layer_n_) {
                     char *ptr = v->layers_p_;
-                    file_handle.Append(ptr, meta.levelx_size() * v->layer_n_);
+                    std::memcpy((char *)mmap_p + offset, ptr, meta.levelx_size() * v->layer_n_);
+                    offset += meta.levelx_size() * v->layer_n_;
                 }
             }
         }

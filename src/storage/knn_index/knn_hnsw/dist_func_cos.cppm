@@ -49,8 +49,8 @@ private:
 
 public:
     PlainCosDist() : SIMDFunc(nullptr) {}
-    PlainCosDist(PlainCosDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    PlainCosDist &operator=(PlainCosDist &&other) {
+    PlainCosDist(PlainCosDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    PlainCosDist &operator=(PlainCosDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -138,8 +138,8 @@ private:
 
 public:
     LVQCosDist() : SIMDFunc(nullptr) {}
-    LVQCosDist(LVQCosDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    LVQCosDist &operator=(LVQCosDist &&other) {
+    LVQCosDist(LVQCosDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    LVQCosDist &operator=(LVQCosDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }
@@ -204,8 +204,8 @@ private:
 
 public:
     RabitqCosDist() : SIMDFunc(nullptr) {}
-    RabitqCosDist(RabitqCosDist &&other) : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
-    RabitqCosDist &operator=(RabitqCosDist &&other) {
+    RabitqCosDist(RabitqCosDist &&other) noexcept : SIMDFunc(std::exchange(other.SIMDFunc, nullptr)) {}
+    RabitqCosDist &operator=(RabitqCosDist &&other) noexcept {
         if (this != &other) {
             SIMDFunc = std::exchange(other.SIMDFunc, nullptr);
         }

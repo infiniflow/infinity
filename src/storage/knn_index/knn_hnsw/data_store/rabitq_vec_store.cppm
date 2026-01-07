@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
 #include <random>
 
 #include <common/simd/simd_functions.h>
@@ -167,11 +166,11 @@ public:
 
 public:
     RabitqVecStoreMetaBase() : origin_dim_(0), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
-    RabitqVecStoreMetaBase(This &&other)
+    RabitqVecStoreMetaBase(This &&other) noexcept
         : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), rot_centroid_(std::move(other.rot_centroid_)),
           dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
           compress_query_size_(std::exchange(other.compress_query_size_, 0)) {}
-    RabitqVecStoreMetaBase &operator=(This &&other) {
+    RabitqVecStoreMetaBase &operator=(This &&other) noexcept {
         if (this != &other) {
             origin_dim_ = std::exchange(other.origin_dim_, 0);
             rom_ = std::move(other.rom_);
@@ -183,10 +182,25 @@ public:
         return *this;
     }
 
-    void Save(LocalFileHandle &file_handle) const {
-        file_handle.Append(&origin_dim_, sizeof(origin_dim_));
-        file_handle.Append(rom_.get(), sizeof(DataType) * dim_ * dim_);
-        file_handle.Append(rot_centroid_.get(), sizeof(DataType) * dim_);
+    size_t CalcSize() const {
+        size_t ret{};
+
+        ret += sizeof(origin_dim_);
+        ret += sizeof(DataType) * dim_ * dim_;
+        ret += sizeof(DataType) * dim_;
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        std::memcpy((char *)mmap_p + offset, &origin_dim_, sizeof(origin_dim_));
+        offset += sizeof(origin_dim_);
+
+        std::memcpy((char *)mmap_p + offset, rom_.get(), sizeof(DataType) * dim_ * dim_);
+        offset += sizeof(DataType) * dim_ * dim_;
+
+        std::memcpy((char *)mmap_p + offset, rot_centroid_.get(), sizeof(DataType) * dim_);
+        offset += sizeof(DataType) * dim_;
     }
 
     QueryType MakeQuery(const DataType *vec) const {
@@ -402,16 +416,6 @@ public:
     static This Make(size_t origin_dim) { return This(origin_dim); }
     static This Make(size_t origin_dim, bool normalize) { return This(origin_dim); }
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t origin_dim;
-        file_handle.Read(&origin_dim, sizeof(origin_dim));
-        This meta(origin_dim);
-        size_t dim = meta.dim_;
-        file_handle.Read(meta.rom_.get(), dim * dim * sizeof(DataType));
-        file_handle.Read(meta.rot_centroid_.get(), dim * sizeof(DataType));
-        return meta;
-    }
-
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);
         This meta(origin_dim);
@@ -523,11 +527,19 @@ public:
 
     size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
-        file_handle.Append(ptr_.get(), cur_vec_num * meta.compress_data_size());
+    static size_t CalcSize(const Meta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+        size_t ret{};
+
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            ret += chunk_size * meta.compress_data_size();
+        }
+
+        return ret;
     }
 
-    static void SaveToPtr(LocalFileHandle &file_handle,
+    static void SaveToPtr(void *&mmap_p,
+                          size_t &offset,
                           const std::vector<const This *> &inners,
                           const Meta &meta,
                           size_t ck_size,
@@ -535,7 +547,9 @@ public:
                           size_t last_chunk_size) {
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
-            file_handle.Append(inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
+
+            std::memcpy((char *)mmap_p + offset, inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
+            offset += chunk_size * meta.compress_data_size();
         }
     }
 

@@ -43,12 +43,17 @@ public:
     static This Make(size_t max_dim) { return This(max_dim); }
     static This Make(size_t max_dim, bool) { return This(max_dim); }
 
-    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&max_dim_, sizeof(max_dim_)); }
+    size_t CalcSize() const {
+        size_t ret{};
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t max_dim;
-        file_handle.Read(&max_dim, sizeof(max_dim));
-        return This(max_dim);
+        ret += sizeof(max_dim_);
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        std::memcpy((char *)mmap_p + offset, &max_dim_, sizeof(max_dim_));
+        offset += sizeof(max_dim_);
     }
 
     // Get size of vector in search
@@ -85,12 +90,31 @@ public:
         return ret;
     }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
+    size_t CalcSize(size_t cur_vec_num, const Meta &meta) const {
+        size_t ret{};
+
         size_t nnz = 0;
         for (size_t i = 0; i < cur_vec_num; ++i) {
             nnz += vecs_[i].nnz_;
         }
-        file_handle.Append(&nnz, sizeof(nnz));
+
+        ret += sizeof(nnz);
+
+        ret += sizeof(i32) * (cur_vec_num + 1);
+        ret += sizeof(IdxType) * nnz;
+        ret += sizeof(DataType) * nnz;
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset, size_t cur_vec_num, const Meta &meta) const {
+        size_t nnz = 0;
+        for (size_t i = 0; i < cur_vec_num; ++i) {
+            nnz += vecs_[i].nnz_;
+        }
+        std::memcpy((char *)mmap_p + offset, &nnz, sizeof(nnz));
+        offset += sizeof(nnz);
+
         auto indptr = std::make_unique_for_overwrite<i32[]>(cur_vec_num + 1);
         indptr[0] = 0;
         auto indice = std::make_unique_for_overwrite<IdxType[]>(nnz);
@@ -101,9 +125,15 @@ public:
             std::copy(vec.data_.get(), vec.data_.get() + vec.nnz_, data.get() + indptr[i]);
             indptr[i + 1] = indptr[i] + vec.nnz_;
         }
-        file_handle.Append(indptr.get(), sizeof(i32) * (cur_vec_num + 1));
-        file_handle.Append(indice.get(), sizeof(IdxType) * nnz);
-        file_handle.Append(data.get(), sizeof(DataType) * nnz);
+
+        std::memcpy((char *)mmap_p + offset, indptr.get(), sizeof(i32) * (cur_vec_num + 1));
+        offset += sizeof(i32) * (cur_vec_num + 1);
+
+        std::memcpy((char *)mmap_p + offset, indice.get(), sizeof(IdxType) * nnz);
+        offset += sizeof(IdxType) * nnz;
+
+        std::memcpy((char *)mmap_p + offset, data.get(), sizeof(DataType) * nnz);
+        offset += sizeof(DataType) * nnz;
     }
 
     static This Load(LocalFileHandle &file_handle, size_t cur_vec_num, size_t max_vec_num, const Meta &meta, size_t &mem_usage) {

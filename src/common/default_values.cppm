@@ -346,7 +346,7 @@ export {
     constexpr u32 BATCH_OR_LEN = 128;
 
     constexpr int MAX_TUPLE_LENGTH = 1024;
-    constexpr size_t L1_CACHE_SIZE = 32 * KB;
+    constexpr size_t L1_DATA_CACHE_SIZE = 288 * KB;
 
     constexpr u64 DEFAULT_META_CACHE_SIZE = 8192;
 }

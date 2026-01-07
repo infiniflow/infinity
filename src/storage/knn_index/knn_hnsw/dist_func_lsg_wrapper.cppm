@@ -32,8 +32,8 @@ public:
     using RabitqDist = typename Dist::RabitqDist;
 
     LSGDistWrapper() = default;
-    LSGDistWrapper(LSGDistWrapper &&other) : avg_(std::exchange(other.avg_, nullptr)), alpha_(other.alpha_), dist_(std::move(other.dist_)) {}
-    LSGDistWrapper &operator=(LSGDistWrapper &&other) {
+    LSGDistWrapper(LSGDistWrapper &&other) noexcept : avg_(std::exchange(other.avg_, nullptr)), alpha_(other.alpha_), dist_(std::move(other.dist_)) {}
+    LSGDistWrapper &operator=(LSGDistWrapper &&other) noexcept {
         if (this != &other) {
             avg_ = std::exchange(other.avg_, nullptr);
             alpha_ = other.alpha_;
@@ -86,7 +86,7 @@ private:
     }
 
 private:
-    float *avg_ = nullptr;
+    float *avg_{};
     float alpha_ = 1.0;
     Dist dist_;
 };

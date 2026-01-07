@@ -44,13 +44,6 @@ private:
 
 public:
     PlainVecStoreMeta() : dim_(0) {}
-    // PlainVecStoreMeta(This &&other) : dim_(std::exchange(other.dim_, 0)) {}
-    // PlainVecStoreMeta &operator=(This &&other) {
-    //     if (this != &other) {
-    //         dim_ = std::exchange(other.dim_, 0);
-    //     }
-    //     return *this;
-    // }
 
     static This Make(size_t dim) { return This(dim); }
     static This Make(size_t dim, bool) { return This(dim); }
@@ -60,12 +53,17 @@ public:
     // Get size of vector in search
     size_t GetVecSizeInBytes() const { return sizeof(DataType) * dim_; }
 
-    void Save(LocalFileHandle &file_handle) const { file_handle.Append(&dim_, sizeof(dim_)); }
+    size_t CalcSize() const {
+        size_t ret{};
 
-    static This Load(LocalFileHandle &file_handle) {
-        size_t dim;
-        file_handle.Read(&dim, sizeof(dim));
-        return This(dim);
+        ret += sizeof(dim_);
+
+        return ret;
+    }
+
+    void SaveToPtr(void *&mmap_p, size_t &offset) const {
+        std::memcpy((char *)mmap_p + offset, &dim_, sizeof(dim_));
+        offset += sizeof(dim_);
     }
 
     static This LoadFromPtr(const char *&ptr) {
@@ -91,16 +89,21 @@ public:
     using Meta = PlainVecStoreMeta<OtherDataType>;
     using Base = PlainVecStoreInnerBase<OtherDataType, OwnMem>;
 
-public:
     PlainVecStoreInnerBase() = default;
 
     size_t GetSizeInBytes(size_t cur_vec_num, const Meta &meta) const { return sizeof(OtherDataType) * cur_vec_num * meta.dim(); }
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const Meta &meta) const {
-        file_handle.Append(ptr_.get(), sizeof(OtherDataType) * cur_vec_num * meta.dim());
+    static size_t CalcSize(const Meta &meta, size_t ck_size, size_t chunk_num, size_t last_chunk_size) {
+        size_t ret{};
+        for (size_t i = 0; i < chunk_num; ++i) {
+            size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            ret += sizeof(OtherDataType) * chunk_size * meta.dim();
+        }
+        return ret;
     }
 
-    static void SaveToPtr(LocalFileHandle &file_handle,
+    static void SaveToPtr(void *&mmap_p,
+                          size_t &offset,
                           const std::vector<const This *> &inners,
                           const Meta &meta,
                           size_t ck_size,
@@ -108,7 +111,8 @@ public:
                           size_t last_chunk_size) {
         for (size_t i = 0; i < chunk_num; ++i) {
             size_t chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
-            file_handle.Append(inners[i]->ptr_.get(), sizeof(OtherDataType) * chunk_size * meta.dim());
+            std::memcpy((char *)mmap_p + offset, inners[i]->ptr_.get(), sizeof(OtherDataType) * chunk_size * meta.dim());
+            offset += sizeof(OtherDataType) * chunk_size * meta.dim();
         }
     }
 

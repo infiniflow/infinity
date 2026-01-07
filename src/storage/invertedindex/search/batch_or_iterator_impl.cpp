@@ -37,9 +37,8 @@ namespace infinity {
 // Dynamic batch sizing implementation
 u32 BatchOrIterator::CalculateOptimalBatchSize(u32 num_keywords) const {
     // L1 cache size optimization: typical L1 cache is 32KB
-    const u32 l1_cache_size = 32 * 1024;
     const u32 data_per_keyword = sizeof(u32) * 2; // tf + doc_len per keyword
-    const u32 max_batch_for_cache = l1_cache_size / (data_per_keyword * num_keywords);
+    const u32 max_batch_for_cache = L1_DATA_CACHE_SIZE / (data_per_keyword * num_keywords);
 
     // Balance between cache efficiency and vectorization benefits
     // Minimum 64 for SIMD efficiency, maximum 512 to avoid excessive memory usage

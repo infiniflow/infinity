@@ -82,4 +82,10 @@ std::string TrimPath(const std::string &path) {
     return path.substr(pos + 1);
 }
 
+// template <typename T>
+// void AlignOffset(size_t &offset) {
+//     size_t align_up = [](size_t n, size_t align) { return (n + align - 1) & ~(align - 1); };
+//     offset = align_up(offset, alignof(T));
+// }
+
 } // namespace infinity
