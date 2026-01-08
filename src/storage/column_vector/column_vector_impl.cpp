@@ -2638,10 +2638,18 @@ void ColumnVector::SetArrayValue(ArrayT &target, const Value &value) {
     SetArrayValueRecursively(value, reinterpret_cast<char *>(&target));
 }
 
-bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset) {
-    if (other.data_type_->type() != LogicalType::kArray) {
-        UnrecoverableError("Attempt to unnest non-array column vector");
+bool ColumnVector::AppendUnnest(const ColumnVector &other, size_t offset, size_t &array_offset) {
+    if (other.data_type_->type() == LogicalType::kArray) {
+        return AppendUnnestArray(other, offset, array_offset);
+    } else if (other.data_type_->type() == LogicalType::kJson) {
+        return AppendUnnestJson(other, offset, array_offset);
+    } else {
+        RecoverableError(Status::NotSupport("Not supported"));
     }
+    return false;
+}
+
+bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset) {
     auto *array_info = static_cast<ArrayInfo *>(other.data_type_->type_info().get());
     if (array_info->ElemType() != *data_type_) {
         UnrecoverableError("Attempt to unnest array with different element type");
@@ -2714,6 +2722,25 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
         }
     }
     return complete;
+}
+
+bool ColumnVector::AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset) {
+    const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_.get())[row_id];
+    auto data = other.buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+    std::vector<uint8_t> parsed_bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json_info.length_);
+    auto parsed_json = JsonManager::from_bson(parsed_bson);
+    auto [total_elements, element_strings] = JsonManager::json_unnest(parsed_json);
+
+    size_t start_idx = element_offset;
+    size_t remaining_space = capacity_ - tail_index_.load();
+    size_t elements_to_append = std::min(total_elements - start_idx, remaining_space);
+    element_offset = start_idx + elements_to_append;
+
+    for (size_t idx = start_idx; idx < element_offset; ++idx) {
+        Value v = Value::MakeVarchar(element_strings[idx]);
+        this->AppendValue(v);
+    }
+    return element_offset == total_elements;
 }
 
 //////////////////////////////tensor end////////////////////////////////////
