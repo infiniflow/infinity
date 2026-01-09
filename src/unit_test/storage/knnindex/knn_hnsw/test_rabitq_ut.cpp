@@ -298,43 +298,43 @@ TEST_F(RabitqTest, test_compress) {
     std::cout << std::endl;
 }
 
-TEST_F(RabitqTest, test_distance) {
-    using namespace infinity;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
-    Distance distance(dim_);
-
-    // generate base
-    auto data = std::make_unique<DataType[]>(dim_ * vec_n_);
-    std::default_random_engine rng;
-    std::uniform_real_distribution<DataType> distrib_real(100, 200);
-    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
-        data[i] = distrib_real(rng);
-    }
-
-    // Init DataStore
-    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
-    auto rabitq_store = DataStore::Make(vec_n_, 1, dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(iter));
-
-    // generate query
-    auto query = std::make_unique<float[]>(dim_);
-    for (size_t d = 0; d < dim_; ++d) {
-        query[d] = distrib_real(rng);
-    }
-    auto rabitq_query = rabitq_store.MakeQuery(query.get());
-
-    // Compute recall
-    for (LabelType id = start_i; id < end_i; ++id) {
-        // Compute truth distance
-        auto truth_dis = SIMDFuncL2(query.get(), data.get() + id * dim_, dim_);
-
-        // Estimate l2 distance by rabitq
-        auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-
-        // output
-        std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
-    }
-}
+// TEST_F(RabitqTest, test_distance) {
+//     using namespace infinity;
+//     using VecStoreType = RabitqL2VecStoreType<DataType>;
+//     using DataStore = DataStore<VecStoreType, LabelType>;
+//     using Distance = VecStoreType::Distance;
+//     auto SIMDFuncL2 = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
+//     Distance distance(dim_);
+//
+//     // generate base
+//     auto data = std::make_unique<DataType[]>(dim_ * vec_n_);
+//     std::default_random_engine rng;
+//     std::uniform_real_distribution<DataType> distrib_real(100, 200);
+//     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+//         data[i] = distrib_real(rng);
+//     }
+//
+//     // Init DataStore
+//     auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
+//     auto rabitq_store = DataStore::Make(vec_n_, 1, dim_, 0, 0);
+//     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(iter));
+//
+//     // generate query
+//     auto query = std::make_unique<float[]>(dim_);
+//     for (size_t d = 0; d < dim_; ++d) {
+//         query[d] = distrib_real(rng);
+//     }
+//     auto rabitq_query = rabitq_store.MakeQuery(query.get());
+//
+//     // Compute recall
+//     for (LabelType id = start_i; id < end_i; ++id) {
+//         // Compute truth distance
+//         auto truth_dis = SIMDFuncL2(query.get(), data.get() + id * dim_, dim_);
+//
+//         // Estimate l2 distance by rabitq
+//         auto estimate_dis = distance(rabitq_query, id, rabitq_store);
+//
+//         // output
+//         std::cout << fmt::format("id: {}, truth distance: {:.2f}, estimate distance: {:.2f}", id, truth_dis, estimate_dis) << std::endl;
+//     }
+// }

@@ -193,7 +193,7 @@ AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, std::sh
     }
 }
 
-HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem)
+HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem)
     : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
     if (!own_mem)
         return;
@@ -212,7 +212,7 @@ HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef>
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction);
+                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction, sm);
                     if constexpr (IndexT::LSG) {
                         index->InitLSGBuilder(index_hnsw, column_def);
                     }
@@ -224,8 +224,9 @@ HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef>
         hnsw_);
 }
 
-std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
-    return std::make_unique<HnswHandler>(index_base, column_def, own_mem);
+std::unique_ptr<HnswHandler>
+HnswHandler::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem) {
+    return std::make_unique<HnswHandler>(index_base, column_def, sm, own_mem);
 }
 
 size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
@@ -542,108 +543,109 @@ void HnswHandler::CompressToRabitq() {
         hnsw_);
 }
 
-HnswIndexInMem::~HnswIndexInMem() {
-    if (own_memory_ && hnsw_handler_ != nullptr) {
-        size_t mem_usage = hnsw_handler_->MemUsage();
-        delete hnsw_handler_;
-        auto *storage = InfinityContext::instance().storage();
-        if (storage == nullptr) {
-            return;
-        }
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer != nullptr) {
-            memindex_tracer->DecreaseMemUsed(mem_usage);
-        }
-    }
-}
-
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
-    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
-
-    auto *storage = InfinityContext::instance().storage();
-    if (storage) {
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer) {
-            memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
-        }
-    }
-    return memidx;
-}
-
-std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
-    RowID begin_row_id{0, 0};
-    auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
-
-    auto *storage = InfinityContext::instance().storage();
-    if (storage != nullptr) {
-        auto *memindex_tracer = storage->memindex_tracer();
-        if (memindex_tracer != nullptr) {
-            memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
-        }
-    }
-    return memidx;
-}
-
-MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
-    auto [mem_used, row_cnt] = hnsw_handler_->GetInfo();
-    return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
-                              std::make_shared<std::string>(table_name_),
-                              std::make_shared<std::string>(db_name_),
-                              mem_used,
-                              row_cnt);
-}
-
-void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
-                                const ColumnVector &col,
-                                BlockOffset offset,
-                                BlockOffset row_count,
-                                const HnswInsertConfig &config) {
-    size_t mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
-    row_count_ += row_count;
-    IncreaseMemoryUsageBase(mem_usage);
-}
-
-void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
-    if (dump_size_ptr != nullptr) {
-        size_t dump_size = hnsw_handler_->MemUsage();
-        *dump_size_ptr = dump_size;
-    }
-
-    own_memory_ = false;
-    index_file_worker_ = std::move(index_file_worker);
-    auto hnsw_handler = std::shared_ptr<HnswHandler>(hnsw_handler_);
-
-    size_t mem_usage = hnsw_handler_->MemUsage();
-
-    auto *storage = InfinityContext::instance().storage();
-    if (storage == nullptr) {
-        return;
-    }
-    auto *memindex_tracer = storage->memindex_tracer();
-    if (memindex_tracer != nullptr) {
-        memindex_tracer->DecreaseMemUsed(mem_usage);
-    }
-
-    index_file_worker_->Write(std::move(hnsw_handler));
-}
-
-size_t
-HnswIndexInMem::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
-    return hnsw_handler_->InsertSampleVecs(sample_num, block_offset, offset, col, row_count);
-}
-
-void HnswIndexInMem::InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
-    hnsw_handler_->InsertLSAvg(block_offset, offset, col, row_count);
-}
-
-void HnswIndexInMem::SetLSGParam() { hnsw_handler_->SetLSGParam(); }
-
-size_t HnswIndexInMem::GetRowCount() const { return row_count_; }
-
-size_t HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
-
-const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
-    return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, GetSizeInBytes()};
-}
+// HnswIndexInMem::~HnswIndexInMem() {
+//     if (own_memory_ && hnsw_handler_ != nullptr) {
+//         size_t mem_usage = hnsw_handler_->MemUsage();
+//         delete hnsw_handler_;
+//         auto *storage = InfinityContext::instance().storage();
+//         if (storage == nullptr) {
+//             return;
+//         }
+//         auto *memindex_tracer = storage->memindex_tracer();
+//         if (memindex_tracer != nullptr) {
+//             memindex_tracer->DecreaseMemUsed(mem_usage);
+//         }
+//     }
+// }
+//
+// std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
+//     auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
+//
+//     auto *storage = InfinityContext::instance().storage();
+//     if (storage) {
+//         auto *memindex_tracer = storage->memindex_tracer();
+//         if (memindex_tracer) {
+//             memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+//         }
+//     }
+//     return memidx;
+// }
+//
+// std::unique_ptr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def) {
+//     RowID begin_row_id{0, 0};
+//     auto memidx = std::make_unique<HnswIndexInMem>(begin_row_id, index_base, column_def);
+//
+//     auto *storage = InfinityContext::instance().storage();
+//     if (storage != nullptr) {
+//         auto *memindex_tracer = storage->memindex_tracer();
+//         if (memindex_tracer != nullptr) {
+//             memindex_tracer->IncreaseMemoryUsage(memidx->hnsw_handler_->MemUsage());
+//         }
+//     }
+//     return memidx;
+// }
+//
+// MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
+//     auto [mem_used, row_cnt] = hnsw_handler_->GetInfo();
+//     return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),
+//                               std::make_shared<std::string>(table_name_),
+//                               std::make_shared<std::string>(db_name_),
+//                               mem_used,
+//                               row_cnt);
+// }
+//
+// void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
+//                                 const ColumnVector &col,
+//                                 BlockOffset offset,
+//                                 BlockOffset row_count,
+//                                 const HnswInsertConfig &config) {
+//     size_t mem_usage = hnsw_handler_->InsertVecs(block_offset, col, offset, row_count, config, kBuildBucketSize);
+//     row_count_ += row_count;
+//     IncreaseMemoryUsageBase(mem_usage);
+// }
+//
+// void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
+//     if (dump_size_ptr != nullptr) {
+//         size_t dump_size = hnsw_handler_->MemUsage();
+//         *dump_size_ptr = dump_size;
+//     }
+//
+//     own_memory_ = false;
+//     index_file_worker_ = std::move(index_file_worker);
+//     auto hnsw_handler = std::shared_ptr<HnswHandler>(hnsw_handler_);
+//
+//     size_t mem_usage = hnsw_handler_->MemUsage();
+//
+//     auto *storage = InfinityContext::instance().storage();
+//     if (storage == nullptr) {
+//         return;
+//     }
+//     auto *memindex_tracer = storage->memindex_tracer();
+//     if (memindex_tracer != nullptr) {
+//         memindex_tracer->DecreaseMemUsed(mem_usage);
+//     }
+//
+//     index_file_worker_->Write(hnsw_handler);
+// }
+//
+// size_t
+// HnswIndexInMem::InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count)
+// {
+//     return hnsw_handler_->InsertSampleVecs(sample_num, block_offset, offset, col, row_count);
+// }
+//
+// void HnswIndexInMem::InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count) {
+//     hnsw_handler_->InsertLSAvg(block_offset, offset, col, row_count);
+// }
+//
+// void HnswIndexInMem::SetLSGParam() { hnsw_handler_->SetLSGParam(); }
+//
+// size_t HnswIndexInMem::GetRowCount() const { return row_count_; }
+//
+// size_t HnswIndexInMem::GetSizeInBytes() const { return hnsw_handler_->GetSizeInBytes(); }
+//
+// const ChunkIndexMetaInfo HnswIndexInMem::GetChunkIndexMetaInfo() const {
+//     return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, GetSizeInBytes()};
+// }
 
 } // namespace infinity

@@ -68,11 +68,10 @@ void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, Tx
     version_file_worker_ = std::move(version_file_worker);
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
-    {
-        std::shared_ptr<BlockVersion> block_version;
-        static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
-        block_offset_end_ = block_version->GetRowCount(begin_ts_);
-    }
+
+    BlockVersion *block_version{};
+    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
+    block_offset_end_ = block_version->GetRowCount(begin_ts_);
 }
 
 bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range) {
@@ -80,7 +79,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
 
     if (block_offset_begin == block_offset_end_) {
@@ -992,6 +991,24 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
+Status NewCatalog::InitHnswChunkIndex(SegmentIndexMeta &segment_index_meta, NewTxn *new_txn, std::optional<ChunkIndexMeta> &chunk_index_meta) {
+    {
+        ChunkIndexMetaInfo chunk_info;
+        chunk_index_meta.emplace(0, segment_index_meta);
+        auto status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        auto status = segment_index_meta.AddChunkIndexID1(0, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                          NewTxn *new_txn,
                                          ChunkID chunk_id,
@@ -1112,7 +1129,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_buffer)->Read(block_version);
     {
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1129,7 +1146,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     static_cast<FileWorker *>(version_file_worker)->Read(block_version);
     {
         block_version->GetDeleteTS(offset, size, column_vector);

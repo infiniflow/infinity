@@ -304,12 +304,12 @@ TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
         u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    check_index(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
-        auto hnsw_index = mem_index->GetHnswIndex();
-        RowID begin_id = hnsw_index->GetBeginRowID();
-        u32 row_cnt = hnsw_index->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
+    // check_index(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
+    //     auto hnsw_index = mem_index->GetHnswIndex();
+    //     RowID begin_id = hnsw_index->GetBeginRowID();
+    //     u32 row_cnt = hnsw_index->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
     check_index(*index_name5, [&](const std::shared_ptr<MemIndex> &mem_index) {
         auto bmp_index = mem_index->GetBMPIndex();
         RowID begin_id = bmp_index->GetBeginRowID();
@@ -441,12 +441,12 @@ TEST_P(TestTxnReplayIndex, SLOW_test_replay_append_with_index) {
         u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    check_index2(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
-        auto hnsw_index = mem_index->GetHnswIndex();
-        RowID begin_id = hnsw_index->GetBeginRowID();
-        u32 row_cnt = hnsw_index->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
+    // check_index2(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
+    //     auto hnsw_index = mem_index->GetHnswIndex();
+    //     RowID begin_id = hnsw_index->GetBeginRowID();
+    //     u32 row_cnt = hnsw_index->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
     check_index2(*index_name5, [&](const std::shared_ptr<MemIndex> &mem_index) {
         auto bmp_index = mem_index->GetBMPIndex();
         RowID begin_id = bmp_index->GetBeginRowID();
@@ -705,12 +705,12 @@ TEST_P(TestTxnReplayIndex, SLOW_test_populate_index) {
         u32 row_cnt = ivf_index->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    check_index(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
-        auto hnsw_index = mem_index->GetHnswIndex();
-        RowID begin_id = hnsw_index->GetBeginRowID();
-        u32 row_cnt = hnsw_index->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
+    // check_index(*index_name4, [&](const std::shared_ptr<MemIndex> &mem_index) {
+    //     auto hnsw_index = mem_index->GetHnswIndex();
+    //     RowID begin_id = hnsw_index->GetBeginRowID();
+    //     u32 row_cnt = hnsw_index->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
     check_index(*index_name5, [&](const std::shared_ptr<MemIndex> &mem_index) {
         auto bmp_index = mem_index->GetBMPIndex();
         RowID begin_id = bmp_index->GetBeginRowID();

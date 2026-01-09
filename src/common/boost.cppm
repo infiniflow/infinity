@@ -22,6 +22,11 @@ module;
 #include <boost/asio/write.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/containers/containers_fwd.hpp>
+#include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/vector.hpp>
+#include <boost/interprocess/managed_mapped_file.hpp>
 #include <boost/thread.hpp>
 
 export module infinity_core:boost;
@@ -56,8 +61,20 @@ export using boost::asio::error::connection_reset;
 } // namespace asio
 } // namespace boost
 
-// export namespace boost {
-// using boost::defer_lock_t;
-// // using boost::defer_lock;
-// // using BOOST_CONSTEXPR_OR_CONST defer_lock_t defer_lock = {};
-// } // namespace boost
+export namespace boost {
+namespace interprocess {
+using boost::interprocess::allocator;
+using boost::interprocess::vector;
+// export using boost::interprocess::map;
+
+using boost::interprocess::file_mapping;
+using boost::interprocess::managed_mapped_file;
+
+inline constexpr auto create_only_infinity = create_only;
+inline constexpr auto open_copy_on_write_infinity = open_copy_on_write;
+inline constexpr auto open_only_infinity = open_only;
+inline constexpr auto open_or_create_infinity = open_or_create;
+inline constexpr auto open_read_only_infinity = open_read_only;
+
+} // namespace interprocess
+} // namespace boost
