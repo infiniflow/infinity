@@ -1421,11 +1421,11 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
 
     new_chunk_ids.push_back(new_chunk_id);
 
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
-    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
-                                                   table_index_meta.table_meta().table_id_str(),
-                                                   segment_index_meta.segment_id(),
-                                                   new_chunk_id});
+    // TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    // chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+    //                                                table_index_meta.table_meta().table_id_str(),
+    //                                                segment_index_meta.segment_id(),
+    //                                                new_chunk_id});
 
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex()) {
@@ -1514,11 +1514,11 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
 
     new_chunk_ids.push_back(new_chunk_id);
 
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
-    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
-                                                   table_index_meta.table_meta().table_id_str(),
-                                                   segment_index_meta.segment_id(),
-                                                   new_chunk_id});
+    // TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    // chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+    //                                                table_index_meta.table_meta().table_id_str(),
+    //                                                segment_index_meta.segment_id(),
+    //                                                new_chunk_id});
 
     ChunkIndexMetaInfo chunk_index_meta_info;
     chunk_index_meta_info = memory_secondary_index->GetChunkIndexMetaInfo();
@@ -1607,11 +1607,11 @@ Status NewTxn::PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> 
 
     new_chunk_ids.push_back(new_chunk_id);
 
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
-    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
-                                                   table_index_meta.table_meta().table_id_str(),
-                                                   segment_index_meta.segment_id(),
-                                                   new_chunk_id});
+    // TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    // chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+    //                                                table_index_meta.table_meta().table_id_str(),
+    //                                                segment_index_meta.segment_id(),
+    //                                                new_chunk_id});
 
     ChunkIndexMetaInfo chunk_index_meta_info;
     chunk_index_meta_info = memory_functional_index->GetChunkIndexMetaInfo();
@@ -1747,11 +1747,11 @@ Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
 
     new_chunk_ids.push_back(new_chunk_id);
 
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
-    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
-                                                   table_index_meta.table_meta().table_id_str(),
-                                                   segment_index_meta.segment_id(),
-                                                   new_chunk_id});
+    // TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    // chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+    //                                                table_index_meta.table_meta().table_id_str(),
+    //                                                segment_index_meta.segment_id(),
+    //                                                new_chunk_id});
 
     ChunkIndexMetaInfo chunk_index_meta_info;
     if (mem_index->GetBaseMemIndex()) {

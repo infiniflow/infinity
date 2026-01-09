@@ -14,7 +14,6 @@
 
 module;
 
-#include "statement/command_statement.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.infinity;

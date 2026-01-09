@@ -14,8 +14,6 @@
 
 module;
 
-#include "type/number/bfloat16.h"
-#include "type/number/float16.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.value_embedding;
@@ -39,6 +37,8 @@ import logical_type;
 import embedding_info;
 import knn_expr;
 import data_type;
+import float16;
+import bfloat16;
 
 using namespace infinity;
 
@@ -181,7 +181,7 @@ TEST_F(Value2JsonTest, test_embedding) {
         json[name] = json_float16;
 
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat16, 16);
-        std::vector<infinity::float16_t> data((i64)embedding_info->Dimension());
+        std::vector<float16_t> data((i64)embedding_info->Dimension());
 
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             auto tmp = std::make_shared<uint16_t>(j);
@@ -197,7 +197,7 @@ TEST_F(Value2JsonTest, test_embedding) {
         json[name] = json_bfloat16;
 
         auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemBFloat16, 16);
-        std::vector<infinity::bfloat16_t> data((i64)embedding_info->Dimension());
+        std::vector<bfloat16_t> data((i64)embedding_info->Dimension());
 
         for (i64 j = 0; j < (i64)embedding_info->Dimension(); ++j) {
             auto tmp = std::make_shared<uint16_t>(j);
