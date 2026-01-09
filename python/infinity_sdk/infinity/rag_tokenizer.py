@@ -346,9 +346,8 @@ class RagTokenizer:
                 s = e
                 e = s + 1
                 zh = _zh
-            if s >= len(a):
-                continue
-            txt_lang_pairs.append((a[s:e], zh))
+            if s < len(a):  # Changed from s >= len(a) to be clearer
+                txt_lang_pairs.append((a[s:min(e, len(a))], zh))  # Ensure e doesn't exceed length of a
         return txt_lang_pairs
 
     def tokenize(self, line: str) -> str:
