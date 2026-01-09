@@ -61,11 +61,7 @@ public:
 
     static BooleanT json_contains(const JsonTypeDef &data, const std::string &token);
 
-private:
-    // Helper template for traversing JSON path tokens
-    template <typename Func>
-    static std::invoke_result_t<Func, const JsonTypeDef &>
-    traverse_json_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens, Func &&on_success);
+    static std::tuple<size_t, std::vector<std::string>> json_unnest(const JsonTypeDef &data);
 };
 
 } // namespace infinity

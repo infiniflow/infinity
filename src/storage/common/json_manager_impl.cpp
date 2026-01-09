@@ -403,4 +403,17 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
     return std::any_of(data.begin(), data.end(), [&serialized_token](const JsonTypeDef &element) { return element.dump() == serialized_token; });
 }
 
+std::tuple<size_t, std::vector<std::string>> JsonManager::json_unnest(const JsonTypeDef &data) {
+    std::vector<std::string> result;
+    if (data.is_array()) {
+        result.reserve(data.size());
+        for (const auto &element : data) {
+            result.emplace_back(element.dump());
+        }
+    } else {
+        result.emplace_back(data.dump());
+    }
+    return {result.size(), std::move(result)};
+}
+
 } // namespace infinity

@@ -1187,6 +1187,10 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const Function
             return_type = DataType(array_info->ElemType().type());
             break;
         }
+        case LogicalType::kJson: {
+            return_type = DataType(LogicalType::kVarchar);
+            break;
+        }
         default: {
             RecoverableError(Status::SyntaxError("UNNEST() requires an array argument."));
             return nullptr;

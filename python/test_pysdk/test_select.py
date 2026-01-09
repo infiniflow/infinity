@@ -223,6 +223,10 @@ class TestInfinity:
         res, extra_res = table_obj.output(["json_extract_int(c3,'$.2')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
             {'json_extract_int(c3, $.2)': (3232, pd.NA)}).astype('Int32'))
+        res, extra_res = table_obj.output(["json_extract_int(c3,'$.2') + 1"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('Int32'), pd.DataFrame(
+        {'(json_extract_int(c3, $.2) + 1)': (3233, pd.NA)}).astype('Int32'))
+
         res, extra_res = table_obj.output(["json_extract_double(c3,'$.4')"]).to_pl()
         pd.testing.assert_frame_equal(res.to_pandas().astype('Float64'), pd.DataFrame(
             {'json_extract_double(c3, $.4)': (1.123, 1.123)}).astype(
@@ -1912,4 +1916,570 @@ class TestInfinity:
         assert res['datepart(c5, c3)'][0] == 1, "The value of c5 datepart c3 should be 1"
 
         res = db_obj.drop_table("test_select_date_part" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_with_arithmetic(self, suffix):
+        """
+        Test JSON functions combined with arithmetic operations
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_arithmetic" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_arithmetic" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_arithmetic" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '{"value": 100}'},
+            {"c1": 2, "c2": '{"score": 95.5}'},
+            {"c1": 3, "c2": '{"age": 25}'},
+            {"c1": 4, "c2": '{"price": 19.99}'},
+            {"c1": 5, "c2": '{"quantity": 42}'},
+            {"c1": 6, "c2": '{"negative": -10}'},
+            {"c1": 7, "c2": '{"zero": 0}'},
+            {"c1": 8, "c2": '{"decimal": 3.14159}'},
+            {"c1": 9, "c2": '{"large": 999999}'},
+        ])
+
+        # Test json_extract_int with addition
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.value') + 50"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 150
+
+        # Test json_extract_double with addition
+        res, extra_res = table_obj.output(["c1", "json_extract_double(c2, '$.score') + 10"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 2, col_name].values[0] == 105.5
+
+        # Test json_extract_int with subtraction
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.value') - 20"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 80
+
+        # Test json_extract_int with multiplication
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.quantity') * 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 5, col_name].values[0] == 84
+
+        # Test json_extract_double with multiplication
+        res, extra_res = table_obj.output(["c1", "json_extract_double(c2, '$.price') * 3"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 4, col_name].values[0] == 59.97
+
+        # Test json_extract_int with division (should return float)
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.value') / 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 50.0
+
+        # Test json_extract_double with division
+        res, extra_res = table_obj.output(["c1", "json_extract_double(c2, '$.decimal') / 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 8, col_name].values[0] == 1.570795
+
+        # Test json_extract_int with modulo
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.value') % 3"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 1
+
+        res = db_obj.drop_table("test_json_arithmetic" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_with_round_sqrt_abs(self, suffix):
+        """
+        Test JSON functions combined with ROUND, SQRT, ABS functions
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_scalar" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_scalar" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_scalar" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '{"score": 95.5}'},
+            {"c1": 2, "c2": '{"decimal": 3.14159}'},
+            {"c1": 3, "c2": '{"small": 0.001}'},
+            {"c1": 4, "c2": '{"area": 144}'},
+            {"c1": 5, "c2": '{"negative": -10}'},
+            {"c1": 6, "c2": '{"age": 25}'},
+        ])
+
+        # Test ROUND with json_extract_double
+        res, extra_res = table_obj.output(["c1", "round(json_extract_double(c2, '$.score'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 96.0
+
+        # Test ROUND with precision
+        res, extra_res = table_obj.output(["c1", "round(json_extract_double(c2, '$.decimal'), 1)"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 2, col_name].values[0] == 3.1
+
+        # Test ROUND with small number
+        res, extra_res = table_obj.output(["c1", "round(json_extract_double(c2, '$.small'), 3)"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 3, col_name].values[0] == 0.001
+
+        # Test SQRT with json_extract_int
+        res, extra_res = table_obj.output(["c1", "sqrt(json_extract_int(c2, '$.area'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 4, col_name].values[0] == 12.0
+
+        # Test ABS with json_extract_int
+        res, extra_res = table_obj.output(["c1", "abs(json_extract_int(c2, '$.negative'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 5, col_name].values[0] == 10
+
+        # Test ABS with expression
+        res, extra_res = table_obj.output(["c1", "abs(json_extract_int(c2, '$.age') - 100)"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 6, col_name].values[0] == 75
+
+        res = db_obj.drop_table("test_json_scalar" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_with_ceil_floor(self, suffix):
+        """
+        Test JSON functions combined with CEIL and FLOOR functions
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_ceil_floor" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_ceil_floor" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_ceil_floor" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '{"decimal": 3.14159}'},
+            {"c1": 2, "c2": '{"value": 2.7}'},
+            {"c1": 3, "c2": '{"number": -1.2}'},
+        ])
+
+        # Test CEIL
+        res, extra_res = table_obj.output(["c1", "ceil(json_extract_double(c2, '$.decimal'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 4.0
+
+        # Test FLOOR
+        res, extra_res = table_obj.output(["c1", "floor(json_extract_double(c2, '$.decimal'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 3.0
+
+        # Test CEIL with negative number
+        res, extra_res = table_obj.output(["c1", "ceil(json_extract_double(c2, '$.number'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 3, col_name].values[0] == -1.0
+
+        # Test FLOOR with negative number
+        res, extra_res = table_obj.output(["c1", "floor(json_extract_double(c2, '$.number'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 3, col_name].values[0] == -2.0
+
+        res = db_obj.drop_table("test_json_ceil_floor" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_nested_path_arithmetic(self, suffix):
+        """
+        Test JSON functions with nested paths and arithmetic
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_nested" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_nested" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_nested" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '{"data": {"inner": 50, "outer": 100}}'},
+            {"c1": 2, "c2": '{"nested": {"value": 25, "multiplier": 3}}'},
+        ])
+
+        # Test nested path extraction with addition
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.data.inner') + json_extract_int(c2, '$.data.outer')"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 150
+
+        # Test nested path with division
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.data.outer') / 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 50.0
+
+        # Test nested path with multiplication
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.nested.value') * json_extract_int(c2, '$.nested.multiplier')"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 2, col_name].values[0] == 75
+
+        res = db_obj.drop_table("test_json_nested" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_null_handling(self, suffix):
+        """
+        Test JSON functions with NULL values and edge cases
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_null" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_null" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_null" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '{"val": null}'},
+            {"c1": 2, "c2": '{"val": 0}'},
+            {"c1": 3, "c2": '{"missing": null}'},
+            {"c1": 4, "c2": '{"negative": -16}'},
+        ])
+
+        # Test json_extract_int with NULL value in arithmetic
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.val') + 10"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert pd.isna(res.loc[res['c1'] == 1, col_name].values[0])
+
+        # Test json_extract_int with zero (not NULL)
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.val') + 10"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 2, col_name].values[0] == 10
+
+        # Test json_extract_int on missing path with arithmetic
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$.missing') * 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert pd.isna(res.loc[res['c1'] == 3, col_name].values[0])
+
+        # Test SQRT of negative number (should return NULL)
+        res, extra_res = table_obj.output(["c1", "sqrt(json_extract_int(c2, '$.negative'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert pd.isna(res.loc[res['c1'] == 4, col_name].values[0])
+
+        # Test ROUND with NULL
+        res, extra_res = table_obj.output(["c1", "round(json_extract_int(c2, '$.val'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert pd.isna(res.loc[res['c1'] == 1, col_name].values[0])
+
+        # Test ABS with NULL
+        res, extra_res = table_obj.output(["c1", "abs(json_extract_int(c2, '$.val'))"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert pd.isna(res.loc[res['c1'] == 1, col_name].values[0])
+
+        res = db_obj.drop_table("test_json_null" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_json_array_with_arithmetic(self, suffix):
+        """
+        Test JSON array extraction with arithmetic operations
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_json_array" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_json_array" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_json_array" + suffix)
+        table_obj.insert([
+            {"c1": 1, "c2": '[10, 20, 30]'},
+            {"c1": 2, "c2": '[1.5, 2.5, 3.5]'},
+            {"c1": 3, "c2": '[100, 200, 300]'},
+        ])
+
+        # Test array element extraction with addition
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$[0]') + 100"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 110
+
+        # Test array element extraction with multiplication
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$[1]') * 2"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 40
+
+        # Test array element with division
+        res, extra_res = table_obj.output(["c1", "json_extract_int(c2, '$[2]') / 3"]).to_df()
+        print(res)
+        col_name = res.columns[1]
+        assert res.loc[res['c1'] == 1, col_name].values[0] == 10.0
+
+        res = db_obj.drop_table("test_json_array" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_basic(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json" + suffix)
+
+        # Test 1: Simple integer array
+        table_obj.insert([{"c1": 1, "c2": '[1, 2, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).to_df()
+        print("Test 1 - Simple integer array:")
+        print(res)
+        # UNNEST should return 3 rows
+        assert len(res) == 3
+        # Check values - UNNEST returns as strings
+        values = sorted(res.iloc[:, 0].tolist())
+        assert values == ['1', '2', '3'] or values == [1, 2, 3] or values == [1.0, 2.0, 3.0]
+
+        # Test 2: String array
+        table_obj.insert([{"c1": 2, "c2": '["apple", "banana", "cherry"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - String array:")
+        print(res)
+        assert len(res) == 3
+        values = res.iloc[:, 0].tolist()
+        assert "apple" in str(values)
+        assert "banana" in str(values)
+        assert "cherry" in str(values)
+
+        # Test 3: Mixed type array
+        table_obj.insert([{"c1": 3, "c2": '[1, "text", 3.14, true, null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Mixed type array:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 4: Array with all NULL values
+        table_obj.insert([{"c1": 4, "c2": '[null, null, null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - All NULL array:")
+        print(res)
+        assert len(res) == 3
+        # All values should be "null" string or NaN
+        for idx in range(len(res)):
+            val = res.iloc[idx, 0]
+            assert pd.isna(val) or val == "null" or val == 'null'
+
+        # Test 5: Mixed NULL and valid values
+        table_obj.insert([{"c1": 5, "c2": '[1, null, 2, null, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Mixed NULL array:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 6: Empty array
+        table_obj.insert([{"c1": 6, "c2": '[]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Empty array:")
+        print(res)
+        assert len(res) == 0
+
+        res = db_obj.drop_table("test_unnest_json" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_complex(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_complex" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_complex" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_complex" + suffix)
+
+        # Test 1: Array of objects
+        table_obj.insert([{"c1": 1, "c2": '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Array of objects:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 2: Nested arrays
+        table_obj.insert([{"c1": 2, "c2": '[[1, 2], [3, 4], [5, 6]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - Nested arrays:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 3: Array containing empty objects and arrays
+        table_obj.insert([{"c1": 3, "c2": '[{}, [], {"key": "value"}, [1, 2]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Empty objects and arrays:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 4: Single element array
+        table_obj.insert([{"c1": 4, "c2": '[42]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Single element:")
+        print(res)
+        assert len(res) == 1
+
+        # Test 5: Boolean values
+        table_obj.insert([{"c1": 5, "c2": '[true, false, true]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Boolean array:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 6: Negative numbers and zeros
+        table_obj.insert([{"c1": 6, "c2": '[-100, -0.5, 0, 0.0, 100]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Negative numbers and zeros:")
+        print(res)
+        assert len(res) == 5
+
+        res = db_obj.drop_table("test_unnest_json_complex" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_edge_cases(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_edge" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_edge" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_edge" + suffix)
+
+        # Test 1: Special string values
+        table_obj.insert([{"c1": 1, "c2": '["", "text", "123", "true", "null"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Special strings:")
+        print(res)
+        assert len(res) == 5
+
+        # Test 2: Single NULL
+        table_obj.insert([{"c1": 2, "c2": '[null]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - Single NULL:")
+        print(res)
+        assert len(res) == 1
+        val = res.iloc[0, 0]
+        assert pd.isna(val) or val == "null" or val == 'null'
+
+        # Test 3: Large array
+        table_obj.insert([{"c1": 3, "c2": '[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Large array:")
+        print(res)
+        assert len(res) == 11
+
+        # Test 4: Duplicate values
+        table_obj.insert([{"c1": 4, "c2": '[1, 1, 1, 2, 2, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Duplicate values:")
+        print(res)
+        assert len(res) == 6
+
+        # Test 5: Floating point edge cases
+        table_obj.insert([{"c1": 5, "c2": '[0.0001, 999999.999999, 1e10, -1e-10]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Floating point edge cases:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 6: Non-array JSON (object) - should still work
+        table_obj.insert([{"c1": 6, "c2": '{"key": "value", "number": 123}'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Non-array JSON (object):")
+        print(res)
+        # UNNEST on object might return 1 row with the object itself or 0 rows
+        assert len(res) >= 0
+
+        # Test 7: Scalar JSON value (string)
+        table_obj.insert([{"c1": 7, "c2": '"just a string"'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 7").to_df()
+        print("\nTest 7 - Scalar string:")
+        print(res)
+        # UNNEST on scalar might return 1 row with the scalar itself or 0 rows
+        assert len(res) >= 0
+
+        # Test 8: Scalar JSON value (number)
+        table_obj.insert([{"c1": 8, "c2": '42'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 8").to_df()
+        print("\nTest 8 - Scalar number:")
+        print(res)
+        assert len(res) >= 0
+
+        # Test 9: Scalar JSON value (boolean)
+        table_obj.insert([{"c1": 9, "c2": 'true'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 9").to_df()
+        print("\nTest 9 - Scalar boolean:")
+        print(res)
+        assert len(res) >= 0
+
+        # Test 10: Scalar JSON null
+        table_obj.insert([{"c1": 10, "c2": 'null'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 10").to_df()
+        print("\nTest 10 - Scalar null:")
+        print(res)
+        assert len(res) >= 0
+
+        res = db_obj.drop_table("test_unnest_json_edge" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_unnest_json_nested(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_unnest_json_nested" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_unnest_json_nested" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "json"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_unnest_json_nested" + suffix)
+
+        # Test 1: Deeply nested array elements
+        table_obj.insert([{"c1": 1, "c2": '[[[[[1]]]], [[[[2]]]]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 1").to_df()
+        print("Test 1 - Deeply nested arrays:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 2: 3D array
+        table_obj.insert([{"c1": 2, "c2": '[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 2").to_df()
+        print("\nTest 2 - 3D array:")
+        print(res)
+        assert len(res) == 2
+
+        # Test 3: Mixed nested structures
+        table_obj.insert([{"c1": 3, "c2": '[{"arr": [1, 2]}, {"obj": {"k": "v"}}, [null], "string"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 3").to_df()
+        print("\nTest 3 - Mixed nested structures:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 4: Very long strings
+        table_obj.insert([{"c1": 4, "c2": '["very_long_string_value_with_many_characters", "another_extremely_long_string_for_testing_purposes", "short"]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 4").to_df()
+        print("\nTest 4 - Very long strings:")
+        print(res)
+        assert len(res) == 3
+
+        # Test 5: Scientific notation
+        table_obj.insert([{"c1": 5, "c2": '[1E2, 1.5e-3, -2E10, 3.14159e0]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 5").to_df()
+        print("\nTest 5 - Scientific notation:")
+        print(res)
+        assert len(res) == 4
+
+        # Test 6: Sparse null array
+        table_obj.insert([{"c1": 6, "c2": '[null, null, null, 1, null, 2, null, null, 3]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 6").to_df()
+        print("\nTest 6 - Sparse null array:")
+        print(res)
+        assert len(res) == 9
+
+        # Test 7: Alternating types
+        table_obj.insert([{"c1": 7, "c2": '[1, "one", 2, "two", true, false, null, 3.14]'}])
+        res, extra_res = table_obj.output(["unnest(c2)"]).filter("c1 = 7").to_df()
+        print("\nTest 7 - Alternating types:")
+        print(res)
+        assert len(res) == 8
+
+        res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK

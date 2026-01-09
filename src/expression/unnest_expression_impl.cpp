@@ -37,11 +37,16 @@ UnnestExpression::UnnestExpression(std::shared_ptr<BaseExpression> column_expres
 DataType UnnestExpression::Type() const {
     const auto &expr = arguments_[0];
     const DataType &column_type = expr->Type();
-    if (column_type.type() != LogicalType::kArray) {
-        UnrecoverableError("Unnest expression must be applied to an array column.");
+    if (column_type.type() == LogicalType::kArray) {
+        auto *array_info = static_cast<const ArrayInfo *>(column_type.type_info().get());
+        return array_info->ElemType();
+    } else if (column_type.type() == LogicalType::kJson) {
+        return DataType(LogicalType::kVarchar);
+    } else {
+        UnrecoverableError("Unnest expression must be applied to array column or json column.");
     }
-    auto *array_info = static_cast<const ArrayInfo *>(column_type.type_info().get());
-    return array_info->ElemType();
+
+    return DataType(LogicalType::kInvalid);
 }
 
 std::string UnnestExpression::ToString() const {
