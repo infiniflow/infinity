@@ -501,6 +501,8 @@ public:
 
 export template <typename VecStoreType, typename LabelType, bool OwnMem = true>
 class KnnHnsw : public KnnHnswBase<VecStoreType, LabelType, OwnMem> {
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 public:
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = VecStoreType::Distance;
@@ -516,9 +518,9 @@ public:
         this->distance_ = std::move(distance);
     }
 
-    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
+    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction, segment_manager *sm) {
         auto [Mmax0, Mmax] = KnnHnsw::GetMmax(M);
-        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
+        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax, sm);
         Distance distance(data_store.dim());
         return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
     }

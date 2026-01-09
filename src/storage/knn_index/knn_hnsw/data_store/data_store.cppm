@@ -26,6 +26,7 @@ import :infinity_exception;
 import :data_store_util;
 import :plain_vec_store;
 import :utility;
+import :boost;
 
 import std;
 
@@ -102,6 +103,8 @@ public:
     friend class DataStoreChunkIter<VecStoreT, LabelType>;
     friend class DataStoreIter<VecStoreT, LabelType>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
     DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
         : Base(std::move(vec_store_meta), std::move(graph_store_meta)), chunk_size_(chunk_size), max_chunk_n_(max_chunk_n),
@@ -145,7 +148,7 @@ public:
         }
     }
 
-    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax) {
+    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax, segment_manager *sm) {
         bool normalize = false;
         if constexpr (Base::template has_compress_type<VecStoreT>::value) {
             normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::template Meta<OwnMem>>;

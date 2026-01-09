@@ -991,6 +991,24 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
+Status NewCatalog::InitHnswChunkIndex(SegmentIndexMeta &segment_index_meta, NewTxn *new_txn, std::optional<ChunkIndexMeta> &chunk_index_meta) {
+    {
+        ChunkIndexMetaInfo chunk_info;
+        chunk_index_meta.emplace(0, segment_index_meta);
+        auto status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        auto status = segment_index_meta.AddChunkIndexID1(0, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                          NewTxn *new_txn,
                                          ChunkID chunk_id,

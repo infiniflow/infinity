@@ -34,8 +34,6 @@ struct CreateField {
     static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
 
-std::atomic_int cnt{};
-
 export struct BlockVersion {
     using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
     using TxnTimeStamp_allocator = boost::interprocess::allocator<TxnTimeStamp, segment_manager>;

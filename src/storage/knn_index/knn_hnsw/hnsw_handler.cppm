@@ -97,6 +97,8 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::nullptr_t>;
 
 export struct HnswHandler {
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 public:
     // HnswHandler() : hnsw_(nullptr) {}
     // virtual ~HnswHandler() {}
@@ -105,9 +107,10 @@ public:
 
     static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
-    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
+    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem = true);
 
-    static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
+    static std::unique_ptr<HnswHandler>
+    Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem = true);
 
     template <typename DistanceT, typename LabelT, typename Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
@@ -307,72 +310,72 @@ private:
 
 export using HnswHandlerPtr = HnswHandler *;
 
-export struct HnswIndexInMem : public BaseMemIndex {
-public:
-    HnswIndexInMem() : hnsw_handler_(nullptr) {}
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def)
-        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), own_memory_(true) {}
-    HnswIndexInMem(const HnswIndexInMem &) = delete;
-    HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
-    virtual ~HnswIndexInMem();
-
-public:
-    static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
-
-    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
-
-public:
-    void InsertVecs(SegmentOffset block_offset,
-                    const ColumnVector &col,
-                    BlockOffset offset,
-                    BlockOffset row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
-
-    template <typename Iter>
-    void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
-        row_count_ += iter.GetRowCount();
-        IncreaseMemoryUsageBase(mem_usage);
-    }
-
-    void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
-
-public:
-    // LSG setting
-    template <typename Iter>
-    size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
-        return hnsw_handler_->InsertSampleVecs(std::move(iter), sample_num);
-    }
-    size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
-    template <typename Iter>
-
-    void InsertLSAvg(Iter iter, size_t row_count) {
-        hnsw_handler_->InsertLSAvg(std::move(iter), row_count);
-    }
-    void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
-
-    void SetLSGParam();
-
-public:
-    RowID GetBeginRowID() const override { return begin_row_id_; }
-    const HnswHandlerPtr &get() const { return hnsw_handler_; }
-    HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
-    size_t GetRowCount() const;
-    size_t GetSizeInBytes() const;
-
-    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
-
-protected:
-    MemIndexTracerInfo GetInfo() const override;
-
-private:
-    static constexpr size_t kBuildBucketSize = 1024;
-
-    RowID begin_row_id_{};
-    size_t row_count_{};
-    HnswHandlerPtr hnsw_handler_{};
-    bool own_memory_{};
-    FileWorker *index_file_worker_{};
-};
+// export struct HnswIndexInMem : public BaseMemIndex {
+// public:
+//     HnswIndexInMem() : hnsw_handler_(nullptr) {}
+//     HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def)
+//         : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), own_memory_(true) {}
+//     HnswIndexInMem(const HnswIndexInMem &) = delete;
+//     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
+//     virtual ~HnswIndexInMem();
+//
+// public:
+//     static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
+//
+//     static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
+//
+// public:
+//     void InsertVecs(SegmentOffset block_offset,
+//                     const ColumnVector &col,
+//                     BlockOffset offset,
+//                     BlockOffset row_count,
+//                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
+//
+//     template <typename Iter>
+//     void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+//         size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
+//         row_count_ += iter.GetRowCount();
+//         IncreaseMemoryUsageBase(mem_usage);
+//     }
+//
+//     void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
+//
+// public:
+//     // LSG setting
+//     template <typename Iter>
+//     size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
+//         return hnsw_handler_->InsertSampleVecs(std::move(iter), sample_num);
+//     }
+//     size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+//     template <typename Iter>
+//
+//     void InsertLSAvg(Iter iter, size_t row_count) {
+//         hnsw_handler_->InsertLSAvg(std::move(iter), row_count);
+//     }
+//     void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+//
+//     void SetLSGParam();
+//
+// public:
+//     RowID GetBeginRowID() const override { return begin_row_id_; }
+//     const HnswHandlerPtr &get() const { return hnsw_handler_; }
+//     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
+//     size_t GetRowCount() const;
+//     size_t GetSizeInBytes() const;
+//
+//     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
+//
+// protected:
+//     MemIndexTracerInfo GetInfo() const override;
+//
+// private:
+//     static constexpr size_t kBuildBucketSize = 1024;
+//
+//     RowID begin_row_id_{};
+//     size_t row_count_{};
+//     HnswHandlerPtr hnsw_handler_{};
+//     bool own_memory_{};
+//     FileWorker *index_file_worker_{};
+// };
 
 } // namespace infinity

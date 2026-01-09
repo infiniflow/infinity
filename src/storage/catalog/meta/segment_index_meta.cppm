@@ -47,7 +47,7 @@ public:
 
     std::tuple<std::vector<ChunkID> *, Status> GetChunkIDs1();
 
-    Status SetChunkIDs(const std::vector<ChunkID> &chunk_ids);
+    // Status SetChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
     Status RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids);
 
@@ -75,7 +75,7 @@ private:
 
     Status LoadNextChunkID();
 
-    Status LoadFtInfo();
+    // Status LoadFtInfo();
 
     std::string GetSegmentIndexTag(const std::string &tag);
 

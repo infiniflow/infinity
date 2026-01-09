@@ -64,15 +64,15 @@ size_t MemIndex::GetRowCount() {
 }
 
 bool MemIndex::IsNull() const {
-    std::unique_lock<std::mutex> lock(mtx_);
-    return memory_hnsw_index_ == nullptr && memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
+    std::unique_lock lock(mtx_);
+    return /* memory_hnsw_index_ == nullptr && */ memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
            memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_dummy_index_ == nullptr;
 }
 
 void MemIndex::ClearMemIndex() {
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock lock(mtx_);
 
-    memory_hnsw_index_.reset();
+    // memory_hnsw_index_.reset();
     memory_ivf_index_.reset();
     memory_indexer_.reset();
     memory_secondary_index_.reset();
@@ -83,11 +83,12 @@ void MemIndex::ClearMemIndex() {
 }
 
 const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
-    std::unique_lock<std::mutex> lock(mtx_);
-    BaseMemIndex *res = nullptr;
-    if (memory_hnsw_index_.get() != nullptr) {
-        res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
-    } else if (memory_ivf_index_.get() != nullptr) {
+    std::unique_lock lock(mtx_);
+    BaseMemIndex *res{};
+    // if (memory_hnsw_index_.get() != nullptr) {
+    //     res = static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
+    // } else
+    if (memory_ivf_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_ivf_index_.get());
     } else if (memory_indexer_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_indexer_.get());
@@ -104,15 +105,15 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
     return res;
 }
 
-std::shared_ptr<HnswIndexInMem> MemIndex::GetHnswIndex() {
-    std::unique_lock<std::mutex> lock(mtx_);
-    return memory_hnsw_index_;
-}
+// std::shared_ptr<HnswIndexInMem> MemIndex::GetHnswIndex() {
+//     std::unique_lock<std::mutex> lock(mtx_);
+//     return memory_hnsw_index_;
+// }
 
-void MemIndex::SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index) {
-    std::unique_lock<std::mutex> lock(mtx_);
-    memory_hnsw_index_ = hnsw_index;
-}
+// void MemIndex::SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index) {
+//     std::unique_lock<std::mutex> lock(mtx_);
+//     memory_hnsw_index_ = hnsw_index;
+// }
 
 std::shared_ptr<IVFIndexInMem> MemIndex::GetIVFIndex() {
     std::unique_lock<std::mutex> lock(mtx_);
