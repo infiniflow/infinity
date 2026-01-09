@@ -16,6 +16,7 @@ export module infinity_core:block_version;
 
 import :local_file_handle;
 import :status;
+import :boost;
 
 namespace infinity {
 
@@ -36,12 +37,36 @@ struct CreateField {
 std::atomic_int cnt{};
 
 export struct BlockVersion {
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+    using TxnTimeStamp_allocator = boost::interprocess::allocator<TxnTimeStamp, segment_manager>;
+    using CreateField_allocator = boost::interprocess::allocator<CreateField, segment_manager>;
     constexpr static std::string_view PATH = "version";
 
     static std::shared_ptr<std::string> FileName() { return std::make_shared<std::string>(PATH); }
 
-    explicit BlockVersion(size_t capacity) : deleted_(capacity, 0) {}
+    // explicit BlockVersion(size_t capacity) : deleted_(capacity) {}
+    explicit BlockVersion(size_t capacity, segment_manager *sm)
+        : deleted_(capacity, TxnTimeStamp_allocator(sm)), created_(CreateField_allocator(sm)) {}
     BlockVersion() = default;
+
+    BlockVersion(const BlockVersion &other) : rw_mutex_(), deleted_(other.deleted_), created_(other.created_) {}
+
+    BlockVersion(BlockVersion &&other) noexcept : rw_mutex_(), deleted_(std::move(other.deleted_)), created_(std::move(other.created_)) {}
+
+    // BlockVersion &operator=(const BlockVersion &other) {
+    //     // if (this != &other) {
+    //     deleted_ = other.deleted_;
+    //     created_ = other.created_;
+    //     // }
+    //     return *this;
+    // }
+    //
+    // BlockVersion &operator=(BlockVersion &&other) noexcept {
+    //     // if (this != &other) {
+    //     deleted_ = std::move(other.deleted_);
+    //     // }
+    //     return *this;
+    // }
 
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
@@ -49,10 +74,10 @@ export struct BlockVersion {
     std::pair<BlockOffset, i32> GetCommitRowCount(TxnTimeStamp commit_ts) const;
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
-
     bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler);
     bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
 
+    static void LoadFromFile(LocalFileHandle *file_handle, BlockVersion *&block_version);
     static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
@@ -76,12 +101,13 @@ export struct BlockVersion {
 private:
     mutable std::shared_mutex rw_mutex_;
 
-    std::vector<TxnTimeStamp> deleted_;
+    boost::interprocess::vector<TxnTimeStamp, boost::interprocess::allocator<TxnTimeStamp, segment_manager>> deleted_;
 
-    std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+    boost::interprocess::vector<CreateField, boost::interprocess::allocator<CreateField, segment_manager>>
+        created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
     // risk to write uninitialized buffer. (ts, rows)
 
-    std::map<size_t, TxnTimeStamp> dirty_deleted_;
+    // boost::interprocess::map<size_t, TxnTimeStamp> dirty_deleted_;
 
     size_t append_cnt_{};
 };

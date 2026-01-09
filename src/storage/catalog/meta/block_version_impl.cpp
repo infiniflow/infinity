@@ -178,7 +178,7 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
 
 bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     bool is_modified = false;
-    std::unique_lock<std::shared_mutex> lock(rw_mutex_);
+    std::unique_lock lock(rw_mutex_);
 
     BlockOffset capacity = deleted_.size();
     file_handle.Append(&capacity, sizeof(capacity));
@@ -212,6 +212,23 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
                           is_modified));
 
     return !is_modified;
+    // return true;
+}
+
+void BlockVersion::LoadFromFile(LocalFileHandle *file_handle, BlockVersion *&block_version) {
+    BlockOffset capacity;
+    file_handle->Read(&capacity, sizeof(capacity));
+    block_version->deleted_.resize(capacity);
+    for (BlockOffset i = 0; i < capacity; i++) {
+        file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
+    }
+    BlockOffset create_size;
+    file_handle->Read(&create_size, sizeof(create_size));
+    block_version->created_.reserve(create_size);
+    for (BlockOffset i = 0; i < create_size; i++) {
+        block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
+    }
+    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
 }
 
 void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <unistd.h>
+
 module infinity_core:snapshot_info.impl;
 
 import :snapshot_info;
@@ -30,6 +34,7 @@ import :block_version;
 import :fst.fst;
 import :version_file_worker;
 import :fileworker_manager;
+import :new_txn_manager;
 
 import std.compat;
 import third_party;
@@ -566,11 +571,30 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         if (!VirtualStore::Exists(dst_dir)) {
             VirtualStore::MakeDirectory(dst_dir);
         }
-        Status status = VirtualStore::Copy(dst_file_path, src_file_path);
-        if (!status.ok()) {
-            LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
+        if (src_file_path.find("/version") != std::string::npos) {
+            auto [handle, status] = VirtualStore::Open(src_file_path, FileAccessMode::kRead);
+            auto file_handle = LocalFileHandle{handle->fd(), src_file_path, FileAccessMode::kRead};
+            FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            boost::interprocess::file_mapping::remove(dst_file_path.c_str());
+
+            auto rel_file_path = std::make_shared<std::string>(modified_file);
+            auto read_path = std::make_shared<std::string>(fmt::format("{}", *rel_file_path));
+            auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, 8192);
+            auto version_file_worker1 = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+            // Mmap version info
+            BlockVersion *block_version{};
+            static_cast<FileWorker *>(version_file_worker1)->Read(block_version);
+
+            BlockVersion::LoadFromFile(&file_handle, block_version);
+
+            close(handle->fd());
         } else {
-            restored_file_paths.push_back(modified_file);
+            Status status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!status.ok()) {
+                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
+            } else {
+                restored_file_paths.push_back(modified_file);
+            }
         }
     }
 

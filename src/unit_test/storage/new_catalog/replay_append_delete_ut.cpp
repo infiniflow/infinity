@@ -231,8 +231,8 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("scan"), TransactionType::kRead);
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        TxnTimeStamp commit_ts = txn->CommitTS();
+        auto begin_ts = txn->BeginTS();
+        auto commit_ts = txn->CommitTS();
 
         std::shared_ptr<DBMeta> db_meta;
         std::shared_ptr<TableMeta> table_meta;
@@ -240,7 +240,7 @@ TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta, create_timestamp);
         EXPECT_TRUE(status.ok());
 
-        std::vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::vector<SegmentID> *segment_ids_ptr{};
         std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, std::vector<SegmentID>({0}));
