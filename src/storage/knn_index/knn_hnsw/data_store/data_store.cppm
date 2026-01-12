@@ -26,6 +26,7 @@ import :infinity_exception;
 import :data_store_util;
 import :plain_vec_store;
 import :utility;
+import :boost;
 
 import std;
 

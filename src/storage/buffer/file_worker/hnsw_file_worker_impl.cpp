@@ -47,16 +47,16 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
                                std::shared_ptr<ColumnDef> column_def,
                                size_t index_size)
     : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
-    if (index_size == 0) {
-
-        std::string index_path = GetFilePath();
-        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
-        if (status.ok()) {
-            // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = file_handle->FileSize();
-        }
-    }
-    index_size_ = index_size;
+    // if (index_size == 0) {
+    //
+    //     std::string index_path = GetFilePath();
+    //     auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
+    //     if (status.ok()) {
+    //         // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
+    //         index_size = file_handle->FileSize();
+    //     }
+    // }
+    // index_size_ = index_size;
 }
 
 HnswFileWorker::~HnswFileWorker() {
@@ -89,6 +89,7 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
 void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     std::unique_lock l(mutex_);
     if (!file_handle) {
+        data = HnswHandler::Make(index_base_.get(), column_def_);
         return;
     }
     auto &path = *rel_file_path_;

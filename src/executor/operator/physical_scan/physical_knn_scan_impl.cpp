@@ -958,16 +958,10 @@ void ExecuteHnswSearch(QueryContext *query_context,
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
+        // HnswHandler *hnsw_handler{};
         std::shared_ptr<HnswHandler> hnsw_handler;
         index_file_worker->Read(hnsw_handler);
         hnsw_search(hnsw_handler.get(), false);
-    }
-    if (mem_index) {
-        auto memory_hnsw_index = mem_index->GetHnswIndex();
-        if (memory_hnsw_index) {
-            const HnswHandlerPtr hnsw_handler = memory_hnsw_index->get();
-            hnsw_search(hnsw_handler, true);
-        }
     }
 }
 
