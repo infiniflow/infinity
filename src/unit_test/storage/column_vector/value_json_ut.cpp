@@ -14,8 +14,6 @@
 
 module;
 
-#include "type/number/bfloat16.h"
-#include "type/number/float16.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.value_embedding;
@@ -39,6 +37,8 @@ import logical_type;
 import embedding_info;
 import knn_expr;
 import data_type;
+import bfloat16;
+import float16;
 
 using namespace infinity;
 
