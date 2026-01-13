@@ -97,6 +97,8 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::nullptr_t>;
 
 export struct HnswHandler {
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 public:
     // HnswHandler() : hnsw_(nullptr) {}
     // virtual ~HnswHandler() {}
@@ -105,9 +107,7 @@ public:
 
     static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
-    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
-
-    static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
+    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem = true);
 
     template <typename DistanceT, typename LabelT, typename Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
@@ -294,8 +294,8 @@ public:
 public:
     // hnsw_ data operator
     size_t CalcSize() const;
-    void SaveToPtr(void *&mmap_p, size_t &offset) const;
-    void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
+    // void SaveToPtr(void *&mmap_p, size_t &offset) const;
+    // void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
     void Build(VertexType vertex_i);
     void Optimize();
     void CompressToLVQ();

@@ -23,6 +23,7 @@ export module infinity_core:plain_vec_store;
 import :local_file_handle;
 import :hnsw_common;
 import :data_store_util;
+import :boost;
 
 import std;
 
@@ -38,6 +39,7 @@ public:
     using StoreType = const DataType *;
     using QueryType = const DataType *;
     using DistanceType = f32;
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
 private:
     PlainVecStoreMeta(size_t dim) : dim_(dim) {}
@@ -45,8 +47,8 @@ private:
 public:
     PlainVecStoreMeta() : dim_(0) {}
 
-    static This Make(size_t dim) { return This(dim); }
-    static This Make(size_t dim, bool) { return This(dim); }
+    static This Make(size_t dim, segment_manager *sm) { return This(dim); }
+    static This Make(size_t dim, bool normalize, segment_manager *sm) { return This(dim); }
 
     size_t GetSizeInBytes() const { return sizeof(size_t); }
 

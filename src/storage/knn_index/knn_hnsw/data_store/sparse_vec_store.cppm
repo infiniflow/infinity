@@ -21,6 +21,7 @@ export module infinity_core:sparse_vec_store;
 import :local_file_handle;
 import :hnsw_common;
 import :sparse_util;
+import :boost;
 
 import std;
 
@@ -35,13 +36,15 @@ public:
     using QueryType = SparseVecRef<DataType, IdxType>;
     using DistanceType = std::conditional_t<std::is_same_v<DataType, bool>, IdxType, std::conditional_t<std::is_same_v<DataType, f64>, f64, f32>>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
     SparseVecStoreMeta(size_t max_dim) : max_dim_(max_dim) {}
 
 public:
     SparseVecStoreMeta() = default;
-    static This Make(size_t max_dim) { return This(max_dim); }
-    static This Make(size_t max_dim, bool) { return This(max_dim); }
+    static This Make(size_t max_dim, segment_manager *sm) { return This(max_dim, sm); }
+    static This Make(size_t max_dim, bool normalize, segment_manager *sm) { return This(max_dim, sm); }
 
     size_t CalcSize() const {
         size_t ret{};

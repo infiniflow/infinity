@@ -193,7 +193,7 @@ AbstractHnsw HnswHandler::InitAbstractIndex(const IndexBase *index_base, std::sh
     }
 }
 
-HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem)
+HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, segment_manager *sm, bool own_mem)
     : hnsw_(InitAbstractIndex(index_base, column_def, own_mem)) {
     if (!own_mem)
         return;
@@ -212,7 +212,7 @@ HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef>
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction);
+                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction, sm);
                     if constexpr (IndexT::LSG) {
                         index->InitLSGBuilder(index_hnsw, column_def);
                     }
@@ -222,10 +222,6 @@ HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef>
             }
         },
         hnsw_);
-}
-
-std::unique_ptr<HnswHandler> HnswHandler::Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem) {
-    return std::make_unique<HnswHandler>(index_base, column_def, own_mem);
 }
 
 size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
@@ -403,23 +399,23 @@ void HnswHandler::Check() const {
         hnsw_);
 }
 
-void HnswHandler::SaveToPtr(void *&mmap_p, size_t &offset) const {
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                static_assert(true, "Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    index->SaveToPtr(mmap_p, offset);
-                } else {
-                    static_assert(true, "Invalid index type.");
-                }
-            }
-        },
-        hnsw_);
-}
+// void HnswHandler::SaveToPtr(void *&mmap_p, size_t &offset) const {
+//     std::visit(
+//         [&](auto &&index) {
+//             using T = std::decay_t<decltype(index)>;
+//             if constexpr (std::is_same_v<T, std::nullptr_t>) {
+//                 static_assert(true, "Invalid index type.");
+//             } else {
+//                 using IndexT = std::decay_t<decltype(*index)>;
+//                 if constexpr (IndexT::kOwnMem) {
+//                     index->SaveToPtr(mmap_p, offset);
+//                 } else {
+//                     static_assert(true, "Invalid index type.");
+//                 }
+//             }
+//         },
+//         hnsw_);
+// }
 
 size_t HnswHandler::CalcSize() const {
     size_t ret{};
@@ -442,23 +438,23 @@ size_t HnswHandler::CalcSize() const {
     return ret;
 }
 
-void HnswHandler::LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size) {
-    std::visit(
-        [&](auto &&index) {
-            using T = std::decay_t<decltype(index)>;
-            if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                static_assert(true, "Invalid index type.");
-            } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::LoadFromPtr(m_mmap, mmap_size, file_size);
-                } else {
-                    static_assert(true, "Invalid index type.");
-                }
-            }
-        },
-        hnsw_);
-}
+// void HnswHandler::LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size) {
+//     std::visit(
+//         [&](auto &&index) {
+//             using T = std::decay_t<decltype(index)>;
+//             if constexpr (std::is_same_v<T, std::nullptr_t>) {
+//                 static_assert(true, "Invalid index type.");
+//             } else {
+//                 using IndexT = std::decay_t<decltype(*index)>;
+//                 if constexpr (IndexT::kOwnMem) {
+//                     index = IndexT::LoadFromPtr(m_mmap, mmap_size, file_size);
+//                 } else {
+//                     static_assert(true, "Invalid index type.");
+//                 }
+//             }
+//         },
+//         hnsw_);
+// }
 
 void HnswHandler::Build(VertexType vertex_i) {
     std::visit(

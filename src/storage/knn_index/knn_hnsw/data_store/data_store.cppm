@@ -59,6 +59,8 @@ public:
     template <typename T>
     struct has_compress_type<T, std::void_t<typename T::CompressType>> : std::true_type {};
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
     DataStoreBase() = default;
     DataStoreBase(VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
         : vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {}
@@ -87,6 +89,8 @@ public:
 protected:
     VecStoreMeta vec_store_meta_;
     GraphStoreMeta graph_store_meta_;
+
+    segment_manager *sm_{};
 };
 
 export template <typename VecStoreT, typename LabelType, bool OwnMem = true>
@@ -103,13 +107,16 @@ public:
     friend class DataStoreChunkIter<VecStoreT, LabelType>;
     friend class DataStoreIter<VecStoreT, LabelType>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
-    DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
+    DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta, segment_manager *sm)
         : Base(std::move(vec_store_meta), std::move(graph_store_meta)), chunk_size_(chunk_size), max_chunk_n_(max_chunk_n),
           chunk_shift_(__builtin_ctzll(chunk_size)), inners_(std::make_unique<Inner[]>(max_chunk_n)), mem_usage_(0) {
         assert(chunk_size > 0);
         assert((chunk_size & (chunk_size - 1)) == 0);
         cur_vec_num_ = 0;
+        this->sm_ = sm;
     }
 
 public:
@@ -146,14 +153,14 @@ public:
         }
     }
 
-    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax) {
+    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax, segment_manager *sm) {
         bool normalize = false;
         if constexpr (Base::template has_compress_type<VecStoreT>::value) {
             normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::template Meta<OwnMem>>;
         }
-        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize);
+        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize, sm);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
-        This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
+        This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta), sm);
         ret.cur_vec_num_ = 0;
 
         size_t mem_usage = 0;
@@ -819,7 +826,8 @@ DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelTyp
                                                                             this->max_chunk_n_,
                                                                             this->vec_store_meta_.dim(),
                                                                             this->Mmax0(),
-                                                                            this->Mmax());
+                                                                            this->Mmax(),
+                                                                            this->sm_);
         ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
         ret.SetGraph(std::move(this->graph_store_meta_), std::move(graph_inners));
         this->inners_ = nullptr;
@@ -842,7 +850,8 @@ DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelTyp
                                                                             this->max_chunk_n_,
                                                                             this->vec_store_meta_.dim(),
                                                                             this->Mmax0(),
-                                                                            this->Mmax());
+                                                                            this->Mmax(),
+                                                                            this->sm_);
         ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
         ret.SetGraph(std::move(this->graph_store_meta_), std::move(graph_inners));
         this->inners_ = nullptr;

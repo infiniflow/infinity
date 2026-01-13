@@ -23,6 +23,7 @@ export module infinity_core:lvq_vec_store;
 import :local_file_handle;
 import :hnsw_common;
 import :data_store_util;
+import :boost;
 
 import std;
 
@@ -79,6 +80,8 @@ public:
     using StoreType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::StoreType;
     using QueryType = LVQVecStoreMetaType<DataType, CompressType, LVQCache>::QueryType;
     using DistanceType = f32;
+
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
 public:
     LVQVecStoreMetaBase() : dim_(0), compress_data_size_(0), normalize_(false) {}
@@ -206,6 +209,8 @@ protected:
 
     bool normalize_{};
 
+    segment_manager *sm_;
+
 public:
     void Dump(std::ostream &os) const {
         os << "[CONST] dim: " << dim_ << ", compress_data_size: " << compress_data_size_ << std::endl;
@@ -226,20 +231,23 @@ class LVQVecStoreMeta : public LVQVecStoreMetaBase<DataType, CompressType, LVQCa
     using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
     using GlobalCacheType = LVQCache::GlobalCacheType;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
-    LVQVecStoreMeta(size_t dim) {
+    LVQVecStoreMeta(size_t dim, segment_manager *sm) {
         this->dim_ = dim;
         this->compress_data_size_ = sizeof(LVQData) + sizeof(CompressType) * dim;
         this->mean_ = std::make_unique<MeanType[]>(dim);
         std::fill(this->mean_.get(), this->mean_.get() + dim, 0);
         this->global_cache_ = LVQCache::MakeGlobalCache(this->mean_.get(), dim);
+        this->sm_ = sm;
     }
 
 public:
     LVQVecStoreMeta() = default;
-    static This Make(size_t dim) { return This(dim); }
-    static This Make(size_t dim, bool normalize) {
-        This ret(dim);
+    static This Make(size_t dim, segment_manager *sm) { return This(dim, sm); }
+    static This Make(size_t dim, bool normalize, segment_manager *sm) {
+        This ret(dim, sm);
         ret.normalize_ = normalize;
         return ret;
     }

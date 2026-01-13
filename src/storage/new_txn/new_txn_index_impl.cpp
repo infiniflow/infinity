@@ -855,8 +855,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             break;
         }
         case IndexType::kHnsw: {
-            // HnswHandler *hnsw_index{};
-            std::shared_ptr<HnswHandler> hnsw_index;
+            HnswHandler *hnsw_index{};
             // indexfuck
             // First, addNewChunkIndex for register fileworker
             // Then, get the hnsw_index from fileworker_mgr
@@ -900,12 +899,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             if (!status.ok()) {
                 return status;
             }
-
             index_file_worker->Read(hnsw_index);
-
             hnsw_index->InsertVecs(block_offset, col, offset, row_cnt);
-
-            index_file_worker->Write(hnsw_index);
             break;
         }
         case IndexType::kBMP: {
@@ -1412,8 +1407,7 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
                                       ColumnID column_id,
                                       std::shared_ptr<ColumnDef> column_def,
                                       std::vector<ChunkID> &new_chunk_ids) {
-    // HnswHandler *hnsw_index{};
-    std::shared_ptr<HnswHandler> hnsw_index;
+    HnswHandler *hnsw_index{};
     IndexFileWorker *index_file_worker{};
     std::optional<ChunkIndexMeta> chunk_index_meta;
 
@@ -1472,8 +1466,6 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
         if (!status.ok()) {
             return status;
         }
-
-        index_file_worker->Write(hnsw_index);
     }
     return Status::OK();
 }
@@ -1969,8 +1961,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                     return status;
                 }
                 // indexfuck
-                // HnswHandler *hnsw_handler{};
-                std::shared_ptr<HnswHandler> hnsw_handler;
+                HnswHandler *hnsw_handler{};
                 index_file_worker->Read(hnsw_handler);
                 if (params->compress_to_lvq) {
                     hnsw_handler->CompressToLVQ();

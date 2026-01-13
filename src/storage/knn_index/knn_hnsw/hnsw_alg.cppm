@@ -65,6 +65,8 @@ public:
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
     static std::pair<size_t, size_t> GetMmax(size_t M) { return {2 * M, M}; }
 
     KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
@@ -487,6 +489,8 @@ protected:
 
     std::optional<HnswLSGBuilder<DataType, DistanceType>> lsg_builder_{};
 
+    segment_manager *sm_{};
+
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:
     void Check() const { data_store_.Check(); }
@@ -501,6 +505,8 @@ public:
 
 export template <typename VecStoreType, typename LabelType, bool OwnMem = true>
 class KnnHnsw : public KnnHnswBase<VecStoreType, LabelType, OwnMem> {
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 public:
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = VecStoreType::Distance;
@@ -508,41 +514,42 @@ public:
     using CompressRabitqVecStoreType = decltype(VecStoreType::ToRabitq());
     constexpr static bool kOwnMem = OwnMem;
 
-    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
+    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance, segment_manager *sm) {
         this->M_ = M;
         this->ef_construction_ = std::max(M, ef_construction);
         this->mult_ = 1 / std::log(1.0 * M);
         this->data_store_ = std::move(data_store);
         this->distance_ = std::move(distance);
+        this->sm_ = sm;
     }
 
-    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
+    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction, segment_manager *sm) {
         auto [Mmax0, Mmax] = KnnHnsw::GetMmax(M);
-        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
+        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax, sm);
         Distance distance(data_store.dim());
-        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance), sm);
     }
 
-    static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
-        auto *buffer = static_cast<char *>(m_mmap);
-        const char *ptr = buffer;
-
-        // size_t M = ReadBufAdv<size_t>(ptr);
-        auto *M = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
-        ptr += sizeof(size_t);
-
-        // size_t ef_construction = ReadBufAdv<size_t>(ptr);
-        auto *ef_construction = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
-        ptr += sizeof(size_t);
-
-        auto data_store = DataStore::LoadFromPtr(ptr);
-
-        Distance distance(data_store.dim());
-        if (size_t diff = ptr - buffer; diff != size) {
-            UnrecoverableError("LoadFromPtr failed");
-        }
-        return std::make_unique<KnnHnsw>(*M, *ef_construction, std::move(data_store), std::move(distance));
-    }
+    // static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
+    //     auto *buffer = static_cast<char *>(m_mmap);
+    //     const char *ptr = buffer;
+    //
+    //     // size_t M = ReadBufAdv<size_t>(ptr);
+    //     auto *M = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
+    //     ptr += sizeof(size_t);
+    //
+    //     // size_t ef_construction = ReadBufAdv<size_t>(ptr);
+    //     auto *ef_construction = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
+    //     ptr += sizeof(size_t);
+    //
+    //     auto data_store = DataStore::LoadFromPtr(ptr);
+    //
+    //     Distance distance(data_store.dim());
+    //     if (size_t diff = ptr - buffer; diff != size) {
+    //         UnrecoverableError("LoadFromPtr failed");
+    //     }
+    //     return std::make_unique<KnnHnsw>(*M, *ef_construction, std::move(data_store), std::move(distance));
+    // }
 
     std::unique_ptr<KnnHnsw<CompressLVQVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressLVQVecStoreType>) {
@@ -554,7 +561,8 @@ public:
             return std::make_unique<KnnHnsw<CompressLVQVecStoreType, LabelType>>(this->M_,
                                                                                  this->ef_construction_,
                                                                                  std::move(compressed_datastore),
-                                                                                 std::move(distance));
+                                                                                 std::move(distance),
+                                                                                 this->sm_);
         }
     }
 
@@ -568,7 +576,8 @@ public:
             return std::make_unique<KnnHnsw<CompressRabitqVecStoreType, LabelType>>(this->M_,
                                                                                     this->ef_construction_,
                                                                                     std::move(compressed_datastore),
-                                                                                    std::move(distance));
+                                                                                    std::move(distance),
+                                                                                    this->sm_);
         }
     }
 };
@@ -595,17 +604,17 @@ public:
         return *this;
     }
 
-    static std::unique_ptr<KnnHnsw> LoadFromPtr(const char *&ptr, size_t size) {
-        const char *ptr_end = ptr + size;
-        size_t M = ReadBufAdv<size_t>(ptr);
-        size_t ef_construction = ReadBufAdv<size_t>(ptr);
-        auto data_store = DataStore::LoadFromPtr(ptr);
-        Distance distance(data_store.dim());
-        if (size_t diff = ptr_end - ptr; diff != 0) {
-            UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end, diff));
-        }
-        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
-    }
+    // static std::unique_ptr<KnnHnsw> LoadFromPtr(const char *&ptr, size_t size) {
+    //     const char *ptr_end = ptr + size;
+    //     size_t M = ReadBufAdv<size_t>(ptr);
+    //     size_t ef_construction = ReadBufAdv<size_t>(ptr);
+    //     auto data_store = DataStore::LoadFromPtr(ptr);
+    //     Distance distance(data_store.dim());
+    //     if (size_t diff = ptr_end - ptr; diff != 0) {
+    //         UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end, diff));
+    //     }
+    //     return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
+    // }
 };
 
 } // namespace infinity

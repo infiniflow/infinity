@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <random>
 
 #include <common/simd/simd_functions.h>
 
@@ -26,8 +25,8 @@ import :data_store_util;
 import :infinity_exception;
 import :hnsw_common;
 import :mlas_matrix_multiply;
+import :boost;
 
-import std;
 import std.compat;
 import serialize;
 
@@ -50,7 +49,7 @@ void GenerateRandomOrthogonalMatrix(DataType *rom, size_t dim) {
     // Random Givens Rotation
     for (size_t i = 0; i < dim; ++i) {
         for (size_t j = i + 1; j < dim; ++j) {
-            DataType angle = 2 * M_PI * dist(gen);
+            DataType angle = 2 * std::numbers::pi * dist(gen);
             DataType c = std::cos(angle);
             DataType s = std::sin(angle);
             for (size_t k = 0; k < dim; ++k) {
@@ -163,6 +162,8 @@ public:
     using AlignType = typename MetaType::AlignType;
     using CompressType = typename MetaType::CompressType;
     using DistanceType = typename MetaType::DistanceType;
+
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
 public:
     RabitqVecStoreMetaBase() : origin_dim_(0), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
@@ -385,6 +386,7 @@ protected:
     size_t dim_;
     size_t compress_data_size_;
     size_t compress_query_size_;
+    segment_manager *sm_;
 };
 
 export template <typename DataType, bool OwnMem>
@@ -398,9 +400,10 @@ public:
     using QueryData = typename Base::QueryData;
     using AlignType = typename Base::AlignType;
     using CompressType = typename Base::CompressType;
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
 private:
-    RabitqVecStoreMeta(size_t origin_dim) {
+    RabitqVecStoreMeta(size_t origin_dim, segment_manager *sm) {
         this->origin_dim_ = origin_dim;
         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
         this->dim_ = dim;
@@ -409,12 +412,13 @@ private:
         GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->dim_);
         this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
         this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
+        this->sm_ = sm;
     }
 
 public:
     RabitqVecStoreMeta() = default;
-    static This Make(size_t origin_dim) { return This(origin_dim); }
-    static This Make(size_t origin_dim, bool normalize) { return This(origin_dim); }
+    static This Make(size_t origin_dim, segment_manager *sm) { return This(origin_dim, sm); }
+    static This Make(size_t origin_dim, bool normalize, segment_manager *sm) { return This(origin_dim, sm); }
 
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);
