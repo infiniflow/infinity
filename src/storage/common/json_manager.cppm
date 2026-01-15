@@ -40,6 +40,8 @@ public:
 
     // bson --> json
     static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
+    static JsonTypeDef from_bson(const unit8 *bson_data, const size_t &len);
+
     // json --> bson
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
 

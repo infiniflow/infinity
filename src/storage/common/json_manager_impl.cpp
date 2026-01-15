@@ -111,6 +111,17 @@ JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     }
     return {};
 }
+JsonTypeDef JsonManager::from_bson(const uint8 *bson_data, const size_t &len) {
+    try {
+        auto tmp_bson_data = JsonTypeDef::from_bson(bson_data, len);
+        return tmp_bson_data["data"];
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
+    } catch (...) {
+        LOG_TRACE("JsonManager::from_bson unknown error");
+    }
+    return {};
+}
 
 std::string JsonManager::dump(const JsonTypeDef &json_obj) {
     try {

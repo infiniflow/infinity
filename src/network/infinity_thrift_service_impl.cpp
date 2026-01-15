@@ -3250,8 +3250,7 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const JsonT &data_value,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
     auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, data_value.length_);
-    std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + data_value.length_);
-    auto json_data = JsonManager::from_bson(bson);
+    auto json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
     auto json_str = json_data.dump();
     auto json_length = json_str.length();
 
