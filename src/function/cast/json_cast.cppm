@@ -74,8 +74,7 @@ inline bool TryCastJson::Run(const JsonT &input,
                              DataType target_type,
                              ColumnVector *target_vector) {
     const auto data = source_vector->buffer_->GetVarchar(input.file_offset_, input.length_);
-    std::vector<uint8_t> bson_data(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + input.length_);
-    auto json_data = JsonManager::from_bson(bson_data);
+    auto json_data = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), input.length_);
 
     Value value = Value::MakeVarchar(json_data.dump());
     target_vector->AppendValue(value);

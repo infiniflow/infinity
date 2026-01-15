@@ -111,7 +111,7 @@ JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     }
     return {};
 }
-JsonTypeDef JsonManager::from_bson(const uint8 *bson_data, const size_t &len) {
+JsonTypeDef JsonManager::from_bson(const unit8_t *bson_data, size_t len) {
     try {
         auto tmp_bson_data = JsonTypeDef::from_bson(bson_data, len);
         return tmp_bson_data["data"];
