@@ -42,7 +42,7 @@ public:
         const auto &path_column = input_block.column_vectors_[1];
 
         auto rvarchar = path_column->GetVarchar(0);
-        auto [is_valid, tokens] = JsonManager::get_json_tokens(std::string(rvarchar.data(), rvarchar.size()));
+        auto [is_valid, tokens] = JsonManager::get_json_tokens(rvarchar);
         if (!is_valid) {
             RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
         }

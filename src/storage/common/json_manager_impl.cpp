@@ -15,6 +15,7 @@
 module infinity_core:json_manager.impl;
 
 import :json_manager;
+import std.compat;
 
 namespace infinity {
 
@@ -111,7 +112,8 @@ std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const std::vector<uint8_t> &
     }
     return nullptr;
 }
-std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const unit8_t *bson_data, size_t len) {
+
+std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const uint8_t *bson_data, size_t len) {
     try {
         auto tmp_bson_data = JsonTypeDef::from_bson(bson_data, len);
         return std::make_unique<JsonTypeDef>(std::move(tmp_bson_data["data"]));
@@ -160,14 +162,14 @@ bool JsonManager::check_json_path(const std::string_view &json_path) {
     return true;
 }
 
-std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get_json_tokens(const std::string &json_path) {
-    std::vector<std::pair<JsonType, std::string>> json_tokens;
-
-    if (!JsonManager::check_json_path(json_path)) {
+std::tuple<bool, std::vector<JsonTokenInfo>> JsonManager::get_json_tokens(const std::span<const char> &json_path) {
+    std::string_view path_view(json_path.data(), json_path.size());
+    if (!JsonManager::check_json_path(path_view)) {
         return {false, {}};
     }
 
-    std::string_view remaining = std::string_view(json_path).substr(1);
+    std::vector<std::pair<JsonType, std::string>> json_tokens;
+    std::string_view remaining = path_view.substr(1);
     size_t pos = 0;
     while (pos < remaining.length()) {
         if (remaining[pos] == '.') {
@@ -223,6 +225,11 @@ std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get
     }
 
     return {true, json_tokens};
+}
+
+std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get_json_tokens(const std::string &json_path) {
+    std::span<const char> path_span(json_path.data(), json_path.size());
+    return get_json_tokens(path_span);
 }
 
 std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {

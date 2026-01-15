@@ -40,7 +40,7 @@ public:
 
     // bson --> json
     static std::unique_ptr<JsonTypeDef> from_bson(const std::vector<uint8_t> &bson_data);
-    static std::unique_ptr<JsonTypeDef> from_bson(const unit8_t *bson_data, size_t len);
+    static std::unique_ptr<JsonTypeDef> from_bson(const uint8_t *bson_data, size_t len);
 
     // json --> bson
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
@@ -50,7 +50,7 @@ public:
 
     // Parse json path
     static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::string &json_path);
-
+    static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::span<const char> &json_path);
     /* extract json
      * return: arg1: is_null, arg2: result
      */
