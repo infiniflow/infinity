@@ -56,7 +56,7 @@ public:
                 const auto json_info = json_column_data[row_index];
                 auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
                 auto json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(json_data), json_info.length_);
-                auto [exist_path, extracted_value] = ExtractFunc(json, tokens);
+                auto [exist_path, extracted_value] = ExtractFunc(*json, tokens);
                 output_null->Set(row_index, exist_path);
                 Value v = MakeValueFunc(extracted_value);
                 output_column->AppendValue(v);
@@ -111,7 +111,7 @@ void JsonContains(const DataBlock &input, std::shared_ptr<ColumnVector> &output)
             const auto json_info = json_column_data[row_index];
             auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
             auto json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(json_data), json_info.length_);
-            BooleanT flag = JsonManager::json_contains(json, token);
+            BooleanT flag = JsonManager::json_contains(*json, token);
             Value v = Value::MakeBool(flag);
             output->AppendValue(v);
         }

@@ -100,27 +100,27 @@ JsonTypeDef JsonManager::parse(const std::string &json_str) {
     return {};
 }
 
-JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
+std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     try {
         auto tmp_bson_data = JsonTypeDef::from_bson(bson_data);
-        return tmp_bson_data["data"];
+        return std::make_unique<JsonTypeDef>(std::move(tmp_bson_data["data"]));
     } catch (const JsonTypeDef::parse_error &e) {
         LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
     } catch (...) {
         LOG_TRACE("JsonManager::from_bson unknown error");
     }
-    return {};
+    return nullptr;
 }
-JsonTypeDef JsonManager::from_bson(const unit8_t *bson_data, size_t len) {
+std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const unit8_t *bson_data, size_t len) {
     try {
         auto tmp_bson_data = JsonTypeDef::from_bson(bson_data, len);
-        return tmp_bson_data["data"];
+        return std::make_unique<JsonTypeDef>(std::move(tmp_bson_data["data"]));
     } catch (const JsonTypeDef::parse_error &e) {
         LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
     } catch (...) {
         LOG_TRACE("JsonManager::from_bson unknown error");
     }
-    return {};
+    return nullptr;
 }
 
 std::string JsonManager::dump(const JsonTypeDef &json_obj) {

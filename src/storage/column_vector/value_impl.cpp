@@ -1457,7 +1457,7 @@ std::string Value::ToString() const {
         case LogicalType::kJson: {
             const auto &bson = this->GetBson();
             auto json = JsonManager::from_bson(bson);
-            return json.dump();
+            return json->dump();
         }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
@@ -1745,7 +1745,7 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         case LogicalType::kJson: {
             const auto &bson = this->GetBson();
             auto data = JsonManager::from_bson(bson);
-            json[name] = data.dump();
+            json[name] = data->dump();
             return;
         }
         case LogicalType::kEmbedding: {
@@ -1905,7 +1905,7 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
             const auto &bson = this->GetBson();
             auto json = JsonManager::from_bson(bson);
-            auto status = builder->Append(json.dump());
+            auto status = builder->Append(json->dump());
             break;
         }
         case LogicalType::kEmbedding: {

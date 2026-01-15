@@ -881,7 +881,7 @@ std::string ColumnVector::ToString(size_t row_index) const {
             const auto &json = reinterpret_cast<const JsonT *>(data_ptr_.get())[row_index];
             auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
             auto res = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
-            return res.dump();
+            return res->dump();
         }
         case LogicalType::kDate: {
             return ((DateT *)data_ptr_.get())[row_index].ToString();
@@ -2737,7 +2737,7 @@ bool ColumnVector::AppendUnnestJson(const ColumnVector &other, size_t row_id, si
     const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_.get())[row_id];
     auto data = other.buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
     auto parsed_json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
-    auto [total_elements, element_strings] = JsonManager::json_unnest(parsed_json);
+    auto [total_elements, element_strings] = JsonManager::json_unnest(*parsed_json);
 
     size_t start_idx = element_offset;
     size_t remaining_space = capacity_ - tail_index_.load();

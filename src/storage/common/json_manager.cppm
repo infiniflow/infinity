@@ -39,8 +39,8 @@ public:
     static std::string dump(const JsonTypeDef &json_obj);
 
     // bson --> json
-    static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
-    static JsonTypeDef from_bson(const unit8_t *bson_data, size_t len);
+    static std::unique_ptr<JsonTypeDef> from_bson(const std::vector<uint8_t> &bson_data);
+    static std::unique_ptr<JsonTypeDef> from_bson(const unit8_t *bson_data, size_t len);
 
     // json --> bson
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
