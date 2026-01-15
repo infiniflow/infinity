@@ -64,36 +64,36 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset>>,
 
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset, false>>,
                                   std::nullptr_t>;
 
 export struct HnswHandler {
@@ -153,32 +153,32 @@ private:
         }
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-            using IndexT = std::decay_t<decltype(*index)>;
-            if constexpr (!IndexT::kOwnMem) {
-                UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
-            } else {
-                size_t mem1 = index->mem_usage();
-                auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
-                size_t bucket_size = std::max(kBuildBucketSize, size_t(end - start - 1) / thread_pool.size() + 1);
-                size_t bucket_n = (end - start - 1) / bucket_size + 1;
+            // using IndexT = std::decay_t<decltype(*index)>;
+            // if constexpr (!IndexT::kOwnMem) {
+            //     UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+            // } else {
+            size_t mem1 = index->mem_usage();
+            auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
+            size_t bucket_size = std::max(kBuildBucketSize, static_cast<size_t>(end - start - 1) / thread_pool.size() + 1);
+            size_t bucket_n = (end - start - 1) / bucket_size + 1;
 
-                std::vector<std::future<void>> futs;
-                futs.reserve(bucket_n);
-                for (size_t i = 0; i < bucket_n; ++i) {
-                    size_t i1 = start + i * bucket_size;
-                    size_t i2 = std::min(i1 + bucket_size, size_t(end));
-                    futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
-                        for (size_t j = i1; j < i2; ++j) {
-                            index->Build(j);
-                        }
-                    }));
-                }
-                for (auto &fut : futs) {
-                    fut.get();
-                }
-                size_t mem2 = index->mem_usage();
-                mem_usage = mem2 - mem1;
+            std::vector<std::future<void>> futs;
+            futs.reserve(bucket_n);
+            for (size_t i = 0; i < bucket_n; ++i) {
+                size_t i1 = start + i * bucket_size;
+                size_t i2 = std::min(i1 + bucket_size, size_t(end));
+                futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
+                    for (size_t j = i1; j < i2; ++j) {
+                        index->Build(j);
+                    }
+                }));
             }
+            for (auto &fut : futs) {
+                fut.get();
+            }
+            size_t mem2 = index->mem_usage();
+            mem_usage = mem2 - mem1;
+            // }
         }
     }
 

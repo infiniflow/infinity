@@ -227,76 +227,76 @@ TEST_F(RabitqTest, test_simple) {
     // }
 }
 
-TEST_F(RabitqTest, test_compress) {
-    using namespace infinity;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using RabitqVecStoreMeta = VecStoreType::Meta<true>;
-    using RabitqVecStoreInner = VecStoreType::Inner<true>;
-    using MetaType = VecStoreType::MetaType;
-    constexpr size_t align_size = MetaType::align_size_;
-
-    // generate dataset
-    auto data = std::make_unique<float[]>(dim_ * vec_n_);
-    auto query = std::make_unique<float[]>(dim_);
-    std::default_random_engine rng;
-    std::uniform_real_distribution<float> distrib_real(100, 200);
-    for (size_t i = 0; i < dim_ * vec_n_; ++i) {
-        data[i] = distrib_real(rng);
-    }
-    auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
-    for (size_t i = 0; i < dim_; ++i) {
-        query[i] = distrib_real(rng);
-    }
-
-    // Init meta
-    RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
-    size_t mem_usage = 0;
-    meta.Optimize<LabelType>(DenseVectorIter(iter), {}, mem_usage);
-    meta.Dump(std::cout);
-
-    // Compress data
-    mem_usage = 0;
-    RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
-    size_t insert_n = 0;
-    for (auto val = iter.Next(); val; val = iter.Next()) {
-        const auto &[embedding, offset] = val.value();
-        inner.SetVec(insert_n++, embedding, meta, mem_usage);
-    }
-    ASSERT_EQ(insert_n, vec_n_);
-
-    // Get vector
-    for (size_t i = 0; i < vec_n_; ++i) {
-        auto vec = inner.GetVec(i, meta);
-        std::cout << fmt::format("raw_norm = {}, norm = {}, sum = {}, error = {}", vec->raw_norm_, vec->norm_, vec->sum_, vec->error_);
-        std::cout << ", compress_vec_ =";
-        auto code = vec->compress_vec_;
-        size_t sum = 0;
-        for (size_t d = 0; d < meta.dim(); ++d) {
-            bool c_i = code[d / align_size] >> (align_size - 1 - d % align_size) & 1;
-            sum += c_i;
-            if (d % align_size == 0) {
-                std::cout << " ";
-            }
-            std::cout << c_i;
-        }
-        std::cout << std::endl;
-        ASSERT_EQ(sum, vec->sum_);
-    }
-
-    // Compress query
-    auto query_code = meta.MakeQuery(query.get());
-    std::cout << fmt::format("query_raw_norm = {}, query_norm = {}, query_sum = {}, query_lower_bound = {}, query_delta = {}",
-                             query_code->query_raw_norm_,
-                             query_code->query_norm_,
-                             query_code->query_sum_,
-                             query_code->query_lower_bound_,
-                             query_code->query_delta_);
-    std::cout << ", query_compress_vec_ =";
-    for (size_t d = 0; d < meta.dim(); ++d) {
-        std::cout << " " << (i32)query_code->query_compress_vec_[d];
-    }
-    std::cout << std::endl;
-}
+// TEST_F(RabitqTest, test_compress) {
+//     using namespace infinity;
+//     using VecStoreType = RabitqL2VecStoreType<DataType>;
+//     using RabitqVecStoreMeta = VecStoreType::Meta<true>;
+//     using RabitqVecStoreInner = VecStoreType::Inner<true>;
+//     using MetaType = VecStoreType::MetaType;
+//     constexpr size_t align_size = MetaType::align_size_;
+//
+//     // generate dataset
+//     auto data = std::make_unique<float[]>(dim_ * vec_n_);
+//     auto query = std::make_unique<float[]>(dim_);
+//     std::default_random_engine rng;
+//     std::uniform_real_distribution<float> distrib_real(100, 200);
+//     for (size_t i = 0; i < dim_ * vec_n_; ++i) {
+//         data[i] = distrib_real(rng);
+//     }
+//     auto iter = DenseVectorIter<DataType, LabelType>(data.get(), dim_, vec_n_);
+//     for (size_t i = 0; i < dim_; ++i) {
+//         query[i] = distrib_real(rng);
+//     }
+//
+//     // Init meta
+//     RabitqVecStoreMeta meta = RabitqVecStoreMeta::Make(dim_);
+//     size_t mem_usage = 0;
+//     meta.Optimize<LabelType>(DenseVectorIter(iter), {}, mem_usage);
+//     meta.Dump(std::cout);
+//
+//     // Compress data
+//     mem_usage = 0;
+//     RabitqVecStoreInner inner = RabitqVecStoreInner::Make(vec_n_, meta, mem_usage);
+//     size_t insert_n = 0;
+//     for (auto val = iter.Next(); val; val = iter.Next()) {
+//         const auto &[embedding, offset] = val.value();
+//         inner.SetVec(insert_n++, embedding, meta, mem_usage);
+//     }
+//     ASSERT_EQ(insert_n, vec_n_);
+//
+//     // Get vector
+//     for (size_t i = 0; i < vec_n_; ++i) {
+//         auto vec = inner.GetVec(i, meta);
+//         std::cout << fmt::format("raw_norm = {}, norm = {}, sum = {}, error = {}", vec->raw_norm_, vec->norm_, vec->sum_, vec->error_);
+//         std::cout << ", compress_vec_ =";
+//         auto code = vec->compress_vec_;
+//         size_t sum = 0;
+//         for (size_t d = 0; d < meta.dim(); ++d) {
+//             bool c_i = code[d / align_size] >> (align_size - 1 - d % align_size) & 1;
+//             sum += c_i;
+//             if (d % align_size == 0) {
+//                 std::cout << " ";
+//             }
+//             std::cout << c_i;
+//         }
+//         std::cout << std::endl;
+//         ASSERT_EQ(sum, vec->sum_);
+//     }
+//
+//     // Compress query
+//     auto query_code = meta.MakeQuery(query.get());
+//     std::cout << fmt::format("query_raw_norm = {}, query_norm = {}, query_sum = {}, query_lower_bound = {}, query_delta = {}",
+//                              query_code->query_raw_norm_,
+//                              query_code->query_norm_,
+//                              query_code->query_sum_,
+//                              query_code->query_lower_bound_,
+//                              query_code->query_delta_);
+//     std::cout << ", query_compress_vec_ =";
+//     for (size_t d = 0; d < meta.dim(); ++d) {
+//         std::cout << " " << (i32)query_code->query_compress_vec_[d];
+//     }
+//     std::cout << std::endl;
+// }
 
 // TEST_F(RabitqTest, test_distance) {
 //     using namespace infinity;

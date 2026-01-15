@@ -867,7 +867,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             }
 
             IndexFileWorker *index_file_worker{};
+            ChunkIndexMetaInfo chunk_index_meta_info;
 
+            // return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, GetSizeInBytes()};
             std::optional<ChunkIndexMeta> chunk_index_meta;
             if (next_chunk_id == 0) {
                 auto status = NewCatalog::InitHnswChunkIndex(segment_index_meta, this, chunk_index_meta);
@@ -1418,8 +1420,6 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
     }
 
     if (next_chunk_id == 0) {
-        ChunkIndexMetaInfo chunk_index_meta_info;
-        chunk_index_meta_info.base_row_id_ = RowID{0, 0};
         auto status = NewCatalog::InitHnswChunkIndex(segment_index_meta, this, chunk_index_meta);
         if (!status.ok()) {
             return status;

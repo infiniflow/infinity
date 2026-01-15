@@ -81,14 +81,19 @@ public:
     using SparseVecRef = SparseVecRef<DataType, IdxType>;
     using SparseVecEle = SparseVecEle<DataType, IdxType>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
-    SparseVecStoreInner(size_t max_vec_num, const Meta &meta) : vecs_(std::make_unique_for_overwrite<SparseVecEle[]>(max_vec_num)) {}
+    SparseVecStoreInner(size_t max_vec_num, const Meta &meta, segment_manager *sm)
+        : vecs_(std::make_unique_for_overwrite<SparseVecEle[]>(max_vec_num)) {
+        this->sm_ = sm;
+    }
 
 public:
     SparseVecStoreInner() = default;
 
-    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
-        auto ret = This(max_vec_num, meta);
+    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage, segment_manager *sm) {
+        auto ret = This(max_vec_num, meta, sm);
         mem_usage += sizeof(SparseVecEle) * max_vec_num;
         return ret;
     }
@@ -190,6 +195,7 @@ public:
 
 private:
     std::unique_ptr<SparseVecEle[]> vecs_;
+    segment_manager *sm_;
 
 public:
     void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {

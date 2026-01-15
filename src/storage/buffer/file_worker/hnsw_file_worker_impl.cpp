@@ -14,6 +14,7 @@
 
 module;
 
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -59,37 +60,13 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
     // index_size_ = index_size;
 }
 
-HnswFileWorker::~HnswFileWorker() {
-    munmap(mmap_, mmap_size_);
-    mmap_ = nullptr;
-}
-
-// bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
-//                            std::unique_ptr<LocalFileHandle> &file_handle,
-//                            bool &prepare_success,
-//                            const FileWorkerSaveCtx &ctx) {
-//     std::unique_lock l(mutex_);
-//
-//     auto fd = file_handle->fd();
-//     mmap_size_ = data->CalcSize();
-//     ftruncate(fd, mmap_size_);
-//
-//     mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-//
-//     size_t offset{};
-//     data->SaveToPtr(mmap_, offset);
-//
-//     auto &path = *rel_file_path_;
-//     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-//     cache_manager.Set(path, data, data->MemUsage());
-//     prepare_success = true;
-//     return true;
-// }
+HnswFileWorker::~HnswFileWorker() {}
 
 void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     std::unique_lock l(mutex_);
     auto &path = *rel_file_path_;
     auto tmp_path = GetFilePathTemp();
+    auto data_path = GetFilePath();
     if (!inited_) {
         if (!VirtualStore::Exists("/var/infinity/tmp")) {
             VirtualStore::MakeDirectory("/var/infinity/tmp");
@@ -100,7 +77,41 @@ void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &
             close(handle->fd());
             VirtualStore::DeleteFile(tmp_path.c_str());
         }
-        segment_ = boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 1145141);
+
+        boost::interprocess::file_mapping::remove(tmp_path.c_str());
+
+        auto copy_range = [](const char *src, const char *dst, off_t src_off, off_t dst_off, size_t len) {
+            int in = open(src, O_RDONLY);
+            int out = open(dst, O_WRONLY | O_CREAT, 0644);
+            if (in < 0 || out < 0)
+                return -1;
+
+            ssize_t copied = copy_file_range(in, &src_off, out, &dst_off, len, 0);
+            close(in);
+            close(out);
+            return (copied == (ssize_t)len) ? 0 : -1;
+        };
+
+        auto file_path = GetFilePath();
+        if (persistence_manager_) {
+            std::println("A");
+            auto result = persistence_manager_->GetObjCache(file_path);
+            obj_addr_ = result.obj_addr_;
+            if (obj_addr_.Valid()) {
+                auto true_file_path = fmt::format("{}/{}", persistence_manager_->workspace(), obj_addr_.obj_key_);
+                auto [file_handle, status] = VirtualStore::Open(true_file_path, FileAccessMode::kReadWrite);
+
+                copy_range(true_file_path.c_str(), tmp_path.c_str(), obj_addr_.part_offset_, 0, obj_addr_.part_size_);
+            }
+        } else if (VirtualStore::Exists(file_path, true)) {
+            std::println("B");
+            auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kReadWrite);
+            if (status.ok()) {
+                VirtualStore::Copy(tmp_path, data_path);
+            }
+        }
+
+        segment_ = boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 1145141919ull * 2);
         auto *sm = segment_.get_segment_manager();
         data = segment_.find_or_construct<HnswHandler>(path.c_str())(index_base_.get(), column_def_, sm);
         inited_ = true;
@@ -108,25 +119,6 @@ void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &
     }
     auto result = segment_.find<HnswHandler>(path.c_str());
     data = result.first;
-
-    // std::unique_lock l(mutex_);
-    // if (!file_handle) {
-    //     data = HnswHandler::Make(index_base_.get(), column_def_).release();
-    //     return;
-    // }
-    // auto &path = *rel_file_path_;
-    // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
-    // bool flag = cache_manager.Get(path, data);
-    // if (!flag) {
-    //     data = HnswHandler::Make(index_base_.get(), column_def_).release();
-    //     if (!mmap_) {
-    //         mmap_size_ = file_handle->FileSize();
-    //         auto fd = file_handle->fd();
-    //         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-    //     }
-    //     data->LoadFromPtr(mmap_, mmap_size_, file_size);
-    //     cache_manager.Set(path, data, data->MemUsage());
-    // }
 }
 
 } // namespace infinity

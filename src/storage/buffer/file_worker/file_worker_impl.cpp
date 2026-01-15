@@ -110,7 +110,13 @@ FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_pa
 void FileWorker::MoveFile() {
     // boost::unique_lock l(boost_rw_mutex_);
     boost::unique_lock l(mutex_);
-    msync(mmap_, mmap_size_, MS_SYNC);
+    if (Type() == FileWorkerType::kHNSWIndexFile) {
+        static_cast<HnswFileWorker *>(this)->segment_.flush();
+    } else if (Type() == FileWorkerType::kVersionDataFile) {
+        static_cast<VersionFileWorker *>(this)->segment_.flush();
+    } else {
+        msync(mmap_, mmap_size_, MS_SYNC);
+    }
     auto temp_path = GetFilePathTemp();
     auto data_path = GetFilePath();
 

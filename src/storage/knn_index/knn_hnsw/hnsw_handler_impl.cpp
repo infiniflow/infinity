@@ -28,22 +28,22 @@ import logical_type;
 
 namespace infinity {
 
-template <typename DataType, bool OwnMem>
+template <typename DataType>
 AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
     switch (index_hnsw->encode_type_) {
         case HnswEncodeType::kPlain: {
             if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -53,15 +53,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -78,15 +78,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             } else if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -96,15 +96,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -121,15 +121,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             } else if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType, true>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -139,15 +139,15 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
             } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqL2VecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqIPVecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                        using HnswIndex = KnnHnsw<RabitqCosVecStoreType<DataType>, SegmentOffset>;
                         return std::unique_ptr<HnswIndex>();
                     }
                     default: {
@@ -171,13 +171,13 @@ AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, std::shared_ptr<Col
 
     switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemFloat: {
-            return InitAbstractIndexT<float, OwnMem>(index_hnsw);
+            return InitAbstractIndexT<float>(index_hnsw);
         }
         case EmbeddingDataType::kElemUInt8: {
-            return InitAbstractIndexT<u8, OwnMem>(index_hnsw);
+            return InitAbstractIndexT<u8>(index_hnsw);
         }
         case EmbeddingDataType::kElemInt8: {
-            return InitAbstractIndexT<i8, OwnMem>(index_hnsw);
+            return InitAbstractIndexT<i8>(index_hnsw);
         }
         default: {
             return nullptr;
@@ -211,14 +211,15 @@ HnswHandler::HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef>
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction, sm);
-                    if constexpr (IndexT::LSG) {
-                        index->InitLSGBuilder(index_hnsw, column_def);
-                    }
-                } else {
-                    UnrecoverableError("HnswHandler::HnswHandler: index does not own memory");
+                // if constexpr (IndexT::kOwnMem) {
+                index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction, sm);
+                if constexpr (IndexT::LSG) {
+                    index->InitLSGBuilder(index_hnsw, column_def);
                 }
+                // }
+                // else {
+                //     UnrecoverableError("HnswHandler::HnswHandler: index does not own memory");
+                // }
             }
         },
         hnsw_);
@@ -236,27 +237,27 @@ size_t HnswHandler::InsertVecs(SegmentOffset block_offset,
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    using DataType = typename IndexT::DataType;
-                    switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
-                        case LogicalType::kEmbedding: {
-                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
-                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
-                            break;
-                        }
-                        case LogicalType::kMultiVector: {
-                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
-                            HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
-                            break;
-                        }
+                // if constexpr (IndexT::kOwnMem) {
+                using DataType = typename IndexT::DataType;
+                switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                    case LogicalType::kEmbedding: {
+                        MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                        HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                        break;
                     }
-                } else {
-                    UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+                    case LogicalType::kMultiVector: {
+                        MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                        HnswHandler::InsertVecs(index, std::move(iter), config, mem_usage, kBuildBucketSize);
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                        break;
+                    }
                 }
+                // } else {
+                //     UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+                // }
             }
         },
         hnsw_);
@@ -373,12 +374,12 @@ size_t HnswHandler::GetSizeInBytes() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return size_t(0);
             } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    return index->GetSizeInBytes();
-                } else {
-                    return static_cast<size_t>(0);
-                }
+                // using IndexT = std::decay_t<decltype(*index)>;
+                // if constexpr (IndexT::kOwnMem) {
+                return index->GetSizeInBytes();
+                // } else {
+                //     return static_cast<size_t>(0);
+                // }
             }
         },
         hnsw_);
@@ -426,12 +427,12 @@ size_t HnswHandler::CalcSize() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 static_assert(true, "Invalid index type.");
             } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    ret += index->CalcSize();
-                } else {
-                    static_assert(true, "Invalid index type.");
-                }
+                // using IndexT = std::decay_t<decltype(*index)>;
+                // if constexpr (IndexT::kOwnMem) {
+                ret += index->CalcSize();
+                // } else {
+                //     static_assert(true, "Invalid index type.");
+                // }
             }
         },
         hnsw_);
@@ -463,12 +464,12 @@ void HnswHandler::Build(VertexType vertex_i) {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 static_assert(true, "Invalid index type.");
             } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    index->Build(vertex_i);
-                } else {
-                    static_assert(true, "Invalid index type.");
-                }
+                // using IndexT = std::decay_t<decltype(*index)>;
+                // if constexpr (IndexT::kOwnMem) {
+                index->Build(vertex_i);
+                // } else {
+                //     static_assert(true, "Invalid index type.");
+                // }
             }
         },
         hnsw_);
@@ -481,12 +482,12 @@ void HnswHandler::Optimize() {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 static_assert(true, "Invalid index type.");
             } else {
-                using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    index->Optimize();
-                } else {
-                    static_assert(true, "Invalid index type.");
-                }
+                // using IndexT = std::decay_t<decltype(*index)>;
+                // if constexpr (IndexT::kOwnMem) {
+                index->Optimize();
+                // } else {
+                //     static_assert(true, "Invalid index type.");
+                // }
             }
         },
         hnsw_);
@@ -500,16 +501,16 @@ void HnswHandler::CompressToLVQ() {
                 static_assert(true, "Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    using HnswIndexDataType = IndexT::DataType;
-                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                        static_assert(true, "Invalid index type.");
-                    } else {
-                        hnsw_ = std::move(*index).CompressToLVQ();
-                    }
-                } else {
+                // if constexpr (IndexT::kOwnMem) {
+                using HnswIndexDataType = IndexT::DataType;
+                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                     static_assert(true, "Invalid index type.");
+                } else {
+                    hnsw_ = std::move(*index).CompressToLVQ();
                 }
+                // } else {
+                //     static_assert(true, "Invalid index type.");
+                // }
             }
         },
         hnsw_);
@@ -523,16 +524,16 @@ void HnswHandler::CompressToRabitq() {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                if constexpr (IndexT::kOwnMem) {
-                    using HnswIndexDataType = IndexT::DataType;
-                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                        UnrecoverableError("Invalid index type.");
-                    } else {
-                        hnsw_ = std::move(*index).CompressToRabitq();
-                    }
-                } else {
+                // if constexpr (IndexT::kOwnMem) {
+                using HnswIndexDataType = IndexT::DataType;
+                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                     UnrecoverableError("Invalid index type.");
+                } else {
+                    hnsw_ = std::move(*index).CompressToRabitq();
                 }
+                // } else {
+                //     UnrecoverableError("Invalid index type.");
+                // }
             }
         },
         hnsw_);

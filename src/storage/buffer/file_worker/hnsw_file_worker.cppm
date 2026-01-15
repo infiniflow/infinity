@@ -41,6 +41,9 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
+    boost::interprocess::managed_mapped_file segment_; // mmap
+    // segment_.flush();
+
 protected:
     // bool Write(std::shared_ptr<HnswHandler> &data,
     //            std::unique_ptr<LocalFileHandle> &file_handle,
@@ -52,7 +55,7 @@ protected:
 private:
     mutable std::mutex mutex_;
     size_t index_size_{};
-    boost::interprocess::managed_mapped_file segment_;
+
     bool inited_{};
 };
 

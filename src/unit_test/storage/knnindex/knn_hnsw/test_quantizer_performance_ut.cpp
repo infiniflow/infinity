@@ -221,108 +221,108 @@ public:
     std::unique_ptr<LabelType[]> groundtruth_data_;
 };
 
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_lvq) {
-    using namespace infinity;
-    using CompressType = i8;
-    using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    Distance distance(base_dim_);
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_lvq) {
+//     using namespace infinity;
+//     using CompressType = i8;
+//     using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
+//     using DataStore = DataStore<VecStoreType, LabelType>;
+//     using Distance = VecStoreType::Distance;
+//     Distance distance(base_dim_);
+//
+//     // Init DataStore
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//     auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
+//     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
+//
+//     // Compute recall
+//     size_t cnt = 0;
+//     for (size_t i = 0; i < query_num_; ++i) {
+//         ASSERT_EQ(base_dim_, query_dim_);
+//         auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+//         auto query_vec = query_data_.get() + i * query_dim_;
+//         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
+//
+//         // Compute recall
+//         MaxHeap<DataType, LabelType> rabitq_heap(topk_);
+//         for (LabelType id = start_i; id < end_i; ++id) {
+//             // Estimate l2 distance by lvq
+//             auto estimate_dis = distance(rabitq_query, id, rabitq_store);
+//             rabitq_heap.push(id, estimate_dis);
+//         }
+//
+//         std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
+//         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
+//         for (LabelType id : ids) {
+//             if (gt.contains(id)) {
+//                 ++cnt;
+//             }
+//         }
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (LabelType id : ids) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << std::endl;
+//     }
+//     f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
+//     std::cout << "Recall_10@1 = " << recall << std::endl;
+// }
 
-    // Init DataStore
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
-
-    // Compute recall
-    size_t cnt = 0;
-    for (size_t i = 0; i < query_num_; ++i) {
-        ASSERT_EQ(base_dim_, query_dim_);
-        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
-        auto query_vec = query_data_.get() + i * query_dim_;
-        auto rabitq_query = rabitq_store.MakeQuery(query_vec);
-
-        // Compute recall
-        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
-        for (LabelType id = start_i; id < end_i; ++id) {
-            // Estimate l2 distance by lvq
-            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-            rabitq_heap.push(id, estimate_dis);
-        }
-
-        std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
-        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
-        for (LabelType id : ids) {
-            if (gt.contains(id)) {
-                ++cnt;
-            }
-        }
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (LabelType id : ids) {
-            std::cout << " " << id;
-        }
-        std::cout << std::endl;
-    }
-    f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
-    std::cout << "Recall_10@1 = " << recall << std::endl;
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_rabitq) {
-    using namespace infinity;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    Distance distance(base_dim_);
-
-    // Init DataStore
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
-
-    // Compute recall
-    size_t cnt = 0;
-    for (size_t i = 0; i < query_num_; ++i) {
-        ASSERT_EQ(base_dim_, query_dim_);
-        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
-        auto query_vec = query_data_.get() + i * query_dim_;
-        auto rabitq_query = rabitq_store.MakeQuery(query_vec);
-
-        // Compute recall
-        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
-        for (LabelType id = start_i; id < end_i; ++id) {
-            // Estimate l2 distance by rabitq
-            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-            rabitq_heap.push(id, estimate_dis);
-        }
-
-        std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
-        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
-        for (LabelType id : ids) {
-            if (gt.contains(id)) {
-                ++cnt;
-            }
-        }
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (LabelType id : ids) {
-            std::cout << " " << id;
-        }
-        std::cout << std::endl;
-    }
-    f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
-    std::cout << "Recall_10@1 = " << recall << std::endl;
-}
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_rabitq) {
+//     using namespace infinity;
+//     using VecStoreType = RabitqL2VecStoreType<DataType>;
+//     using DataStore = DataStore<VecStoreType, LabelType>;
+//     using Distance = VecStoreType::Distance;
+//     Distance distance(base_dim_);
+//
+//     // Init DataStore
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//     auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
+//     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
+//
+//     // Compute recall
+//     size_t cnt = 0;
+//     for (size_t i = 0; i < query_num_; ++i) {
+//         ASSERT_EQ(base_dim_, query_dim_);
+//         auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+//         auto query_vec = query_data_.get() + i * query_dim_;
+//         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
+//
+//         // Compute recall
+//         MaxHeap<DataType, LabelType> rabitq_heap(topk_);
+//         for (LabelType id = start_i; id < end_i; ++id) {
+//             // Estimate l2 distance by rabitq
+//             auto estimate_dis = distance(rabitq_query, id, rabitq_store);
+//             rabitq_heap.push(id, estimate_dis);
+//         }
+//
+//         std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
+//         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
+//         for (LabelType id : ids) {
+//             if (gt.contains(id)) {
+//                 ++cnt;
+//             }
+//         }
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (LabelType id : ids) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << std::endl;
+//     }
+//     f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
+//     std::cout << "Recall_10@1 = " << recall << std::endl;
+// }
 
 // TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lvq) {
 //     using Hnsw = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;

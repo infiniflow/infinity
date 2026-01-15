@@ -36,9 +36,10 @@ public:
 
     void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
+    boost::interprocess::managed_mapped_file segment_;
+
 private:
     size_t capacity_{};
-    boost::interprocess::managed_mapped_file segment_;
     bool inited_{};
 };
 
