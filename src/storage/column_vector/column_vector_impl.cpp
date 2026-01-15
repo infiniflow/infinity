@@ -880,7 +880,7 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kJson: {
             const auto &json = reinterpret_cast<const JsonT *>(data_ptr_.get())[row_index];
             auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            auto res = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
+            auto res = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json.length_);
             return res->dump();
         }
         case LogicalType::kDate: {
