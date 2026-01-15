@@ -662,7 +662,7 @@ Value Value::MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type
 Value Value::MakeJson(std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kJson, std::move(type_info_ptr));
     auto value_json = infinity::JsonManager::parse(json_str);
-    auto value_bson = infinity::JsonManager::to_bson(value_json);
+    auto value_bson = infinity::JsonManager::to_bson(std::move(value_json));
     value.value_info_ = std::make_shared<JsonValueInfo>(std::move(value_bson));
     return value;
 }
@@ -1662,7 +1662,7 @@ Value Value::StringToValue(const std::string &str, const DataType &data_type) {
         }
         case LogicalType::kJson: {
             auto json = nlohmann::json::parse(str);
-            auto bson = JsonManager::to_bson(json);
+            auto bson = JsonManager::to_bson(std::move(json));
             value.value_info_ = std::make_shared<JsonValueInfo>(bson);
             break;
         }

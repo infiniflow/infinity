@@ -148,6 +148,19 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     return {};
 }
 
+std::vector<uint8_t> JsonManager::to_bson(JsonTypeDef &&json_obj) {
+    try {
+        JsonTypeDef wrapper;
+        wrapper["data"] = std::move(json_obj);
+        return JsonTypeDef::to_bson(wrapper);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::to_bson error: {}", e.what()));
+    } catch (...) {
+        LOG_TRACE("JsonManager::to_bson unknown error");
+    }
+    return {};
+}
+
 bool JsonManager::check_json_path(const std::string &json_path) {
     if (json_path.empty() || json_path[0] != '$') {
         return false;

@@ -44,6 +44,7 @@ public:
 
     // json --> bson
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
+    static std::vector<uint8_t> to_bson(JsonTypeDef &&json_obj);
 
     static bool check_json_path(const std::string &json_path);
     static bool check_json_path(const std::string_view &json_path);
