@@ -221,425 +221,421 @@ public:
     std::unique_ptr<LabelType[]> groundtruth_data_;
 };
 
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_lvq) {
-    using namespace infinity;
-    using CompressType = i8;
-    using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    Distance distance(base_dim_);
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_lvq) {
+//     using namespace infinity;
+//     using CompressType = i8;
+//     using VecStoreType = LVQL2VecStoreType<DataType, CompressType>;
+//     using DataStore = DataStore<VecStoreType, LabelType>;
+//     using Distance = VecStoreType::Distance;
+//     Distance distance(base_dim_);
+//
+//     // Init DataStore
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//     auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
+//     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
+//
+//     // Compute recall
+//     size_t cnt = 0;
+//     for (size_t i = 0; i < query_num_; ++i) {
+//         ASSERT_EQ(base_dim_, query_dim_);
+//         auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+//         auto query_vec = query_data_.get() + i * query_dim_;
+//         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
+//
+//         // Compute recall
+//         MaxHeap<DataType, LabelType> rabitq_heap(topk_);
+//         for (LabelType id = start_i; id < end_i; ++id) {
+//             // Estimate l2 distance by lvq
+//             auto estimate_dis = distance(rabitq_query, id, rabitq_store);
+//             rabitq_heap.push(id, estimate_dis);
+//         }
+//
+//         std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
+//         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
+//         for (LabelType id : ids) {
+//             if (gt.contains(id)) {
+//                 ++cnt;
+//             }
+//         }
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (LabelType id : ids) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << std::endl;
+//     }
+//     f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
+//     std::cout << "Recall_10@1 = " << recall << std::endl;
+// }
 
-    // Init DataStore
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_rabitq) {
+//     using namespace infinity;
+//     using VecStoreType = RabitqL2VecStoreType<DataType>;
+//     using DataStore = DataStore<VecStoreType, LabelType>;
+//     using Distance = VecStoreType::Distance;
+//     Distance distance(base_dim_);
+//
+//     // Init DataStore
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//     auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
+//     auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
+//
+//     // Compute recall
+//     size_t cnt = 0;
+//     for (size_t i = 0; i < query_num_; ++i) {
+//         ASSERT_EQ(base_dim_, query_dim_);
+//         auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
+//         auto query_vec = query_data_.get() + i * query_dim_;
+//         auto rabitq_query = rabitq_store.MakeQuery(query_vec);
+//
+//         // Compute recall
+//         MaxHeap<DataType, LabelType> rabitq_heap(topk_);
+//         for (LabelType id = start_i; id < end_i; ++id) {
+//             // Estimate l2 distance by rabitq
+//             auto estimate_dis = distance(rabitq_query, id, rabitq_store);
+//             rabitq_heap.push(id, estimate_dis);
+//         }
+//
+//         std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
+//         std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
+//         for (LabelType id : ids) {
+//             if (gt.contains(id)) {
+//                 ++cnt;
+//             }
+//         }
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (LabelType id : ids) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << std::endl;
+//     }
+//     f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
+//     std::cout << "Recall_10@1 = " << recall << std::endl;
+// }
 
-    // Compute recall
-    size_t cnt = 0;
-    for (size_t i = 0; i < query_num_; ++i) {
-        ASSERT_EQ(base_dim_, query_dim_);
-        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
-        auto query_vec = query_data_.get() + i * query_dim_;
-        auto rabitq_query = rabitq_store.MakeQuery(query_vec);
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lvq) {
+//     using Hnsw = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
+//     size_t M = 16;
+//     size_t ef_construction = 200;
+//     size_t ef_search = 200;
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//
+//     auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+//     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto t0 = std::chrono::high_resolution_clock::now();
+//     hnsw_index->InsertVecs(std::move(iter));
+//     auto t1 = std::chrono::high_resolution_clock::now();
+//     double seconds = std::chrono::duration<double>(t1 - t0).count();
+//     std::cout << "Build index use time: " << seconds << std::endl;
+//
+//     KnnSearchOption search_option{.ef_ = ef_search};
+//     int correct = 0;
+//     for (int i = 0; i < query_num_; ++i) {
+//         const auto &query = query_data_.get() + i * query_dim_;
+//         const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+//         auto result = hnsw_index->KnnSearchSorted(query, topk_, search_option);
+//         result.resize(topk_);
+//
+//         std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+//         for (auto item : result) {
+//             if (gt_set.contains(item.second)) {
+//                 ++correct;
+//             }
+//         }
+//
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt_set) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (auto item : result) {
+//             std::cout << " " << item.second;
+//         }
+//         std::cout << std::endl;
+//     }
+//     float correct_rate = float(correct) / query_num_ / recall_at_;
+//     std::printf("correct rage: %f\n", correct_rate);
+//     // EXPECT_GE(correct_rate, 0.9);
+// }
 
-        // Compute recall
-        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
-        for (LabelType id = start_i; id < end_i; ++id) {
-            // Estimate l2 distance by lvq
-            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-            rabitq_heap.push(id, estimate_dis);
-        }
-
-        std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
-        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
-        for (LabelType id : ids) {
-            if (gt.contains(id)) {
-                ++cnt;
-            }
-        }
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (LabelType id : ids) {
-            std::cout << " " << id;
-        }
-        std::cout << std::endl;
-    }
-    f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
-    std::cout << "Recall_10@1 = " << recall << std::endl;
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_flat_rabitq) {
-    using namespace infinity;
-    using VecStoreType = RabitqL2VecStoreType<DataType>;
-    using DataStore = DataStore<VecStoreType, LabelType>;
-    using Distance = VecStoreType::Distance;
-    Distance distance(base_dim_);
-
-    // Init DataStore
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-    auto base_iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto rabitq_store = DataStore::Make(chunk_size_, max_chunk_n, base_dim_, 0, 0);
-    auto [start_i, end_i] = rabitq_store.OptAddVec(std::move(base_iter));
-
-    // Compute recall
-    size_t cnt = 0;
-    for (size_t i = 0; i < query_num_; ++i) {
-        ASSERT_EQ(base_dim_, query_dim_);
-        auto gt_vec = groundtruth_data_.get() + i * gt_dim_;
-        auto query_vec = query_data_.get() + i * query_dim_;
-        auto rabitq_query = rabitq_store.MakeQuery(query_vec);
-
-        // Compute recall
-        MaxHeap<DataType, LabelType> rabitq_heap(topk_);
-        for (LabelType id = start_i; id < end_i; ++id) {
-            // Estimate l2 distance by rabitq
-            auto estimate_dis = distance(rabitq_query, id, rabitq_store);
-            rabitq_heap.push(id, estimate_dis);
-        }
-
-        std::unordered_set<LabelType> gt(gt_vec, gt_vec + recall_at_);
-        std::vector<LabelType> ids = rabitq_heap.TransfromIdsVec();
-        for (LabelType id : ids) {
-            if (gt.contains(id)) {
-                ++cnt;
-            }
-        }
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (LabelType id : ids) {
-            std::cout << " " << id;
-        }
-        std::cout << std::endl;
-    }
-    f32 recall = 1.0f * cnt / (query_num_ * recall_at_);
-    std::cout << "Recall_10@1 = " << recall << std::endl;
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lvq) {
-    using Hnsw = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
-    size_t M = 16;
-    size_t ef_construction = 200;
-    size_t ef_search = 200;
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-
-    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
-    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto t0 = std::chrono::high_resolution_clock::now();
-    hnsw_index->InsertVecs(std::move(iter));
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(t1 - t0).count();
-    std::cout << "Build index use time: " << seconds << std::endl;
-
-    KnnSearchOption search_option{.ef_ = ef_search};
-    int correct = 0;
-    for (int i = 0; i < query_num_; ++i) {
-        const auto &query = query_data_.get() + i * query_dim_;
-        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
-        auto result = hnsw_index->KnnSearchSorted(query, topk_, search_option);
-        result.resize(topk_);
-
-        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
-        for (auto item : result) {
-            if (gt_set.contains(item.second)) {
-                ++correct;
-            }
-        }
-
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt_set) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (auto item : result) {
-            std::cout << " " << item.second;
-        }
-        std::cout << std::endl;
-    }
-    float correct_rate = float(correct) / query_num_ / recall_at_;
-    std::printf("correct rage: %f\n", correct_rate);
-    // EXPECT_GE(correct_rate, 0.9);
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_rabitq) {
-    using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
-    size_t M = 16;
-    size_t ef_construction = 200;
-    size_t ef_search = 200;
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-
-    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
-    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto t0 = std::chrono::high_resolution_clock::now();
-    hnsw_index->InsertVecs(std::move(iter), {true});
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(t1 - t0).count();
-    std::cout << "Build index use time: " << seconds << std::endl;
-
-    KnnSearchOption search_option{.ef_ = ef_search};
-    auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
-        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
-        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
-        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
-        for (size_t i = 0; i < result_n; ++i) {
-            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
-            const DataType *ori_vec = base_data_.get() + id * base_dim_;
-            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
-            result[i] = {dis, id};
-        }
-        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-        return result;
-    };
-
-    int correct = 0;
-    for (int i = 0; i < query_num_; ++i) {
-        const auto &query = query_data_.get() + i * query_dim_;
-        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
-        auto result = KnnSearchSortedByFlat(hnsw_index, query);
-        result.resize(topk_);
-
-        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
-        for (auto item : result) {
-            if (gt_set.contains(item.second)) {
-                ++correct;
-            }
-        }
-
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt_set) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (auto item : result) {
-            std::cout << " " << item.second;
-        }
-        std::cout << std::endl;
-    }
-    float correct_rate = float(correct) / query_num_ / recall_at_;
-    std::printf("correct rage: %f\n", correct_rate);
-    // EXPECT_GE(correct_rate, 0.9);
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lsg_rabitq) {
-    using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType, true>, LabelType>;
-    size_t M = 16;
-    size_t ef_construction = 200;
-    size_t ef_search = 200;
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-
-    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
-    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-
-    size_t sample_num = base_num_ * 0.1;
-    size_t ls_k = 10;
-    float alpha = 1.0;
-    std::unique_ptr<float[]> avg = GetAvgBF(base_num_, base_dim_, base_data_.get(), ls_k, sample_num);
-    hnsw_index->distance().SetLSGParam(alpha, avg.get());
-
-    auto t0 = std::chrono::high_resolution_clock::now();
-    hnsw_index->InsertVecs(std::move(iter), {true});
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(t1 - t0).count();
-    std::cout << "Build index use time: " << seconds << std::endl;
-
-    KnnSearchOption search_option{.ef_ = ef_search};
-    auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
-        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
-        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
-        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
-        for (size_t i = 0; i < result_n; ++i) {
-            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
-            const DataType *ori_vec = base_data_.get() + id * base_dim_;
-            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
-            result[i] = {dis, id};
-        }
-        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-        return result;
-    };
-
-    int correct = 0;
-    for (int i = 0; i < query_num_; ++i) {
-        const auto &query = query_data_.get() + i * query_dim_;
-        const auto &gt = groundtruth_data_.get() + i * gt_dim_;
-        auto result = KnnSearchSortedByFlat(hnsw_index, query);
-        result.resize(topk_);
-
-        std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
-        for (auto item : result) {
-            if (gt_set.contains(item.second)) {
-                ++correct;
-            }
-        }
-
-        std::cout << "query: " << i;
-        std::cout << ", gt:";
-        for (LabelType id : gt_set) {
-            std::cout << " " << id;
-        }
-        std::cout << ", ids:";
-        for (auto item : result) {
-            std::cout << " " << item.second;
-        }
-        std::cout << std::endl;
-    }
-    float correct_rate = float(correct) / query_num_ / recall_at_;
-    std::printf("correct rage: %f\n", correct_rate);
-    // EXPECT_GE(correct_rate, 0.9);
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_compress_hnsw_to_rabitq) {
-    using Hnsw = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
-    size_t M = 16;
-    size_t ef_construction = 200;
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-
-    auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
-    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-    auto t0 = std::chrono::high_resolution_clock::now();
-    hnsw_index->InsertVecs(std::move(iter));
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(t1 - t0).count();
-    std::cout << "Build index use time: " << seconds << std::endl;
-
-    auto KnnSearchSortedByFlat =
-        [&](const auto &hnsw_index, const DataType *query, const KnnSearchOption &search_option) -> std::vector<std::pair<DistanceType, LabelType>> {
-        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
-        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
-        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
-        for (size_t i = 0; i < result_n; ++i) {
-            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
-            const DataType *ori_vec = base_data_.get() + id * base_dim_;
-            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
-            result[i] = {dis, id};
-        }
-        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-        return result;
-    };
-
-    auto SearchIndex = [&](const auto &hnsw_index, const KnnSearchOption &search_option) -> void {
-        int correct = 0;
-        for (int i = 0; i < query_num_; ++i) {
-            const auto &query = query_data_.get() + i * query_dim_;
-            const auto &gt = groundtruth_data_.get() + i * gt_dim_;
-            auto result = KnnSearchSortedByFlat(hnsw_index, query, search_option);
-            result.resize(topk_);
-
-            std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
-            for (auto item : result) {
-                if (gt_set.contains(item.second)) {
-                    ++correct;
-                }
-            }
-
-            std::cout << "query: " << i;
-            std::cout << ", gt:";
-            for (LabelType id : gt_set) {
-                std::cout << " " << id;
-            }
-            std::cout << ", ids:";
-            for (auto item : result) {
-                std::cout << " " << item.second;
-            }
-            std::cout << std::endl;
-        }
-        float correct_rate = float(correct) / query_num_ / recall_at_;
-        std::printf("correct rage: %f\n", correct_rate);
-        // EXPECT_GE(correct_rate, 0.9);
-    };
-
-    SearchIndex(hnsw_index, {.ef_ = 200});
-
-    auto compress_hnsw_index = std::move(*hnsw_index).CompressToRabitq();
-
-    using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
-    ASSERT_TRUE((std::is_same_v<HnswRabitq, std::decay_t<decltype(*compress_hnsw_index)>>));
-
-    SearchIndex(compress_hnsw_index, {.ef_ = 400});
-}
-
-TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_compress_lsg_to_rabitq) {
-    using HnswLsg = KnnHnsw<PlainL2VecStoreType<DataType, true>, LabelType>;
-    size_t M = 16;
-    size_t ef_construction = 200;
-    size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
-
-    auto hnsw_index = HnswLsg::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
-    auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
-
-    size_t sample_num = base_num_ * 0.1;
-    size_t ls_k = 10;
-    float alpha = 1.0;
-    std::unique_ptr<float[]> avg = GetAvgBF(base_num_, base_dim_, base_data_.get(), ls_k, sample_num);
-    hnsw_index->distance().SetLSGParam(alpha, avg.get());
-
-    auto t0 = std::chrono::high_resolution_clock::now();
-    hnsw_index->InsertVecs(std::move(iter));
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(t1 - t0).count();
-    std::cout << "Build index use time: " << seconds << std::endl;
-
-    auto KnnSearchSortedByFlat =
-        [&](const auto &hnsw_index, const DataType *query, const KnnSearchOption &search_option) -> std::vector<std::pair<DistanceType, LabelType>> {
-        auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
-        auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
-        std::vector<std::pair<DistanceType, LabelType>> result(result_n);
-        for (size_t i = 0; i < result_n; ++i) {
-            LabelType id = hnsw_index->GetLabel(v_ptr[i]);
-            const DataType *ori_vec = base_data_.get() + id * base_dim_;
-            DistanceType dis = L2Distance(query, ori_vec, base_dim_);
-            result[i] = {dis, id};
-        }
-        std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-        return result;
-    };
-
-    auto SearchIndex = [&](const auto &hnsw_index, const KnnSearchOption &search_option) -> void {
-        int correct = 0;
-        for (int i = 0; i < query_num_; ++i) {
-            const auto &query = query_data_.get() + i * query_dim_;
-            const auto &gt = groundtruth_data_.get() + i * gt_dim_;
-            auto result = KnnSearchSortedByFlat(hnsw_index, query, search_option);
-            result.resize(topk_);
-
-            std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
-            for (auto item : result) {
-                if (gt_set.contains(item.second)) {
-                    ++correct;
-                }
-            }
-
-            std::cout << "query: " << i;
-            std::cout << ", gt:";
-            for (LabelType id : gt_set) {
-                std::cout << " " << id;
-            }
-            std::cout << ", ids:";
-            for (auto item : result) {
-                std::cout << " " << item.second;
-            }
-            std::cout << std::endl;
-        }
-        float correct_rate = float(correct) / query_num_ / recall_at_;
-        std::printf("correct rage: %f\n", correct_rate);
-        // EXPECT_GE(correct_rate, 0.9);
-    };
-
-    SearchIndex(hnsw_index, {.ef_ = 200});
-
-    auto compress_hnsw_index = std::move(*hnsw_index).CompressToRabitq();
-
-    using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
-    ASSERT_TRUE((std::is_same_v<HnswRabitq, std::decay_t<decltype(*compress_hnsw_index)>>));
-
-    SearchIndex(compress_hnsw_index, {.ef_ = 400});
-}
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_rabitq) {
+//     using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
+//     size_t M = 16;
+//     size_t ef_construction = 200;
+//     size_t ef_search = 200;
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//
+//     auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+//     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto t0 = std::chrono::high_resolution_clock::now();
+//     hnsw_index->InsertVecs(std::move(iter), {true});
+//     auto t1 = std::chrono::high_resolution_clock::now();
+//     double seconds = std::chrono::duration<double>(t1 - t0).count();
+//     std::cout << "Build index use time: " << seconds << std::endl;
+//
+//     KnnSearchOption search_option{.ef_ = ef_search};
+//     auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
+//         auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
+//         auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
+//         std::vector<std::pair<DistanceType, LabelType>> result(result_n);
+//         for (size_t i = 0; i < result_n; ++i) {
+//             LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+//             const DataType *ori_vec = base_data_.get() + id * base_dim_;
+//             DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+//             result[i] = {dis, id};
+//         }
+//         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+//         return result;
+//     };
+//
+//     int correct = 0;
+//     for (int i = 0; i < query_num_; ++i) {
+//         const auto &query = query_data_.get() + i * query_dim_;
+//         const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+//         auto result = KnnSearchSortedByFlat(hnsw_index, query);
+//         result.resize(topk_);
+//
+//         std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+//         for (auto item : result) {
+//             if (gt_set.contains(item.second)) {
+//                 ++correct;
+//             }
+//         }
+//
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt_set) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (auto item : result) {
+//             std::cout << " " << item.second;
+//         }
+//         std::cout << std::endl;
+//     }
+//     float correct_rate = float(correct) / query_num_ / recall_at_;
+//     std::printf("correct rage: %f\n", correct_rate);
+//     // EXPECT_GE(correct_rate, 0.9);
+// }
+//
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_hnsw_lsg_rabitq) {
+//     using Hnsw = KnnHnsw<RabitqL2VecStoreType<DataType, true>, LabelType>;
+//     size_t M = 16;
+//     size_t ef_construction = 200;
+//     size_t ef_search = 200;
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//
+//     auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+//     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//
+//     size_t sample_num = base_num_ * 0.1;
+//     size_t ls_k = 10;
+//     float alpha = 1.0;
+//     std::unique_ptr<float[]> avg = GetAvgBF(base_num_, base_dim_, base_data_.get(), ls_k, sample_num);
+//     hnsw_index->distance().SetLSGParam(alpha, avg.get());
+//
+//     auto t0 = std::chrono::high_resolution_clock::now();
+//     hnsw_index->InsertVecs(std::move(iter), {true});
+//     auto t1 = std::chrono::high_resolution_clock::now();
+//     double seconds = std::chrono::duration<double>(t1 - t0).count();
+//     std::cout << "Build index use time: " << seconds << std::endl;
+//
+//     KnnSearchOption search_option{.ef_ = ef_search};
+//     auto KnnSearchSortedByFlat = [&](const auto &hnsw_index, const DataType *query) -> std::vector<std::pair<DistanceType, LabelType>> {
+//         auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
+//         auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_, search_option);
+//         std::vector<std::pair<DistanceType, LabelType>> result(result_n);
+//         for (size_t i = 0; i < result_n; ++i) {
+//             LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+//             const DataType *ori_vec = base_data_.get() + id * base_dim_;
+//             DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+//             result[i] = {dis, id};
+//         }
+//         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+//         return result;
+//     };
+//
+//     int correct = 0;
+//     for (int i = 0; i < query_num_; ++i) {
+//         const auto &query = query_data_.get() + i * query_dim_;
+//         const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+//         auto result = KnnSearchSortedByFlat(hnsw_index, query);
+//         result.resize(topk_);
+//
+//         std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+//         for (auto item : result) {
+//             if (gt_set.contains(item.second)) {
+//                 ++correct;
+//             }
+//         }
+//
+//         std::cout << "query: " << i;
+//         std::cout << ", gt:";
+//         for (LabelType id : gt_set) {
+//             std::cout << " " << id;
+//         }
+//         std::cout << ", ids:";
+//         for (auto item : result) {
+//             std::cout << " " << item.second;
+//         }
+//         std::cout << std::endl;
+//     }
+//     float correct_rate = float(correct) / query_num_ / recall_at_;
+//     std::printf("correct rage: %f\n", correct_rate);
+//     // EXPECT_GE(correct_rate, 0.9);
+// }
+//
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_compress_hnsw_to_rabitq) {
+//     using Hnsw = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
+//     size_t M = 16;
+//     size_t ef_construction = 200;
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//
+//     auto hnsw_index = Hnsw::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+//     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//     auto t0 = std::chrono::high_resolution_clock::now();
+//     hnsw_index->InsertVecs(std::move(iter));
+//     auto t1 = std::chrono::high_resolution_clock::now();
+//     double seconds = std::chrono::duration<double>(t1 - t0).count();
+//     std::cout << "Build index use time: " << seconds << std::endl;
+//
+//     auto KnnSearchSortedByFlat =
+//         [&](const auto &hnsw_index, const DataType *query, const KnnSearchOption &search_option) -> std::vector<std::pair<DistanceType, LabelType>>
+//         { auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_; auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_,
+//         search_option); std::vector<std::pair<DistanceType, LabelType>> result(result_n); for (size_t i = 0; i < result_n; ++i) {
+//             LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+//             const DataType *ori_vec = base_data_.get() + id * base_dim_;
+//             DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+//             result[i] = {dis, id};
+//         }
+//         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+//         return result;
+//     };
+//
+//     auto SearchIndex = [&](const auto &hnsw_index, const KnnSearchOption &search_option) -> void {
+//         int correct = 0;
+//         for (int i = 0; i < query_num_; ++i) {
+//             const auto &query = query_data_.get() + i * query_dim_;
+//             const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+//             auto result = KnnSearchSortedByFlat(hnsw_index, query, search_option);
+//             result.resize(topk_);
+//
+//             std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+//             for (auto item : result) {
+//                 if (gt_set.contains(item.second)) {
+//                     ++correct;
+//                 }
+//             }
+//
+//             std::cout << "query: " << i;
+//             std::cout << ", gt:";
+//             for (LabelType id : gt_set) {
+//                 std::cout << " " << id;
+//             }
+//             std::cout << ", ids:";
+//             for (auto item : result) {
+//                 std::cout << " " << item.second;
+//             }
+//             std::cout << std::endl;
+//         }
+//         float correct_rate = float(correct) / query_num_ / recall_at_;
+//         std::printf("correct rage: %f\n", correct_rate);
+//         // EXPECT_GE(correct_rate, 0.9);
+//     };
+//
+//     SearchIndex(hnsw_index, {.ef_ = 200});
+//
+//     auto compress_hnsw_index = std::move(*hnsw_index).CompressToRabitq();
+//
+//     using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
+//     ASSERT_TRUE((std::is_same_v<HnswRabitq, std::decay_t<decltype(*compress_hnsw_index)>>));
+//
+//     SearchIndex(compress_hnsw_index, {.ef_ = 400});
+// }
+//
+// TEST_F(QuantizerPerformanceTest, DISABLED_SLOW_compress_lsg_to_rabitq) {
+//     using HnswLsg = KnnHnsw<PlainL2VecStoreType<DataType, true>, LabelType>;
+//     size_t M = 16;
+//     size_t ef_construction = 200;
+//     size_t max_chunk_n = (base_num_ + chunk_size_ - 1) / chunk_size_;
+//
+//     auto hnsw_index = HnswLsg::Make(chunk_size_, max_chunk_n, base_dim_, M, ef_construction);
+//     auto iter = DenseVectorIter<DataType, LabelType>(base_data_.get(), base_dim_, base_num_);
+//
+//     size_t sample_num = base_num_ * 0.1;
+//     size_t ls_k = 10;
+//     float alpha = 1.0;
+//     std::unique_ptr<float[]> avg = GetAvgBF(base_num_, base_dim_, base_data_.get(), ls_k, sample_num);
+//     hnsw_index->distance().SetLSGParam(alpha, avg.get());
+//
+//     auto t0 = std::chrono::high_resolution_clock::now();
+//     hnsw_index->InsertVecs(std::move(iter));
+//     auto t1 = std::chrono::high_resolution_clock::now();
+//     double seconds = std::chrono::duration<double>(t1 - t0).count();
+//     std::cout << "Build index use time: " << seconds << std::endl;
+//
+//     auto KnnSearchSortedByFlat =
+//         [&](const auto &hnsw_index, const DataType *query, const KnnSearchOption &search_option) -> std::vector<std::pair<DistanceType, LabelType>>
+//         { auto L2Distance = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_; auto [result_n, d_ptr, v_ptr] = hnsw_index->KnnSearch(query, topk_,
+//         search_option); std::vector<std::pair<DistanceType, LabelType>> result(result_n); for (size_t i = 0; i < result_n; ++i) {
+//             LabelType id = hnsw_index->GetLabel(v_ptr[i]);
+//             const DataType *ori_vec = base_data_.get() + id * base_dim_;
+//             DistanceType dis = L2Distance(query, ori_vec, base_dim_);
+//             result[i] = {dis, id};
+//         }
+//         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+//         return result;
+//     };
+//
+//     auto SearchIndex = [&](const auto &hnsw_index, const KnnSearchOption &search_option) -> void {
+//         int correct = 0;
+//         for (int i = 0; i < query_num_; ++i) {
+//             const auto &query = query_data_.get() + i * query_dim_;
+//             const auto &gt = groundtruth_data_.get() + i * gt_dim_;
+//             auto result = KnnSearchSortedByFlat(hnsw_index, query, search_option);
+//             result.resize(topk_);
+//
+//             std::unordered_set<LabelType> gt_set(gt, gt + recall_at_);
+//             for (auto item : result) {
+//                 if (gt_set.contains(item.second)) {
+//                     ++correct;
+//                 }
+//             }
+//
+//             std::cout << "query: " << i;
+//             std::cout << ", gt:";
+//             for (LabelType id : gt_set) {
+//                 std::cout << " " << id;
+//             }
+//             std::cout << ", ids:";
+//             for (auto item : result) {
+//                 std::cout << " " << item.second;
+//             }
+//             std::cout << std::endl;
+//         }
+//         float correct_rate = float(correct) / query_num_ / recall_at_;
+//         std::printf("correct rage: %f\n", correct_rate);
+//         // EXPECT_GE(correct_rate, 0.9);
+//     };
+//
+//     SearchIndex(hnsw_index, {.ef_ = 200});
+//
+//     auto compress_hnsw_index = std::move(*hnsw_index).CompressToRabitq();
+//
+//     using HnswRabitq = KnnHnsw<RabitqL2VecStoreType<DataType>, LabelType>;
+//     ASSERT_TRUE((std::is_same_v<HnswRabitq, std::decay_t<decltype(*compress_hnsw_index)>>));
+//
+//     SearchIndex(compress_hnsw_index, {.ef_ = 400});
+// }

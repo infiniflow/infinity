@@ -48,7 +48,7 @@ SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeta &table_i
 SegmentIndexMeta::~SegmentIndexMeta() = default;
 
 Status SegmentIndexMeta::GetNextChunkID(ChunkID &chunk_id) {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (!next_chunk_id_) {
         Status status = LoadNextChunkID();
         if (!status.ok()) {
@@ -126,7 +126,7 @@ Status SegmentIndexMeta::RemoveChunkIDs(const std::vector<ChunkID> &chunk_ids) {
 Status SegmentIndexMeta::AddChunkIndexID1(ChunkID chunk_id, NewTxn *new_txn) {
 
     TableMeta &table_meta = table_index_meta_.table_meta();
-    std::string chunk_id_key =
+    auto chunk_id_key =
         KeyEncode::CatalogIdxChunkKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, chunk_id);
     std::string commit_ts_str;
     switch (new_txn->GetTxnState()) {

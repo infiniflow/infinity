@@ -297,6 +297,8 @@ public:
                                     size_t index_size,
                                     std::optional<ChunkIndexMeta> &chunk_index_meta);
 
+    static Status InitHnswChunkIndex(SegmentIndexMeta &segment_index_meta, NewTxn *new_txn, std::optional<ChunkIndexMeta> &chunk_index_meta);
+
     static Status RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                         NewTxn *new_txn,
                                         ChunkID chunk_id,

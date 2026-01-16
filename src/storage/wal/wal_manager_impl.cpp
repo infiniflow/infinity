@@ -152,9 +152,7 @@ std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnT
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
         if (wal_infos.size() > 1) {
-            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
-                return a.max_commit_ts_ > b.max_commit_ts_;
-            });
+            std::ranges::sort(wal_infos, [](const WalFileInfo &a, const WalFileInfo &b) { return a.max_commit_ts_ > b.max_commit_ts_; });
         }
         if (temp_wal_info.has_value()) {
             wal_list.push_back(temp_wal_info->path_);
@@ -216,7 +214,7 @@ std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnT
         }
     }
 
-    std::reverse(log_entries.begin(), log_entries.end());
+    std::ranges::reverse(log_entries);
     log_strings.reserve(log_entries.size());
 
     for (const auto &log_entry : log_entries) {
