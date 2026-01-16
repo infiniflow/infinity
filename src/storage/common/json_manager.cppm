@@ -39,16 +39,19 @@ public:
     static std::string dump(const JsonTypeDef &json_obj);
 
     // bson --> json
-    static JsonTypeDef from_bson(const std::vector<uint8_t> &bson_data);
+    static std::unique_ptr<JsonTypeDef> from_bson(const std::vector<uint8_t> &bson_data);
+    static std::unique_ptr<JsonTypeDef> from_bson(const uint8_t *bson_data, size_t len);
+
     // json --> bson
     static std::vector<uint8_t> to_bson(const JsonTypeDef &json_obj);
+    static std::vector<uint8_t> to_bson(JsonTypeDef &&json_obj);
 
     static bool check_json_path(const std::string &json_path);
     static bool check_json_path(const std::string_view &json_path);
 
     // Parse json path
     static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::string &json_path);
-
+    static std::tuple<bool, std::vector<JsonTokenInfo>> get_json_tokens(const std::span<const char> &json_path);
     /* extract json
      * return: arg1: is_null, arg2: result
      */

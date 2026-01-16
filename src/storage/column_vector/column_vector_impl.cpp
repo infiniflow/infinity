@@ -870,9 +870,8 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kJson: {
             const auto &json = reinterpret_cast<const JsonT *>(data_ptr_)[row_index];
             auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json.length_);
-            auto res = JsonManager::from_bson(bson);
-            return res.dump();
+            auto res = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json.length_);
+            return res->dump();
         }
         case LogicalType::kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
@@ -1985,7 +1984,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             auto &json = reinterpret_cast<JsonT *>(data_ptr_)[index];
             std::string sub_data(sv.data(), sv.length());
             auto json_str = JsonManager::parse(sub_data);
-            auto bson = JsonManager::to_bson(json_str);
+            auto bson = JsonManager::to_bson(std::move(json_str));
             json.length_ = bson.size() * sizeof(uint8_t);
             json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson.data()), json.length_);
             break;
@@ -2727,9 +2726,8 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
 bool ColumnVector::AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset) {
     const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_.get())[row_id];
     auto data = other.buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
-    std::vector<uint8_t> parsed_bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json_info.length_);
-    auto parsed_json = JsonManager::from_bson(parsed_bson);
-    auto [total_elements, element_strings] = JsonManager::json_unnest(parsed_json);
+    auto parsed_json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
+    auto [total_elements, element_strings] = JsonManager::json_unnest(*parsed_json);
 
     size_t start_idx = element_offset;
     size_t remaining_space = capacity_ - tail_index_.load();
