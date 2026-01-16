@@ -83,9 +83,8 @@ Status Status::EmptyConfigParameter() {
 }
 
 Status Status::MismatchVersion(const std::string &current_version, const std::string &expected_version) {
-    return Status(
-        ErrorCode::kMismatchVersion,
-        std::make_unique<std::string>(fmt::format("Current config version: {}, expected version: {}", current_version, expected_version)));
+    return Status(ErrorCode::kMismatchVersion,
+                  std::make_unique<std::string>(fmt::format("Current config version: {}, expected version: {}", current_version, expected_version)));
 }
 
 Status Status::InvalidTimezone(const std::string &timezone) {
