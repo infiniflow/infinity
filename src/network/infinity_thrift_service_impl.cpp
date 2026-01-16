@@ -153,6 +153,11 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
     auto infinity = Infinity::RemoteConnect();
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
+    int32_t thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    int32_t session_count = infinity_session_map_.size();
+    if (session_count + 10 > thrift_server_pool_size) {
+        LOG_WARN(fmt::format("THRIFT: Connection pool size is: {}, current connection count: {}", thrift_server_pool_size, session_count));
+    }
     response.__set_session_id(infinity->GetSessionId());
     response.__set_error_code(static_cast<i64>(ErrorCode::kOk));
     LOG_TRACE(fmt::format("THRIFT: Connect success, new session {}", response.session_id));
