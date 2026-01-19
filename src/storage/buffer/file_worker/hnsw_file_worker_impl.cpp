@@ -65,6 +65,7 @@ HnswFileWorker::~HnswFileWorker() {}
 void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     std::unique_lock l(mutex_);
     auto &path = *rel_file_path_;
+    std::println("fuck path: {}", path);
     auto tmp_path = GetFilePathTemp();
     auto data_path = GetFilePath();
     if (!inited_) {
@@ -73,9 +74,10 @@ void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &
         }
 
         if (!VirtualStore::Exists(tmp_path.c_str())) {
+            std::println("fuck clean tmp");
             auto [handle, status] = VirtualStore::Open(tmp_path, FileAccessMode::kReadWrite);
             close(handle->fd());
-            VirtualStore::DeleteFile(tmp_path.c_str());
+            // VirtualStore::DeleteFile(tmp_path.c_str());
         }
 
         boost::interprocess::file_mapping::remove(tmp_path.c_str());
@@ -113,12 +115,16 @@ void HnswFileWorker::Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &
 
         segment_ = boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 1145141919ull * 2);
         auto *sm = segment_.get_segment_manager();
-        data = segment_.find_or_construct<HnswHandler>(path.c_str())(index_base_.get(), column_def_, sm);
+        data = segment_.find_or_construct<HnswHandler>("")(index_base_.get(), column_def_, sm);
+        data->ReBindAllocator(sm);
         inited_ = true;
+
+        std::println("fuck GetRowCnt special: {}", data->GetRowCount());
         return;
     }
-    auto result = segment_.find<HnswHandler>(path.c_str());
+    auto result = segment_.find<HnswHandler>("");
     data = result.first;
+    std::println("fuck GetRowCnt normal: {}", data->GetRowCount());
 }
 
 } // namespace infinity

@@ -51,7 +51,7 @@ public:
         std::unique_ptr<LVQData> inner_;
         LVQData *operator->() const { return inner_.get(); }
 
-        LVQQuery(size_t compress_data_size) : inner_(new(new char[compress_data_size]) LVQData) {}
+        LVQQuery(size_t compress_data_size) : inner_(new (new char[compress_data_size]) LVQData) {}
         LVQQuery(size_t compress_data_size, const LVQData *data) : LVQQuery(compress_data_size) {
             memcpy(reinterpret_cast<char *>(inner_.get()), reinterpret_cast<const char *>(data), compress_data_size);
         }
@@ -258,6 +258,15 @@ public:
         This ret(dim, sm);
         ret.normalize_ = normalize;
         return ret;
+    }
+
+    void RebindAllocator(segment_manager *sm) {
+        this->sm_ = sm;
+
+        decltype(this->mean_) mean(std::move(this->mean_), boost::interprocess::allocator<MeanType, segment_manager>(sm));
+        this->mean_.swap(mean);
+
+        // this->mean_.get_stored_allocator() = boost::interprocess::allocator<MeanType, segment_manager>(sm);
     }
 
     static This LoadFromPtr(const char *&ptr) {

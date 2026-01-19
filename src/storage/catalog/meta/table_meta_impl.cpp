@@ -846,7 +846,7 @@ std::tuple<std::vector<SegmentID> *, Status> TableMeta::GetSegmentIDs1() {
             }
         }
 
-        segment_ids1_ = infinity::GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
+        segment_ids1_ = GetTableSegments(kv_instance_, db_id_str_, table_id_str_, begin_ts_, commit_ts_);
     }
 
     if (table_cache.get() != nullptr && txn_ != nullptr && txn_->readonly()) {
@@ -997,8 +997,7 @@ std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> TableMeta::MapMetaToSnapS
         return {nullptr, status};
     }
     table_snapshot_info->columns_ = *column_defs;
-    std::sort(table_snapshot_info->columns_.begin(),
-              table_snapshot_info->columns_.end(),
+    std::ranges::sort(table_snapshot_info->columns_,
               [](const std::shared_ptr<ColumnDef> &a, const std::shared_ptr<ColumnDef> &b) { return a->id_ < b->id_; });
 
     // Get segment ids

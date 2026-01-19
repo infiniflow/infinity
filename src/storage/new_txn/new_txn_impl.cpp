@@ -1954,18 +1954,37 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
     LOG_TRACE(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
     {
-        auto CreateSnapshotFile = [&](const std::string &file) -> Status {
+        auto CreateSnapshotFile = [&](const std::string &file) {
+            // 此处不应当复制才对
+
+            std::string read_path = fmt::format("{}/{}", temp_dir, file);
+            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+
+            // auto *hnsw_handle = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.GetFileWorker(file);
+            // if (hnsw_handle) {
+            //     read_path = fmt::format("{}/{}", data_dir, file);
+            //     // std::println("should not create snapshot for hnsw index?");
+            //     // return Status::OK();
+            // }
             // Status status = VirtualStore::Copy(write_path, read_path);
             // if (!status.ok()) {
             //     LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
             //     return Status::OK();
             // }
-            std::string read_path = fmt::format("{}/{}", temp_dir, file);
-            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+
+            // if (file.find("idx") != std::string::npos) {
+            //     // LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
+            //     return Status::OK();
+            // }
+
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-            Status status = VirtualStore::Copy(write_path, read_path);
-            if (!status.ok()) {
+            // if (!VirtualStore::Exists(write_path)) {
+            //     return Status::OK();
+            // }
+
+            Status status1 = VirtualStore::Copy(write_path, read_path);
+            if (!status1.ok()) {
                 LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
                 return Status::OK();
             }
@@ -1977,6 +1996,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
         std::vector<std::string> index_files = table_snapshot_info->GetIndexFiles();
         for (const auto &index_file : index_files) {
+            // fuck
             status = CreateSnapshotFile(index_file);
             if (!status.ok()) {
                 UnrecoverableError(status.message());

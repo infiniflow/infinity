@@ -690,7 +690,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status =
+            auto status =
                 NewCatalog::GetColumnVector(*column_meta, column_meta->get_column_def(), cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
@@ -872,6 +872,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             // return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, GetSizeInBytes()};
             std::optional<ChunkIndexMeta> chunk_index_meta;
             if (next_chunk_id == 0) {
+                std::println("<<<<<<<");
                 auto status = NewCatalog::InitHnswChunkIndex(segment_index_meta, this, chunk_index_meta);
                 if (!status.ok()) {
                     return status;
@@ -886,7 +887,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
 
                 if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kAppend) {
                     ChunkIndexMetaInfo chunk_index_meta_info;
-                    chunk_index_meta_info.base_row_id_ = RowID{0, 0};
+                    chunk_index_meta_info.base_row_id_ = RowID{segment_index_meta.segment_id(), 0};
                     auto txn_store = static_cast<AppendTxnStore *>(base_txn_store_.get());
                     std::vector<WalChunkIndexInfo> chunk_infos;
                     chunk_infos.emplace_back(chunk_index_meta_info, next_chunk_id);
@@ -894,6 +895,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 }
 
             } else { // ?
+                std::println(">>>>>>>");
                 chunk_index_meta.emplace(0 /* chunk_id */, segment_index_meta);
             }
 
@@ -2137,6 +2139,18 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
 Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
                                          SegmentMeta &segment_meta,
                                          std::vector<std::pair<RowID, u64>> &append_ranges) {
+    SegmentID segment_id = segment_meta.segment_id();
+    {
+        std::println("fuck why not go to the hnse path");
+        auto [index_base, status] = segment_index_meta.table_index_meta().GetIndexBase();
+        if (index_base->index_type_ == IndexType::kHnsw) {
+            auto [total_row_cnt, status] = segment_meta.GetRowCnt1();
+            append_ranges.emplace_back(RowID{segment_id, 0}, total_row_cnt);
+            std::println("fuck the cnt: {}", total_row_cnt);
+            return status;
+        }
+    }
+
     Status status;
     std::vector<ChunkID> *chunk_ids_ptr{};
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
@@ -2155,7 +2169,6 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     }
     std::ranges::sort(chunk_index_meta_infos,
                       [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) { return lhs.base_row_id_ < rhs.base_row_id_; });
-    SegmentID segment_id = segment_meta.segment_id();
 
     RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
@@ -2221,6 +2234,9 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
 
     std::vector<std::pair<RowID, u64>> append_ranges;
     std::unordered_set<SegmentID> index_segment_ids_set(index_segment_ids_ptr->begin(), index_segment_ids_ptr->end());
+    if (segment_ids_ptr->empty()) {
+        std::println("fuck the empty vec");
+    }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
         if (!index_segment_ids_set.contains(segment_id)) {

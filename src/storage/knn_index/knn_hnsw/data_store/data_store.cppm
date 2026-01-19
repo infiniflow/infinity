@@ -113,9 +113,10 @@ private:
     DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta, segment_manager *sm)
         : Base(std::move(vec_store_meta), std::move(graph_store_meta), sm), chunk_size_(chunk_size), max_chunk_n_(max_chunk_n),
           chunk_shift_(__builtin_ctzll(chunk_size)), inners_(sm), mem_usage_(0) {
-        // inners_.resize(max_chunk_n);
+        // inners_.resize(max_chunk_n, {sm});
         assert(chunk_size > 0);
         assert((chunk_size & (chunk_size - 1)) == 0);
+        // Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage, sm)
         cur_vec_num_ = 0;
     }
 
@@ -206,6 +207,29 @@ public:
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
         ret += Inner::CalcSize(inners_.data(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
         return ret;
+    }
+
+    void RebindAllocator(segment_manager *sm) {
+        this->sm_ = sm;
+        this->vec_store_meta_.RebindAllocator(sm);
+        // this->graph_store_meta_.RebindAllocator(sm);
+        decltype(inners_) inners(std::move(inners_), boost::interprocess::allocator<Inner, segment_manager>(sm));
+        inners_.swap(inners);
+
+        // namespace boost { namespace interprocess {
+        //
+        // template<class T, class SegmentManager>
+        // struct allocator_traits<allocator<T, SegmentManager>>
+        // {
+        //     using allocator_type = allocator<T, SegmentManager>;
+        //     using is_always_equal = std::false_type;
+        //     using propagate_on_container_swap = std::true_type;
+        // };
+        //
+        // }} // namespace boost::interprocess
+
+
+        // inners_.get_stored_allocator() = boost::interprocess::allocator<Inner, segment_manager>(sm);
     }
 
     void SaveToPtr(void *&mmap_p, size_t &offset) const {
@@ -671,8 +695,8 @@ private:
 
     DataStoreInner(size_t chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta, size_t &mem_usage, segment_manager *sm)
         : Base(chunk_size, vec_store_meta, graph_store_meta, mem_usage, sm) {
-        // this->vec_store_inner_ = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm);
-        // this->graph_store_inner_ = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm);
+        this->vec_store_inner_ = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm);
+        this->graph_store_inner_ = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm);
 
         // this->labels_ = std::make_unique<LabelType[]>(chunk_size);
         this->labels_.resize(chunk_size);

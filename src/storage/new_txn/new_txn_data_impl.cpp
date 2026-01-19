@@ -1403,20 +1403,44 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     }
     std::vector<std::shared_ptr<TableIndexMeta>> table_index_metas;
     std::vector<std::string> *index_name_strs{};
-    if (!IsReplay()) {
-        std::vector<std::string> *index_id_strs{};
-        {
-            status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        for (size_t i = 0; i < index_id_strs->size(); ++i) {
-            const auto &index_id_str = (*index_id_strs)[i];
-            const auto &index_name_str = (*index_name_strs)[i];
-            table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
+    // if (!IsReplay()) {
+    //     std::vector<std::string> *index_id_strs{};
+    //     {
+    //         status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+    //     for (size_t i = 0; i < index_id_strs->size(); ++i) {
+    //         const auto &index_id_str = (*index_id_strs)[i];
+    //         const auto &index_name_str = (*index_name_strs)[i];
+    //         table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
+    //     }
+    // }
+
+    // if (!IsReplay()) {
+    std::vector<std::string> *index_id_strs{};
+    {
+        status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
+        if (!status.ok()) {
+            return status;
         }
     }
+    for (size_t i = 0; i < index_id_strs->size(); ++i) {
+        const auto &index_id_str = (*index_id_strs)[i];
+        const auto &index_name_str = (*index_name_strs)[i];
+
+        auto table_index_meta = std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta);
+        auto [index_def, status] = table_index_meta->GetIndexBase();
+        auto index_type = index_def->index_type_;
+
+        if (!IsReplay()) {
+            table_index_metas.push_back(table_index_meta);
+        } else if (index_type == IndexType::kHnsw) {
+            table_index_metas.push_back(table_index_meta);
+        }
+    }
+    // }
 
     // ensure append_cmd->row_ranges_ be block aligned
     std::vector<std::pair<RowID, u64>> append_ranges;
@@ -1472,7 +1496,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         } else {
             block_meta.emplace(block_id, segment_meta.value());
         }
-        size_t block_row_cnt;
+        size_t block_row_cnt{};
         std::tie(block_row_cnt, status) = block_meta->GetRowCnt1();
         if (!status.ok()) {
             return status;

@@ -294,6 +294,7 @@ public:
 public:
     // hnsw_ data operator
     size_t CalcSize() const;
+    void ReBindAllocator(segment_manager *sm);
     // void SaveToPtr(void *&mmap_p, size_t &offset) const;
     // void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
     void Build(VertexType vertex_i);

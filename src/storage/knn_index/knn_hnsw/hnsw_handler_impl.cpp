@@ -439,6 +439,24 @@ size_t HnswHandler::CalcSize() const {
     return ret;
 }
 
+void HnswHandler::ReBindAllocator(segment_manager *sm) {
+    std::visit(
+        [&](auto &&index) mutable {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                static_assert(true, "Invalid index type.");
+            } else {
+                // using IndexT = std::decay_t<decltype(*index)>;
+                // if constexpr (IndexT::kOwnMem) {
+                index->RebindAllocator(sm);
+                // } else {
+                //     static_assert(true, "Invalid index type.");
+                // }
+            }
+        },
+        hnsw_);
+}
+
 // void HnswHandler::LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size) {
 //     std::visit(
 //         [&](auto &&index) {

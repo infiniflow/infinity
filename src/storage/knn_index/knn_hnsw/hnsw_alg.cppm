@@ -100,6 +100,11 @@ public:
         return ret;
     }
 
+    void RebindAllocator(segment_manager *sm) {
+        sm_ = sm;
+        data_store_.RebindAllocator(sm);
+    }
+
     void SaveToPtr(void *&mmap_p, size_t &offset) const {
         // AlignOffset<decltype(M_)>(offset);
         std::memcpy((char *)mmap_p + offset, &M_, sizeof(M_));

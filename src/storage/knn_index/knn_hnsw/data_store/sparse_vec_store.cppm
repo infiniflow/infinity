@@ -54,6 +54,8 @@ public:
         return ret;
     }
 
+    void RebindAllocator(segment_manager *sm) {}
+
     void SaveToPtr(void *&mmap_p, size_t &offset) const {
         std::memcpy((char *)mmap_p + offset, &max_dim_, sizeof(max_dim_));
         offset += sizeof(max_dim_);

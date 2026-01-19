@@ -63,6 +63,8 @@ public:
         return ret;
     }
 
+    void RebindAllocator(segment_manager *sm) {}
+
     void SaveToPtr(void *&mmap_p, size_t &offset) const {
         std::memcpy((char *)mmap_p + offset, &dim_, sizeof(dim_));
         offset += sizeof(dim_);
@@ -156,7 +158,8 @@ public:
 protected:
     PlainVecStoreInner(size_t max_vec_num, const Meta &meta, segment_manager *sm) : Base(sm) {
         // this->ptr_ = std::make_unique<DataType[]>(max_vec_num * meta.dim());
-        this->ptr_.resize(max_vec_num * meta.dim());
+        // this->ptr_.resize(max_vec_num * meta.dim());
+        this->ptr_.reserve(max_vec_num * meta.dim());
     }
 
 public:

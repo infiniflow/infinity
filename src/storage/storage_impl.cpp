@@ -334,17 +334,19 @@ Status Storage::AdminToWriter() {
     dump_index_processor_ = std::make_unique<DumpIndexProcessor>();
     dump_index_processor_->Start();
 
-    this->RecoverMemIndex();
+    RecoverMemIndex();
 
-    auto *new_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
+    {
+        auto *new_txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("checkpoint"), TransactionType::kNewCheckpoint);
 
-    status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS(), true);
-    if (!status.ok()) {
-        UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
-    }
-    status = new_txn_mgr_->CommitTxn(new_txn);
-    if (!status.ok()) {
-        UnrecoverableError("Failed to commit txn for checkpoint");
+        status = new_txn->Checkpoint(wal_mgr_->LastCheckpointTS(), true);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Failed to checkpoint: {}", status.message()));
+        }
+        status = new_txn_mgr_->CommitTxn(new_txn);
+        if (!status.ok()) {
+            UnrecoverableError("Failed to commit txn for checkpoint");
+        }
     }
 
     std::unique_ptr<SystemCache> system_cache = new_catalog_->RestoreCatalogCache(this);

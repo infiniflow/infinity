@@ -101,7 +101,7 @@ public:
         std::unique_ptr<QueryData> inner_;
         QueryData *operator->() const { return inner_.get(); }
 
-        QueryType(size_t compress_data_size) : inner_(new(new char[compress_data_size]) QueryData) {}
+        QueryType(size_t compress_data_size) : inner_(new (new char[compress_data_size]) QueryData) {}
         QueryType(QueryType &&other) = default;
         ~QueryType() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
@@ -431,6 +431,17 @@ public:
     RabitqVecStoreMeta(segment_manager *sm) : Base(sm) {}
     static This Make(size_t origin_dim, segment_manager *sm) { return This(origin_dim, sm); }
     static This Make(size_t origin_dim, bool normalize, segment_manager *sm) { return This(origin_dim, sm); }
+
+    void RebindAllocator(segment_manager *sm) {
+        this->sm_ = sm;
+        // this->rom_.get_stored_allocator() = boost::interprocess::allocator<DataType, segment_manager>(sm);
+        decltype(this->rom_) rom(std::move(this->rom_), boost::interprocess::allocator<DataType, segment_manager>(sm));
+        this->rom_.swap(rom);
+
+        // this->rot_centroid_.get_stored_allocator() = boost::interprocess::allocator<DataType, segment_manager>(sm);
+        decltype(this->rot_centroid_) rot_centroid(std::move(this->rot_centroid_), boost::interprocess::allocator<DataType, segment_manager>(sm));
+        this->rot_centroid_.swap(this->rot_centroid_);
+    }
 
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);

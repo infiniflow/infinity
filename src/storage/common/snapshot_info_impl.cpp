@@ -589,7 +589,16 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
 
             close(handle->fd());
         } else {
-            Status status = VirtualStore::Copy(dst_file_path, src_file_path);
+            Status status;
+            if (src_file_path.find(".idx") != std::string::npos) {
+                std::println("fuck the first path: {}", modified_file);
+                dst_file_path = fmt::format("{}/{}", config->TempDir(), modified_file);
+                src_file_path = config->DataDir();
+                status = VirtualStore::Copy(dst_file_path, src_file_path);
+            } else {
+                std::println("fuck dst: {}", dst_file_path);
+                status = VirtualStore::Copy(dst_file_path, src_file_path);
+            }
             if (!status.ok()) {
                 LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
             } else {
