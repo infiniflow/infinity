@@ -584,16 +584,16 @@ private:
         size_t outlength = text.length() * 2 < 1024 ? 1024 : text.length() * 2;
         auto buffer = std::make_unique<PCRE2_UCHAR[]>(outlength);
         int rc = pcre2_substitute(compiled.re,
-                                 pcre2_subject,
-                                 text.length(),
-                                 0,
-                                 PCRE2_SUBSTITUTE_GLOBAL,
-                                 nullptr,
-                                 nullptr,
-                                 pcre2_replacement,
-                                 PCRE2_ZERO_TERMINATED,
-                                 buffer.get(),
-                                 &outlength);
+                                  pcre2_subject,
+                                  text.length(),
+                                  0,
+                                  PCRE2_SUBSTITUTE_GLOBAL,
+                                  nullptr,
+                                  nullptr,
+                                  pcre2_replacement,
+                                  PCRE2_ZERO_TERMINATED,
+                                  buffer.get(),
+                                  &outlength);
 
         if (rc < 0) {
             return text;
