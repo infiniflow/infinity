@@ -87,7 +87,7 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
 }
 
 void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     if (!file_handle) {
         return;
     }

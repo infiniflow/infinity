@@ -69,7 +69,7 @@ void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_pt
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
         auto fd = file_handle->fd();
-        std::unique_lock l(mutex_);
+        // std::unique_lock l(mutex_);
         mmap_size_ = file_handle->FileSize();
         if (!mmap_) {
             mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);

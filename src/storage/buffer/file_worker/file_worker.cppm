@@ -107,7 +107,7 @@ public:
     }
 
     void Read(auto &data) {
-        boost::unique_lock l(mutex_);
+        std::unique_lock l(mutex_);
         size_t file_size{};
 
         auto working_path = GetWorkingPath();
