@@ -14,8 +14,6 @@
 
 module;
 
-#include "base_statement.h"
-#include "parser.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.logical_create_index;

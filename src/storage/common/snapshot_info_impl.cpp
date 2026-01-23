@@ -566,7 +566,7 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         if (!VirtualStore::Exists(dst_dir)) {
             VirtualStore::MakeDirectory(dst_dir);
         }
-        Status status = VirtualStore::Copy(dst_file_path, src_file_path);
+        Status status = VirtualStore::Copy(src_file_path, dst_file_path);
         if (!status.ok()) {
             LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
         } else {

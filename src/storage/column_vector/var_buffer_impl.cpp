@@ -119,7 +119,10 @@ VarBufferManager::VarBufferManager(VarFileWorker *var_file_worker)
     : type_(BufferType::kNewCatalog), data_file_worker_(nullptr), var_fileworker_(var_file_worker) {}
 
 size_t VarBufferManager::Append(const char *data, size_t size) {
-    auto buffer = std::make_unique<char[]>(size);
+    if (size == 0) {
+        return 0;
+    }
+    auto buffer = std::make_unique_for_overwrite<char[]>(size);
     std::memcpy(buffer.get(), data, size);
     return Append(std::move(buffer), size);
 }

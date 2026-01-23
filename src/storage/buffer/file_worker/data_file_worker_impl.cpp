@@ -15,6 +15,7 @@
 module;
 
 #include <sys/mman.h>
+#include <unistd.h>
 
 module infinity_core:data_file_worker.impl;
 
@@ -59,7 +60,7 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     }
 
     auto fd = file_handle->fd();
-    VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
+    VirtualStore::Truncate(GetWorkingPath(), mmap_size_);
     if (mmap_ == nullptr) {
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
         size_t offset{};

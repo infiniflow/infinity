@@ -70,7 +70,7 @@ void VectorBuffer::InitializeCompactBit(size_t capacity) {
     }
     size_t data_size = (capacity + 7) / 8;
     if (data_size > 0) {
-        ptr_ = std::make_shared<char[]>(data_size);
+        ptr_ = std::make_shared_for_overwrite<char[]>(data_size);
     }
     initialized_ = true;
     data_size_ = data_size;

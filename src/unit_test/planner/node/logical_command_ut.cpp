@@ -14,8 +14,6 @@
 
 module;
 
-#include "base_statement.h"
-#include "parser.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.logical_command;
@@ -51,12 +49,7 @@ public:
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
 
-    void TearDown() override {
-        std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
-        system(cmd.c_str());
-
-        BaseTestParamStr::TearDown();
-    }
+    void TearDown() override { BaseTestParamStr::TearDown(); }
 
     void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
         if (!node) {

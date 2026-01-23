@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <fcntl.h>
+
 export module infinity_core:virtual_store;
 
 import :status;
@@ -64,7 +68,8 @@ public:
     static Status Rename(const std::string &old_path, const std::string &new_path);
     static Status Truncate(const std::string &file_name, size_t new_length);
     static Status Merge(const std::string &dst_file, const std::string &src_file);
-    static Status Copy(std::string_view dst_file, std::string_view src_file);
+    static Status Copy(std::string_view src_file, std::string_view dst_file);
+    static Status CopyRange(std::string_view src, std::string_view dst, off_t src_off, off_t dst_off, size_t len);
     static std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> ListDirectory(const std::string &path);
     static size_t GetFileSize(const std::string &path);
     static std::string GetParentPath(std::string_view path);

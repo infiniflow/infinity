@@ -51,7 +51,7 @@ bool VersionFileWorker::Write(std::shared_ptr<BlockVersion> &data,
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
     cache_manager.Set(*rel_file_path_, data, mmap_size_);
     if (is_full) {
-        LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+        LOG_TRACE(fmt::format("Version file is full: {}", GetPath()));
         // if the version file is full, return true to spill to file
         return true;
     }

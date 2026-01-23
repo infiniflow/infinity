@@ -1963,7 +1963,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-            Status status = VirtualStore::Copy(write_path, read_path);
+            Status status = VirtualStore::Copy(read_path, write_path);
             if (!status.ok()) {
                 LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
                 return Status::OK();
