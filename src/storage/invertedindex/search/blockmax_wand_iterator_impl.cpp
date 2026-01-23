@@ -78,6 +78,19 @@ BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterat
     }
     indices_valid_ = true;
 
+    // Initialize MSM optimization structures
+    block_min_match_counts_.resize(num_iterators, 0);
+
+    // Initialize cost-sorted iterators (Lucene-inspired)
+    cost_sorted_iterators_.reserve(num_iterators);
+    for (size_t i = 0; i < num_iterators; i++) {
+        DocIteratorEstimateIterateCost cost = sorted_iterators_[i]->GetEstimateIterateCost();
+        cost_sorted_iterators_.emplace_back(sorted_iterators_[i], cost);
+    }
+    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(),
+              [](const auto &a, const auto &b) { return a.cost < b.cost; });
+    cost_sorted_valid_ = true;
+
     UpdateScoreUpperBoundPrefixSums();
 }
 
@@ -313,6 +326,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             num_iterators = sorted_iterators_.size();
             prefix_sums_valid_ = false; // Invalidate prefix sums when iterators are removed
             indices_valid_ = false;     // Invalidate indices cache
+            cost_sorted_valid_ = false; // Invalidate cost-sorted cache
         }
         if (bm25_score_upper_bound_ <= threshold_) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
@@ -399,17 +413,62 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             num_iterators = sorted_iterators_.size();
             prefix_sums_valid_ = false;
             indices_valid_ = false;
+            cost_sorted_valid_ = false;  // Invalidate cost-sorted cache
             continue;
         }
 
         if (sum_score_bm > threshold_) {
             if (sorted_iterators_[0]->DocID() == d) {
+                // Lucene-inspired optimization: Check MSM feasibility before scoring
+                // Similar to Lucene's: if (freq + tailSize < minShouldMatch) skip entire doc
+                if (minimum_should_match_hint_ > 0) {
+                    u32 current_matches = 0;
+                    // Count iterators already on this doc
+                    for (size_t i = 0; i <= pivot && sorted_iterators_[i]->DocID() == d; i++) {
+                        current_matches++;
+                    }
+                    // Check if we can possibly satisfy MSM
+                    if (!CanSatisfyMinimumShouldMatch(d, current_matches)) {
+                        // Even if we advance all iterators, we can't satisfy MSM
+                        // Skip to next document - this is the key optimization from Lucene
+                        next_sum_score_low_cnt_++;
+                        for (size_t i = 0; i <= pivot; i++) {
+                            sorted_iterators_[i]->Next(d + 1);
+                        }
+                        continue; // Go to next iteration of main loop
+                    }
+                }
+
                 // EvaluatePartial(d , p);
                 float sum_score = 0.0f;
                 for (size_t i = 0; i <= pivot; i++) {
                     sum_score += sorted_iterators_[i]->BM25Score();
                 }
                 if (sum_score > threshold_) {
+                    // Early check using minimum_should_match hint
+                    // If we have MSM hint, perform a quick match count check
+                    // This can save the wrapper from calling MatchCount() on documents that can't satisfy MSM
+                    bool skip_this_doc = false;
+                    if (minimum_should_match_hint_ > 0) {
+                        u32 match_count = 0;
+                        for (size_t i = 0; i <= pivot && sorted_iterators_[i]->DocID() == d; i++) {
+                            match_count += sorted_iterators_[i]->MatchCount();
+                        }
+                        if (match_count < minimum_should_match_hint_) {
+                            skip_this_doc = true;
+                        }
+                    }
+
+                    if (skip_this_doc) {
+                        // Skip this document as it can't meet MSM requirement
+                        next_sum_score_low_cnt_++;
+                        for (size_t i = 0; i <= pivot; i++) {
+                            sorted_iterators_[i]->Next(d + 1);
+                        }
+                        // Go back to start of main loop to find next pivot
+                        continue;
+                    }
+
                     pivot_ = pivot;
                     doc_id_ = d;
                     bm25_score_cache_ = sum_score;
@@ -435,6 +494,32 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             RowID up_to = INVALID_ROWID;
             if (pivot + 1 < num_iterators)
                 up_to = sorted_iterators_[pivot + 1]->DocID();
+
+            // Lucene-inspired: Skip blocks that cannot satisfy MSM
+            // Similar to Lucene's block-max pruning but with MSM awareness
+            if (minimum_should_match_hint_ > 0) {
+                // Estimate maximum possible matches in the range [d, up_to)
+                u32 max_matches_in_range = 0;
+                for (size_t i = 0; i <= pivot; i++) {
+                    RowID block_min = sorted_iterators_[i]->BlockMinPossibleDocID();
+                    RowID block_last = sorted_iterators_[i]->BlockLastDocID();
+                    // Check if this block overlaps with [d, up_to)
+                    if (block_last >= d && (up_to == INVALID_ROWID || block_min < up_to)) {
+                        max_matches_in_range++;
+                    }
+                }
+                // If even in the best case we can't satisfy MSM, skip the entire range
+                if (max_matches_in_range < minimum_should_match_hint_) {
+                    next_sum_score_bm_low_cnt_++;
+                    RowID target = (up_to == INVALID_ROWID) ? d + 1 : up_to;
+                    for (size_t i = 0; i <= pivot; i++) {
+                        sorted_iterators_[i]->Next(target);
+                    }
+                    cost_sorted_valid_ = false;  // Invalidate cache after Next()
+                    continue;
+                }
+            }
+
             RowID shallowed_did = INVALID_ROWID;
             std::partial_sort(sorted_iterators_.begin(),
                               sorted_iterators_.begin() + 1,
@@ -512,6 +597,77 @@ u32 BlockMaxWandIterator::MatchCount() const {
         }
     }
     return count;
+}
+
+void BlockMaxWandIterator::SetMinimumShouldMatchHint(u32 minimum_should_match) {
+    minimum_should_match_hint_ = minimum_should_match;
+    // The hint is used during Next() to perform additional pruning
+    // when minimum_should_match > 0
+    // Update cost-sorted iterators for efficient advancement
+    cost_sorted_valid_ = false;  // Will be updated lazily in Next()
+}
+
+// Lucene-inspired: Estimate the maximum possible number of matches for a document
+// This is like Lucene's "freq + tailSize" concept
+u32 BlockMaxWandIterator::EstimateMaxPossibleMatches(RowID doc_id) {
+    u32 max_possible = 0;
+    const size_t num_iterators = sorted_iterators_.size();
+
+    // Count iterators that could potentially match this doc
+    for (size_t i = 0; i < num_iterators; i++) {
+        RowID iter_doc_id = sorted_iterators_[i]->DocID();
+        RowID block_last = sorted_iterators_[i]->BlockLastDocID();
+        RowID block_min = sorted_iterators_[i]->BlockMinPossibleDocID();
+
+        // If the iterator is already on this doc, definitely matches
+        if (iter_doc_id == doc_id) {
+            max_possible++;
+        }
+        // If the iterator's current block contains this doc, might match
+        else if (iter_doc_id < doc_id && block_last >= doc_id && block_min <= doc_id) {
+            max_possible++;
+        }
+    }
+
+    return max_possible;
+}
+
+// Lucene-inspired: Check if we can potentially satisfy the MSM requirement
+bool BlockMaxWandIterator::CanSatisfyMinimumShouldMatch(RowID doc_id, u32 current_matches) {
+    if (minimum_should_match_hint_ <= 0) {
+        return true;  // No MSM constraint
+    }
+    if (current_matches >= minimum_should_match_hint_) {
+        return true;  // Already satisfied
+    }
+
+    // Use max possible matches estimation for early pruning
+    // Similar to Lucene's: if (freq + tailSize < minShouldMatch) return false;
+    u32 max_possible_matches = EstimateMaxPossibleMatches(doc_id);
+    return max_possible_matches >= minimum_should_match_hint_;
+}
+
+// Lucene-inspired: Maintain cost-sorted iterators for efficient advancement
+// When we need to advance iterators to satisfy MSM, prioritize low-cost ones
+void BlockMaxWandIterator::UpdateCostSortedIterators() {
+    if (cost_sorted_valid_) {
+        return;  // Already up to date
+    }
+
+    const size_t num_iterators = sorted_iterators_.size();
+    cost_sorted_iterators_.clear();
+    cost_sorted_iterators_.reserve(num_iterators);
+
+    for (size_t i = 0; i < num_iterators; i++) {
+        DocIteratorEstimateIterateCost cost = sorted_iterators_[i]->GetEstimateIterateCost();
+        cost_sorted_iterators_.emplace_back(sorted_iterators_[i], cost);
+    }
+
+    // Sort by cost (ascending) - advance cheaper iterators first
+    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(),
+              [](const auto &a, const auto &b) { return a.cost < b.cost; });
+
+    cost_sorted_valid_ = true;
 }
 
 } // namespace infinity
