@@ -41,17 +41,22 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
-protected:
-    bool Write(std::shared_ptr<HnswHandler> &data,
-               std::unique_ptr<LocalFileHandle> &file_handle,
-               bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+    boost::interprocess::managed_mapped_file segment_; // mmap
+    // segment_.flush();
 
-    void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+protected:
+    // bool Write(std::shared_ptr<HnswHandler> &data,
+    //            std::unique_ptr<LocalFileHandle> &file_handle,
+    //            bool &prepare_success,
+    //            const FileWorkerSaveCtx &ctx) override;
+
+    void Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
 private:
     mutable std::mutex mutex_;
     size_t index_size_{};
+
+    bool inited_{};
 };
 
 } // namespace infinity

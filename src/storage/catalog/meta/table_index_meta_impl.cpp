@@ -45,8 +45,7 @@ namespace infinity {
 TableIndexMeta::TableIndexMeta(const std::string &index_id_str, const std::string &index_name, TableMeta &table_meta)
     : kv_instance_(*table_meta.kv_instance()), table_meta_(table_meta), index_id_str_(index_id_str), index_name_str_(index_name) {
     if (index_name_str_.empty()) {
-        index_def_ =
-            infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+        index_def_ = GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
         index_name_str_ = *index_def_->index_name_;
     }
 }
@@ -70,8 +69,7 @@ std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeta::GetIndexBase() {
         }
     }
 
-    index_def_ =
-        infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+    index_def_ = GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
 
     if (index_cache.get() != nullptr && table_meta_.txn() != nullptr) {
         table_meta_.txn()->AddCacheInfo(
@@ -105,14 +103,14 @@ std::tuple<std::shared_ptr<ColumnDef>, Status> TableIndexMeta::GetColumnDef() {
 }
 
 std::tuple<std::vector<SegmentID> *, Status> TableIndexMeta::GetSegmentIndexIDs1() {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (!segment_ids_) {
-        segment_ids_ = infinity::GetTableIndexSegments(&kv_instance_,
-                                                       table_meta_.db_id_str(),
-                                                       table_meta_.table_id_str(),
-                                                       index_id_str_,
-                                                       table_meta_.begin_ts(),
-                                                       table_meta_.commit_ts());
+        segment_ids_ = GetTableIndexSegments(&kv_instance_,
+                                             table_meta_.db_id_str(),
+                                             table_meta_.table_id_str(),
+                                             index_id_str_,
+                                             table_meta_.begin_ts(),
+                                             table_meta_.commit_ts());
     }
     return {&*segment_ids_, Status::OK()};
 }
@@ -122,7 +120,7 @@ bool TableIndexMeta::HasSegmentIndexID(SegmentID segment_id) {
     if (!status.ok()) {
         return false;
     }
-    auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id);
+    auto iter = std::ranges::find(*segment_ids_ptr, segment_id);
     if (iter == segment_ids_ptr->end()) {
         return false;
     }

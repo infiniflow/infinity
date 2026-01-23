@@ -899,13 +899,9 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
         }
 
         // append in version file.
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(commit_ts, block_offset + append_rows);
-        // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-        // cache_manager.UnPin(*version_file_worker->rel_file_path_);
-        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -967,7 +963,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
         // delete in version file
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         version_file_worker->Read(block_version);
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
@@ -977,8 +973,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             }
             undo_block_offsets.push_back(block_offset);
         }
-        VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        version_file_worker->Write(block_version, version_file_worker_save_ctx);
     }
     return Status::OK();
 }
@@ -997,7 +991,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
 
     {
         // delete in version file
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         version_file_worker->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
@@ -1018,7 +1012,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     {
         // delete in version file
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         version_file_worker->Read(block_version);
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
@@ -1409,20 +1403,44 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     }
     std::vector<std::shared_ptr<TableIndexMeta>> table_index_metas;
     std::vector<std::string> *index_name_strs{};
-    if (!IsReplay()) {
-        std::vector<std::string> *index_id_strs{};
-        {
-            status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        for (size_t i = 0; i < index_id_strs->size(); ++i) {
-            const auto &index_id_str = (*index_id_strs)[i];
-            const auto &index_name_str = (*index_name_strs)[i];
-            table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
+    // if (!IsReplay()) {
+    //     std::vector<std::string> *index_id_strs{};
+    //     {
+    //         status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
+    //         if (!status.ok()) {
+    //             return status;
+    //         }
+    //     }
+    //     for (size_t i = 0; i < index_id_strs->size(); ++i) {
+    //         const auto &index_id_str = (*index_id_strs)[i];
+    //         const auto &index_name_str = (*index_name_strs)[i];
+    //         table_index_metas.push_back(std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta));
+    //     }
+    // }
+
+    // if (!IsReplay()) {
+    std::vector<std::string> *index_id_strs{};
+    {
+        status = table_meta.GetIndexIDs(index_id_strs, &index_name_strs);
+        if (!status.ok()) {
+            return status;
         }
     }
+    for (size_t i = 0; i < index_id_strs->size(); ++i) {
+        const auto &index_id_str = (*index_id_strs)[i];
+        const auto &index_name_str = (*index_name_strs)[i];
+
+        auto table_index_meta = std::make_shared<TableIndexMeta>(index_id_str, index_name_str, table_meta);
+        auto [index_def, status] = table_index_meta->GetIndexBase();
+        auto index_type = index_def->index_type_;
+
+        if (!IsReplay()) {
+            table_index_metas.push_back(table_index_meta);
+        } else if (index_type == IndexType::kHnsw) {
+            table_index_metas.push_back(table_index_meta);
+        }
+    }
+    // }
 
     // ensure append_cmd->row_ranges_ be block aligned
     std::vector<std::pair<RowID, u64>> append_ranges;
@@ -1478,7 +1496,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
         } else {
             block_meta.emplace(block_id, segment_meta.value());
         }
-        size_t block_row_cnt;
+        size_t block_row_cnt{};
         std::tie(block_row_cnt, status) = block_meta->GetRowCnt1();
         if (!status.ok()) {
             return status;
@@ -1718,11 +1736,9 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
         if (!status.ok()) {
             return status;
         }
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->Append(save_ts, block_info.row_count_);
-
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
     return Status::OK();
 }
@@ -1738,11 +1754,9 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         if (!status.ok()) {
             return status;
         }
-        std::shared_ptr<BlockVersion> block_version;
+        BlockVersion *block_version{};
         static_cast<FileWorker *>(version_file_worker)->Read(block_version);
         block_version->CommitAppend(save_ts, commit_ts);
-
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
     }
 
     return Status::OK();

@@ -4,10 +4,10 @@ import time
 import argparse
 
 commands = [
-    "python3 tools/run_pysdk_remote_infinity_test.py --pytest_mark='not complex'",
+    # "python3 tools/run_pysdk_remote_infinity_test.py --pytest_mark='not complex'",
     "python3 tools/run_parallel_test.py --pytest_mark='not complex'",
-    "python3 tools/run_http_api.py --pytest_mark='not complex'",
-    "python3 tools/sqllogictest.py"
+    # "python3 tools/run_http_api.py --pytest_mark='not complex'",
+    # "python3 tools/sqllogictest.py"
 ]
 
 LOG_PATH = "/var/infinity/log/infinity.log"

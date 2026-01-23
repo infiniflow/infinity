@@ -26,6 +26,7 @@ import :infinity_exception;
 import :data_store_util;
 import :plain_vec_store;
 import :utility;
+import :boost;
 
 import std;
 
@@ -33,7 +34,7 @@ import serialize;
 
 namespace infinity {
 
-template <typename VecStoreT, typename LabelType, bool OwnMem>
+template <typename VecStoreT, typename LabelType>
 class DataStoreInner;
 
 export template <typename VecStoreT, typename LabelType>
@@ -45,12 +46,12 @@ class DataStoreIter;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
 
-export template <typename VecStoreT, typename LabelType, bool OwnMem>
+export template <typename VecStoreT, typename LabelType>
 class DataStoreBase {
 public:
-    using This = DataStoreBase<VecStoreT, LabelType, OwnMem>;
-    using QueryVecType = VecStoreT::QueryVecType;
-    using VecStoreMeta = VecStoreT::template Meta<OwnMem>;
+    using This = DataStoreBase<VecStoreT, LabelType>;
+    using QueryVecType = typename VecStoreT::QueryVecType;
+    using VecStoreMeta = typename VecStoreT::Meta;
 
     template <typename T, typename = void>
     struct has_compress_type : std::false_type {};
@@ -58,17 +59,19 @@ public:
     template <typename T>
     struct has_compress_type<T, std::void_t<typename T::CompressType>> : std::true_type {};
 
-    DataStoreBase() = default;
-    DataStoreBase(VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
-        : vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)) {}
-    // DataStoreBase(This &&other) : vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)) {}
-    // DataStoreBase &operator=(This &&other) {
-    //     if (this != &other) {
-    //         vec_store_meta_ = std::move(other.vec_store_meta_);
-    //         graph_store_meta_ = std::move(other.graph_store_meta_);
-    //     }
-    //     return *this;
-    // }
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
+    DataStoreBase(segment_manager *sm) : vec_store_meta_(sm), sm_(sm) {}
+    DataStoreBase(VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta, segment_manager *sm)
+        : vec_store_meta_(std::move(vec_store_meta)), graph_store_meta_(std::move(graph_store_meta)), sm_(sm) {}
+    DataStoreBase(This &&other) noexcept : vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)) {}
+    DataStoreBase &operator=(This &&other) noexcept {
+        if (this != &other) {
+            vec_store_meta_ = std::move(other.vec_store_meta_);
+            graph_store_meta_ = std::move(other.graph_store_meta_);
+        }
+        return *this;
+    }
     // ~DataStoreBase() = default;
 
     typename VecStoreT::QueryType MakeQuery(QueryVecType query) const { return vec_store_meta_.MakeQuery(query); }
@@ -86,39 +89,54 @@ public:
 protected:
     VecStoreMeta vec_store_meta_;
     GraphStoreMeta graph_store_meta_;
+
+    segment_manager *sm_{};
 };
 
-export template <typename VecStoreT, typename LabelType, bool OwnMem = true>
-class DataStore : public DataStoreBase<VecStoreT, LabelType, OwnMem> {
+export template <typename VecStoreT, typename LabelType>
+class DataStore : public DataStoreBase<VecStoreT, LabelType> {
 public:
-    using This = DataStore<VecStoreT, LabelType, OwnMem>;
-    using Base = DataStoreBase<VecStoreT, LabelType, OwnMem>;
+    using This = DataStore<VecStoreT, LabelType>;
+    using Base = DataStoreBase<VecStoreT, LabelType>;
     using DataType = VecStoreT::DataType;
     using QueryVecType = VecStoreT::QueryVecType;
-    using Inner = DataStoreInner<VecStoreT, LabelType, OwnMem>;
-    using VecStoreMeta = VecStoreT::template Meta<OwnMem>;
-    using VecStoreInner = VecStoreT::template Inner<OwnMem>;
+    using Inner = DataStoreInner<VecStoreT, LabelType>;
+    using VecStoreMeta = typename VecStoreT::Meta;
+    using VecStoreInner = typename VecStoreT::Inner;
 
     friend class DataStoreChunkIter<VecStoreT, LabelType>;
     friend class DataStoreIter<VecStoreT, LabelType>;
 
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
 private:
-    DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
-        : Base(std::move(vec_store_meta), std::move(graph_store_meta)), chunk_size_(chunk_size), max_chunk_n_(max_chunk_n),
-          chunk_shift_(__builtin_ctzll(chunk_size)), inners_(std::make_unique<Inner[]>(max_chunk_n)), mem_usage_(0) {
+    DataStore(size_t chunk_size, size_t max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta, segment_manager *sm)
+        : Base(std::move(vec_store_meta), std::move(graph_store_meta), sm), chunk_size_(chunk_size), max_chunk_n_(max_chunk_n),
+          chunk_shift_(__builtin_ctzll(chunk_size)), inners_(sm), mem_usage_(0) {
+        // inners_.resize(max_chunk_n, {sm});
         assert(chunk_size > 0);
         assert((chunk_size & (chunk_size - 1)) == 0);
+        // Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage, sm)
         cur_vec_num_ = 0;
     }
 
 public:
-    DataStore() = default;
-    DataStore(DataStore &&other) noexcept : Base(std::move(other)) {
+    DataStore(segment_manager *sm) : Base(sm), inners_(sm) {}
+    DataStore(DataStore &&other) noexcept : Base(std::move(other)), inners_(std::move(other.inners_)) {
         chunk_size_ = std::exchange(other.chunk_size_, 0);
         max_chunk_n_ = std::exchange(other.max_chunk_n_, 0);
         chunk_shift_ = std::exchange(other.chunk_shift_, 0);
         cur_vec_num_ = other.cur_vec_num_.exchange(0);
-        inners_ = std::exchange(other.inners_, nullptr);
+
+        // inners_ = std::exchange(other.inners_, nullptr);
+        // inners_.clear();
+        // size_t size = other.inners_.size();
+        // inners_.resize(size);
+        // for (size_t i = 0; i < size; ++i) {
+        //     std::swap(inners_[i], other.inners_[i]);
+        // }
+        // other.inners_.clear();
+
         mem_usage_ = other.mem_usage_.exchange(0);
     }
     DataStore &operator=(DataStore &&other) noexcept {
@@ -128,13 +146,23 @@ public:
             max_chunk_n_ = std::exchange(other.max_chunk_n_, 0);
             chunk_shift_ = std::exchange(other.chunk_shift_, 0);
             cur_vec_num_ = other.cur_vec_num_.exchange(0);
-            inners_ = std::exchange(other.inners_, nullptr);
+
+            inners_ = std::move(other.inners_);
+            // inners_ = std::exchange(other.inners_, nullptr);
+            // inners_.clear();
+            // size_t size = other.inners_.size();
+            // inners_.resize(size);
+            // for (size_t i = 0; i < size; ++i) {
+            //     std::swap(inners_[i], other.inners_[i]);
+            // }
+            // other.inners_.clear();
+
             mem_usage_ = other.mem_usage_.exchange(0);
         }
         return *this;
     }
     ~DataStore() {
-        if (!inners_) {
+        if (inners_.empty()) {
             return;
         }
         size_t cur_vec_num = this->cur_vec_num();
@@ -145,18 +173,23 @@ public:
         }
     }
 
-    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax) {
+    static This Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t Mmax0, size_t Mmax, segment_manager *sm) {
         bool normalize = false;
         if constexpr (Base::template has_compress_type<VecStoreT>::value) {
-            normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::template Meta<OwnMem>>;
+            normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::Meta>;
         }
-        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize);
+        // static_assert(!std::is_standard_layout_v<VecStoreMeta>);
+        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize, sm);
+
+        static_assert(std::is_standard_layout_v<GraphStoreMeta>);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
-        This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
+
+        This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta), sm);
         ret.cur_vec_num_ = 0;
 
         size_t mem_usage = 0;
-        ret.inners_[0] = Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
+        // ret.inners_[0] = Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
+        ret.inners_.push_back(Inner::Make(chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage, sm));
         ret.mem_usage_.store(mem_usage);
         return ret;
     }
@@ -172,8 +205,31 @@ public:
         ret += this->graph_store_meta_.CalcSize(cur_vec_num);
 
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
-        ret += Inner::CalcSize(inners_.get(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
+        ret += Inner::CalcSize(inners_.data(), this->vec_store_meta_, this->graph_store_meta_, chunk_size_, chunk_num, last_chunk_size);
         return ret;
+    }
+
+    void RebindAllocator(segment_manager *sm) {
+        this->sm_ = sm;
+        this->vec_store_meta_.RebindAllocator(sm);
+        // this->graph_store_meta_.RebindAllocator(sm);
+        decltype(inners_) inners(std::move(inners_), boost::interprocess::allocator<Inner, segment_manager>(sm));
+        inners_.swap(inners);
+
+        // namespace boost { namespace interprocess {
+        //
+        // template<class T, class SegmentManager>
+        // struct allocator_traits<allocator<T, SegmentManager>>
+        // {
+        //     using allocator_type = allocator<T, SegmentManager>;
+        //     using is_always_equal = std::false_type;
+        //     using propagate_on_container_swap = std::true_type;
+        // };
+        //
+        // }} // namespace boost::interprocess
+
+
+        // inners_.get_stored_allocator() = boost::interprocess::allocator<Inner, segment_manager>(sm);
     }
 
     void SaveToPtr(void *&mmap_p, size_t &offset) const {
@@ -208,7 +264,7 @@ public:
         return ret;
     }
 
-    void SetGraph(GraphStoreMeta &&graph_meta, std::vector<GraphStoreInner<OwnMem>> &&graph_inners) {
+    void SetGraph(GraphStoreMeta &&graph_meta, std::vector<GraphStoreInner> &&graph_inners) {
         this->graph_store_meta_ = std::move(graph_meta);
         for (size_t i = 0; i < graph_inners.size(); ++i) {
             inners_[i].SetGraphStoreInner(std::move(graph_inners[i]));
@@ -249,7 +305,9 @@ public:
                 break;
             }
             if (last_chunk_size == chunk_size_) {
-                inners_[chunk_num++] = Inner::Make(chunk_size_, this->vec_store_meta_, this->graph_store_meta_, mem_usage);
+                ++chunk_num;
+                // inners_[chunk_num++] = Inner::Make(chunk_size_, this->vec_store_meta_, this->graph_store_meta_, mem_usage, this->sm_);
+                inners_.push_back(Inner::Make(chunk_size_, this->vec_store_meta_, this->graph_store_meta_, mem_usage, this->sm_));
                 last_chunk_size = 0;
             }
             if (used_up) {
@@ -332,25 +390,25 @@ public:
         return inner.GetLabel(idx);
     }
 
-    std::shared_lock<std::shared_mutex> SharedLock(size_t vec_i) const {
-        const auto &[inner, idx] = GetInner(vec_i);
-        return inner.SharedLock(idx);
-    }
-
-    std::unique_lock<std::shared_mutex> UniqueLock(size_t vec_i) {
-        const auto &[inner, idx] = GetInner(vec_i);
-        return inner.UniqueLock(idx);
-    }
+    // std::shared_lock<std::shared_mutex> SharedLock(size_t vec_i) const {
+    //     const auto &[inner, idx] = GetInner(vec_i);
+    //     return inner.SharedLock(idx);
+    // }
+    //
+    // std::unique_lock<std::shared_mutex> UniqueLock(size_t vec_i) {
+    //     const auto &[inner, idx] = GetInner(vec_i);
+    //     return inner.UniqueLock(idx);
+    // }
 
     size_t cur_vec_num() const { return cur_vec_num_.load(); }
 
     size_t mem_usage() const { return mem_usage_.load(); }
 
     template <typename CompressVecStoreType>
-    DataStore<CompressVecStoreType, LabelType, OwnMem> CompressToLVQ() &&;
+    DataStore<CompressVecStoreType, LabelType> CompressToLVQ() &&;
 
     template <typename CompressVecStoreType>
-    DataStore<CompressVecStoreType, LabelType, OwnMem> CompressToRabitq() &&;
+    DataStore<CompressVecStoreType, LabelType> CompressToRabitq() &&;
 
 private:
     std::pair<Inner &, size_t> GetInner(size_t vec_i) { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
@@ -372,7 +430,8 @@ private:
 
     std::atomic<size_t> cur_vec_num_;
 
-    std::unique_ptr<Inner[]> inners_;
+    // std::unique_ptr<Inner[]> inners_;
+    boost::interprocess::vector<Inner, boost::interprocess::allocator<Inner, segment_manager>> inners_;
     std::atomic<size_t> mem_usage_ = 0;
 
 public:
@@ -416,100 +475,108 @@ public:
     }
 };
 
-export template <typename VecStoreT, typename LabelType>
-class DataStore<VecStoreT, LabelType, false> : public DataStoreBase<VecStoreT, LabelType, false> {
-public:
-    using This = DataStore<VecStoreT, LabelType, false>;
-    using VecStoreMeta = typename VecStoreT::template Meta<false>;
-    using Base = DataStoreBase<VecStoreT, LabelType, false>;
-    using Inner = DataStoreInner<VecStoreT, LabelType, false>;
-
-private:
-    DataStore(size_t cur_vec_num, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
-        : Base(std::move(vec_store_meta), std::move(graph_store_meta)), cur_vec_num_(cur_vec_num) {}
-
-public:
-    DataStore() = default;
-    // DataStore(DataStore &&other) : Base(std::move(other)), inner_(std::move(other.inner_)), cur_vec_num_(other.cur_vec_num_) {}
-    // DataStore &operator=(DataStore &&other) {
-    //     if (this != &other) {
-    //         Base::operator=(std::move(other));
-    //         inner_ = std::move(other.inner_);
-    //         cur_vec_num_ = other.cur_vec_num_;
-    //     }
-    //     return *this;
-    // }
-    // ~DataStore() = default;
-
-    static This LoadFromPtr(const char *&ptr) {
-        size_t cur_vec_num = ReadBufAdv<size_t>(ptr);
-        VecStoreMeta vec_store_meta = VecStoreMeta::LoadFromPtr(ptr);
-        GraphStoreMeta graph_store_meta = GraphStoreMeta::LoadFromPtr(ptr);
-
-        This ret = This(cur_vec_num, std::move(vec_store_meta), std::move(graph_store_meta));
-        ret.inner_ = Inner::LoadFromPtr(ptr, cur_vec_num, cur_vec_num, ret.vec_store_meta_, ret.graph_store_meta_);
-        return ret;
-    }
-
-    typename VecStoreT::StoreType GetVec(size_t vec_i) const { return inner_.GetVec(vec_i, this->vec_store_meta_); }
-
-    void PrefetchVec(size_t vec_i) const { inner_.PrefetchVec(vec_i, this->vec_store_meta_); }
-
-    std::pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
-        return inner_.GetNeighbors(vertex_i, layer_i, this->graph_store_meta_);
-    }
-
-    LabelType GetLabel(size_t vec_i) const { return inner_.GetLabel(vec_i); }
-
-    size_t cur_vec_num() const { return cur_vec_num_; }
-
-    size_t mem_usage() const { return 0; }
-
-private:
-    Inner inner_;
-    size_t cur_vec_num_ = 0;
-
-public:
-    void Check() const {
-        i32 max_l = -1;
-        inner_.Check(cur_vec_num_, this->graph_store_meta_, 0, cur_vec_num_, max_l);
-        auto [max_layer, ep] = this->GetEnterPoint();
-        if (max_l != max_layer) {
-            UnrecoverableError("max_l != max_layer");
-        }
-    }
-
-    void Dump() const {
-        std::cout << "[CONST] cur_vec_num: " << cur_vec_num_ << std::endl;
-        this->vec_store_meta_.Dump();
-        inner_.DumpVec(std::cout, 0, cur_vec_num_, this->vec_store_meta_);
-        this->graph_store_meta_.Dump();
-        inner_.DumpGraph(std::cout, cur_vec_num_, this->graph_store_meta_);
-    }
-};
+// export template <typename VecStoreT, typename LabelType>
+// class DataStore<VecStoreT, LabelType, false> : public DataStoreBase<VecStoreT, LabelType, false> {
+// public:
+//     using This = DataStore<VecStoreT, LabelType, false>;
+//     using VecStoreMeta = typename VecStoreT::template Meta<false>;
+//     using Base = DataStoreBase<VecStoreT, LabelType, false>;
+//     using Inner = DataStoreInner<VecStoreT, LabelType, false>;
+//
+// private:
+//     DataStore(size_t cur_vec_num, VecStoreMeta vec_store_meta, GraphStoreMeta graph_store_meta)
+//         : Base(std::move(vec_store_meta), std::move(graph_store_meta)), cur_vec_num_(cur_vec_num) {}
+//
+// public:
+//     DataStore() = default;
+//     // DataStore(DataStore &&other) : Base(std::move(other)), inner_(std::move(other.inner_)), cur_vec_num_(other.cur_vec_num_) {}
+//     // DataStore &operator=(DataStore &&other) {
+//     //     if (this != &other) {
+//     //         Base::operator=(std::move(other));
+//     //         inner_ = std::move(other.inner_);
+//     //         cur_vec_num_ = other.cur_vec_num_;
+//     //     }
+//     //     return *this;
+//     // }
+//     // ~DataStore() = default;
+//
+//     static This LoadFromPtr(const char *&ptr) {
+//         size_t cur_vec_num = ReadBufAdv<size_t>(ptr);
+//         VecStoreMeta vec_store_meta = VecStoreMeta::LoadFromPtr(ptr);
+//         GraphStoreMeta graph_store_meta = GraphStoreMeta::LoadFromPtr(ptr);
+//
+//         This ret = This(cur_vec_num, std::move(vec_store_meta), std::move(graph_store_meta));
+//         ret.inner_ = Inner::LoadFromPtr(ptr, cur_vec_num, cur_vec_num, ret.vec_store_meta_, ret.graph_store_meta_);
+//         return ret;
+//     }
+//
+//     typename VecStoreT::StoreType GetVec(size_t vec_i) const { return inner_.GetVec(vec_i, this->vec_store_meta_); }
+//
+//     void PrefetchVec(size_t vec_i) const { inner_.PrefetchVec(vec_i, this->vec_store_meta_); }
+//
+//     std::pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i) const {
+//         return inner_.GetNeighbors(vertex_i, layer_i, this->graph_store_meta_);
+//     }
+//
+//     LabelType GetLabel(size_t vec_i) const { return inner_.GetLabel(vec_i); }
+//
+//     size_t cur_vec_num() const { return cur_vec_num_; }
+//
+//     size_t mem_usage() const { return 0; }
+//
+// private:
+//     Inner inner_;
+//     size_t cur_vec_num_ = 0;
+//
+// public:
+//     void Check() const {
+//         i32 max_l = -1;
+//         inner_.Check(cur_vec_num_, this->graph_store_meta_, 0, cur_vec_num_, max_l);
+//         auto [max_layer, ep] = this->GetEnterPoint();
+//         if (max_l != max_layer) {
+//             UnrecoverableError("max_l != max_layer");
+//         }
+//     }
+//
+//     void Dump() const {
+//         std::cout << "[CONST] cur_vec_num: " << cur_vec_num_ << std::endl;
+//         this->vec_store_meta_.Dump();
+//         inner_.DumpVec(std::cout, 0, cur_vec_num_, this->vec_store_meta_);
+//         this->graph_store_meta_.Dump();
+//         inner_.DumpGraph(std::cout, cur_vec_num_, this->graph_store_meta_);
+//     }
+// };
 
 #pragma clang diagnostic pop
 //----------------------------------------------- Inner -----------------------------------------------
 
-template <typename VecStoreT, typename LabelType, bool OwnMem>
+template <typename VecStoreT, typename LabelType>
 class DataStoreInnerBase {
 public:
-    using This = DataStoreInner<VecStoreT, LabelType, OwnMem>;
+    using This = DataStoreInner<VecStoreT, LabelType>;
     using DataType = typename VecStoreT::DataType;
-    using VecStoreInner = typename VecStoreT::template Inner<OwnMem>;
-    using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
-    using GraphStoreInner = GraphStoreInner<OwnMem>;
+    using VecStoreInner = typename VecStoreT::Inner;
+    using VecStoreMeta = typename VecStoreT::Meta;
+    using GraphStoreInner = GraphStoreInner;
 
     friend class DataStoreIter<VecStoreT, LabelType>;
 
-public:
-    DataStoreInnerBase() = default;
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
-    void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
-        this->vec_store_inner_.Save(file_handle, cur_vec_num, vec_store_meta);
-        this->graph_store_inner_.Save(file_handle, cur_vec_num, graph_store_meta);
-        file_handle.Append(this->labels_.get(), sizeof(LabelType) * cur_vec_num);
+public:
+    // DataStoreInnerBase() = default;
+    DataStoreInnerBase(size_t chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta, size_t &mem_usage, segment_manager *sm)
+        : vec_store_inner_(VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm)),
+          graph_store_inner_(GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm)), labels_(sm), sm_(sm) {
+        // this->vec_store_inner_ = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm);
+        // this->graph_store_inner_ = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm);
     }
+
+    // void Save(LocalFileHandle &file_handle, size_t cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
+    //     this->vec_store_inner_.Save(file_handle, cur_vec_num, vec_store_meta);
+    //     this->graph_store_inner_.Save(file_handle, cur_vec_num, graph_store_meta);
+    //     file_handle.Append(this->labels_.get(), sizeof(LabelType) * cur_vec_num);
+    // }
 
     static size_t CalcSize(const This *inners,
                            const VecStoreMeta &vec_store_meta,
@@ -593,7 +660,9 @@ public:
 protected:
     VecStoreInner vec_store_inner_;
     GraphStoreInner graph_store_inner_;
-    ArrayPtr<LabelType, OwnMem> labels_;
+    // ArrayPtr<LabelType> labels_;
+    boost::interprocess::vector<LabelType, boost::interprocess::allocator<LabelType, segment_manager>> labels_;
+    segment_manager *sm_;
 
 public:
     void Check(size_t chunk_size, const GraphStoreMeta &meta, VertexType vertex_i_offset, size_t cur_vec_num, i32 &max_l) const {
@@ -612,43 +681,53 @@ public:
     void DumpGraph(std::ostream &os, size_t chunk_size, const GraphStoreMeta &meta) const { graph_store_inner_.Dump(os, chunk_size, meta); }
 };
 
-template <typename VecStoreT, typename LabelType, bool OwnMem>
-class DataStoreInner : public DataStoreInnerBase<VecStoreT, LabelType, OwnMem> {
+template <typename VecStoreT, typename LabelType>
+class DataStoreInner : public DataStoreInnerBase<VecStoreT, LabelType> {
 private:
-    using This = DataStoreInner<VecStoreT, LabelType, OwnMem>;
-    using VecStoreInner = typename VecStoreT::template Inner<OwnMem>;
-    using VecStoreMeta = typename VecStoreT::template Meta<OwnMem>;
-    using GraphStoreInner = GraphStoreInner<OwnMem>;
+    using This = DataStoreInner<VecStoreT, LabelType>;
+    using Base = DataStoreInnerBase<VecStoreT, LabelType>;
+    using VecStoreInner = typename VecStoreT::Inner;
+    using VecStoreMeta = typename VecStoreT::Meta;
+    using GraphStoreInner = GraphStoreInner;
     using QueryVecType = typename VecStoreT::QueryVecType;
 
-    DataStoreInner(size_t chunk_size, VecStoreInner vec_store_inner, GraphStoreInner graph_store_inner) {
-        this->vec_store_inner_ = std::move(vec_store_inner);
-        this->graph_store_inner_ = std::move(graph_store_inner);
-        this->labels_ = std::make_unique<LabelType[]>(chunk_size);
-        vertex_mutex_ = std::make_unique<std::shared_mutex[]>(chunk_size);
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+
+    DataStoreInner(size_t chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta, size_t &mem_usage, segment_manager *sm)
+        : Base(chunk_size, vec_store_meta, graph_store_meta, mem_usage, sm) {
+        this->vec_store_inner_ = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm);
+        this->graph_store_inner_ = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm);
+
+        // this->labels_ = std::make_unique<LabelType[]>(chunk_size);
+        this->labels_.resize(chunk_size);
+        // vertex_mutex_ = std::make_unique<std::shared_mutex[]>(chunk_size);
     }
 
 public:
-    DataStoreInner() = default;
-    static This Make(size_t chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta, size_t &mem_usage) {
-        auto vec_store_inner = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage);
-        auto graph_store_inner = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage);
-        return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
+    // DataStoreInner() = default;
+    static This Make(size_t chunk_size, VecStoreMeta &vec_store_meta, GraphStoreMeta &graph_store_meta, size_t &mem_usage, segment_manager *sm) {
+        // static_assert(std::is_standard_layout_v<VecStoreInner>);
+        // auto vec_store_inner = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage, sm);
+        //
+        // // static_assert(std::is_standard_layout_v<GraphStoreInner>);
+        // auto graph_store_inner = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage, sm);
+        // return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner), sm);
+        return This(chunk_size, vec_store_meta, graph_store_meta, mem_usage, sm);
     }
 
-    static This LoadFromPtr(const char *&ptr,
-                            size_t cur_vec_num,
-                            size_t chunk_size,
-                            VecStoreMeta &vec_store_meta,
-                            GraphStoreMeta &graph_store_meta,
-                            size_t &mem_usage) {
-        auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
-        auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
-        This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
-        std::memcpy(ret.labels_.get(), ptr, sizeof(LabelType) * cur_vec_num);
-        ptr += sizeof(LabelType) * cur_vec_num;
-        return ret;
-    }
+    // static This LoadFromPtr(const char *&ptr,
+    //                         size_t cur_vec_num,
+    //                         size_t chunk_size,
+    //                         VecStoreMeta &vec_store_meta,
+    //                         GraphStoreMeta &graph_store_meta,
+    //                         size_t &mem_usage) {
+    //     auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
+    //     auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
+    //     This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
+    //     std::memcpy(ret.labels_.get(), ptr, sizeof(LabelType) * cur_vec_num);
+    //     ptr += sizeof(LabelType) * cur_vec_num;
+    //     return ret;
+    // }
 
     // vec store
     template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
@@ -677,48 +756,48 @@ public:
         return this->graph_store_inner_.GetNeighborsMut(vertex_i, layer_i, meta);
     }
 
-    std::shared_lock<std::shared_mutex> SharedLock(VertexType vec_i) const { return std::shared_lock<std::shared_mutex>(vertex_mutex_[vec_i]); }
-
-    std::unique_lock<std::shared_mutex> UniqueLock(VertexType vec_i) { return std::unique_lock<std::shared_mutex>(vertex_mutex_[vec_i]); }
-
-private:
-    mutable std::unique_ptr<std::shared_mutex[]> vertex_mutex_;
-};
-
-template <typename VecStoreT, typename LabelType>
-class DataStoreInner<VecStoreT, LabelType, false> : public DataStoreInnerBase<VecStoreT, LabelType, false> {
-public:
-    using This = DataStoreInner<VecStoreT, LabelType, false>;
-    using VecStoreInner = typename VecStoreT::template Inner<false>;
-    using VecStoreMeta = typename VecStoreT::template Meta<false>;
-    using GraphStoreInner = GraphStoreInner<false>;
+    // std::shared_lock<std::shared_mutex> SharedLock(VertexType vec_i) const { return std::shared_lock<std::shared_mutex>(vertex_mutex_[vec_i]); }
+    //
+    // std::unique_lock<std::shared_mutex> UniqueLock(VertexType vec_i) { return std::unique_lock<std::shared_mutex>(vertex_mutex_[vec_i]); }
 
 private:
-    DataStoreInner(size_t chunk_size, VecStoreInner vec_store_inner, GraphStoreInner graph_store_inner, const LabelType *labels) {
-        this->vec_store_inner_ = std::move(vec_store_inner);
-        this->graph_store_inner_ = std::move(graph_store_inner);
-        this->labels_ = labels;
-    }
-
-public:
-    DataStoreInner() = default;
-
-    static This
-    LoadFromPtr(const char *&ptr, size_t cur_vec_num, size_t chunk_size, VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) {
-        auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, vec_store_meta);
-        auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta);
-        auto *labels = reinterpret_cast<const LabelType *>(ptr);
-        ptr += sizeof(LabelType) * cur_vec_num;
-        return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner), labels);
-    }
+    // mutable std::unique_ptr<std::shared_mutex[]> vertex_mutex_;
 };
+
+// template <typename VecStoreT, typename LabelType>
+// class DataStoreInner<VecStoreT, LabelType, false> : public DataStoreInnerBase<VecStoreT, LabelType, false> {
+// public:
+//     using This = DataStoreInner<VecStoreT, LabelType, false>;
+//     using VecStoreInner = typename VecStoreT::template Inner<false>;
+//     using VecStoreMeta = typename VecStoreT::template Meta<false>;
+//     using GraphStoreInner = GraphStoreInner<false>;
+//
+// private:
+//     DataStoreInner(size_t chunk_size, VecStoreInner vec_store_inner, GraphStoreInner graph_store_inner, const LabelType *labels) {
+//         this->vec_store_inner_ = std::move(vec_store_inner);
+//         this->graph_store_inner_ = std::move(graph_store_inner);
+//         this->labels_ = labels;
+//     }
+//
+// public:
+//     DataStoreInner() = default;
+//
+//     static This
+//     LoadFromPtr(const char *&ptr, size_t cur_vec_num, size_t chunk_size, VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) {
+//         auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, vec_store_meta);
+//         auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta);
+//         auto *labels = reinterpret_cast<const LabelType *>(ptr);
+//         ptr += sizeof(LabelType) * cur_vec_num;
+//         return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner), labels);
+//     }
+// };
 
 template <typename VecStoreT, typename LabelType>
 class DataStoreChunkIter {
 public:
-    using Inner = typename DataStore<VecStoreT, LabelType, true>::Inner;
+    using Inner = typename DataStore<VecStoreT, LabelType>::Inner;
 
-    DataStoreChunkIter(const DataStore<VecStoreT, LabelType, true> *data_store) : data_store_(data_store) {
+    DataStoreChunkIter(const DataStore<VecStoreT, LabelType> *data_store) : data_store_(data_store) {
         std::tie(chunk_num_, last_chunk_size_) = data_store_->ChunkInfo(data_store_->cur_vec_num());
     }
 
@@ -732,7 +811,7 @@ public:
         return ret;
     }
 
-    const DataStore<VecStoreT, LabelType, true> *data_store_;
+    const DataStore<VecStoreT, LabelType> *data_store_;
 
 private:
     size_t cur_chunk_i_ = 0;
@@ -743,8 +822,8 @@ private:
 template <typename VecStoreT, typename LabelType>
 class DataStoreInnerIter {
 public:
-    using VecMeta = typename VecStoreT::template Meta<true>;
-    using Inner = DataStoreInner<VecStoreT, LabelType, true>;
+    using VecMeta = typename VecStoreT::Meta;
+    using Inner = DataStoreInner<VecStoreT, LabelType>;
     using StoreType = typename VecStoreT::StoreType;
 
     DataStoreInnerIter(const VecMeta *vec_meta, const Inner *inner, size_t max_vec_num)
@@ -774,7 +853,7 @@ public:
     using InnerIter = DataStoreInnerIter<VecStoreT, LabelType>;
     using ValueType = StoreType;
 
-    DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store)
+    DataStoreIter(const DataStore<VecStoreT, LabelType> *data_store)
         : data_store_iter_(data_store), inner_iter_(std::nullopt), row_count_(data_store->cur_vec_num()) {}
 
     std::optional<std::pair<StoreType, LabelType>> Next() {
@@ -803,48 +882,50 @@ private:
     size_t row_count_ = 0;
 };
 
-template <typename VecStoreT, typename LabelType, bool OwnMem>
+template <typename VecStoreT, typename LabelType>
 template <typename CompressVecStoreType>
-DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelType, OwnMem>::CompressToLVQ() && {
+DataStore<CompressVecStoreType, LabelType> DataStore<VecStoreT, LabelType>::CompressToLVQ() && {
     if constexpr (std::is_same_v<CompressVecStoreType, VecStoreT>) {
         return std::move(*this);
     } else {
         const auto [chunk_num, last_chunk_size] = this->ChunkInfo(this->cur_vec_num());
-        std::vector<GraphStoreInner<OwnMem>> graph_inners;
+        std::vector<GraphStoreInner> graph_inners;
         for (size_t i = 0; i < chunk_num; ++i) {
             graph_inners.emplace_back(std::move(*this->inners_[i].graph_store_inner()));
         }
-        auto ret = DataStore<CompressVecStoreType, LabelType, OwnMem>::Make(this->chunk_size_,
-                                                                            this->max_chunk_n_,
-                                                                            this->vec_store_meta_.dim(),
-                                                                            this->Mmax0(),
-                                                                            this->Mmax());
+        auto ret = DataStore<CompressVecStoreType, LabelType>::Make(this->chunk_size_,
+                                                                    this->max_chunk_n_,
+                                                                    this->vec_store_meta_.dim(),
+                                                                    this->Mmax0(),
+                                                                    this->Mmax(),
+                                                                    this->sm_);
         ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
         ret.SetGraph(std::move(this->graph_store_meta_), std::move(graph_inners));
-        this->inners_ = nullptr;
+        this->inners_.clear();
         return ret;
     }
 }
 
-template <typename VecStoreT, typename LabelType, bool OwnMem>
+template <typename VecStoreT, typename LabelType>
 template <typename CompressVecStoreType>
-DataStore<CompressVecStoreType, LabelType, OwnMem> DataStore<VecStoreT, LabelType, OwnMem>::CompressToRabitq() && {
+DataStore<CompressVecStoreType, LabelType> DataStore<VecStoreT, LabelType>::CompressToRabitq() && {
     if constexpr (std::is_same_v<CompressVecStoreType, VecStoreT>) {
         return std::move(*this);
     } else {
         const auto [chunk_num, last_chunk_size] = this->ChunkInfo(this->cur_vec_num());
-        std::vector<GraphStoreInner<OwnMem>> graph_inners;
+        std::vector<GraphStoreInner> graph_inners;
         for (size_t i = 0; i < chunk_num; ++i) {
             graph_inners.emplace_back(std::move(*this->inners_[i].graph_store_inner()));
         }
-        auto ret = DataStore<CompressVecStoreType, LabelType, OwnMem>::Make(this->chunk_size_,
-                                                                            this->max_chunk_n_,
-                                                                            this->vec_store_meta_.dim(),
-                                                                            this->Mmax0(),
-                                                                            this->Mmax());
+        auto ret = DataStore<CompressVecStoreType, LabelType>::Make(this->chunk_size_,
+                                                                    this->max_chunk_n_,
+                                                                    this->vec_store_meta_.dim(),
+                                                                    this->Mmax0(),
+                                                                    this->Mmax(),
+                                                                    this->sm_);
         ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
         ret.SetGraph(std::move(this->graph_store_meta_), std::move(graph_inners));
-        this->inners_ = nullptr;
+        this->inners_.clear();
         return ret;
     }
 }

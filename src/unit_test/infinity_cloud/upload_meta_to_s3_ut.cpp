@@ -26,7 +26,7 @@ class UploadMetaToS3 : public BaseTestParamStr {};
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, UploadMetaToS3, ::testing::Values(BaseTestParamStr::S3_STORAGE));
 
 TEST_P(UploadMetaToS3, DISABLED_MINIO_test1) {
-    auto *txn_mgr_ = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn_mgr_ = InfinityContext::instance().storage()->new_txn_manager();
     auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());

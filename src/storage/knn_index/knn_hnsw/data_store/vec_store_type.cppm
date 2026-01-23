@@ -53,13 +53,13 @@ class PlainCosVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
-    template <bool OwnMem>
+    // template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    template <bool OwnMem>
-    using Inner = PlainVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta<true>::StoreType;
-    using QueryType = typename Meta<true>::QueryType;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
     using Distance = std::conditional_t<LSG, PlainCosLSGDist<DataType>, PlainCosDist<DataType>>;
 
     static constexpr bool HasOptimize = false;
@@ -77,13 +77,13 @@ class PlainL2VecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
-    template <bool OwnMem>
+    // template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    template <bool OwnMem>
-    using Inner = PlainVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta<true>::StoreType;
-    using QueryType = typename Meta<true>::QueryType;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
     using Distance = std::conditional_t<LSG, PlainL2LSGDist<DataType>, PlainL2Dist<DataType>>;
 
     static constexpr bool HasOptimize = false;
@@ -101,13 +101,13 @@ class PlainIPVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
-    template <bool OwnMem>
+    // template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    template <bool OwnMem>
-    using Inner = PlainVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta<true>::StoreType;
-    using QueryType = typename Meta<true>::QueryType;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
     using Distance = std::conditional_t<LSG, PlainIPLSGDist<DataType>, PlainIPDist<DataType>>;
 
     static constexpr bool HasOptimize = false;
@@ -126,13 +126,13 @@ public:
     using This = SparseIPVecStoreType<DataT, IndexT>;
     using DataType = DataT;
     using CompressType = void;
-    template <bool OwnMem>
+    // template <bool OwnMem>
     using Meta = SparseVecStoreMeta<DataT, IndexT>;
-    template <bool OwnMem>
+    // template <bool OwnMem>
     using Inner = SparseVecStoreInner<DataT, IndexT>;
     using QueryVecType = SparseVecRef<DataT, IndexT>;
-    using StoreType = typename Meta<true>::StoreType;
-    using QueryType = typename Meta<true>::QueryType;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
     using Distance = SparseIPDist<DataT, IndexT>;
 
     static constexpr bool HasOptimize = false;
@@ -152,10 +152,10 @@ public:
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQCosCache<DataType, CompressType>;
-    template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType>;
+    // template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType>;
     using QueryVecType = const DataType *;
     using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = typename MetaType::StoreType;
@@ -179,10 +179,10 @@ public:
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQL2Cache<DataType, CompressType>;
-    template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType>;
+    // template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType>;
     using QueryVecType = const DataType *;
     using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = MetaType::StoreType;
@@ -206,10 +206,10 @@ public:
     using DataType = DataT;
     using CompressType = CompressT;
     using LVQCacheType = LVQIPCache<DataType, CompressType>;
-    template <bool OwnMem>
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCacheType>;
+    // template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCacheType>;
     using QueryVecType = const DataType *;
     using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCacheType>;
     using StoreType = typename MetaType::StoreType;
@@ -231,10 +231,10 @@ class RabitqCosVecStoreType {
 public:
     using This = RabitqCosVecStoreType<DataT, LSG>;
     using DataType = DataT;
-    template <bool OwnMem>
-    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType>;
+    // template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = MetaType::StoreType;
@@ -256,10 +256,10 @@ class RabitqL2VecStoreType {
 public:
     using This = RabitqL2VecStoreType<DataT, LSG>;
     using DataType = DataT;
-    template <bool OwnMem>
-    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType>;
+    // template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;
@@ -281,10 +281,10 @@ class RabitqIPVecStoreType {
 public:
     using This = RabitqIPVecStoreType<DataT, LSG>;
     using DataType = DataT;
-    template <bool OwnMem>
-    using Meta = RabitqVecStoreMeta<DataType, OwnMem>;
-    template <bool OwnMem>
-    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    // template <bool OwnMem>
+    using Meta = RabitqVecStoreMeta<DataType>;
+    // template <bool OwnMem>
+    using Inner = RabitqVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreType = typename MetaType::StoreType;

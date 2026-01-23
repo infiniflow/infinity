@@ -18,7 +18,7 @@ import std.compat;
 
 namespace infinity {
 
-export template <typename T, bool OwnMem>
+export template <typename T>
 class ArrayPtr {
 public:
     ArrayPtr() = default;
@@ -35,21 +35,21 @@ private:
     std::unique_ptr<T[]> ptr_;
 };
 
-export template <typename T>
-class ArrayPtr<T, false> {
-public:
-    ArrayPtr() = default;
-    ArrayPtr(const T *ptr) : ptr_(ptr) {}
+// export template <typename T>
+// class ArrayPtr<T, false> {
+// public:
+//     ArrayPtr() = default;
+//     ArrayPtr(const T *ptr) : ptr_(ptr) {}
+//
+//     const T &operator[](size_t idx) const { return ptr_[idx]; }
+//
+//     const T *get() const { return ptr_; }
+//
+// private:
+//     const T *ptr_ = nullptr;
+// };
 
-    const T &operator[](size_t idx) const { return ptr_[idx]; }
-
-    const T *get() const { return ptr_; }
-
-private:
-    const T *ptr_ = nullptr;
-};
-
-export template <bool OwnMem>
+// export template <bool OwnMem>
 class PPtr {
 public:
     PPtr() = default;
@@ -60,15 +60,15 @@ private:
     char *ptr_;
 };
 
-export template <>
-class PPtr<false> {
-public:
-    PPtr() = default;
-    void set(const char *ptr) { ptr_ = ptr; }
-    const char *get() const { return ptr_; }
-
-private:
-    const char *ptr_ = nullptr;
-};
+// export template <>
+// class PPtr<false> {
+// public:
+//     PPtr() = default;
+//     void set(const char *ptr) { ptr_ = ptr; }
+//     const char *get() const { return ptr_; }
+//
+// private:
+//     const char *ptr_ = nullptr;
+// };
 
 } // namespace infinity

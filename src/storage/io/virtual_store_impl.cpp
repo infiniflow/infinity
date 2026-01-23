@@ -123,6 +123,10 @@ std::tuple<std::unique_ptr<LocalFileHandle>, Status> VirtualStore::Open(const st
     //
     // }
 
+    if (path == "/var/infinity/data/db_2/tbl_0/idx_4/seg_0/chunk_0.idx") {
+        std::println("asdasdasdasdasdasda fuck");
+    }
+
     switch (access_mode) {
         case FileAccessMode::kRead: {
             fd = open(path.c_str(), O_RDONLY, 0666);

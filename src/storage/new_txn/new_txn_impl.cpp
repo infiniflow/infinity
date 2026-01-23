@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <unistd.h>
+
 module infinity_core:new_txn.impl;
 
 import :new_txn;
@@ -1868,13 +1872,10 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             {
                 auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
                 auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
-                auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
-
-                // Read version info
-                std::shared_ptr<BlockVersion> block_version;
-                static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
-
-                // Write snapshot file
+                // Mmap version info
+                BlockVersion *block_version{};
+                static_cast<FileWorker *>(version_file_worker.get())->Read(block_version);
+                // // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!status.ok()) {
@@ -1882,7 +1883,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 }
 
                 block_version->SaveToFile(option.checkpoint_ts_, *handle);
-                // close(handle->fd());
+                close(handle->fd());
             }
 
             {
@@ -1953,18 +1954,37 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
     LOG_TRACE(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
     {
-        auto CreateSnapshotFile = [&](const std::string &file) -> Status {
+        auto CreateSnapshotFile = [&](const std::string &file) {
+            // 此处不应当复制才对
+
+            std::string read_path = fmt::format("{}/{}", temp_dir, file);
+            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+
+            // auto *hnsw_handle = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.GetFileWorker(file);
+            // if (hnsw_handle) {
+            //     read_path = fmt::format("{}/{}", data_dir, file);
+            //     // std::println("should not create snapshot for hnsw index?");
+            //     // return Status::OK();
+            // }
             // Status status = VirtualStore::Copy(write_path, read_path);
             // if (!status.ok()) {
             //     LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
             //     return Status::OK();
             // }
-            std::string read_path = fmt::format("{}/{}", temp_dir, file);
-            std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+
+            // if (file.find("idx") != std::string::npos) {
+            //     // LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
+            //     return Status::OK();
+            // }
+
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-            Status status = VirtualStore::Copy(write_path, read_path);
-            if (!status.ok()) {
+            // if (!VirtualStore::Exists(write_path)) {
+            //     return Status::OK();
+            // }
+
+            Status status1 = VirtualStore::Copy(write_path, read_path);
+            if (!status1.ok()) {
                 LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
                 return Status::OK();
             }
@@ -1976,6 +1996,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
         std::vector<std::string> index_files = table_snapshot_info->GetIndexFiles();
         for (const auto &index_file : index_files) {
+            // fuck
             status = CreateSnapshotFile(index_file);
             if (!status.ok()) {
                 UnrecoverableError(status.message());

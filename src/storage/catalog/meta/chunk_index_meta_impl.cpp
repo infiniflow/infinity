@@ -71,7 +71,7 @@ ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index
     : kv_instance_(segment_index_meta.kv_instance()), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
 
 Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (!chunk_info_) {
         Status status = LoadChunkInfo();
         if (!status.ok()) {
@@ -100,6 +100,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
         auto status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        std::println("fuck: {}", chunk_info_json.dump());
         if (!status.ok()) {
             return status;
         }
@@ -272,6 +273,7 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
         Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        // Status status = kv_instance_.Put(chunk_info_key, "");
         if (!status.ok()) {
             return status;
         }
