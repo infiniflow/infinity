@@ -56,13 +56,6 @@ public:
     bool ready_{false};
     std::shared_ptr<MySnapshotInfo> snapshot_info;
 
-    void TearDown() override {
-        std::string cmd = fmt::format("rm -rf {}", InfinityContext::instance().config()->SnapshotDir());
-        LOG_INFO(fmt::format("Exec cmd: {}", cmd));
-        system(cmd.c_str());
-        BaseTestParamStr::TearDown();
-    }
-
     void SetUp() override {
         NewRequestTest::SetUp();
         SetupDatabase();

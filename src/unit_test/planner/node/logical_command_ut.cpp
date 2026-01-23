@@ -49,8 +49,6 @@ public:
     std::shared_ptr<std::string> table_name;
     std::shared_ptr<TableDef> table_def;
 
-    void TearDown() override { BaseTestParamStr::TearDown(); }
-
     void CheckLogicalNode(const std::shared_ptr<LogicalNode> &node, LogicalNodeType type) {
         if (!node) {
             return;
