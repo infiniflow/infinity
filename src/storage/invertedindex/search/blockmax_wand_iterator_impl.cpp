@@ -87,8 +87,7 @@ BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterat
         DocIteratorEstimateIterateCost cost = sorted_iterators_[i]->GetEstimateIterateCost();
         cost_sorted_iterators_.emplace_back(sorted_iterators_[i], cost);
     }
-    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(),
-              [](const auto &a, const auto &b) { return a.cost < b.cost; });
+    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(), [](const auto &a, const auto &b) { return a.cost < b.cost; });
     cost_sorted_valid_ = true;
 
     UpdateScoreUpperBoundPrefixSums();
@@ -413,7 +412,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
             num_iterators = sorted_iterators_.size();
             prefix_sums_valid_ = false;
             indices_valid_ = false;
-            cost_sorted_valid_ = false;  // Invalidate cost-sorted cache
+            cost_sorted_valid_ = false; // Invalidate cost-sorted cache
             continue;
         }
 
@@ -515,7 +514,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id) {
                     for (size_t i = 0; i <= pivot; i++) {
                         sorted_iterators_[i]->Next(target);
                     }
-                    cost_sorted_valid_ = false;  // Invalidate cache after Next()
+                    cost_sorted_valid_ = false; // Invalidate cache after Next()
                     continue;
                 }
             }
@@ -604,7 +603,7 @@ void BlockMaxWandIterator::SetMinimumShouldMatchHint(u32 minimum_should_match) {
     // The hint is used during Next() to perform additional pruning
     // when minimum_should_match > 0
     // Update cost-sorted iterators for efficient advancement
-    cost_sorted_valid_ = false;  // Will be updated lazily in Next()
+    cost_sorted_valid_ = false; // Will be updated lazily in Next()
 }
 
 // Lucene-inspired: Estimate the maximum possible number of matches for a document
@@ -635,10 +634,10 @@ u32 BlockMaxWandIterator::EstimateMaxPossibleMatches(RowID doc_id) {
 // Lucene-inspired: Check if we can potentially satisfy the MSM requirement
 bool BlockMaxWandIterator::CanSatisfyMinimumShouldMatch(RowID doc_id, u32 current_matches) {
     if (minimum_should_match_hint_ <= 0) {
-        return true;  // No MSM constraint
+        return true; // No MSM constraint
     }
     if (current_matches >= minimum_should_match_hint_) {
-        return true;  // Already satisfied
+        return true; // Already satisfied
     }
 
     // Use max possible matches estimation for early pruning
@@ -651,7 +650,7 @@ bool BlockMaxWandIterator::CanSatisfyMinimumShouldMatch(RowID doc_id, u32 curren
 // When we need to advance iterators to satisfy MSM, prioritize low-cost ones
 void BlockMaxWandIterator::UpdateCostSortedIterators() {
     if (cost_sorted_valid_) {
-        return;  // Already up to date
+        return; // Already up to date
     }
 
     const size_t num_iterators = sorted_iterators_.size();
@@ -664,8 +663,7 @@ void BlockMaxWandIterator::UpdateCostSortedIterators() {
     }
 
     // Sort by cost (ascending) - advance cheaper iterators first
-    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(),
-              [](const auto &a, const auto &b) { return a.cost < b.cost; });
+    std::sort(cost_sorted_iterators_.begin(), cost_sorted_iterators_.end(), [](const auto &a, const auto &b) { return a.cost < b.cost; });
 
     cost_sorted_valid_ = true;
 }
