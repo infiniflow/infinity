@@ -12,6 +12,10 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+module;
+
+#include "parser/search_options.h"
+
 module infinity_core:index_scan_builder.impl;
 
 import :index_scan_builder;
@@ -32,13 +36,15 @@ import :infinity_exception;
 import :filter_expression_push_down;
 import :base_table_ref;
 import :lazy_load;
+import :query_node;
 
 import std;
 import third_party;
 
 namespace infinity {
 
-// Different from LogicalNodeVisitor, this visitor accepts shared_ptr<LogicalNode> as input.
+// Build index scans and reuse parsed full-text query trees.
+// Two-pass approach: collect LogicalMatch nodes, then optimize using cached query trees.
 class BuildIndexScan {
 public:
     explicit BuildIndexScan(QueryContext *query_context_ptr) : query_context_(query_context_ptr) {}
@@ -61,7 +67,7 @@ public:
                     auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
                     // check if the filter can be pushed down to the table scan
                     auto [index_filter, leftover_filter, index_filter_evaluator] =
-                        FilterExpressionPushDown::PushDownToIndexScan(query_context_, base_table_ref_ptr.get(), filter_expression);
+                        FilterExpressionPushDown::PushDownToIndexScan(query_context_, base_table_ref_ptr.get(), filter_expression, &match_cache_);
                     // 1. check if the filter can be pushed down to the table scan
                     if (!index_filter) {
                         // no qualified index filter condition, keep the table scan
@@ -94,12 +100,12 @@ public:
             case LogicalNodeType::kMatchSparseScan:
             case LogicalNodeType::kMatchTensorScan: {
                 auto &match_base = static_cast<LogicalMatchScanBase &>(*op);
-                match_base.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_);
+                match_base.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_, &match_cache_);
                 break;
             }
             case LogicalNodeType::kMatch: {
                 auto &match = static_cast<LogicalMatch &>(*op);
-                match.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_);
+                match.common_query_filter_->TryApplyIndexFilterOptimizer(query_context_, &match_cache_);
                 break;
             }
             default: {
@@ -120,17 +126,49 @@ public:
         }
         if (op->operator_type() == LogicalNodeType::kProjection) {
             const auto &proj = static_cast<LogicalProject &>(*op);
-            FilterExpressionPushDown::BuildFilterFulltextExpression(query_context_, scan_table_ref_ptr_, proj.expressions_);
+            FilterExpressionPushDown::BuildFilterFulltextExpression(query_context_, scan_table_ref_ptr_, proj.expressions_, &match_cache_);
+        }
+    }
+
+    // Collect LogicalMatch nodes with parsed query trees for reuse.
+    void CollectMatchNodes(std::shared_ptr<LogicalNode> &op) {
+        if (!op) {
+            return;
+        }
+        if (op->operator_type() == LogicalNodeType::kMatch) {
+            auto match_ptr = std::static_pointer_cast<LogicalMatch>(op);
+            SearchOptions search_ops(match_ptr->match_expr_->options_text_);
+            std::string default_field;
+            auto iter = search_ops.options_.find("default_field");
+            if (iter != search_ops.options_.end()) {
+                default_field = iter->second;
+            }
+            MatchCacheKey key(match_ptr->match_expr_->fields_, match_ptr->match_expr_->matching_text_, default_field);
+            match_cache_.emplace(std::move(key), op);
+            LOG_INFO(fmt::format("CollectMatchNodes: Found LogicalMatch with fields: '{}', text: '{}', default_field: '{}', query_tree_: {}",
+                                 match_ptr->match_expr_->fields_,
+                                 match_ptr->match_expr_->matching_text_,
+                                 default_field,
+                                 match_ptr->query_tree_ ? "populated" : "null"));
+        }
+        CollectMatchNodes(op->left_node());
+        CollectMatchNodes(op->right_node());
+        if (op->operator_type() == LogicalNodeType::kFusion) {
+            for (auto &fusion = static_cast<LogicalFusion &>(*op); auto &child : fusion.other_children_) {
+                CollectMatchNodes(child);
+            }
         }
     }
 
 private:
     QueryContext *query_context_ = nullptr;
     const BaseTableRef *scan_table_ref_ptr_ = nullptr;
+    FilterExpressionPushDown::MatchQueryCache match_cache_;
 };
 
 void IndexScanBuilder::ApplyToPlan(QueryContext *query_context_ptr, std::shared_ptr<LogicalNode> &logical_plan) {
     BuildIndexScan visitor(query_context_ptr);
+    visitor.CollectMatchNodes(logical_plan);
     visitor.VisitNode(logical_plan);
 }
 

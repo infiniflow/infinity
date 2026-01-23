@@ -24,6 +24,8 @@ namespace infinity {
 
 class NewTxn;
 class QueryContext;
+class LogicalNode;
+
 // TODO: equivalent expression rewrite optimization
 
 // TODO: now do not support "not" expression in index scan
@@ -58,14 +60,43 @@ export struct IndexScanFilterExpressionPushDownResult {
     std::unique_ptr<IndexFilterEvaluator> index_filter_evaluator_;
 };
 
+// Cache key for LogicalMatch nodes.
+struct MatchCacheKey {
+    std::string fields_;
+    std::string matching_text_;
+    std::string default_field_;
+
+    MatchCacheKey(std::string fields, std::string text, std::string default_field)
+        : fields_(std::move(fields)), matching_text_(std::move(text)), default_field_(std::move(default_field)) {}
+
+    bool operator==(const MatchCacheKey &other) const {
+        return fields_ == other.fields_ && matching_text_ == other.matching_text_ && default_field_ == other.default_field_;
+    }
+};
+
+// Hash function for MatchCacheKey.
+struct MatchCacheKeyHash {
+    std::size_t operator()(const MatchCacheKey &key) const noexcept {
+        std::size_t h1 = std::hash<std::string>{}(key.fields_);
+        std::size_t h2 = std::hash<std::string>{}(key.matching_text_);
+        std::size_t h3 = std::hash<std::string>{}(key.default_field_);
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+
 export class FilterExpressionPushDown {
 public:
-    static IndexScanFilterExpressionPushDownResult
-    PushDownToIndexScan(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr, const std::shared_ptr<BaseExpression> &expression);
+    using MatchQueryCache = std::unordered_map<MatchCacheKey, std::shared_ptr<LogicalNode>, MatchCacheKeyHash>;
+
+    static IndexScanFilterExpressionPushDownResult PushDownToIndexScan(QueryContext *query_context,
+                                                                       const BaseTableRef *base_table_ref_ptr,
+                                                                       const std::shared_ptr<BaseExpression> &expression,
+                                                                       const MatchQueryCache *match_cache = nullptr);
 
     static void BuildFilterFulltextExpression(QueryContext *query_context,
                                               const BaseTableRef *base_table_ref_ptr,
-                                              const std::vector<std::shared_ptr<BaseExpression>> &expressions);
+                                              const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                              const MatchQueryCache *match_cache = nullptr);
 
     static std::unique_ptr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression);
 };

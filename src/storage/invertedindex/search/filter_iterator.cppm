@@ -111,6 +111,8 @@ export struct FilterQueryNode final : public QueryNode {
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
     void GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const override {}
+
+    [[nodiscard]] std::unique_ptr<QueryNode> Clone() const override;
 };
 
 } // namespace infinity
