@@ -179,6 +179,7 @@ std::string FileWorker::GetPath() const { return fmt::format("{}/{}", InfinityCo
 std::string FileWorker::GetWorkingPath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), *rel_file_path_); }
 
 Status FileWorker::CleanupFile() const {
+    boost::unique_lock l(mutex_);
     auto status = VirtualStore::DeleteFile(GetWorkingPath());
     if (Type() == FileWorkerType::kRawFile) {
         auto temp_dict_path =
