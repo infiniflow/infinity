@@ -729,7 +729,11 @@ private:
                                                   default_field));
                             auto *match_node = static_cast<LogicalMatch *>(it->second.get());
                             query_tree = match_node->query_tree_->Clone();
-                            found_cached = true;
+                            if (query_tree) {
+                                found_cached = true;
+                            } else {
+                                LOG_INFO("Empty query tree");
+                            }
                         }
                     }
 
