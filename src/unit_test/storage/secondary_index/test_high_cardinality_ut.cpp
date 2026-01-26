@@ -31,6 +31,8 @@ import :txn_state;
 import :index_secondary;
 import :segment_index_meta;
 import :ut.request_test;
+import :secondary_index_file_worker;
+import :virtual_store;
 
 import data_type;
 import logical_type;
@@ -44,7 +46,7 @@ import constant_expr;
 
 using namespace infinity;
 
-class HighCardinalitySecondaryIndexTest : public NewRequestTest {
+class HighCardinalitySecondaryIndexTest : public BaseTestNoParam {
 public:
     HighCardinalitySecondaryIndexTest() = default;
     ~HighCardinalitySecondaryIndexTest() = default;
@@ -63,9 +65,7 @@ protected:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, HighCardinalitySecondaryIndexTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
-
-TEST_P(HighCardinalitySecondaryIndexTest, TestSaveLoadHighCardinality) {
+TEST_F(HighCardinalitySecondaryIndexTest, TestSaveLoadHighCardinality) {
     const u32 chunk_row_count = 10;
     const u32 unique_values = 5;
 
@@ -90,9 +90,12 @@ TEST_P(HighCardinalitySecondaryIndexTest, TestSaveLoadHighCardinality) {
     EXPECT_TRUE(status2.ok());
     index2->ReadIndexInner(*file2);
     EXPECT_EQ(key_count, index2->GetUniqueKeyCount());
+
+    delete index;
+    delete index2;
 }
 
-TEST_P(HighCardinalitySecondaryIndexTest, TestTxn) {
+TEST_F(HighCardinalitySecondaryIndexTest, TestTxn) {
     NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -135,5 +138,7 @@ TEST_P(HighCardinalitySecondaryIndexTest, TestTxn) {
 
         auto test_data = CreateHighCardinalityData<i32>(chunk_row_count, unique_values);
         index->InsertData(&test_data);
+        
+        delete index;
     }
 }
