@@ -78,18 +78,17 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         std::unique_lock l(rw_clean_mtx_);
         cleans_.swap(cleans);
     }
-    // std::vector<std::future<Status>> futs;
-    // futs.reserve(cleans.size());
+    std::vector<std::future<Status>> futs;
+    futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
-        file_worker->CleanupFile();
-        // futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
+        futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
     }
-    // for (auto &fut : futs) {
-    //     auto status = fut.get();
-    //     if (!status.ok()) {
-    //         // return status;
-    //     }
-    // }
+    for (auto &fut : futs) {
+        auto status = fut.get();
+        if (!status.ok()) {
+            // return status;
+        }
+    }
 
     {
         std::unique_lock lock(rw_mtx_);
@@ -123,8 +122,8 @@ template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::MoveFiles() {
     // std::shared_lock lock(rw_temp_mtx_);
     std::unique_lock l(rw_mtx_);
-    // std::vector<std::future<void>> futs;
-    // futs.reserve(map_.size());
+    std::vector<std::future<void>> futs;
+    futs.reserve(map_.size());
     for (auto it = active_dic_.begin(); it != active_dic_.end();) {
         auto &rel_file_path = *it;
         if (rel_file_path.find("import") != std::string::npos) {
@@ -133,15 +132,14 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
         }
         auto file_worker = GetFileWorkerNoLock(rel_file_path);
         // assert(file_worker);
-        file_worker->MoveFile();
-        // futs.emplace_back(std::async(&FileWorkerT::MoveFile, file_worker));
+        futs.emplace_back(std::async(&FileWorkerT::MoveFile, file_worker));
         ++it;
     }
 
     active_dic_.clear();
-    // for (auto &fut : futs) {
-    //     fut.wait();
-    // }
+    for (auto &fut : futs) {
+        fut.wait();
+    }
 }
 
 template struct FileWorkerMap<BMPIndexFileWorker>;
@@ -178,85 +176,58 @@ size_t FileWorkerManager::FileWorkerCount() {
 
 Status FileWorkerManager::RemoveCleanList() {
     std::lock_guard l(mutex_); // Because of async problem
-    // std::vector<std::future<void>> futs;
-    // //
-    // futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::ClearCleans, &bmp_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::ClearCleans, &data_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::ClearCleans, &emvb_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::ClearCleans, &hnsw_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::ClearCleans, &raw_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::ClearCleans, &secondary_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::ClearCleans, &var_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::ClearCleans, &version_map_));
+    std::vector<std::future<void>> futs;
 
-    // for (auto &fut : futs) {
-    //     fut.wait();
-    // }
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::ClearCleans, &bmp_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::ClearCleans, &data_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::ClearCleans, &emvb_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::ClearCleans, &hnsw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::ClearCleans, &raw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::ClearCleans, &secondary_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::ClearCleans, &var_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::ClearCleans, &version_map_));
 
-    bmp_map_.ClearCleans();
-    data_map_.ClearCleans();
-    emvb_map_.ClearCleans();
-    hnsw_map_.ClearCleans();
-    raw_map_.ClearCleans();
-    secondary_map_.ClearCleans();
-    var_map_.ClearCleans();
-    version_map_.ClearCleans();
+    for (auto &fut : futs) {
+        fut.wait();
+    }
 
     return Status::OK();
 }
 
 void FileWorkerManager::RemoveImport(TransactionID txn_id) {
     std::lock_guard l(mutex_); // Because of async problem
-    // std::vector<std::future<void>> futs;
-    //
-    // futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::RemoveImport, &bmp_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::RemoveImport, &data_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::RemoveImport, &emvb_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::RemoveImport, &hnsw_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::RemoveImport, &raw_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::RemoveImport, &secondary_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::RemoveImport, &var_map_, txn_id));
-    // futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::RemoveImport, &version_map_, txn_id));
-    //
-    // for (auto &fut : futs) {
-    //     fut.wait();
-    // }
+    std::vector<std::future<void>> futs;
 
-    bmp_map_.RemoveImport(txn_id);
-    data_map_.RemoveImport(txn_id);
-    emvb_map_.RemoveImport(txn_id);
-    hnsw_map_.RemoveImport(txn_id);
-    raw_map_.RemoveImport(txn_id);
-    secondary_map_.RemoveImport(txn_id);
-    var_map_.RemoveImport(txn_id);
-    version_map_.RemoveImport(txn_id);
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::RemoveImport, &bmp_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::RemoveImport, &data_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::RemoveImport, &emvb_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::RemoveImport, &hnsw_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::RemoveImport, &raw_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::RemoveImport, &secondary_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::RemoveImport, &var_map_, txn_id));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::RemoveImport, &version_map_, txn_id));
+
+    for (auto &fut : futs) {
+        fut.wait();
+    }
 }
 
 void FileWorkerManager::MoveFiles() {
     std::lock_guard l(mutex_); // Because of async problem
-    // std::vector<std::future<void>> futs;
-    //
-    // futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::MoveFiles, &bmp_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::MoveFiles, &data_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::MoveFiles, &emvb_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::MoveFiles, &hnsw_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::MoveFiles, &raw_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::MoveFiles, &secondary_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::MoveFiles, &var_map_));
-    // futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::MoveFiles, &version_map_));
-    //
-    // for (auto &fut : futs) {
-    //     fut.wait();
-    // }
+    std::vector<std::future<void>> futs;
 
-    bmp_map_.MoveFiles();
-    data_map_.MoveFiles();
-    emvb_map_.MoveFiles();
-    hnsw_map_.MoveFiles();
-    raw_map_.MoveFiles();
-    secondary_map_.MoveFiles();
-    var_map_.MoveFiles();
-    version_map_.MoveFiles();
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::MoveFiles, &bmp_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::MoveFiles, &data_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::MoveFiles, &emvb_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::MoveFiles, &hnsw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::MoveFiles, &raw_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::MoveFiles, &secondary_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::MoveFiles, &var_map_));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::MoveFiles, &version_map_));
+
+    for (auto &fut : futs) {
+        fut.wait();
+    }
 }
 
 } // namespace infinity
