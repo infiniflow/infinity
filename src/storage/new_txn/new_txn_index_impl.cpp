@@ -416,16 +416,16 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 // data_ptr->InsertMergeData(old_buffers);
 
                 SecondaryIndexData *data_ptr{};
-                index_file_worker->Read(data_ptr);
+                index_file_worker->Read(data_ptr); // fuck
                 data_ptr->InsertMergeData(old_buffers);
-                index_file_worker->Write(data_ptr);
+                index_file_worker->Write(data_ptr); // fuck
             } else {
                 // auto *data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(buffer_handle.GetDataMut());
                 // data_ptr->InsertMergeData(old_buffers);
                 SecondaryIndexDataBase<LowCardinalityTag> *data_ptr{};
-                index_file_worker->Read(data_ptr);
+                index_file_worker->Read(data_ptr); // fuck
                 data_ptr->InsertMergeData(old_buffers);
-                index_file_worker->Write(data_ptr);
+                index_file_worker->Write(data_ptr); // fuck
             }
             // // std::shared_ptr<SecondaryIndexData> data_ptr;
             // SecondaryIndexData *data_ptr;
@@ -451,9 +451,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
             // std::shared_ptr<IVFIndexInChunk> data_ptr;
             IVFIndexInChunk *data_ptr{};
-            index_file_worker->Read(data_ptr);
+            index_file_worker->Read(data_ptr); // fuck
             data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
-            index_file_worker->Write(std::span{data_ptr, 1});
+            index_file_worker->Write(std::span{data_ptr, 1}); // fuck
             break;
         }
         case IndexType::kHnsw:
@@ -486,9 +486,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
 
             std::shared_ptr<EMVBIndex> data_ptr;
-            index_file_worker->Read(data_ptr);
+            index_file_worker->Read(data_ptr); // fuck
             data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
-            index_file_worker->Write(std::span{data_ptr.get(), 1});
+            index_file_worker->Write(std::span{data_ptr.get(), 1}); // fuck
             break;
         }
         default: {
@@ -1312,9 +1312,9 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     {
         IVFIndexInChunk *data_ptr{};
-        index_file_worker->Read(data_ptr);
+        index_file_worker->Read(data_ptr); // fuck
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
-        index_file_worker->Write(std::span{data_ptr, 1});
+        index_file_worker->Write(std::span{data_ptr, 1}); // fuck
     }
     return Status::OK();
 }
@@ -1359,9 +1359,9 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     {
         std::shared_ptr<EMVBIndex> data_ptr;
-        index_file_worker->Read(data_ptr);
+        index_file_worker->Read(data_ptr); // fuck
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
-        index_file_worker->Write(std::span{data_ptr.get(), 1});
+        index_file_worker->Write(std::span{data_ptr.get(), 1}); // fuck
     }
     return Status::OK();
 }
@@ -1967,7 +1967,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                 }
 
                 std::shared_ptr<BMPHandlerPtr> bmp_handler;
-                index_file_worker->Read(bmp_handler);
+                index_file_worker->Read(bmp_handler); // fuck
                 (*bmp_handler)->Optimize(options);
             }
             std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
@@ -1991,7 +1991,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
                     return status;
                 }
                 std::shared_ptr<HnswHandler> hnsw_handler;
-                index_file_worker->Read(hnsw_handler);
+                index_file_worker->Read(hnsw_handler); // fuck
                 if (params->compress_to_lvq) {
                     (hnsw_handler)->CompressToLVQ();
                 } else if (params->compress_to_rabitq) {

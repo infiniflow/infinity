@@ -38,8 +38,8 @@ import global_resource_usage;
 
 namespace infinity {
 
-class DataFileWorker;
-class VarFileWorker;
+struct DataFileWorker;
+struct VarFileWorker;
 
 export enum class ColumnVectorMode : i8 {
     kReadWrite,

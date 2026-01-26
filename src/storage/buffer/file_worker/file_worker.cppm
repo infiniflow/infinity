@@ -61,25 +61,50 @@ export struct FileWorkerSaveCtx {};
 
 export struct FileWorkerTag {};
 
-export template <typename FileWorkerT>
-concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
-    file_worker.Read();
-    file_worker.Write();
-};
+// export template <typename FileWorkerT>
+// concept FileWorkerConcept = std::derived_from<FileWorkerT, FileWorkerTag> && requires(FileWorkerT file_worker) {
+//     file_worker.Read();
+//     file_worker.Write();
+// };
+//
+// export struct DataFileWorkerV2 : FileWorkerTag {
+//     void Write() {}
+//     void Read() {}
+// };
+//
+// export struct VarFileWorkerV2 : FileWorkerTag {
+//     void Write() {}
+//     void Read() {}
+// };
+//
+// export struct VersionFileWorkerV2 : FileWorkerTag {
+//     void Write() {}
+//     void Read() {}
+// };
 
-export struct DataFileWorkerV2 : FileWorkerTag {
-    void Write() {}
-    void Read() {}
-};
+export struct FileWorkerBase {
+    // mutable boost::shared_mutex boost_rw_mutex_;
+    // Get an absolute file path. As key of a buffer handle.
+    FileWorkerBase(std::shared_ptr<std::string> rel_file_path);
 
-export struct VarFileWorkerV2 : FileWorkerTag {
-    void Write() {}
-    void Read() {}
-};
+    [[nodiscard]] std::string GetPath() const;
 
-export struct VersionFileWorkerV2 : FileWorkerTag {
-    void Write() {}
-    void Read() {}
+    [[nodiscard]] std::string GetWorkingPath() const;
+
+    void MoveFile();
+
+    Status CleanupFile() const;
+
+    // void lock();
+
+    mutable std::mutex mutex_;
+    std::shared_ptr<std::string> rel_file_path_;
+    PersistenceManager *persistence_manager_{};
+    FileWorkerManager *file_worker_manager_{};
+    void *mmap_{};
+    // std::atomic_uintptr_t mmap_;
+    size_t mmap_size_{};
+    // std::atomic_size_t mmap_size_;
 };
 
 export class FileWorker {
@@ -89,11 +114,93 @@ public:
     // No destruct here
     virtual ~FileWorker() = default;
 
+    [[nodiscard]] std::string GetPath() const;
+
+    [[nodiscard]] std::string GetWorkingPath() const;
+
+    template <typename FileWorkerT, typename PayloadT>
+    static bool Write(FileWorkerT file_worker, PayloadT data, const FileWorkerSaveCtx &ctx = {}) {
+        // boost::unique_lock l(boost_rw_mutex_);
+
+        auto working_path = file_worker->GetWorkingPath();
+        auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
+        if (!status.ok()) {
+            // fuck
+            // UnrecoverableError(status.message());
+        }
+
+        bool prepare_success = false;
+
+        bool all_save = file_worker->Write(data, file_handle, prepare_success, ctx);
+        close(file_handle->fd());
+        return all_save;
+    }
+
+    template <typename FileWorkerT, typename PayloadT>
+    static void Read(FileWorkerT file_worker, PayloadT &data) {
+        std::unique_lock l(file_worker->mutex_);
+        size_t file_size{};
+
+        auto working_path = file_worker->GetWorkingPath();
+        auto data_path = file_worker->GetPath();
+        // auto file_worker_map = InfinityContext::instance().storage()->fileworker_manager();
+        if (VirtualStore::Exists(working_path)) {
+            auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
+            if (!status.ok()) {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                file_worker->Read(data, file_handle, file_size);
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                return;
+            }
+            file_size = file_handle->FileSize();
+            file_worker->Read(data, file_handle, file_size);
+            close(file_handle->fd());
+            return;
+        }
+        auto persistence_manager = file_worker->persistence_manager_;
+        if (persistence_manager) {
+            auto result = persistence_manager->GetObjCache(data_path);
+            auto obj_addr = result.obj_addr_;
+            auto true_file_path = fmt::format("{}/{}", persistence_manager->workspace(), obj_addr.obj_key_);
+            if (obj_addr.Valid()) {
+                VirtualStore::CopyRange(true_file_path, working_path, obj_addr.part_offset_, 0, obj_addr.part_size_);
+                obj_addr.obj_key_.clear();
+                auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
+                if (!status.ok()) {
+                    std::unique_ptr<LocalFileHandle> file_handle;
+                    file_worker->Read(data, file_handle, file_size);
+                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                    return;
+                }
+                file_worker->Read(data, file_handle, obj_addr.part_size_);
+                close(file_handle->fd());
+                return;
+            }
+        }
+        if (VirtualStore::Exists(data_path, true)) {
+            auto [file_handle, status] = VirtualStore::Open(data_path, FileAccessMode::kReadWrite);
+            if (!status.ok()) {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                file_worker->Read(data, file_handle, file_size);
+                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
+                return;
+            }
+            file_size = file_handle->FileSize();
+
+            VirtualStore::CopyRange(data_path, working_path, 0, 0, file_size);
+            file_worker->Read(data, file_handle, file_size);
+            close(file_handle->fd());
+            return;
+        }
+        std::unique_ptr<LocalFileHandle> file_handle;
+        file_worker->Read(data, file_handle, file_size);
+    }
+
     bool Write(auto data, const FileWorkerSaveCtx &ctx = {}) {
         // boost::unique_lock l(boost_rw_mutex_);
 
-        [[maybe_unused]] auto tmp = GetWorkingPath();
-        auto [file_handle, status] = VirtualStore::Open(GetWorkingPath(), FileAccessMode::kReadWrite);
+        auto working_path = GetWorkingPath();
+        auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
         if (!status.ok()) {
             // fuck
             // UnrecoverableError(status.message());
@@ -112,6 +219,7 @@ public:
 
         auto working_path = GetWorkingPath();
         auto data_path = GetPath();
+        // auto file_worker_map = InfinityContext::instance().storage()->fileworker_manager();
         if (VirtualStore::Exists(working_path)) {
             auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
             if (!status.ok()) {
@@ -167,11 +275,6 @@ public:
 
     virtual FileWorkerType Type() const = 0;
 
-    // Get an absolute file path. As key of a buffer handle.
-    [[nodiscard]] std::string GetPath() const;
-
-    [[nodiscard]] std::string GetWorkingPath() const;
-
     Status CleanupFile() const;
 
 protected:
@@ -225,20 +328,6 @@ protected:
     virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
     virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
     // virtual void Read(SecondaryIndexDataLowCardinalityT<BooleanT> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool
-    Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool
-    Write(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
     // mutable boost::shared_mutex boost_rw_mutex_;

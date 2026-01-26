@@ -78,6 +78,17 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         std::unique_lock l(rw_clean_mtx_);
         cleans_.swap(cleans);
     }
+
+    {
+        std::unique_lock lock(rw_mtx_);
+        for (auto *file_worker : cleans) {
+            auto fileworker_key = *(file_worker->rel_file_path_);
+            map_.erase(fileworker_key);
+            active_dic_.erase(fileworker_key);
+        }
+        map_.rehash(map_.size());
+    }
+
     std::vector<std::future<Status>> futs;
     futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
@@ -88,27 +99,6 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         if (!status.ok()) {
             // return status;
         }
-    }
-
-    {
-        std::unique_lock lock(rw_mtx_);
-        for (auto *file_worker : cleans) {
-            auto fileworker_key = *(file_worker->rel_file_path_);
-            map_.erase(fileworker_key);
-            active_dic_.erase(fileworker_key);
-            // if (remove_n != 1) {
-            //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
-            // }
-        }
-        map_.rehash(map_.size());
-
-        // for (auto *file_worker : cleans) {
-        //     auto fileworker_key = *(file_worker->rel_file_path_);
-        //     [[maybe_unused]] size_t remove_n = map_.erase(fileworker_key);
-        //     // if (remove_n != 1) {
-        //     //     UnrecoverableError(fmt::format("FileWorkerManager::RemoveClean: file {} not found.", file_path.c_str()));
-        //     // }
-        // }
     }
 }
 

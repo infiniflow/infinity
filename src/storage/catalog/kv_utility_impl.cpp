@@ -156,7 +156,7 @@ size_t GetBlockRowCount(KVInstance *kv_instance,
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
+    FileWorker::Read(version_file_worker, block_version); // fuck
     size_t row_cnt = 0;
     if (block_version) {
         {

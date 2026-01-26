@@ -432,7 +432,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                     UnrecoverableError(status.message());
                 }
                 std::shared_ptr<EMVBIndex> emvb_index;
-                index_file_worker->Read(emvb_index);
+                index_file_worker->Read(emvb_index); // fuck
 
                 const auto [result_num, score_ptr, row_id_ptr] =
                     emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),

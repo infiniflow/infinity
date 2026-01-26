@@ -321,7 +321,7 @@ void BMPIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
 
     own_memory_ = false;
     index_file_worker_ = std::move(index_file_worker);
-    index_file_worker_->Write(std::span{&bmp_handler_, 1});
+    index_file_worker_->Write(std::span{&bmp_handler_, 1}); // fuck
 }
 
 size_t BMPIndexInMem::GetRowCount() const { return bmp_handler_->DocNum(); }

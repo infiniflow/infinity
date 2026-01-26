@@ -24,8 +24,8 @@ import data_type;
 import global_resource_usage;
 
 namespace infinity {
-class DataFileWorker;
-class VarFileWorker;
+struct DataFileWorker;
+struct VarFileWorker;
 
 export enum class VectorBufferType {
     kInvalid,
@@ -66,7 +66,8 @@ public:
             data = std::get<std::shared_ptr<char[]>>(ptr_);
             return;
         }
-        static_cast<FileWorker *>(std::get<DataFileWorker *>(ptr_))->Read(data);
+        // static_cast<FileWorker *>(std::get<DataFileWorker *>(ptr_))->Read(data, true); // fuck
+        FileWorker::Read(std::get<DataFileWorker *>(ptr_), data); // fuck
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;

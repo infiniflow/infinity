@@ -108,10 +108,10 @@ void EMVBIndexInMem::Dump(FileWorker *index_file_worker) {
     is_built_.clear(std::memory_order_release);
 
     std::shared_ptr<EMVBIndex> data_ptr;
-    index_file_worker->Read(data_ptr);
+    index_file_worker->Read(data_ptr); // fuck
     data_ptr = std::move(emvb_index_); // call move in lock
     emvb_index_.reset();
-    index_file_worker->Write(std::span{data_ptr.get(), 1});
+    index_file_worker->Write(std::span{data_ptr.get(), 1}); // fuck
 }
 
 std::shared_ptr<EMVBIndexInMem>
