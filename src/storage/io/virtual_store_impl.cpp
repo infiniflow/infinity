@@ -171,7 +171,7 @@ bool VirtualStore::Exists(std::string_view path, bool is_v2) {
     if (error_code.value() == 0) {
         return is_exists;
     } else {
-        UnrecoverableError(fmt::format("{} exists exception: {}", path, strerror(errno)));
+        UnrecoverableError(fmt::format("{} exists exception: {}", path, error_code.message()));
     }
     return false;
 }
@@ -187,10 +187,10 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
     }
     bool is_deleted = std::filesystem::remove(file_name, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
+        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, error_code.message()));
     }
     if (!is_deleted) {
-        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, error_code.message());
         LOG_ERROR(error_msg);
         Status status = Status::IOError(error_msg);
         return status;
