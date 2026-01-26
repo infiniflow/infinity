@@ -46,7 +46,7 @@ public:
     }
     
     void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
-        data = index_data_;
+        data = index_data_.get();
     }
     
     void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
@@ -57,7 +57,7 @@ public:
     u32 GetRowCount() const { return row_count_; }
     
 private:
-    SecondaryIndexDataBase<HighCardinalityTag>* index_data_;
+    std::unique_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index_data_;
     u32 row_count_;
 };
 
@@ -81,13 +81,13 @@ public:
     }
     
     void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
-        data = index_data_;
+        data = index_data_.get();
     }
     
     u32 GetRowCount() const { return row_count_; }
     
 private:
-    SecondaryIndexDataBase<LowCardinalityTag>* index_data_;
+    std::unique_ptr<SecondaryIndexDataBase<LowCardinalityTag>> index_data_;
     u32 row_count_;
 };
 
