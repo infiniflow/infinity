@@ -135,14 +135,19 @@ template <typename RawValueType>
 struct SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     std::vector<SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag>> readers_;
+    std::vector<u32> reader_offsets_;
     std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
     explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
         readers_.reserve(file_workers.size());
+        reader_offsets_.reserve(file_workers.size());
+        u32 offset_shift = 0;
         for (const auto &[row_count, file_worker] : file_workers) {
             readers_.emplace_back(file_worker, row_count);
+            reader_offsets_.push_back(offset_shift);
+            offset_shift += row_count;
         }
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -158,7 +163,7 @@ struct SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> {
         }
         const auto [key, offset, reader_id] = pq_.top();
         out_key = key;
-        out_offset = offset;
+        out_offset = offset + reader_offsets_[reader_id];
         pq_.pop();
         OrderedKeyType next_key = {};
         u32 next_offset = 0;
@@ -174,14 +179,19 @@ template <typename RawValueType>
 struct SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     std::vector<SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag>> readers_;
+    std::vector<u32> reader_offsets_;
     std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
     explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
         readers_.reserve(file_workers.size());
+        reader_offsets_.reserve(file_workers.size());
+        u32 offset_shift = 0;
         for (const auto &[row_count, file_worker] : file_workers) {
             readers_.emplace_back(file_worker, row_count);
+            reader_offsets_.push_back(offset_shift);
+            offset_shift += row_count;
         }
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -197,7 +207,7 @@ struct SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> {
         }
         const auto [key, offset, reader_id] = pq_.top();
         out_key = key;
-        out_offset = offset;
+        out_offset = offset + reader_offsets_[reader_id];
         pq_.pop();
         OrderedKeyType next_key = {};
         u32 next_offset = 0;
