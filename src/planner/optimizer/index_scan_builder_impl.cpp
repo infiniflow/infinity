@@ -143,13 +143,26 @@ public:
             if (iter != search_ops.options_.end()) {
                 default_field = iter->second;
             }
-            MatchCacheKey key(match_ptr->match_expr_->fields_, match_ptr->match_expr_->matching_text_, default_field);
+            // Get query operator option
+            auto query_operator_option = FulltextQueryOperatorOption::kInfinitySyntax;
+            if (iter = search_ops.options_.find("operator"); iter != search_ops.options_.end()) {
+                std::string op_str = iter->second;
+                std::transform(op_str.begin(), op_str.end(), op_str.begin(), [](unsigned char c) { return std::tolower(c); });
+                if (op_str == "and") {
+                    query_operator_option = FulltextQueryOperatorOption::kAnd;
+                } else if (op_str == "or") {
+                    query_operator_option = FulltextQueryOperatorOption::kOr;
+                }
+            }
+            MatchCacheKey key(match_ptr->match_expr_->fields_, match_ptr->match_expr_->matching_text_, default_field, query_operator_option);
             match_cache_.emplace(std::move(key), op);
-            LOG_DEBUG(fmt::format("CollectMatchNodes: Found LogicalMatch with fields: '{}', text: '{}', default_field: '{}', query_tree_: {}",
-                                  match_ptr->match_expr_->fields_,
-                                  match_ptr->match_expr_->matching_text_,
-                                  default_field,
-                                  match_ptr->query_tree_ ? "populated" : "null"));
+            LOG_DEBUG(fmt::format(
+                "CollectMatchNodes: Found LogicalMatch with fields: '{}', text: '{}', default_field: '{}', operator: {:d}, query_tree_: {}",
+                match_ptr->match_expr_->fields_,
+                match_ptr->match_expr_->matching_text_,
+                default_field,
+                static_cast<int>(query_operator_option),
+                match_ptr->query_tree_ ? "populated" : "null"));
         }
         CollectMatchNodes(op->left_node());
         CollectMatchNodes(op->right_node());

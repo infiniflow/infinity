@@ -19,6 +19,7 @@ import :base_table_ref;
 import :index_base;
 import :fast_rough_filter;
 import :roaring_bitmap;
+import :search_driver;
 
 namespace infinity {
 
@@ -65,26 +66,31 @@ struct MatchCacheKey {
     std::string fields_;
     std::string matching_text_;
     std::string default_field_;
+    FulltextQueryOperatorOption query_operator_option_;
 
-    MatchCacheKey(std::string fields, std::string text, std::string default_field)
-        : fields_(std::move(fields)), matching_text_(std::move(text)), default_field_(std::move(default_field)) {}
+    MatchCacheKey(std::string fields, std::string text, std::string default_field, FulltextQueryOperatorOption query_operator_option)
+        : fields_(std::move(fields)), matching_text_(std::move(text)), default_field_(std::move(default_field)),
+          query_operator_option_(query_operator_option) {}
 
     bool operator==(const MatchCacheKey &other) const {
-        return fields_ == other.fields_ && matching_text_ == other.matching_text_ && default_field_ == other.default_field_;
+        return fields_ == other.fields_ && matching_text_ == other.matching_text_ && default_field_ == other.default_field_ &&
+               query_operator_option_ == other.query_operator_option_;
     }
 };
 
 // Hash function for MatchCacheKey.
 struct MatchCacheKeyHash {
     std::size_t operator()(const MatchCacheKey &key) const noexcept {
-        std::size_t h1 = hasher_(key.fields_);
-        std::size_t h2 = hasher_(key.matching_text_);
-        std::size_t h3 = hasher_(key.default_field_);
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
+        std::size_t h1 = hash_str(key.fields_);
+        std::size_t h2 = hash_str(key.matching_text_);
+        std::size_t h3 = hash_str(key.default_field_);
+        std::size_t h4 = hash_int(static_cast<int>(key.query_operator_option_));
+        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
     }
 
 private:
-    std::hash<std::string> hasher_;
+    std::hash<std::string> hash_str;
+    std::hash<int> hash_int;
 };
 
 export class FilterExpressionPushDown {

@@ -718,19 +718,21 @@ private:
                     }
 
                     // Try to reuse cached query tree from LogicalMatch.
-                    MatchCacheKey key(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_, default_field);
+                    MatchCacheKey key(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_, default_field, query_operator_option);
                     bool found_cached = false;
+
                     if (match_cache_) {
-                        auto it = match_cache_->find(key);
-                        if (it != match_cache_->end()) {
-                            LOG_DEBUG(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: '{}'",
-                                                  filter_fulltext_expr->fields_,
-                                                  filter_fulltext_expr->matching_text_,
-                                                  default_field));
+                        if (auto it = match_cache_->find(key); it != match_cache_->end()) {
                             auto *match_node = static_cast<LogicalMatch *>(it->second.get());
                             query_tree = match_node->query_tree_->Clone();
                             if (query_tree) {
                                 found_cached = true;
+                                LOG_DEBUG(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: "
+                                                      "'{}', operator: {:d}",
+                                                      filter_fulltext_expr->fields_,
+                                                      filter_fulltext_expr->matching_text_,
+                                                      default_field,
+                                                      static_cast<int>(query_operator_option)));
                             } else {
                                 LOG_INFO("Empty query tree");
                             }
@@ -740,9 +742,12 @@ private:
                     if (!found_cached) {
                         std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
                         SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
-                        LOG_DEBUG(fmt::format("Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}'",
-                                              filter_fulltext_expr->fields_,
-                                              filter_fulltext_expr->matching_text_));
+                        LOG_DEBUG(fmt::format(
+                            "Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}', default_field: '{}', operator: {:d}",
+                            filter_fulltext_expr->fields_,
+                            filter_fulltext_expr->matching_text_,
+                            default_field,
+                            static_cast<int>(query_operator_option)));
                         query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                         if (!query_tree) {
                             RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
