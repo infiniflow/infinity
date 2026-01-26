@@ -73,7 +73,7 @@ void FilterQueryNode::PrintTree(std::ostream &os, const std::string &prefix, con
 }
 
 std::unique_ptr<QueryNode> FilterQueryNode::Clone() const {
-    // Return nullptr to indicate this should not be cached.
+    UnrecoverableError("FilterQueryNode cannot be cloned");
     return nullptr;
 }
 

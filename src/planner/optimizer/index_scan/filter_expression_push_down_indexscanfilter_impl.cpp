@@ -717,18 +717,16 @@ private:
                         bm25_params.delta_phrase = delta_phrase_v;
                     }
 
-                    std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
-
                     // Try to reuse cached query tree from LogicalMatch.
                     MatchCacheKey key(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_, default_field);
                     bool found_cached = false;
                     if (match_cache_) {
                         auto it = match_cache_->find(key);
                         if (it != match_cache_->end()) {
-                            LOG_INFO(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: '{}'",
-                                                 filter_fulltext_expr->fields_,
-                                                 filter_fulltext_expr->matching_text_,
-                                                 default_field));
+                            LOG_DEBUG(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: '{}'",
+                                                  filter_fulltext_expr->fields_,
+                                                  filter_fulltext_expr->matching_text_,
+                                                  default_field));
                             auto *match_node = static_cast<LogicalMatch *>(it->second.get());
                             query_tree = match_node->query_tree_->Clone();
                             found_cached = true;
@@ -736,10 +734,11 @@ private:
                     }
 
                     if (!found_cached) {
+                        std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
                         SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
-                        LOG_INFO(fmt::format("Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}'",
-                                             filter_fulltext_expr->fields_,
-                                             filter_fulltext_expr->matching_text_));
+                        LOG_DEBUG(fmt::format("Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}'",
+                                              filter_fulltext_expr->fields_,
+                                              filter_fulltext_expr->matching_text_));
                         query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                         if (!query_tree) {
                             RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));

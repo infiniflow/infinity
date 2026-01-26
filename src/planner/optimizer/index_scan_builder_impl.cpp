@@ -145,11 +145,11 @@ public:
             }
             MatchCacheKey key(match_ptr->match_expr_->fields_, match_ptr->match_expr_->matching_text_, default_field);
             match_cache_.emplace(std::move(key), op);
-            LOG_INFO(fmt::format("CollectMatchNodes: Found LogicalMatch with fields: '{}', text: '{}', default_field: '{}', query_tree_: {}",
-                                 match_ptr->match_expr_->fields_,
-                                 match_ptr->match_expr_->matching_text_,
-                                 default_field,
-                                 match_ptr->query_tree_ ? "populated" : "null"));
+            LOG_DEBUG(fmt::format("CollectMatchNodes: Found LogicalMatch with fields: '{}', text: '{}', default_field: '{}', query_tree_: {}",
+                                  match_ptr->match_expr_->fields_,
+                                  match_ptr->match_expr_->matching_text_,
+                                  default_field,
+                                  match_ptr->query_tree_ ? "populated" : "null"));
         }
         CollectMatchNodes(op->left_node());
         CollectMatchNodes(op->right_node());

@@ -77,11 +77,14 @@ struct MatchCacheKey {
 // Hash function for MatchCacheKey.
 struct MatchCacheKeyHash {
     std::size_t operator()(const MatchCacheKey &key) const noexcept {
-        std::size_t h1 = std::hash<std::string>{}(key.fields_);
-        std::size_t h2 = std::hash<std::string>{}(key.matching_text_);
-        std::size_t h3 = std::hash<std::string>{}(key.default_field_);
+        std::size_t h1 = hasher_(key.fields_);
+        std::size_t h2 = hasher_(key.matching_text_);
+        std::size_t h3 = hasher_(key.default_field_);
         return h1 ^ (h2 << 1) ^ (h3 << 2);
     }
+
+private:
+    std::hash<std::string> hasher_;
 };
 
 export class FilterExpressionPushDown {
