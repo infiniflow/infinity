@@ -312,7 +312,7 @@ PersistReadResult PersistenceManager::GetObjCache(std::string_view file_path) {
     ObjAddr obj_addr;
     obj_addr.Deserialize(value);
 
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     result.obj_addr_ = obj_addr;
     if (obj_addr.part_size_ == 0) {
         LOG_TRACE(fmt::format("GetObjCache empty object {} for local path {}", obj_addr.obj_key_, local_path));

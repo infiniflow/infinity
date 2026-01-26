@@ -65,7 +65,7 @@ bool RawFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle>
 }
 
 void RawFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     buffer_size_ = file_handle ? file_handle->FileSize() : 0;
     data = std::make_shared<char[]>(buffer_size_);
     if (!file_handle) {

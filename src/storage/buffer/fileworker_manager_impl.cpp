@@ -172,7 +172,7 @@ void FileWorkerManager::Stop() {
 
 // Get size in concurrency environment is meaningless
 size_t FileWorkerManager::FileWorkerCount() {
-    // std::unique_lock lock(w_locker_);
+    std::unique_lock lock(mutex_);
     return 0;
 }
 

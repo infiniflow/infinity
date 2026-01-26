@@ -538,8 +538,7 @@ void InfinityContext::StopThriftServers() {
         // stop_servers_func_ {};
     }
     // close all thrift sessions
-    const auto removed_session_count = InfinityThriftService::ClearSessionMap();
-    LOG_INFO(fmt::format("Removed {} thrift sessions", removed_session_count));
+    LOG_INFO(fmt::format("Removed thrift sessions. cnt: {}", InfinityThriftService::ClearSessionMap()));
 }
 
 void InfinityContext::SetConfig(std::unique_ptr<Config> &&config) { config_ = std::move(config); }

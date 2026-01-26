@@ -102,7 +102,7 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
 }
 
 void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     data = std::make_shared<VarBuffer>(this);
     if (!file_handle) {
         return;
@@ -112,7 +112,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         return;
     }
     if (!mmap_) {
-        auto buffer = std::make_unique<char[]>(buffer_size);
+        auto buffer = std::make_unique_for_overwrite<char[]>(buffer_size);
 
         auto [nbytes, status] = file_handle->Read(buffer.get(), buffer_size);
         if (!status.ok()) {
@@ -129,7 +129,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
             mmap_ = nullptr;
         }
     } else {
-        auto buffer = std::make_unique<char[]>(buffer_size);
+        auto buffer = std::make_unique_for_overwrite<char[]>(buffer_size);
         std::memcpy(buffer.get(), mmap_, buffer_size);
         data = std::make_shared<VarBuffer>(this, std::move(buffer), buffer_size);
     }

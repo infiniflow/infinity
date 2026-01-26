@@ -44,7 +44,7 @@ public:
 };
 
 TEST_F(TestTxnManagerTest, test_ts) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
 
     std::vector<TxnTimeStamp> begin_tss;

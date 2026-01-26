@@ -43,7 +43,7 @@ public:
             abort();
         }
 
-        CleanupTmpDir();
+        CleanupWorkingDir();
     }
 
     ~BaseTestWithParam() override = default;
@@ -80,33 +80,64 @@ public:
 
     static constexpr const char *S3_STORAGE = "test/data/config/test_minio_s3_storage.toml";
 
-protected:
-    const char *GetHomeDir() { return "/var/infinity"; }
+    static void CleanupDirectory(const char *dir) {
+        std::error_code error_code;
+        // std::string dir_str{dir};
+        // fs::path p(dir_str);
+        if (!VirtualStore::Exists(dir)) {
+            std::filesystem::create_directories(dir, error_code);
+            if (error_code.value() != 0) {
+                UnrecoverableError(fmt::format("Failed to create directory {}", dir));
+            }
+        }
+        try {
+            for (const auto &dir_entry : std::filesystem::directory_iterator{dir}) {
+                std::filesystem::remove_all(dir_entry.path());
+            }
+        } catch (const std::filesystem::filesystem_error &e) {
+            UnrecoverableError(fmt::format("Failed to cleanup {}, exception: {}", dir, e.what()));
+        }
+    }
 
-    const char *GetFullDataDir() { return "/var/infinity/data"; }
+    static void RemoveDirectory(const char *dir) {
+        fs::path p(dir);
+        try {
+            std::error_code error_code;
+            std::filesystem::remove_all(p, error_code);
+        } catch (const std::filesystem::filesystem_error &e) {
+            UnrecoverableError(fmt::format("Failed to remove {}, exception: {}", dir, e.what()));
+        }
+    }
 
-    const char *GetFullWalDir() { return "/var/infinity/wal"; }
+    static const char *GetHomeDir() { return "/var/infinity"; }
 
-    const char *GetFullLogDir() { return "/var/infinity/log"; }
+    static const char *GetFullDataDir() { return "/var/infinity/data"; }
 
-    const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
+    static const char *GetFullWalDir() { return "/var/infinity/wal"; }
 
-    const char *GetCatalogDir() { return "/var/infinity/catalog"; }
+    static const char *GetFullLogDir() { return "/var/infinity/log"; }
 
-    const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
+    static const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
 
-    const char *GetTmpDir() { return "tmp"; }
+    static const char *GetCatalogDir() { return "/var/infinity/catalog"; }
 
-    const char *GetResourceDir() { return "/usr/share/infinity/resource"; }
+    static const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
+
+    static const char *GetSnapshotDir() { return "/var/infinity/snapshot"; }
+
+    static const char *GetTmpDir() { return "tmp"; }
+
+    static const char *GetResourceDir() { return "/usr/share/infinity/resource"; }
 
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
+        const char *infinity_db_dirs[] =
+            {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir(), GetSnapshotDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
     }
 
-    void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
+    void CleanupWorkingDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {
         const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
@@ -155,34 +186,6 @@ private:
             return false;
 
         return true;
-    }
-
-    void CleanupDirectory(const char *dir) {
-        std::error_code error_code;
-        fs::path p(dir);
-        if (!fs::exists(dir)) {
-            std::filesystem::create_directories(p, error_code);
-            if (error_code.value() != 0) {
-                UnrecoverableError(fmt::format("Failed to create directory {}", dir));
-            }
-        }
-        try {
-            for (const auto &dir_entry : std::filesystem::directory_iterator{dir}) {
-                std::filesystem::remove_all(dir_entry.path());
-            };
-        } catch (const std::filesystem::filesystem_error &e) {
-            UnrecoverableError(fmt::format("Failed to cleanup {}, exception: {}", dir, e.what()));
-        }
-    }
-
-    void RemoveDirectory(const char *dir) {
-        std::error_code error_code;
-        fs::path p(dir);
-        try {
-            std::filesystem::remove_all(p, error_code);
-        } catch (const std::filesystem::filesystem_error &e) {
-            UnrecoverableError(fmt::format("Failed to remove {}, exception: {}", dir, e.what()));
-        }
     }
 };
 
