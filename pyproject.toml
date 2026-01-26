@@ -1,6 +1,6 @@
 [project]
 name = "infinity-sdk"
-version = "0.7.0.dev1"
+version = "0.7.0.dev2"
 description = "infinity"
 readme = "python/infinity_sdk/README.md"
 license = "Apache-2.0"
