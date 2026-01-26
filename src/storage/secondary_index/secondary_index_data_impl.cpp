@@ -37,7 +37,16 @@ import data_type;
 namespace infinity {
 
 template <typename RawValueType>
-struct SecondaryIndexChunkDataReader {
+class SecondaryIndexDataLowCardinalityT;
+
+template <typename RawValueType, typename CardinalityTag>
+struct SecondaryIndexChunkDataReader;
+
+template <typename RawValueType, typename CardinalityTag>
+struct SecondaryIndexChunkMerger;
+
+template <typename RawValueType>
+struct SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     FileWorker *handle_;
     u32 row_count_ = 0;
@@ -64,10 +73,107 @@ struct SecondaryIndexChunkDataReader {
     }
 };
 
+// Low cardinality version: reads unique keys and bitmaps
 template <typename RawValueType>
-struct SecondaryIndexChunkMerger {
+struct SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    std::vector<SecondaryIndexChunkDataReader<RawValueType>> readers_;
+    FileWorker *handle_;
+    u32 row_count_ = 0;
+    std::vector<OrderedKeyType> unique_keys_;
+    std::vector<Bitmap> offset_bitmaps_;
+    u32 current_key_index_ = 0;
+    u32 current_offset_ = 0;
+
+    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
+        handle_ = file_worker;
+        row_count_ = row_count;
+        SecondaryIndexDataBase<LowCardinalityTag> *index;
+        file_worker->Read(index);
+        assert(index->GetChunkRowCount() == row_count_);
+
+        auto *low_card_index = static_cast<SecondaryIndexDataLowCardinalityT<RawValueType> *>(index);
+        unique_keys_ = low_card_index->GetUniqueKeys();
+
+        // Copy bitmaps from the index
+        u32 unique_key_count = low_card_index->GetUniqueKeyCount();
+        offset_bitmaps_.reserve(unique_key_count);
+        for (u32 i = 0; i < unique_key_count; ++i) {
+            const Bitmap *bitmap = low_card_index->GetOffsetsForKey(unique_keys_[i]);
+            if (bitmap) {
+                offset_bitmaps_.emplace_back(*bitmap);
+            }
+        }
+    }
+
+    bool GetNextDataPair(OrderedKeyType &key, u32 &offset) {
+        // Skip to the next key with at least one offset set
+        while (current_key_index_ < unique_keys_.size()) {
+            const Bitmap &bitmap = offset_bitmaps_[current_key_index_];
+
+            // Find the next set offset in the current bitmap
+            while (current_offset_ < row_count_) {
+                if (bitmap.IsTrue(current_offset_)) {
+                    key = unique_keys_[current_key_index_];
+                    offset = current_offset_;
+                    current_offset_++;
+                    return true;
+                }
+                current_offset_++;
+            }
+
+            // Move to next key
+            current_key_index_++;
+            current_offset_ = 0;
+        }
+
+        return false;
+    }
+};
+
+// High cardinality merger
+template <typename RawValueType>
+struct SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> {
+    using OrderedKeyType = ConvertToOrderedType<RawValueType>;
+    std::vector<SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag>> readers_;
+    std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
+                        std::vector<std::tuple<OrderedKeyType, u32, u32>>,
+                        std::greater<std::tuple<OrderedKeyType, u32, u32>>>
+        pq_;
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+        readers_.reserve(file_workers.size());
+        for (const auto &[row_count, file_worker] : file_workers) {
+            readers_.emplace_back(file_worker, row_count);
+        }
+        OrderedKeyType key = {};
+        u32 offset = 0;
+        for (u32 i = 0; i < readers_.size(); ++i) {
+            if (readers_[i].GetNextDataPair(key, offset)) {
+                pq_.emplace(key, offset, i);
+            }
+        }
+    }
+    bool GetNextDataPair(OrderedKeyType &out_key, u32 &out_offset) {
+        if (pq_.empty()) {
+            return false;
+        }
+        const auto [key, offset, reader_id] = pq_.top();
+        out_key = key;
+        out_offset = offset;
+        pq_.pop();
+        OrderedKeyType next_key = {};
+        u32 next_offset = 0;
+        if (readers_[reader_id].GetNextDataPair(next_key, next_offset)) {
+            pq_.emplace(next_key, next_offset, reader_id);
+        }
+        return true;
+    }
+};
+
+// Low cardinality merger
+template <typename RawValueType>
+struct SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> {
+    using OrderedKeyType = ConvertToOrderedType<RawValueType>;
+    std::vector<SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag>> readers_;
     std::priority_queue<std::tuple<OrderedKeyType, u32, u32>,
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
@@ -104,13 +210,13 @@ struct SecondaryIndexChunkMerger {
 
 // High cardinality implementation (current implementation)
 template <typename RawValueType>
-class SecondaryIndexDataT final : public SecondaryIndexDataBase<HighCardinalityTag> {
+class SecondaryIndexDataHighCardinalityT final : public SecondaryIndexDataBase<HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
     std::unique_ptr<OrderedKeyType[]> key_;
     std::unique_ptr<SegmentOffset[]> offset_;
 
 public:
-    SecondaryIndexDataT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexDataBase<HighCardinalityTag>(chunk_row_count) {
+    SecondaryIndexDataHighCardinalityT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexDataBase<HighCardinalityTag>(chunk_row_count) {
         pgm_index_ = GenerateSecondaryPGMIndex<OrderedKeyType>();
         key_ = std::make_unique<OrderedKeyType[]>(chunk_row_count_);
         offset_ = std::make_unique<SegmentOffset[]>(chunk_row_count_);
@@ -151,7 +257,7 @@ public:
     }
 
     void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
-        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
+        SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;
         u32 i = 0;
@@ -270,7 +376,7 @@ public:
     }
 
     void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
-        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
+        SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> merger(old_chunks);
 
         // Build unique keys and corresponding bitmaps from merged data
         std::map<OrderedKeyType, std::vector<u32>> key_to_offsets;
@@ -546,58 +652,52 @@ public:
     }
 };
 
+template <>
 SecondaryIndexDataBase<HighCardinalityTag> *
-GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
+GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return nullptr;
     }
     switch (data_type->type()) {
         case LogicalType::kTinyInt: {
-            return new SecondaryIndexDataT<TinyIntT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<TinyIntT>(chunk_row_count, allocate);
         }
         case LogicalType::kSmallInt: {
-            return new SecondaryIndexDataT<SmallIntT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<SmallIntT>(chunk_row_count, allocate);
         }
         case LogicalType::kInteger: {
-            return new SecondaryIndexDataT<IntegerT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<IntegerT>(chunk_row_count, allocate);
         }
         case LogicalType::kBigInt: {
-            return new SecondaryIndexDataT<BigIntT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<BigIntT>(chunk_row_count, allocate);
         }
         case LogicalType::kFloat: {
-            return new SecondaryIndexDataT<FloatT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<FloatT>(chunk_row_count, allocate);
         }
         case LogicalType::kDouble: {
-            return new SecondaryIndexDataT<DoubleT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<DoubleT>(chunk_row_count, allocate);
         }
         case LogicalType::kDate: {
-            return new SecondaryIndexDataT<DateT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<DateT>(chunk_row_count, allocate);
         }
         case LogicalType::kTime: {
-            return new SecondaryIndexDataT<TimeT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<TimeT>(chunk_row_count, allocate);
         }
         case LogicalType::kDateTime: {
-            return new SecondaryIndexDataT<DateTimeT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<DateTimeT>(chunk_row_count, allocate);
         }
         case LogicalType::kTimestamp: {
-            return new SecondaryIndexDataT<TimestampT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<TimestampT>(chunk_row_count, allocate);
         }
         case LogicalType::kVarchar: {
-            return new SecondaryIndexDataT<VarcharT>(chunk_row_count, allocate);
+            return new SecondaryIndexDataHighCardinalityT<VarcharT>(chunk_row_count, allocate);
         }
         default: {
             UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));
             return nullptr;
         }
     }
-}
-
-// Template specialization for HighCardinalityTag
-template <>
-SecondaryIndexDataBase<HighCardinalityTag> *
-GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(const std::shared_ptr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
-    return GetSecondaryIndexData(data_type, chunk_row_count, allocate);
 }
 
 // Template specialization for LowCardinalityTag
