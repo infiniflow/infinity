@@ -106,19 +106,16 @@ struct SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag> {
     }
 
     bool GetNextDataPair(OrderedKeyType &key, u32 &offset) {
-        // Skip to the next key with at least one offset set
         while (current_key_index_ < unique_keys_.size()) {
             const Bitmap &bitmap = offset_bitmaps_[current_key_index_];
 
-            // Find the next set offset in the current bitmap
-            while (current_offset_ < row_count_) {
-                if (bitmap.IsTrue(current_offset_)) {
-                    key = unique_keys_[current_key_index_];
-                    offset = current_offset_;
-                    current_offset_++;
-                    return true;
-                }
-                current_offset_++;
+            // Use efficient NextSetBit API
+            u32 next_pos = current_offset_;
+            if (bitmap.NextSetBit(next_pos)) {
+                key = unique_keys_[current_key_index_];
+                offset = next_pos;
+                current_offset_ = next_pos + 1;
+                return true;
             }
 
             // Move to next key
@@ -588,20 +585,22 @@ public:
             for (size_t i = 0; i < old_keys.size(); ++i) {
                 // Create a new bitmap with shifted offsets
                 Bitmap shifted_bitmap(chunk_row_count_);
-                for (u32 j = 0; j < old_row_count; ++j) {
-                    if (old_bitmaps[i].IsTrue(j)) {
-                        shifted_bitmap.SetTrue(j + offset_shift);
-                    }
+                // Efficiently iterate over set bits using NextSetBit
+                u32 pos = 0;
+                while (old_bitmaps[i].NextSetBit(pos)) {
+                    shifted_bitmap.SetTrue(pos + offset_shift);
+                    pos++;
                 }
 
                 // Merge with existing data
                 auto it = merged_data.find(old_keys[i]);
                 if (it != merged_data.end()) {
                     // Merge bitmaps by combining the sets
-                    for (u32 j = 0; j < chunk_row_count_; ++j) {
-                        if (shifted_bitmap.IsTrue(j)) {
-                            it->second.SetTrue(j);
-                        }
+                    // Efficiently merge set bits using NextSetBit
+                    u32 pos = 0;
+                    while (shifted_bitmap.NextSetBit(pos)) {
+                        it->second.SetTrue(pos);
+                        pos++;
                     }
                 } else {
                     merged_data[old_keys[i]] = std::move(shifted_bitmap);
