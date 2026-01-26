@@ -79,16 +79,6 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         cleans_.swap(cleans);
     }
 
-    {
-        std::unique_lock lock(rw_mtx_);
-        for (auto *file_worker : cleans) {
-            auto fileworker_key = *(file_worker->rel_file_path_);
-            map_.erase(fileworker_key);
-            active_dic_.erase(fileworker_key);
-        }
-        map_.rehash(map_.size());
-    }
-
     std::vector<std::future<Status>> futs;
     futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
@@ -99,6 +89,16 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
         if (!status.ok()) {
             // return status;
         }
+    }
+
+    {
+        std::unique_lock lock(rw_mtx_);
+        for (auto *file_worker : cleans) {
+            auto fileworker_key = *file_worker->rel_file_path_;
+            map_.erase(fileworker_key);
+            active_dic_.erase(fileworker_key);
+        }
+        map_.rehash(map_.size());
     }
 }
 

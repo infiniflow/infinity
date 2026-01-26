@@ -34,7 +34,7 @@ protected:
 
 public:
     explicit IndexFileWorker(std::shared_ptr<std::string> file_path, std::shared_ptr<IndexBase> index_base, std::shared_ptr<ColumnDef> column_def)
-        : FileWorker(std::move(file_path)), column_def_(std::move(column_def)), index_base_(std::move(index_base)) {}
+        : FileWorker(file_path), column_def_(column_def), index_base_(index_base) {}
 
     FileWorkerType Type() const override { return FileWorkerType::kIndexFile; }
 

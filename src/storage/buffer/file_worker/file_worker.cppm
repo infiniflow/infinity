@@ -327,7 +327,6 @@ protected:
 
     virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
     virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-    // virtual void Read(SecondaryIndexDataLowCardinalityT<BooleanT> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
 public:
     // mutable boost::shared_mutex boost_rw_mutex_;
@@ -335,7 +334,6 @@ public:
     std::shared_ptr<std::string> rel_file_path_;
     PersistenceManager *persistence_manager_{};
     FileWorkerManager *file_worker_manager_{};
-    // ObjAddr obj_addr_;
     void *mmap_{};
     // std::atomic_uintptr_t mmap_;
     size_t mmap_size_{};
