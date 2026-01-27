@@ -996,7 +996,7 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
     if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
-    size_t tail_index = tail_index_.load();
+    size_t tail_index = tail_index_.load(); // A
     if (index >= tail_index) {
         UnrecoverableError(fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", index, tail_index));
     }
@@ -1010,7 +1010,7 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
         // special case for boolean
         return Value::MakeBool(buffer_->GetCompactBit(index));
     }
-    return GetArrayValueRecursively(*data_type_, data_ptr_.get() + index * data_type_->Size());
+    return GetArrayValueRecursively(*data_type_, data_ptr_.get() + index * data_type_->Size()); // B
 }
 
 Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const {

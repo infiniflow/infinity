@@ -86,11 +86,11 @@ struct SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag> {
     u32 current_key_index_ = 0;
     u32 current_offset_ = 0;
 
-    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
-        handle_ = file_worker;
+    SecondaryIndexChunkDataReader(SecondaryIndexFileWorker *index_file_worker, u32 row_count) {
+        handle_ = index_file_worker;
         row_count_ = row_count;
         SecondaryIndexDataBase<LowCardinalityTag> *index;
-        file_worker->Read(index);
+        FileWorker::Read(index_file_worker, index);
         assert(index->GetChunkRowCount() == row_count_);
 
         auto *low_card_index = static_cast<SecondaryIndexDataLowCardinalityT<RawValueType> *>(index);
@@ -183,7 +183,7 @@ struct SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> {
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
-    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &file_workers) {
         readers_.reserve(file_workers.size());
         reader_offsets_.reserve(file_workers.size());
         u32 offset_shift = 0;
