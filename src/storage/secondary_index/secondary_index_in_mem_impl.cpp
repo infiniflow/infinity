@@ -75,10 +75,9 @@ public:
     }
 
     void Dump(IndexFileWorker *index_file_worker) const override {
-        // std::shared_ptr<SecondaryIndexData> data_ptr;
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
-            SecondaryIndexData *data_ptr{};
-            index_file_worker->Read(data_ptr); // yee todo
+            SecondaryIndexDataBase<HighCardinalityTag> *data_ptr{};
+            index_file_worker->Read(data_ptr);
 
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
