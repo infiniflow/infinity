@@ -29,8 +29,7 @@ import column_def;
 namespace infinity {
 
 // pgm index
-export class SecondaryIndexFileWorker : public IndexFileWorker {
-public:
+export struct SecondaryIndexFileWorker : IndexFileWorker {
     explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> file_path,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
@@ -45,28 +44,25 @@ public:
         }
     }
 
-    ~SecondaryIndexFileWorker() override;
+    ~SecondaryIndexFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
-protected:
     bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
                std::unique_ptr<LocalFileHandle> &file_handle,
                bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+               const FileWorkerSaveCtx &ctx);
     bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
                std::unique_ptr<LocalFileHandle> &file_handle,
                bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+               const FileWorkerSaveCtx &ctx);
 
-    void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-    // void Read(auto &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
     const u32 row_count_{};
 
-private:
     DataType index_data_type_{LogicalType::kInvalid};
 };
 

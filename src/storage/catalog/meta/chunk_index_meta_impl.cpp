@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
 module infinity_core:chunk_index_meta.impl;
 
 import :chunk_index_meta;
@@ -40,7 +38,6 @@ import column_def;
 import create_index_info;
 
 namespace infinity {
-class IndexFileWorker;
 
 namespace {
 
@@ -71,7 +68,7 @@ ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index
     : kv_instance_(segment_index_meta.kv_instance()), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
 
 Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
-    std::lock_guard<std::mutex> lock(mtx_);
+    std::lock_guard lock(mtx_);
     if (!chunk_info_) {
         Status status = LoadChunkInfo();
         if (!status.ok()) {
@@ -82,16 +79,17 @@ Status ChunkIndexMeta::GetChunkInfo(ChunkIndexMetaInfo *&chunk_info) {
     return Status::OK();
 }
 
-Status ChunkIndexMeta::GetFileWorker(IndexFileWorker *&index_file_worker) {
-    if (!index_file_worker_) {
-        Status status = LoadIndexFileWorker();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    index_file_worker = index_file_worker_;
-    return Status::OK();
-}
+// template <typename FileWorkerT>
+// Status ChunkIndexMeta::GetFileWorker(FileWorkerT *&index_file_worker) {
+//     if (!index_file_worker_) {
+//         Status status = LoadIndexFileWorker();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     index_file_worker = index_file_worker_;
+//     return Status::OK();
+// }
 
 Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
@@ -209,6 +207,7 @@ Status ChunkIndexMeta::LoadSet() {
     }
     auto index_dir = segment_index_meta_.GetSegmentIndexDir();
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    index_type_ = index_base->index_type_;
     switch (index_base->index_type_) {
         case IndexType::kSecondary:
             [[fallthrough]];
@@ -302,37 +301,37 @@ Status ChunkIndexMeta::RestoreSetFromSnapshot(const ChunkIndexMetaInfo &chunk_in
 }
 
 Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
-    Status status = this->GetFileWorker(index_file_worker_);
+    Status status = GetFileWorker(index_file_worker_);
     if (!status.ok()) {
         return status;
     }
-    switch (index_file_worker_->Type()) {
-        case FileWorkerType::kBMPIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->bmp_map_.MoveToCleans(
-                dynamic_cast<BMPIndexFileWorker *>(index_file_worker_));
+    switch (index_type_) {
+        case IndexType::kBMP: {
+            InfinityContext::instance().storage()->fileworker_manager()->bmp_map_.MoveToCleans(static_cast<BMPIndexFileWorker *>(index_file_worker_));
             break;
         }
-        case FileWorkerType::kEMVBIndexFile: {
+        case IndexType::kEMVB: {
             InfinityContext::instance().storage()->fileworker_manager()->emvb_map_.MoveToCleans(
-                dynamic_cast<EMVBIndexFileWorker *>(index_file_worker_));
+                static_cast<EMVBIndexFileWorker *>(index_file_worker_));
             break;
         }
-        case FileWorkerType::kHNSWIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.MoveToCleans(dynamic_cast<HnswFileWorker *>(index_file_worker_));
+        case IndexType::kHnsw: {
+            InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.MoveToCleans(static_cast<HnswFileWorker *>(index_file_worker_));
             break;
         }
-        case FileWorkerType::kIVFIndexFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.MoveToCleans(
-                dynamic_cast<IVFIndexFileWorker *>(index_file_worker_));
+        case IndexType::kIVF: {
+            InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.MoveToCleans(static_cast<IVFIndexFileWorker *>(index_file_worker_));
             break;
         }
-        case FileWorkerType::kRawFile: {
-            InfinityContext::instance().storage()->fileworker_manager()->raw_map_.MoveToCleans(dynamic_cast<RawFileWorker *>(index_file_worker_));
+        case IndexType::kFullText: {
+            InfinityContext::instance().storage()->fileworker_manager()->raw_map_.MoveToCleans(static_cast<RawFileWorker *>(index_file_worker_));
             break;
         }
-        case FileWorkerType::kSecondaryIndexFile: {
+        case IndexType::kSecondaryFunctional: // ????
+            [[fallthrough]];
+        case IndexType::kSecondary: {
             InfinityContext::instance().storage()->fileworker_manager()->secondary_map_.MoveToCleans(
-                dynamic_cast<SecondaryIndexFileWorker *>(index_file_worker_));
+                static_cast<SecondaryIndexFileWorker *>(index_file_worker_));
             break;
         }
         default: {
@@ -349,7 +348,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
     if (usage_flag == UsageFlag::kOther) {
         if (index_def->index_type_ == IndexType::kFullText) {
             ChunkIndexMetaInfo *chunk_info_ptr{};
-            status = this->GetChunkInfo(chunk_info_ptr);
+            status = GetChunkInfo(chunk_info_ptr);
             if (!status.ok()) {
                 return status;
             }
@@ -419,7 +418,7 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         return index_status;
     }
     ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-    status = this->GetChunkInfo(chunk_info_ptr);
+    status = GetChunkInfo(chunk_info_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -432,10 +431,15 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
             break;
         }
         case IndexType::kHnsw:
+            [[fallthrough]];
         case IndexType::kEMVB:
+            [[fallthrough]];
         case IndexType::kIVF:
+            [[fallthrough]];
         case IndexType::kSecondary:
+            [[fallthrough]];
         case IndexType::kSecondaryFunctional:
+            [[fallthrough]];
         case IndexType::kBMP: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
@@ -471,8 +475,10 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
     if (!index_status.ok()) {
         return index_status;
     }
-    switch (index_def->index_type_) {
+    index_type_ = index_def->index_type_;
+    switch (index_type_) {
         case IndexType::kSecondary:
+            [[fallthrough]];
         case IndexType::kSecondaryFunctional: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
@@ -521,7 +527,7 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
         case IndexType::kFullText: {
             ChunkIndexMetaInfo *chunk_info_ptr{};
             {
-                Status status = this->GetChunkInfo(chunk_info_ptr);
+                Status status = GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
                     return status;
                 }
@@ -553,9 +559,9 @@ std::string ChunkIndexMeta::GetChunkIndexTag(const std::string &tag) const {
 }
 
 std::tuple<std::shared_ptr<ChunkIndexSnapshotInfo>, Status> ChunkIndexMeta::MapMetaToSnapShotInfo(ChunkID chunk_id) {
-    std::shared_ptr<ChunkIndexSnapshotInfo> chunk_index_snapshot_info = std::make_shared<ChunkIndexSnapshotInfo>();
+    auto chunk_index_snapshot_info = std::make_shared<ChunkIndexSnapshotInfo>();
     chunk_index_snapshot_info->chunk_id_ = chunk_id_;
-    Status status = LoadChunkInfo();
+    auto status = LoadChunkInfo();
     if (!status.ok()) {
         return {nullptr, status};
     }

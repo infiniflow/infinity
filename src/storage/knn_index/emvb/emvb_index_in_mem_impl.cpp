@@ -31,6 +31,7 @@ import :segment_meta;
 import :new_txn;
 import :kv_store;
 import :chunk_index_meta;
+import :emvb_index_file_worker;
 
 import std;
 
@@ -100,7 +101,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
     }
 }
 
-void EMVBIndexInMem::Dump(IndexFileWorker *index_file_worker) {
+void EMVBIndexInMem::Dump(EMVBIndexFileWorker *index_file_worker) {
     std::unique_lock lock(rw_mutex_);
     if (!is_built_.test(std::memory_order_acquire)) {
         UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");

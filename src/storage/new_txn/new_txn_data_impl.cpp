@@ -1748,51 +1748,51 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
     return Status::OK();
 }
 
-Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
-    std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
-    FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+// Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
+//     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
+//     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+//
+//     // just rename it, dont need to get
+//     VersionFileWorker *version_file_worker{};
+//     {
+//         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" +
+//         std::string(BlockVersion::PATH); version_file_worker = fileworker_mgr->version_map_.GetFileWorker(version_filepath); if
+//         (version_file_worker == nullptr) {
+//             return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+//         }
+//     }
+//     // Move the file from temp to data
+//     version_file_worker->MoveFile();
+//     // version_file_worker->Save(VersionFileWorkerSaveCtx(save_ts));
+//     return Status::OK();
+// }
 
-    // just rename it, dont need to get
-    VersionFileWorker *version_file_worker{};
-    {
-        std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
-        version_file_worker = fileworker_mgr->version_map_.GetFileWorker(version_filepath);
-        if (version_file_worker == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-        }
-    }
-    // Move the file from temp to data
-    version_file_worker->MoveFile();
-    // version_file_worker->Save(VersionFileWorkerSaveCtx(save_ts));
-    return Status::OK();
-}
-
-Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
-    Status status;
-
-    std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
-    std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
-    if (!status.ok()) {
-        return status;
-    }
-    LOG_TRACE("NewTxn::FlushColumnFiles begin");
-    for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
-        ColumnMeta column_meta(column_idx, block_meta);
-        DataFileWorker *file_worker{};
-        VarFileWorker *var_file_worker{};
-
-        status = column_meta.GetFileWorker(file_worker, var_file_worker);
-        if (!status.ok()) {
-            return status;
-        }
-        file_worker->MoveFile();
-        if (var_file_worker) {
-            var_file_worker->MoveFile();
-        }
-    }
-    LOG_TRACE("NewTxn::FlushColumnFiles end");
-    return Status::OK();
-}
+// Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
+//     Status status;
+//
+//     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
+//     std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     LOG_TRACE("NewTxn::FlushColumnFiles begin");
+//     for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+//         ColumnMeta column_meta(column_idx, block_meta);
+//         DataFileWorker *file_worker{};
+//         VarFileWorker *var_file_worker{};
+//
+//         status = column_meta.GetFileWorker(file_worker, var_file_worker);
+//         if (!status.ok()) {
+//             return status;
+//         }
+//         file_worker->MoveFile();
+//         if (var_file_worker) {
+//             var_file_worker->MoveFile();
+//         }
+//     }
+//     LOG_TRACE("NewTxn::FlushColumnFiles end");
+//     return Status::OK();
+// }
 
 Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
                                     const std::string &table_name,

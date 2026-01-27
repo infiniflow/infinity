@@ -645,7 +645,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     auto [chunk_ids_ptr, mem_index] = get_chunks();
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                        IndexFileWorker *index_file_worker{};
+                        IVFIndexFileWorker *index_file_worker{};
                         status = chunk_index_meta.GetFileWorker(index_file_worker);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
@@ -953,7 +953,7 @@ void ExecuteHnswSearch(QueryContext *query_context,
     auto [chunk_ids_ptr, mem_index] = get_chunks();
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-        IndexFileWorker *index_file_worker{};
+        HnswFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());

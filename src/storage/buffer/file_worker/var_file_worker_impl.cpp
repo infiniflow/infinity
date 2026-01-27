@@ -31,7 +31,7 @@ import third_party;
 
 namespace infinity {
 
-VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorkerBase(std::move(file_path)) {}
+VarFileWorker::VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size) : FileWorker(std::move(file_path)) {}
 
 VarFileWorker::~VarFileWorker() {
     munmap(mmap_, mmap_size_);

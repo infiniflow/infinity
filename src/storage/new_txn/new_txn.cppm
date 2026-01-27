@@ -123,7 +123,7 @@ struct MetaBaseCache;
 struct CacheInfo;
 class NewCatalog;
 class NewTxnManager;
-class IndexFileWorker;
+struct IndexFileWorker;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;

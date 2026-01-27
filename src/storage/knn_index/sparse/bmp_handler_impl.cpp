@@ -22,6 +22,7 @@ import :logger;
 import :local_file_handle;
 import :chunk_index_meta;
 import :bmp_alg;
+import :bmp_index_file_worker;
 
 import sparse_info;
 import embedding_type;
@@ -311,7 +312,7 @@ void BMPIndexInMem::AddDocs(SegmentOffset block_offset, const ColumnVector &col,
     IncreaseMemoryUsageBase(mem_used);
 }
 
-void BMPIndexInMem::Dump(IndexFileWorker *index_file_worker, size_t *dump_size_ptr) {
+void BMPIndexInMem::Dump(BMPIndexFileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }

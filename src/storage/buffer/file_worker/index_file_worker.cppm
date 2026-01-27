@@ -27,68 +27,14 @@ import column_def;
 
 namespace infinity {
 
-export class IndexFileWorker : public FileWorker {
-protected:
+export struct IndexFileWorker : FileWorker {
     std::shared_ptr<ColumnDef> column_def_{};
     std::shared_ptr<IndexBase> index_base_{};
-
-public:
-    virtual bool
-    Write(std::span<BMPHandlerPtr> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<BMPHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool
-    Write(std::span<EMVBIndex> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool
-    Write(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool
-    Write(std::span<IVFIndexInChunk> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-
-    virtual bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
-                       std::unique_ptr<LocalFileHandle> &file_handle,
-                       bool &prepare_success,
-                       const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-    virtual bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
-                       std::unique_ptr<LocalFileHandle> &file_handle,
-                       bool &prepare_success,
-                       const FileWorkerSaveCtx &ctx) {
-        return false;
-    }
-
-    virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
-    virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {}
 
     explicit IndexFileWorker(std::shared_ptr<std::string> file_path, std::shared_ptr<IndexBase> index_base, std::shared_ptr<ColumnDef> column_def)
         : FileWorker(file_path), column_def_(column_def), index_base_(index_base) {}
 
-    FileWorkerType Type() const override { return FileWorkerType::kIndexFile; }
-
-    ~IndexFileWorker() override = default;
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kIndexFile; }
 
     void SetIndexDef(std::shared_ptr<IndexBase> index_base) { index_base_ = std::move(index_base); }
 };

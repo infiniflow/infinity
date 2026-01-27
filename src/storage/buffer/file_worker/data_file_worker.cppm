@@ -20,12 +20,12 @@ import :persistence_manager;
 
 namespace infinity {
 
-export struct DataFileWorker : FileWorkerBase {
+export struct DataFileWorker : FileWorker {
     explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
     ~DataFileWorker();
 
-    FileWorkerType Type() const { return FileWorkerType::kDataFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kDataFile; }
 
     bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
     bool WriteSnapshot(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);

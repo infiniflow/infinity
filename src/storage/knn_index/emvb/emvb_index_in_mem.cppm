@@ -31,6 +31,7 @@ struct ColumnVector;
 class KVInstance;
 struct ChunkIndexMetaInfo;
 class MetaCache;
+class EMVBIndexFileWorker;
 
 using EMVBInMemQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 
@@ -80,7 +81,7 @@ public:
 
     void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
 
-    void Dump(IndexFileWorker *index_file_worker);
+    void Dump(EMVBIndexFileWorker *index_file_worker);
 
     // return id: offset in the segment
     std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,

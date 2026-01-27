@@ -635,14 +635,14 @@ template <typename ColumnValueType, typename CardinalityTag>
 struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, CardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    IndexFileWorker *index_file_worker_{};
+    SecondaryIndexFileWorker *index_file_worker_{};
     const SecondaryIndexDataBase<CardinalityTag> *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     // For LowCardinality: store the range for processing
     std::pair<KeyType, KeyType> current_range_;
 
-    TrunkReaderT(const u32 segment_row_count, IndexFileWorker *index_file_worker)
+    TrunkReaderT(const u32 segment_row_count, SecondaryIndexFileWorker *index_file_worker)
         : segment_row_count_(segment_row_count), index_file_worker_(index_file_worker) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<CardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
@@ -656,7 +656,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             const u32 begin_pos = begin_pos_;
             const u32 end_pos = end_pos_;
             std::shared_ptr<SecondaryIndexDataBase<CardinalityTag>> index;
-            dynamic_cast<FileWorker *>(index_file_worker_)->Read(index);
+            FileWorker::Read(index_file_worker_, index);
             const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
             // output result
             for (u32 i = begin_pos; i < end_pos; ++i) {
@@ -699,11 +699,11 @@ template <typename ColumnValueType>
 struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<ColumnValueType, HighCardinalityTag> {
     using KeyType = typename TrunkReader<ColumnValueType, HighCardinalityTag>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    IndexFileWorker *index_file_worker_{};
+    SecondaryIndexFileWorker *index_file_worker_{};
     const SecondaryIndexDataBase<HighCardinalityTag> *index_{};
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
-    TrunkReaderT(const u32 segment_row_count, IndexFileWorker *index_file_worker)
+    TrunkReaderT(const u32 segment_row_count, SecondaryIndexFileWorker *index_file_worker)
         : segment_row_count_(segment_row_count), index_file_worker_(index_file_worker) {}
     TrunkReaderT(const u32 segment_row_count, const SecondaryIndexDataBase<HighCardinalityTag> *index)
         : segment_row_count_(segment_row_count), index_(index) {}
@@ -849,7 +849,7 @@ ExecuteSingleRangeHighCardinalityT(const std::pair<ConvertToOrderedType<ColumnVa
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        IndexFileWorker *index_file_worker{};
+        SecondaryIndexFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
@@ -889,7 +889,7 @@ ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnVal
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
-        IndexFileWorker *index_file_worker{};
+        SecondaryIndexFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());

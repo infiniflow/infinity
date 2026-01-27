@@ -426,7 +426,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // 2. chunk index
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                IndexFileWorker *index_file_worker{};
+                EMVBIndexFileWorker *index_file_worker{};
                 Status status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
@@ -485,7 +485,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                   operator_state);
         operator_state->SetComplete();
     }
-    return;
 }
 
 // TensorElemT: bit, QueryElemT: bit (unaligned).

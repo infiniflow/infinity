@@ -74,7 +74,7 @@ public:
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
-    void Dump(IndexFileWorker *index_file_worker) const override {
+    void Dump(SecondaryIndexFileWorker *index_file_worker) const override {
         // std::shared_ptr<SecondaryIndexData> data_ptr;
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
             SecondaryIndexData *data_ptr{};
