@@ -138,7 +138,7 @@ TEST_F(HighCardinalitySecondaryIndexTest, TestTxn) {
 
         auto test_data = CreateHighCardinalityData<i32>(chunk_row_count, unique_values);
         index->InsertData(&test_data);
-        
+
         delete index;
     }
 }
