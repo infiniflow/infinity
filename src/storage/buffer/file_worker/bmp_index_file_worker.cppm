@@ -15,11 +15,6 @@
 export module infinity_core:bmp_index_file_worker;
 
 import :index_file_worker;
-// // import :file_worker;
-// import :index_base;
-// import :file_worker_type;
-// import :persistence_manager;
-// import :bmp_handler;
 
 import std.compat;
 
@@ -37,7 +32,7 @@ public:
 
     ~BMPIndexFileWorker() override;
 
-    FileWorkerType Type() const override { return FileWorkerType::kBMPIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const override { return FileWorkerType::kBMPIndexFile; }
 
 protected:
     bool

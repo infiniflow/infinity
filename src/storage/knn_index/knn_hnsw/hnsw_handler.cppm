@@ -335,7 +335,7 @@ public:
         IncreaseMemoryUsageBase(mem_usage);
     }
 
-    void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
+    void Dump(IndexFileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
 
 public:
     // LSG setting
@@ -372,7 +372,7 @@ private:
     size_t row_count_{};
     HnswHandlerPtr hnsw_handler_{};
     bool own_memory_{};
-    FileWorker *index_file_worker_{};
+    IndexFileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

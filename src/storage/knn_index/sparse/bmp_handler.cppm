@@ -136,7 +136,7 @@ public:
 
     void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
-    void Dump(FileWorker *index_file_worker, size_t *dump_size = nullptr);
+    void Dump(IndexFileWorker *index_file_worker, size_t *dump_size = nullptr);
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
@@ -151,7 +151,7 @@ private:
     RowID begin_row_id_ = {};
     BMPHandlerPtr bmp_handler_ = nullptr;
     mutable bool own_memory_ = true;
-    mutable FileWorker *index_file_worker_{};
+    mutable IndexFileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

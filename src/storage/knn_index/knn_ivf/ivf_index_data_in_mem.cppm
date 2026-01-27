@@ -39,7 +39,7 @@ protected:
     u32 input_embedding_count_ = 0;
     IVF_Index_Storage *ivf_index_storage_{};
     bool own_ivf_index_storage_ = true;
-    FileWorker *index_file_worker_{};
+    IndexFileWorker *index_file_worker_{};
 
     const IndexIVFOption &ivf_option() const { return ivf_index_storage_->ivf_option(); }
     u32 embedding_dimension() const { return ivf_index_storage_->embedding_dimension(); }
@@ -58,7 +58,7 @@ public:
     virtual u32 GetRowCount() const = 0;
 
     virtual void InsertBlockData(const SegmentOffset block_offset, const ColumnVector &col, BlockOffset row_offset, BlockOffset row_cnt) = 0;
-    virtual void Dump(FileWorker *file_worker, size_t *p_dump_size = nullptr) = 0;
+    virtual void Dump(IndexFileWorker *index_file_worker, size_t *p_dump_size = nullptr) = 0;
     void SearchIndex(const KnnDistanceBase1 *knn_distance,
                      const void *query_ptr,
                      EmbeddingDataType query_element_type,

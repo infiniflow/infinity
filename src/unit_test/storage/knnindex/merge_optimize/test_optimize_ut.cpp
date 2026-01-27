@@ -19,8 +19,6 @@ module;
 module infinity_core:ut.test_optimize;
 
 import :ut.base_test;
-import :logger;
-import third_party;
 import :infinity_context;
 import :table_def;
 import :column_vector;
@@ -30,7 +28,6 @@ import :index_secondary;
 import :infinity_exception;
 import :bg_task;
 import :wal_manager;
-
 import :background_process;
 import :txn_state;
 import :new_txn_manager;
@@ -48,6 +45,8 @@ import :status;
 import :new_txn;
 import :hnsw_handler;
 import :storage;
+
+import third_party;
 
 import compilation_config;
 import global_resource_usage;
@@ -216,14 +215,14 @@ TEST_P(OptimizeKnnTest, test_hnsw_optimize) {
         ChunkID chunk_id = 3;
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
+            ChunkIndexMetaInfo *chunk_info{};
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(chunk_info->row_cnt_, 24);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        IndexFileWorker *file_worker{};
+        BMPIndexFileWorker::IndexFileWorker *file_worker{};
         status = chunk_index_meta.GetFileWorker(file_worker);
         EXPECT_TRUE(status.ok());
 

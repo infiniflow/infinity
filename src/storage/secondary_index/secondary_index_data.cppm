@@ -30,6 +30,7 @@ import data_type;
 namespace infinity {
 
 class TableIndexMeta;
+class IndexFileWorker;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, BooleanT, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -171,7 +172,7 @@ public:
 
     virtual void InsertData(const void *ptr) = 0;
 
-    virtual void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) = 0;
+    virtual void InsertMergeData(const std::vector<std::pair<u32, IndexFileWorker *>> &old_chunks) = 0;
 
     // Virtual methods for low cardinality access (default implementations for high cardinality)
     virtual u32 GetUniqueKeyCount() const { return 0; }

@@ -78,26 +78,26 @@ public:
         // std::shared_ptr<SecondaryIndexData> data_ptr;
         if constexpr (std::is_same_v<CardinalityTag, HighCardinalityTag>) {
             SecondaryIndexData *data_ptr{};
-            index_file_worker->Read(data_ptr); // yee todo
+            FileWorker::Read(index_file_worker, data_ptr);
 
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
             data_ptr->InsertData(&temp_map);
-            index_file_worker->Write(data_ptr); // yee todo
+            FileWorker::Write(index_file_worker, data_ptr);
         } else if constexpr (std::is_same_v<CardinalityTag, LowCardinalityTag>) {
             // auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
             // std::multimap<KeyType, u32> temp_map;
             // const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
             // data_ptr->InsertData(&temp_map);
             SecondaryIndexDataBase<LowCardinalityTag> *data_ptr{};
-            index_file_worker->Read(data_ptr); // yee todo
+            FileWorker::Read(index_file_worker, data_ptr);
 
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
             data_ptr->InsertData(&temp_map);
-            index_file_worker->Write(data_ptr); // yee todo
+            FileWorker::Write(index_file_worker, data_ptr);
         } else {
             UnrecoverableError("Unsupported cardinality tag type");
         }

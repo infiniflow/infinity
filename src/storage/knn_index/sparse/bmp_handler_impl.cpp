@@ -311,7 +311,7 @@ void BMPIndexInMem::AddDocs(SegmentOffset block_offset, const ColumnVector &col,
     IncreaseMemoryUsageBase(mem_used);
 }
 
-void BMPIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
+void BMPIndexInMem::Dump(IndexFileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }
@@ -321,7 +321,7 @@ void BMPIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
 
     own_memory_ = false;
     index_file_worker_ = std::move(index_file_worker);
-    index_file_worker_->Write(std::span{&bmp_handler_, 1}); // yee todo
+    FileWorker::Write(index_file_worker_, std::span{&bmp_handler_, 1});
 }
 
 size_t BMPIndexInMem::GetRowCount() const { return bmp_handler_->DocNum(); }

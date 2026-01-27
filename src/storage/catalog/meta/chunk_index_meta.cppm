@@ -16,6 +16,7 @@ export module infinity_core:chunk_index_meta;
 
 import :status;
 import :new_catalog;
+import :index_file_worker;
 
 import third_party;
 
@@ -30,7 +31,6 @@ class SegmentIndexMeta;
 // class HnswFileWorker;
 // class IVFIndexFileWorker;
 // class SecondaryIndexFileWorker;
-class IndexFileWorker;
 
 export struct ChunkIndexMetaInfo {
     ChunkIndexMetaInfo() = default;

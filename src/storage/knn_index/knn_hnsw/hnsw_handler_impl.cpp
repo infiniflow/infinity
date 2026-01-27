@@ -603,7 +603,7 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(IndexFileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
@@ -624,7 +624,7 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
         memindex_tracer->DecreaseMemUsed(mem_usage);
     }
 
-    index_file_worker_->Write(std::move(hnsw_handler)); // yee todo
+    FileWorker::Write(index_file_worker_, std::move(hnsw_handler));
 }
 
 size_t
