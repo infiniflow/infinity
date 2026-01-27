@@ -44,6 +44,65 @@ import global_resource_usage;
 
 namespace infinity {
 
+// Get absolute file path. As key of buffer handle.
+
+FileWorkerBase::FileWorkerBase(std::shared_ptr<std::string> rel_file_path) : rel_file_path_(std::move(rel_file_path)) {
+    mmap_ = nullptr;
+    persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();
+    file_worker_manager_ = InfinityContext::instance().storage()->fileworker_manager();
+}
+
+std::string FileWorkerBase::GetPath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *rel_file_path_); }
+
+std::string FileWorkerBase::GetWorkingPath() const { return fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), *rel_file_path_); }
+
+void FileWorkerBase::MoveFile() {
+    // boost::unique_lock l(boost_rw_mutex_);
+    std::unique_lock l(mutex_);
+    msync(mmap_, mmap_size_, MS_SYNC);
+    auto working_path = GetWorkingPath();
+    auto data_path = GetPath();
+
+    if (persistence_manager_) {
+        PersistResultHandler handler(persistence_manager_);
+        if (!VirtualStore::Exists(working_path)) {
+            return;
+        }
+        auto persist_result = persistence_manager_->Persist(data_path, working_path);
+        handler.HandleWriteResult(persist_result);
+
+        // obj_addr_ = persist_result.obj_addr_;
+    } else {
+        if (!VirtualStore::Exists(working_path)) {
+            return;
+        }
+        auto data_path_parent = VirtualStore::GetParentPath(data_path);
+        if (!VirtualStore::Exists(data_path_parent)) {
+            VirtualStore::MakeDirectory(data_path_parent);
+        }
+
+        VirtualStore::Copy(working_path, data_path);
+    }
+}
+
+Status FileWorkerBase::CleanupFile() const {
+    std::unique_lock l(mutex_);
+    auto status = VirtualStore::DeleteFile(GetWorkingPath());
+    if (persistence_manager_) {
+        PersistResultHandler handler{persistence_manager_};
+        auto result_data = persistence_manager_->Cleanup(GetPath());
+        // if (!result_data.obj_addr_.Valid()) {
+        //     return Status::OK();
+        // }
+        handler.HandleWriteResult(result_data);
+
+    } else {
+        status = VirtualStore::DeleteFile(GetPath());
+    }
+
+    return Status::OK();
+}
+
 FileWorker::FileWorker(std::shared_ptr<std::string> rel_file_path) : rel_file_path_(std::move(rel_file_path)) {
     mmap_ = nullptr;
     persistence_manager_ = InfinityContext::instance().storage()->persistence_manager();

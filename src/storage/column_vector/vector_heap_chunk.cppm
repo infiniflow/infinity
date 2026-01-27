@@ -33,7 +33,7 @@ public:
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 
-    VectorHeapChunk(VectorHeapChunk &&other) {
+    VectorHeapChunk(VectorHeapChunk &&other) noexcept {
         if (std::holds_alternative<std::unique_ptr<char[]>>(other.ptr_)) {
             ptr_ = std::move(std::get<std::unique_ptr<char[]>>(other.ptr_));
         } else {
@@ -47,14 +47,14 @@ public:
 
     ~VectorHeapChunk() {}
 
-    const char *GetPtr() const { // Pattern Matching here
-        if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
-            return std::get<std::unique_ptr<char[]>>(ptr_).get();
-        }
-        std::shared_ptr<char[]> data;
-        std::get<FileWorker *>(ptr_)->Read(data);
-        return data.get(); // dangling
-    }
+    // const char *GetPtr() const { // Pattern Matching here
+    //     if (std::holds_alternative<std::unique_ptr<char[]>>(ptr_)) {
+    //         return std::get<std::unique_ptr<char[]>>(ptr_).get();
+    //     }
+    //     std::shared_ptr<char[]> data;
+    //     std::get<FileWorker *>(ptr_)->Read(, data, true); // yee todo
+    //     return data.get();                                // dangling
+    // }
 
 private:
     std::variant<std::unique_ptr<char[]>, FileWorker *> ptr_;

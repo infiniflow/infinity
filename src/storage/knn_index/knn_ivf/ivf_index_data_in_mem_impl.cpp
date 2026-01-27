@@ -227,13 +227,13 @@ public:
         }
         // std::shared_ptr<IVFIndexInChunk> data_ptr;
         IVFIndexInChunk *data_ptr{};
-        index_file_worker->Read(data_ptr);
+        index_file_worker->Read(data_ptr); // yee todo
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
         delete ivf_index_storage_;
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         index_file_worker_ = std::move(index_file_worker);
-        index_file_worker_->Write(std::span{data_ptr, 1});
+        index_file_worker_->Write(std::span{data_ptr, 1}); // yee todo
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,

@@ -95,7 +95,7 @@ public:
 };
 
 TEST_F(HnswLVQTest, test1) {
-    // fuck
+    // yee todo
     // using namespace infinity;
     //
     // auto data = std::make_unique<float[]>(dim_ * vec_n_);

@@ -179,9 +179,11 @@ public:
 
     // auto &fileworker_map() { return fileworker_map_; }
 
-    std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
+    [[nodiscard]] std::shared_ptr<std::string> GetFullDataDir() const { return data_dir_; }
 
-    std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
+    [[nodiscard]] std::shared_ptr<std::string> GetTempDir() const { return temp_dir_; }
+
+    [[nodiscard]] inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
 
     size_t FileWorkerCount();
 
@@ -189,9 +191,6 @@ public:
 
     void RemoveImport(TransactionID txn_id);
 
-    inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
-
-    std::mutex mutex_;
     void MoveFiles();
 
     FileWorkerMap<BMPIndexFileWorker> bmp_map_;
@@ -205,6 +204,8 @@ public:
     FileWorkerMap<VersionFileWorker> version_map_;
 
     // private:
+    std::mutex mutex_;
+
     std::shared_ptr<std::string> data_dir_;
     std::shared_ptr<std::string> temp_dir_;
     PersistenceManager *persistence_manager_{};

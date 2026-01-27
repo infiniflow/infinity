@@ -49,7 +49,7 @@ struct SecondaryIndexChunkDataReader {
         row_count_ = row_count;
         // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
         SecondaryIndexDataBase<HighCardinalityTag> *index;
-        file_worker->Read(index);
+        file_worker->Read(index); // yee todo
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
     }
@@ -462,7 +462,7 @@ public:
         for (const auto &[old_row_count, old_buffer] : old_buffers) {
             // SecondaryIndexDataLowCardinalityT<BooleanT> *old_data{};
             SecondaryIndexDataBase<LowCardinalityTag> *old_data_origin{};
-            old_buffer->Read(old_data_origin); // ? truncted
+            old_buffer->Read(old_data_origin); // ? truncted  // yee todo
 
             auto *old_data = static_cast<SecondaryIndexDataLowCardinalityT<BooleanT> *>(old_data_origin);
 

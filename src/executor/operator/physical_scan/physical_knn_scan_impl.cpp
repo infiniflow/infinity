@@ -651,7 +651,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                             UnrecoverableError(status.message());
                         }
                         IVFIndexInChunk *ivf_chunk{};
-                        index_file_worker->Read(ivf_chunk);
+                        index_file_worker->Read(ivf_chunk); // yee todo
                         ivf_result_handler->Search(ivf_chunk);
                         // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.cache_manager_;
                         // cache_manager.UnPin(*index_file_worker->rel_file_path_);
@@ -959,7 +959,7 @@ void ExecuteHnswSearch(QueryContext *query_context,
             UnrecoverableError(status.message());
         }
         std::shared_ptr<HnswHandler> hnsw_handler;
-        index_file_worker->Read(hnsw_handler);
+        index_file_worker->Read(hnsw_handler); // yee todo
         hnsw_search(hnsw_handler.get(), false);
     }
     if (mem_index) {

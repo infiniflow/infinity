@@ -75,7 +75,7 @@ public:
 };
 
 TEST_F(RabitqTest, test_simple) {
-    // fuck
+    // yee todo
     // using namespace infinity;
     //
     // size_t write_mem = 0;
