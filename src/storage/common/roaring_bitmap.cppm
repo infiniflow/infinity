@@ -329,11 +329,12 @@ struct RoaringBitmap {
         if (size > maxbytes) {
             UnrecoverableError("RoaringBitmap::ReadAdv: size > maxbytes");
         }
+        auto roaring_bitmap = roaring::Roaring::readSafe(ptr, size);
         auto bitmap = std::make_shared<RoaringBitmap>(count);
         if constexpr (init_all_true) {
             bitmap->all_true_flag_.value = false;
         }
-        bitmap->roaring_.read(ptr);
+        bitmap->roaring_ = std::move(roaring_bitmap);
         ptr += size;
         // no need to reduce maxbytes
         return bitmap;
