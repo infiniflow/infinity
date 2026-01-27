@@ -416,7 +416,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 // auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
                 // data_ptr->InsertMergeData(old_buffers);
 
-                SecondaryIndexData *data_ptr{};
+                SecondaryIndexDataBase<HighCardinalityTag> *data_ptr{};
                 FileWorker::Read(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
                 data_ptr->InsertMergeData(old_buffers);
                 FileWorker::Write(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
@@ -428,11 +428,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 data_ptr->InsertMergeData(old_buffers);
                 FileWorker::Write(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
             }
-            // // std::shared_ptr<SecondaryIndexData> data_ptr;
-            // SecondaryIndexData *data_ptr;
-            // index_file_worker->Read(data_ptr);
-            // data_ptr->InsertMergeData(old_buffers);
-            // index_file_worker->Write(data_ptr);
             break;
         }
         case IndexType::kFullText: {

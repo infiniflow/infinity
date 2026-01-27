@@ -71,7 +71,7 @@ void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
     // std::unique_lock l(mutex_);
-    auto index = GetSecondaryIndexData(std::make_shared<DataType>(index_data_type_), row_count_, false);
+    auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
     // data = std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(index);
     data = index;
     if (!file_handle) {
