@@ -79,8 +79,8 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     version_file_worker_ = version_file_worker;
 
     std::shared_ptr<BlockVersion> block_version;
-    // static_cast<FileWorker *>(version_file_worker_)->Read(block_version, true); // fuck
-    FileWorker::Read(version_file_worker_, block_version); // fuck
+    // static_cast<FileWorker *>(version_file_worker_)->Read(block_version, true); // yee todo
+    FileWorker::Read(version_file_worker_, block_version); // yee todo
     block_version->RestoreFromSnapshot(commit_ts_);
     return Status::OK();
 }

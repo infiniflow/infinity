@@ -624,7 +624,7 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
         memindex_tracer->DecreaseMemUsed(mem_usage);
     }
 
-    index_file_worker_->Write(std::move(hnsw_handler)); // fuck
+    index_file_worker_->Write(std::move(hnsw_handler)); // yee todo
 }
 
 size_t

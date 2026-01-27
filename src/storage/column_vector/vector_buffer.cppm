@@ -66,8 +66,8 @@ public:
             data = std::get<std::shared_ptr<char[]>>(ptr_);
             return;
         }
-        // static_cast<FileWorker *>(std::get<DataFileWorker *>(ptr_))->Read(data, true); // fuck
-        FileWorker::Read(std::get<DataFileWorker *>(ptr_), data); // fuck
+        // static_cast<FileWorker *>(std::get<DataFileWorker *>(ptr_))->Read(data, true); // yee todo
+        FileWorker::Read(std::get<DataFileWorker *>(ptr_), data); // yee todo
     }
 
     [[nodiscard]] bool GetCompactBit(size_t idx) const;

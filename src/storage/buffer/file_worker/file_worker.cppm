@@ -125,7 +125,7 @@ public:
         auto working_path = file_worker->GetWorkingPath();
         auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
         if (!status.ok()) {
-            // fuck
+            // yee todo
             // UnrecoverableError(status.message());
         }
 
@@ -202,7 +202,7 @@ public:
         auto working_path = GetWorkingPath();
         auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
         if (!status.ok()) {
-            // fuck
+            // yee todo
             // UnrecoverableError(status.message());
         }
 

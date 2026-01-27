@@ -667,7 +667,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             const auto [begin_val, end_val] = current_range_;
             // const SecondaryIndexDataBase<CardinalityTag> *index{};
             SecondaryIndexDataBase<CardinalityTag> *index;
-            index_file_worker_->Read(index); // fuck
+            index_file_worker_->Read(index); // yee todo
 
             // Get unique keys count and pointer through base class interface
             u32 unique_key_count = index->GetUniqueKeyCount();
@@ -713,7 +713,7 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
         // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index1;
         SecondaryIndexDataBase<HighCardinalityTag> *index1;
         if (index_file_worker_) {
-            index_file_worker_->Read(index1); // fuck
+            index_file_worker_->Read(index1); // yee todo
             index = index1;
         } else {
             index = index_;
@@ -799,7 +799,7 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
         const u32 end_pos = end_pos_;
         // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
         SecondaryIndexDataBase<HighCardinalityTag> *index;
-        index_file_worker_->Read(index); // fuck
+        index_file_worker_->Read(index); // yee todo
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
         for (u32 i = begin_pos; i < end_pos; ++i) {

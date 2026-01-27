@@ -52,7 +52,7 @@ public:
     //         return std::get<std::unique_ptr<char[]>>(ptr_).get();
     //     }
     //     std::shared_ptr<char[]> data;
-    //     std::get<FileWorker *>(ptr_)->Read(, data, true); // fuck
+    //     std::get<FileWorker *>(ptr_)->Read(, data, true); // yee todo
     //     return data.get();                                // dangling
     // }
 

@@ -70,7 +70,7 @@ void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, Tx
     commit_ts_ = commit_ts;
     {
         std::shared_ptr<BlockVersion> block_version;
-        FileWorker::Read(version_file_worker_, block_version); // fuck
+        FileWorker::Read(version_file_worker_, block_version); // yee todo
         block_offset_end_ = block_version->GetRowCount(begin_ts_);
     }
 }
@@ -81,7 +81,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    FileWorker::Read(version_file_worker_, block_version); // fuck
+    FileWorker::Read(version_file_worker_, block_version); // yee todo
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -1113,7 +1113,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    FileWorker::Read(version_buffer, block_version); // fuck
+    FileWorker::Read(version_buffer, block_version); // yee todo
     {
         block_version->GetCreateTS(offset, size, column_vector);
     }
@@ -1130,7 +1130,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     std::shared_ptr<BlockVersion> block_version;
-    FileWorker::Read(version_file_worker, block_version); // fuck
+    FileWorker::Read(version_file_worker, block_version); // yee todo
     {
         block_version->GetDeleteTS(offset, size, column_vector);
     }

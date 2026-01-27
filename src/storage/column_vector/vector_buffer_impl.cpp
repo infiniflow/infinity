@@ -138,8 +138,8 @@ void VectorBuffer::SetToCatalog(DataFileWorker *data_file_worker, VarFileWorker 
     }
 
     auto src_ptr = std::move(std::get<std::shared_ptr<char[]>>(ptr_));
-    // static_cast<FileWorker *>(data_file_worker)->Write(std::span{src_ptr.get(), data_size_}, true); // fuck
-    FileWorker::Write(data_file_worker, std::span{src_ptr.get(), data_size_}); // fuck
+    // static_cast<FileWorker *>(data_file_worker)->Write(std::span{src_ptr.get(), data_size_}, true); // yee todo
+    FileWorker::Write(data_file_worker, std::span{src_ptr.get(), data_size_}); // yee todo
 
     src_ptr.reset();
 

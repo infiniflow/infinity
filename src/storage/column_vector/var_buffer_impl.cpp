@@ -138,7 +138,7 @@ void VarBufferManager::SetToCatalog(VarFileWorker *var_file_worker) {
         mem_buffer_ = std::make_shared<VarBuffer>();
     }
     // var_fileworker_->SetData(mem_buffer_.release());
-    FileWorker::Write(var_file_worker_, std::span{mem_buffer_.get(), 1}); // fuck
+    FileWorker::Write(var_file_worker_, std::span{mem_buffer_.get(), 1}); // yee todo
     mem_buffer_.reset();                                                  // this is shit
 }
 
@@ -164,7 +164,7 @@ std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
                 var_buffer = my_var_buffer_;
                 return var_buffer;
             }
-            FileWorker::Read(var_file_worker_, var_buffer); // fuck
+            FileWorker::Read(var_file_worker_, var_buffer); // yee todo
             my_var_buffer_ = var_buffer;
             // if (var_buffer->TotalSize() == 0) {
             //     std::println("//////////////////");
