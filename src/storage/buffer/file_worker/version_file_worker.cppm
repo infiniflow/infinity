@@ -21,29 +21,25 @@ import :block_version;
 
 namespace infinity {
 
-export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
+export struct VersionFileWorkerSaveCtx : FileWorkerSaveCtx {
     VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
 
     TxnTimeStamp checkpoint_ts_{};
 };
 
-export class VersionFileWorker : public FileWorker {
-public:
+export struct VersionFileWorker : FileWorkerBase {
     static constexpr BlockVersion *has_cache_manager_{};
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
-    virtual ~VersionFileWorker() override;
+    ~VersionFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
+    FileWorkerType Type() const { return FileWorkerType::kVersionDataFile; }
 
-    bool Write(std::shared_ptr<BlockVersion> &data,
-               std::unique_ptr<LocalFileHandle> &file_handle,
-               bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+    bool
+    Write(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
     size_t capacity_{};
 };
 

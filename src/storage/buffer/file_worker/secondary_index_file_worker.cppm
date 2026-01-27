@@ -35,7 +35,7 @@ public:
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), row_count_(row_count) {
+        : IndexFileWorker(file_path, index_base, column_def), row_count_(row_count) {
 
         if (index_base_->index_type_ == IndexType::kSecondary) {
             index_data_type_ = *column_def_->type();

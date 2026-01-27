@@ -116,7 +116,7 @@ size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
 }
 
 VarBufferManager::VarBufferManager(VarFileWorker *var_file_worker)
-    : type_(BufferType::kNewCatalog), data_file_worker_(nullptr), var_fileworker_(var_file_worker) {}
+    : type_(BufferType::kNewCatalog), data_file_worker_(nullptr), var_file_worker_(var_file_worker) {}
 
 size_t VarBufferManager::Append(const char *data, size_t size) {
     if (size == 0) {
@@ -133,13 +133,13 @@ void VarBufferManager::SetToCatalog(VarFileWorker *var_file_worker) {
         UnrecoverableError("Cannot convert to new catalog");
     }
     type_ = BufferType::kNewCatalog;
-    var_fileworker_ = var_file_worker;
+    var_file_worker_ = var_file_worker;
     if (!mem_buffer_) {
         mem_buffer_ = std::make_shared<VarBuffer>();
     }
     // var_fileworker_->SetData(mem_buffer_.release());
-    static_cast<FileWorker *>(var_fileworker_)->Write(std::span{mem_buffer_.get(), 1});
-    mem_buffer_.reset(); // this is shit
+    FileWorker::Write(var_file_worker_, std::span{mem_buffer_.get(), 1}); // yee todo
+    mem_buffer_.reset();                                                  // this is shit
 }
 
 std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
@@ -164,7 +164,7 @@ std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
                 var_buffer = my_var_buffer_;
                 return var_buffer;
             }
-            static_cast<FileWorker *>(var_fileworker_)->Read(var_buffer);
+            FileWorker::Read(var_file_worker_, var_buffer); // yee todo
             my_var_buffer_ = var_buffer;
             // if (var_buffer->TotalSize() == 0) {
             //     std::println("//////////////////");

@@ -57,7 +57,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(CleanupTaskTest, test_delete_db_simple) {
     auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
-    i64 cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
+    auto cleanup_interval = InfinityContext::instance().storage()->config()->CleanupInterval();
 
     auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -105,7 +105,6 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
                 EXPECT_TRUE(status.ok());
-                ;
             }
         }
 
@@ -141,7 +140,7 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
 
         // Wait for the cleanup task to run
         LOG_INFO(fmt::format("cleanup_interval: {} seconds, wait for cleanup task to run", cleanup_interval));
-        std::this_thread::sleep_for(std::chrono::seconds(cleanup_interval + 1));
+        std::this_thread::sleep_for(seconds(cleanup_interval + 1));
 
         CheckFilePaths(delete_file_paths, exist_file_paths);
     }

@@ -83,20 +83,20 @@ public:
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
             data_ptr->InsertData(&temp_map);
-            index_file_worker->Write(data_ptr);
+            index_file_worker->Write(data_ptr); // yee todo
         } else if constexpr (std::is_same_v<CardinalityTag, LowCardinalityTag>) {
             // auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
             // std::multimap<KeyType, u32> temp_map;
             // const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
             // data_ptr->InsertData(&temp_map);
             SecondaryIndexDataBase<LowCardinalityTag> *data_ptr{};
-            index_file_worker->Read(data_ptr);
+            index_file_worker->Read(data_ptr); // yee todo
 
             std::multimap<KeyType, u32> temp_map;
             const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
 
             data_ptr->InsertData(&temp_map);
-            index_file_worker->Write(data_ptr);
+            index_file_worker->Write(data_ptr); // yee todo
         } else {
             UnrecoverableError("Unsupported cardinality tag type");
         }

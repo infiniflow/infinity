@@ -1872,7 +1872,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 // Read version info
                 std::shared_ptr<BlockVersion> block_version;
-                static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
+                FileWorker::Read(version_file_worker_, block_version); // yee todo
 
                 // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
@@ -1909,7 +1909,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read data file
                         std::shared_ptr<char[]> data;
-                        static_cast<FileWorker *>(data_file_worker_)->Read(data);
+                        FileWorker::Read(data_file_worker_, data); // yee todo
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
@@ -1931,7 +1931,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read variable data file
                         std::shared_ptr<VarBuffer> var_buffer;
-                        static_cast<FileWorker *>(var_file_worker_)->Read(var_buffer);
+                        FileWorker::Read(var_file_worker_, var_buffer); // yee todo
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());

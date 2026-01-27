@@ -34,7 +34,7 @@ import compilation_config;
 
 using namespace infinity;
 
-// fuck
+// yee todo
 // class HnswSparseTest : public BaseTest {
 // protected:
 //     using LabelT = u64;

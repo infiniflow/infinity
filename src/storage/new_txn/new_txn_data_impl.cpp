@@ -140,13 +140,13 @@ struct NewTxnCompactState {
                 }
 
                 // data_file_worker->Write(std::span{column_vectors_[i].data().get(), column_vectors_[i].Size()});
-                static_cast<FileWorker *>(data_file_worker)->Write(std::span{column_vectors_[i].data().get(), data_size});
+                FileWorker::Write(data_file_worker, std::span{column_vectors_[i].data().get(), data_size}); // yee todo
                 if (var_file_worker) {
                     if ((column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_ || column_vectors_[i].buffer_->var_buffer_mgr()->mem_buffer_) &&
                         std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(
                             column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
                         auto data = column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_;
-                        static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
+                        FileWorker::Write(var_file_worker, std::span{data.get(), 1}); // yee todo
                     }
                 }
             }
@@ -900,12 +900,12 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 
         // append in version file.
         std::shared_ptr<BlockVersion> block_version;
-        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         block_version->Append(commit_ts, block_offset + append_rows);
         // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
         // cache_manager.UnPin(*version_file_worker->rel_file_path_);
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, version_file_worker_save_ctx);
+        FileWorker::Write(version_file_worker, block_version, version_file_worker_save_ctx); // yee todo
     }
     return Status::OK();
 }
@@ -937,12 +937,12 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
     // dest_vec.SetToCatalog(data_file_worker, var_file_worker, ColumnVectorMode::kReadWrite);
 
     // data_file_worker->Write(std::span{dest_vec.data().get(), dest_vec.Size()});
-    static_cast<FileWorker *>(data_file_worker)->Write(std::span{dest_vec.data().get(), data_size});
+    FileWorker::Write(data_file_worker, std::span{dest_vec.data().get(), data_size}); // yee todo
     if (var_file_worker) {
         if (dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_ &&
             std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
             auto data = dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_;
-            static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
+            FileWorker::Write(var_file_worker, std::span{data.get(), 1}); // yee todo
         }
     }
     // }
@@ -957,7 +957,7 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
 Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, std::vector<BlockOffset> &undo_block_offsets) {
     auto block_dir_ptr = block_meta.GetBlockDir();
     Status status;
-    FileWorker *version_file_worker{};
+    VersionFileWorker *version_file_worker{};
     std::tie(version_file_worker, status) = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
@@ -968,7 +968,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
 
         // delete in version file
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         undo_block_offsets.reserve(block_offsets.size());
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Delete(block_offset, commit_ts);
@@ -978,14 +978,14 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
             undo_block_offsets.push_back(block_offset);
         }
         VersionFileWorkerSaveCtx version_file_worker_save_ctx{commit_ts};
-        version_file_worker->Write(block_version, version_file_worker_save_ctx);
+        FileWorker::Write(version_file_worker, block_version, version_file_worker_save_ctx); // yee todo
     }
     return Status::OK();
 }
 
 Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
-    FileWorker *version_file_worker{};
+    VersionFileWorker *version_file_worker{};
     {
         auto version_filepath = fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH);
         auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
@@ -998,7 +998,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
     {
         // delete in version file
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
         }
@@ -1009,7 +1009,7 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const std::vector<Bl
 Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<BlockOffset> &block_offsets, bool ignore_invisible) {
     std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
     Status status;
-    FileWorker *version_file_worker{};
+    VersionFileWorker *version_file_worker{};
     std::tie(version_file_worker, status) = block_meta.GetVersionFileWorker();
     if (!status.ok()) {
         return status;
@@ -1019,7 +1019,7 @@ Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const std::vector<Bloc
     {
         // delete in version file
         std::shared_ptr<BlockVersion> block_version;
-        version_file_worker->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Print(begin_ts, block_offset, ignore_invisible);
             if (!status.ok()) {
@@ -1222,12 +1222,12 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
 
         // // XXX
         // data_file_worker->Write(std::span{column_vector.data().get(), column_vector.Size()});
-        static_cast<FileWorker *>(data_file_worker)->Write(std::span{column_vector.data().get(), data_size});
+        FileWorker::Write(data_file_worker, std::span{column_vector.data().get(), data_size}); // yee todo
         if (var_file_worker) {
             if (column_vector.buffer_->var_buffer_mgr()->my_var_buffer_ &&
                 std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(column_vector.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
                 auto data = column_vector.buffer_->var_buffer_mgr()->my_var_buffer_;
-                static_cast<FileWorker *>(var_file_worker)->Write(std::span{data.get(), 1});
+                FileWorker::Write(var_file_worker, std::span{data.get(), 1}); // yee todo
             }
         }
 
@@ -1719,10 +1719,10 @@ Status NewTxn::AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segm
             return status;
         }
         std::shared_ptr<BlockVersion> block_version;
-        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         block_version->Append(save_ts, block_info.row_count_);
 
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
+        FileWorker::Write(version_file_worker, block_version, VersionFileWorkerSaveCtx{static_cast<u64>(-1)});
     }
     return Status::OK();
 }
@@ -1739,10 +1739,10 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
             return status;
         }
         std::shared_ptr<BlockVersion> block_version;
-        static_cast<FileWorker *>(version_file_worker)->Read(block_version);
+        FileWorker::Read(version_file_worker, block_version); // yee todo
         block_version->CommitAppend(save_ts, commit_ts);
 
-        static_cast<FileWorker *>(version_file_worker)->Write(block_version, VersionFileWorkerSaveCtx(commit_ts));
+        FileWorker::Write(version_file_worker, block_version, VersionFileWorkerSaveCtx(commit_ts)); // yee todo
     }
 
     return Status::OK();
@@ -1753,7 +1753,7 @@ Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
     FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
 
     // just rename it, dont need to get
-    FileWorker *version_file_worker{};
+    VersionFileWorker *version_file_worker{};
     {
         std::string version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + std::string(BlockVersion::PATH);
         version_file_worker = fileworker_mgr->version_map_.GetFileWorker(version_filepath);
