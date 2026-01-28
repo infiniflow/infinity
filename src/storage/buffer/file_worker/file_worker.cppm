@@ -119,6 +119,12 @@ export struct FileWorker {
         std::unique_lock l(file_worker->mutex_);
         size_t file_size{};
 
+        if (file_worker->mmap_) {
+            std::unique_ptr<LocalFileHandle> file_handle;
+            file_worker->Read(data, file_handle, file_size);
+            return;
+        }
+
         auto working_path = file_worker->GetWorkingPath();
         auto data_path = file_worker->GetPath();
         // auto file_worker_map = InfinityContext::instance().storage()->fileworker_manager();

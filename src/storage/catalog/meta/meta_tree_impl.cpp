@@ -758,12 +758,16 @@ std::shared_ptr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_
         table_cache->segment_cache_map_.emplace(segment_id, segment_cache);
     }
 
+    u64 max_index_id = 0;
     for (const auto &index_pair : index_map_) {
         const std::string &index_name = index_pair.first;
         MetaTableIndexObject *table_index_obj = static_cast<MetaTableIndexObject *>(index_pair.second.get());
         TableIndexMetaKey *table_index_meta_key = static_cast<TableIndexMetaKey *>(table_index_obj->meta_key_.get());
         u64 index_id = std::stoull(table_index_meta_key->index_id_str_);
         std::shared_ptr<TableIndexCache> table_index_cache = std::make_shared<TableIndexCache>(db_id, table_id, index_id, index_name);
+        if (index_id > max_index_id) {
+            max_index_id = index_id;
+        }
         for (const auto &segment_index_pair : table_index_obj->segment_map_) {
             SegmentID segment_id = segment_index_pair.first;
             MetaSegmentIndexObject *segment_index_obj = static_cast<MetaSegmentIndexObject *>(segment_index_pair.second.get());
@@ -780,7 +784,7 @@ std::shared_ptr<TableCache> MetaTableObject::RestoreTableCache(Storage *storage_
         }
         table_cache->index_cache_map_.emplace(index_id, table_index_cache);
     }
-
+    table_cache->next_index_id_ = max_index_id + 1;
     return table_cache;
 }
 

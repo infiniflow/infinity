@@ -149,10 +149,11 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
     // std::unique_lock l(mutex_);
     data = std::make_shared<char[]>(buffer_size_);
-    if (!file_handle) {
-        return;
-    }
+
     if (!mmap_) {
+        if (!file_handle) {
+            return;
+        }
         if (file_size < sizeof(u64) * 3) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
         }

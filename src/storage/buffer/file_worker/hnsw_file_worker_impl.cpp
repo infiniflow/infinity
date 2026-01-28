@@ -88,13 +88,14 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
 
 void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // std::unique_lock l(mutex_);
-    if (!file_handle) {
-        return;
-    }
+
     auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
+        if (!file_handle) {
+            return;
+        }
         data = HnswHandler::Make(index_base_.get(), column_def_);
         if (!mmap_) {
             mmap_size_ = file_handle->FileSize();
