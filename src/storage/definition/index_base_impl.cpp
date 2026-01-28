@@ -106,8 +106,8 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
     }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     std::vector<std::string> column_names;
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
-    std::shared_ptr<std::string> index_comment = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+    auto index_name = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+    auto index_comment = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
     std::string file_name = ReadBufAdv<std::string>(ptr);
     int32_t column_names_size = ReadBufAdv<int32_t>(ptr);
     for (int32_t i = 0; i < column_names_size; ++i) {
@@ -162,15 +162,15 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             break;
         }
         case IndexType::kSecondary: {
-            SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
+            auto cardinality = static_cast<SecondaryIndexCardinality>(ReadBufAdv<u8>(ptr));
             res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality);
             break;
         }
         case IndexType::kSecondaryFunctional: {
-            std::shared_ptr<std::string> func_col_params = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+            auto func_col_params = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
             auto func_return_type = DataType::ReadAdv(ptr, maxbytes);
-            std::shared_ptr<std::string> function_expression_str = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
-            SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
+            auto function_expression_str = std::make_shared<std::string>(ReadBufAdv<std::string>(ptr));
+            auto cardinality = static_cast<SecondaryIndexCardinality>(ReadBufAdv<u8>(ptr));
             res = std::make_shared<IndexSecondaryFunctional>(index_name,
                                                              index_comment,
                                                              file_name,
