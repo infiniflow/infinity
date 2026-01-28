@@ -59,15 +59,14 @@ bool VersionFileWorker::Write(std::shared_ptr<BlockVersion> &data,
 }
 
 void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    if (!file_handle) {
-        data = std::make_shared<BlockVersion>(8192);
-        return;
-    }
-
     auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
+        if (!file_handle) {
+            data = std::make_shared<BlockVersion>(8192);
+            return;
+        }
         auto fd = file_handle->fd();
         // std::unique_lock l(mutex_);
         mmap_size_ = file_handle->FileSize();

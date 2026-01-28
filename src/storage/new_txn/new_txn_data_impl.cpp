@@ -1427,10 +1427,10 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     // ensure append_cmd->row_ranges_ be block aligned
     std::vector<std::pair<RowID, u64>> append_ranges;
     auto calc_block_room = [](RowID row_id) -> u64 { return BLOCK_OFFSET_MASK - (row_id.segment_offset_ & BLOCK_OFFSET_MASK) + 1; };
-    for (const std::pair<RowID, u64> &range : append_cmd->row_ranges_) {
-        RowID begin_row_id = range.first;
+    for (const auto &[fst, snd] : append_cmd->row_ranges_) {
+        RowID begin_row_id = fst;
         u64 block_room = calc_block_room(begin_row_id);
-        u64 left_rows = range.second;
+        u64 left_rows = snd;
         while (block_room < left_rows) {
             append_ranges.emplace_back(begin_row_id, block_room);
             left_rows -= block_room;
@@ -1515,23 +1515,23 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
 }
 
 Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    const std::string &db_id_str = delete_cmd->db_id_;
-    const std::string &table_id_str = delete_cmd->table_id_;
-    const std::string &table_name = delete_cmd->table_name_;
+    auto commit_ts = txn_context_ptr_->commit_ts_;
+    const auto &db_id_str = delete_cmd->db_id_;
+    const auto &table_id_str = delete_cmd->table_id_;
+    const auto &table_name = delete_cmd->table_name_;
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
 
     std::optional<SegmentMeta> segment_meta;
     std::optional<BlockMeta> block_meta;
 
-    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    auto *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     Status delete_status = txn_table_store->Delete(delete_cmd->row_ids_);
     if (!delete_status.ok()) {
         return delete_status;
     }
-    DeleteState &delete_state = txn_table_store->delete_state();
-    DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
+    auto &delete_state = txn_table_store->delete_state();
+    auto &undo_delete_state = txn_table_store->undo_delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
             segment_meta.emplace(segment_id, table_meta);
@@ -1543,7 +1543,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
                 block_meta.emplace(block_id, segment_meta.value());
             }
             auto &undo_block_offsets = undo_segment_map[block_id];
-            Status status = DeleteInBlock(*block_meta, block_offsets, undo_block_offsets);
+            auto status = DeleteInBlock(*block_meta, block_offsets, undo_block_offsets);
             if (!status.ok()) {
                 return status;
             }
@@ -1568,9 +1568,9 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
 }
 
 Status NewTxn::RollbackDelete(const DeleteTxnStore *delete_txn_store) {
-    const std::string &db_id_str = delete_txn_store->db_id_str_;
-    const std::string &table_id_str = delete_txn_store->table_id_str_;
-    const std::string &table_name = delete_txn_store->table_name_;
+    const auto &db_id_str = delete_txn_store->db_id_str_;
+    const auto &table_id_str = delete_txn_store->table_id_str_;
+    const auto &table_name = delete_txn_store->table_name_;
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
 
