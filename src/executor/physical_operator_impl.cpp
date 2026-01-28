@@ -127,90 +127,54 @@ std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalCommonFunctionUs
     return output_types;
 }
 
-// Helper function to copy a single value from source to target column vector
-inline static void CopySingleValue(const ColumnVector &src_col, size_t src_offset, ColumnVector &dst_col, size_t dst_offset) {
-    auto val = src_col.GetValueByIndex(src_offset);
-    dst_col.SetValueByIndex(dst_offset, val);
-}
-
-// Helper struct for hashing std::pair<SegmentID, BlockID>
-struct BlockKeyHash {
-    std::size_t operator()(const std::pair<SegmentID, BlockID> &key) const noexcept {
-        return std::hash<SegmentID>{}(key.first) ^ (std::hash<BlockID>{}(key.second) << 1);
-    }
-};
-
 void OutputToDataBlockHelper::OutputToDataBlock(FileWorkerManager *fileworker_mgr,
                                                 const BlockIndex *block_index,
                                                 const std::vector<std::unique_ptr<DataBlock>> &output_data_blocks) {
     std::ranges::sort(output_job_infos);
 
     Status status;
+
+    auto cache_segment_id = std::numeric_limits<SegmentID>::max();
+    auto cache_block_id = std::numeric_limits<BlockID>::max();
+    // BlockEntry *cache_block_entry = nullptr;
+    BlockMeta *cached_block_meta = nullptr;
+    size_t cached_block_row_cnt = 0;
+    auto cache_column_id = std::numeric_limits<ColumnID>::max();
+    ColumnVector cache_column_vector;
     std::vector<std::pair<SegmentID, BlockID>> segment_block_ids_without_blockmeta;
-
-    // ===== OPTIMIZATION: Batch processing by (segment_id, block_id) =====
-    // Group jobs by (segment_id, block_id) to load all columns of a block at once
-    // This reduces the number of GetColumnVector calls from O(N) to O(unique_blocks * unique_columns)
-    using BlockKey = std::pair<SegmentID, BlockID>;
-    std::unordered_map<BlockKey, std::vector<OutputJobInfo>, BlockKeyHash> block_jobs_map;
-    for (const auto &job : output_job_infos) {
-        block_jobs_map[{job.segment_id_, job.block_id_}].push_back(job);
-    }
-
-    // Process each block
-    for (auto &block_entry : block_jobs_map) {
-        auto &block_key = block_entry.first;
-        auto &jobs = block_entry.second;
-        auto segment_id = block_key.first;
-        auto block_id = block_key.second;
-
-        // Get BlockMeta
-        BlockMeta *block_meta = block_index->GetBlockMeta(segment_id, block_id);
-        if (block_meta == nullptr) {
-            segment_block_ids_without_blockmeta.emplace_back(segment_id, block_id);
-            continue;
-        }
-
-        size_t row_cnt;
-        std::tie(row_cnt, status) = block_meta->GetRowCnt1();
-        if (!status.ok()) {
-            RecoverableError(status);
-            continue;
-        }
-
-        // ===== OPTIMIZATION: Group by column_id to batch-load columns =====
-        // All columns for this block are loaded once, then reused for all jobs
-        std::unordered_map<ColumnID, std::vector<size_t>> column_job_indices;
-        for (size_t i = 0; i < jobs.size(); ++i) {
-            column_job_indices[jobs[i].column_id_].push_back(i);
-        }
-
-        // Batch load all required columns for this block
-        std::unordered_map<ColumnID, ColumnVector> column_vectors;
-
-        for (const auto &[column_id, job_indices] : column_job_indices) {
-            ColumnMeta column_meta(column_id, *block_meta);
-            auto column_def = column_meta.get_column_def();
-
-            ColumnVector col_vector;
-            NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col_vector);
-
-            column_vectors[column_id] = std::move(col_vector);
-        }
-
-        // ===== OPTIMIZATION: Batch copy values =====
-        // Process all jobs for each column together
-        for (const auto &[column_id, col_vector] : column_vectors) {
-            const auto &job_indices = column_job_indices[column_id];
-
-            for (size_t idx : job_indices) {
-                const auto &job = jobs[idx];
-                auto *dst_col = output_data_blocks[job.output_block_id_]->column_vectors_[job.output_column_id_].get();
-                CopySingleValue(col_vector, job.block_offset_, *dst_col, job.output_row_id_);
+    for (const auto [segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id] : output_job_infos) {
+        if (segment_id != cache_segment_id || block_id != cache_block_id) {
+            cache_segment_id = segment_id;
+            cache_block_id = block_id;
+            cached_block_meta = block_index->GetBlockMeta(segment_id, block_id);
+            if (cached_block_meta != nullptr) {
+                std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                cache_column_id = std::numeric_limits<ColumnID>::max();
+            } else {
+                segment_block_ids_without_blockmeta.emplace_back(segment_id, block_id);
+                continue;
             }
         }
-    }
+        if (cached_block_meta == nullptr) {
+            continue;
+        }
+        if (column_id != cache_column_id) {
+            // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
+            ColumnMeta column_meta(column_id, *cached_block_meta);
+            NewCatalog::GetColumnVector(column_meta,
+                                        column_meta.get_column_def(),
+                                        cached_block_row_cnt,
+                                        ColumnVectorMode::kReadOnly,
+                                        cache_column_vector);
 
+            cache_column_id = column_id;
+        }
+        auto val_for_update = cache_column_vector.GetValueByIndex(block_offset);
+        output_data_blocks[output_block_id]->column_vectors_[output_column_id]->SetValueByIndex(output_row_id, val_for_update);
+    }
     output_job_infos.clear();
 
     if (segment_block_ids_without_blockmeta.size() > 0) {
