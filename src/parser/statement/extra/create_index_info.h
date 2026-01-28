@@ -28,7 +28,6 @@ namespace infinity {
 enum class SecondaryIndexCardinality : uint8_t { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
 
 enum class IndexType {
-    kInvalid,
     kIVF,
     kHnsw,
     kBMP,
@@ -36,6 +35,7 @@ enum class IndexType {
     kSecondary,
     kSecondaryFunctional,
     kEMVB,
+    kInvalid,
     kDiskAnn,
 };
 

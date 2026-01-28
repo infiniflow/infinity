@@ -87,7 +87,7 @@ export struct FileWorker {
     explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
-    virtual ~FileWorker() = default;
+    ~FileWorker() = default;
 
     [[nodiscard]] std::string GetPath() const;
 

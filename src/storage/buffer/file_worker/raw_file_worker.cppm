@@ -28,7 +28,7 @@ namespace infinity {
 export struct RawFileWorker : IndexFileWorker {
     explicit RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size);
 
-    virtual ~RawFileWorker();
+    ~RawFileWorker();
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kRawFile; }
 
