@@ -19,12 +19,11 @@ module;
 module infinity_core:ut.test_secondary_index_merge;
 
 import :ut.base_test;
-
-import third_party;
 import :secondary_index_data;
 import :secondary_index_file_worker;
 import :virtual_store;
-import :file_worker;
+
+import third_party;
 
 import data_type;
 import logical_type;
@@ -32,14 +31,18 @@ import logical_type;
 using namespace infinity;
 
 // Mock FileWorker for HighCardinalityTag
-class MockHighCardFileWorker : public FileWorker {
+class MockHighCardFileWorker : public SecondaryIndexFileWorker {
 public:
     explicit MockHighCardFileWorker(SecondaryIndexDataBase<HighCardinalityTag> *index_data, u32 row_count)
-        : FileWorker(std::make_shared<std::string>("mock_highcard_path")), index_data_(index_data), row_count_(row_count) {}
+        : SecondaryIndexFileWorker(std::make_shared<std::string>("mock_highcard_path"),
+                                   std::make_shared<IndexBase>(),
+                                   std::make_shared<ColumnDef>(),
+                                   row_count),
+          index_data_(index_data) {}
 
-    ~MockHighCardFileWorker() override = default;
+    ~MockHighCardFileWorker() = default;
 
-    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
     void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
         data = index_data_.get();
@@ -54,18 +57,21 @@ public:
 
 private:
     std::unique_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index_data_;
-    u32 row_count_;
 };
 
 // Mock FileWorker for LowCardinalityTag
-class MockLowCardFileWorker : public FileWorker {
+class MockLowCardFileWorker : public SecondaryIndexFileWorker {
 public:
     explicit MockLowCardFileWorker(SecondaryIndexDataBase<LowCardinalityTag> *index_data, u32 row_count)
-        : FileWorker(std::make_shared<std::string>("mock_lowcard_path")), index_data_(index_data), row_count_(row_count) {}
+        : SecondaryIndexFileWorker(std::make_shared<std::string>("mock_highcard_path"),
+                                   std::make_shared<IndexBase>(),
+                                   std::make_shared<ColumnDef>(),
+                                   row_count),
+          index_data_(index_data) {}
 
-    ~MockLowCardFileWorker() override = default;
+    ~MockLowCardFileWorker() = default;
 
-    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
     void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
         // Not used for this mock
@@ -80,7 +86,6 @@ public:
 
 private:
     std::unique_ptr<SecondaryIndexDataBase<LowCardinalityTag>> index_data_;
-    u32 row_count_;
 };
 
 class SecondaryIndexMergeTest : public BaseTestNoParam {
@@ -163,9 +168,9 @@ TEST_F(SecondaryIndexMergeTest, TestHighCardinalityMerge) {
     auto *target_index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, total_row_count, true);
 
     // Prepare vector for InsertMergeData
-    std::vector<std::pair<u32, FileWorker *>> old_chunks = {{chunk1_row_count, mock_worker1},
-                                                            {chunk2_row_count, mock_worker2},
-                                                            {chunk3_row_count, mock_worker3}};
+    std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_chunks = {{chunk1_row_count, mock_worker1},
+                                                                          {chunk2_row_count, mock_worker2},
+                                                                          {chunk3_row_count, mock_worker3}};
 
     // Call InsertMergeData
     target_index->InsertMergeData(old_chunks);
@@ -212,7 +217,7 @@ TEST_F(SecondaryIndexMergeTest, TestLowCardinalityMerge) {
     auto *target_index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, total_row_count, true);
 
     // Prepare vector for InsertMergeData
-    std::vector<std::pair<u32, FileWorker *>> old_chunks = {{chunk1_row_count, mock_worker1}, {chunk2_row_count, mock_worker2}};
+    std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_chunks = {{chunk1_row_count, mock_worker1}, {chunk2_row_count, mock_worker2}};
 
     // Call InsertMergeData
     target_index->InsertMergeData(old_chunks);
@@ -238,7 +243,7 @@ TEST_F(SecondaryIndexMergeTest, TestEmptyMerge) {
     auto data_type = std::make_shared<DataType>(LogicalType::kInteger);
     auto *target_index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, 0, true);
 
-    std::vector<std::pair<u32, FileWorker *>> old_chunks;
+    std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_chunks;
 
     // Should not crash
     target_index->InsertMergeData(old_chunks);
@@ -319,14 +324,18 @@ TEST_F(SecondaryIndexMergeTest, TestHighCardinalityMergeWithFileIO) {
     // EXPECT_GT(loaded_index2->GetUniqueKeyCount(), 0);
 
     // Create FileWorker wrappers for loaded indices (take ownership)
-    class FileWorkerWrapper : public FileWorker {
+    class FileWorkerWrapper : public SecondaryIndexFileWorker {
     public:
         explicit FileWorkerWrapper(std::unique_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index, u32 row_count)
-            : FileWorker(std::make_shared<std::string>("wrapper_path")), index_(std::move(index)), row_count_(row_count) {}
+            : SecondaryIndexFileWorker(std::make_shared<std::string>("wrapper_path"),
+                                       std::make_shared<IndexBase>(),
+                                       std::make_shared<ColumnDef>(),
+                                       row_count),
+              index_(std::move(index)) {}
 
         ~FileWorkerWrapper() override = default;
 
-        FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+        [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
         void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
             data = index_.get();
@@ -340,7 +349,6 @@ TEST_F(SecondaryIndexMergeTest, TestHighCardinalityMergeWithFileIO) {
 
     private:
         std::unique_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index_;
-        u32 row_count_;
     };
 
     auto *wrapper1 = new FileWorkerWrapper(std::unique_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(loaded_index1), chunk1_row_count);
@@ -350,7 +358,7 @@ TEST_F(SecondaryIndexMergeTest, TestHighCardinalityMergeWithFileIO) {
     u32 total_row_count = chunk1_row_count + chunk2_row_count;
     auto *target_index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(data_type, total_row_count, true);
 
-    std::vector<std::pair<u32, FileWorker *>> old_chunks = {{chunk1_row_count, wrapper1}, {chunk2_row_count, wrapper2}};
+    std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_chunks = {{chunk1_row_count, wrapper1}, {chunk2_row_count, wrapper2}};
 
     target_index->InsertMergeData(old_chunks);
 
@@ -450,18 +458,22 @@ TEST_F(SecondaryIndexMergeTest, TestLowCardinalityMergeWithFileIO) {
     // EXPECT_GT(loaded_index2->GetUniqueKeyCount(), 0);
 
     // Create FileWorker wrappers for loaded indices (take ownership)
-    class FileWorkerWrapperLow : public FileWorker {
+    class FileWorkerWrapperLow : public SecondaryIndexFileWorker {
     public:
         explicit FileWorkerWrapperLow(std::unique_ptr<SecondaryIndexDataBase<LowCardinalityTag>> index, u32 row_count)
-            : FileWorker(std::make_shared<std::string>("/tmp/wrapper_low_path_" + std::to_string(reinterpret_cast<uintptr_t>(this)))),
-              index_(std::move(index)), row_count_(row_count) {
+            : SecondaryIndexFileWorker(
+                  std::make_shared<std::string>(fmt::format("/tmp/wrapper_low_path_{}", std::to_string(reinterpret_cast<uintptr_t>(this)))),
+                  std::make_shared<IndexBase>(),
+                  std::make_shared<ColumnDef>(),
+                  row_count),
+              index_(std::move(index)) {
             // Set up the index data that will be returned by Read
             cached_index_ = index_.get();
         }
 
         ~FileWorkerWrapperLow() override = default;
 
-        FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+        [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
         void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override {
             data = nullptr;
@@ -477,7 +489,6 @@ TEST_F(SecondaryIndexMergeTest, TestLowCardinalityMergeWithFileIO) {
     private:
         std::unique_ptr<SecondaryIndexDataBase<LowCardinalityTag>> index_;
         SecondaryIndexDataBase<LowCardinalityTag> *cached_index_;
-        u32 row_count_;
     };
 
     auto *wrapper1 = new FileWorkerWrapperLow(std::unique_ptr<SecondaryIndexDataBase<LowCardinalityTag>>(loaded_index1), chunk1_row_count);
@@ -487,7 +498,7 @@ TEST_F(SecondaryIndexMergeTest, TestLowCardinalityMergeWithFileIO) {
     u32 total_row_count = chunk1_row_count + chunk2_row_count;
     auto *target_index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(data_type, total_row_count, true);
 
-    std::vector<std::pair<u32, FileWorker *>> old_chunks = {{chunk1_row_count, wrapper1}, {chunk2_row_count, wrapper2}};
+    std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_chunks = {{chunk1_row_count, wrapper1}, {chunk2_row_count, wrapper2}};
 
     target_index->InsertMergeData(old_chunks);
 

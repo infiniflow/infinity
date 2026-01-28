@@ -44,7 +44,7 @@ export struct SecondaryIndexFileWorker : IndexFileWorker {
         }
     }
 
-    ~SecondaryIndexFileWorker();
+    virtual ~SecondaryIndexFileWorker();
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
@@ -57,9 +57,9 @@ export struct SecondaryIndexFileWorker : IndexFileWorker {
                bool &prepare_success,
                const FileWorkerSaveCtx &ctx);
 
-    void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
+    virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
+    virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
     const u32 row_count_{};
 
