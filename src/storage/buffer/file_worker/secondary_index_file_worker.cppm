@@ -34,15 +34,7 @@ export struct SecondaryIndexFileWorker : IndexFileWorker {
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(file_path, index_base, column_def), row_count_(row_count) {
-
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            index_data_type_ = *column_def_->type();
-        } else {
-            auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
-            index_data_type_ = functional_index->GetFuncReturnType();
-        }
-    }
+        : IndexFileWorker(file_path, index_base, column_def), row_count_(row_count) {}
 
     virtual ~SecondaryIndexFileWorker();
 
@@ -63,7 +55,7 @@ export struct SecondaryIndexFileWorker : IndexFileWorker {
 
     const u32 row_count_{};
 
-    DataType index_data_type_{LogicalType::kInvalid};
+    // DataType index_data_type_{LogicalType::kInvalid};
 };
 
 } // namespace infinity

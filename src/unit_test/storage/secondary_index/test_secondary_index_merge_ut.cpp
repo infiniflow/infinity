@@ -40,7 +40,7 @@ public:
                                    row_count),
           index_data_(index_data) {}
 
-    ~MockHighCardFileWorker() = default;
+    ~MockHighCardFileWorker() {}
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
@@ -69,7 +69,7 @@ public:
                                    row_count),
           index_data_(index_data) {}
 
-    ~MockLowCardFileWorker() = default;
+    ~MockLowCardFileWorker() {}
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
