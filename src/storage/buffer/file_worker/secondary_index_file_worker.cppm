@@ -29,45 +29,33 @@ import column_def;
 namespace infinity {
 
 // pgm index
-export class SecondaryIndexFileWorker : public IndexFileWorker {
-public:
+export struct SecondaryIndexFileWorker : IndexFileWorker {
     explicit SecondaryIndexFileWorker(std::shared_ptr<std::string> file_path,
                                       std::shared_ptr<IndexBase> index_base,
                                       std::shared_ptr<ColumnDef> column_def,
                                       u32 row_count)
-        : IndexFileWorker(file_path, index_base, column_def), row_count_(row_count) {
+        : IndexFileWorker(file_path, index_base, column_def), row_count_(row_count) {}
 
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            index_data_type_ = *column_def_->type();
-        } else {
-            auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
-            index_data_type_ = functional_index->GetFuncReturnType();
-        }
-    }
+    virtual ~SecondaryIndexFileWorker();
 
-    ~SecondaryIndexFileWorker() override;
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kSecondaryIndexFile; }
 
-    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
-
-protected:
     bool Write(SecondaryIndexDataBase<HighCardinalityTag> *data,
                std::unique_ptr<LocalFileHandle> &file_handle,
                bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+               const FileWorkerSaveCtx &ctx);
     bool Write(SecondaryIndexDataBase<LowCardinalityTag> *data,
                std::unique_ptr<LocalFileHandle> &file_handle,
                bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+               const FileWorkerSaveCtx &ctx);
 
-    void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    virtual void Read(SecondaryIndexDataBase<HighCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
-    // void Read(auto &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    virtual void Read(SecondaryIndexDataBase<LowCardinalityTag> *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
     const u32 row_count_{};
 
-private:
-    DataType index_data_type_{LogicalType::kInvalid};
+    // DataType index_data_type_{LogicalType::kInvalid};
 };
 
 } // namespace infinity

@@ -31,6 +31,7 @@ import :segment_meta;
 import :new_txn;
 import :kv_store;
 import :chunk_index_meta;
+import :emvb_index_file_worker;
 
 import std;
 
@@ -100,7 +101,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector,
     }
 }
 
-void EMVBIndexInMem::Dump(FileWorker *index_file_worker) {
+void EMVBIndexInMem::Dump(EMVBIndexFileWorker *index_file_worker) {
     std::unique_lock lock(rw_mutex_);
     if (!is_built_.test(std::memory_order_acquire)) {
         UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");
@@ -108,10 +109,10 @@ void EMVBIndexInMem::Dump(FileWorker *index_file_worker) {
     is_built_.clear(std::memory_order_release);
 
     std::shared_ptr<EMVBIndex> data_ptr;
-    index_file_worker->Read(data_ptr); // yee todo
+    FileWorker::Read(index_file_worker, data_ptr);
     data_ptr = std::move(emvb_index_); // call move in lock
     emvb_index_.reset();
-    index_file_worker->Write(std::span{data_ptr.get(), 1}); // yee todo
+    FileWorker::Write(index_file_worker, std::span{data_ptr.get(), 1});
 }
 
 std::shared_ptr<EMVBIndexInMem>

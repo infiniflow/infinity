@@ -645,13 +645,13 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     auto [chunk_ids_ptr, mem_index] = get_chunks();
                     for (ChunkID chunk_id : *chunk_ids_ptr) {
                         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                        IndexFileWorker *index_file_worker{};
+                        IVFIndexFileWorker *index_file_worker{};
                         status = chunk_index_meta.GetFileWorker(index_file_worker);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
                         IVFIndexInChunk *ivf_chunk{};
-                        index_file_worker->Read(ivf_chunk); // yee todo
+                        FileWorker::Read(index_file_worker, ivf_chunk); // yee todo1
                         ivf_result_handler->Search(ivf_chunk);
                         // auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->ivf_map_.cache_manager_;
                         // cache_manager.UnPin(*index_file_worker->rel_file_path_);
@@ -953,13 +953,13 @@ void ExecuteHnswSearch(QueryContext *query_context,
     auto [chunk_ids_ptr, mem_index] = get_chunks();
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-        IndexFileWorker *index_file_worker{};
+        HnswFileWorker *index_file_worker{};
         Status status = chunk_index_meta.GetFileWorker(index_file_worker);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         std::shared_ptr<HnswHandler> hnsw_handler;
-        index_file_worker->Read(hnsw_handler); // yee todo
+        FileWorker::Read(index_file_worker, hnsw_handler); // yee todo1
         hnsw_search(hnsw_handler.get(), false);
     }
     if (mem_index) {

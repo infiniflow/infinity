@@ -123,6 +123,7 @@ struct MetaBaseCache;
 struct CacheInfo;
 class NewCatalog;
 class NewTxnManager;
+struct IndexFileWorker;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -587,7 +588,7 @@ private:
                             SegmentMeta &segment_meta,
                             RowID base_rowid,
                             u32 row_cnt,
-                            FileWorker *file_worker);
+                            IndexFileWorker *index_file_worker);
 
     Status AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 

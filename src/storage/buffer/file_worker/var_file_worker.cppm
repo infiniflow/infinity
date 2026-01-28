@@ -21,12 +21,12 @@ import :var_buffer;
 
 namespace infinity {
 
-export struct VarFileWorker : FileWorkerBase {
+export struct VarFileWorker : FileWorker {
     explicit VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size);
 
     ~VarFileWorker();
 
-    FileWorkerType Type() const { return FileWorkerType::kVarFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVarFile; }
 
     bool Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
     bool WriteSnapshot(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);

@@ -18,7 +18,6 @@ import :index_file_worker;
 import :file_worker;
 import :index_base;
 import :file_worker_type;
-import :persistence_manager;
 import :emvb_index;
 
 import embedding_info;
@@ -27,25 +26,21 @@ import column_def;
 namespace infinity {
 
 // TODO:now only suppor f32
-export class EMVBIndexFileWorker : public IndexFileWorker {
-public:
+export struct EMVBIndexFileWorker : IndexFileWorker {
     explicit EMVBIndexFileWorker(std::shared_ptr<std::string> file_path,
                                  std::shared_ptr<IndexBase> index_base,
                                  std::shared_ptr<ColumnDef> column_def,
                                  const u32 start_segment_offset)
         : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)), start_segment_offset_(start_segment_offset) {}
 
-    ~EMVBIndexFileWorker() override;
+    ~EMVBIndexFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kEMVBIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kEMVBIndexFile; }
 
-protected:
-    bool
-    Write(std::span<EMVBIndex> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<EMVBIndex> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
     const EmbeddingInfo *GetEmbeddingInfo() const;
 
     const u32 start_segment_offset_;

@@ -35,7 +35,7 @@ import serialize;
 namespace infinity {
 
 DataFileWorker::DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size)
-    : FileWorkerBase(std::move(file_path)), buffer_size_(buffer_size) {}
+    : FileWorker(std::move(file_path)), buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     madvise(mmap_, mmap_size_, MADV_FREE);

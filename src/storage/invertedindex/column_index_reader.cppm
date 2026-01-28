@@ -33,10 +33,11 @@ class NewTxn;
 class MemoryIndexer;
 class TableIndexMeta;
 struct SegmentIndexFtInfo;
-class IndexFileWorker;
+struct IndexFileWorker;
+struct RawFileWorker;
 
 struct ColumnReaderChunkInfo {
-    IndexFileWorker *index_file_worker_{};
+    RawFileWorker *index_file_worker_{};
     RowID base_rowid_{};
     size_t row_cnt_{};
     size_t term_cnt_{};
@@ -76,7 +77,7 @@ public:
     std::string analyzer_;
     // for loading column length files
     std::string index_dir_;
-    std::shared_ptr<MemoryIndexer> memory_indexer_{nullptr};
+    std::shared_ptr<MemoryIndexer> memory_indexer_;
 
     std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
 };

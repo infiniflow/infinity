@@ -316,7 +316,7 @@ TEST_P(TestTxnImport, test_import_with_index) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            IndexFileWorker *file_worker{};
+            BMPIndexFileWorker::IndexFileWorker *file_worker{};
             status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
         };
@@ -341,9 +341,9 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
 
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -352,7 +352,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
     auto index_def1 = IndexSecondary::Make(index_name1, std::make_shared<std::string>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<std::string>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, std::make_shared<std::string>(), "file_name", {column_def2->name()}, {});
-    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    auto default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -547,7 +547,7 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
             }
 
-            IndexFileWorker *file_worker{};
+            BMPIndexFileWorker::IndexFileWorker *file_worker{};
             status = chunk_index_meta.GetFileWorker(file_worker);
             EXPECT_TRUE(status.ok());
         };
@@ -571,9 +571,9 @@ TEST_P(TestTxnImport, test_import_with_index_rollback) {
 TEST_P(TestTxnImport, test_insert_and_import) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");

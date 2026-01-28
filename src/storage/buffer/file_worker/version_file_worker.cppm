@@ -27,13 +27,13 @@ export struct VersionFileWorkerSaveCtx : FileWorkerSaveCtx {
     TxnTimeStamp checkpoint_ts_{};
 };
 
-export struct VersionFileWorker : FileWorkerBase {
+export struct VersionFileWorker : FileWorker {
     static constexpr BlockVersion *has_cache_manager_{};
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
     ~VersionFileWorker();
 
-    FileWorkerType Type() const { return FileWorkerType::kVersionDataFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVersionDataFile; }
 
     bool
     Write(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);

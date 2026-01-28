@@ -520,13 +520,13 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
-                IndexFileWorker *index_file_worker{};
+                BMPIndexFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
                 std::shared_ptr<BMPHandlerPtr> bmp_handler;
-                index_file_worker->Read(bmp_handler); // yee todo
+                FileWorker::Read(index_file_worker, bmp_handler); // yee todo1
                 bmp_search(*bmp_handler, 0, false, filter);
             }
             if (auto mem_index = segment_index_meta->GetMemIndex()) {

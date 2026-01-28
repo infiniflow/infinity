@@ -28,6 +28,7 @@ namespace infinity {
 enum class SecondaryIndexCardinality : uint8_t { kHighCardinality = 0, kLowCardinality = 1, kInvalid = 255 };
 
 enum class IndexType {
+    kInvalid,
     kIVF,
     kHnsw,
     kBMP,
@@ -35,7 +36,6 @@ enum class IndexType {
     kSecondary,
     kSecondaryFunctional,
     kEMVB,
-    kInvalid,
     kDiskAnn,
 };
 
@@ -43,9 +43,9 @@ struct IndexInfo {
     ~IndexInfo();
     IndexType index_type_{IndexType::kInvalid};
     std::string column_name_{};
-    std::vector<InitParameter *> *index_param_list_{nullptr};
+    std::vector<InitParameter *> *index_param_list_{};
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
-    ParsedExpr *function_expr_{nullptr};
+    ParsedExpr *function_expr_{};
 
     static std::string IndexTypeToString(IndexType index_type);
     static IndexType StringToIndexType(const std::string &index_type_str);
@@ -57,11 +57,11 @@ public:
 
     ~CreateIndexInfo() final;
 
-    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string ToString() const;
 
-    std::string schema_name_{};
-    std::string table_name_{};
-    std::string index_name_{};
+    std::string schema_name_;
+    std::string table_name_;
+    std::string index_name_;
 
     IndexInfo *index_info_{};
 };

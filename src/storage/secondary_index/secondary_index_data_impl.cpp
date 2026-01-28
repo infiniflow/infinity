@@ -26,6 +26,8 @@ import :infinity_exception;
 import :secondary_index_pgm;
 import :logger;
 import :table_index_meta;
+import :index_file_worker;
+import :secondary_index_file_worker;
 
 import std;
 import third_party;
@@ -48,17 +50,17 @@ struct SecondaryIndexChunkMerger;
 template <typename RawValueType>
 struct SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag> {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    FileWorker *handle_;
+    SecondaryIndexFileWorker *index_file_worker_{};
     u32 row_count_ = 0;
     u32 next_offset_ = 0;
     const void *key_ptr_{};
     const SegmentOffset *offset_ptr_{};
-    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
-        handle_ = file_worker;
+    SecondaryIndexChunkDataReader(SecondaryIndexFileWorker *index_file_worker, u32 row_count) {
+        index_file_worker_ = index_file_worker;
         row_count_ = row_count;
         // std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>> index;
         SecondaryIndexDataBase<HighCardinalityTag> *index;
-        file_worker->Read(index); // yee todo
+        FileWorker::Read(index_file_worker, index);
         std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
         assert(index->GetChunkRowCount() == row_count_);
     }
@@ -84,11 +86,11 @@ struct SecondaryIndexChunkDataReader<RawValueType, LowCardinalityTag> {
     u32 current_key_index_ = 0;
     u32 current_offset_ = 0;
 
-    SecondaryIndexChunkDataReader(FileWorker *file_worker, u32 row_count) {
-        handle_ = file_worker;
+    SecondaryIndexChunkDataReader(SecondaryIndexFileWorker *index_file_worker, u32 row_count) {
+        handle_ = index_file_worker;
         row_count_ = row_count;
         SecondaryIndexDataBase<LowCardinalityTag> *index;
-        file_worker->Read(index);
+        FileWorker::Read(index_file_worker, index);
         assert(index->GetChunkRowCount() == row_count_);
 
         auto *low_card_index = static_cast<SecondaryIndexDataLowCardinalityT<RawValueType> *>(index);
@@ -137,7 +139,7 @@ struct SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> {
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
-    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &file_workers) {
         readers_.reserve(file_workers.size());
         reader_offsets_.reserve(file_workers.size());
         u32 offset_shift = 0;
@@ -181,7 +183,7 @@ struct SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> {
                         std::vector<std::tuple<OrderedKeyType, u32, u32>>,
                         std::greater<std::tuple<OrderedKeyType, u32, u32>>>
         pq_;
-    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, FileWorker *>> &file_workers) {
+    explicit SecondaryIndexChunkMerger(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &file_workers) {
         readers_.reserve(file_workers.size());
         reader_offsets_.reserve(file_workers.size());
         u32 offset_shift = 0;
@@ -263,7 +265,7 @@ public:
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType, HighCardinalityTag> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -382,7 +384,7 @@ public:
         SetupCompatibilityPointers();
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) override {
+    void InsertMergeData(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType, LowCardinalityTag> merger(old_chunks);
 
         // Build unique keys and corresponding bitmaps from merged data
@@ -561,7 +563,7 @@ public:
         SetupCompatibilityPointers();
     }
 
-    void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_buffers) override {
+    void InsertMergeData(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &old_buffers) override {
         // For low cardinality, we need to merge the unique keys and bitmaps
         std::map<OrderedKeyType, Bitmap> merged_data;
 
@@ -575,7 +577,7 @@ public:
         for (const auto &[old_row_count, old_buffer] : old_buffers) {
             // SecondaryIndexDataLowCardinalityT<BooleanT> *old_data{};
             SecondaryIndexDataBase<LowCardinalityTag> *old_data_origin{};
-            old_buffer->Read(old_data_origin); // ? truncted  // yee todo
+            FileWorker::Read(old_buffer, old_data_origin); // ? truncted
 
             auto *old_data = static_cast<SecondaryIndexDataLowCardinalityT<BooleanT> *>(old_data_origin);
 

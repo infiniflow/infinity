@@ -32,6 +32,7 @@ namespace infinity {
 
 struct ColumnVector;
 class LocalFileHandle;
+export struct HnswFileWorker;
 
 using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset>>,
@@ -335,7 +336,7 @@ public:
         IncreaseMemoryUsageBase(mem_usage);
     }
 
-    void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
+    void Dump(HnswFileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
 
 public:
     // LSG setting
@@ -372,7 +373,7 @@ private:
     size_t row_count_{};
     HnswHandlerPtr hnsw_handler_{};
     bool own_memory_{};
-    FileWorker *index_file_worker_{};
+    HnswFileWorker *index_file_worker_{};
 };
 
 } // namespace infinity

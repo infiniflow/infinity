@@ -27,7 +27,6 @@ FileWorkerT *FileWorkerMap<FileWorkerT>::EmplaceFileWorker(std::unique_ptr<FileW
     std::unique_lock lock(rw_mtx_);
     auto rel_file_path = file_worker->rel_file_path_;
     active_dic_.emplace(*rel_file_path);
-    // std::println("file worker cnt: {}", active_dic_.size());
     if (auto iter = map_.find(*rel_file_path); iter != map_.end()) {
         return iter->second.get();
     }
@@ -82,7 +81,7 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
     std::vector<std::future<Status>> futs;
     futs.reserve(cleans.size());
     for (auto *file_worker : cleans) {
-        futs.emplace_back(std::async(&FileWorkerT::CleanupFile, file_worker));
+        futs.emplace_back(std::async(&FileWorkerT::template CleanupFile<FileWorkerT>, file_worker));
     }
     for (auto &fut : futs) {
         auto status = fut.get();
@@ -122,7 +121,7 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
         }
         auto file_worker = GetFileWorkerNoLock(rel_file_path);
         // assert(file_worker);
-        futs.emplace_back(std::async(&FileWorkerT::MoveFile, file_worker));
+        futs.emplace_back(std::async(&FileWorkerT::template MoveFile<FileWorkerT>, file_worker));
         ++it;
     }
 

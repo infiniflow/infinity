@@ -1872,8 +1872,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 // Read version info
                 std::shared_ptr<BlockVersion> block_version;
-                FileWorker::Read(version_file_worker_, block_version); // yee todo
-
+                FileWorker::Read(version_file_worker_, block_version);
                 // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
@@ -1909,7 +1908,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read data file
                         std::shared_ptr<char[]> data;
-                        FileWorker::Read(data_file_worker_, data); // yee todo
+                        FileWorker::Read(data_file_worker_, data);
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
@@ -1931,7 +1930,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read variable data file
                         std::shared_ptr<VarBuffer> var_buffer;
-                        FileWorker::Read(var_file_worker_, var_buffer); // yee todo
+                        FileWorker::Read(var_file_worker_, var_buffer);
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());

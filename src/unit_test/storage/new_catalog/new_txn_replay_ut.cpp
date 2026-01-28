@@ -140,12 +140,12 @@ TEST_P(TestTxnReplayTest, test_replay_create_db2) {
 TEST_P(TestTxnReplayTest, test_replay_create_table) {
     using namespace infinity;
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -172,12 +172,12 @@ TEST_P(TestTxnReplayTest, test_replay_create_table) {
 TEST_P(TestTxnReplayTest, test_replay_drop_table) {
     using namespace infinity;
 
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto db_name = std::make_shared<std::string>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
     {
+        auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -214,7 +214,7 @@ TEST_P(TestTxnReplayTest, test_replay_drop_table) {
 }
 
 TEST_P(TestTxnReplayTest, test_replay_flush_gap_create) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -239,8 +239,8 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_create) {
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
         ConflictType conflict_type_{ConflictType::kError};
-        std::shared_ptr<std::string> index_name_ptr = std::make_shared<std::string>("index_name");
-        std::shared_ptr<std::string> index_comment_ptr = std::make_shared<std::string>("index_comment");
+        auto index_name_ptr = std::make_shared<std::string>("index_name");
+        auto index_comment_ptr = std::make_shared<std::string>("index_comment");
         const std::string file_name = "";
         std::vector<std::string> column_names{"col2"};
         std::shared_ptr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);
@@ -290,13 +290,13 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_create) {
 }
 
 TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>("index_name");
-    std::shared_ptr<std::string> index_comment_ptr = std::make_shared<std::string>("index_comment");
+    auto index_name = std::make_shared<std::string>("index_name");
+    auto index_comment_ptr = std::make_shared<std::string>("index_comment");
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -412,13 +412,13 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop) {
 }
 
 TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop_column_add_column) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>("index_name");
-    std::shared_ptr<std::string> index_comment_ptr = std::make_shared<std::string>("index_comment");
+    auto index_name = std::make_shared<std::string>("index_name");
+    auto index_comment_ptr = std::make_shared<std::string>("index_comment");
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -528,13 +528,13 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_drop_column_add_column) {
 }
 
 TEST_P(TestTxnReplayTest, test_replay_flush_gap_append_compact) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
-    std::shared_ptr<std::string> index_name = std::make_shared<std::string>("index_name");
-    std::shared_ptr<std::string> index_comment_ptr = std::make_shared<std::string>("index_comment");
+    auto index_name = std::make_shared<std::string>("index_name");
+    auto index_comment_ptr = std::make_shared<std::string>("index_comment");
 
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
@@ -1187,7 +1187,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
                 EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
                 EXPECT_EQ(chunk_info->base_row_id_, RowID(0, chunk_id * block_row_cnt));
 
-                IndexFileWorker *file_worker{};
+                BMPIndexFileWorker::IndexFileWorker *file_worker{};
                 status = chunk_index_meta.GetFileWorker(file_worker);
                 EXPECT_TRUE(status.ok());
             }
@@ -1202,7 +1202,7 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_dump_index) {
 }
 
 TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
-    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto db_name = std::make_shared<std::string>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
@@ -1225,8 +1225,8 @@ TEST_P(TestTxnReplayTest, test_replay_flush_gap_optimize_index) {
     {
         auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
         ConflictType conflict_type_{ConflictType::kError};
-        std::shared_ptr<std::string> index_name_ptr = std::make_shared<std::string>("index_name");
-        std::shared_ptr<std::string> index_comment_ptr = std::make_shared<std::string>("index_comment");
+        auto index_name_ptr = std::make_shared<std::string>("index_name");
+        auto index_comment_ptr = std::make_shared<std::string>("index_comment");
         const std::string file_name = "";
         std::vector<std::string> column_names{"col2"};
         std::shared_ptr<IndexBase> index_base = IndexSecondary::Make(index_name_ptr, index_comment_ptr, file_name, column_names);

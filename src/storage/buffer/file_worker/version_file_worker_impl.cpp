@@ -33,7 +33,7 @@ import third_party;
 namespace infinity {
 
 VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
-    : FileWorkerBase(std::move(file_path)), capacity_(capacity) {}
+    : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
     munmap(mmap_, mmap_size_);

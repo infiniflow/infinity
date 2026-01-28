@@ -15,11 +15,6 @@
 export module infinity_core:bmp_index_file_worker;
 
 import :index_file_worker;
-// // import :file_worker;
-// import :index_base;
-// import :file_worker_type;
-// import :persistence_manager;
-// import :bmp_handler;
 
 import std.compat;
 
@@ -28,24 +23,22 @@ import sparse_info;
 
 namespace infinity {
 
-export class BMPIndexFileWorker : public IndexFileWorker {
-public:
+export class BMPHandler;
+
+export struct BMPIndexFileWorker : IndexFileWorker {
     explicit BMPIndexFileWorker(std::shared_ptr<std::string> file_path,
                                 std::shared_ptr<IndexBase> index_base,
                                 std::shared_ptr<ColumnDef> column_def,
                                 size_t index_size = 0);
 
-    ~BMPIndexFileWorker() override;
+    ~BMPIndexFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kBMPIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kBMPIndexFile; }
 
-protected:
-    bool
-    Write(std::span<BMPHandlerPtr> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<BMPHandler *> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<BMPHandlerPtr> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<BMPHandler *> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
     size_t index_size_{};
 };
 
