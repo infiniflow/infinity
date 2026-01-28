@@ -139,7 +139,14 @@ public:
     template <typename FileWorkerT, typename PayloadT>
     static void Read(FileWorkerT file_worker, PayloadT &data) {
         std::unique_lock l(file_worker->mutex_);
+
         size_t file_size{};
+
+        if (file_worker->mmap_) {
+            std::unique_ptr<LocalFileHandle> file_handle;
+            file_worker->Read(data, file_handle, file_size);
+            return;
+        }
 
         auto working_path = file_worker->GetWorkingPath();
         auto data_path = file_worker->GetPath();
@@ -216,6 +223,12 @@ public:
     void Read(auto &data) {
         std::unique_lock l(mutex_);
         size_t file_size{};
+
+        if (mmap_) {
+            std::unique_ptr<LocalFileHandle> file_handle;
+            Read(data, file_handle, file_size);
+            return;
+        }
 
         auto working_path = GetWorkingPath();
         auto data_path = GetPath();
