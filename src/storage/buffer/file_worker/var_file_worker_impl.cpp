@@ -25,6 +25,8 @@ import :var_buffer;
 import :local_file_handle;
 import :persistence_manager;
 import :status;
+import :fileworker_manager;
+import :infinity_context;
 
 import std;
 import third_party;
