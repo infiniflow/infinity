@@ -148,9 +148,9 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
         std::memcpy(buffer.get(), mmap_, mmap_size_);
         data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
+		
+		cache_manager.Set(path, data, data->TotalSize());
     }
-
-	cache_manager.Set(path, data, data->TotalSize());
 }
 
 } // namespace infinity
