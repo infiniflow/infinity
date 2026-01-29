@@ -75,7 +75,6 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->var_map_.cache_manager_;
     cache_manager.Evict(path);
 
-
     return true;
 }
 
@@ -116,8 +115,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         return;
     }
 
-
-	// std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     data = std::make_shared<VarBuffer>(this);
 
     if (!mmap_) {
@@ -148,9 +146,9 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
         std::memcpy(buffer.get(), mmap_, mmap_size_);
         data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
-		
-		cache_manager.Set(path, data, data->TotalSize());
     }
+
+    cache_manager.Set(path, data, data->TotalSize());
 }
 
 } // namespace infinity
