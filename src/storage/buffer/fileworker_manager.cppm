@@ -49,17 +49,31 @@ public:
 
     void Set(std::string path, std::shared_ptr<DataT> data, size_t request_space) {
         std::lock_guard l(mutex_);
+
+        // Check if the item itself is larger than total capacity
+        if (request_space > MAX_CAPACITY_) {
+            LOG_WARN(fmt::format("Skipping cache for item larger than total capacity: item={}bytes, capacity={}bytes", request_space, MAX_CAPACITY_));
+            return;
+        }
+
         if (auto map_iter = path_data_map_.find(path); map_iter != path_data_map_.end()) {
             payloads_.splice(payloads_.begin(), payloads_, map_iter->second);
             current_mem_usage_ -= memory_map_[path];
             if (!IsAccomodatable(request_space)) {
-                Evict(request_space);
+                if (!Evict(request_space)) {
+                    LOG_WARN(fmt::format("Skipping cache update for item: {}bytes (cannot free enough space)", request_space));
+                    current_mem_usage_ += memory_map_[path]; // Restore the usage
+                    return;
+                }
             }
             memory_map_[path] = request_space;
             current_mem_usage_ += request_space;
         } else {
             if (!IsAccomodatable(request_space)) {
-                Evict(request_space);
+                if (!Evict(request_space)) {
+                    LOG_WARN(fmt::format("Skipping cache for new item: {}bytes (cannot free enough space)", request_space));
+                    return;
+                }
             }
 
             payloads_.push_front(data);
@@ -99,7 +113,13 @@ public:
     }
 
 private:
-    void Evict(size_t request_space) {
+    bool Evict(size_t request_space) {
+        // First check: even if we free all space, is it enough?
+        if (request_space > MAX_CAPACITY_) {
+            return false;
+        }
+
+        // Try to evict objects
         for (auto rev_iter = payloads_.rbegin(); rev_iter != payloads_.rend(); ++rev_iter) {
             const auto path = data_path_map_[*rev_iter];
             auto memory_size = memory_map_[path];
@@ -116,10 +136,12 @@ private:
             payloads_.erase(fwd_iter);
 
             if (IsAccomodatable(request_space)) {
-                return;
+                return true; // Successfully freed enough space
             }
         }
-        UnrecoverableError("Buffer manager's memory size is too small.");
+
+        // Evicted all objects but still not enough space
+        return false;
     }
 
     bool IsAccomodatable(size_t request_space) { return current_mem_usage_ + request_space <= MAX_CAPACITY_; }
