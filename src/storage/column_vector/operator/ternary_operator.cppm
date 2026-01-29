@@ -21,8 +21,117 @@ import :roaring_bitmap;
 
 namespace infinity {
 
+template <typename FirstType, typename SecondType, typename ThirdType, typename Operator>
+class BooleanResultTernaryOperator {
+public:
+    static void inline Execute(const std::shared_ptr<ColumnVector> &first,
+                               const std::shared_ptr<ColumnVector> &second,
+                               const std::shared_ptr<ColumnVector> &third,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
+                               void *state_ptr_first,
+                               void *state_ptr,
+                               bool nullable) {
+
+        auto first_vector_type = first->vector_type();
+        auto second_vector_type = second->vector_type();
+        auto third_vector_type = third->vector_type();
+
+        // Only support: Flat, Constant, Constant (for LIKE operator)
+        if (first_vector_type == ColumnVectorType::kFlat && second_vector_type == ColumnVectorType::kConstant &&
+            third_vector_type == ColumnVectorType::kConstant) {
+            ExecuteFlatConstantConstant(first, second, third, result, count, nullable);
+        } else {
+            // Helper lambda to convert ColumnVectorType to string
+            auto type_to_string = [](ColumnVectorType type) -> std::string {
+                switch (type) {
+                    case ColumnVectorType::kFlat:
+                        return "kFlat";
+                    case ColumnVectorType::kConstant:
+                        return "kConstant";
+                    case ColumnVectorType::kCompactBit:
+                        return "kCompactBit";
+                    case ColumnVectorType::kHeterogeneous:
+                        return "kHeterogeneous";
+                    default:
+                        return fmt::format("Invalid({})", int(type));
+                }
+            };
+            std::string types =
+                fmt::format("({}, {}, {})", type_to_string(first_vector_type), type_to_string(second_vector_type), type_to_string(third_vector_type));
+            UnrecoverableError(fmt::format("Not support ternary functions with column vector types {}", types));
+        }
+    }
+
+private:
+    static void inline ExecuteFlatConstantConstant(const std::shared_ptr<ColumnVector> &first,
+                                                   const std::shared_ptr<ColumnVector> &second,
+                                                   const std::shared_ptr<ColumnVector> &third,
+                                                   std::shared_ptr<ColumnVector> &result,
+                                                   size_t count,
+                                                   bool nullable) {
+        const auto &first_null = first->nulls_ptr_;
+        const auto &second_null = second->nulls_ptr_;
+        const auto &third_null = third->nulls_ptr_;
+        auto &result_null = result->nulls_ptr_;
+
+        auto second_c = ColumnValueReader<SecondType>(second)[0];
+        auto third_c = ColumnValueReader<ThirdType>(third)[0];
+        if (nullable && !(second_null->IsAllTrue() && third_null->IsAllTrue())) {
+            result_null->SetAllFalse();
+        } else if (!nullable || first_null->IsAllTrue()) {
+            result_null->SetAllTrue();
+            auto first_ptr = ColumnValueReader<FirstType>(first);
+            BooleanColumnWriter result_ptr(result);
+            for (size_t i = 0; i < count; ++i) {
+                Operator::Execute(first_ptr[i], second_c, third_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, nullptr);
+            }
+        } else {
+            *result_null = *first_null;
+            auto first_ptr = ColumnValueReader<FirstType>(first);
+            BooleanColumnWriter result_ptr(result);
+            result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+                if (row_index >= count) {
+                    return false;
+                }
+                Operator::Execute(first_ptr[row_index],
+                                  second_c,
+                                  third_c,
+                                  result_ptr[row_index],
+                                  result_null.get(),
+                                  row_index,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr);
+                return row_index + 1 < count;
+            });
+        }
+        result->Finalize(count);
+    }
+};
+
 export class TernaryOperator {
 public:
+    // case for ternary operator which returns BooleanT result
+    template <typename FirstType, typename SecondType, typename ThirdType, std::same_as<BooleanT> ResultType, typename Operator>
+    static void inline Execute(const std::shared_ptr<ColumnVector> &first,
+                               const std::shared_ptr<ColumnVector> &second,
+                               const std::shared_ptr<ColumnVector> &third,
+                               std::shared_ptr<ColumnVector> &result,
+                               size_t count,
+                               void *state_ptr_first,
+                               void *state_ptr,
+                               bool nullable) {
+        return BooleanResultTernaryOperator<FirstType, SecondType, ThirdType, Operator>::Execute(first,
+                                                                                                 second,
+                                                                                                 third,
+                                                                                                 result,
+                                                                                                 count,
+                                                                                                 state_ptr_first,
+                                                                                                 state_ptr,
+                                                                                                 nullable);
+    }
+
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operator>
     static void inline Execute(const std::shared_ptr<ColumnVector> &first,
                                const std::shared_ptr<ColumnVector> &second,

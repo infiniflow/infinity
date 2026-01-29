@@ -27,12 +27,25 @@ import logical_type;
 
 namespace infinity {
 
-bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len) {
+bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len, char escape_char) {
     size_t left_idx{0}, right_idx{0};
 
     while (right_idx < right_len) {
-        char left_char = left_ptr[left_idx];
+        char left_char = (left_idx < left_len) ? left_ptr[left_idx] : '\0';
         char right_char = right_ptr[right_idx];
+
+        // Check if current character is escaped
+        if (right_char == escape_char && right_idx + 1 < right_len) {
+            char next_char = right_ptr[right_idx + 1];
+            if (left_char == next_char) {
+                ++left_idx;
+                right_idx += 2;
+                continue;
+            } else {
+                return false;
+            }
+        }
+
         if (right_char == '_' or (left_char == right_char)) {
             ++left_idx;
             ++right_idx;
@@ -51,7 +64,7 @@ bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, 
 
             // Check any left part is matched with rest of right part.
             while (left_idx < left_len) {
-                if (LikeOperator(&left_ptr[left_idx], left_len - left_idx, &right_ptr[right_idx], right_len - right_idx)) {
+                if (LikeOperator(&left_ptr[left_idx], left_len - left_idx, &right_ptr[right_idx], right_len - right_idx, escape_char)) {
                     return true;
                 }
                 ++left_idx;
@@ -71,44 +84,32 @@ bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, 
     return left_idx == left_len && right_idx == right_len;
 }
 
-struct LikeFunction {
-    template <typename TA, typename TB, typename TC>
-    static inline void Run(TA, TB, TC &) {
-        Status status = Status::NotSupport("Not support: Like function");
-        RecoverableError(status);
+template <bool like>
+struct LikeFunctionBase {
+    template <typename TA, typename TB, typename TC, typename TD>
+    static inline void Run(TA &left, TB &right, TC &escape, TD &result) {
+        const char *left_str;
+        size_t left_len;
+        const char *right_str;
+        size_t right_len;
+        const char *escape_str;
+        size_t escape_len;
+        GetReaderValue(left, left_str, left_len);
+        GetReaderValue(right, right_str, right_len);
+        GetReaderValue(escape, escape_str, escape_len);
+
+        // ESCAPE clause is always exactly 1 character
+        bool match = LikeOperator(left_str, left_len, right_str, right_len, escape_str[0]);
+        if constexpr (like) {
+            result.SetValue(!match);
+        } else {
+            result.SetValue(match);
+        }
     }
 };
 
-template <>
-inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    UnrecoverableError("Not implement");
-
-    //    char * left_ptr = left.GetDataPtr();
-    //    size_t left_len = left.GetDataLen();
-    //    char * right_ptr = right.GetDataPtr();
-    //    size_t right_len = right.GetDataLen();
-
-    //    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
-}
-
-struct NotLikeFunction {
-    template <typename TA, typename TB, typename TC>
-    static inline void Run(TA, TB, TC &) {
-        UnrecoverableError("Not implement");
-    }
-};
-
-template <>
-inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    UnrecoverableError("Not implement");
-
-    //    char * left_ptr = left.GetDataPtr();
-    //    size_t left_len = left.GetDataLen();
-    //    char * right_ptr = right.GetDataPtr();
-    //    size_t right_len = right.GetDataLen();
-
-    //    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
-}
+using LikeFunction = LikeFunctionBase<false>;
+using NotLikeFunction = LikeFunctionBase<true>;
 
 void RegisterLikeFunction(NewCatalog *catalog_ptr) {
     std::string func_name = "like";
@@ -116,9 +117,9 @@ void RegisterLikeFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_like_function(func_name,
-                                         {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
+                                         {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
                                          DataType(LogicalType::kBoolean),
-                                         &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, LikeFunction>);
+                                         &ScalarFunction::TernaryFunction<VarcharT, VarcharT, VarcharT, BooleanT, LikeFunction>);
     function_set_ptr->AddFunction(varchar_like_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
@@ -130,9 +131,9 @@ void RegisterNotLikeFunction(NewCatalog *catalog_ptr) {
     std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_not_like_function(func_name,
-                                             {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
+                                             {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
                                              DataType(LogicalType::kBoolean),
-                                             &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, NotLikeFunction>);
+                                             &ScalarFunction::TernaryFunction<VarcharT, VarcharT, VarcharT, BooleanT, NotLikeFunction>);
     function_set_ptr->AddFunction(varchar_not_like_function);
 
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

@@ -69,7 +69,7 @@ struct BinaryOpDirectWrapper {
 template <typename Operator>
 struct TernaryOpDirectWrapper {
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
-    inline static void Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, size_t, void *, void *) {
+    inline static void Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, size_t, void *, void *, void *) {
         return Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first, second, third, result);
     }
 };

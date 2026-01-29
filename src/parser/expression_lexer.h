@@ -842,7 +842,7 @@ extern int yylex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, yyscan_t yyscanne
 #undef yyTABLES_NAME
 #endif
 
-#line 97 "expression_lexer.l"
+#line 98 "expression_lexer.l"
 
 #line 853 "expression_lexer.h"
 #undef expressionIN_HEADER
