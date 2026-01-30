@@ -14,41 +14,53 @@ import data_type;
 
 namespace infinity {
 
-// Thread-local cache for compiled regex patterns
+// Thread-safe global cache for compiled regex patterns
 struct RegexPatternCache {
-    // Max cached patterns per thread
     static constexpr size_t MAX_CACHE_SIZE = 256;
 
-    std::unordered_map<std::string, re2::RE2> cache;
-    std::vector<std::string> lru_list;
+    using CacheIter = std::unordered_map<std::string, std::unique_ptr<re2::RE2>>::iterator;
+    std::unordered_map<std::string, std::unique_ptr<re2::RE2>> cache;
+    std::list<CacheIter> lru_list;
+    std::mutex mutex;
 
     re2::RE2 *GetOrCreate(const std::string &pattern_str) {
+        std::lock_guard<std::mutex> lock(mutex);
+
         auto it = cache.find(pattern_str);
         if (it != cache.end()) {
-            return &it->second;
-        }
-
-        // Cache miss - create new pattern
-        if (cache.size() >= MAX_CACHE_SIZE) {
-            // Simple LRU: remove oldest entry
-            if (!lru_list.empty()) {
-                cache.erase(lru_list.front());
-                lru_list.erase(lru_list.begin());
+            for (auto lru_it = lru_list.begin(); lru_it != lru_list.end(); ++lru_it) {
+                if (*lru_it == it) {
+                    lru_list.erase(lru_it);
+                    break;
+                }
             }
+            lru_list.push_back(it);
+            return it->second.get();
         }
 
-        auto [inserted_it, success] = cache.try_emplace(pattern_str, pattern_str);
-        if (success && inserted_it->second.ok()) {
-            lru_list.push_back(pattern_str);
-            return &inserted_it->second;
+        if (cache.size() >= MAX_CACHE_SIZE && !lru_list.empty()) {
+            auto oldest = lru_list.front();
+            cache.erase(oldest);
+            lru_list.pop_front();
+        }
+
+        auto re2_ptr = std::make_unique<re2::RE2>(pattern_str);
+        if (!re2_ptr->ok()) {
+            return nullptr;
+        }
+
+        auto [inserted_it, success] = cache.try_emplace(pattern_str, std::move(re2_ptr));
+        if (success) {
+            lru_list.push_back(inserted_it);
+            return inserted_it->second.get();
         }
 
         return nullptr;
     }
 };
 
-// Thread-local cache instance
-static thread_local RegexPatternCache thread_cache;
+// Global cache instance (shared across all threads)
+static RegexPatternCache global_cache;
 
 struct RegexFunction {
     template <typename TA, typename TB, typename TC>
@@ -62,7 +74,7 @@ struct RegexFunction {
         std::string pattern_str_(pattern_str, pattern_len);
 
         // Try to get from cache
-        re2::RE2 *cached_pattern = thread_cache.GetOrCreate(pattern_str_);
+        re2::RE2 *cached_pattern = global_cache.GetOrCreate(pattern_str_);
         if (!cached_pattern) {
             Status status = Status::SyntaxError("Invalid regex pattern");
             RecoverableError(status);

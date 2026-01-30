@@ -27,12 +27,36 @@ import logical_type;
 
 namespace infinity {
 
-// Thread-local cache for compiled LIKE patterns
+// Convert LIKE pattern to RE2 regex pattern
+static std::string LikeToRegexPattern(const std::string &like_pattern, char escape_char) {
+    std::string regex_pattern;
+    regex_pattern.reserve(like_pattern.size() * 2);
+
+    for (size_t i = 0; i < like_pattern.size(); ++i) {
+        char c = like_pattern[i];
+        if (c == escape_char && i + 1 < like_pattern.size()) {
+            char next = like_pattern[++i];
+            regex_pattern += re2::RE2::QuoteMeta(std::string(1, next));
+        } else if (c == '%') {
+            regex_pattern += ".*";
+        } else if (c == '_') {
+            regex_pattern += ".";
+        } else {
+            regex_pattern += re2::RE2::QuoteMeta(std::string(1, c));
+        }
+    }
+
+    return regex_pattern;
+}
+
+// Thread-safe global cache for compiled LIKE patterns
 struct LikePatternCache {
     static constexpr size_t MAX_CACHE_SIZE = 256;
 
-    std::unordered_map<std::string, re2::RE2> cache;
-    std::vector<std::string> lru_list;
+    using CacheIter = std::unordered_map<std::string, std::unique_ptr<re2::RE2>>::iterator;
+    std::unordered_map<std::string, std::unique_ptr<re2::RE2>> cache;
+    std::list<CacheIter> lru_list;
+    std::mutex mutex;
 
     re2::RE2 *GetOrCreate(const std::string &like_pattern, char escape_char) {
         // Create cache key: pattern + escape char as hex
@@ -41,49 +65,46 @@ struct LikePatternCache {
         std::string cache_key = like_pattern;
         cache_key += escape_buf;
 
+        std::lock_guard<std::mutex> lock(mutex);
+
         auto it = cache.find(cache_key);
         if (it != cache.end()) {
-            return &it->second;
-        }
-
-        // Cache miss - create new regex pattern
-        if (cache.size() >= MAX_CACHE_SIZE) {
-            if (!lru_list.empty()) {
-                cache.erase(lru_list.front());
-                lru_list.erase(lru_list.begin());
+            for (auto lru_it = lru_list.begin(); lru_it != lru_list.end(); ++lru_it) {
+                if (*lru_it == it) {
+                    lru_list.erase(lru_it);
+                    break;
+                }
             }
+            lru_list.push_back(it);
+            return it->second.get();
         }
 
-        // Convert LIKE to regex pattern
-        std::string regex_pattern;
-        regex_pattern.reserve(like_pattern.size() * 2);
-
-        for (size_t i = 0; i < like_pattern.size(); ++i) {
-            char c = like_pattern[i];
-            if (c == escape_char && i + 1 < like_pattern.size()) {
-                char next = like_pattern[++i];
-                regex_pattern += re2::RE2::QuoteMeta(std::string(1, next));
-            } else if (c == '%') {
-                regex_pattern += ".*";
-            } else if (c == '_') {
-                regex_pattern += ".";
-            } else {
-                regex_pattern += re2::RE2::QuoteMeta(std::string(1, c));
-            }
+        if (cache.size() >= MAX_CACHE_SIZE && !lru_list.empty()) {
+            // Remove least recently used entry
+            auto oldest = lru_list.front();
+            cache.erase(oldest);
+            lru_list.pop_front();
         }
 
-        auto [inserted_it, success] = cache.try_emplace(cache_key, regex_pattern);
-        if (success && inserted_it->second.ok()) {
-            lru_list.push_back(cache_key);
-            return &inserted_it->second;
+        std::string regex_pattern = LikeToRegexPattern(like_pattern, escape_char);
+
+        auto re2_ptr = std::make_unique<re2::RE2>(regex_pattern);
+        if (!re2_ptr->ok()) {
+            return nullptr;
+        }
+
+        auto [inserted_it, success] = cache.try_emplace(cache_key, std::move(re2_ptr));
+        if (success) {
+            lru_list.push_back(inserted_it);
+            return inserted_it->second.get();
         }
 
         return nullptr;
     }
 };
 
-// Thread-local cache instance
-static thread_local LikePatternCache thread_cache;
+// Global cache instance (shared across all threads)
+static LikePatternCache global_cache;
 
 bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len, char escape_char, bool &pattern_error) {
     if (right_len == 0) {
@@ -94,7 +115,7 @@ bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, 
     }
 
     std::string pattern_str(right_ptr, right_len);
-    re2::RE2 *cached_pattern = thread_cache.GetOrCreate(pattern_str, escape_char);
+    re2::RE2 *cached_pattern = global_cache.GetOrCreate(pattern_str, escape_char);
     if (!cached_pattern) {
         pattern_error = true;
         return false;
