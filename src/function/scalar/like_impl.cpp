@@ -27,61 +27,81 @@ import logical_type;
 
 namespace infinity {
 
-bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len, char escape_char) {
-    size_t left_idx{0}, right_idx{0};
+// Thread-local cache for compiled LIKE patterns
+struct LikePatternCache {
+    static constexpr size_t MAX_CACHE_SIZE = 256;
 
-    while (right_idx < right_len) {
-        char left_char = (left_idx < left_len) ? left_ptr[left_idx] : '\0';
-        char right_char = right_ptr[right_idx];
+    std::unordered_map<std::string, re2::RE2> cache;
+    std::vector<std::string> lru_list;
 
-        // Check if current character is escaped
-        if (right_char == escape_char && right_idx + 1 < right_len) {
-            char next_char = right_ptr[right_idx + 1];
-            if (left_char == next_char) {
-                ++left_idx;
-                right_idx += 2;
-                continue;
+    re2::RE2 *GetOrCreate(const std::string &like_pattern, char escape_char) {
+        // Create cache key: pattern + escape char as hex
+        char escape_buf[8];
+        snprintf(escape_buf, sizeof(escape_buf), "\\x%02x", static_cast<unsigned char>(escape_char));
+        std::string cache_key = like_pattern;
+        cache_key += escape_buf;
+
+        auto it = cache.find(cache_key);
+        if (it != cache.end()) {
+            return &it->second;
+        }
+
+        // Cache miss - create new regex pattern
+        if (cache.size() >= MAX_CACHE_SIZE) {
+            if (!lru_list.empty()) {
+                cache.erase(lru_list.front());
+                lru_list.erase(lru_list.begin());
+            }
+        }
+
+        // Convert LIKE to regex pattern
+        std::string regex_pattern;
+        regex_pattern.reserve(like_pattern.size() * 2);
+
+        for (size_t i = 0; i < like_pattern.size(); ++i) {
+            char c = like_pattern[i];
+            if (c == escape_char && i + 1 < like_pattern.size()) {
+                char next = like_pattern[++i];
+                regex_pattern += re2::RE2::QuoteMeta(std::string(1, next));
+            } else if (c == '%') {
+                regex_pattern += ".*";
+            } else if (c == '_') {
+                regex_pattern += ".";
             } else {
-                return false;
+                regex_pattern += re2::RE2::QuoteMeta(std::string(1, c));
             }
         }
 
-        if (right_char == '_' or (left_char == right_char)) {
-            ++left_idx;
-            ++right_idx;
-        } else if (right_char == '%') {
-            ++right_idx;
-
-            // If there are more than one %
-            while (right_idx < right_len && right_ptr[right_idx] == '%') {
-                ++right_idx;
-            }
-
-            // % is the last character
-            if (right_idx == right_len) {
-                return true;
-            }
-
-            // Check any left part is matched with rest of right part.
-            while (left_idx < left_len) {
-                if (LikeOperator(&left_ptr[left_idx], left_len - left_idx, &right_ptr[right_idx], right_len - right_idx, escape_char)) {
-                    return true;
-                }
-                ++left_idx;
-            }
-
-            // Not matched
-            return false;
-        } else {
-            return false;
+        auto [inserted_it, success] = cache.try_emplace(cache_key, regex_pattern);
+        if (success && inserted_it->second.ok()) {
+            lru_list.push_back(cache_key);
+            return &inserted_it->second;
         }
+
+        return nullptr;
+    }
+};
+
+// Thread-local cache instance
+static thread_local LikePatternCache thread_cache;
+
+bool LikeOperator(const char *left_ptr, size_t left_len, const char *right_ptr, size_t right_len, char escape_char, bool &pattern_error) {
+    if (right_len == 0) {
+        return left_len == 0;
+    }
+    if (right_len == 1 && right_ptr[0] == '%') {
+        return true;
     }
 
-    while (right_idx < right_len && right_ptr[right_idx] == '%') {
-        ++right_idx;
+    std::string pattern_str(right_ptr, right_len);
+    re2::RE2 *cached_pattern = thread_cache.GetOrCreate(pattern_str, escape_char);
+    if (!cached_pattern) {
+        pattern_error = true;
+        return false;
     }
 
-    return left_idx == left_len && right_idx == right_len;
+    std::string input(left_ptr, left_len);
+    return re2::RE2::FullMatch(input, *cached_pattern);
 }
 
 template <bool like>
@@ -98,8 +118,15 @@ struct LikeFunctionBase {
         GetReaderValue(right, right_str, right_len);
         GetReaderValue(escape, escape_str, escape_len);
 
+        bool pattern_error = false;
         // ESCAPE clause is always exactly 1 character
-        bool match = LikeOperator(left_str, left_len, right_str, right_len, escape_str[0]);
+        bool match = LikeOperator(left_str, left_len, right_str, right_len, escape_str[0], pattern_error);
+
+        if (pattern_error) {
+            Status status = Status::SyntaxError("Invalid LIKE pattern");
+            RecoverableError(status);
+        }
+
         if constexpr (like) {
             result.SetValue(!match);
         } else {
