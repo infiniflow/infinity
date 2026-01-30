@@ -20,10 +20,6 @@ import :persistence_manager;
 
 namespace infinity {
 
-struct DataFileWorkerCachedData {
-    std::shared_ptr<char[]> data_;
-};
-
 export struct DataFileWorker : FileWorker {
     explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
