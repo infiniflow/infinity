@@ -583,7 +583,7 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
             auto version_file_worker1 = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
             // Mmap version info
             BlockVersion *block_version{};
-            static_cast<FileWorker *>(version_file_worker1)->Read(block_version);
+            FileWorker::Read(version_file_worker1, block_version);
 
             BlockVersion::LoadFromFile(&file_handle, block_version);
 

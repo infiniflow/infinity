@@ -31,9 +31,9 @@ export struct VersionFileWorker : FileWorker {
     // static constexpr BlockVersion *has_cache_manager_{};
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
-    FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVersionDataFile; }
 
-    void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
     size_t capacity_{};
     boost::interprocess::managed_mapped_file segment_;
