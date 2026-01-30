@@ -26,6 +26,8 @@ import :logger;
 import :persistence_manager;
 import :local_file_handle;
 import :virtual_store;
+import :infinity_context;
+import :fileworker_manager;
 
 import std;
 import third_party;
@@ -100,6 +102,15 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
         // l.lock();
         data_size_ = data_size + append_data_size;
     }
+
+    // Update cache after write
+    auto cached_data = std::make_shared<DataFileWorkerCachedData>();
+    cached_data->data_ = std::make_shared<char[]>(buffer_size_);
+    std::memcpy(cached_data->data_.get(), (char *)mmap_ + sizeof(u64) + sizeof(buffer_size_), buffer_size_);
+    auto &path = *rel_file_path_;
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->data_map_.cache_manager_;
+    cache_manager.Set(path, cached_data, buffer_size_);
+
     prepare_success = true; // Not run defer_fn
     return true;
 }
@@ -146,8 +157,17 @@ bool DataFileWorker::WriteSnapshot(std::span<char> data,
 }
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
-    // std::unique_lock l(mutex_);
+    // Check cache first
+    auto &path = *rel_file_path_;
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->data_map_.cache_manager_;
+    std::shared_ptr<DataFileWorkerCachedData> cached_data;
+    bool cached = cache_manager.Get(path, cached_data);
+    if (cached) {
+        data = cached_data->data_;
+        return;
+    }
+
+    // Cache miss - read from file
     data = std::make_shared<char[]>(buffer_size_);
 
     if (!mmap_) {
@@ -209,6 +229,11 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
     } else {
         std::memcpy(data.get(), (char *)mmap_ + sizeof(u64) /* magic_num */ + sizeof(buffer_size_), buffer_size_);
     }
+
+    // Store in cache
+    auto wrapper = std::make_shared<DataFileWorkerCachedData>();
+    wrapper->data_ = data;
+    cache_manager.Set(path, wrapper, buffer_size_);
 }
 
 } // namespace infinity
