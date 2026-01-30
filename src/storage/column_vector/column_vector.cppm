@@ -38,8 +38,8 @@ import global_resource_usage;
 
 namespace infinity {
 
-class DataFileWorker;
-class VarFileWorker;
+struct DataFileWorker;
+struct VarFileWorker;
 
 export enum class ColumnVectorMode : i8 {
     kReadWrite,
@@ -218,9 +218,12 @@ public:
 
     void SetArrayValue(ArrayT &target, const Value &value);
 
-    bool AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset);
+    bool AppendUnnest(const ColumnVector &other, size_t offset, size_t &array_offset);
 
 private:
+    bool AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset);
+    bool AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset);
+
     Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
 
     void SetArrayValueRecursively(const Value &value, char *dst_ptr);

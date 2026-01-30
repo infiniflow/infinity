@@ -20,20 +20,18 @@ import :persistence_manager;
 
 namespace infinity {
 
-export class DataFileWorker : public FileWorker {
-public:
+export struct DataFileWorker : FileWorker {
     explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
-    virtual ~DataFileWorker() override;
+    ~DataFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kDataFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kDataFile; }
 
-    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
     bool WriteSnapshot(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
     size_t buffer_size_{};
     size_t data_size_{};
 };

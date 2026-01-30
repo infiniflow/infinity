@@ -171,7 +171,7 @@ bool VirtualStore::Exists(std::string_view path, bool is_v2) {
     if (error_code.value() == 0) {
         return is_exists;
     } else {
-        UnrecoverableError(fmt::format("{} exists exception: {}", path, strerror(errno)));
+        UnrecoverableError(fmt::format("{} exists exception: {}", path, error_code.message()));
     }
     return false;
 }
@@ -187,10 +187,10 @@ Status VirtualStore::DeleteFile(const std::string &file_name) {
     }
     bool is_deleted = std::filesystem::remove(file_name, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
+        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, error_code.message()));
     }
     if (!is_deleted) {
-        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno));
+        std::string error_msg = fmt::format("Failed to delete file: {}: {}", file_name, error_code.message());
         LOG_ERROR(error_msg);
         Status status = Status::IOError(error_msg);
         return status;
@@ -218,19 +218,18 @@ Status VirtualStore::DeleteFileBG(const std::string &path) {
 }
 
 Status VirtualStore::MakeDirectory(std::string_view path) {
-    if (VirtualStore::Exists(path)) {
-        if (std::filesystem::is_directory(path)) {
+    if (Exists(path)) {
+        if (fs::is_directory(path)) {
             return Status::OK();
-        } else {
-            std::string error_msg = fmt::format("Exists file: {}", path);
-            LOG_ERROR(error_msg);
-            return Status::IOError(error_msg);
         }
+        std::string error_msg = fmt::format("Exists file: {}", path);
+        LOG_ERROR(error_msg);
+        return Status::IOError(error_msg);
     }
 
     std::error_code error_code;
     fs::path p{path};
-    std::filesystem::create_directories(p, error_code);
+    fs::create_directories(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("{} create exception: {}", path, strerror(errno)));
     }
@@ -353,25 +352,37 @@ Status VirtualStore::Merge(const std::string &dst_path, const std::string &src_p
     return Status::OK();
 }
 
-Status VirtualStore::Copy(std::string_view dst_path, std::string_view src_path) {
-    if (!std::filesystem::path(dst_path).is_absolute()) {
-        UnrecoverableError(fmt::format("{} isn't absolute path.", dst_path));
+Status VirtualStore::Copy(std::string_view src, std::string_view dst) {
+    if (!std::filesystem::path(dst).is_absolute()) {
+        UnrecoverableError(fmt::format("{} isn't absolute path.", dst));
     }
-    if (!std::filesystem::path(src_path).is_absolute()) {
-        UnrecoverableError(fmt::format("{} isn't absolute path.", src_path));
-    }
-
-    auto dst_dir = GetParentPath(dst_path);
-    if (!Exists(dst_dir)) {
-        MakeDirectory(dst_dir);
+    if (!std::filesystem::path(src).is_absolute()) {
+        UnrecoverableError(fmt::format("{} isn't absolute path.", src));
     }
 
-    try {
-        std::filesystem::copy(src_path, dst_path, fs::copy_options::update_existing);
-    } catch (const std::filesystem::filesystem_error &e) {
-        return Status::IOError(fmt::format("Failed to copy file: {}", e.what()));
+    return CopyRange(src, dst, 0, 0, fs::file_size(src));
+}
+
+Status VirtualStore::CopyRange(std::string_view src, std::string_view dst, off_t src_off, off_t dst_off, size_t len) {
+    auto in = open(src.data(), O_RDONLY);
+    if (in < 0) {
+        return Status::IOError(fmt::format("Open file failed. file: {}", src));
     }
-    return Status::OK();
+    auto ps = std::filesystem::path(dst).parent_path().string();
+    MakeDirectory(ps);
+    auto out = open(dst.data(), O_WRONLY | O_CREAT, 0666);
+    if (out < 0) {
+        close(in);
+        return Status::IOError(fmt::format("Open file failed. file: {}", dst));
+    }
+    size_t copied = copy_file_range(in, &src_off, out, &dst_off, len, 0);
+    close(in);
+    close(out);
+    if (copied == len) {
+        return Status::OK();
+    }
+    return Status::IOError(
+        fmt::format("Copy file range failed. src: {}, src_off: {}, dst: {}, dst_off: {}, len: {}", src, src_off, dst, dst_off, len));
 }
 
 std::tuple<std::vector<std::shared_ptr<std::filesystem::directory_entry>>, Status> VirtualStore::ListDirectory(const std::string &path) {

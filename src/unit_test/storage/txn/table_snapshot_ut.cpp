@@ -56,13 +56,6 @@ public:
         }
     }
 
-    void TearDown() override {
-        std::string cmd = "rm -rf " + InfinityContext::instance().config()->SnapshotDir();
-        system(cmd.c_str());
-
-        BaseTestParamStr::TearDown();
-    }
-
     void SetUp() override {
         NewRequestTest::SetUp();
         SetupTestTable();
@@ -158,8 +151,7 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_BG_OFF_PATH));
-// INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH));
 
 // TEST_P(TableSnapshotTest, test_restore_table_rollback_basic) {
 //     using namespace infinity;
@@ -501,7 +493,6 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TableSnapshotTest, ::testing::
 // }
 
 TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
-    [[maybe_unused]] auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     {
         std::string restore_sql = "restore table snapshot tb1_snapshot";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -597,9 +588,7 @@ TEST_P(TableSnapshotTest, test_create_snapshot_delete_data) {
 }
 
 TEST_P(TableSnapshotTest, test_create_snapshot_insert_data) {
-    using namespace infinity;
-    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
-    [[maybe_unused]] auto file_worker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+    auto *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
     {
         std::string restore_sql = "restore table snapshot tb1_snapshot";
         std::unique_ptr<QueryContext> query_context = MakeQueryContext();
@@ -612,11 +601,9 @@ TEST_P(TableSnapshotTest, test_create_snapshot_insert_data) {
         }
     }
 
-    Status status;
-
     auto *txn1 = txn_mgr->BeginTxn(std::make_unique<std::string>("append"), TransactionType::kAppend);
     auto input_block = MakeInputBlock(Value::MakeInt(999), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"), 900);
-    status = txn1->Append(*db_name, *table_name, input_block);
+    auto status = txn1->Append(*db_name, *table_name, input_block);
     if (!status.ok()) {
         LOG_INFO(fmt::format("Line: {} message: {}", __LINE__, status.message()));
     }

@@ -250,7 +250,7 @@ protected:
                 const auto &[c_dist, c_idx] = candidates.back();
                 QueryType c_data = data_store_.GetVecToQuery(c_idx);
                 bool check = true;
-                for (size_t i = 0; i < size_t(result_size); ++i) { // fuck 1
+                for (size_t i = 0; i < size_t(result_size); ++i) { // yee todo 1
                     VertexType r_idx = result_p[i];
                     auto cr_dist = distance_(c_data, r_idx, data_store_, c_idx);
                     if (cr_dist < c_dist) {

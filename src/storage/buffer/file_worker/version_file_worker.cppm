@@ -21,14 +21,13 @@ import :block_version;
 
 namespace infinity {
 
-export struct VersionFileWorkerSaveCtx : public FileWorkerSaveCtx {
+export struct VersionFileWorkerSaveCtx : FileWorkerSaveCtx {
     VersionFileWorkerSaveCtx(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
 
     TxnTimeStamp checkpoint_ts_{};
 };
 
-export class VersionFileWorker : public FileWorker {
-public:
+export struct VersionFileWorker : FileWorker {
     // static constexpr BlockVersion *has_cache_manager_{};
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
 
@@ -36,7 +35,6 @@ public:
 
     void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
 
-private:
     size_t capacity_{};
     boost::interprocess::managed_mapped_file segment_;
     bool inited_{};

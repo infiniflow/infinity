@@ -55,6 +55,7 @@ protected:
     }
 
 public:
+    IndexBase() = default;
     explicit IndexBase(std::shared_ptr<std::string> index_name) : index_name_(std::move(index_name)) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("IndexBase");

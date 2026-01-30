@@ -389,14 +389,15 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     switch (index_base->index_type_) {
         case IndexType::kSecondary:
+            [[fallthrough]];
         case IndexType::kSecondaryFunctional: {
             const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
-            std::vector<std::pair<u32, FileWorker *>> old_buffers;
+            std::vector<std::pair<u32, SecondaryIndexFileWorker *>> old_buffers;
             for (size_t i = 0; i < deprecate_ids.size(); ++i) {
                 ChunkID old_chunk_id = deprecate_ids[i];
                 ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
 
-                IndexFileWorker *index_file_worker{};
+                SecondaryIndexFileWorker *index_file_worker{};
                 {
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, file_worker);
                     status = old_chunk_meta.GetFileWorker(index_file_worker);
@@ -415,23 +416,18 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 // auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
                 // data_ptr->InsertMergeData(old_buffers);
 
-                SecondaryIndexData *data_ptr{};
-                index_file_worker->Read(data_ptr);
+                SecondaryIndexDataBase<HighCardinalityTag> *data_ptr{};
+                FileWorker::Read(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
                 data_ptr->InsertMergeData(old_buffers);
-                index_file_worker->Write(data_ptr);
+                FileWorker::Write(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
             } else {
                 // auto *data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(buffer_handle.GetDataMut());
                 // data_ptr->InsertMergeData(old_buffers);
                 SecondaryIndexDataBase<LowCardinalityTag> *data_ptr{};
-                index_file_worker->Read(data_ptr);
+                FileWorker::Read(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
                 data_ptr->InsertMergeData(old_buffers);
-                index_file_worker->Write(data_ptr);
+                FileWorker::Write(static_cast<SecondaryIndexFileWorker *>(index_file_worker), data_ptr);
             }
-            // // std::shared_ptr<SecondaryIndexData> data_ptr;
-            // SecondaryIndexData *data_ptr;
-            // index_file_worker->Read(data_ptr);
-            // data_ptr->InsertMergeData(old_buffers);
-            // index_file_worker->Write(data_ptr);
             break;
         }
         case IndexType::kFullText: {
@@ -451,9 +447,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
             // std::shared_ptr<IVFIndexInChunk> data_ptr;
             IVFIndexInChunk *data_ptr{};
-            index_file_worker->Read(data_ptr);
+            FileWorker::Read(static_cast<IVFIndexFileWorker *>(index_file_worker), data_ptr);
             data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
-            index_file_worker->Write(std::span{data_ptr, 1});
+            FileWorker::Write(static_cast<IVFIndexFileWorker *>(index_file_worker), std::span{data_ptr, 1});
             break;
         }
         case IndexType::kHnsw:
@@ -486,9 +482,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             }
 
             std::shared_ptr<EMVBIndex> data_ptr;
-            index_file_worker->Read(data_ptr);
+            FileWorker::Read(static_cast<EMVBIndexFileWorker *>(index_file_worker), data_ptr);
             data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
-            index_file_worker->Write(std::span{data_ptr.get(), 1});
+            FileWorker::Write(static_cast<EMVBIndexFileWorker *>(index_file_worker), std::span{data_ptr.get(), 1});
             break;
         }
         default: {
@@ -1291,7 +1287,7 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     new_chunk_ids.push_back(chunk_id);
     std::optional<ChunkIndexMeta> chunk_index_meta;
-    IndexFileWorker *index_file_worker{};
+    IVFIndexFileWorker *index_file_worker{};
     {
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                this,
@@ -1312,9 +1308,9 @@ Status NewTxn::PopulateIvfIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     {
         IVFIndexInChunk *data_ptr{};
-        index_file_worker->Read(data_ptr);
+        FileWorker::Read(index_file_worker, data_ptr);
         data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
-        index_file_worker->Write(std::span{data_ptr, 1});
+        FileWorker::Write(index_file_worker, std::span{data_ptr, 1});
     }
     return Status::OK();
 }
@@ -1340,7 +1336,7 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
-    IndexFileWorker *index_file_worker{};
+    EMVBIndexFileWorker *index_file_worker{};
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
         status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
@@ -1359,9 +1355,9 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     }
     {
         std::shared_ptr<EMVBIndex> data_ptr;
-        index_file_worker->Read(data_ptr);
+        FileWorker::Read(index_file_worker, data_ptr);
         data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
-        index_file_worker->Write(std::span{data_ptr.get(), 1});
+        FileWorker::Write(index_file_worker, std::span{data_ptr.get(), 1});
     }
     return Status::OK();
 }
@@ -1448,7 +1444,7 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
     if (!status.ok()) {
         return status;
     }
-    IndexFileWorker *index_file_worker{};
+    HnswFileWorker *index_file_worker{};
 
     status = chunk_index_meta->GetFileWorker(index_file_worker);
     memory_hnsw_index->Dump(index_file_worker);
@@ -1536,7 +1532,7 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
     if (!status.ok()) {
         return status;
     }
-    IndexFileWorker *index_file_worker{};
+    SecondaryIndexFileWorker *index_file_worker{};
 
     status = chunk_index_meta->GetFileWorker(index_file_worker);
     memory_secondary_index->Dump(index_file_worker);
@@ -1629,7 +1625,7 @@ Status NewTxn::PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> 
     if (!status.ok()) {
         return status;
     }
-    IndexFileWorker *index_file_worker{};
+    SecondaryIndexFileWorker *index_file_worker{};
 
     status = chunk_index_meta->GetFileWorker(index_file_worker);
     memory_functional_index->Dump(index_file_worker);
@@ -1774,7 +1770,7 @@ Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
     if (!status.ok()) {
         return status;
     }
-    IndexFileWorker *index_file_worker{};
+    BMPIndexFileWorker *index_file_worker{};
 
     status = chunk_index_meta->GetFileWorker(index_file_worker);
     memory_bmp_index->Dump(index_file_worker);
@@ -1874,7 +1870,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                                 SegmentMeta &segment_meta,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
-                                FileWorker *file_worker) {
+                                IndexFileWorker *index_file_worker) {
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
@@ -1906,7 +1902,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             memory_hnsw_index->InsertVecs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
 
-        memory_hnsw_index->Dump(file_worker);
+        memory_hnsw_index->Dump(static_cast<HnswFileWorker *>(index_file_worker));
     } else if (index_base->index_type_ == IndexType::kBMP) {
         auto memory_bmp_index = std::make_shared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get());
 
@@ -1928,7 +1924,7 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             u32 offset = 0;
             memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
-        memory_bmp_index->Dump(file_worker);
+        memory_bmp_index->Dump(static_cast<BMPIndexFileWorker *>(index_file_worker));
     } else {
         UnrecoverableError("Not implemented yet");
     }
@@ -1960,14 +1956,14 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
 
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                IndexFileWorker *index_file_worker{};
+                BMPIndexFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     return status;
                 }
 
                 std::shared_ptr<BMPHandlerPtr> bmp_handler;
-                index_file_worker->Read(bmp_handler);
+                FileWorker::Read(index_file_worker, bmp_handler);
                 (*bmp_handler)->Optimize(options);
             }
             std::shared_ptr<BMPIndexInMem> bmp_index = mem_index->GetBMPIndex();
@@ -1985,13 +1981,13 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
             }
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                IndexFileWorker *index_file_worker{};
+                HnswFileWorker *index_file_worker{};
                 status = chunk_index_meta.GetFileWorker(index_file_worker);
                 if (!status.ok()) {
                     return status;
                 }
                 std::shared_ptr<HnswHandler> hnsw_handler;
-                index_file_worker->Read(hnsw_handler);
+                FileWorker::Read(index_file_worker, hnsw_handler);
                 if (params->compress_to_lvq) {
                     (hnsw_handler)->CompressToLVQ();
                 } else if (params->compress_to_rabitq) {
@@ -2151,27 +2147,28 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     }
     switch (index_base->index_type_) {
         case IndexType::kSecondary:
+            [[fallthrough]];
         case IndexType::kSecondaryFunctional: {
-            memory_secondary_index->Dump(index_file_worker);
+            memory_secondary_index->Dump(static_cast<SecondaryIndexFileWorker *>(index_file_worker));
             break;
         }
         case IndexType::kFullText: {
             break;
         }
         case IndexType::kIVF: {
-            memory_ivf_index->Dump(index_file_worker);
+            memory_ivf_index->Dump(static_cast<IVFIndexFileWorker *>(index_file_worker));
             break;
         }
         case IndexType::kHnsw: {
-            memory_hnsw_index->Dump(index_file_worker);
+            memory_hnsw_index->Dump(static_cast<HnswFileWorker *>(index_file_worker));
             break;
         }
         case IndexType::kBMP: {
-            memory_bmp_index->Dump(index_file_worker);
+            memory_bmp_index->Dump(static_cast<BMPIndexFileWorker *>(index_file_worker));
             break;
         }
         case IndexType::kEMVB: {
-            memory_emvb_index->Dump(index_file_worker);
+            memory_emvb_index->Dump(static_cast<EMVBIndexFileWorker *>(index_file_worker));
             break;
         }
         default: {

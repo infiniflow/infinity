@@ -29,28 +29,22 @@ import internal_types;
 
 namespace infinity {
 
-export class HnswFileWorker : public IndexFileWorker {
-public:
+export struct HnswFileWorker : IndexFileWorker {
     static constexpr HnswHandler *has_cache_manager_{};
     explicit HnswFileWorker(std::shared_ptr<std::string> file_path,
                             std::shared_ptr<IndexBase> index_base,
                             std::shared_ptr<ColumnDef> column_def,
                             size_t index_size = 0);
 
-    virtual ~HnswFileWorker() override;
+    ~HnswFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kHNSWIndexFile; }
 
-protected:
-    bool Write(std::shared_ptr<HnswHandler> &data,
-               std::unique_ptr<LocalFileHandle> &file_handle,
-               bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+    bool
+    Write(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
-    mutable std::mutex mutex_;
     size_t index_size_{};
 };
 

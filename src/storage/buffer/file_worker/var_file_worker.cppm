@@ -21,19 +21,17 @@ import :var_buffer;
 
 namespace infinity {
 
-export class VarFileWorker : public FileWorker {
-public:
+export struct VarFileWorker : FileWorker {
     explicit VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size);
 
-    virtual ~VarFileWorker() override;
+    ~VarFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVarFile; }
 
-    bool
-    Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
     bool WriteSnapshot(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 };
 
 } // namespace infinity

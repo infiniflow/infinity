@@ -25,20 +25,17 @@ namespace infinity {
 // - There's no file header nor footer.
 // - The buffer size is just the file size.
 // - The file size is consistant since creation.
-export class RawFileWorker : public IndexFileWorker {
-public:
+export struct RawFileWorker : IndexFileWorker {
     explicit RawFileWorker(std::shared_ptr<std::string> file_path, u32 file_size);
 
-    virtual ~RawFileWorker() override;
+    ~RawFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kRawFile; }
 
-protected:
-    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<char> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-private:
     size_t buffer_size_;
 };
 } // namespace infinity

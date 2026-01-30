@@ -38,7 +38,7 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, siz
 void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     std::unique_lock l(mutex_);
     auto &path = *rel_file_path_;
-    auto tmp_path = GetFilePathTemp();
+    auto tmp_path = GetWorkingPath();
     if (!inited_) {
         if (!VirtualStore::Exists("/var/infinity/tmp")) {
             VirtualStore::MakeDirectory("/var/infinity/tmp");

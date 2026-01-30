@@ -70,7 +70,7 @@ void VectorBuffer::InitializeCompactBit(size_t capacity) {
     }
     size_t data_size = (capacity + 7) / 8;
     if (data_size > 0) {
-        ptr_ = std::make_shared<char[]>(data_size);
+        ptr_ = std::make_shared_for_overwrite<char[]>(data_size);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -138,7 +138,7 @@ void VectorBuffer::SetToCatalog(DataFileWorker *data_file_worker, VarFileWorker 
     }
 
     auto src_ptr = std::move(std::get<std::shared_ptr<char[]>>(ptr_));
-    static_cast<FileWorker *>(data_file_worker)->Write(std::span{src_ptr.get(), data_size_});
+    FileWorker::Write(data_file_worker, std::span{src_ptr.get(), data_size_});
 
     src_ptr.reset();
 

@@ -1874,7 +1874,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
                 // Mmap version info
                 BlockVersion *block_version{};
-                static_cast<FileWorker *>(version_file_worker.get())->Read(block_version);
+                FileWorker::Read(version_file_worker.get(), block_version);
                 // // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
@@ -1910,7 +1910,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read data file
                         std::shared_ptr<char[]> data;
-                        static_cast<FileWorker *>(data_file_worker_)->Read(data);
+                        FileWorker::Read(data_file_worker_, data);
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
@@ -1932,7 +1932,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                         // Read variable data file
                         std::shared_ptr<VarBuffer> var_buffer;
-                        static_cast<FileWorker *>(var_file_worker_)->Read(var_buffer);
+                        FileWorker::Read(var_file_worker_, var_buffer);
 
                         // Write snapshot file
                         auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
@@ -1964,7 +1964,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-            Status status = VirtualStore::Copy(write_path, read_path);
+            Status status = VirtualStore::Copy(read_path, write_path);
             if (!status.ok()) {
                 LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
                 return Status::OK();

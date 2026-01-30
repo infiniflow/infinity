@@ -2,12 +2,9 @@
 // Created by infiniflow on 25-5-13.
 //
 
-module;
-
 module infinity_core:hnsw_handler.impl;
 
 import :hnsw_handler;
-
 import :block_column_iter;
 import :memindex_tracer;
 import :default_values;
@@ -17,6 +14,7 @@ import :column_vector;
 import :local_file_handle;
 import :chunk_index_meta;
 import :plain_vec_store;
+import :hnsw_file_worker;
 
 import third_party;
 
@@ -603,7 +601,7 @@ void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
     IncreaseMemoryUsageBase(mem_usage);
 }
 
-void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) {
+void HnswIndexInMem::Dump(HnswFileWorker *index_file_worker, size_t *dump_size_ptr) {
     if (dump_size_ptr != nullptr) {
         size_t dump_size = hnsw_handler_->MemUsage();
         *dump_size_ptr = dump_size;
@@ -624,7 +622,7 @@ void HnswIndexInMem::Dump(FileWorker *index_file_worker, size_t *dump_size_ptr) 
         memindex_tracer->DecreaseMemUsed(mem_usage);
     }
 
-    index_file_worker_->Write(std::move(hnsw_handler));
+    FileWorker::Write(index_file_worker_, std::move(hnsw_handler));
 }
 
 size_t

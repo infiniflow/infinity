@@ -89,10 +89,11 @@ export const useBuildTreeData = () => {
 
   const fetchTables = useCallback(async (databaseName: string) => {
     const ret = await listTable(databaseName);
-    if (ret?.tables?.length > 0) {
+    const tables = ret?.tables ?? ret?.table_names ?? [];
+    if (tables.length > 0) {
       setData((value) => {
         const tablePropertyList: INode[] = [];
-        const tableList = ret.tables.map((x: string) => {
+        const tableList = tables.map((x: string) => {
           const leafs = buildLeafData(x);
           tablePropertyList.push(...leafs);
 

@@ -25,23 +25,18 @@ import column_def;
 
 namespace infinity {
 
-export class IVFIndexFileWorker : public IndexFileWorker {
-public:
+export struct IVFIndexFileWorker : IndexFileWorker {
     // static constexpr IVFIndexInChunk *has_cache_manager_{};
     explicit IVFIndexFileWorker(std::shared_ptr<std::string> file_path, std::shared_ptr<IndexBase> index_base, std::shared_ptr<ColumnDef> column_def)
         : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {}
 
-    ~IVFIndexFileWorker() override;
+    ~IVFIndexFileWorker();
 
-    FileWorkerType Type() const override { return FileWorkerType::kIVFIndexFile; }
+    [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kIVFIndexFile; }
 
-protected:
-    bool Write(std::span<IVFIndexInChunk> data,
-               std::unique_ptr<LocalFileHandle> &file_handle,
-               bool &prepare_success,
-               const FileWorkerSaveCtx &ctx) override;
+    bool Write(std::span<IVFIndexInChunk> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
-    void Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) override;
+    void Read(IVFIndexInChunk *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 };
 
 } // namespace infinity

@@ -59,7 +59,7 @@ bool EMVBIndexFileWorker::Write(std::span<EMVBIndex> data,
 }
 
 void EMVBIndexFileWorker::Read(std::shared_ptr<EMVBIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
     const auto *index_emvb = static_cast<IndexEMVB *>(index_base_.get());
     const auto residual_pq_subspace_num = index_emvb->residual_pq_subspace_num_;

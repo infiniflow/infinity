@@ -15,6 +15,7 @@
 module infinity_core:json_manager.impl;
 
 import :json_manager;
+import std.compat;
 
 namespace infinity {
 
@@ -100,16 +101,28 @@ JsonTypeDef JsonManager::parse(const std::string &json_str) {
     return {};
 }
 
-JsonTypeDef JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
+std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const std::vector<uint8_t> &bson_data) {
     try {
         auto tmp_bson_data = JsonTypeDef::from_bson(bson_data);
-        return tmp_bson_data["data"];
+        return std::make_unique<JsonTypeDef>(std::move(tmp_bson_data["data"]));
     } catch (const JsonTypeDef::parse_error &e) {
         LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
     } catch (...) {
         LOG_TRACE("JsonManager::from_bson unknown error");
     }
-    return {};
+    return nullptr;
+}
+
+std::unique_ptr<JsonTypeDef> JsonManager::from_bson(const uint8_t *bson_data, size_t len) {
+    try {
+        auto tmp_bson_data = JsonTypeDef::from_bson(bson_data, len);
+        return std::make_unique<JsonTypeDef>(std::move(tmp_bson_data["data"]));
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::from_bson error: {}", e.what()));
+    } catch (...) {
+        LOG_TRACE("JsonManager::from_bson unknown error");
+    }
+    return nullptr;
 }
 
 std::string JsonManager::dump(const JsonTypeDef &json_obj) {
@@ -135,6 +148,19 @@ std::vector<uint8_t> JsonManager::to_bson(const JsonTypeDef &json_obj) {
     return {};
 }
 
+std::vector<uint8_t> JsonManager::to_bson(JsonTypeDef &&json_obj) {
+    try {
+        JsonTypeDef wrapper;
+        wrapper["data"] = std::move(json_obj);
+        return JsonTypeDef::to_bson(wrapper);
+    } catch (const JsonTypeDef::parse_error &e) {
+        LOG_TRACE(fmt::format("JsonManager::to_bson error: {}", e.what()));
+    } catch (...) {
+        LOG_TRACE("JsonManager::to_bson unknown error");
+    }
+    return {};
+}
+
 bool JsonManager::check_json_path(const std::string &json_path) {
     if (json_path.empty() || json_path[0] != '$') {
         return false;
@@ -149,14 +175,14 @@ bool JsonManager::check_json_path(const std::string_view &json_path) {
     return true;
 }
 
-std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get_json_tokens(const std::string &json_path) {
-    std::vector<std::pair<JsonType, std::string>> json_tokens;
-
-    if (!JsonManager::check_json_path(json_path)) {
+std::tuple<bool, std::vector<JsonTokenInfo>> JsonManager::get_json_tokens(const std::span<const char> &json_path) {
+    std::string_view path_view(json_path.data(), json_path.size());
+    if (!JsonManager::check_json_path(path_view)) {
         return {false, {}};
     }
 
-    std::string_view remaining = std::string_view(json_path).substr(1);
+    std::vector<std::pair<JsonType, std::string>> json_tokens;
+    std::string_view remaining = path_view.substr(1);
     size_t pos = 0;
     while (pos < remaining.length()) {
         if (remaining[pos] == '.') {
@@ -212,6 +238,11 @@ std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get
     }
 
     return {true, json_tokens};
+}
+
+std::tuple<bool, std::vector<std::pair<JsonType, std::string>>> JsonManager::get_json_tokens(const std::string &json_path) {
+    std::span<const char> path_span(json_path.data(), json_path.size());
+    return get_json_tokens(path_span);
 }
 
 std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
@@ -401,6 +432,19 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
 
     const std::string serialized_token = parse_success ? parsed_token.dump() : token;
     return std::any_of(data.begin(), data.end(), [&serialized_token](const JsonTypeDef &element) { return element.dump() == serialized_token; });
+}
+
+std::tuple<size_t, std::vector<std::string>> JsonManager::json_unnest(const JsonTypeDef &data) {
+    std::vector<std::string> result;
+    if (data.is_array()) {
+        result.reserve(data.size());
+        for (const auto &element : data) {
+            result.emplace_back(element.dump());
+        }
+    } else {
+        result.emplace_back(data.dump());
+    }
+    return {result.size(), std::move(result)};
 }
 
 } // namespace infinity

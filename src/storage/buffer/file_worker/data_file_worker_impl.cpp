@@ -15,6 +15,7 @@
 module;
 
 #include <sys/mman.h>
+#include <unistd.h>
 
 module infinity_core:data_file_worker.impl;
 
@@ -59,7 +60,7 @@ bool DataFileWorker::Write(std::span<char> data, std::unique_ptr<LocalFileHandle
     }
 
     auto fd = file_handle->fd();
-    VirtualStore::Truncate(GetFilePathTemp(), mmap_size_);
+    VirtualStore::Truncate(GetWorkingPath(), mmap_size_);
     if (mmap_ == nullptr) {
         mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0 /*align_offset*/);
         size_t offset{};
@@ -146,12 +147,13 @@ bool DataFileWorker::WriteSnapshot(std::span<char> data,
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     data = std::make_shared<char[]>(buffer_size_);
-    if (!file_handle) {
-        return;
-    }
+
     if (!mmap_) {
+        if (!file_handle) {
+            return;
+        }
         if (file_size < sizeof(u64) * 3) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
         }

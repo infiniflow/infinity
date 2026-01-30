@@ -50,6 +50,7 @@ import :table_meta;
 import :db_meta;
 import :kv_store;
 import :utility;
+import :logical_match;
 
 import std;
 import third_party;
@@ -317,9 +318,13 @@ class IndexScanFilterExpressionPushDownMethod {
     ScalarFunctionSet *and_scalar_function_set_ptr_ = nullptr;
     ExpressionIndexScanInfo tree_info_;
 
+    const FilterExpressionPushDown::MatchQueryCache *match_cache_{nullptr};
+
 public:
     explicit IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr)
         : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {}
+
+    void SetMatchCache(const FilterExpressionPushDown::MatchQueryCache *match_cache) { match_cache_ = match_cache; }
 
     void Init() {
         const auto and_function_set_ptr = NewCatalog::GetFunctionSetByName(query_context_->storage()->new_catalog(), "AND");
@@ -712,11 +717,41 @@ private:
                         bm25_params.delta_phrase = delta_phrase_v;
                     }
 
-                    std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
-                    SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
-                    query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
-                    if (!query_tree) {
-                        RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
+                    // Try to reuse cached query tree from LogicalMatch.
+                    MatchCacheKey key(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_, default_field, query_operator_option);
+                    bool found_cached = false;
+
+                    if (match_cache_) {
+                        if (auto it = match_cache_->find(key); it != match_cache_->end()) {
+                            auto *match_node = static_cast<LogicalMatch *>(it->second.get());
+                            query_tree = match_node->query_tree_->Clone();
+                            if (query_tree) {
+                                found_cached = true;
+                                LOG_DEBUG(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: "
+                                                      "'{}', operator: {:d}",
+                                                      filter_fulltext_expr->fields_,
+                                                      filter_fulltext_expr->matching_text_,
+                                                      default_field,
+                                                      static_cast<int>(query_operator_option)));
+                            } else {
+                                LOG_INFO("Empty query tree");
+                            }
+                        }
+                    }
+
+                    if (!found_cached) {
+                        std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
+                        SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
+                        LOG_DEBUG(fmt::format(
+                            "Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}', default_field: '{}', operator: {:d}",
+                            filter_fulltext_expr->fields_,
+                            filter_fulltext_expr->matching_text_,
+                            default_field,
+                            static_cast<int>(query_operator_option)));
+                        query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
+                        if (!query_tree) {
+                            RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
+                        }
                     }
                 }
                 return std::make_unique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
@@ -842,16 +877,24 @@ private:
 
 IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToIndexScan(QueryContext *query_context,
                                                                                       const BaseTableRef *base_table_ref_ptr,
-                                                                                      const std::shared_ptr<BaseExpression> &expression) {
+                                                                                      const std::shared_ptr<BaseExpression> &expression,
+                                                                                      const MatchQueryCache *match_cache) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    if (match_cache) {
+        filter_expression_push_down_method.SetMatchCache(match_cache);
+    }
     filter_expression_push_down_method.Init();
     return filter_expression_push_down_method.SolveForIndexScan(expression);
 }
 
 void FilterExpressionPushDown::BuildFilterFulltextExpression(QueryContext *query_context,
                                                              const BaseTableRef *base_table_ref_ptr,
-                                                             const std::vector<std::shared_ptr<BaseExpression>> &expressions) {
+                                                             const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                             const MatchQueryCache *match_cache) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    if (match_cache) {
+        filter_expression_push_down_method.SetMatchCache(match_cache);
+    }
     filter_expression_push_down_method.Init();
     for (const auto &expr : expressions) {
         filter_expression_push_down_method.BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(expr);

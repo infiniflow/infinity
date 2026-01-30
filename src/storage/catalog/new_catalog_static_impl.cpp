@@ -70,7 +70,7 @@ void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, Tx
     commit_ts_ = commit_ts;
 
     BlockVersion *block_version{};
-    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
+    FileWorker::Read(version_file_worker_,block_version);
     block_offset_end_ = block_version->GetRowCount(begin_ts_);
 }
 
@@ -80,7 +80,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
     }
 
     BlockVersion *block_version{};
-    static_cast<FileWorker *>(version_file_worker_)->Read(block_version);
+    FileWorker::Read(version_file_worker_, block_version);
 
     if (block_offset_begin == block_offset_end_) {
         auto [offset, commit_cnt] = block_version->GetCommitRowCount(commit_ts_);
@@ -1112,7 +1112,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     BlockVersion *block_version{};
-    static_cast<FileWorker *>(version_buffer)->Read(block_version);
+    FileWorker::Read(version_buffer, block_version);
     {
         block_version->GetCreateTS(offset, size, column_vector);
     }
@@ -1129,7 +1129,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
     }
 
     BlockVersion *block_version{};
-    static_cast<FileWorker *>(version_file_worker)->Read(block_version);
+    FileWorker::Read(version_file_worker, block_version);
     {
         block_version->GetDeleteTS(offset, size, column_vector);
     }

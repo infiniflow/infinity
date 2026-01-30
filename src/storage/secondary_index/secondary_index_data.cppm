@@ -30,6 +30,8 @@ import data_type;
 namespace infinity {
 
 class TableIndexMeta;
+struct IndexFileWorker;
+export struct SecondaryIndexFileWorker;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, BooleanT, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -171,19 +173,13 @@ public:
 
     virtual void InsertData(const void *ptr) = 0;
 
-    virtual void InsertMergeData(const std::vector<std::pair<u32, FileWorker *>> &old_chunks) = 0;
+    virtual void InsertMergeData(const std::vector<std::pair<u32, SecondaryIndexFileWorker *>> &old_chunks) = 0;
 
     // Virtual methods for low cardinality access (default implementations for high cardinality)
     virtual u32 GetUniqueKeyCount() const { return 0; }
     virtual const void *GetUniqueKeysPtr() const { return nullptr; }
     virtual const void *GetOffsetsForKeyPtr(const void *key_ptr) const { return nullptr; }
 };
-
-// Type aliases for backward compatibility
-export using SecondaryIndexData = SecondaryIndexDataBase<HighCardinalityTag>;
-
-export SecondaryIndexDataBase<HighCardinalityTag> *
-GetSecondaryIndexData(const std::shared_ptr<DataType> &data_type, u32 chunk_row_count, bool allocate);
 
 // New factory function that can create both cardinality variants
 export template <typename CardinalityTag>

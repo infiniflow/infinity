@@ -49,7 +49,7 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
     : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
     if (index_size == 0) {
 
-        std::string index_path = GetFilePath();
+        std::string index_path = GetPath();
         auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
         if (status.ok()) {
             // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
@@ -87,14 +87,15 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
 }
 
 void HnswFileWorker::Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
-    if (!file_handle) {
-        return;
-    }
+    // std::unique_lock l(mutex_);
+
     auto &path = *rel_file_path_;
     auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
     bool flag = cache_manager.Get(path, data);
     if (!flag) {
+        if (!file_handle) {
+            return;
+        }
         data = HnswHandler::Make(index_base_.get(), column_def_);
         if (!mmap_) {
             mmap_size_ = file_handle->FileSize();

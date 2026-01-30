@@ -70,8 +70,16 @@ bool SecondaryIndexFileWorker::Write(SecondaryIndexDataBase<LowCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
-    std::unique_lock l(mutex_);
-    auto index = GetSecondaryIndexData(std::make_shared<DataType>(index_data_type_), row_count_, false);
+    // std::unique_lock l(mutex_);
+    DataType index_data_type{LogicalType::kInvalid};
+    if (index_base_->index_type_ == IndexType::kSecondary) {
+        index_data_type = *column_def_->type();
+    } else {
+        auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
+        index_data_type = functional_index->GetFuncReturnType();
+    }
+
+    auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, false);
     // data = std::shared_ptr<SecondaryIndexDataBase<HighCardinalityTag>>(index);
     data = index;
     if (!file_handle) {
@@ -84,8 +92,16 @@ void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<HighCardinalityTag> *
 void SecondaryIndexFileWorker::Read(SecondaryIndexDataBase<LowCardinalityTag> *&data,
                                     std::unique_ptr<LocalFileHandle> &file_handle,
                                     size_t file_size) {
-    std::unique_lock l(mutex_);
-    auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
+    // std::unique_lock l(mutex_);
+    DataType index_data_type{LogicalType::kInvalid};
+    if (index_base_->index_type_ == IndexType::kSecondary) {
+        index_data_type = *column_def_->type();
+    } else {
+        auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
+        index_data_type = functional_index->GetFuncReturnType();
+    }
+
+    auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, false);
     data = index;
     if (!file_handle) {
         return;

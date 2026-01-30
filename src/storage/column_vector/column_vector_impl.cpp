@@ -880,9 +880,8 @@ std::string ColumnVector::ToString(size_t row_index) const {
         case LogicalType::kJson: {
             const auto &json = reinterpret_cast<const JsonT *>(data_ptr_.get())[row_index];
             auto data = buffer_->GetVarchar(json.file_offset_, json.length_);
-            std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + json.length_);
-            auto res = JsonManager::from_bson(bson);
-            return res.dump();
+            auto res = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json.length_);
+            return res->dump();
         }
         case LogicalType::kDate: {
             return ((DateT *)data_ptr_.get())[row_index].ToString();
@@ -997,7 +996,7 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
     if (!initialized_) {
         UnrecoverableError("Column vector isn't initialized.");
     }
-    size_t tail_index = tail_index_.load();
+    size_t tail_index = tail_index_.load(); // A
     if (index >= tail_index) {
         UnrecoverableError(fmt::format("Attempt to access an invalid index of column vector: {}, current tail index: {}", index, tail_index));
     }
@@ -1011,7 +1010,7 @@ Value ColumnVector::GetValueByIndex(size_t index) const {
         // special case for boolean
         return Value::MakeBool(buffer_->GetCompactBit(index));
     }
-    return GetArrayValueRecursively(*data_type_, data_ptr_.get() + index * data_type_->Size());
+    return GetArrayValueRecursively(*data_type_, data_ptr_.get() + index * data_type_->Size()); // B
 }
 
 Value ColumnVector::GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const {
@@ -1994,7 +1993,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             auto &json = reinterpret_cast<JsonT *>(data_ptr_.get())[index];
             std::string sub_data(sv.data(), sv.length());
             auto json_str = JsonManager::parse(sub_data);
-            auto bson = JsonManager::to_bson(json_str);
+            auto bson = JsonManager::to_bson(std::move(json_str));
             json.length_ = bson.size() * sizeof(uint8_t);
             json.file_offset_ = buffer_->AppendVarchar(reinterpret_cast<const char *>(bson.data()), json.length_);
             break;
@@ -2648,10 +2647,18 @@ void ColumnVector::SetArrayValue(ArrayT &target, const Value &value) {
     SetArrayValueRecursively(value, reinterpret_cast<char *>(&target));
 }
 
-bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset) {
-    if (other.data_type_->type() != LogicalType::kArray) {
-        UnrecoverableError("Attempt to unnest non-array column vector");
+bool ColumnVector::AppendUnnest(const ColumnVector &other, size_t offset, size_t &array_offset) {
+    if (other.data_type_->type() == LogicalType::kArray) {
+        return AppendUnnestArray(other, offset, array_offset);
+    } else if (other.data_type_->type() == LogicalType::kJson) {
+        return AppendUnnestJson(other, offset, array_offset);
+    } else {
+        RecoverableError(Status::NotSupport("Not supported"));
     }
+    return false;
+}
+
+bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset) {
     auto *array_info = static_cast<ArrayInfo *>(other.data_type_->type_info().get());
     if (array_info->ElemType() != *data_type_) {
         UnrecoverableError("Attempt to unnest array with different element type");
@@ -2724,6 +2731,24 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
         }
     }
     return complete;
+}
+
+bool ColumnVector::AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset) {
+    const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_.get())[row_id];
+    auto data = other.buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+    auto parsed_json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
+    auto [total_elements, element_strings] = JsonManager::json_unnest(*parsed_json);
+
+    size_t start_idx = element_offset;
+    size_t remaining_space = capacity_ - tail_index_.load();
+    size_t elements_to_append = std::min(total_elements - start_idx, remaining_space);
+    element_offset = start_idx + elements_to_append;
+
+    for (size_t idx = start_idx; idx < element_offset; ++idx) {
+        Value v = Value::MakeVarchar(element_strings[idx]);
+        this->AppendValue(v);
+    }
+    return element_offset == total_elements;
 }
 
 //////////////////////////////tensor end////////////////////////////////////

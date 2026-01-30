@@ -109,7 +109,7 @@ export struct WalBlockInfo {
 
     static WalBlockInfo ReadBufferAdv(const char *&ptr);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 };
 
 export struct WalSegmentInfo {
@@ -132,7 +132,7 @@ export struct WalSegmentInfo {
 
     static WalSegmentInfo ReadBufferAdv(const char *&ptr);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 };
 
 export struct WalSegmentInfoV2 {
@@ -151,7 +151,7 @@ export struct WalSegmentInfoV2 {
 
     static WalSegmentInfoV2 ReadBufferAdv(const char *&ptr);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 };
 
 export struct WalChunkIndexInfo {
@@ -176,7 +176,7 @@ export struct WalChunkIndexInfo {
 
     static WalChunkIndexInfo ReadBufferAdv(const char *&ptr);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 };
 
 export struct WalSegmentIndexInfo {
@@ -196,7 +196,7 @@ export struct WalSegmentIndexInfo {
 
     static WalSegmentIndexInfo ReadBufferAdv(const char *&ptr);
 
-    std::string ToString() const;
+    [[nodiscard]] std::string ToString() const;
 };
 
 // WalCommandType -> std::string
@@ -242,8 +242,8 @@ export struct WalCmdDummy final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final { return 0; }
     void WriteAdv(char *&buf) const final {}
 
-    std::string ToString() const final { return "Dummy"; }
-    std::string CompactInfo() const final { return "Dummy"; }
+    [[nodiscard]] std::string ToString() const final { return "Dummy"; }
+    [[nodiscard]] std::string CompactInfo() const final { return "Dummy"; }
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 };
 
@@ -257,8 +257,8 @@ export struct WalCmdCreateDatabaseV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -276,8 +276,8 @@ export struct WalCmdDropDatabaseV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -295,8 +295,8 @@ export struct WalCmdCreateTableV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -321,8 +321,8 @@ export struct WalCmdDropTableV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -351,8 +351,8 @@ export struct WalCmdCreateIndexV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -377,8 +377,8 @@ export struct WalRestoreIndexV2 final {
     bool operator==(const WalRestoreIndexV2 &other) const;
     [[nodiscard]] i32 GetSizeInBytes() const;
     void WriteAdv(char *&buf) const;
-    std::string ToString() const;
-    std::string CompactInfo() const;
+    [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] std::string CompactInfo() const;
 
     std::string index_id_{};
     std::shared_ptr<IndexBase> index_base_{};
@@ -405,8 +405,8 @@ export struct WalCmdDropIndexV2 final : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -435,8 +435,8 @@ export struct WalCmdImportV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -462,8 +462,8 @@ export struct WalCmdAppendV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -488,8 +488,8 @@ export struct WalCmdDeleteV2 final : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -511,8 +511,8 @@ export struct WalCmdCheckpoint final : public WalCmd {
     virtual i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 max_commit_ts_{};
@@ -529,8 +529,8 @@ export struct WalCmdCheckpointV2 final : public WalCmd {
     virtual i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 max_commit_ts_{};
@@ -556,8 +556,8 @@ export struct WalCmdCompactV2 final : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     const std::string db_name_{};
@@ -587,8 +587,8 @@ export struct WalCmdAlterIndexV2 final : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -634,8 +634,8 @@ export struct WalCmdDumpIndexV2 final : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -668,8 +668,8 @@ export struct WalCmdRenameTableV2 : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -700,8 +700,8 @@ export struct WalCmdAddColumnsV2 : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -732,8 +732,8 @@ export struct WalCmdDropColumnsV2 : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     std::string db_name_{};
@@ -756,8 +756,8 @@ export struct WalCmdCleanup : public WalCmd {
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     i64 timestamp_{};
@@ -772,8 +772,8 @@ export struct WalCmdCreateTableSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdCreateTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
@@ -792,8 +792,8 @@ export struct WalCmdCreateDBSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdCreateDBSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
@@ -811,8 +811,8 @@ export struct WalCmdCreateSystemSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdCreateSystemSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
@@ -838,18 +838,18 @@ export struct WalCmdRestoreTableSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdRestoreTableSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
-    std::string db_name_{};
-    std::string db_id_{};
-    std::string table_name_{};
-    std::string table_id_{};
-    std::string snapshot_name_{};
-    std::shared_ptr<TableDef> table_def_{};
+    std::string db_name_;
+    std::string db_id_;
+    std::string table_name_;
+    std::string table_id_;
+    std::string snapshot_name_;
+    std::shared_ptr<TableDef> table_def_;
     std::vector<std::string> files_;
     std::vector<WalSegmentInfoV2> segment_infos_; // eache segment has a vector of block ids(assuming same column count)
     std::vector<WalCmdCreateIndexV2> index_cmds_; // index commands to restore indexes
@@ -868,16 +868,16 @@ export struct WalCmdRestoreDatabaseSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
     static WalCmdRestoreDatabaseSnapshot ReadBufferAdv(const char *&ptr, i32 max_bytes);
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string db_comment_{};
-    std::string snapshot_name_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string db_comment_;
+    std::string snapshot_name_;
 
     std::vector<WalCmdRestoreTableSnapshot> restore_table_wal_cmds_{};
 };
@@ -890,12 +890,12 @@ export struct WalCmdRestoreSystemSnapshot : public WalCmd {
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
 
-    std::string ToString() const final;
-    std::string CompactInfo() const final;
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
     std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
 
-    std::string snapshot_name_{};
-    std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_{};
+    std::string snapshot_name_;
+    std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_;
 };
 
 export struct WalEntryHeader {
@@ -988,8 +988,8 @@ public:
 private:
     // Locate the latest checkpoint entry, and purge bad entries after it.
     void PurgeBadEntriesAfterLatestCheckpoint();
-    std::list<std::string> wal_list_{};
-    std::unique_ptr<WalEntryIterator> iter_{};
+    std::list<std::string> wal_list_;
+    std::unique_ptr<WalEntryIterator> iter_;
 };
 
 } // namespace infinity

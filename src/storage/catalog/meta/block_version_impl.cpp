@@ -139,6 +139,17 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
         std::println("oops..");
     }
 
+    std::memcpy((char *)mmap_p + offset, &create_size, sizeof(create_size));
+    offset += sizeof(create_size);
+
+    for (size_t j = 0; j < create_size; ++j) {
+        std::memcpy((char *)mmap_p + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+
+        std::memcpy((char *)mmap_p + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
+        offset += sizeof(TxnTimeStamp);
+    }
+
     std::memcpy((char *)mmap_p + offset, &capacity, sizeof(capacity));
     offset += sizeof(capacity);
 
@@ -156,17 +167,6 @@ bool BlockVersion::SaveToFile(void *&mmap_p,
         }
     }
 
-    std::memcpy((char *)mmap_p + offset, &create_size, sizeof(create_size));
-    offset += sizeof(create_size);
-
-    for (size_t j = 0; j < create_size; ++j) {
-        std::memcpy((char *)mmap_p + offset, &created_[j].create_ts_, sizeof(TxnTimeStamp));
-        offset += sizeof(TxnTimeStamp);
-
-        std::memcpy((char *)mmap_p + offset, &created_[j].row_count_, sizeof(TxnTimeStamp));
-        offset += sizeof(TxnTimeStamp);
-    }
-
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
                           checkpoint_ts,
                           create_size,
@@ -180,6 +180,17 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
     bool is_modified = false;
     std::unique_lock lock(rw_mutex_);
 
+    BlockOffset create_size = created_.size();
+    while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
+        --create_size;
+        is_modified = true;
+    }
+
+    file_handle.Append(&create_size, sizeof(create_size));
+    for (size_t j = 0; j < create_size; ++j) {
+        created_[j].SaveToFile(&file_handle);
+    }
+
     BlockOffset capacity = deleted_.size();
     file_handle.Append(&capacity, sizeof(capacity));
     TxnTimeStamp dump_ts = 0;
@@ -192,17 +203,6 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
             is_modified = true;
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
-    }
-
-    BlockOffset create_size = created_.size();
-    while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {
-        --create_size;
-        is_modified = true;
-    }
-
-    file_handle.Append(&create_size, sizeof(create_size));
-    for (size_t j = 0; j < create_size; ++j) {
-        created_[j].SaveToFile(&file_handle);
     }
 
     LOG_TRACE(fmt::format("Flush block version, ckp ts: {}, write create: {}, delete {}, is_modified: {}",
@@ -237,16 +237,6 @@ void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mma
     size_t offset{};
     BlockOffset create_size{};
 
-    auto &deleted = data->deleted_;
-
-    BlockOffset capacity{};
-    std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
-    offset += sizeof(capacity);
-    for (auto &ts : deleted) {
-        std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
-        offset += sizeof(ts);
-    }
-
     std::memcpy(&create_size, (char *)mmap_p + offset, sizeof(create_size));
     offset += sizeof(create_size);
 
@@ -259,6 +249,16 @@ void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mma
 
         std::memcpy(&created[j].row_count_, (char *)mmap_p + offset, sizeof(TxnTimeStamp));
         offset += sizeof(TxnTimeStamp);
+    }
+
+    auto &deleted = data->deleted_;
+
+    BlockOffset capacity{};
+    std::memcpy(&capacity, (char *)mmap_p + offset, sizeof(capacity));
+    offset += sizeof(capacity);
+    for (auto &ts : deleted) {
+        std::memcpy(&ts, (char *)mmap_p + offset, sizeof(ts));
+        offset += sizeof(ts);
     }
 }
 

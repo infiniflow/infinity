@@ -106,6 +106,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[33] = std::string("0.6.10");
     client_version_map_[34] = std::string("0.6.13");
     client_version_map_[35] = std::string("0.6.15");
+    client_version_map_[36] = std::string("0.7.0.dev2");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -153,6 +154,11 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
     auto infinity = Infinity::RemoteConnect();
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
+    int32_t thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    int32_t session_count = infinity_session_map_.size();
+    if (session_count + 10 > thrift_server_pool_size) {
+        LOG_WARN(fmt::format("THRIFT: Connection pool size is: {}, current connection count: {}", thrift_server_pool_size, session_count));
+    }
     response.__set_session_id(infinity->GetSessionId());
     response.__set_error_code(static_cast<i64>(ErrorCode::kOk));
     LOG_TRACE(fmt::format("THRIFT: Connect success, new session {}", response.session_id));
@@ -3250,9 +3256,8 @@ void InfinityThriftService::HandleArrayTypeRecursively(std::string &output_str,
                                                        const JsonT &data_value,
                                                        const std::shared_ptr<ColumnVector> &column_vector) {
     auto data = column_vector->buffer_->GetVarchar(data_value.file_offset_, data_value.length_);
-    std::vector<uint8_t> bson(reinterpret_cast<const uint8_t *>(data), reinterpret_cast<const uint8_t *>(data) + data_value.length_);
-    auto json_data = JsonManager::from_bson(bson);
-    auto json_str = json_data.dump();
+    auto json_data = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), data_value.length_);
+    auto json_str = json_data->dump();
     auto json_length = json_str.length();
 
     output_str.append(reinterpret_cast<const char *>(&json_length), sizeof(i32));

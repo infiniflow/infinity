@@ -251,13 +251,13 @@ void CommonQueryFilter::TryApplyFastRoughFilterOptimizer() {
     fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_);
 }
 
-void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context) {
+void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context, const FilterExpressionPushDown::MatchQueryCache *match_cache) {
     if (finish_build_index_filter_) {
         return;
     }
     finish_build_index_filter_ = true;
     IndexScanFilterExpressionPushDownResult index_scan_solve_result =
-        FilterExpressionPushDown::PushDownToIndexScan(query_context, base_table_ref_.get(), original_filter_);
+        FilterExpressionPushDown::PushDownToIndexScan(query_context, base_table_ref_.get(), original_filter_, match_cache);
     index_filter_ = std::move(index_scan_solve_result.index_filter_);
     leftover_filter_ = std::move(index_scan_solve_result.leftover_filter_);
     index_filter_evaluator_ = std::move(index_scan_solve_result.index_filter_evaluator_);

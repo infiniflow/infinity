@@ -604,7 +604,6 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
     validity_function_ = [this] {
         { // check optimize index
             auto *txn = new_txn_mgr_->BeginTxn(std::make_unique<std::string>("check"), TransactionType::kRead);
-            size_t block_row_cnt = 2;
             std::shared_ptr<DBMeta> db_meta;
             std::shared_ptr<TableMeta> table_meta;
             std::shared_ptr<TableIndexMeta> table_index_meta;
@@ -630,6 +629,7 @@ TEST_P(TestTxnCleanup, cleanup_and_optimize_index) {
             ChunkID chunk_id = 2;
             ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
+                size_t block_row_cnt = 2;
                 ChunkIndexMetaInfo *chunk_info = nullptr;
                 auto status = chunk_index_meta.GetChunkInfo(chunk_info);
                 EXPECT_TRUE(status.ok());

@@ -16,7 +16,6 @@ module infinity_core:ivf_index_data_in_mem.impl;
 
 import :ivf_index_data_in_mem;
 import :ivf_index_storage;
-
 import :index_base;
 import :index_ivf;
 import :infinity_exception;
@@ -31,6 +30,7 @@ import :ivf_index_util_func;
 import :base_memindex;
 import :memindex_tracer;
 import :infinity_context;
+import :ivf_index_file_worker;
 
 import std;
 import third_party;
@@ -216,7 +216,7 @@ public:
         IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
-    void Dump(FileWorker *index_file_worker, size_t *p_dump_size) override {
+    void Dump(IVFIndexFileWorker *index_file_worker, size_t *p_dump_size) override {
         std::unique_lock lock(rw_mutex_);
         size_t dump_size = MemoryUsed();
         if (!have_ivf_index_.test(std::memory_order_acquire)) {
@@ -227,13 +227,13 @@ public:
         }
         // std::shared_ptr<IVFIndexInChunk> data_ptr;
         IVFIndexInChunk *data_ptr{};
-        index_file_worker->Read(data_ptr);
+        FileWorker::Read(index_file_worker, data_ptr);
         data_ptr->GetMemData(std::move(*ivf_index_storage_));
         delete ivf_index_storage_;
         ivf_index_storage_ = data_ptr->GetIVFIndexStoragePtr();
         own_ivf_index_storage_ = false;
         index_file_worker_ = std::move(index_file_worker);
-        index_file_worker_->Write(std::span{data_ptr, 1});
+        FileWorker::Write(index_file_worker_, std::span{data_ptr, 1});
     }
 
     void SearchIndexInMem(const KnnDistanceBase1 *knn_distance,
