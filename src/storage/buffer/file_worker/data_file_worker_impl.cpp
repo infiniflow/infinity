@@ -202,9 +202,9 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
             // std::println("that code data: {}", mmap_size_);
             mmap_ = nullptr;
         }
+    } else {
+        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *p) {});
     }
-
-    data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *p) {});
 }
 
 } // namespace infinity
