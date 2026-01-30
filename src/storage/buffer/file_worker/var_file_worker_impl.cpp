@@ -102,38 +102,21 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
 }
 
 void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    // std::unique_lock l(mutex_);
-    data = std::make_shared<VarBuffer>(this);
-
     if (!mmap_) {
-        if (!file_handle) {
+        if (!file_handle || file_size == 0) {
             return;
         }
         mmap_size_ = file_size;
-        if (mmap_size_ == 0) {
-            return;
-        }
-        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
-
-        auto [nbytes, status] = file_handle->Read(buffer.get(), mmap_size_);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
 
         auto fd = file_handle->fd();
-        // mmap_size_ = mmap_size_;
-        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (mmap_ == MAP_FAILED) {
-            // std::println("that code var: {}", mmap_size_);
             mmap_ = nullptr;
+            return;
         }
-    } else {
-        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
-        std::memcpy(buffer.get(), mmap_, mmap_size_);
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
     }
+
+    data = std::make_shared<VarBuffer>(this, static_cast<const char *>(mmap_), mmap_size_);
 }
 
 } // namespace infinity
