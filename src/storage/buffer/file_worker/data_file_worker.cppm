@@ -25,8 +25,6 @@ struct DataFileWorkerCachedData {
 };
 
 export struct DataFileWorker : FileWorker {
-    static constexpr DataFileWorkerCachedData *has_cache_manager_{};
-
     explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 
     ~DataFileWorker();
