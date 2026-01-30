@@ -147,6 +147,7 @@ bool DataFileWorker::WriteSnapshot(std::span<char> data,
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     if (!mmap_) {
+        data = std::make_shared<char[]>(buffer_size_);
         if (!file_handle) {
             return;
         }
