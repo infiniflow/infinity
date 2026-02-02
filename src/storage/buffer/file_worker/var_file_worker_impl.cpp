@@ -126,11 +126,6 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         std::memcpy(buffer.get(), (char *)mmap_ + offset, mmap_size_);
         offset += mmap_size_;
 
-        // auto [nbytes, status] = file_handle->Read(buffer.get(), mmap_size_);
-        // if (!status.ok()) {
-        // UnrecoverableError(status.message());
-        // }
-
         data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
 
     } else {
