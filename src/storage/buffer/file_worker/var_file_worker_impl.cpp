@@ -113,15 +113,6 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         if (mmap_size_ == 0) {
             return;
         }
-        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
-
-        auto [nbytes, status] = file_handle->Read(buffer.get(), mmap_size_);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
-        }
-
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
-
         auto fd = file_handle->fd();
         // mmap_size_ = mmap_size_;
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
@@ -129,6 +120,19 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
             // std::println("that code var: {}", mmap_size_);
             mmap_ = nullptr;
         }
+        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
+
+        size_t offset{};
+        std::memcpy(buffer.get(), (char *)mmap_ + offset, mmap_size_);
+        offset += mmap_size_;
+
+        // auto [nbytes, status] = file_handle->Read(buffer.get(), mmap_size_);
+        // if (!status.ok()) {
+        // UnrecoverableError(status.message());
+        // }
+
+        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
+
     } else {
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
         std::memcpy(buffer.get(), mmap_, mmap_size_);
