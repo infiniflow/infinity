@@ -146,8 +146,11 @@ bool DataFileWorker::WriteSnapshot(std::span<char> data,
 }
 
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
+    // std::unique_lock l(mutex_);
+    data = std::make_shared<char[]>(buffer_size_);
+
     if (!mmap_) {
-        data = std::make_shared<char[]>(buffer_size_);
         if (!file_handle) {
             return;
         }
@@ -204,7 +207,7 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
             mmap_ = nullptr;
         }
     } else {
-        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *p) {});
+        std::memcpy(data.get(), (char *)mmap_ + sizeof(u64) /* magic_num */ + sizeof(buffer_size_), buffer_size_);
     }
 }
 
