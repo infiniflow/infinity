@@ -189,8 +189,6 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
         }
 
         data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + offset, [](char *p) {});
-
-        std::memcpy(data.get(), (char *)mmap_ + offset, buffer_size_);
         offset += buffer_size_;
 
         // // file footer: checksum
