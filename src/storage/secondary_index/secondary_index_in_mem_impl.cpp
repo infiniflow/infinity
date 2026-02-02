@@ -71,7 +71,7 @@ public:
     void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) override {
         MemIndexInserterIter1<RawValueType> iter(block_offset, col, offset, row_count);
         const auto inserted_rows = InsertInner(iter);
-        assert(inserted_rows == row_count);
+        assert(inserted_rows <= row_count);
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
 
@@ -101,11 +101,16 @@ public:
 private:
     u32 InsertInner(auto &iter) {
         u32 inserted_count = 0;
+        u32 bitmap_idx = 0;
         // No lock needed - RcuMultiMap handles concurrency internally
         while (true) {
             auto opt = iter.Next();
             if (!opt.has_value()) {
                 break;
+            }
+            auto &nulls_ptr = iter.column_vector()->nulls_ptr_;
+            if (nulls_ptr && !nulls_ptr->IsTrue(bitmap_idx++)) {
+                continue;
             }
             const auto &[v_ptr, offset] = opt.value();
             if constexpr (std::is_same_v<RawValueType, VarcharT>) {
