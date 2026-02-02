@@ -148,66 +148,58 @@ bool DataFileWorker::WriteSnapshot(std::span<char> data,
 void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
     // data = std::make_shared_for_overwrite<char[]>(buffer_size_);
     // std::unique_lock l(mutex_);
-    data = std::make_shared<char[]>(buffer_size_);
-
     if (!mmap_) {
+
         if (!file_handle) {
+            data = std::make_shared<char[]>(buffer_size_);
             return;
         }
         if (file_size < sizeof(u64) * 3) {
             RecoverableError(Status::DataIOError(fmt::format("Incorrect file length {}.", file_size)));
         }
-        // file header: magic number, buffer_size
-        u64 magic_number{};
-        auto [nbytes1, status1] = file_handle->Read(&magic_number, sizeof(magic_number));
-        if (!status1.ok()) {
-            RecoverableError(status1);
-        }
-        if (nbytes1 != sizeof(magic_number)) {
-            RecoverableError(Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1)));
-        }
-        if (magic_number != 0x00dd3344) {
-            RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
-        }
 
-        // u64 buffer_size_{};
-        auto [nbytes2, status2] = file_handle->Read(&buffer_size_, sizeof(buffer_size_));
-        if (nbytes2 != sizeof(buffer_size_)) {
-            Status status = Status::DataIOError(fmt::format("Unmatched buffer length: {} / {}", nbytes2, buffer_size_));
-            RecoverableError(status2);
-        }
-
-        if (file_size != buffer_size_ + 3 * sizeof(u64)) {
-            Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
-            RecoverableError(status);
-        }
-
-        // file body
-        // data_ = static_cast<void *>(new char[buffer_size_]);
-        auto [nbytes3, status3] = file_handle->Read(data.get(), buffer_size_);
-        if (nbytes3 != buffer_size_) {
-            Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes3));
-            RecoverableError(status);
-        }
-
-        // file footer: checksum
-        u64 checksum{0};
-        auto [nbytes4, status4] = file_handle->Read(&checksum, sizeof(checksum));
-        if (nbytes4 != sizeof(checksum)) {
-            Status status = Status::DataIOError(fmt::format("Incorrect file checksum length: {}.", nbytes4));
-            RecoverableError(status);
-        }
-        //
         auto fd = file_handle->fd();
-        mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+        // mmap_size_ = sizeof(u64) + sizeof(buffer_size_) + buffer_size_ + sizeof(u64);
+        mmap_size_ = file_size;
         // std::memcpy((char *)mmap_true_, data_, mmap_true_size_);
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
             // std::println("that code data: {}", mmap_size_);
             mmap_ = nullptr;
         }
+
+        // file header: magic number, buffer_size
+
+        size_t offset{};
+
+        u64 magic_number{};
+        std::memcpy(&magic_number, (char *)mmap_ + offset, sizeof(magic_number));
+        offset += sizeof(magic_number);
+
+        if (magic_number != 0x00dd3344) {
+            RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
+        }
+
+        std::memcpy(&buffer_size_, (char *)mmap_ + offset, sizeof(buffer_size_));
+        offset += sizeof(buffer_size_);
+
+        if (file_size != buffer_size_ + 3 * sizeof(u64)) {
+            Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size_ + 3 * sizeof(u64)));
+            RecoverableError(status);
+        }
+
+        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + offset, [](char *p) {});
+
+        std::memcpy(data.get(), (char *)mmap_ + offset, buffer_size_);
+        offset += buffer_size_;
+
+        // // file footer: checksum
+        // u64 checksum{};
+        // std::memcpy(&checksum, mmap_ + offset, sizeof(checksum));
+        // offset += sizeof(checksum);
+
     } else {
-        std::memcpy(data.get(), (char *)mmap_ + sizeof(u64) /* magic_num */ + sizeof(buffer_size_), buffer_size_);
+        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *) {});
     }
 }
 
