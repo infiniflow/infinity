@@ -25,6 +25,7 @@ import third_party;
 namespace infinity {
 
 export using JsonTypeDef = nlohmann::json;
+export using JsonValueType = nlohmann::detail::value_t;
 export enum class JsonType : uint8_t { kInvalid, kJsonObject, kJsonArray };
 export using JsonTokenInfo = std::pair<JsonType, std::string>;
 
