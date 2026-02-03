@@ -37,12 +37,69 @@ public:
         auto second_vector_type = second->vector_type();
         auto third_vector_type = third->vector_type();
 
-        // Only support: Flat, Constant, Constant (for LIKE operator)
-        if (first_vector_type == ColumnVectorType::kFlat && second_vector_type == ColumnVectorType::kConstant &&
+        const auto &first_null = first->nulls_ptr_;
+        const auto &second_null = second->nulls_ptr_;
+        const auto &third_null = third->nulls_ptr_;
+        auto &result_null = result->nulls_ptr_;
+
+        // Case 1: Constant + Constant + Constant
+        if (first_vector_type == ColumnVectorType::kConstant && second_vector_type == ColumnVectorType::kConstant &&
             third_vector_type == ColumnVectorType::kConstant) {
-            ExecuteFlatConstantConstant(first, second, third, result, count, nullable);
+            if (!nullable || (first_null->IsAllTrue() && second_null->IsAllTrue() && third_null->IsAllTrue())) {
+                auto first_c = ColumnValueReader<FirstType>(first)[0];
+                auto second_c = ColumnValueReader<SecondType>(second)[0];
+                auto third_c = ColumnValueReader<ThirdType>(third)[0];
+                BooleanColumnWriter result_ptr(result);
+                Operator::Execute(first_c, second_c, third_c, result_ptr[0], result_null.get(), 0, nullptr, nullptr, nullptr);
+                result_null->SetAllTrue();
+            } else {
+                result_null->SetAllFalse();
+            }
+            result->Finalize(1);
+        }
+        // Case 2: Flat + Constant + Constant
+        else if (first_vector_type == ColumnVectorType::kFlat && second_vector_type == ColumnVectorType::kConstant &&
+                 third_vector_type == ColumnVectorType::kConstant) {
+            auto second_c = ColumnValueReader<SecondType>(second)[0];
+            auto third_c = ColumnValueReader<ThirdType>(third)[0];
+            if (nullable && !(second_null->IsAllTrue() && third_null->IsAllTrue())) {
+                result_null->SetAllFalse();
+            } else if (!nullable || (first_null->IsAllTrue() && second_null->IsAllTrue() && third_null->IsAllTrue())) {
+                result_null->SetAllTrue();
+                auto first_ptr = ColumnValueReader<FirstType>(first);
+                BooleanColumnWriter result_ptr(result);
+                // Check if Operator supports batch processing
+                if constexpr (requires { Operator::ExecuteBatch(first_ptr, second_c, third_c, result_ptr, count); }) {
+                    Operator::ExecuteBatch(first_ptr, second_c, third_c, result_ptr, count);
+                } else {
+                    for (size_t i = 0; i < count; ++i) {
+                        Operator::Execute(first_ptr[i], second_c, third_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, nullptr);
+                    }
+                }
+            } else {
+                ExecuteFlatConstantConstantWithNull(first, second_c, third_c, result, count, state_ptr_first, state_ptr);
+            }
+            result->Finalize(count);
+        }
+        // Case 3: Flat + Flat + Constant
+        else if (first_vector_type == ColumnVectorType::kFlat && second_vector_type == ColumnVectorType::kFlat &&
+                 third_vector_type == ColumnVectorType::kConstant) {
+            auto third_c = ColumnValueReader<ThirdType>(third)[0];
+            if (nullable && !third_null->IsAllTrue()) {
+                result_null->SetAllFalse();
+            } else if (!nullable || (first_null->IsAllTrue() && second_null->IsAllTrue() && third_null->IsAllTrue())) {
+                result_null->SetAllTrue();
+                auto first_ptr = ColumnValueReader<FirstType>(first);
+                auto second_ptr = ColumnValueReader<SecondType>(second);
+                BooleanColumnWriter result_ptr(result);
+                for (size_t i = 0; i < count; ++i) {
+                    Operator::Execute(first_ptr[i], second_ptr[i], third_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, nullptr);
+                }
+            } else {
+                ExecuteFlatFlatConstantWithNull(first, second, third_c, result, count, state_ptr_first, state_ptr);
+            }
+            result->Finalize(count);
         } else {
-            // Helper lambda to convert ColumnVectorType to string
             auto type_to_string = [](ColumnVectorType type) -> std::string {
                 switch (type) {
                     case ColumnVectorType::kFlat:
@@ -59,54 +116,71 @@ public:
             };
             std::string types =
                 fmt::format("({}, {}, {})", type_to_string(first_vector_type), type_to_string(second_vector_type), type_to_string(third_vector_type));
-            UnrecoverableError(fmt::format("Not support ternary functions with column vector types {}", types));
+            RecoverableError(Status::SyntaxError(fmt::format("Not support ternary functions with column vector types {}", types)));
         }
     }
 
 private:
-    static void inline ExecuteFlatConstantConstant(const std::shared_ptr<ColumnVector> &first,
-                                                   const std::shared_ptr<ColumnVector> &second,
-                                                   const std::shared_ptr<ColumnVector> &third,
-                                                   std::shared_ptr<ColumnVector> &result,
-                                                   size_t count,
-                                                   bool nullable) {
+    // Helper functions for null handling using RoaringBitmapApplyFunc
+    static inline void ExecuteFlatConstantConstantWithNull(const std::shared_ptr<ColumnVector> &first,
+                                                           auto second_c,
+                                                           auto third_c,
+                                                           std::shared_ptr<ColumnVector> &result,
+                                                           size_t count,
+                                                           void *state_ptr_first,
+                                                           void *state_ptr) {
+        const auto &first_null = first->nulls_ptr_;
+        auto &result_null = result->nulls_ptr_;
+        *result_null = *first_null;
+        ColumnValueReader<FirstType> first_ptr(first);
+        BooleanColumnWriter result_ptr(result);
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
+            }
+            Operator::Execute(first_ptr[row_index],
+                              second_c,
+                              third_c,
+                              result_ptr[row_index],
+                              result_null.get(),
+                              0,
+                              state_ptr_first,
+                              nullptr,
+                              state_ptr);
+            return row_index + 1 < count;
+        });
+    }
+
+    static inline void ExecuteFlatFlatConstantWithNull(const std::shared_ptr<ColumnVector> &first,
+                                                       const std::shared_ptr<ColumnVector> &second,
+                                                       auto third_c,
+                                                       std::shared_ptr<ColumnVector> &result,
+                                                       size_t count,
+                                                       void *state_ptr_first,
+                                                       void *state_ptr) {
         const auto &first_null = first->nulls_ptr_;
         const auto &second_null = second->nulls_ptr_;
-        const auto &third_null = third->nulls_ptr_;
         auto &result_null = result->nulls_ptr_;
-
-        auto second_c = ColumnValueReader<SecondType>(second)[0];
-        auto third_c = ColumnValueReader<ThirdType>(third)[0];
-        if (nullable && !(second_null->IsAllTrue() && third_null->IsAllTrue())) {
-            result_null->SetAllFalse();
-        } else if (!nullable || first_null->IsAllTrue()) {
-            result_null->SetAllTrue();
-            auto first_ptr = ColumnValueReader<FirstType>(first);
-            BooleanColumnWriter result_ptr(result);
-            for (size_t i = 0; i < count; ++i) {
-                Operator::Execute(first_ptr[i], second_c, third_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, nullptr);
+        *result_null = *first_null;
+        result_null->MergeAnd(*second_null);
+        ColumnValueReader<FirstType> first_ptr(first);
+        ColumnValueReader<SecondType> second_ptr(second);
+        BooleanColumnWriter result_ptr(result);
+        result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
+            if (row_index >= count) {
+                return false;
             }
-        } else {
-            *result_null = *first_null;
-            auto first_ptr = ColumnValueReader<FirstType>(first);
-            BooleanColumnWriter result_ptr(result);
-            result_null->RoaringBitmapApplyFunc([&](u32 row_index) -> bool {
-                if (row_index >= count) {
-                    return false;
-                }
-                Operator::Execute(first_ptr[row_index],
-                                  second_c,
-                                  third_c,
-                                  result_ptr[row_index],
-                                  result_null.get(),
-                                  row_index,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr);
-                return row_index + 1 < count;
-            });
-        }
-        result->Finalize(count);
+            Operator::Execute(first_ptr[row_index],
+                              second_ptr[row_index],
+                              third_c,
+                              result_ptr[row_index],
+                              result_null.get(),
+                              0,
+                              state_ptr_first,
+                              nullptr,
+                              state_ptr);
+            return row_index + 1 < count;
+        });
     }
 };
 

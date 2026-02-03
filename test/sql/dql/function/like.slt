@@ -63,6 +63,26 @@ SELECT * FROM test_like WHERE SUBSTRING(c1, 0, 3) LIKE 'hel';
 hello world
 hello_world
 
+query T
+SELECT * FROM test_like WHERE 'hello' LIKE 'hell%';
+----
+hello world
+hello_world
+cat
+cat%
+
+query T
+SELECT * FROM test_like WHERE 'hello' LIKE 'world';
+----
+
+query T
+SELECT * FROM test_like WHERE 'hello' NOT LIKE 'world';
+----
+hello world
+hello_world
+cat
+cat%
+
 statement error
 SELECT c1 FROM test_like WHERE c1 LIKE 'test%' ESCAPE c1;
 
@@ -71,3 +91,22 @@ SELECT c1 FROM test_like WHERE c1 LIKE 'test%' ESCAPE 'ab';
 
 statement ok
 DROP TABLE test_like;
+
+statement ok
+DROP TABLE IF EXISTS test_like2;
+
+statement ok
+CREATE TABLE test_like2 (c1 varchar, c2 varchar);
+
+statement ok
+INSERT INTO test_like2 (c1, c2) VALUES ('abcdef', 'a%f'), ('hello world', 'hello%'), ('test', 'test2'),('abcd', '%d');
+
+query TT
+select * from test_like2 where c1 like c2;
+----
+abcdef a%f
+hello world hello%
+abcd %d
+
+statement ok
+DROP TABLE test_like2;

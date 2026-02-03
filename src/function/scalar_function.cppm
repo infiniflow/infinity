@@ -58,6 +58,8 @@ struct UnaryOpDirectWrapper {
     }
 };
 
+// Standard wrapper with only Execute (row-by-row processing)
+// Used by most operators that don't support batch processing
 template <typename Operator>
 struct BinaryOpDirectWrapper {
     template <typename LeftValueType, typename RightValueType, typename TargetValueType>
@@ -66,11 +68,45 @@ struct BinaryOpDirectWrapper {
     }
 };
 
+// Extended wrapper with both Execute (row-by-row) and ExecuteBatch (batch processing)
+// Used by operators that support both methods (e.g. REGEX)
+// Framework chooses the appropriate method at runtime based on vector types
+template <typename Operator>
+struct BinaryOpDirectWithBatchWrapper {
+    template <typename LeftType, typename RightType, typename ResultType>
+    inline static void Execute(LeftType left, RightType right, ResultType &result, Bitmask *, size_t, void *, void *, void *) {
+        return Operator::template Run<LeftType, RightType, ResultType>(left, right, result);
+    }
+
+    template <typename LeftType, typename RightType, typename ResultType>
+    inline static void ExecuteBatch(LeftType left, RightType right, ResultType &result, size_t count) {
+        return Operator::template RunBatch<LeftType, RightType>(left, right, result, count);
+    }
+};
+
+// Standard wrapper with only Execute (row-by-row processing)
+// Used by most ternary operators that don't support batch processing
 template <typename Operator>
 struct TernaryOpDirectWrapper {
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
     inline static void Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, size_t, void *, void *, void *) {
         return Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first, second, third, result);
+    }
+};
+
+// Extended wrapper with both Execute (row-by-row) and ExecuteBatch (batch processing)
+// Used by operators that support both methods (e.g. LIKE)
+// Framework chooses the appropriate method at runtime based on vector types
+template <typename Operator>
+struct TernaryOpDirectWithBatchWrapper {
+    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
+    inline static void Execute(FirstType first, SecondType second, ThirdType third, ResultType &result, Bitmask *, size_t, void *, void *, void *) {
+        return Operator::template Run<FirstType, SecondType, ThirdType, ResultType>(first, second, third, result);
+    }
+
+    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType>
+    inline static void ExecuteBatch(FirstType first, SecondType second, ThirdType third, ResultType &result, size_t count) {
+        return Operator::template RunBatch<FirstType, SecondType, ThirdType>(first, second, third, result, count);
     }
 };
 
@@ -416,6 +452,24 @@ public:
                                                                                                    nullptr,
                                                                                                    true);
     }
+    // Binary function with batch processing (optimized for REGEX with constant pattern).
+    template <typename LeftType, typename RightType, typename OutputType, typename Operation>
+    static inline void BinaryFunctionWithBatch(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+        if (input.column_count() != 2) {
+            UnrecoverableError("Binary function: input column count isn't two.");
+        }
+        if (!input.Finalized()) {
+            UnrecoverableError("Input data block is finalized");
+        }
+        BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWithBatchWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                            input.column_vectors_[1],
+                                                                                                            output,
+                                                                                                            input.row_count(),
+                                                                                                            nullptr,
+                                                                                                            nullptr,
+                                                                                                            nullptr,
+                                                                                                            true);
+    }
 
     // Binary function with some failures such as overflow.
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
@@ -515,6 +569,25 @@ public:
                                                                                                                   nullptr,
                                                                                                                   nullptr,
                                                                                                                   true);
+    }
+
+    // Ternary function with batch processing (optimized for LIKE with constant pattern).
+    template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
+    static inline void TernaryFunctionWithBatch(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+        if (input.column_count() != 3) {
+            UnrecoverableError("Ternary function: input column count isn't three.");
+        }
+        if (!input.Finalized()) {
+            UnrecoverableError("Input data block is finalized");
+        }
+        TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWithBatchWrapper<Operation>>(input.column_vectors_[0],
+                                                                                                                           input.column_vectors_[1],
+                                                                                                                           input.column_vectors_[2],
+                                                                                                                           output,
+                                                                                                                           input.row_count(),
+                                                                                                                           nullptr,
+                                                                                                                           nullptr,
+                                                                                                                           true);
     }
 
     // Ternary function with some failures such as overflow.
