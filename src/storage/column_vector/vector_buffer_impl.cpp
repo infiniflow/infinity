@@ -351,6 +351,7 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
             break;
         }
         default: {
+            UnrecoverableError("VectorBuffer not support this data type");
             break;
         }
     }
@@ -371,6 +372,7 @@ void VectorBuffer::ReadAdv(const char *&ptr, const DataType *data_type) {
             break;
         }
         default: {
+            UnrecoverableError("VectorBuffer not support this data type");
             break;
         }
     }
