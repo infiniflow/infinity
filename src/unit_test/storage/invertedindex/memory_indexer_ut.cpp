@@ -117,7 +117,10 @@ public:
             R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
         };
 
-        expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
+        expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}},
+                              {"automaton", {0, 3}, {2, 5}},
+                              {"transducer", {0, 4}, {1, 4}},
+                              {"tape", {0, 1, 3, 4}, {3, 2, 3, 6}}};
     }
 
     std::shared_ptr<ColumnVector> MakeColumnVector(const std::vector<std::string> &paragraphs, size_t repeats = 1) {
@@ -218,7 +221,7 @@ TEST_P(MemoryIndexerTest, SLOW_Memory) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    std::this_thread::sleep_for(5s);
+    // std::this_thread::sleep_for(5s);
     Check();
 }
 

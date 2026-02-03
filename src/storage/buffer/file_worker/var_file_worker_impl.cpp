@@ -25,11 +25,13 @@ import :var_buffer;
 import :local_file_handle;
 import :persistence_manager;
 import :status;
-import :fileworker_manager;
-import :infinity_context;
 
 import std;
 import third_party;
+
+#ifndef MREMAP_DONTUNMAP
+#define MREMAP_DONTUNMAP 0x4
+#endif
 
 namespace infinity {
 
@@ -40,21 +42,20 @@ VarFileWorker::~VarFileWorker() {
     mmap_ = nullptr;
 }
 
-bool VarFileWorker::Write(std::span<VarBuffer> data,
+bool VarFileWorker::Write(std::shared_ptr<VarBuffer> data,
                           std::unique_ptr<LocalFileHandle> &file_handle,
                           bool &prepare_success,
                           const FileWorkerSaveCtx &ctx) {
     std::unique_lock l(mutex_);
-    const auto *buffer = data.data();
     auto old_mmap_size = mmap_size_;
-    mmap_size_ = buffer->TotalSize();
+    mmap_size_ = data->TotalSize();
     if (!mmap_size_) {
         VirtualStore::DeleteFile(file_handle->Path());
         return true;
     }
     auto buffer_data = std::make_unique<char[]>(mmap_size_);
     char *ptr = buffer_data.get();
-    buffer->Write(ptr);
+    data->Write(ptr);
 
     auto fd = file_handle->fd();
     ftruncate(fd, mmap_size_);
@@ -62,7 +63,9 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
     if (mmap_ == nullptr) {
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     } else {
-        mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+        // mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE);
+        // void *new_addr{};
+        mmap_ = mremap(mmap_, old_mmap_size, mmap_size_, MREMAP_MAYMOVE | MREMAP_DONTUNMAP);
     }
     if (mmap_ == MAP_FAILED) {
         mmap_ = nullptr;
@@ -72,10 +75,6 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
         std::memcpy((char *)mmap_ + old_mmap_size, ptr + old_mmap_size, diff);
     }
     prepare_success = true;
-
-    auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->var_map_.cache_manager_;
-    cache_manager.Evict(path);
 
     return true;
 }
@@ -108,48 +107,26 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
 }
 
 void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->var_map_.cache_manager_;
-
-    // Try to get from cache
-    bool flag = cache_manager.Get(path, data);
-    if (flag) {
-        return;
-    }
-
     // std::unique_lock l(mutex_);
-    data = std::make_shared<VarBuffer>(this);
-
     if (!mmap_) {
         if (!file_handle) {
+            data = std::make_shared<VarBuffer>(this);
             return;
         }
         mmap_size_ = file_size;
         if (mmap_size_ == 0) {
+            data = std::make_shared<VarBuffer>(this);
             return;
         }
         auto fd = file_handle->fd();
-        // mmap_size_ = mmap_size_;
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
             // std::println("that code var: {}", mmap_size_);
             mmap_ = nullptr;
         }
-        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
-
-        size_t offset{};
-        std::memcpy(buffer.get(), (char *)mmap_ + offset, mmap_size_);
-        offset += mmap_size_;
-
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
-
-    } else {
-        auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
-        std::memcpy(buffer.get(), mmap_, mmap_size_);
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
     }
-
-    cache_manager.Set(path, data, data->TotalSize());
+    auto buffer = std::shared_ptr<char[]>(static_cast<char *>(mmap_), [](char *) {});
+    data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
 }
 
 } // namespace infinity

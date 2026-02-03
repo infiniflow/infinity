@@ -686,7 +686,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status =
+            auto status =
                 NewCatalog::GetColumnVector(*column_meta, column_meta->get_column_def(), cur_offset + cur_row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
@@ -694,7 +694,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
         }
         {
             BlockID block_id = block_meta->block_id();
-            Status status = AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
+            auto status = AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
             if (!status.ok()) {
                 return status;
             }

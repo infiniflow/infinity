@@ -24,11 +24,11 @@ import third_party;
 
 namespace infinity {
 
-size_t VarBuffer::Append(std::unique_ptr<char[]> buffer, size_t size) {
+size_t VarBuffer::Append(std::shared_ptr<char[]> buffer, size_t size) {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot append to a const buffer");
     }
-    auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
+    auto &buffers = std::get<std::vector<std::shared_ptr<char[]>>>(buffers_);
     std::unique_lock lock(mtx_);
     buffers.push_back(std::move(buffer));
     size_t offset = buffer_size_prefix_sum_.back();
@@ -51,7 +51,7 @@ const char *VarBuffer::Get(size_t offset, size_t size) const {
         const auto *buffer = std::get<const char *>(buffers_);
         return buffer + offset;
     }
-    auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
+    auto &buffers = std::get<std::vector<std::shared_ptr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::ranges::upper_bound(buffer_size_prefix_sum_, offset);
@@ -74,7 +74,7 @@ size_t VarBuffer::Write(char *ptr, size_t size) const {
     if (std::holds_alternative<const char *>(buffers_)) {
         UnrecoverableError("Cannot write to a const buffer");
     }
-    auto &buffers = std::get<std::vector<std::unique_ptr<char[]>>>(buffers_);
+    auto &buffers = std::get<std::vector<std::shared_ptr<char[]>>>(buffers_);
 
     size_t total_size = 0;
     std::shared_lock lock(mtx_);
@@ -104,7 +104,7 @@ size_t VarBuffer::TotalSize() const {
     return buffer_size_prefix_sum_.back();
 }
 
-size_t VarBufferManager::Append(std::unique_ptr<char[]> data, size_t size) {
+size_t VarBufferManager::Append(std::shared_ptr<char[]> data, size_t size) {
     std::unique_lock<std::mutex> lock(mutex_);
     auto buffer = GetInnerNoLock();
     size_t offset = buffer->Append(std::move(data), size);
@@ -138,7 +138,7 @@ void VarBufferManager::SetToCatalog(VarFileWorker *var_file_worker) {
         mem_buffer_ = std::make_shared<VarBuffer>();
     }
     // var_fileworker_->SetData(mem_buffer_.release());
-    FileWorker::Write(var_file_worker_, std::span{mem_buffer_.get(), 1});
+    FileWorker::Write(var_file_worker_, mem_buffer_);
     mem_buffer_.reset(); // this is shit
 }
 
@@ -149,27 +149,13 @@ std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
             if (mem_buffer_ == nullptr) {
                 mem_buffer_ = std::make_shared<VarBuffer>();
             }
-            // my_var_buffer_ = mem_buffer_;
-            // // my_var_buffer_ = std::move(mem_buffer_);
-            // return var_buffer
-            // if (mem_buffer_->TotalSize() == 0) {
-            //     // std::println("..................");
-            // }
-            var_buffer = mem_buffer_;
-            return var_buffer; // copy eliminate
+            return mem_buffer_; // copy eliminate
         }
         case BufferType::kNewCatalog: {
-            // std::shared_ptr<VarBuffer> var_buffer;
-            if (my_var_buffer_) {
-                var_buffer = my_var_buffer_;
-                return var_buffer;
+            if (!var_buffer_) {
+                FileWorker::Read(var_file_worker_, var_buffer_);
             }
-            FileWorker::Read(var_file_worker_, var_buffer);
-            my_var_buffer_ = var_buffer;
-            // if (var_buffer->TotalSize() == 0) {
-            //     std::println("//////////////////");
-            // }
-            return var_buffer;
+            return var_buffer_;
         }
     }
 }

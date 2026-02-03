@@ -30,9 +30,9 @@ public:
     VarBuffer(VarFileWorker *var_file_worker) : buffer_size_prefix_sum_({0}), var_file_worker_(var_file_worker) {}
 
     // this is called by VarFileWorker
-    VarBuffer(VarFileWorker *var_file_worker, std::unique_ptr<char[]> buffer, size_t size)
+    VarBuffer(VarFileWorker *var_file_worker, std::shared_ptr<char[]> buffer, size_t size)
         : buffer_size_prefix_sum_({0, size}), var_file_worker_(var_file_worker) {
-        std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
+        std::get<std::vector<std::shared_ptr<char[]>>>(buffers_).push_back(buffer);
     }
 
     VarBuffer(VarFileWorker *var_file_worker, const char *buffer, size_t size)
@@ -40,11 +40,11 @@ public:
         buffers_ = buffer;
     }
 
-    VarBuffer(VarBuffer &&other)
+    VarBuffer(VarBuffer &&other) noexcept
         : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)),
           var_file_worker_(other.var_file_worker_) {}
 
-    VarBuffer &operator=(VarBuffer &&other) {
+    VarBuffer &operator=(VarBuffer &&other) noexcept {
         if (this != &other) {
             buffers_ = std::move(other.buffers_);
             buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
@@ -54,7 +54,7 @@ public:
     }
 
 public:
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
+    size_t Append(std::shared_ptr<char[]> buffer, size_t size);
 
     size_t Append(const char *data, size_t size);
 
@@ -66,14 +66,14 @@ public:
 
     size_t TotalSize() const;
 
-    std::variant<std::vector<std::unique_ptr<char[]>>, const char *> buffers_;
+    std::variant<std::vector<std::shared_ptr<char[]>>, const char *> buffers_;
 
     std::vector<size_t> buffer_size_prefix_sum_ = {0};
 
+    VarFileWorker *var_file_worker_{};
+
 private:
     mutable std::shared_mutex mtx_;
-
-    VarFileWorker *var_file_worker_{};
 };
 
 export class VarBufferManager {
@@ -82,7 +82,7 @@ public:
 
     VarBufferManager(VarFileWorker *var_file_worker);
 
-    size_t Append(std::unique_ptr<char[]> buffer, size_t size);
+    size_t Append(std::shared_ptr<char[]> buffer, size_t size);
 
     size_t Append(const char *data, size_t size);
 
@@ -103,7 +103,7 @@ public:
 
     std::shared_ptr<VarBuffer> mem_buffer_;
 
-    std::shared_ptr<VarBuffer> my_var_buffer_;
+    std::shared_ptr<VarBuffer> var_buffer_;
 
 private:
     std::shared_ptr<VarBuffer> GetInnerNoLock();
