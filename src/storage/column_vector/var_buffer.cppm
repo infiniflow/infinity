@@ -18,7 +18,7 @@ import :file_worker;
 
 namespace infinity {
 
-class DataFileWorker;
+struct DataFileWorker;
 export struct VarFileWorker;
 
 export class VarBuffer {
@@ -28,18 +28,13 @@ public:
     VarBuffer() = default;
 
     // this is called by VarFileWorker
-    VarBuffer(std::unique_ptr<char[]> buffer, size_t size)
-        : buffer_size_prefix_sum_({0, size}) {
+    VarBuffer(std::unique_ptr<char[]> buffer, size_t size) : buffer_size_prefix_sum_({0, size}) {
         std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(const char *buffer, size_t size)
-        : buffer_size_prefix_sum_({0, size}) {
-        buffers_ = buffer;
-    }
+    VarBuffer(const char *buffer, size_t size) : buffer_size_prefix_sum_({0, size}) { buffers_ = buffer; }
 
-    VarBuffer(VarBuffer &&other)
-        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)){}
+    VarBuffer(VarBuffer &&other) : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)) {}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
