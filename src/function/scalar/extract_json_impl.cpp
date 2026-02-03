@@ -73,7 +73,7 @@ void JsonExtractString(const DataBlock &input, std::shared_ptr<ColumnVector> &ou
 }
 
 void JsonExtractInt(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
-    JsonExtractor<IntegerT, JsonManager::json_extract_int, Value::MakeInt>::Execute(input, output);
+    JsonExtractor<BigIntT, JsonManager::json_extract_int, Value::MakeBigInt>::Execute(input, output);
 }
 
 void JsonExtractDouble(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
@@ -147,7 +147,7 @@ void RegisterJsonFunction(NewCatalog *catalog_ptr) {
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
         ScalarFunction json_function(func_name,
                                      {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                     DataType(LogicalType::kInteger),
+                                     DataType(LogicalType::kBigInt),
                                      JsonExtractInt);
         function_set_ptr->AddFunction(json_function);
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);

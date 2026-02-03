@@ -22,6 +22,7 @@ import :var_buffer;
 namespace infinity {
 
 export struct VarFileWorker : FileWorker {
+    static constexpr VarBuffer *has_cache_manager_{};
     explicit VarFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_size);
 
     ~VarFileWorker();
