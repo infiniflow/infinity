@@ -318,6 +318,7 @@ size_t VectorBuffer::TotalSize(const DataType *data_type) const {
     switch (data_type->type()) {
         case LogicalType::kArray:
         case LogicalType::kVarchar:
+        case LogicalType::kJson:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
@@ -336,6 +337,7 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
     switch (data_type->type()) {
         case LogicalType::kArray:
         case LogicalType::kVarchar:
+        case LogicalType::kJson:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
@@ -358,6 +360,7 @@ void VectorBuffer::ReadAdv(const char *&ptr, const DataType *data_type) {
     switch (data_type->type()) {
         case LogicalType::kArray:
         case LogicalType::kVarchar:
+        case LogicalType::kJson:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
