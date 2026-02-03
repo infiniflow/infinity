@@ -327,6 +327,7 @@ size_t VectorBuffer::TotalSize(const DataType *data_type) const {
             break;
         }
         default: {
+            UnrecoverableError(fmt::format("VectorBuffer not support {}", data_type->type()));
             break;
         }
     }
@@ -351,6 +352,7 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
             break;
         }
         default: {
+            UnrecoverableError(fmt::format("VectorBuffer not support {}", data_type->type()));
             break;
         }
     }
@@ -371,6 +373,7 @@ void VectorBuffer::ReadAdv(const char *&ptr, const DataType *data_type) {
             break;
         }
         default: {
+            UnrecoverableError(fmt::format("VectorBuffer not support {}", data_type->type()));
             break;
         }
     }
