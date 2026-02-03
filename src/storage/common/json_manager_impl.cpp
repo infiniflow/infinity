@@ -270,7 +270,7 @@ std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data,
     return {true, current->dump()};
 }
 
-std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
+std::tuple<bool, BigIntT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     const JsonTypeDef *current = &data;
     for (const auto &token : tokens) {
         const auto &token_type = token.first;
@@ -294,7 +294,7 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data
     }
 
     if (current->is_number_integer()) {
-        return {true, current->get<IntegerT>()};
+        return {true, current->get<BigIntT>()};
     }
     return {false, 0};
 }
@@ -429,31 +429,25 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
 
     switch (parsed_token.type()) {
         case JsonValueType::string: {
-            const std::string &token_value = parsed_token.get_ref<const std::string &>();
+            const auto &token_value = parsed_token.get_ref<const std::string &>();
             return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) {
                 return element.is_string() && element.get_ref<const std::string &>() == token_value;
             });
         }
         case JsonValueType::number_integer: {
-            const int64_t token_value = parsed_token.get<int64_t>();
+            const auto token_value = parsed_token.get<int64_t>();
             return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
                 return element.is_number_integer() && element.get<int64_t>() == token_value;
             });
         }
-        case JsonValueType::number_unsigned: {
-            const uint64_t token_value = parsed_token.get<uint64_t>();
-            return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
-                return element.is_number_unsigned() && element.get<uint64_t>() == token_value;
-            });
-        }
         case JsonValueType::number_float: {
-            const double token_value = parsed_token.get<double>();
+            const auto token_value = parsed_token.get<double>();
             return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
                 return element.is_number_float() && std::abs(element.get<double>() - token_value) < 1e-10;
             });
         }
         case JsonValueType::boolean: {
-            const bool token_value = parsed_token.get<bool>();
+            const auto token_value = parsed_token.get<bool>();
             return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) {
                 return element.is_boolean() && element.get<bool>() == token_value;
             });
