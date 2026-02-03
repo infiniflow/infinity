@@ -25,6 +25,7 @@ import third_party;
 namespace infinity {
 
 export using JsonTypeDef = nlohmann::json;
+export using JsonValueType = nlohmann::detail::value_t;
 export enum class JsonType : uint8_t { kInvalid, kJsonObject, kJsonArray };
 export using JsonTokenInfo = std::pair<JsonType, std::string>;
 
@@ -56,7 +57,7 @@ public:
      * return: arg1: is_null, arg2: result
      */
     static std::tuple<bool, std::string> json_extract(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
-    static std::tuple<bool, IntegerT> json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
+    static std::tuple<bool, BigIntT> json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
     static std::tuple<bool, DoubleT> json_extract_double(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
     static std::tuple<bool, BooleanT> json_extract_bool(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);
     static std::tuple<bool, BooleanT> json_extract_is_null(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens);

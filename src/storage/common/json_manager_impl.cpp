@@ -270,7 +270,7 @@ std::tuple<bool, std::string> JsonManager::json_extract(const JsonTypeDef &data,
     return {true, current->dump()};
 }
 
-std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
+std::tuple<bool, BigIntT> JsonManager::json_extract_int(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &tokens) {
     const JsonTypeDef *current = &data;
     for (const auto &token : tokens) {
         const auto &token_type = token.first;
@@ -294,7 +294,7 @@ std::tuple<bool, IntegerT> JsonManager::json_extract_int(const JsonTypeDef &data
     }
 
     if (current->is_number_integer()) {
-        return {true, current->get<IntegerT>()};
+        return {true, current->get<BigIntT>()};
     }
     return {false, 0};
 }
@@ -423,15 +423,43 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
         // If parsing fails, treat token as a literal string value
     }
 
-    if (parse_success && parsed_token.is_string()) {
-        const std::string token_value = parsed_token.get<std::string>();
-        return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) {
-            return element.is_string() && element.get<std::string>() == token_value;
-        });
+    if (!parse_success) {
+        return false;
     }
 
-    const std::string serialized_token = parse_success ? parsed_token.dump() : token;
-    return std::any_of(data.begin(), data.end(), [&serialized_token](const JsonTypeDef &element) { return element.dump() == serialized_token; });
+    switch (parsed_token.type()) {
+        case JsonValueType::string: {
+            const auto &token_value = parsed_token.get_ref<const std::string &>();
+            return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) {
+                return element.is_string() && element.get_ref<const std::string &>() == token_value;
+            });
+        }
+        case JsonValueType::number_integer: {
+            const auto token_value = parsed_token.get<int64_t>();
+            return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
+                return element.is_number_integer() && element.get<int64_t>() == token_value;
+            });
+        }
+        case JsonValueType::number_float: {
+            const auto token_value = parsed_token.get<double>();
+            return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
+                return element.is_number_float() && std::abs(element.get<double>() - token_value) < 1e-10;
+            });
+        }
+        case JsonValueType::boolean: {
+            const auto token_value = parsed_token.get<bool>();
+            return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) {
+                return element.is_boolean() && element.get<bool>() == token_value;
+            });
+        }
+        case JsonValueType::null: {
+            return std::any_of(data.begin(), data.end(), [](const JsonTypeDef &element) { return element.is_null(); });
+        }
+        default: {
+            const std::string token_value = parsed_token.dump();
+            return std::any_of(data.begin(), data.end(), [&token_value](const JsonTypeDef &element) { return element.dump() == token_value; });
+        }
+    }
 }
 
 std::tuple<size_t, std::vector<std::string>> JsonManager::json_unnest(const JsonTypeDef &data) {
