@@ -435,13 +435,13 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
             });
         }
         case JsonValueType::number_integer: {
-            const int64_t token_value = parsed_token.get<std::int64_t>();
+            const int64_t token_value = parsed_token.get<int64_t>();
             return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
                 return element.is_number_integer() && element.get<int64_t>() == token_value;
             });
         }
         case JsonValueType::number_unsigned: {
-            const uint64_t token_value = parsed_token.get<std::uint64_t>();
+            const uint64_t token_value = parsed_token.get<uint64_t>();
             return std::any_of(data.begin(), data.end(), [token_value](const JsonTypeDef &element) {
                 return element.is_number_unsigned() && element.get<uint64_t>() == token_value;
             });
