@@ -27,28 +27,24 @@ export class VarBuffer {
 public:
     VarBuffer() = default;
 
-    VarBuffer(VarFileWorker *var_file_worker) : buffer_size_prefix_sum_({0}), var_file_worker_(var_file_worker) {}
-
     // this is called by VarFileWorker
-    VarBuffer(VarFileWorker *var_file_worker, std::unique_ptr<char[]> buffer, size_t size)
-        : buffer_size_prefix_sum_({0, size}), var_file_worker_(var_file_worker) {
+    VarBuffer(std::unique_ptr<char[]> buffer, size_t size)
+        : buffer_size_prefix_sum_({0, size}) {
         std::get<std::vector<std::unique_ptr<char[]>>>(buffers_).push_back(std::move(buffer));
     }
 
-    VarBuffer(VarFileWorker *var_file_worker, const char *buffer, size_t size)
-        : buffer_size_prefix_sum_({0, size}), var_file_worker_(var_file_worker) {
+    VarBuffer(const char *buffer, size_t size)
+        : buffer_size_prefix_sum_({0, size}) {
         buffers_ = buffer;
     }
 
     VarBuffer(VarBuffer &&other)
-        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)),
-          var_file_worker_(other.var_file_worker_) {}
+        : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)){}
 
     VarBuffer &operator=(VarBuffer &&other) {
         if (this != &other) {
             buffers_ = std::move(other.buffers_);
             buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
-            var_file_worker_ = other.var_file_worker_;
         }
         return *this;
     }
@@ -72,8 +68,6 @@ public:
 
 private:
     mutable std::shared_mutex mtx_;
-
-    VarFileWorker *var_file_worker_{};
 };
 
 export class VarBufferManager {
@@ -103,7 +97,7 @@ public:
 
     std::shared_ptr<VarBuffer> mem_buffer_;
 
-    std::shared_ptr<VarBuffer> my_var_buffer_;
+    std::shared_ptr<VarBuffer> var_buffer_;
 
 private:
     std::shared_ptr<VarBuffer> GetInnerNoLock();
