@@ -43,6 +43,7 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
         auto *sm = segment_.get_segment_manager();
         data = segment_.find_or_construct<BlockVersion>(path.c_str())(8192, sm);
         inited_ = true;
+        mmap_ = (void *)(-1); // for test
         return;
     }
     auto result = segment_.find<BlockVersion>(path.c_str());
