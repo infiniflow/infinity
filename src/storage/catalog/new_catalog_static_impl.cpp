@@ -70,7 +70,7 @@ void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, Tx
     commit_ts_ = commit_ts;
 
     BlockVersion *block_version{};
-    FileWorker::Read(version_file_worker_,block_version);
+    FileWorker::Read(version_file_worker_, block_version);
     block_offset_end_ = block_version->GetRowCount(begin_ts_);
 }
 
