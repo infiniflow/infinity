@@ -168,8 +168,10 @@ struct ExpressionIndexScanInfo {
             }
             case ExpressionType::kColumn: {
                 auto *column_expression = static_cast<const ColumnExpression *>(expression.get());
-                const ColumnID column_id = column_expression->binding().column_idx;
-                if (new_candidate_column_index_map_.contains(column_id)) {
+                // Get the actual column ID by column name (not the column index, which changes after DROP COLUMN)
+                const auto &column_name = column_expression->column_name();
+                auto [column_id, status] = table_meta_->GetColumnIDByColumnName(column_name);
+                if (status.ok() && new_candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
@@ -516,7 +518,7 @@ private:
                         FilterCompareType initial_compare_type) -> std::tuple<ColumnID, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
                     auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                     auto [column_id, value, _, compare_type] =
-                        FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
+                        FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type, tree_info_.table_meta_);
                     std::shared_ptr<TableIndexMeta> secondary_index_meta = tree_info_.new_candidate_column_index_map_.at(column_id);
                     return std::make_tuple(column_id, value, compare_type, secondary_index_meta);
                 };
@@ -526,7 +528,7 @@ private:
                     -> std::tuple<ColumnID, FunctionExpression *, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
                     auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                     auto [column_id, value, base_expression, compare_type] =
-                        FilterExpressionPushDownHelper::UnwindCast(func_expr, std::move(val_right), initial_compare_type);
+                        FilterExpressionPushDownHelper::UnwindCast(func_expr, std::move(val_right), initial_compare_type, tree_info_.table_meta_);
 
                     auto *scalar_func_expression = static_cast<FunctionExpression *>(base_expression.get());
                     std::string func_col_params = scalar_func_expression->ExtractFunctionInfo();

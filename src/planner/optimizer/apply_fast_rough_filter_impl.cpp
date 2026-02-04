@@ -30,6 +30,8 @@ import :infinity_exception;
 import :filter_expression_push_down;
 import :fast_rough_filter;
 import :logical_match_scan_base;
+import :table_meta;
+import :block_index;
 
 import std;
 import third_party;
@@ -50,13 +52,15 @@ public:
                     UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
                     auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
-                    table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+                    TableMeta *table_meta = table_scan.base_table_ref_->block_index_->table_meta_.get();
+                    table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression, table_meta);
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kIndexScan) {
                     // warn
                     LOG_WARN("ApplyFastRoughFilterMethod: IndexScan exist after Filter. A part of filter condition has been removed.");
                     // still build from remaining filter condition
                     auto &index_scan = static_cast<LogicalIndexScan &>(*(op->left_node()));
-                    index_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+                    TableMeta *table_meta = index_scan.base_table_ref_->block_index_->table_meta_.get();
+                    index_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression, table_meta);
                 } else {
                     LOG_WARN("ApplyFastRoughFilterMethod: Filter node should be followed by TableScan or IndexScan.");
                 }

@@ -248,7 +248,8 @@ void CommonQueryFilter::TryApplyFastRoughFilterOptimizer() {
         return;
     }
     finish_build_fast_rough_filter_ = true;
-    fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_);
+    TableMeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+    fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_, table_meta);
 }
 
 void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context, const FilterExpressionPushDown::MatchQueryCache *match_cache) {
