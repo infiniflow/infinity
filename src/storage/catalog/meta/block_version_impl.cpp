@@ -294,7 +294,6 @@ void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) co
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     std::unique_lock lock(rw_mutex_);
     created_.emplace_back(commit_ts, row_count);
-    ++append_cnt_;
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {

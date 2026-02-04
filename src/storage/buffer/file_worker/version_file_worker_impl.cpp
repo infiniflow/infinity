@@ -39,7 +39,8 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
     auto &path = *rel_file_path_;
     auto tmp_path = GetWorkingPath();
     if (!inited_) {
-        segment_ = boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 1145141);
+        segment_ =
+            boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 2 * 1024 * 1024 /* 2MB */);
         auto *sm = segment_.get_segment_manager();
         data = segment_.find_or_construct<BlockVersion>(path.c_str())(8192, sm);
         inited_ = true;

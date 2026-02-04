@@ -107,10 +107,6 @@ private:
     boost::interprocess::vector<CreateField, boost::interprocess::allocator<CreateField, segment_manager>>
         created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
     // risk to write uninitialized buffer. (ts, rows)
-
-    // boost::interprocess::map<size_t, TxnTimeStamp> dirty_deleted_;
-
-    size_t append_cnt_{};
 };
 
 } // namespace infinity
