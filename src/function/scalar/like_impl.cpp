@@ -29,7 +29,7 @@ import third_party;
 namespace infinity {
 
 // Convert LIKE pattern to RE2 regex pattern
-static std::string LikeToRegexPattern(const std::string &like_pattern, char escape_char) {
+std::string LikeToRegexPattern(const std::string &like_pattern, char escape_char) {
     std::string regex_pattern;
     regex_pattern.reserve(like_pattern.size() * 2);
 
