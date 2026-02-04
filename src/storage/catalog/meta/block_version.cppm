@@ -99,7 +99,8 @@ export struct BlockVersion {
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
 private:
-    mutable std::shared_mutex rw_mutex_;
+    // mutable std::shared_mutex rw_mutex_;
+    mutable boost::interprocess::interprocess_sharable_mutex rw_mutex_;
 
     boost::interprocess::vector<TxnTimeStamp, boost::interprocess::allocator<TxnTimeStamp, segment_manager>> deleted_;
 

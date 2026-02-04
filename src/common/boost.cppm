@@ -27,6 +27,8 @@ module;
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/vector.hpp>
 #include <boost/interprocess/managed_mapped_file.hpp>
+#include <boost/interprocess/sync/interprocess_mutex.hpp>
+#include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <boost/thread.hpp>
 
 export module infinity_core:boost;
@@ -69,6 +71,9 @@ using boost::interprocess::vector;
 
 using boost::interprocess::file_mapping;
 using boost::interprocess::managed_mapped_file;
+
+using boost::interprocess::interprocess_mutex;
+using boost::interprocess::interprocess_sharable_mutex;
 
 inline constexpr auto create_only_infinity = create_only;
 inline constexpr auto open_copy_on_write_infinity = open_copy_on_write;

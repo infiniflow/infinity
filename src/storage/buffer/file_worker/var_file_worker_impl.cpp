@@ -132,7 +132,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         // mmap_size_ = mmap_size_;
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
-            // std::println("that code var: {}", mmap_size_);
+            // std::println("that code var: {}", mma'p_size_);
             mmap_ = nullptr;
         }
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);

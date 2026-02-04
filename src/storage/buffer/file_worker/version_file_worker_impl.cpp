@@ -14,7 +14,6 @@
 
 module;
 
-#include <sys/mman.h>
 #include <unistd.h>
 
 module infinity_core:version_file_worker.impl;
@@ -36,19 +35,10 @@ VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, siz
     : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
 void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock l(mutex_);
+    // std::unique_lock l(mutex_);
     auto &path = *rel_file_path_;
     auto tmp_path = GetWorkingPath();
     if (!inited_) {
-        if (!VirtualStore::Exists("/var/infinity/tmp")) {
-            VirtualStore::MakeDirectory("/var/infinity/tmp");
-        }
-
-        if (!VirtualStore::Exists(tmp_path.c_str())) {
-            auto [handle, status] = VirtualStore::Open(tmp_path, FileAccessMode::kReadWrite);
-            close(handle->fd());
-            VirtualStore::DeleteFile(tmp_path.c_str());
-        }
         segment_ = boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 1145141);
         auto *sm = segment_.get_segment_manager();
         data = segment_.find_or_construct<BlockVersion>(path.c_str())(8192, sm);

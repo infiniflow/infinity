@@ -15,6 +15,7 @@
 export module infinity_core:var_buffer;
 
 import :file_worker;
+import :boost;
 
 namespace infinity {
 
@@ -23,6 +24,10 @@ export struct VarFileWorker;
 
 export class VarBuffer {
     friend struct VarFileWorker;
+
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
+    using size_t_allocator = boost::interprocess::allocator<size_t, segment_manager>;
+    using CreateField_allocator = boost::interprocess::allocator<CreateField, segment_manager>;
 
 public:
     VarBuffer() = default;

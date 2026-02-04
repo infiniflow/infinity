@@ -176,6 +176,8 @@ export struct FileWorker {
             close(file_handle->fd());
             return;
         }
+        auto ps = std::filesystem::path(working_path).parent_path().string();
+        VirtualStore::MakeDirectory(ps);
         std::unique_ptr<LocalFileHandle> file_handle;
         file_worker->Read(data, file_handle, file_size);
     }
