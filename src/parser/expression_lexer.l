@@ -32,6 +32,7 @@ AND             { return AND; }
 AS              { return AS; }
 BETWEEN         { return BETWEEN; }
 CAST            { return CAST; }
+ESCAPE          { return ESCAPE; }
 FALSE           { return FALSE; }
 IN              { return IN; }
 IS              { return IS; }

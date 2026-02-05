@@ -92,6 +92,7 @@ DROP            { return DROP; }
 ELSE            { return ELSE; }
 EMBEDDING       { return EMBEDDING; }
 END             { return END; }
+ESCAPE          { return ESCAPE; }
 EXCEPT          { return EXCEPT; }
 EXTRACT         { return EXTRACT; }
 EXECUTE         { return EXECUTE; }

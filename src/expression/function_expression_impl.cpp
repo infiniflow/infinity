@@ -122,8 +122,20 @@ bool FunctionExpression::Eq(const BaseExpression &other_base) const {
     return true;
 }
 
-// e.g. substring(c1,1,2) -> "substring_COL0_1_2"
 std::string FunctionExpression::ExtractFunctionInfo() {
+    // e.g. substring(c1,1,2) -> "substring_COL0_1_2"
+    // For LIKE, NOT LIKE operators, just extract the nested function
+    // e.g. substring(c1,1,2) LIKE 'c%' -> "substring_COL0_1_2"
+    std::string func_name = ScalarFunctionName();
+    static const std::set<std::string> like_ops = {"like", "not_like"};
+    if (like_ops.contains(func_name) && !arguments().empty()) {
+        const auto &first_arg = arguments()[0];
+        if (first_arg && first_arg->type() == ExpressionType::kFunction) {
+            auto nested_func = std::static_pointer_cast<FunctionExpression>(first_arg);
+            return nested_func->ExtractFunctionInfo();
+        }
+    }
+
     auto extract_expr_info = [&](const std::shared_ptr<BaseExpression> &expr, std::string &param_str, auto &&self) -> void {
         if (!expr) {
             return;
@@ -155,7 +167,6 @@ std::string FunctionExpression::ExtractFunctionInfo() {
         }
     };
 
-    std::string func_name = ScalarFunctionName();
     std::string col_params_str;
     const auto &func_args = arguments();
 

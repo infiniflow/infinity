@@ -255,26 +255,27 @@ struct EXPRESSION_LTYPE {
     OR = 400,                      /* OR  */
     EXTRACT = 401,                 /* EXTRACT  */
     LIKE = 402,                    /* LIKE  */
-    DATA = 403,                    /* DATA  */
-    LOG = 404,                     /* LOG  */
-    BUFFER = 405,                  /* BUFFER  */
-    KNN = 406,                     /* KNN  */
-    USING = 407,                   /* USING  */
-    SESSION = 408,                 /* SESSION  */
-    GLOBAL = 409,                  /* GLOBAL  */
-    OFF = 410,                     /* OFF  */
-    EXPORT = 411,                  /* EXPORT  */
-    PROFILE = 412,                 /* PROFILE  */
-    CONFIGS = 413,                 /* CONFIGS  */
-    PROFILES = 414,                /* PROFILES  */
-    STATUS = 415,                  /* STATUS  */
-    VAR = 416,                     /* VAR  */
-    SEARCH = 417,                  /* SEARCH  */
-    MATCH = 418,                   /* MATCH  */
-    QUERY = 419,                   /* QUERY  */
-    FUSION = 420,                  /* FUSION  */
-    PARSE_JSON = 421,              /* PARSE_JSON  */
-    NUMBER = 422                   /* NUMBER  */
+    ESCAPE = 403,                  /* ESCAPE  */
+    DATA = 404,                    /* DATA  */
+    LOG = 405,                     /* LOG  */
+    BUFFER = 406,                  /* BUFFER  */
+    KNN = 407,                     /* KNN  */
+    USING = 408,                   /* USING  */
+    SESSION = 409,                 /* SESSION  */
+    GLOBAL = 410,                  /* GLOBAL  */
+    OFF = 411,                     /* OFF  */
+    EXPORT = 412,                  /* EXPORT  */
+    PROFILE = 413,                 /* PROFILE  */
+    CONFIGS = 414,                 /* CONFIGS  */
+    PROFILES = 415,                /* PROFILES  */
+    STATUS = 416,                  /* STATUS  */
+    VAR = 417,                     /* VAR  */
+    SEARCH = 418,                  /* SEARCH  */
+    MATCH = 419,                   /* MATCH  */
+    QUERY = 420,                   /* QUERY  */
+    FUSION = 421,                  /* FUSION  */
+    PARSE_JSON = 422,              /* PARSE_JSON  */
+    NUMBER = 423                   /* NUMBER  */
   };
   typedef enum expressiontokentype expressiontoken_kind_t;
 #endif
@@ -295,7 +296,7 @@ union EXPRESSIONSTYPE
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
     infinity::ColumnType*             column_type_t;
 
-#line 299 "expression_parser.h"
+#line 300 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;
