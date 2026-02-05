@@ -131,7 +131,7 @@ struct EXPRESSION_LTYPE {
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT SPARSE
 %token PRIMARY KEY UNIQUE NULLABLE IS
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
-%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE ESCAPE
 %token DATA LOG BUFFER
 %token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS PROFILES STATUS VAR
 %token SEARCH MATCH QUERY FUSION
@@ -164,6 +164,8 @@ struct EXPRESSION_LTYPE {
 %precedence   IS
 %left       '+' '-'
 %left       '*' '/' '%'
+
+%precedence ESCAPE
 
 
 %%
@@ -489,6 +491,28 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
+    // Add default escape character ('\')
+    infinity::ConstantExpr* escape_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
+    escape_expr->str_value_ = strdup("\\");
+    func_expr->arguments_->emplace_back(escape_expr);
+    $$ = func_expr;
+}
+| operand LIKE operand ESCAPE operand {
+    // Validate that escape character is a constant string of exactly one character
+    infinity::ConstantExpr* escape_expr = (infinity::ConstantExpr*)$5;
+    if (   $5->type_ != infinity::ParsedExprType::kConstant
+        || escape_expr->literal_type_ != infinity::LiteralType::kString
+        || strlen(escape_expr->str_value_) != 1) {
+        yyerror(&@$, scanner, result, "ESCAPE clause must be exactly one character");
+        YYABORT;
+    }
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "like";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    // Use the provided escape character
+    func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
 }
 | operand NOT LIKE operand {
@@ -497,6 +521,28 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($4);
+    // Add default escape character ('\')
+    infinity::ConstantExpr* escape_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
+    escape_expr->str_value_ = strdup("\\");
+    func_expr->arguments_->emplace_back(escape_expr);
+    $$ = func_expr;
+}
+| operand NOT LIKE operand ESCAPE operand {
+    // Validate that escape character is a constant string of exactly one character
+    infinity::ConstantExpr* escape_expr = (infinity::ConstantExpr*)$6;
+    if (   $6->type_ != infinity::ParsedExprType::kConstant
+        || escape_expr->literal_type_ != infinity::LiteralType::kString
+        || strlen(escape_expr->str_value_) != 1) {
+        yyerror(&@$, scanner, result, "ESCAPE clause must be exactly one character");
+        YYABORT;
+    }
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "not_like";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($4);
+    // Use the provided escape character
+    func_expr->arguments_->emplace_back($6);
     $$ = func_expr;
 };
 
