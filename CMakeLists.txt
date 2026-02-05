@@ -57,6 +57,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
     # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field --rtlib=libgcc --unwindlib=libgcc")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
     add_link_options(-L/usr/local/lib)
+    include_directories(/usr/include)
     set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
     set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 

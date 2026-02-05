@@ -29,7 +29,7 @@ export struct VarFileWorker : FileWorker {
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVarFile; }
 
-    bool Write(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
+    bool Write(std::shared_ptr<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
     bool WriteSnapshot(std::span<VarBuffer> data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
 
     void Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);

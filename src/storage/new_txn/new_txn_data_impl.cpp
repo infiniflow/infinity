@@ -142,11 +142,11 @@ struct NewTxnCompactState {
                 // data_file_worker->Write(std::span{column_vectors_[i].data().get(), column_vectors_[i].Size()});
                 FileWorker::Write(data_file_worker, std::span{column_vectors_[i].data().get(), data_size});
                 if (var_file_worker) {
-                    if ((column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_ || column_vectors_[i].buffer_->var_buffer_mgr()->mem_buffer_) &&
-                        std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(
-                            column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
-                        auto data = column_vectors_[i].buffer_->var_buffer_mgr()->my_var_buffer_;
-                        FileWorker::Write(var_file_worker, std::span{data.get(), 1});
+                    if ((column_vectors_[i].buffer_->var_buffer_mgr()->var_buffer_ || column_vectors_[i].buffer_->var_buffer_mgr()->mem_buffer_) &&
+                        std::holds_alternative<std::vector<std::shared_ptr<char[]>>>(
+                            column_vectors_[i].buffer_->var_buffer_mgr()->var_buffer_->buffers_)) {
+                        auto data = column_vectors_[i].buffer_->var_buffer_mgr()->var_buffer_;
+                        FileWorker::Write(var_file_worker, data);
                     }
                 }
             }
@@ -938,11 +938,12 @@ NewTxn::AppendInColumn(ColumnMeta &column_meta, size_t dest_offset, size_t appen
 
     // data_file_worker->Write(std::span{dest_vec.data().get(), dest_vec.Size()});
     FileWorker::Write(data_file_worker, std::span{dest_vec.data().get(), data_size});
+
     if (var_file_worker) {
-        if (dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_ &&
-            std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
-            auto data = dest_vec.buffer_->var_buffer_mgr()->my_var_buffer_;
-            FileWorker::Write(var_file_worker, std::span{data.get(), 1});
+        if (dest_vec.buffer_->var_buffer_mgr()->var_buffer_ &&
+            std::holds_alternative<std::vector<std::shared_ptr<char[]>>>(dest_vec.buffer_->var_buffer_mgr()->var_buffer_->buffers_)) {
+            auto data = dest_vec.buffer_->var_buffer_mgr()->var_buffer_;
+            FileWorker::Write(var_file_worker, data);
         }
     }
     // }
@@ -1224,10 +1225,10 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta,
         // data_file_worker->Write(std::span{column_vector.data().get(), column_vector.Size()});
         FileWorker::Write(data_file_worker, std::span{column_vector.data().get(), data_size});
         if (var_file_worker) {
-            if (column_vector.buffer_->var_buffer_mgr()->my_var_buffer_ &&
-                std::holds_alternative<std::vector<std::unique_ptr<char[]>>>(column_vector.buffer_->var_buffer_mgr()->my_var_buffer_->buffers_)) {
-                auto data = column_vector.buffer_->var_buffer_mgr()->my_var_buffer_;
-                FileWorker::Write(var_file_worker, std::span{data.get(), 1});
+            if (column_vector.buffer_->var_buffer_mgr()->var_buffer_ &&
+                std::holds_alternative<std::vector<std::shared_ptr<char[]>>>(column_vector.buffer_->var_buffer_mgr()->var_buffer_->buffers_)) {
+                auto data = column_vector.buffer_->var_buffer_mgr()->var_buffer_;
+                FileWorker::Write(var_file_worker, data);
             }
         }
 

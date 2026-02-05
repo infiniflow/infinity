@@ -173,14 +173,14 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
         size_t offset{};
 
         u64 magic_number{};
-        std::memcpy(&magic_number, (char *)mmap_ + offset, sizeof(magic_number));
+        std::memcpy(&magic_number, static_cast<char *>(mmap_) + offset, sizeof(magic_number));
         offset += sizeof(magic_number);
 
         if (magic_number != 0x00dd3344) {
             RecoverableError(Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number)));
         }
 
-        std::memcpy(&buffer_size_, (char *)mmap_ + offset, sizeof(buffer_size_));
+        std::memcpy(&buffer_size_, static_cast<char *>(mmap_) + offset, sizeof(buffer_size_));
         offset += sizeof(buffer_size_);
 
         if (file_size != buffer_size_ + 3 * sizeof(u64)) {
@@ -188,17 +188,12 @@ void DataFileWorker::Read(std::shared_ptr<char[]> &data, std::unique_ptr<LocalFi
             RecoverableError(status);
         }
 
-        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + offset, [](char *p) {});
-        offset += buffer_size_;
-
         // // file footer: checksum
         // u64 checksum{};
         // std::memcpy(&checksum, mmap_ + offset, sizeof(checksum));
         // offset += sizeof(checksum);
-
-    } else {
-        data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *) {});
     }
+    data = std::shared_ptr<char[]>(static_cast<char *>(mmap_) + sizeof(u64) + sizeof(buffer_size_), [](char *) {});
 }
 
 } // namespace infinity
