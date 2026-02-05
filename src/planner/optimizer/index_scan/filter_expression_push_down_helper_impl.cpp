@@ -364,8 +364,7 @@ FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression>
         Status status;
         std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
         if (!status.ok()) {
-            // Fallback to column_idx if column lookup fails (shouldn't happen in normal cases)
-            column_id = column_expression->binding().column_idx;
+            UnrecoverableError(fmt::format("GetColumnIDByColumnName failed: column_name:{}", column_name));
         }
         return std::make_tuple(column_id, std::move(right_val), nullptr, compare_type);
     } else if (cast_expr->type() == ExpressionType::kCast) {
@@ -483,8 +482,7 @@ FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression>
                 Status status;
                 std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
                 if (!status.ok()) {
-                    // Fallback to column_idx if column lookup fails (shouldn't happen in normal cases)
-                    column_id = column_expression->binding().column_idx;
+                    UnrecoverableError(fmt::format("GetColumnIDByColumnName failed: column_name:{}", column_name));
                 }
             }
         }
