@@ -226,12 +226,12 @@ std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMeta
     return {block_column_snapshot_info, Status::OK()};
 }
 
-Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id) {
+Status ColumnMeta::RestoreFromSnapshot() {
     auto [column_defs, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    auto col_def = (*column_defs)[column_id];
+    auto col_def = (*column_defs)[column_idx_];
     status = InitSet(col_def);
     if (!status.ok()) {
         return status;

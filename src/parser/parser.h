@@ -289,60 +289,61 @@ struct SQL_LTYPE {
     OR = 413,                      /* OR  */
     EXTRACT = 414,                 /* EXTRACT  */
     LIKE = 415,                    /* LIKE  */
-    DATA = 416,                    /* DATA  */
-    LOG = 417,                     /* LOG  */
-    BUFFER = 418,                  /* BUFFER  */
-    TRANSACTIONS = 419,            /* TRANSACTIONS  */
-    TRANSACTION = 420,             /* TRANSACTION  */
-    MEMINDEX = 421,                /* MEMINDEX  */
-    USING = 422,                   /* USING  */
-    SESSION = 423,                 /* SESSION  */
-    GLOBAL = 424,                  /* GLOBAL  */
-    OFF = 425,                     /* OFF  */
-    EXPORT = 426,                  /* EXPORT  */
-    CONFIGS = 427,                 /* CONFIGS  */
-    CONFIG = 428,                  /* CONFIG  */
-    PROFILES = 429,                /* PROFILES  */
-    VARIABLES = 430,               /* VARIABLES  */
-    VARIABLE = 431,                /* VARIABLE  */
-    LOGS = 432,                    /* LOGS  */
-    CATALOGS = 433,                /* CATALOGS  */
-    CATALOG = 434,                 /* CATALOG  */
-    SEARCH = 435,                  /* SEARCH  */
-    MATCH = 436,                   /* MATCH  */
-    MAXSIM = 437,                  /* MAXSIM  */
-    QUERY = 438,                   /* QUERY  */
-    QUERIES = 439,                 /* QUERIES  */
-    FUSION = 440,                  /* FUSION  */
-    ROWLIMIT = 441,                /* ROWLIMIT  */
-    ADMIN = 442,                   /* ADMIN  */
-    LEADER = 443,                  /* LEADER  */
-    FOLLOWER = 444,                /* FOLLOWER  */
-    LEARNER = 445,                 /* LEARNER  */
-    CONNECT = 446,                 /* CONNECT  */
-    STANDALONE = 447,              /* STANDALONE  */
-    NODES = 448,                   /* NODES  */
-    NODE = 449,                    /* NODE  */
-    REMOVE = 450,                  /* REMOVE  */
-    SNAPSHOT = 451,                /* SNAPSHOT  */
-    SNAPSHOTS = 452,               /* SNAPSHOTS  */
-    RECOVER = 453,                 /* RECOVER  */
-    RESTORE = 454,                 /* RESTORE  */
-    CACHES = 455,                  /* CACHES  */
-    CACHE = 456,                   /* CACHE  */
-    PERSISTENCE = 457,             /* PERSISTENCE  */
-    OBJECT = 458,                  /* OBJECT  */
-    OBJECTS = 459,                 /* OBJECTS  */
-    FILES = 460,                   /* FILES  */
-    MEMORY = 461,                  /* MEMORY  */
-    ALLOCATION = 462,              /* ALLOCATION  */
-    HISTORY = 463,                 /* HISTORY  */
-    CHECK = 464,                   /* CHECK  */
-    CLEAN = 465,                   /* CLEAN  */
-    CHECKPOINT = 466,              /* CHECKPOINT  */
-    IMPORT = 467,                  /* IMPORT  */
-    PARSE_JSON = 468,              /* PARSE_JSON  */
-    NUMBER = 469                   /* NUMBER  */
+    ESCAPE = 416,                  /* ESCAPE  */
+    DATA = 417,                    /* DATA  */
+    LOG = 418,                     /* LOG  */
+    BUFFER = 419,                  /* BUFFER  */
+    TRANSACTIONS = 420,            /* TRANSACTIONS  */
+    TRANSACTION = 421,             /* TRANSACTION  */
+    MEMINDEX = 422,                /* MEMINDEX  */
+    USING = 423,                   /* USING  */
+    SESSION = 424,                 /* SESSION  */
+    GLOBAL = 425,                  /* GLOBAL  */
+    OFF = 426,                     /* OFF  */
+    EXPORT = 427,                  /* EXPORT  */
+    CONFIGS = 428,                 /* CONFIGS  */
+    CONFIG = 429,                  /* CONFIG  */
+    PROFILES = 430,                /* PROFILES  */
+    VARIABLES = 431,               /* VARIABLES  */
+    VARIABLE = 432,                /* VARIABLE  */
+    LOGS = 433,                    /* LOGS  */
+    CATALOGS = 434,                /* CATALOGS  */
+    CATALOG = 435,                 /* CATALOG  */
+    SEARCH = 436,                  /* SEARCH  */
+    MATCH = 437,                   /* MATCH  */
+    MAXSIM = 438,                  /* MAXSIM  */
+    QUERY = 439,                   /* QUERY  */
+    QUERIES = 440,                 /* QUERIES  */
+    FUSION = 441,                  /* FUSION  */
+    ROWLIMIT = 442,                /* ROWLIMIT  */
+    ADMIN = 443,                   /* ADMIN  */
+    LEADER = 444,                  /* LEADER  */
+    FOLLOWER = 445,                /* FOLLOWER  */
+    LEARNER = 446,                 /* LEARNER  */
+    CONNECT = 447,                 /* CONNECT  */
+    STANDALONE = 448,              /* STANDALONE  */
+    NODES = 449,                   /* NODES  */
+    NODE = 450,                    /* NODE  */
+    REMOVE = 451,                  /* REMOVE  */
+    SNAPSHOT = 452,                /* SNAPSHOT  */
+    SNAPSHOTS = 453,               /* SNAPSHOTS  */
+    RECOVER = 454,                 /* RECOVER  */
+    RESTORE = 455,                 /* RESTORE  */
+    CACHES = 456,                  /* CACHES  */
+    CACHE = 457,                   /* CACHE  */
+    PERSISTENCE = 458,             /* PERSISTENCE  */
+    OBJECT = 459,                  /* OBJECT  */
+    OBJECTS = 460,                 /* OBJECTS  */
+    FILES = 461,                   /* FILES  */
+    MEMORY = 462,                  /* MEMORY  */
+    ALLOCATION = 463,              /* ALLOCATION  */
+    HISTORY = 464,                 /* HISTORY  */
+    CHECK = 465,                   /* CHECK  */
+    CLEAN = 466,                   /* CLEAN  */
+    CHECKPOINT = 467,              /* CHECKPOINT  */
+    IMPORT = 468,                  /* IMPORT  */
+    PARSE_JSON = 469,              /* PARSE_JSON  */
+    NUMBER = 470                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -432,7 +433,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 436 "parser.h"
+#line 437 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

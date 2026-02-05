@@ -1895,17 +1895,23 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     auto column_def = column_defs->at(column_idx);
+                    ColumnMeta column_meta(column_idx, block_meta);
 
                     size_t rel_data_size = 0;
-                    ColumnMeta column_meta(column_idx, block_meta);
                     std::tie(rel_data_size, status) = column_meta.GetColumnSize(rel_row_cnt, column_def);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    size_t full_data_size = 0;
+                    std::tie(full_data_size, status) = column_meta.GetColumnSize(block_meta.block_capacity(), column_def);
                     if (!status.ok()) {
                         return status;
                     }
 
                     {
                         auto read_path = std::make_shared<std::string>(fmt::format("{}/{}.col", *block_dir_ptr, column_def->id()));
-                        auto data_file_worker = std::make_unique<DataFileWorker>(read_path, rel_data_size);
+                        auto data_file_worker = std::make_unique<DataFileWorker>(read_path, full_data_size);
                         auto data_file_worker_ = fileworker_mgr->data_map_.EmplaceFileWorker(std::move(data_file_worker));
 
                         // Read data file
@@ -1942,7 +1948,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         }
 
                         bool prepare_success{};
-                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, prepare_success, {});
+                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, rel_data_size, prepare_success, {});
                     }
                 }
             }
@@ -1955,11 +1961,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
     {
         auto CreateSnapshotFile = [&](const std::string &file) -> Status {
-            // Status status = VirtualStore::Copy(write_path, read_path);
-            // if (!status.ok()) {
-            //     LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
-            //     return Status::OK();
-            // }
             std::string read_path = fmt::format("{}/{}", temp_dir, file);
             std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
             LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
@@ -1967,7 +1968,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             Status status = VirtualStore::Copy(read_path, write_path);
             if (!status.ok()) {
                 LOG_INFO(fmt::format("Copy {} to {} failed: {}", read_path, write_path, status.message()));
-                return Status::OK();
             }
 
             return Status::OK();
