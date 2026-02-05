@@ -14,11 +14,6 @@
 
 module;
 
-#include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-
 module infinity_core:wordnet_lemmatizer.impl;
 
 import :wordnet_lemmatizer;

@@ -286,8 +286,8 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         return status;
     }
     auto IndexRecoverTable = [&](TableMeta &table_meta) {
-        std::vector<std::string> *index_id_strs_ptr = nullptr;
-        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        std::vector<std::string> *index_id_strs_ptr{};
+        std::vector<std::string> *index_name_strs_ptr{};
         status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
@@ -297,6 +297,13 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
             TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+            auto [index_base, status] = table_index_meta.GetIndexBase();
+            if (!status.ok()) {
+                return status;
+            }
+            if (index_base->index_type_ == IndexType::kHnsw) {
+                continue;
+            }
             status = txn->RecoverMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -984,6 +991,24 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     }
     {
         auto status = segment_index_meta.AddChunkIndexID1(chunk_id, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::InitHnswChunkIndex(SegmentIndexMeta &segment_index_meta, NewTxn *new_txn, std::optional<ChunkIndexMeta> &chunk_index_meta) {
+    {
+        ChunkIndexMetaInfo chunk_info;
+        chunk_index_meta.emplace(0, segment_index_meta);
+        auto status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        auto status = segment_index_meta.AddChunkIndexID1(0, new_txn);
         if (!status.ok()) {
             return status;
         }

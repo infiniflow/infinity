@@ -101,22 +101,22 @@ export template <typename DataType>
 using PlainCosLSGDist = LSGDistWrapper<PlainCosDist<DataType>, PlainVecStoreMeta<DataType>>;
 
 export template <typename DataType, typename CompressType, typename LVQCache>
-using LVQL2LSGDist = LSGDistWrapper<LVQL2Dist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+using LVQL2LSGDist = LSGDistWrapper<LVQL2Dist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache>>;
 
 export template <typename DataType, typename CompressType, typename LVQCache>
-using LVQIPLSGDist = LSGDistWrapper<LVQIPDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+using LVQIPLSGDist = LSGDistWrapper<LVQIPDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache>>;
 
 export template <typename DataType, typename CompressType, typename LVQCache>
-using LVQCosLSGDist = LSGDistWrapper<LVQCosDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache, true>>;
+using LVQCosLSGDist = LSGDistWrapper<LVQCosDist<DataType, CompressType>, LVQVecStoreMeta<DataType, CompressType, LVQCache>>;
 
 export template <typename DataType>
-using RabitqL2LSGDist = LSGDistWrapper<RabitqL2Dist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+using RabitqL2LSGDist = LSGDistWrapper<RabitqL2Dist<DataType>, RabitqVecStoreMeta<DataType>>;
 
 export template <typename DataType>
-using RabitqIPLSGDist = LSGDistWrapper<RabitqIPDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+using RabitqIPLSGDist = LSGDistWrapper<RabitqIPDist<DataType>, RabitqVecStoreMeta<DataType>>;
 
 export template <typename DataType>
-using RabitqCosLSGDist = LSGDistWrapper<RabitqCosDist<DataType>, RabitqVecStoreMeta<DataType, true>>;
+using RabitqCosLSGDist = LSGDistWrapper<RabitqCosDist<DataType>, RabitqVecStoreMeta<DataType>>;
 
 export template <typename Distance>
 concept IsLSGDistance = requires { typename Distance::LSG; };

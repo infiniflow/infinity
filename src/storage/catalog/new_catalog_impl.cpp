@@ -124,10 +124,10 @@ std::vector<std::pair<std::string, std::string>> NewCatalog::GetAllMemIndexInfo(
     {
         std::unique_lock lock(mem_index_mtx_);
         for (const auto &mem_index_pair : mem_index_map_) {
-            if (mem_index_pair.second->GetHnswIndex() != nullptr) {
-                result.push_back({mem_index_pair.first, "hnsw"});
-                continue;
-            }
+            // if (mem_index_pair.second->GetHnswIndex() != nullptr) {
+            //     result.push_back({mem_index_pair.first, "hnsw"});
+            //     continue;
+            // }
             if (mem_index_pair.second->GetIVFIndex() != nullptr) {
                 result.push_back({mem_index_pair.first, "ivf"});
                 continue;

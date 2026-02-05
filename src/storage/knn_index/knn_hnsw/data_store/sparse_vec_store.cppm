@@ -21,6 +21,7 @@ export module infinity_core:sparse_vec_store;
 import :local_file_handle;
 import :hnsw_common;
 import :sparse_util;
+import :boost;
 
 import std;
 
@@ -35,13 +36,16 @@ public:
     using QueryType = SparseVecRef<DataType, IdxType>;
     using DistanceType = std::conditional_t<std::is_same_v<DataType, bool>, IdxType, std::conditional_t<std::is_same_v<DataType, f64>, f64, f32>>;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
 private:
     SparseVecStoreMeta(size_t max_dim) : max_dim_(max_dim) {}
 
 public:
     SparseVecStoreMeta() = default;
-    static This Make(size_t max_dim) { return This(max_dim); }
-    static This Make(size_t max_dim, bool) { return This(max_dim); }
+    static This Make(size_t max_dim, const void_allocator &alloc_inst) { return This(max_dim, alloc_inst); }
+    static This Make(size_t max_dim, bool normalize, const void_allocator &alloc_inst) { return This(max_dim, alloc_inst); }
 
     size_t CalcSize() const {
         size_t ret{};
@@ -78,14 +82,20 @@ public:
     using SparseVecRef = SparseVecRef<DataType, IdxType>;
     using SparseVecEle = SparseVecEle<DataType, IdxType>;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
 private:
-    SparseVecStoreInner(size_t max_vec_num, const Meta &meta) : vecs_(std::make_unique_for_overwrite<SparseVecEle[]>(max_vec_num)) {}
+    SparseVecStoreInner(size_t max_vec_num, const Meta &meta, const void_allocator &alloc_inst)
+        : vecs_(std::make_unique_for_overwrite<SparseVecEle[]>(max_vec_num)) {
+        // this->sm_ = sm;
+    }
 
 public:
     SparseVecStoreInner() = default;
 
-    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
-        auto ret = This(max_vec_num, meta);
+    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage, const void_allocator &alloc_inst) {
+        auto ret = This(max_vec_num, meta, alloc_inst);
         mem_usage += sizeof(SparseVecEle) * max_vec_num;
         return ret;
     }
@@ -187,6 +197,7 @@ public:
 
 private:
     std::unique_ptr<SparseVecEle[]> vecs_;
+    // segment_manager *sm_;
 
 public:
     void Dump(std::ostream &os, size_t offset, size_t chunk_size, const Meta &meta) const {

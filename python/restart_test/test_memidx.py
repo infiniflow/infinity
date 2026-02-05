@@ -556,9 +556,11 @@ class TestMemIdx:
                 time.sleep(1)
 
             idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
-            assert len(idx1_dirs) == 2
+            # assert len(idx1_dirs) == 2
+            assert len(idx1_dirs) == 1
             idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-            assert len(idx2_dirs) == 2
+            # assert len(idx2_dirs) == 2
+            assert len(idx2_dirs) == 1
 
         part1()
 
@@ -581,9 +583,11 @@ class TestMemIdx:
 
             idx1_dirs = list(pathlib.Path(db1_dir).rglob("*chunk*"))
             print(idx1_dirs)
-            assert len(idx1_dirs) == 3
+            # assert len(idx1_dirs) == 3
+            assert len(idx1_dirs) == 1
             idx2_dirs = list(pathlib.Path(db2_dir).rglob("*chunk*"))
-            assert len(idx2_dirs) == 3
+            # assert len(idx2_dirs) == 3
+            assert len(idx2_dirs) == 1
 
             # wait for optimize commit
             # The optimization transaction creates the file before committing.

@@ -52,7 +52,7 @@ void FileWorkerMap<FileWorkerT>::RemoveImport(TransactionID txn_id) {
 template <typename FileWorkerT>
 FileWorkerT *FileWorkerMap<FileWorkerT>::GetFileWorker(const std::string &rel_file_path) {
     {
-        std::shared_lock lock(rw_mtx_);
+        std::unique_lock lock(rw_mtx_);
         if (auto iter = map_.find(rel_file_path); iter != map_.end()) {
             return iter->second.get();
         }
@@ -72,9 +72,10 @@ FileWorkerT *FileWorkerMap<FileWorkerT>::GetFileWorkerNoLock(const std::string &
 
 template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::ClearCleans() {
+    std::unique_lock l(rw_mtx_);
     decltype(cleans_) cleans;
     {
-        std::unique_lock l(rw_clean_mtx_);
+        // std::unique_lock l(rw_clean_mtx_);
         cleans_.swap(cleans);
     }
 
@@ -91,7 +92,7 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
     }
 
     {
-        std::unique_lock lock(rw_mtx_);
+        // std::unique_lock lock(rw_mtx_);
         for (auto *file_worker : cleans) {
             auto fileworker_key = *file_worker->rel_file_path_;
             map_.erase(fileworker_key);
@@ -103,7 +104,8 @@ void FileWorkerMap<FileWorkerT>::ClearCleans() {
 
 template <typename FileWorkerT>
 void FileWorkerMap<FileWorkerT>::MoveToCleans(FileWorkerT *file_worker) {
-    std::unique_lock lock(rw_clean_mtx_);
+    // std::unique_lock lock(rw_clean_mtx_);
+    std::unique_lock lock(rw_mtx_);
     cleans_.emplace_back(file_worker);
 }
 

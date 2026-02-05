@@ -31,6 +31,8 @@ import third_party;
 
 namespace infinity {
 
+using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+
 VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
     : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
@@ -40,15 +42,51 @@ void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandl
     auto tmp_path = GetWorkingPath();
     if (!inited_) {
         segment_ =
-            boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 2 * 1024 * 1024 /* 2MB */);
-        auto *sm = segment_.get_segment_manager();
-        data = segment_.find_or_construct<BlockVersion>(path.c_str())(8192, sm);
+            boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 64 * 1024 + 64 * 16 /* 64KB */);
+        boost::interprocess::allocator<void, segment_manager_t> alloc_inst(segment_.get_segment_manager());
+        // std::println("!!!! {}", segment_.get_size());
+        // std::println("!!!! {}", segment_.get_segment_manager()->get_size());
+        // segment_.grow(tmp_path.c_str(), segment_.get_size());
+        // std::println("!!!! {}", segment_.get_size());
+        // // segment_.get_segment_manager()->grow(segment_.get_size());
+        // InfinityContext::instance().storage()->fileworker_manager()->version_map_.GetFileWorker(path)->GrowNolock();
+        // std::println("!!!! {}", segment_.get_size());
+
+        // std::println(">>>> {}", segment_.get_segment_manager()->);
+
+        data = segment_.find_or_construct<BlockVersion>(path.c_str())(path.c_str(), 8192, alloc_inst);
         inited_ = true;
-        mmap_ = (void *)(-1); // for test
         return;
     }
     auto result = segment_.find<BlockVersion>(path.c_str());
     data = result.first;
+}
+
+void VersionFileWorker::Grow() {
+    std::lock_guard l(mutex_);
+    std::println("!!!! {}", segment_.get_size());
+    auto tmp_path = GetWorkingPath();
+    segment_.grow(tmp_path.c_str(), segment_.get_size());
+
+    // boost::interprocess::managed_mapped_file new_seg(boost::interprocess::open_or_create_infinity,
+    //                                                  tmp_path.c_str(),
+    //                                                  segment_.get_size() + extra_size);
+
+    // boost::interprocess::managed_mapped_file new_segment(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), boost_size_ + extra_size);
+    //
+    // segment_.swap(new_segment);
+}
+void VersionFileWorker::GrowNolock() {
+    auto tmp_path = GetWorkingPath();
+    segment_.grow(tmp_path.c_str(), segment_.get_size());
+
+    // boost::interprocess::managed_mapped_file new_seg(boost::interprocess::open_or_create_infinity,
+    //                                                  tmp_path.c_str(),
+    //                                                  segment_.get_size() + extra_size);
+
+    boost::interprocess::managed_mapped_file new_segment(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), segment_.get_size());
+
+    segment_.swap(new_segment);
 }
 
 } // namespace infinity

@@ -31,7 +31,7 @@ struct EraseBaseCache;
 struct MetaKey;
 
 export struct MemIndexRange {
-    std::string index_id_{};
+    std::string index_id_;
     SegmentID segment_id_{};
     ChunkID chunk_id_{};
     SegmentOffset start_offset_{};
@@ -78,7 +78,7 @@ export struct BaseTxnStore {
 };
 
 // DummyTxnStore is only used in test
-export struct DummyTxnStore final : public BaseTxnStore {
+export struct DummyTxnStore final : BaseTxnStore {
     DummyTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
     ~DummyTxnStore() override = default;
 
@@ -86,7 +86,7 @@ export struct DummyTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateDBTxnStore final : public BaseTxnStore {
+export struct CreateDBTxnStore final : BaseTxnStore {
     CreateDBTxnStore() : BaseTxnStore(TransactionType::kCreateDB) {}
     ~CreateDBTxnStore() override = default;
 
@@ -99,7 +99,7 @@ export struct CreateDBTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropDBTxnStore final : public BaseTxnStore {
+export struct DropDBTxnStore final : BaseTxnStore {
     DropDBTxnStore() : BaseTxnStore(TransactionType::kDropDB) {}
     ~DropDBTxnStore() override = default;
 
@@ -112,189 +112,189 @@ export struct DropDBTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateTableTxnStore final : public BaseTxnStore {
+export struct CreateTableTxnStore final : BaseTxnStore {
     CreateTableTxnStore() : BaseTxnStore(TransactionType::kCreateTable) {}
     ~CreateTableTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
-    std::shared_ptr<TableDef> table_def_{};
+    std::shared_ptr<TableDef> table_def_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateTableSnapshotTxnStore final : public BaseTxnStore {
+export struct CreateTableSnapshotTxnStore final : BaseTxnStore {
     CreateTableSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateTableSnapshot) {}
 
-    std::string db_name_{};
-    std::string table_name_{};
-    std::string snapshot_name_{};
+    std::string db_name_;
+    std::string table_name_;
+    std::string snapshot_name_;
     TxnTimeStamp max_commit_ts_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateDBSnapshotTxnStore final : public BaseTxnStore {
+export struct CreateDBSnapshotTxnStore final : BaseTxnStore {
     CreateDBSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateDBSnapshot) {}
 
-    std::string db_name_{};
-    std::string snapshot_name_{};
+    std::string db_name_;
+    std::string snapshot_name_;
     TxnTimeStamp max_commit_ts_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateSystemSnapshotTxnStore final : public BaseTxnStore {
+export struct CreateSystemSnapshotTxnStore final : BaseTxnStore {
     CreateSystemSnapshotTxnStore() : BaseTxnStore(TransactionType::kCreateSystemSnapshot) {}
 
-    std::string snapshot_name_{};
+    std::string snapshot_name_;
     TxnTimeStamp max_commit_ts_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct RestoreTableTxnStore final : public BaseTxnStore {
+export struct RestoreTableTxnStore final : BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 
-    std::string db_name_{};
-    std::string snapshot_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string snapshot_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
 
-    std::shared_ptr<TableDef> table_def_{};
-    std::vector<WalSegmentInfoV2> segment_infos_{};
-    std::vector<WalCmdCreateIndexV2> index_cmds_{};
-    std::vector<std::string> files_{};
+    std::shared_ptr<TableDef> table_def_;
+    std::vector<WalSegmentInfoV2> segment_infos_;
+    std::vector<WalCmdCreateIndexV2> index_cmds_;
+    std::vector<std::string> files_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct RestoreDatabaseTxnStore final : public BaseTxnStore {
+export struct RestoreDatabaseTxnStore final : BaseTxnStore {
     RestoreDatabaseTxnStore() : BaseTxnStore(TransactionType::kRestoreDatabase) {}
 
-    std::string db_name_{};
-    std::string snapshot_name_{};
-    std::string db_id_str_{};
-    std::string db_comment_{};
-    std::vector<std::shared_ptr<RestoreTableTxnStore>> restore_table_txn_stores_{};
+    std::string db_name_;
+    std::string snapshot_name_;
+    std::string db_id_str_;
+    std::string db_comment_;
+    std::vector<std::shared_ptr<RestoreTableTxnStore>> restore_table_txn_stores_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct RestoreSystemTxnStore final : public BaseTxnStore {
+export struct RestoreSystemTxnStore final : BaseTxnStore {
     RestoreSystemTxnStore() : BaseTxnStore(TransactionType::kRestoreSystem) {}
 
-    std::string snapshot_name_{};
+    std::string snapshot_name_;
     std::vector<std::shared_ptr<RestoreDatabaseTxnStore>> restore_database_txn_stores_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropTableTxnStore final : public BaseTxnStore {
+export struct DropTableTxnStore final : BaseTxnStore {
     DropTableTxnStore() : BaseTxnStore(TransactionType::kDropTable) {}
     ~DropTableTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
     TxnTimeStamp create_ts_{};
-    std::string table_key_{};
+    std::string table_key_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct RenameTableTxnStore final : public BaseTxnStore {
+export struct RenameTableTxnStore final : BaseTxnStore {
     RenameTableTxnStore() : BaseTxnStore(TransactionType::kRenameTable) {}
     ~RenameTableTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string old_table_name_{};
-    std::string table_id_str_{};
-    std::string new_table_name_{};
-    std::string old_table_key_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string old_table_name_;
+    std::string table_id_str_;
+    std::string new_table_name_;
+    std::string old_table_key_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct CreateIndexTxnStore final : public BaseTxnStore {
+export struct CreateIndexTxnStore final : BaseTxnStore {
     CreateIndexTxnStore() : BaseTxnStore(TransactionType::kCreateIndex) {}
     ~CreateIndexTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
-    std::shared_ptr<IndexBase> index_base_{};
-    std::string index_id_str_{};
-    std::string table_key_{};
+    std::shared_ptr<IndexBase> index_base_;
+    std::string index_id_str_;
+    std::string table_key_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropIndexTxnStore final : public BaseTxnStore {
+export struct DropIndexTxnStore final : BaseTxnStore {
     DropIndexTxnStore() : BaseTxnStore(TransactionType::kDropIndex) {}
     ~DropIndexTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
-    std::string index_name_{};
-    std::string index_id_str_{};
+    std::string index_name_;
+    std::string index_id_str_;
     u64 index_id_{};
     TxnTimeStamp create_ts_{};
-    std::string index_key_{};
+    std::string index_key_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
 export struct OptimizeIndexStoreEntry {
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
-    std::string table_key_{};
-    std::string index_name_{};
-    std::string index_id_str_{};
+    std::string table_key_;
+    std::string index_name_;
+    std::string index_id_str_;
     u64 index_id_{};
     SegmentID segment_id_{};
     std::vector<WalChunkIndexInfo> new_chunk_infos_;
     std::vector<ChunkID> deprecate_chunks_;
 };
 
-export struct OptimizeIndexTxnStore final : public BaseTxnStore {
+export struct OptimizeIndexTxnStore final : BaseTxnStore {
     OptimizeIndexTxnStore() : BaseTxnStore(TransactionType::kOptimizeIndex) {}
     ~OptimizeIndexTxnStore() override = default;
 
-    std::vector<std::string> db_names_{};
+    std::vector<std::string> db_names_;
     std::map<std::string, std::vector<std::string>> table_names_in_db_{};
     std::vector<OptimizeIndexStoreEntry> entries_;
 
@@ -302,18 +302,18 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AlterIndexTxnStore final : public BaseTxnStore {
+export struct AlterIndexTxnStore final : BaseTxnStore {
     AlterIndexTxnStore() : BaseTxnStore(TransactionType::kInvalid) {}
     ~AlterIndexTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
     u64 db_id_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string table_name_;
+    std::string table_id_str_;
     u64 table_id_{};
-    std::string index_name_{};
-    std::string index_id_str_{};
+    std::string index_name_;
+    std::string index_id_str_;
     u64 index_id_{};
     mutable std::vector<std::unique_ptr<InitParameter>> params_;
 
@@ -321,26 +321,28 @@ export struct AlterIndexTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AppendTxnStore final : public BaseTxnStore {
+export struct AppendTxnStore final : BaseTxnStore {
     AppendTxnStore() : BaseTxnStore(TransactionType::kAppend) {}
     ~AppendTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
-    std::shared_ptr<DataBlock> input_block_{};
-    std::vector<std::string> index_ids_{}; // indexes will be appended
+    std::shared_ptr<DataBlock> input_block_;
+    std::vector<std::string> index_ids_; // indexes will be appended
 
     // For data append
-    std::vector<std::pair<RowID, u64>> row_ranges_{};
+    std::vector<std::pair<RowID, u64>> row_ranges_;
 
     // For mem index
-    std::vector<MemIndexRange> mem_indexes_to_append_{};
-    std::vector<MemIndexRange> mem_indexes_to_dump_{};
+    std::vector<MemIndexRange> mem_indexes_to_append_;
+    std::vector<MemIndexRange> mem_indexes_to_dump_;
+
+    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -349,27 +351,27 @@ export struct AppendTxnStore final : public BaseTxnStore {
     // size_t RowCount() const;
 };
 
-export struct ImportTxnStore final : public BaseTxnStore {
+export struct ImportTxnStore final : BaseTxnStore {
     ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
     ~ImportTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
-    std::string table_key_{};
-    std::string import_tmp_path_{};
-    std::vector<std::string> import_file_names_{}; // used during rollback
-    std::vector<WalSegmentInfo> segment_infos_{};
+    std::string table_key_;
+    std::string import_tmp_path_;
+    std::vector<std::string> import_file_names_; // used during rollback
+    std::vector<WalSegmentInfo> segment_infos_;
 
-    std::vector<std::string> index_names_{};
-    std::vector<std::string> index_ids_str_{};
-    std::vector<u64> index_ids_{};
-    std::vector<SegmentID> segment_ids_{};
-    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
-    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
+    std::vector<std::string> index_names_;
+    std::vector<std::string> index_ids_str_;
+    std::vector<u64> index_ids_;
+    std::vector<SegmentID> segment_ids_;
+    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_;
+    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_;
     size_t row_count_{};
 
     std::string ToString() const final;
@@ -378,62 +380,62 @@ export struct ImportTxnStore final : public BaseTxnStore {
     // size_t SegmentCount() const;
 };
 
-export struct DumpMemIndexTxnStore final : public BaseTxnStore {
+export struct DumpMemIndexTxnStore final : BaseTxnStore {
     DumpMemIndexTxnStore() : BaseTxnStore(TransactionType::kDumpMemIndex) {}
     ~DumpMemIndexTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
-    std::string index_name_{};
-    std::string index_id_str_{};
+    std::string index_name_;
+    std::string index_id_str_;
     u64 index_id_{};
-    std::vector<SegmentID> segment_ids_{};
-    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    std::vector<SegmentID> segment_ids_;
+    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_;
     std::string table_key_{};
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct AddColumnsTxnStore final : public BaseTxnStore {
+export struct AddColumnsTxnStore final : BaseTxnStore {
     AddColumnsTxnStore() : BaseTxnStore(TransactionType::kAddColumn) {}
     ~AddColumnsTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
-    std::vector<u32> column_idx_list_{};
-    std::vector<std::shared_ptr<ColumnDef>> column_defs_{};
-    std::string table_key_{};
+    std::vector<u32> column_idx_list_;
+    std::vector<std::shared_ptr<ColumnDef>> column_defs_;
+    std::string table_key_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
-export struct DropColumnsTxnStore final : public BaseTxnStore {
+export struct DropColumnsTxnStore final : BaseTxnStore {
     DropColumnsTxnStore() : BaseTxnStore(TransactionType::kDropColumn) {}
     ~DropColumnsTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
-    std::vector<std::string> column_names_{};
-    std::vector<ColumnID> column_ids_{};
-    std::string table_key_{};
-    std::vector<std::string> column_keys_{};
+    std::vector<std::string> column_names_;
+    std::vector<ColumnID> column_ids_;
+    std::string table_key_;
+    std::vector<std::string> column_keys_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -443,24 +445,24 @@ export struct CompactTxnStore final : public BaseTxnStore {
     CompactTxnStore() : BaseTxnStore(TransactionType::kCompact) {}
     ~CompactTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
-    std::string table_key_{};
+    std::string table_key_;
 
     SegmentID new_segment_id_{};
-    std::vector<WalSegmentInfo> segment_infos_{};
-    std::vector<SegmentID> deprecated_segment_ids_{};
+    std::vector<WalSegmentInfo> segment_infos_;
+    std::vector<SegmentID> deprecated_segment_ids_;
 
-    std::vector<std::string> index_names_{};
-    std::vector<std::string> index_ids_str_{};
-    std::vector<u64> index_ids_{};
-    std::vector<SegmentID> segment_ids_{};
-    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
-    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
+    std::vector<std::string> index_names_;
+    std::vector<std::string> index_ids_str_;
+    std::vector<u64> index_ids_;
+    std::vector<SegmentID> segment_ids_;
+    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_;
+    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -470,14 +472,14 @@ export struct DeleteTxnStore final : public BaseTxnStore {
     DeleteTxnStore() : BaseTxnStore(TransactionType::kDelete) {}
     ~DeleteTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
-    std::vector<RowID> row_ids_{};
+    std::vector<RowID> row_ids_;
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -487,10 +489,10 @@ export struct UpdateTxnStore final : public BaseTxnStore {
     UpdateTxnStore() : BaseTxnStore(TransactionType::kUpdate) {}
     ~UpdateTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
 
@@ -517,19 +519,19 @@ export struct UpdateTxnStore final : public BaseTxnStore {
 export struct FlushDataEntry {
     explicit FlushDataEntry(const std::string &db_id_str, const std::string &table_id_str, SegmentID segment_id, BlockID block_id)
         : db_id_str_(db_id_str), table_id_str_(table_id_str), segment_id_(segment_id), block_id_(block_id) {}
-    std::string db_id_str_{};
-    std::string table_id_str_{};
+    std::string db_id_str_;
+    std::string table_id_str_;
     SegmentID segment_id_{};
     BlockID block_id_{};
-    std::string to_flush_{};
+    std::string to_flush_;
 };
 
-export struct CheckpointTxnStore final : public BaseTxnStore {
+export struct CheckpointTxnStore final : BaseTxnStore {
     explicit CheckpointTxnStore(TxnTimeStamp checkpoint_ts, bool auto_checkpoint)
         : BaseTxnStore(TransactionType::kNewCheckpoint), max_commit_ts_(checkpoint_ts), auto_check_point_(auto_checkpoint) {}
     ~CheckpointTxnStore() override = default;
 
-    std::vector<std::shared_ptr<FlushDataEntry>> entries_{};
+    std::vector<std::shared_ptr<FlushDataEntry>> entries_;
     i64 max_commit_ts_{};
     bool auto_check_point_{};
 

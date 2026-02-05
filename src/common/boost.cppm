@@ -25,46 +25,49 @@ module;
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/containers_fwd.hpp>
 #include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/containers/vector.hpp>
 #include <boost/interprocess/managed_mapped_file.hpp>
+#include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <boost/thread.hpp>
 
 export module infinity_core:boost;
 
-namespace boost {
+export namespace boost {
+using boost::bind;
+using boost::dynamic_bitset;
+using boost::shared_mutex;
+using boost::unique_lock;
+using boost::upgrade_lock;
+using boost::upgrade_to_unique_lock;
+
 namespace system {
-export using boost::system::error_code;
+using boost::system::error_code;
 }
-export using boost::bind;
-export using boost::dynamic_bitset;
-export using boost::upgrade_lock;
-export using boost::upgrade_to_unique_lock;
-export using boost::shared_mutex;
-export using boost::unique_lock;
-// export using boost::mutex;
+
 namespace asio {
-export using boost::asio::io_context;
-export using boost::asio::read;
-export using boost::asio::buffer;
-export using boost::asio::transfer_at_least;
-export using boost::asio::mutable_buffer;
-export using boost::asio::write;
+using boost::asio::buffer;
+using boost::asio::io_context;
+using boost::asio::mutable_buffer;
+using boost::asio::read;
+using boost::asio::transfer_at_least;
+using boost::asio::write;
 namespace ip {
-export using boost::asio::ip::tcp;
-export using boost::asio::ip::make_address;
-export using boost::asio::ip::address;
+using boost::asio::ip::address;
+using boost::asio::ip::make_address;
+using boost::asio::ip::tcp;
 } // namespace ip
 namespace error {
-export using boost::asio::error::broken_pipe;
-export using boost::asio::error::connection_reset;
+using boost::asio::error::broken_pipe;
+using boost::asio::error::connection_reset;
 } // namespace error
 } // namespace asio
-} // namespace boost
 
-export namespace boost {
 namespace interprocess {
+using boost::interprocess::offset_ptr;
+
 using boost::interprocess::allocator;
 using boost::interprocess::vector;
 // export using boost::interprocess::map;
@@ -82,4 +85,9 @@ inline constexpr auto open_or_create_infinity = open_or_create;
 inline constexpr auto open_read_only_infinity = open_read_only;
 
 } // namespace interprocess
+
+namespace container {
+using boost::container::basic_string;
+} // namespace container
+
 } // namespace boost

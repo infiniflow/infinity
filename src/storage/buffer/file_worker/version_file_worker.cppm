@@ -35,8 +35,13 @@ export struct VersionFileWorker : FileWorker {
 
     void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    size_t capacity_{};
+    void Grow();
+
+    void GrowNolock();
+
     boost::interprocess::managed_mapped_file segment_;
+
+    size_t capacity_{};
     bool inited_{};
 };
 

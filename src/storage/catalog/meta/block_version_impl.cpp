@@ -26,6 +26,9 @@ import :default_values;
 import :column_vector;
 import :local_file_handle;
 import :status;
+import :utility;
+import :infinity_context;
+import :fileworker_manager;
 
 import std;
 import third_party;
@@ -293,7 +296,14 @@ void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) co
 
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     std::unique_lock lock(rw_mutex_);
-    created_.emplace_back(commit_ts, row_count);
+    auto op_func = [&, this] mutable { created_.emplace_back(commit_ts, row_count); };
+    auto grow_func = [&, this] mutable {
+        InfinityContext::instance().storage()->fileworker_manager()->version_map_.GetFileWorker(path_.c_str())->Grow();
+    };
+    // how to get the name????
+    GrowThenRetry(grow_func, op_func);
+
+    // created_.emplace_back(commit_ts, row_count);
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {

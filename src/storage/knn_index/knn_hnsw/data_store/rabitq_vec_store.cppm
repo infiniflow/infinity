@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <random>
 
 #include <common/simd/simd_functions.h>
 
@@ -26,8 +25,8 @@ import :data_store_util;
 import :infinity_exception;
 import :hnsw_common;
 import :mlas_matrix_multiply;
+import :boost;
 
-import std;
 import std.compat;
 import serialize;
 
@@ -50,7 +49,7 @@ void GenerateRandomOrthogonalMatrix(DataType *rom, size_t dim) {
     // Random Givens Rotation
     for (size_t i = 0; i < dim; ++i) {
         for (size_t j = i + 1; j < dim; ++j) {
-            DataType angle = 2 * M_PI * dist(gen);
+            DataType angle = 2 * std::numbers::pi * dist(gen);
             DataType c = std::cos(angle);
             DataType s = std::sin(angle);
             for (size_t k = 0; k < dim; ++k) {
@@ -86,7 +85,7 @@ struct RabitqQueryData {
 
 /////////////////////////// meta info of rabitq ///////////////////////////
 
-export template <typename DataType, bool OwnMem>
+export template <typename DataType>
 class RabitqVecStoreInner;
 
 export template <typename DataType>
@@ -102,7 +101,7 @@ public:
         std::unique_ptr<QueryData> inner_;
         QueryData *operator->() const { return inner_.get(); }
 
-        QueryType(size_t compress_data_size) : inner_(new(new char[compress_data_size]) QueryData) {}
+        QueryType(size_t compress_data_size) : inner_(new (new char[compress_data_size]) QueryData) {}
         QueryType(QueryType &&other) = default;
         ~QueryType() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
@@ -147,14 +146,14 @@ public:
     };
 };
 
-template <typename DataType, bool OwnMem>
+template <typename DataType>
 class RabitqVecStoreMetaBase {
 public:
     // DataType type must be i8 & float temporarily
     static_assert(std::is_same<DataType, i8>() || std::is_same<DataType, float>());
 
-    using This = RabitqVecStoreMetaBase<DataType, OwnMem>;
-    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    using This = RabitqVecStoreMetaBase<DataType>;
+    using Inner = RabitqVecStoreInner<DataType>;
     using MetaType = RabitqVecStoreMetaType<DataType>;
     using StoreData = typename MetaType::StoreData;
     using QueryData = typename MetaType::QueryData;
@@ -164,8 +163,15 @@ public:
     using CompressType = typename MetaType::CompressType;
     using DistanceType = typename MetaType::DistanceType;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
+    using DataTypeAllocator = boost::interprocess::allocator<DataType, segment_manager_t>;
+    using ShmemDataTypeVector = boost::interprocess::vector<DataType, DataTypeAllocator>;
+
 public:
-    RabitqVecStoreMetaBase() : origin_dim_(0), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
+    RabitqVecStoreMetaBase(const void_allocator &alloc_inst)
+        : origin_dim_(0), rom_(alloc_inst), rot_centroid_(alloc_inst), dim_(0), compress_data_size_(0), compress_query_size_(0) {}
     RabitqVecStoreMetaBase(This &&other) noexcept
         : origin_dim_(std::exchange(other.origin_dim_, 0)), rom_(std::move(other.rom_)), rot_centroid_(std::move(other.rot_centroid_)),
           dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)),
@@ -227,7 +233,7 @@ public:
         }
 
         // 3.Rotation align_src by rom
-        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.get(), 1, dim_, dim_, rot_src.data());
+        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.data(), 1, dim_, dim_, rot_src.data());
 
         // 4.normalize rot_src
         DataType norm = 0;
@@ -280,7 +286,7 @@ public:
         }
 
         // 3.Rotation align_src by rom
-        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.get(), 1, dim_, dim_, rot_src.data());
+        matrixA_multiply_matrixB_output_to_C(align_src.data(), rom_.data(), 1, dim_, dim_, rot_src.data());
 
         // 4.normalize rot_src
         DataType norm = 0;
@@ -372,49 +378,65 @@ public:
         }
 
         // 4.Inverse random projection
-        matrixA_multiply_transpose_matrixB_output_to_C(rot_src.data(), rom_.get(), 1, dim_, dim_, dest);
+        matrixA_multiply_transpose_matrixB_output_to_C(rot_src.data(), rom_.data(), 1, dim_, dim_, dest);
     }
 
-    void DecompressCode(const StoreType &src, DataType *dest) const { DecompressCode(src, dest, rot_centroid_.get()); }
+    void DecompressCode(const StoreType &src, DataType *dest) const { DecompressCode(src, dest, rot_centroid_.data()); }
 
 protected:
     size_t origin_dim_;
-    ArrayPtr<DataType, OwnMem> rom_;          // Random orthogonal matrix
-    ArrayPtr<DataType, OwnMem> rot_centroid_; // Rotation centroid of all vector in DataStore
+    // ArrayPtr<DataType> rom_;          // Random orthogonal matrix
+    ShmemDataTypeVector rom_;
+
+    // ArrayPtr<DataType> rot_centroid_; // Rotation centroid of all vector in DataStore
+    ShmemDataTypeVector rot_centroid_;
 
     size_t dim_;
     size_t compress_data_size_;
     size_t compress_query_size_;
+    // segment_manager *sm_;
 };
 
-export template <typename DataType, bool OwnMem>
-class RabitqVecStoreMeta : public RabitqVecStoreMetaBase<DataType, OwnMem> {
+export template <typename DataType>
+class RabitqVecStoreMeta : public RabitqVecStoreMetaBase<DataType> {
 public:
-    using This = RabitqVecStoreMeta<DataType, OwnMem>;
-    using Base = RabitqVecStoreMetaBase<DataType, OwnMem>;
-    using Inner = RabitqVecStoreInner<DataType, OwnMem>;
+    using This = RabitqVecStoreMeta<DataType>;
+    using Base = RabitqVecStoreMetaBase<DataType>;
+    using Inner = RabitqVecStoreInner<DataType>;
     using MetaType = typename Base::MetaType;
     using StoreData = typename Base::StoreData;
     using QueryData = typename Base::QueryData;
     using AlignType = typename Base::AlignType;
     using CompressType = typename Base::CompressType;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
 private:
-    RabitqVecStoreMeta(size_t origin_dim) {
+    RabitqVecStoreMeta(size_t origin_dim, const void_allocator &alloc_inst) : Base(alloc_inst) {
         this->origin_dim_ = origin_dim;
         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
         this->dim_ = dim;
-        this->rom_ = std::make_unique<DataType[]>(dim * dim);
-        this->rot_centroid_ = std::make_unique<DataType[]>(dim);
-        GenerateRandomOrthogonalMatrix<DataType>(this->rom_.get(), this->dim_);
+        // this->rom_ = std::make_unique<DataType[]>(dim * dim);
+        // this->rom_ = boost::interprocess::vector<DataType, boost::interprocess::allocator<DataType, segment_manager>>(sm);
+        this->rom_.resize(dim * dim);
+
+        // this->rot_centroid_ = std::make_unique<DataType[]>(dim);
+        // this->rot_centroid_ = boost::interprocess::vector<DataType, boost::interprocess::allocator<DataType, segment_manager>>(sm);
+        this->rot_centroid_.resize(dim);
+
+        GenerateRandomOrthogonalMatrix<DataType>(this->rom_.data(), this->dim_);
         this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
         this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
+        // this->sm_ = sm;
     }
 
 public:
-    RabitqVecStoreMeta() = default;
-    static This Make(size_t origin_dim) { return This(origin_dim); }
-    static This Make(size_t origin_dim, bool normalize) { return This(origin_dim); }
+    // RabitqVecStoreMeta() = default;
+    //
+    RabitqVecStoreMeta(const void_allocator &alloc_inst) : Base(alloc_inst) {}
+    static This Make(size_t origin_dim, const void_allocator &alloc_inst) { return This(origin_dim, alloc_inst); }
+    static This Make(size_t origin_dim, bool normalize, const void_allocator &alloc_inst) { return This(origin_dim, alloc_inst); }
 
     static This LoadFromPtr(const char *&ptr) {
         size_t origin_dim = ReadBufAdv<size_t>(ptr);
@@ -431,7 +453,8 @@ public:
     void Optimize(Iterator &&query_iter, const std::vector<std::pair<Inner *, size_t>> &inners, size_t &mem_usage) {
         size_t dim = this->dim_;
         // Decompress old vector
-        auto new_centroid = std::make_unique<DataType[]>(dim);
+        // auto new_centroid = std::make_unique<DataType[]>(dim);
+        boost::interprocess::vector<DataType> new_centroid(dim);
         auto temp_decompress = std::make_unique<DataType[]>(dim);
         size_t cur_vec_num = 0;
         for (const auto [inner, size] : inners) {
@@ -462,8 +485,11 @@ public:
 
         // Save rot_centroid
         auto new_rot_centroid = std::make_unique<DataType[]>(dim);
-        matrixA_multiply_matrixB_output_to_C(new_centroid.get(), this->rom_.get(), 1, dim, dim, new_rot_centroid.get());
-        new_rot_centroid = this->rot_centroid_.exchange(std::move(new_rot_centroid));
+        matrixA_multiply_matrixB_output_to_C(new_centroid.data(), this->rom_.data(), 1, dim, dim, new_rot_centroid.get());
+        // new_rot_centroid = this->rot_centroid_.exchange(std::move(new_rot_centroid));
+        for (size_t i = 0; i < dim; ++i) {
+            std::swap(new_rot_centroid[i], this->rot_centroid_[i]);
+        }
 
         // Update old vector code
         for (auto [inner, size] : inners) {
@@ -475,52 +501,54 @@ public:
     }
 };
 
-export template <typename DataType>
-class RabitqVecStoreMeta<DataType, false> : public RabitqVecStoreMetaBase<DataType, false> {
-public:
-    using This = RabitqVecStoreMeta<DataType, false>;
-    using Base = RabitqVecStoreMetaBase<DataType, false>;
-    using MetaType = typename Base::MetaType;
-    using StoreData = typename Base::StoreData;
-    using QueryData = typename Base::QueryData;
-    using AlignType = typename Base::AlignType;
-    using CompressType = typename Base::CompressType;
-
-private:
-    RabitqVecStoreMeta(size_t origin_dim, DataType *rom, DataType *rot_centroid) {
-        this->origin_dim_ = origin_dim;
-        this->rom_ = rom;
-        this->rot_centroid_ = rot_centroid;
-        size_t dim = AlignUp(origin_dim, MetaType::align_size_);
-        this->dim_ = dim;
-        this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
-        this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
-    }
-
-public:
-    RabitqVecStoreMeta() = default;
-
-    static This LoadFromPtr(const char *&ptr) {
-        size_t origin_dim = ReadBufAdv<size_t>(ptr);
-        size_t dim = AlignUp(origin_dim, MetaType::align_size_);
-        auto *rom = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
-        ptr += dim * dim * sizeof(DataType);
-        auto *rot_centroid = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
-        ptr += dim * sizeof(DataType);
-        return This(origin_dim, rom, rot_centroid);
-    }
-};
+// export template <typename DataType>
+// class RabitqVecStoreMeta<DataType, false> : public RabitqVecStoreMetaBase<DataType, false> {
+// public:
+//     using This = RabitqVecStoreMeta<DataType, false>;
+//     using Base = RabitqVecStoreMetaBase<DataType, false>;
+//     using MetaType = typename Base::MetaType;
+//     using StoreData = typename Base::StoreData;
+//     using QueryData = typename Base::QueryData;
+//     using AlignType = typename Base::AlignType;
+//     using CompressType = typename Base::CompressType;
+//
+// private:
+//     RabitqVecStoreMeta(size_t origin_dim, DataType *rom, DataType *rot_centroid) {
+//         this->origin_dim_ = origin_dim;
+//         this->rom_ = rom;
+//         this->rot_centroid_ = rot_centroid;
+//         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
+//         this->dim_ = dim;
+//         this->compress_data_size_ = sizeof(StoreData) + dim / MetaType::align_size_;
+//         this->compress_query_size_ = sizeof(QueryData) + dim * sizeof(CompressType);
+//     }
+//
+// public:
+//     RabitqVecStoreMeta() = default;
+//
+//     static This LoadFromPtr(const char *&ptr) {
+//         size_t origin_dim = ReadBufAdv<size_t>(ptr);
+//         size_t dim = AlignUp(origin_dim, MetaType::align_size_);
+//         auto *rom = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
+//         ptr += dim * dim * sizeof(DataType);
+//         auto *rot_centroid = reinterpret_cast<DataType *>(const_cast<char *>(ptr));
+//         ptr += dim * sizeof(DataType);
+//         return This(origin_dim, rom, rot_centroid);
+//     }
+// };
 
 /////////////////////////// data operation of inner ///////////////////////////
 
-template <typename DataType, bool OwnMem>
+template <typename DataType>
 class RabitqVecStoreInnerBase {
 public:
-    using This = RabitqVecStoreInnerBase<DataType, OwnMem>;
-    using Meta = RabitqVecStoreMetaBase<DataType, OwnMem>;
+    using This = RabitqVecStoreInnerBase<DataType>;
+    using Meta = RabitqVecStoreMetaBase<DataType>;
     using MetaType = typename Meta::MetaType;
     using StoreType = typename Meta::StoreType;
     using QueryType = typename Meta::QueryType;
+
+    using segment_manager = boost::interprocess::managed_mapped_file::segment_manager;
 
 public:
     RabitqVecStoreInnerBase() = default;
@@ -581,25 +609,36 @@ public:
     }
 
 protected:
-    ArrayPtr<char, OwnMem> ptr_;
+    ArrayPtr<char> ptr_;
+    // string ptr;
+    // segment_manager *sm_;
 };
 
-export template <typename DataType, bool OwnMem>
-class RabitqVecStoreInner : public RabitqVecStoreInnerBase<DataType, OwnMem> {
+export template <typename DataType>
+class RabitqVecStoreInner : public RabitqVecStoreInnerBase<DataType> {
 public:
-    using Base = RabitqVecStoreInnerBase<DataType, OwnMem>;
-    using This = RabitqVecStoreInner<DataType, OwnMem>;
-    using Meta = RabitqVecStoreMetaBase<DataType, OwnMem>;
+    using Base = RabitqVecStoreInnerBase<DataType>;
+    using This = RabitqVecStoreInner<DataType>;
+    using Meta = RabitqVecStoreMetaBase<DataType>;
     using StoreData = typename Meta::StoreData;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
+    using StringAllocator = boost::interprocess::allocator<char, segment_manager_t>;
+    using ShmemString = boost::container::basic_string<char, std::char_traits<char>, StringAllocator>;
+
 private:
-    RabitqVecStoreInner(size_t max_vec_num, const Meta &meta) { this->ptr_ = std::make_unique<char[]>(max_vec_num * meta.compress_data_size()); }
+    RabitqVecStoreInner(size_t max_vec_num, const Meta &meta, const void_allocator &alloc_inst) {
+        this->ptr_ = std::make_unique<char[]>(max_vec_num * meta.compress_data_size());
+        // this->sm_ = sm;
+    }
 
 public:
     RabitqVecStoreInner() = default;
 
-    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage) {
-        auto ret = This(max_vec_num, meta);
+    static This Make(size_t max_vec_num, const Meta &meta, size_t &mem_usage, const void_allocator &alloc_inst) {
+        auto ret = This(max_vec_num, meta, alloc_inst);
         mem_usage += max_vec_num * meta.compress_data_size();
         return ret;
     }
@@ -626,25 +665,25 @@ private:
     StoreData *GetVecMut(size_t idx, const Meta &meta) { return reinterpret_cast<StoreData *>(this->ptr_.get() + idx * meta.compress_data_size()); }
 };
 
-export template <typename DataType>
-class RabitqVecStoreInner<DataType, false> : public RabitqVecStoreInnerBase<DataType, false> {
-public:
-    using Base = RabitqVecStoreInnerBase<DataType, false>;
-    using This = RabitqVecStoreInner<DataType, false>;
-    using Meta = RabitqVecStoreMetaBase<DataType, false>;
-
-private:
-    RabitqVecStoreInner(const char *ptr) { this->ptr_ = ptr; }
-
-public:
-    RabitqVecStoreInner() = default;
-
-    static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, const Meta &meta) {
-        const char *p = ptr;
-        This ret(p);
-        ptr += cur_vec_num * meta.compress_data_size();
-        return ret;
-    }
-};
+// export template <typename DataType>
+// class RabitqVecStoreInner<DataType, false> : public RabitqVecStoreInnerBase<DataType, false> {
+// public:
+//     using Base = RabitqVecStoreInnerBase<DataType, false>;
+//     using This = RabitqVecStoreInner<DataType, false>;
+//     using Meta = RabitqVecStoreMetaBase<DataType, false>;
+//
+// private:
+//     RabitqVecStoreInner(const char *ptr) { this->ptr_ = ptr; }
+//
+// public:
+//     RabitqVecStoreInner() = default;
+//
+//     static This LoadFromPtr(const char *&ptr, size_t cur_vec_num, const Meta &meta) {
+//         const char *p = ptr;
+//         This ret(p);
+//         ptr += cur_vec_num * meta.compress_data_size();
+//         return ret;
+//     }
+// };
 
 } // namespace infinity
