@@ -706,7 +706,7 @@ size_t MetaTableObject::GetCurrentSegmentRowCount(Storage *storage_ptr) const {
     if (version_file_worker == nullptr) {
         UnrecoverableError(fmt::format("Can't get version from: {}", rel_version_path));
     }
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     FileWorker::Read(version_file_worker, block_version);
     size_t row_cnt = block_version->GetRowCount();
 

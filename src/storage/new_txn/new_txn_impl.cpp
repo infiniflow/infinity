@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include <unistd.h>
+
 module infinity_core:new_txn.impl;
 
 import :new_txn;
@@ -1868,12 +1872,11 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             {
                 auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
                 auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
-                auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
-
-                // Read version info
-                std::shared_ptr<BlockVersion> block_version;
-                FileWorker::Read(version_file_worker_, block_version);
-                // Write snapshot file
+                // Mmap version info
+                // yee todo ?
+                BlockVersion *block_version{};
+                FileWorker::Read(version_file_worker.get(), block_version);
+                // // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!status.ok()) {
@@ -1881,7 +1884,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 }
 
                 block_version->SaveToFile(option.checkpoint_ts_, *handle);
-                // close(handle->fd());
+                close(handle->fd());
             }
 
             {

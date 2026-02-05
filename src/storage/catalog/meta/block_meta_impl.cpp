@@ -78,7 +78,7 @@ Status BlockMeta::RestoreSetFromSnapshot() {
     auto *version_file_worker = fileworker_mgr->version_map_.EmplaceFileWorker(std::make_unique<VersionFileWorker>(rel_file_path, block_capacity()));
     version_file_worker_ = version_file_worker;
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     FileWorker::Read(version_file_worker_, block_version);
     block_version->RestoreFromSnapshot(commit_ts_);
     return Status::OK();

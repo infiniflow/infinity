@@ -36,16 +36,16 @@ export struct HnswFileWorker : IndexFileWorker {
                             std::shared_ptr<ColumnDef> column_def,
                             size_t index_size = 0);
 
-    ~HnswFileWorker();
-
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kHNSWIndexFile; }
 
-    bool
-    Write(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
+    boost::interprocess::managed_mapped_file segment_; // mmap
+    // segment_.flush();
 
-    void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
+    void Read(HnswHandler *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
     size_t index_size_{};
+
+    bool inited_{};
 };
 
 } // namespace infinity

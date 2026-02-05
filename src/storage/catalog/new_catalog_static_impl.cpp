@@ -68,11 +68,10 @@ void NewTxnGetVisibleRangeState::Init(VersionFileWorker *version_file_worker, Tx
     version_file_worker_ = std::move(version_file_worker);
     begin_ts_ = begin_ts;
     commit_ts_ = commit_ts;
-    {
-        std::shared_ptr<BlockVersion> block_version;
-        FileWorker::Read(version_file_worker_, block_version);
-        block_offset_end_ = block_version->GetRowCount(begin_ts_);
-    }
+
+    BlockVersion *block_version{};
+    FileWorker::Read(version_file_worker_, block_version);
+    block_offset_end_ = block_version->GetRowCount(begin_ts_);
 }
 
 bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<BlockOffset, BlockOffset> &visible_range) {
@@ -80,7 +79,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, std::pair<
         return false;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     FileWorker::Read(version_file_worker_, block_version);
 
     if (block_offset_begin == block_offset_end_) {
@@ -287,8 +286,8 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
         return status;
     }
     auto IndexRecoverTable = [&](TableMeta &table_meta) {
-        std::vector<std::string> *index_id_strs_ptr = nullptr;
-        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        std::vector<std::string> *index_id_strs_ptr{};
+        std::vector<std::string> *index_name_strs_ptr{};
         status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
         if (!status.ok()) {
             return status;
@@ -298,6 +297,13 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
             TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+            auto [index_base, status] = table_index_meta.GetIndexBase();
+            if (!status.ok()) {
+                return status;
+            }
+            if (index_base->index_type_ == IndexType::kHnsw) {
+                continue;
+            }
             status = txn->RecoverMemIndex(table_index_meta);
             if (!status.ok()) {
                 return status;
@@ -992,6 +998,24 @@ Status NewCatalog::AddNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
+Status NewCatalog::InitHnswChunkIndex(SegmentIndexMeta &segment_index_meta, NewTxn *new_txn, std::optional<ChunkIndexMeta> &chunk_index_meta) {
+    {
+        ChunkIndexMetaInfo chunk_info;
+        chunk_index_meta.emplace(0, segment_index_meta);
+        auto status = chunk_index_meta->InitSet(chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        auto status = segment_index_meta.AddChunkIndexID1(0, new_txn);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::RestoreNewChunkIndex1(SegmentIndexMeta &segment_index_meta,
                                          NewTxn *new_txn,
                                          ChunkID chunk_id,
@@ -1112,7 +1136,7 @@ Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     FileWorker::Read(version_buffer, block_version);
     {
         block_version->GetCreateTS(offset, size, column_vector);
@@ -1129,7 +1153,7 @@ Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, size_t offset, size_
         return status;
     }
 
-    std::shared_ptr<BlockVersion> block_version;
+    BlockVersion *block_version{};
     FileWorker::Read(version_file_worker, block_version);
     {
         block_version->GetDeleteTS(offset, size, column_vector);

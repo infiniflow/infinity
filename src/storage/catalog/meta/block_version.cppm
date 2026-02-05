@@ -16,6 +16,7 @@ export module infinity_core:block_version;
 
 import :local_file_handle;
 import :status;
+import :boost;
 
 namespace infinity {
 
@@ -33,15 +34,46 @@ struct CreateField {
     static CreateField LoadFromFile(LocalFileHandle *file_handle);
 };
 
-std::atomic_int cnt{};
-
 export struct BlockVersion {
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
+    using TxnTimeStampAllocator = boost::interprocess::allocator<TxnTimeStamp, segment_manager_t>;
+    using ShmemTxnTimeStampVector = boost::interprocess::vector<TxnTimeStamp, TxnTimeStampAllocator>;
+
+    using CreateFieldAllocator = boost::interprocess::allocator<CreateField, segment_manager_t>;
+    using ShmemCreateFieldVector = boost::interprocess::vector<CreateField, CreateFieldAllocator>;
+
+    using StringAllocator = boost::interprocess::allocator<char, segment_manager_t>;
+    using ShmemString = boost::container::basic_string<char, std::char_traits<char>, StringAllocator>;
+
     constexpr static std::string_view PATH = "version";
 
     static std::shared_ptr<std::string> FileName() { return std::make_shared<std::string>(PATH); }
 
-    explicit BlockVersion(size_t capacity) : deleted_(capacity, 0) {}
+    // explicit BlockVersion(size_t capacity) : deleted_(capacity) {}
+    explicit BlockVersion(const char *path, size_t capacity, const void_allocator &alloc_inst)
+        : path_(path, alloc_inst), deleted_(capacity, alloc_inst), created_(alloc_inst) {}
     BlockVersion() = default;
+
+    // BlockVersion(const BlockVersion &other) : deleted_(other.deleted_), created_(other.created_) {}
+    //
+    // BlockVersion(BlockVersion &&other) noexcept : deleted_(std::move(other.deleted_)), created_(std::move(other.created_)) {}
+
+    // BlockVersion &operator=(const BlockVersion &other) {
+    //     // if (this != &other) {
+    //     deleted_ = other.deleted_;
+    //     created_ = other.created_;
+    //     // }
+    //     return *this;
+    // }
+    //
+    // BlockVersion &operator=(BlockVersion &&other) noexcept {
+    //     // if (this != &other) {
+    //     deleted_ = std::move(other.deleted_);
+    //     // }
+    //     return *this;
+    // }
 
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
@@ -49,10 +81,10 @@ export struct BlockVersion {
     std::pair<BlockOffset, i32> GetCommitRowCount(TxnTimeStamp commit_ts) const;
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
-
     bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler);
     bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
 
+    static void LoadFromFile(LocalFileHandle *file_handle, BlockVersion *&block_version);
     static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
@@ -74,16 +106,15 @@ export struct BlockVersion {
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
 
 private:
-    mutable std::shared_mutex rw_mutex_;
+    // mutable std::shared_mutex rw_mutex_;
+    mutable boost::interprocess::interprocess_sharable_mutex rw_mutex_; // offset_ptr
 
-    std::vector<TxnTimeStamp> deleted_;
+    ShmemString path_;
 
-    std::vector<CreateField> created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
+    ShmemTxnTimeStampVector deleted_;
+
+    ShmemCreateFieldVector created_; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
     // risk to write uninitialized buffer. (ts, rows)
-
-    std::map<size_t, TxnTimeStamp> dirty_deleted_;
-
-    size_t append_cnt_{};
 };
 
 } // namespace infinity

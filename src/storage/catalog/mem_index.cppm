@@ -25,7 +25,7 @@ import row_id;
 namespace infinity {
 
 class BaseMemIndex;
-class HnswIndexInMem;
+// class HnswIndexInMem;
 class IVFIndexInMem;
 class MemoryIndexer;
 class SecondaryIndexInMem;
@@ -52,8 +52,8 @@ public:
 
     const BaseMemIndex *GetBaseMemIndex() const;
 
-    std::shared_ptr<HnswIndexInMem> GetHnswIndex();
-    void SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index);
+    // std::shared_ptr<HnswIndexInMem> GetHnswIndex();
+    // void SetHnswIndex(std::shared_ptr<HnswIndexInMem> hnsw_index);
 
     std::shared_ptr<IVFIndexInMem> GetIVFIndex();
     void SetIVFIndex(std::shared_ptr<IVFIndexInMem> ivf_index);
@@ -85,7 +85,7 @@ private:
     bool is_dumping_{};
     bool is_updating_{};
 
-    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_;
+    // std::shared_ptr<HnswIndexInMem> memory_hnsw_index_;
     std::shared_ptr<IVFIndexInMem> memory_ivf_index_;
     std::shared_ptr<MemoryIndexer> memory_indexer_;
     std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_;

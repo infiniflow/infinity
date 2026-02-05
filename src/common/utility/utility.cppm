@@ -82,6 +82,18 @@ std::string TrimPath(const std::string &path) {
     return path.substr(pos + 1);
 }
 
+template <typename GrowFn, typename OpFn>
+auto GrowThenRetry(GrowFn &&grow_fn, OpFn &&op_fn) {
+    while (true) {
+        try {
+            return op_fn();
+        } catch (...) // std::bad_alloc or boost::bad_alloc ????
+        {
+            grow_fn();
+        }
+    }
+}
+
 // template <typename T>
 // void AlignOffset(size_t &offset) {
 //     size_t align_up = [](size_t n, size_t align) { return (n + align - 1) & ~(align - 1); };

@@ -65,39 +65,42 @@ using AbstractHnsw = std::variant<std::unique_ptr<KnnHnsw<PlainCosVecStoreType<f
                                   std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset>>,
                                   std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset>>,
 
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset, false>>,
-                                  std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<u8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQCosVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQIPVecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<LVQL2VecStoreType<float, i8, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqCosVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqIPVecStoreType<float, true>, SegmentOffset, false>>,
+                                  // std::unique_ptr<KnnHnsw<RabitqL2VecStoreType<float, true>, SegmentOffset, false>>,
                                   std::nullptr_t>;
 
 export struct HnswHandler {
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
 public:
     // HnswHandler() : hnsw_(nullptr) {}
     // virtual ~HnswHandler() {}
@@ -106,9 +109,7 @@ public:
 
     static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
 
-    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
-
-    static std::unique_ptr<HnswHandler> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, bool own_mem = true);
+    HnswHandler(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def, const void_allocator &alloc_inst, bool own_mem = true);
 
     template <typename DistanceT, typename LabelT, typename Filter = std::nullopt_t, bool WithLock = true>
     std::tuple<size_t, std::unique_ptr<DistanceT[]>, std::unique_ptr<LabelT[]>>
@@ -154,32 +155,32 @@ private:
         }
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-            using IndexT = std::decay_t<decltype(*index)>;
-            if constexpr (!IndexT::kOwnMem) {
-                UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
-            } else {
-                size_t mem1 = index->mem_usage();
-                auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
-                size_t bucket_size = std::max(kBuildBucketSize, size_t(end - start - 1) / thread_pool.size() + 1);
-                size_t bucket_n = (end - start - 1) / bucket_size + 1;
+            // using IndexT = std::decay_t<decltype(*index)>;
+            // if constexpr (!IndexT::kOwnMem) {
+            //     UnrecoverableError("HnswHandler::InsertVecs: index does not own memory");
+            // } else {
+            size_t mem1 = index->mem_usage();
+            auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
+            size_t bucket_size = std::max(kBuildBucketSize, static_cast<size_t>(end - start - 1) / thread_pool.size() + 1);
+            size_t bucket_n = (end - start - 1) / bucket_size + 1;
 
-                std::vector<std::future<void>> futs;
-                futs.reserve(bucket_n);
-                for (size_t i = 0; i < bucket_n; ++i) {
-                    size_t i1 = start + i * bucket_size;
-                    size_t i2 = std::min(i1 + bucket_size, size_t(end));
-                    futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
-                        for (size_t j = i1; j < i2; ++j) {
-                            index->Build(j);
-                        }
-                    }));
-                }
-                for (auto &fut : futs) {
-                    fut.get();
-                }
-                size_t mem2 = index->mem_usage();
-                mem_usage = mem2 - mem1;
+            std::vector<std::future<void>> futs;
+            futs.reserve(bucket_n);
+            for (size_t i = 0; i < bucket_n; ++i) {
+                size_t i1 = start + i * bucket_size;
+                size_t i2 = std::min(i1 + bucket_size, size_t(end));
+                futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
+                    for (size_t j = i1; j < i2; ++j) {
+                        index->Build(j);
+                    }
+                }));
             }
+            for (auto &fut : futs) {
+                fut.get();
+            }
+            size_t mem2 = index->mem_usage();
+            mem_usage = mem2 - mem1;
+            // }
         }
     }
 
@@ -295,8 +296,8 @@ public:
 public:
     // hnsw_ data operator
     size_t CalcSize() const;
-    void SaveToPtr(void *&mmap_p, size_t &offset) const;
-    void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
+    // void SaveToPtr(void *&mmap_p, size_t &offset) const;
+    // void LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t file_size);
     void Build(VertexType vertex_i);
     void Optimize();
     void CompressToLVQ();
@@ -308,72 +309,72 @@ private:
 
 export using HnswHandlerPtr = HnswHandler *;
 
-export struct HnswIndexInMem : public BaseMemIndex {
-public:
-    HnswIndexInMem() : hnsw_handler_(nullptr) {}
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def)
-        : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), own_memory_(true) {}
-    HnswIndexInMem(const HnswIndexInMem &) = delete;
-    HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
-    virtual ~HnswIndexInMem();
-
-public:
-    static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
-
-    static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
-
-public:
-    void InsertVecs(SegmentOffset block_offset,
-                    const ColumnVector &col,
-                    BlockOffset offset,
-                    BlockOffset row_count,
-                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
-
-    template <typename Iter>
-    void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
-        row_count_ += iter.GetRowCount();
-        IncreaseMemoryUsageBase(mem_usage);
-    }
-
-    void Dump(HnswFileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
-
-public:
-    // LSG setting
-    template <typename Iter>
-    size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
-        return hnsw_handler_->InsertSampleVecs(std::move(iter), sample_num);
-    }
-    size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
-    template <typename Iter>
-
-    void InsertLSAvg(Iter iter, size_t row_count) {
-        hnsw_handler_->InsertLSAvg(std::move(iter), row_count);
-    }
-    void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
-
-    void SetLSGParam();
-
-public:
-    RowID GetBeginRowID() const override { return begin_row_id_; }
-    const HnswHandlerPtr &get() const { return hnsw_handler_; }
-    HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
-    size_t GetRowCount() const;
-    size_t GetSizeInBytes() const;
-
-    const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
-
-protected:
-    MemIndexTracerInfo GetInfo() const override;
-
-private:
-    static constexpr size_t kBuildBucketSize = 1024;
-
-    RowID begin_row_id_{};
-    size_t row_count_{};
-    HnswHandlerPtr hnsw_handler_{};
-    bool own_memory_{};
-    HnswFileWorker *index_file_worker_{};
-};
+// export struct HnswIndexInMem : public BaseMemIndex {
+// public:
+//     HnswIndexInMem() : hnsw_handler_(nullptr) {}
+//     HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def)
+//         : begin_row_id_(begin_row_id), hnsw_handler_(HnswHandler::Make(index_base, column_def).release()), own_memory_(true) {}
+//     HnswIndexInMem(const HnswIndexInMem &) = delete;
+//     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
+//     virtual ~HnswIndexInMem();
+//
+// public:
+//     static std::unique_ptr<HnswIndexInMem> Make(RowID begin_row_id, const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
+//
+//     static std::unique_ptr<HnswIndexInMem> Make(const IndexBase *index_base, std::shared_ptr<ColumnDef> column_def);
+//
+// public:
+//     void InsertVecs(SegmentOffset block_offset,
+//                     const ColumnVector &col,
+//                     BlockOffset offset,
+//                     BlockOffset row_count,
+//                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
+//
+//     template <typename Iter>
+//     void InsertVecs(Iter iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
+//         size_t mem_usage = hnsw_handler_->InsertVecs(std::move(iter), config, kBuildBucketSize);
+//         row_count_ += iter.GetRowCount();
+//         IncreaseMemoryUsageBase(mem_usage);
+//     }
+//
+//     void Dump(FileWorker *index_file_worker, size_t *dump_size_ptr = nullptr);
+//
+// public:
+//     // LSG setting
+//     template <typename Iter>
+//     size_t InsertSampleVecs(Iter iter, size_t sample_num = std::numeric_limits<size_t>::max()) {
+//         return hnsw_handler_->InsertSampleVecs(std::move(iter), sample_num);
+//     }
+//     size_t InsertSampleVecs(size_t sample_num, SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+//     template <typename Iter>
+//
+//     void InsertLSAvg(Iter iter, size_t row_count) {
+//         hnsw_handler_->InsertLSAvg(std::move(iter), row_count);
+//     }
+//     void InsertLSAvg(SegmentOffset block_offset, BlockOffset offset, const ColumnVector &col, BlockOffset row_count);
+//
+//     void SetLSGParam();
+//
+// public:
+//     RowID GetBeginRowID() const override { return begin_row_id_; }
+//     const HnswHandlerPtr &get() const { return hnsw_handler_; }
+//     HnswHandlerPtr *get_ptr() { return &hnsw_handler_; }
+//     size_t GetRowCount() const;
+//     size_t GetSizeInBytes() const;
+//
+//     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
+//
+// protected:
+//     MemIndexTracerInfo GetInfo() const override;
+//
+// private:
+//     static constexpr size_t kBuildBucketSize = 1024;
+//
+//     RowID begin_row_id_{};
+//     size_t row_count_{};
+//     HnswHandlerPtr hnsw_handler_{};
+//     bool own_memory_{};
+//     FileWorker *index_file_worker_{};
+// };
 
 } // namespace infinity

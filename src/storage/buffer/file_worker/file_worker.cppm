@@ -39,6 +39,8 @@ namespace infinity {
 class LocalFileHandle;
 class Status;
 export struct RawFileWorker;
+export struct VersionFileWorker;
+export struct HnswFileWorker;
 // export class FileWorkerManager;
 // export class BMPHandler;
 // using BMPHandlerPtr = BMPHandler *;
@@ -87,7 +89,7 @@ export struct FileWorker {
     explicit FileWorker(std::shared_ptr<std::string> file_path);
 
     // No destruct here
-    ~FileWorker() = default;
+    // ~FileWorker() = default;
 
     [[nodiscard]] std::string GetPath() const;
 
@@ -116,9 +118,15 @@ export struct FileWorker {
 
     template <typename FileWorkerT, typename PayloadT>
     static void Read(FileWorkerT file_worker, PayloadT &data) {
-        std::unique_lock l(file_worker->mutex_);
+        // std::unique_lock l(file_worker->mutex_);
         size_t file_size{};
 
+        if constexpr (std::same_as<FileWorkerT, VersionFileWorker> || std::same_as<FileWorkerT, HnswFileWorker>) {
+            std::unique_ptr<LocalFileHandle> file_handle;
+            file_worker->Read(data, file_handle, file_size);
+            return;
+        }
+        std::unique_lock l(file_worker->mutex_);
         if (file_worker->mmap_) {
             std::unique_ptr<LocalFileHandle> file_handle;
             file_worker->Read(data, file_handle, file_size);
@@ -176,6 +184,8 @@ export struct FileWorker {
             close(file_handle->fd());
             return;
         }
+        auto ps = std::filesystem::path(working_path).parent_path().string();
+        VirtualStore::MakeDirectory(ps);
         std::unique_ptr<LocalFileHandle> file_handle;
         file_worker->Read(data, file_handle, file_size);
     }
@@ -184,7 +194,12 @@ export struct FileWorker {
     static void MoveFile(FileWorkerT *file_worker) {
         // boost::unique_lock l(boost_rw_mutex_);
         std::unique_lock l(file_worker->mutex_);
-        msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
+        std::println("???? move: {}", file_worker->GetWorkingPath());
+        if constexpr (std::same_as<FileWorkerT, VersionFileWorker> || std::same_as<FileWorkerT, HnswFileWorker>) {
+            file_worker->segment_.flush();
+        } else {
+            msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
+        }
         auto working_path = file_worker->GetWorkingPath();
         auto data_path = file_worker->GetPath();
 
@@ -248,6 +263,10 @@ export struct FileWorker {
         std::unique_lock l(file_worker->mutex_);
         auto status = VirtualStore::DeleteFile(file_worker->GetWorkingPath());
         // if (file_worker->Type() == FileWorkerType::kRawFile) {
+        // if constexpr (std::same_as<FileWorkerT, VersionFileWorker> || std::same_as<FileWorkerT, HnswFileWorker>) {
+        //     return Status::OK();
+        // }
+
         if constexpr (std::same_as<FileWorkerT, RawFileWorker>) {
             auto temp_dict_path =
                 fmt::format("/infinity/tmp/{}.dic", file_worker->rel_file_path_->substr(0, file_worker->rel_file_path_->find_first_of('.')));

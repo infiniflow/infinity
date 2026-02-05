@@ -14,7 +14,6 @@
 
 module;
 
-#include <sys/mman.h>
 #include <unistd.h>
 
 module infinity_core:version_file_worker.impl;
@@ -32,52 +31,62 @@ import third_party;
 
 namespace infinity {
 
+using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+
 VersionFileWorker::VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity)
     : FileWorker(std::move(file_path)), capacity_(capacity) {}
 
-VersionFileWorker::~VersionFileWorker() {
-    munmap(mmap_, mmap_size_);
-    mmap_ = nullptr;
-}
-
-bool VersionFileWorker::Write(std::shared_ptr<BlockVersion> &data,
-                              std::unique_ptr<LocalFileHandle> &file_handle,
-                              bool &prepare_success,
-                              const FileWorkerSaveCtx &base_ctx) {
-    std::unique_lock l(mutex_);
-    const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
-    TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
-    bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    cache_manager.Set(*rel_file_path_, data, mmap_size_);
-    if (is_full) {
-        LOG_TRACE(fmt::format("Version file is full: {}", GetPath()));
-        // if the version file is full, return true to spill to file
-        return true;
-    }
-    return false;
-}
-
-void VersionFileWorker::Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+void VersionFileWorker::Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
+    // std::unique_lock l(mutex_);
     auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
-    bool flag = cache_manager.Get(path, data);
-    if (!flag) {
-        if (!file_handle) {
-            data = std::make_shared<BlockVersion>(8192);
-            return;
-        }
-        auto fd = file_handle->fd();
-        // std::unique_lock l(mutex_);
-        mmap_size_ = file_handle->FileSize();
-        if (!mmap_) {
-            mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-        }
-        data = std::make_shared<BlockVersion>(8192);
-        BlockVersion::LoadFromFile(data, mmap_size_, mmap_, file_handle.get());
-        size_t request_space = file_handle->FileSize();
-        cache_manager.Set(path, data, request_space);
+    auto tmp_path = GetWorkingPath();
+    if (!inited_) {
+        segment_ =
+            boost::interprocess::managed_mapped_file(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), 64 * 1024 + 64 * 16 /* 64KB */);
+        boost::interprocess::allocator<void, segment_manager_t> alloc_inst(segment_.get_segment_manager());
+        // std::println("!!!! {}", segment_.get_size());
+        // std::println("!!!! {}", segment_.get_segment_manager()->get_size());
+        // segment_.grow(tmp_path.c_str(), segment_.get_size());
+        // std::println("!!!! {}", segment_.get_size());
+        // // segment_.get_segment_manager()->grow(segment_.get_size());
+        // InfinityContext::instance().storage()->fileworker_manager()->version_map_.GetFileWorker(path)->GrowNolock();
+        // std::println("!!!! {}", segment_.get_size());
+
+        // std::println(">>>> {}", segment_.get_segment_manager()->);
+
+        data = segment_.find_or_construct<BlockVersion>(path.c_str())(path.c_str(), 8192, alloc_inst);
+        inited_ = true;
+        return;
     }
+    auto result = segment_.find<BlockVersion>(path.c_str());
+    data = result.first;
+}
+
+void VersionFileWorker::Grow() {
+    std::lock_guard l(mutex_);
+    std::println("!!!! {}", segment_.get_size());
+    auto tmp_path = GetWorkingPath();
+    segment_.grow(tmp_path.c_str(), segment_.get_size());
+
+    // boost::interprocess::managed_mapped_file new_seg(boost::interprocess::open_or_create_infinity,
+    //                                                  tmp_path.c_str(),
+    //                                                  segment_.get_size() + extra_size);
+
+    // boost::interprocess::managed_mapped_file new_segment(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), boost_size_ + extra_size);
+    //
+    // segment_.swap(new_segment);
+}
+void VersionFileWorker::GrowNolock() {
+    auto tmp_path = GetWorkingPath();
+    segment_.grow(tmp_path.c_str(), segment_.get_size());
+
+    // boost::interprocess::managed_mapped_file new_seg(boost::interprocess::open_or_create_infinity,
+    //                                                  tmp_path.c_str(),
+    //                                                  segment_.get_size() + extra_size);
+
+    boost::interprocess::managed_mapped_file new_segment(boost::interprocess::open_or_create_infinity, tmp_path.c_str(), segment_.get_size());
+
+    segment_.swap(new_segment);
 }
 
 } // namespace infinity

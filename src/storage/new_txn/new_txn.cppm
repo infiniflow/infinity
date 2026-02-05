@@ -811,7 +811,7 @@ public:
 private:
     std::vector<ChunkInfoForCreateIndex> chunk_infos_; // For cleanup when create index is rollbacked
 
-    bool bottom_done_{false}; // TODO: Use a transaction state instead of a bool flag
+    bool bottom_done_{}; // TODO: Use a transaction state instead of a bool flag
 };
 
 } // namespace infinity

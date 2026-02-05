@@ -48,13 +48,13 @@ export struct KnnSearchOption {
     LogicalType column_logical_type_ = LogicalType::kEmbedding;
 };
 
-export template <typename VecStoreType, typename LabelType, bool OwnMem>
+export template <typename VecStoreType, typename LabelType>
 class KnnHnswBase {
 public:
     using DataType = VecStoreType::DataType;
     using QueryVecType = VecStoreType::QueryVecType;
     using QueryType = VecStoreType::QueryType;
-    using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
+    using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = VecStoreType::Distance;
     using DistanceType = Distance::DistanceType;
 
@@ -65,13 +65,20 @@ public:
 
     constexpr static bool LSG = IsLSGDistance<Distance>;
 
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
+    using IpShMut = boost::interprocess::interprocess_sharable_mutex;
+
     static std::pair<size_t, size_t> GetMmax(size_t M) { return {2 * M, M}; }
 
-    KnnHnswBase() : M_(0), ef_construction_(0), mult_(0), prefetch_step_(DEFAULT_PREFETCH_SIZE) {}
+    // KnnHnswBase(segment_manager *sm) : M_(0), ef_construction_(0), mult_(0), data_store_(sm), prefetch_step_(DEFAULT_PREFETCH_SIZE), sm_(sm) {}
+    KnnHnswBase(const void_allocator &alloc_inst)
+        : M_(0), ef_construction_(0), mult_(0), data_store_(alloc_inst), prefetch_step_(DEFAULT_PREFETCH_SIZE), alloc_inst_(alloc_inst) {}
     KnnHnswBase(KnnHnswBase &&other) noexcept
         : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), mult_(std::exchange(other.mult_, 0.0)),
           data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)),
-          prefetch_step_(L1_DATA_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes()) {}
+          prefetch_step_(L1_DATA_CACHE_SIZE / data_store_.vec_store_meta().GetVecSizeInBytes()), alloc_inst_(std::move(other.alloc_inst_)) {}
     KnnHnswBase &operator=(KnnHnswBase &&other) noexcept {
         if (this != &other) {
             M_ = std::exchange(other.M_, 0);
@@ -181,8 +188,8 @@ protected:
                 break;
             }
 
-            std::shared_lock<std::shared_mutex> lock;
-            if constexpr (WithLock && OwnMem) {
+            std::shared_lock<IpShMut> lock;
+            if constexpr (WithLock) { // yee todo
                 lock = data_store_.SharedLock(c_idx);
             }
 
@@ -216,8 +223,8 @@ protected:
         while (check) {
             check = false;
 
-            std::shared_lock<std::shared_mutex> lock;
-            if constexpr (WithLock && OwnMem) {
+            std::shared_lock<IpShMut> lock;
+            if constexpr (WithLock) { // yee todo
                 lock = data_store_.SharedLock(cur_p);
             }
 
@@ -272,7 +279,7 @@ protected:
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
 
-            std::unique_lock<std::shared_mutex> lock = data_store_.UniqueLock(n_idx);
+            auto lock = data_store_.UniqueLock(n_idx); // yee todo
 
             auto [n_neighbors_p, n_neighbor_size_p] = data_store_.GetNeighborsMut(n_idx, layer_idx);
             VertexListSize n_neighbor_size = *n_neighbor_size_p;
@@ -395,7 +402,7 @@ public:
     void Optimize() { data_store_.Optimize(); }
 
     void Build(VertexType vertex_i) {
-        std::unique_lock<std::shared_mutex> lock = data_store_.UniqueLock(vertex_i);
+        auto lock = data_store_.UniqueLock(vertex_i); // yee todo
 
         i32 q_layer = GenerateRandomLayer();
         auto [max_layer, ep] = data_store_.TryUpdateEnterPoint(q_layer, vertex_i);
@@ -487,6 +494,9 @@ protected:
 
     std::optional<HnswLSGBuilder<DataType, DistanceType>> lsg_builder_{};
 
+    // segment_manager *sm_{};
+    void_allocator alloc_inst_;
+
     // //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 public:
     void Check() const { data_store_.Check(); }
@@ -499,50 +509,58 @@ public:
     }
 };
 
-export template <typename VecStoreType, typename LabelType, bool OwnMem = true>
-class KnnHnsw : public KnnHnswBase<VecStoreType, LabelType, OwnMem> {
+export template <typename VecStoreType, typename LabelType>
+class KnnHnsw : public KnnHnswBase<VecStoreType, LabelType> {
 public:
-    using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
+    using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = VecStoreType::Distance;
     using CompressLVQVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
     using CompressRabitqVecStoreType = decltype(VecStoreType::ToRabitq());
-    constexpr static bool kOwnMem = OwnMem;
+    using Base = KnnHnswBase<VecStoreType, LabelType>;
+    // constexpr static bool kOwnMem = OwnMem;
 
-    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
+    using segment_manager_t = boost::interprocess::managed_mapped_file::segment_manager;
+    using void_allocator = boost::interprocess::allocator<void, segment_manager_t>;
+
+    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance, const void_allocator &alloc_inst) : Base(alloc_inst) {
         this->M_ = M;
         this->ef_construction_ = std::max(M, ef_construction);
         this->mult_ = 1 / std::log(1.0 * M);
         this->data_store_ = std::move(data_store);
         this->distance_ = std::move(distance);
+        // this->sm_ = sm;
     }
 
-    static std::unique_ptr<KnnHnsw> Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction) {
+    static std::unique_ptr<KnnHnsw>
+    Make(size_t chunk_size, size_t max_chunk_n, size_t dim, size_t M, size_t ef_construction, const void_allocator &alloc_inst) {
         auto [Mmax0, Mmax] = KnnHnsw::GetMmax(M);
-        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
+        // static_assert(std::is_standard_layout_v<DataStore>);
+        auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax, alloc_inst);
+        static_assert(std::is_standard_layout_v<Distance>);
         Distance distance(data_store.dim());
-        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
+        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance), alloc_inst);
     }
 
-    static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
-        auto *buffer = static_cast<char *>(m_mmap);
-        const char *ptr = buffer;
-
-        // size_t M = ReadBufAdv<size_t>(ptr);
-        auto *M = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
-        ptr += sizeof(size_t);
-
-        // size_t ef_construction = ReadBufAdv<size_t>(ptr);
-        auto *ef_construction = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
-        ptr += sizeof(size_t);
-
-        auto data_store = DataStore::LoadFromPtr(ptr);
-
-        Distance distance(data_store.dim());
-        if (size_t diff = ptr - buffer; diff != size) {
-            UnrecoverableError("LoadFromPtr failed");
-        }
-        return std::make_unique<KnnHnsw>(*M, *ef_construction, std::move(data_store), std::move(distance));
-    }
+    // static std::unique_ptr<KnnHnsw> LoadFromPtr(void *&m_mmap, size_t &mmap_size, size_t size) {
+    //     auto *buffer = static_cast<char *>(m_mmap);
+    //     const char *ptr = buffer;
+    //
+    //     // size_t M = ReadBufAdv<size_t>(ptr);
+    //     auto *M = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
+    //     ptr += sizeof(size_t);
+    //
+    //     // size_t ef_construction = ReadBufAdv<size_t>(ptr);
+    //     auto *ef_construction = reinterpret_cast<size_t *>(const_cast<char *>(ptr));
+    //     ptr += sizeof(size_t);
+    //
+    //     auto data_store = DataStore::LoadFromPtr(ptr);
+    //
+    //     Distance distance(data_store.dim());
+    //     if (size_t diff = ptr - buffer; diff != size) {
+    //         UnrecoverableError("LoadFromPtr failed");
+    //     }
+    //     return std::make_unique<KnnHnsw>(*M, *ef_construction, std::move(data_store), std::move(distance));
+    // }
 
     std::unique_ptr<KnnHnsw<CompressLVQVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressLVQVecStoreType>) {
@@ -554,7 +572,8 @@ public:
             return std::make_unique<KnnHnsw<CompressLVQVecStoreType, LabelType>>(this->M_,
                                                                                  this->ef_construction_,
                                                                                  std::move(compressed_datastore),
-                                                                                 std::move(distance));
+                                                                                 std::move(distance),
+                                                                                 this->alloc_inst_);
         }
     }
 
@@ -568,44 +587,46 @@ public:
             return std::make_unique<KnnHnsw<CompressRabitqVecStoreType, LabelType>>(this->M_,
                                                                                     this->ef_construction_,
                                                                                     std::move(compressed_datastore),
-                                                                                    std::move(distance));
+                                                                                    std::move(distance),
+                                                                                    this->alloc_inst_);
         }
     }
 };
 
-export template <typename VecStoreType, typename LabelType>
-class KnnHnsw<VecStoreType, LabelType, false> : public KnnHnswBase<VecStoreType, LabelType, false> {
-public:
-    using DataStore = DataStore<VecStoreType, LabelType, false>;
-    using Distance = VecStoreType::Distance;
-    constexpr static bool kOwnMem = false;
-
-    KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
-        this->M_ = M;
-        this->ef_construction_ = std::max(M, ef_construction);
-        this->mult_ = 1 / std::log(1.0 * M);
-        this->data_store_ = std::move(data_store);
-        this->distance_ = std::move(distance);
-    }
-    KnnHnsw(KnnHnsw &&other) noexcept : KnnHnswBase<VecStoreType, LabelType, false>(std::move(other)) {}
-    KnnHnsw &operator=(KnnHnsw &&other) noexcept {
-        if (this != &other) {
-            KnnHnswBase<VecStoreType, LabelType, false>::operator=(std::move(other));
-        }
-        return *this;
-    }
-
-    static std::unique_ptr<KnnHnsw> LoadFromPtr(const char *&ptr, size_t size) {
-        const char *ptr_end = ptr + size;
-        size_t M = ReadBufAdv<size_t>(ptr);
-        size_t ef_construction = ReadBufAdv<size_t>(ptr);
-        auto data_store = DataStore::LoadFromPtr(ptr);
-        Distance distance(data_store.dim());
-        if (size_t diff = ptr_end - ptr; diff != 0) {
-            UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end, diff));
-        }
-        return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
-    }
-};
+// export template <typename VecStoreType, typename LabelType>
+// class KnnHnsw<VecStoreType, LabelType, false> : public KnnHnswBase<VecStoreType, LabelType, false> {
+// public:
+//     using DataStore = DataStore<VecStoreType, LabelType, false>;
+//     using Distance = VecStoreType::Distance;
+//     constexpr static bool kOwnMem = false;
+//
+//     KnnHnsw(size_t M, size_t ef_construction, DataStore data_store, Distance distance) {
+//         this->M_ = M;
+//         this->ef_construction_ = std::max(M, ef_construction);
+//         this->mult_ = 1 / std::log(1.0 * M);
+//         this->data_store_ = std::move(data_store);
+//         this->distance_ = std::move(distance);
+//     }
+//     KnnHnsw(KnnHnsw &&other) noexcept : KnnHnswBase<VecStoreType, LabelType, false>(std::move(other)) {}
+//     KnnHnsw &operator=(KnnHnsw &&other) noexcept {
+//         if (this != &other) {
+//             KnnHnswBase<VecStoreType, LabelType, false>::operator=(std::move(other));
+//         }
+//         return *this;
+//     }
+//
+//     // static std::unique_ptr<KnnHnsw> LoadFromPtr(const char *&ptr, size_t size) {
+//     //     const char *ptr_end = ptr + size;
+//     //     size_t M = ReadBufAdv<size_t>(ptr);
+//     //     size_t ef_construction = ReadBufAdv<size_t>(ptr);
+//     //     auto data_store = DataStore::LoadFromPtr(ptr);
+//     //     Distance distance(data_store.dim());
+//     //     if (size_t diff = ptr_end - ptr; diff != 0) {
+//     //         UnrecoverableError(fmt::format("LoadFromPtr failed, ptr {:p}, ptr_end {:p}, diff {}", (const void *)ptr, (const void *)ptr_end,
+//     diff));
+//     //     }
+//     //     return std::make_unique<KnnHnsw>(M, ef_construction, std::move(data_store), std::move(distance));
+//     // }
+// };
 
 } // namespace infinity

@@ -116,7 +116,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
     }
 
     // std::unique_lock l(mutex_);
-    data = std::make_shared<VarBuffer>(this);
+    data = std::make_shared<VarBuffer>();
 
     if (!mmap_) {
         if (!file_handle) {
@@ -130,7 +130,7 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         // mmap_size_ = mmap_size_;
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*align_offset*/);
         if (mmap_ == MAP_FAILED) {
-            // std::println("that code var: {}", mmap_size_);
+            // std::println("that code var: {}", mma'p_size_);
             mmap_ = nullptr;
         }
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
@@ -139,12 +139,12 @@ void VarFileWorker::Read(std::shared_ptr<VarBuffer> &data, std::unique_ptr<Local
         std::memcpy(buffer.get(), (char *)mmap_ + offset, mmap_size_);
         offset += mmap_size_;
 
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
+        data = std::make_shared<VarBuffer>(std::move(buffer), mmap_size_);
 
     } else {
         auto buffer = std::make_unique_for_overwrite<char[]>(mmap_size_);
         std::memcpy(buffer.get(), mmap_, mmap_size_);
-        data = std::make_shared<VarBuffer>(this, std::move(buffer), mmap_size_);
+        data = std::make_shared<VarBuffer>(std::move(buffer), mmap_size_);
     }
 
     cache_manager.Set(path, data, data->TotalSize());

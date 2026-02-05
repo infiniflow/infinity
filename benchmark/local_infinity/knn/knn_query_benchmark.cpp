@@ -14,11 +14,12 @@
 
 #include "hnsw_benchmark_util.h"
 
-import std;
 #include <cassert>
+
 import infinity_core;
 
-using std::size_t;
+import std.compat;
+
 import compilation_config;
 import knn_expr;
 import column_expr;

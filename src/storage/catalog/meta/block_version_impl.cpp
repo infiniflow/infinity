@@ -26,6 +26,9 @@ import :default_values;
 import :column_vector;
 import :local_file_handle;
 import :status;
+import :utility;
+import :infinity_context;
+import :fileworker_manager;
 
 import std;
 import third_party;
@@ -212,6 +215,23 @@ bool BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
                           is_modified));
 
     return !is_modified;
+    // return true;
+}
+
+void BlockVersion::LoadFromFile(LocalFileHandle *file_handle, BlockVersion *&block_version) {
+    BlockOffset capacity;
+    file_handle->Read(&capacity, sizeof(capacity));
+    block_version->deleted_.resize(capacity);
+    for (BlockOffset i = 0; i < capacity; i++) {
+        file_handle->Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
+    }
+    BlockOffset create_size;
+    file_handle->Read(&create_size, sizeof(create_size));
+    block_version->created_.reserve(create_size);
+    for (BlockOffset i = 0; i < create_size; i++) {
+        block_version->created_.push_back(CreateField::LoadFromFile(file_handle));
+    }
+    LOG_TRACE(fmt::format("BlockVersion::LoadFromFile version, created: {}", create_size));
 }
 
 void BlockVersion::LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap_p, LocalFileHandle *file_handle) {
@@ -276,8 +296,14 @@ void BlockVersion::GetDeleteTS(size_t offset, size_t size, ColumnVector &res) co
 
 void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     std::unique_lock lock(rw_mutex_);
-    created_.emplace_back(commit_ts, row_count);
-    ++append_cnt_;
+    auto op_func = [&, this] mutable { created_.emplace_back(commit_ts, row_count); };
+    auto grow_func = [&, this] mutable {
+        InfinityContext::instance().storage()->fileworker_manager()->version_map_.GetFileWorker(path_.c_str())->Grow();
+    };
+    // how to get the name????
+    GrowThenRetry(grow_func, op_func);
+
+    // created_.emplace_back(commit_ts, row_count);
 }
 
 void BlockVersion::CommitAppend(TxnTimeStamp save_ts, TxnTimeStamp commit_ts) {
