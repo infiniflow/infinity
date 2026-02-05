@@ -110,14 +110,14 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &ex
         case AggregateFlag::kFinish: {
             expr->aggregate_function_.update_func_(data_state, child_output_col);
             const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-            output_column_vector->AppendByPtr(result_ptr);
+            AppendAggregateResult(expr->aggregate_function_, result_ptr, child_output_col, output_column_vector);
             break;
         }
         case AggregateFlag::kRunAndFinish: {
             expr->aggregate_function_.init_func_(data_state);
             expr->aggregate_function_.update_func_(data_state, child_output_col);
             const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-            output_column_vector->AppendByPtr(result_ptr);
+            AppendAggregateResult(expr->aggregate_function_, result_ptr, child_output_col, output_column_vector);
             break;
         }
     }
@@ -268,6 +268,31 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FilterFulltextExpression
         output_column_vector->buffer_->SetCompactBit(idx, row_result);
     }
     output_column_vector->Finalize(input_data_block_->row_count());
+}
+
+void ExpressionEvaluator::AppendAggregateResult(const AggregateFunction &aggregate_func,
+                                                const char *result_ptr,
+                                                const std::shared_ptr<ColumnVector> &child_output_col,
+                                                std::shared_ptr<ColumnVector> &output_column_vector) {
+
+    size_t row_index = output_column_vector->Size();
+    LogicalType logical_type = aggregate_func.return_type_.type();
+
+    // Handle aggregate functions on empty input - should return NULL (except COUNT)
+    if (child_output_col->Size() == 0) {
+        const std::string &func_name = aggregate_func.GetFuncName();
+        if (func_name != "COUNT") {
+            output_column_vector->nulls_ptr_->SetFalse(row_index);
+        }
+    }
+
+    if (logical_type == LogicalType::kVarchar) {
+        const VarcharT *varchar_ptr = reinterpret_cast<const VarcharT *>(result_ptr);
+        std::span<const char> varchar_data = child_output_col->GetVarcharInner(*varchar_ptr);
+        output_column_vector->AppendVarchar(varchar_data);
+    } else {
+        output_column_vector->AppendByPtr(result_ptr);
+    }
 }
 
 } // namespace infinity
