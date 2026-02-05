@@ -313,15 +313,14 @@ std::tuple<std::shared_ptr<BlockSnapshotInfo>, Status> BlockMeta::MapMetaToSnapS
     if (!status.ok()) {
         return {nullptr, status};
     }
-    for (auto &column_def : *column_defs) {
-        ColumnMeta column_meta(column_def->id(), *this);
+    for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, *this);
         auto [column_snapshot_info, status] = column_meta.MapMetaToSnapShotInfo();
         if (!status.ok()) {
             return {nullptr, status};
         }
         block_snapshot_info->column_block_snapshots_.push_back(column_snapshot_info);
     }
-
     return {block_snapshot_info, Status::OK()};
 }
 
@@ -335,9 +334,9 @@ Status BlockMeta::RestoreFromSnapshot() {
     if (!status.ok()) {
         return status;
     }
-    for (const auto &column_def : *column_defs) {
-        ColumnMeta column_meta(column_def->id(), *this);
-        status = column_meta.RestoreFromSnapshot(column_def->id());
+    for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, *this);
+        status = column_meta.RestoreFromSnapshot();
         if (!status.ok()) {
             return status;
         }

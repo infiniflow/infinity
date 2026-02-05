@@ -1,0 +1,97 @@
+statement ok
+DROP TABLE IF EXISTS test_drop_column;
+
+statement ok
+CREATE TABLE test_drop_column (c1 INT, c2 INT, c3 INT);
+
+statement ok
+INSERT INTO test_drop_column VALUES (1, 2, 3), (10, 20, 30), (100, 200, 300);
+
+statement ok
+CREATE INDEX idx_c2 ON test_drop_column (c2);
+
+query III
+SELECT * FROM test_drop_column;
+----
+1 2 3
+10 20 30
+100 200 300
+
+statement ok
+CREATE SNAPSHOT snap_before_drop ON TABLE test_drop_column;
+
+statement ok
+ALTER TABLE test_drop_column DROP COLUMN(c1);
+
+statement ok
+CREATE SNAPSHOT snap_after_drop ON TABLE test_drop_column;
+
+query II
+SELECT * FROM test_drop_column;
+----
+2 3
+20 30
+200 300
+
+# query I
+# SELECT c3 FROM test_drop_column WHERE c3 = 30;
+# ----
+# 30
+
+# query I
+# SELECT c2 FROM test_drop_column WHERE c2 = 20;
+# ----
+# 20
+
+# Restore snapshot
+
+statement ok
+DROP TABLE test_drop_column;
+
+statement ok
+RESTORE TABLE SNAPSHOT snap_before_drop;
+
+query III
+SELECT * FROM test_drop_column;
+----
+1 2 3
+10 20 30
+100 200 300
+
+# query III
+# SELECT c1, c2, c3 FROM test_drop_column WHERE c3 = 30;
+# ----
+# 10 20 30
+
+# query I
+# SELECT c2 FROM test_drop_column WHERE c2 = 200;
+# ----
+# 200
+
+# query I
+# SELECT c1 FROM test_drop_column WHERE c1 = 100;
+# ----
+# 100
+
+statement ok
+DROP TABLE test_drop_column;
+
+statement ok
+RESTORE TABLE SNAPSHOT snap_after_drop;
+
+query II
+SELECT * FROM test_drop_column;
+----
+2 3
+20 30
+200 300
+
+
+statement ok
+DROP TABLE test_drop_column;
+
+statement ok
+DROP SNAPSHOT snap_before_drop;
+
+statement ok
+DROP SNAPSHOT snap_after_drop;

@@ -53,7 +53,7 @@ public:
 
     std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-    Status RestoreFromSnapshot(ColumnID column_id);
+    Status RestoreFromSnapshot();
 
 private:
     Status GetFileWorker(DataFileWorker *&data_file_worker, VarFileWorker *&var_file_worker, const std::shared_ptr<ColumnDef> &column_def);
