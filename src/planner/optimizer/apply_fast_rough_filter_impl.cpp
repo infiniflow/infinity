@@ -53,6 +53,9 @@ public:
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
                     auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
                     TableMeta *table_meta = table_scan.base_table_ref_->block_index_->table_meta_.get();
+                    if (!table_meta) {
+                        UnrecoverableError("ApplyFastRoughFilter: table_meta_ is not initialized");
+                    }
                     table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression, table_meta);
                 } else if (op->left_node()->operator_type() == LogicalNodeType::kIndexScan) {
                     // warn
@@ -60,6 +63,9 @@ public:
                     // still build from remaining filter condition
                     auto &index_scan = static_cast<LogicalIndexScan &>(*(op->left_node()));
                     TableMeta *table_meta = index_scan.base_table_ref_->block_index_->table_meta_.get();
+                    if (!table_meta) {
+                        UnrecoverableError("ApplyFastRoughFilter: table_meta_ is not initialized");
+                    }
                     index_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression, table_meta);
                 } else {
                     LOG_WARN("ApplyFastRoughFilterMethod: Filter node should be followed by TableScan or IndexScan.");
