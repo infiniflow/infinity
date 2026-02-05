@@ -59,7 +59,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
     RegisterMaxFunction(catalog_ptr.get());
 
-    String op = "max";
+    std::string op = "max";
     std::shared_ptr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kAggregate);
     std::shared_ptr<AggregateFunctionSet> aggregate_function_set = std::static_pointer_cast<AggregateFunctionSet>(function_set);
@@ -70,7 +70,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Boolean)->Boolean", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -85,7 +85,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BooleanT result;
         result = *(BooleanT *)func.finalize_func_(data_state.get());
 
@@ -99,7 +99,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(TinyInt)->TinyInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -114,7 +114,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         TinyIntT result;
         result = *(TinyIntT *)func.finalize_func_(data_state.get());
 
@@ -128,7 +128,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(SmallInt)->SmallInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -149,7 +149,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         SmallIntT result;
         result = *(SmallIntT *)func.finalize_func_(data_state.get());
 
@@ -163,7 +163,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Integer)->Integer", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -178,7 +178,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         IntegerT result;
         result = *(IntegerT *)func.finalize_func_(data_state.get());
 
@@ -192,7 +192,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(BigInt)->BigInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -207,7 +207,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         BigIntT result;
         result = *(BigIntT *)func.finalize_func_(data_state.get());
 
@@ -221,7 +221,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Float)->Float", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -236,7 +236,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         FloatT result;
         result = *(FloatT *)func.finalize_func_(data_state.get());
 
@@ -250,7 +250,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(Double)->Double", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -265,7 +265,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         DoubleT result;
         result = *(DoubleT *)func.finalize_func_(data_state.get());
 
@@ -279,7 +279,7 @@ TEST_F(MaxFunctionTest, max_func) {
         AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
         EXPECT_STREQ("MAX(HugeInt)->HugeInt", func.ToString().c_str());
 
-        Vector<std::shared_ptr<DataType>> column_types;
+        std::vector<std::shared_ptr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
         i64 row_count = DEFAULT_VECTOR_SIZE;
@@ -296,7 +296,7 @@ TEST_F(MaxFunctionTest, max_func) {
 
         auto data_state = func.InitState();
         func.init_func_(data_state.get());
-        func.update_func_(data_state.get(), data_block.column_vectors[0]);
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
         HugeIntT result;
         result = *(HugeIntT *)func.finalize_func_(data_state.get());
 
@@ -304,9 +304,69 @@ TEST_F(MaxFunctionTest, max_func) {
     }
 
     {
-        DataType data_type(LogicalType::kVarchar);
-        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
-        EXPECT_THROW_WITHOUT_STACKTRACE(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("MAX(Varchar)->Varchar", func.ToString().c_str());
+
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = 100;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        // Test with inline strings (<= 13 bytes)
+        for (i64 i = 0; i < row_count; ++i) {
+            std::string s = "hello" + std::to_string(i);
+            Value v = Value::MakeVarchar(s);
+            data_block.AppendValue(0, v);
+        }
+        data_block.Finalize();
+
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
+        VarcharT result;
+        result = *(VarcharT *)func.finalize_func_(data_state.get());
+
+        EXPECT_EQ(result.ToString(), "hello99"); // "hello99" is bigger than "hello8192"
+    }
+
+    {
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("MAX(Varchar)->Varchar", func.ToString().c_str());
+
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = 100;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        // Test with non-inline strings (> 13 bytes)
+        for (i64 i = 0; i < row_count; ++i) {
+            std::string s = "greeting_hello_world_" + std::to_string(i);
+            Value v = Value::MakeVarchar(s);
+            data_block.AppendValue(0, v);
+        }
+        data_block.Finalize();
+
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
+        VarcharT result_varchar;
+        result_varchar = *(VarcharT *)func.finalize_func_(data_state.get());
+
+        // For non-inlined strings, use GetVarchar to get the full string from the result
+        std::span<const char> result_span = data_block.column_vectors_[0]->GetVarcharInner(result_varchar);
+        std::string result_str(result_span.data(), result_span.size());
+        EXPECT_EQ(result_str, "greeting_hello_world_99");
     }
 }
