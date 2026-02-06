@@ -107,7 +107,7 @@ public:
                                               const std::vector<std::shared_ptr<BaseExpression>> &expressions,
                                               const MatchQueryCache *match_cache = nullptr);
 
-    static std::unique_ptr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression);
+    static std::unique_ptr<FastRoughFilterEvaluator> PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression, TableMeta *table_meta);
 };
 
 } // namespace infinity

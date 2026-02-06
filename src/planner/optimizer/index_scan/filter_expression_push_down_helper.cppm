@@ -16,6 +16,7 @@ export module infinity_core:filter_expression_push_down_helper;
 
 import :base_expression;
 import :value;
+import :table_meta;
 
 import internal_types;
 
@@ -28,7 +29,7 @@ public:
     static Value CalcValueResult(const std::shared_ptr<BaseExpression> &expression);
 
     static std::tuple<ColumnID, Value, std::shared_ptr<BaseExpression>, FilterCompareType>
-    UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type);
+    UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type, TableMeta *table_meta);
 };
 
 } // namespace infinity

@@ -126,7 +126,7 @@ struct CheckpointTxnStore;
 struct MetaKey;
 struct MetaBaseCache;
 struct CacheInfo;
-class NewCatalog;
+struct NewCatalog;
 class NewTxnManager;
 
 export struct CheckpointOption {
