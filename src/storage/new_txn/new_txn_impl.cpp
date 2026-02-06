@@ -2573,10 +2573,6 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
-                if (IsReplay()) {
-                    // Skip replay of RESTORE_TABLE_SNAPSHOT command.
-                    break;
-                }
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
@@ -2585,10 +2581,6 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
-                if (IsReplay()) {
-                    // Skip replay of RESTORE_DATABASE_SNAPSHOT command.
-                    break;
-                }
                 auto *restore_database_snapshot_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreDatabaseSnapshot(restore_database_snapshot_cmd);
                 if (!status.ok()) {
@@ -2597,10 +2589,6 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
-                if (IsReplay()) {
-                    // Skip replay of RESTORE_SYSTEM_SNAPSHOT command.
-                    break;
-                }
                 auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
                 if (!status.ok()) {
@@ -2718,8 +2706,26 @@ Status NewTxn::PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot 
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = create_table_snapshot_cmd->snapshot_name_;
     std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
+
+    // Check if snapshot path exists
     if (std::filesystem::exists(snapshot_path)) {
-        return Status::SnapshotAlreadyExists(snapshot_name);
+        // Check if this snapshot has been dropped
+        std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+        std::string drop_ts_str;
+        Status drop_status = kv_instance_->Get(drop_key, drop_ts_str);
+        if (!drop_status.ok()) {
+            // Snapshot exists and not dropped, return error
+            return Status::SnapshotAlreadyExists(snapshot_name);
+        }
+
+        // Snapshot was dropped, check if it was dropped before current transaction
+        TxnTimeStamp drop_ts = std::stoull(drop_ts_str);
+        if (drop_ts >= txn_context_ptr_->begin_ts_) {
+            // Dropped after current transaction started, should not happen
+            return Status::Error(
+                fmt::format("Snapshot: {} was dropped at ts {}, current txn begin_ts: {}", snapshot_name, drop_ts, txn_context_ptr_->begin_ts_));
+        }
+        // Dropped before current transaction, cleanup will handle it, allow re-creation
     }
 
     TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
@@ -2738,8 +2744,26 @@ Status NewTxn::PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *creat
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = create_db_snapshot_cmd->snapshot_name_;
     std::string snapshot_path = snapshot_dir + "/" + snapshot_name;
+
+    // Check if snapshot path exists
     if (std::filesystem::exists(snapshot_path)) {
-        return Status::SnapshotAlreadyExists(snapshot_name);
+        // Check if this snapshot has been dropped
+        std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+        std::string drop_ts_str;
+        Status drop_status = kv_instance_->Get(drop_key, drop_ts_str);
+        if (!drop_status.ok()) {
+            // Snapshot exists and not dropped, return error
+            return Status::SnapshotAlreadyExists(snapshot_name);
+        }
+
+        // Snapshot was dropped, check if it was dropped before current transaction
+        TxnTimeStamp drop_ts = std::stoull(drop_ts_str);
+        if (drop_ts >= txn_context_ptr_->begin_ts_) {
+            // Dropped after current transaction started, should not happen
+            return Status::Error(
+                fmt::format("Snapshot: {} was dropped at ts {}, current txn begin_ts: {}", snapshot_name, drop_ts, txn_context_ptr_->begin_ts_));
+        }
+        // Dropped before current transaction, cleanup will handle it, allow re-creation
     }
 
     TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
@@ -2758,8 +2782,26 @@ Status NewTxn::PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapsho
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = create_system_snapshot_cmd->snapshot_name_;
     std::string snapshot_path = fmt::format("{}/{}", snapshot_dir, snapshot_name);
+
+    // Check if snapshot path exists
     if (std::filesystem::exists(snapshot_path)) {
-        return Status::SnapshotAlreadyExists(snapshot_name);
+        // Check if this snapshot has been dropped
+        std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+        std::string drop_ts_str;
+        Status drop_status = kv_instance_->Get(drop_key, drop_ts_str);
+        if (!drop_status.ok()) {
+            // Snapshot exists and not dropped, return error
+            return Status::SnapshotAlreadyExists(snapshot_name);
+        }
+
+        // Snapshot was dropped, check if it was dropped before current transaction
+        TxnTimeStamp drop_ts = std::stoull(drop_ts_str);
+        if (drop_ts >= txn_context_ptr_->begin_ts_) {
+            // Dropped after current transaction started, should not happen
+            return Status::Error(
+                fmt::format("Snapshot: {} was dropped at ts {}, current txn begin_ts: {}", snapshot_name, drop_ts, txn_context_ptr_->begin_ts_));
+        }
+        // Dropped before current transaction, cleanup will handle it, allow re-creation
     }
 
     TxnTimeStamp last_ckp_ts = InfinityContext::instance().storage()->wal_manager()->LastCheckpointTS();
@@ -2779,7 +2821,11 @@ Status NewTxn::PrepareCommitDropSnapshot(const WalCmdDropSnapshot *drop_snapshot
 
     // Write drop marker instead of deleting immediately
     std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
-    kv_instance_->Put(drop_key, std::to_string(txn_context_ptr_->commit_ts_));
+    Status status = kv_instance_->Put(drop_key, std::to_string(txn_context_ptr_->commit_ts_));
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("Failed to write drop marker for snapshot: {}", snapshot_name));
+        return status;
+    }
 
     LOG_INFO(fmt::format("Marked snapshot for deletion: {}", snapshot_name));
     return Status::OK();
@@ -6319,11 +6365,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     if (!status.ok()) {
         return status;
     }
-
-    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
-    if (!status.ok()) {
-        return status;
-    }
     return Status::OK();
 }
 
@@ -6376,12 +6417,6 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
             return status;
         }
     }
-
-    status = PrepareCommitRestoreDatabaseSnapshot(restore_database_cmd);
-    if (!status.ok()) {
-        return status;
-    }
-
     return Status::OK();
 }
 
@@ -6436,11 +6471,6 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
             }
         }
     }
-    status = PrepareCommitRestoreSystemSnapshot(restore_system_cmd);
-    if (!status.ok()) {
-        return status;
-    }
-
     return Status::OK();
 }
 
@@ -6467,7 +6497,11 @@ Status NewTxn::ReplayDropSnapshot(WalCmdDropSnapshot *drop_snapshot_cmd, TxnTime
     }
 
     // Write drop marker
-    kv_instance_->Put(drop_key, std::to_string(commit_ts));
+    Status status = kv_instance_->Put(drop_key, std::to_string(commit_ts));
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("Failed to write drop marker for snapshot during replay: {}", snapshot_name));
+        return status;
+    }
     LOG_INFO(fmt::format("Replayed drop snapshot: {} with commit_ts: {}, txn: {}", snapshot_name, commit_ts, txn_id));
     return Status::OK();
 }

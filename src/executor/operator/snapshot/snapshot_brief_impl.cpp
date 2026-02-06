@@ -24,6 +24,9 @@ import :virtual_store;
 import :local_file_handle;
 import :infinity_exception;
 import :logger;
+import :kv_store;
+import :kv_code;
+import :infinity_context;
 
 import std.compat;
 import third_party;
@@ -56,6 +59,9 @@ std::vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const std::string &dir) {
         LOG_ERROR(fmt::format("Snapshot directory does not exist: {}", dir));
         return briefs;
     }
+
+    auto *storage = InfinityContext::instance().storage();
+    auto *kv_store = storage ? storage->kv_store() : nullptr;
 
     // Scan for snapshot directories instead of JSON files directly
     for (const auto &entry : std::filesystem::directory_iterator(dir)) {
@@ -94,6 +100,18 @@ std::vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const std::string &dir) {
             SnapshotBrief snapshot_brief;
             snapshot_brief.snapshot_name_ = doc["snapshot_name"].get<std::string>();
             snapshot_brief.scope_ = (SnapshotScope)(u8)doc["snapshot_scope"].get<u8>();
+
+            // Check if snapshot has been dropped
+            if (kv_store != nullptr) {
+                std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_brief.snapshot_name_);
+                std::string drop_ts_str;
+                Status drop_status = kv_store->Get(drop_key, drop_ts_str);
+                if (drop_status.ok()) {
+                    // Snapshot has been dropped, skip it
+                    LOG_TRACE(fmt::format("Skipping dropped snapshot: {}", snapshot_brief.snapshot_name_));
+                    continue;
+                }
+            }
 
             // snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
 
