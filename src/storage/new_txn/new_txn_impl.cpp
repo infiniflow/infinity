@@ -1415,7 +1415,15 @@ Status NewTxn::DropSnapshot(const std::string &snapshot_name) {
         // Snapshot already dropped
         TxnTimeStamp drop_ts = std::stoull(existing_drop_ts);
         LOG_WARN(fmt::format("Snapshot: {} was already dropped at ts {}", snapshot_name, drop_ts));
-        return Status::OK();
+        return Status::SnapshotAlreadyDeleted(snapshot_name);
+    }
+
+    // Check if snapshot exists
+    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    std::string snapshot_path = fmt::format("{}/{}", snapshot_dir, snapshot_name);
+    if (!std::filesystem::exists(snapshot_path)) {
+        LOG_WARN(fmt::format("Snapshot: {} doesn't exist", snapshot_name));
+        return Status::NotFound(fmt::format("Snapshot: {} doesn't exist", snapshot_name));
     }
 
     base_txn_store_ = std::make_shared<DropSnapshotTxnStore>();
