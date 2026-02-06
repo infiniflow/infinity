@@ -1407,6 +1407,17 @@ Status NewTxn::CreateSystemSnapshot(const std::string &snapshot_name) {
 }
 
 Status NewTxn::DropSnapshot(const std::string &snapshot_name) {
+    // Check if snapshot has already been dropped
+    std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+    std::string existing_drop_ts;
+    Status status = kv_instance_->Get(drop_key, existing_drop_ts);
+    if (status.ok()) {
+        // Snapshot already dropped
+        TxnTimeStamp drop_ts = std::stoull(existing_drop_ts);
+        LOG_WARN(fmt::format("Snapshot: {} was already dropped at ts {}", snapshot_name, drop_ts));
+        return Status::OK();
+    }
+
     base_txn_store_ = std::make_shared<DropSnapshotTxnStore>();
     DropSnapshotTxnStore *txn_store = static_cast<DropSnapshotTxnStore *>(base_txn_store_.get());
     txn_store->snapshot_name_ = snapshot_name;
@@ -2554,6 +2565,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
+                if (IsReplay()) {
+                    // Skip replay of RESTORE_TABLE_SNAPSHOT command.
+                    break;
+                }
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
@@ -2562,6 +2577,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
+                if (IsReplay()) {
+                    // Skip replay of RESTORE_DATABASE_SNAPSHOT command.
+                    break;
+                }
                 auto *restore_database_snapshot_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreDatabaseSnapshot(restore_database_snapshot_cmd);
                 if (!status.ok()) {
@@ -2570,6 +2589,10 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+                if (IsReplay()) {
+                    // Skip replay of RESTORE_SYSTEM_SNAPSHOT command.
+                    break;
+                }
                 auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
                 if (!status.ok()) {
@@ -5599,12 +5622,11 @@ Status NewTxn::CleanupDroppedSnapshots(TxnTimeStamp visible_ts) {
     auto iter = kv_instance_->GetIterator();
     iter->Seek(snapshot_prefix);
 
+    int cleaned_count = 0;
     while (iter->Valid() && iter->Key().starts_with(snapshot_prefix)) {
         std::string drop_key = iter->Key().ToString();
         std::string commit_ts_str = iter->Value().ToString();
         TxnTimeStamp drop_ts = std::stoull(commit_ts_str);
-
-        LOG_INFO(fmt::format("CleanupDroppedSnapshots: found drop marker: {}, drop_ts: {}, visible_ts: {}", drop_key, drop_ts, visible_ts));
 
         if (drop_ts <= visible_ts) {
             // Extract snapshot name from key: "drop|snapshot|snapshot_name"
@@ -5614,19 +5636,21 @@ Status NewTxn::CleanupDroppedSnapshots(TxnTimeStamp visible_ts) {
             std::string snapshot_path = fmt::format("{}/{}", snapshot_dir, snapshot_name);
 
             if (VirtualStore::Exists(snapshot_path)) {
-                LOG_INFO(fmt::format("Cleaning up snapshot: {}", snapshot_name));
+                LOG_INFO(fmt::format("Cleaning up dropped snapshot: {}", snapshot_name));
                 VirtualStore::RemoveDirectory(snapshot_path);
-            } else {
-                LOG_WARN(fmt::format("Snapshot path does not exist: {}", snapshot_path));
+                ++cleaned_count;
             }
 
             // Delete the drop marker
             kv_instance_->Delete(drop_key);
-        } else {
-            LOG_INFO(fmt::format("Skipping cleanup: drop_ts {} > visible_ts {}", drop_ts, visible_ts));
         }
         iter->Next();
     }
+
+    if (cleaned_count > 0) {
+        LOG_INFO(fmt::format("Cleaned up {} dropped snapshots with visible_ts <= {}", cleaned_count, visible_ts));
+    }
+
     return Status::OK();
 }
 
