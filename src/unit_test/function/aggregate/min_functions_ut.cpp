@@ -298,9 +298,68 @@ TEST_F(MinFunctionTest, min_func) {
     }
 
     {
-        DataType data_type(LogicalType::kVarchar);
-        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
 
-        EXPECT_THROW_WITHOUT_STACKTRACE(aggregate_function_set->GetMostMatchFunction(col_expr_ptr), RecoverableException);
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("MIN(Varchar)->Varchar", func.ToString().c_str());
+
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (i64 i = 0; i < row_count; ++i) {
+            std::string s = "hello" + std::to_string(i);
+            Value v = Value::MakeVarchar(s);
+            data_block.AppendValue(0, v);
+        }
+        data_block.Finalize();
+
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
+        VarcharT result;
+        result = *(VarcharT *)func.finalize_func_(data_state.get());
+
+        EXPECT_EQ(result.ToString(), "hello0");
+    }
+
+    {
+        std::shared_ptr<DataType> data_type = std::make_shared<DataType>(LogicalType::kVarchar);
+        std::shared_ptr<ColumnExpression> col_expr_ptr = std::make_shared<ColumnExpression>(*data_type, "t1", 1, "c1", 0, 0);
+
+        AggregateFunction func = aggregate_function_set->GetMostMatchFunction(col_expr_ptr);
+        EXPECT_STREQ("MIN(Varchar)->Varchar", func.ToString().c_str());
+
+        std::vector<std::shared_ptr<DataType>> column_types;
+        column_types.emplace_back(data_type);
+
+        i64 row_count = 100;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        // Test with non-inline strings (> 13 bytes)
+        for (i64 i = 0; i < row_count; ++i) {
+            std::string s = "greeting_hello_world_" + std::to_string(i);
+            Value v = Value::MakeVarchar(s);
+            data_block.AppendValue(0, v);
+        }
+        data_block.Finalize();
+
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors_[0]);
+        VarcharT result_varchar;
+        result_varchar = *(VarcharT *)func.finalize_func_(data_state.get());
+
+        // For non-inlined strings, use GetVarchar to get the full string from the result
+        std::span<const char> result_span = data_block.column_vectors_[0]->GetVarcharInner(result_varchar);
+        std::string result_str(result_span.data(), result_span.size());
+        EXPECT_EQ(result_str, "greeting_hello_world_0");
     }
 }
