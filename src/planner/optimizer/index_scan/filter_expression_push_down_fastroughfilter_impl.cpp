@@ -25,6 +25,7 @@ import :function_expression;
 import :filter_expression_push_down_helper;
 import :infinity_exception;
 import :column_expression;
+import :table_meta;
 
 import std;
 import third_party;
@@ -213,7 +214,7 @@ class FastRoughFilterExpressionPushDownMethod {
         return ReturnAlwaysTrue();
     }
 
-    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilterFromtreeNode(const TreeT &tree_node) {
+    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilterFromtreeNode(const TreeT &tree_node, TableMeta *table_meta) {
         switch (tree_node.info) {
             case Enum::kUnknownExpr:
             case Enum::kColumnExprOrAfterCast: {
@@ -227,11 +228,11 @@ class FastRoughFilterExpressionPushDownMethod {
                 auto *function_expression = static_cast<FunctionExpression *>(tree_node.src_ptr->get());
                 auto const &f_name = function_expression->ScalarFunctionName();
                 if (f_name == "=") {
-                    auto SolveForExpr1 = [](std::shared_ptr<BaseExpression> &col_expr,
-                                            std::shared_ptr<BaseExpression> &val_expr) -> std::unique_ptr<FastRoughFilterEvaluator> {
+                    auto SolveForExpr1 = [table_meta](std::shared_ptr<BaseExpression> &col_expr,
+                                                      std::shared_ptr<BaseExpression> &val_expr) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                         auto [column_id, value, _, compare_type] =
-                            FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), FilterCompareType::kEqual);
+                            FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), FilterCompareType::kEqual, table_meta);
                         switch (compare_type) {
                             case FilterCompareType::kEqual: {
                                 switch (value.type().type()) {
@@ -304,12 +305,12 @@ class FastRoughFilterExpressionPushDownMethod {
                                                                                     FilterCompareType::kLessEqual};
                 if (auto it = std::find(Case2FunctionNames.begin(), Case2FunctionNames.end(), f_name); it != Case2FunctionNames.end()) {
                     // maybe known expression 2
-                    auto SolveForExpr2 = [](std::shared_ptr<BaseExpression> &col_expr,
-                                            std::shared_ptr<BaseExpression> &val_expr,
-                                            FilterCompareType initial_compare_type) -> std::unique_ptr<FastRoughFilterEvaluator> {
+                    auto SolveForExpr2 = [table_meta](std::shared_ptr<BaseExpression> &col_expr,
+                                                      std::shared_ptr<BaseExpression> &val_expr,
+                                                      FilterCompareType initial_compare_type) -> std::unique_ptr<FastRoughFilterEvaluator> {
                         auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
                         auto [column_id, value, _, compare_type] =
-                            FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
+                            FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type, table_meta);
                         switch (compare_type) {
                             case FilterCompareType::kLessEqual:
                             case FilterCompareType::kGreaterEqual: {
@@ -352,7 +353,7 @@ class FastRoughFilterExpressionPushDownMethod {
             case Enum::kAndExpr: {
                 std::vector<std::unique_ptr<FastRoughFilterEvaluator>> children;
                 for (const auto &child : tree_node.children) {
-                    auto child_filter = GetFastRoughFilterFromtreeNode(child);
+                    auto child_filter = GetFastRoughFilterFromtreeNode(child, table_meta);
                     if (child_filter->Tag() == FastRoughFilterEvaluatorTag::kAlwaysFalse) {
                         return ReturnAlwaysFalse();
                     }
@@ -375,7 +376,7 @@ class FastRoughFilterExpressionPushDownMethod {
             case Enum::kOrExpr: {
                 std::vector<std::unique_ptr<FastRoughFilterEvaluator>> children;
                 for (const auto &child : tree_node.children) {
-                    auto child_filter = GetFastRoughFilterFromtreeNode(child);
+                    auto child_filter = GetFastRoughFilterFromtreeNode(child, table_meta);
                     if (child_filter->Tag() == FastRoughFilterEvaluatorTag::kAlwaysTrue) {
                         return ReturnAlwaysTrue();
                     }
@@ -399,7 +400,7 @@ class FastRoughFilterExpressionPushDownMethod {
     }
 
 public:
-    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilter(std::shared_ptr<BaseExpression> &expression) {
+    static inline std::unique_ptr<FastRoughFilterEvaluator> GetFastRoughFilter(std::shared_ptr<BaseExpression> &expression, TableMeta *table_meta) {
         if (!expression) {
             return ReturnAlwaysTrue();
         }
@@ -413,12 +414,13 @@ public:
         // known expression 3 : "and" or "or" expression
         ExpressionFastRoughFilterInfo tree_info;
         const auto tree = tree_info.BuildTree(expression);
-        return GetFastRoughFilterFromtreeNode(tree);
+        return GetFastRoughFilterFromtreeNode(tree, table_meta);
     }
 };
 
-std::unique_ptr<FastRoughFilterEvaluator> FilterExpressionPushDown::PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression) {
-    return FastRoughFilterExpressionPushDownMethod::GetFastRoughFilter(expression);
+std::unique_ptr<FastRoughFilterEvaluator> FilterExpressionPushDown::PushDownToFastRoughFilter(std::shared_ptr<BaseExpression> &expression,
+                                                                                              TableMeta *table_meta) {
+    return FastRoughFilterExpressionPushDownMethod::GetFastRoughFilter(expression, table_meta);
 }
 
 } // namespace infinity
