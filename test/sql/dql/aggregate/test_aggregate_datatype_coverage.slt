@@ -1,0 +1,783 @@
+# COUNT(), MIN(), MAX(), FIRST(): supports boolean, numeric, string, datetime types
+# SUM(), VAG(): supports numeric types only
+
+# ============================================================================
+# Boolean Type Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_bool_agg;
+
+statement ok
+CREATE TABLE test_bool_agg (grp INTEGER, val BOOLEAN);
+
+statement ok
+INSERT INTO test_bool_agg VALUES (1, TRUE), (1, FALSE), (2, FALSE), (2, TRUE);
+
+query I
+SELECT COUNT(val) FROM test_bool_agg;
+----
+4
+
+statement error
+SELECT SUM(val) FROM test_bool_agg;
+
+statement error
+SELECT AVG(val) FROM test_bool_agg;
+
+query T
+SELECT MIN(val) FROM test_bool_agg;
+----
+false
+
+query T
+SELECT MAX(val) FROM test_bool_agg;
+----
+true
+
+query IT rowsort
+SELECT FIRST(val) FROM test_bool_agg;
+----
+true
+
+statement ok
+DROP TABLE test_bool_agg;
+
+# ============================================================================
+# TinyInt Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_tinyint_agg;
+
+statement ok
+CREATE TABLE test_tinyint_agg (grp INTEGER, val TINYINT);
+
+statement ok
+INSERT INTO test_tinyint_agg VALUES (1, 10), (1, 20), (1, 30), (2, 5), (2, 15);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 3
+2 2
+
+query II rowsort
+SELECT grp, SUM(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 60
+2 20
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 20.000000
+2 10.000000
+
+query II rowsort
+SELECT grp, MIN(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 10
+2 5
+
+query II rowsort
+SELECT grp, MAX(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 30
+2 15
+
+query II rowsort
+SELECT grp, FIRST(val) FROM test_tinyint_agg GROUP BY grp;
+----
+1 10
+2 5
+
+statement ok
+DROP TABLE test_tinyint_agg;
+
+# ============================================================================
+# SmallInt Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_smallint_agg;
+
+statement ok
+CREATE TABLE test_smallint_agg (grp INTEGER, val SMALLINT);
+
+statement ok
+INSERT INTO test_smallint_agg VALUES (1, 1000), (1, 2000), (2, 500), (2, 1500);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query II rowsort
+SELECT grp, SUM(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 3000
+2 2000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 1500.000000
+2 1000.000000
+
+query II rowsort
+SELECT grp, MIN(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 1000
+2 500
+
+query II rowsort
+SELECT grp, MAX(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 2000
+2 1500
+
+query II rowsort
+SELECT grp, FIRST(val) FROM test_smallint_agg GROUP BY grp;
+----
+1 1000
+2 500
+
+statement ok
+DROP TABLE test_smallint_agg;
+
+# ============================================================================
+# Integer Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_integer_agg;
+
+statement ok
+CREATE TABLE test_integer_agg (grp INTEGER, val INTEGER);
+
+statement ok
+INSERT INTO test_integer_agg VALUES (1, 100000), (1, 200000), (2, 50000), (2, 150000);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_integer_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query II rowsort
+SELECT grp, SUM(val) FROM test_integer_agg GROUP BY grp;
+----
+1 300000
+2 200000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_integer_agg GROUP BY grp;
+----
+1 150000.000000
+2 100000.000000
+
+query II rowsort
+SELECT grp, MIN(val) FROM test_integer_agg GROUP BY grp;
+----
+1 100000
+2 50000
+
+query II rowsort
+SELECT grp, MAX(val) FROM test_integer_agg GROUP BY grp;
+----
+1 200000
+2 150000
+
+query II rowsort
+SELECT grp, FIRST(val) FROM test_integer_agg GROUP BY grp;
+----
+1 100000
+2 50000
+
+statement ok
+DROP TABLE test_integer_agg;
+
+# ============================================================================
+# BigInt Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_bigint_agg;
+
+statement ok
+CREATE TABLE test_bigint_agg (grp INTEGER, val BIGINT);
+
+statement ok
+INSERT INTO test_bigint_agg VALUES (1, 10000000000), (1, 20000000000), (2, 5000000000), (2, 15000000000);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query II rowsort
+SELECT grp, SUM(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 30000000000
+2 20000000000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 15000000000.000000
+2 10000000000.000000
+
+query II rowsort
+SELECT grp, MIN(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 10000000000
+2 5000000000
+
+query II rowsort
+SELECT grp, MAX(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 20000000000
+2 15000000000
+
+query II rowsort
+SELECT grp, FIRST(val) FROM test_bigint_agg GROUP BY grp;
+----
+1 10000000000
+2 5000000000
+
+statement ok
+DROP TABLE test_bigint_agg;
+
+# ============================================================================
+# Float Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_float_agg;
+
+statement ok
+CREATE TABLE test_float_agg (grp INTEGER, val FLOAT);
+
+statement ok
+INSERT INTO test_float_agg VALUES (1, 1.5), (1, 2.5), (1, 3.5), (2, 0.5), (2, 1.5);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_float_agg GROUP BY grp;
+----
+1 3
+2 2
+
+query IR rowsort
+SELECT grp, SUM(val) FROM test_float_agg GROUP BY grp;
+----
+1 7.500000
+2 2.000000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_float_agg GROUP BY grp;
+----
+1 2.500000
+2 1.000000
+
+query IR rowsort
+SELECT grp, MIN(val) FROM test_float_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+query IR rowsort
+SELECT grp, MAX(val) FROM test_float_agg GROUP BY grp;
+----
+1 3.500000
+2 1.500000
+
+query IR rowsort
+SELECT grp, FIRST(val) FROM test_float_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+statement ok
+DROP TABLE test_float_agg;
+
+# ============================================================================
+# Double Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_double_agg;
+
+statement ok
+CREATE TABLE test_double_agg (grp INTEGER, val DOUBLE);
+
+statement ok
+INSERT INTO test_double_agg VALUES (1, 1.123456789), (1, 2.234567890), (2, 0.5), (2, 1.5);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_double_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query IR rowsort
+SELECT grp, SUM(val) FROM test_double_agg GROUP BY grp;
+----
+1 3.358025
+2 2.000000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_double_agg GROUP BY grp;
+----
+1 1.679012
+2 1.000000
+
+query IR rowsort
+SELECT grp, MIN(val) FROM test_double_agg GROUP BY grp;
+----
+1 1.123457
+2 0.500000
+
+query IR rowsort
+SELECT grp, MAX(val) FROM test_double_agg GROUP BY grp;
+----
+1 2.234568
+2 1.500000
+
+query IR rowsort
+SELECT grp, FIRST(val) FROM test_double_agg GROUP BY grp;
+----
+1 1.123457
+2 0.500000
+
+statement ok
+DROP TABLE test_double_agg;
+
+# ============================================================================
+# Float16 Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_float16_agg;
+
+statement ok
+CREATE TABLE test_float16_agg (grp INTEGER, val FLOAT16);
+
+statement ok
+INSERT INTO test_float16_agg VALUES (1, 1.5), (1, 2.5), (2, 0.5), (2, 1.5);
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_float16_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query IR rowsort
+SELECT grp, SUM(val) FROM test_float16_agg GROUP BY grp;
+----
+1 4.000000
+2 2.000000
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_float16_agg GROUP BY grp;
+----
+1 2.000000
+2 1.000000
+
+query IR rowsort
+SELECT grp, MIN(val) FROM test_float16_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+query IR rowsort
+SELECT grp, MAX(val) FROM test_float16_agg GROUP BY grp;
+----
+1 2.500000
+2 1.500000
+
+query IR rowsort
+SELECT grp, FIRST(val) FROM test_float16_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+statement ok
+DROP TABLE test_float16_agg;
+
+# ============================================================================
+# BFloat16 Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_bfloat16_agg;
+
+statement ok
+CREATE TABLE test_bfloat16_agg (grp INTEGER, val BFLOAT16);
+
+statement ok
+INSERT INTO test_bfloat16_agg VALUES (1, 1.5), (1, 2.5), (2, 0.5), (2, 1.5);
+
+query IR rowsort
+SELECT grp, SUM(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 4.000000
+2 2.000000
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 2
+2 2
+
+query IR rowsort
+SELECT grp, AVG(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 2.000000
+2 1.000000
+
+query IR rowsort
+SELECT grp, MIN(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+query IR rowsort
+SELECT grp, MAX(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 2.500000
+2 1.500000
+
+query IR rowsort
+SELECT grp, FIRST(val) FROM test_bfloat16_agg GROUP BY grp;
+----
+1 1.500000
+2 0.500000
+
+statement ok
+DROP TABLE test_bfloat16_agg;
+
+# ============================================================================
+# Varchar Tests - Full aggregate function coverage
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_varchar_agg;
+
+statement ok
+CREATE TABLE test_varchar_agg (grp INTEGER, val VARCHAR);
+
+statement ok
+INSERT INTO test_varchar_agg VALUES (1, 'apple'), (1, 'banana'), (1, 'cherry'), (2, 'I like to eat apple pie'), (2, 'I like to eat apple cake');
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_varchar_agg GROUP BY grp;
+----
+1 3
+2 2
+
+query II rowsort
+SELECT grp, COUNT(*) FROM test_varchar_agg GROUP BY grp;
+----
+1 3
+2 2
+
+statement error
+SELECT grp, SUM(val) FROM test_varchar_agg GROUP BY grp;
+
+statement error
+SELECT grp, AVG(val) FROM test_varchar_agg GROUP BY grp;
+
+query IT rowsort
+SELECT grp, MIN(val) FROM test_varchar_agg GROUP BY grp;
+----
+1 apple
+2 I like to eat apple cake
+
+query IT rowsort
+SELECT grp, MAX(val) FROM test_varchar_agg GROUP BY grp;
+----
+1 cherry
+2 I like to eat apple pie
+
+query IT rowsort
+SELECT grp, FIRST(val) FROM test_varchar_agg GROUP BY grp;
+----
+1 apple
+2 I like to eat apple pie
+
+statement ok
+DROP TABLE test_varchar_agg;
+
+# ============================================================================
+# Date Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_date_agg;
+
+statement ok
+CREATE TABLE test_date_agg (grp INTEGER, val DATE);
+
+statement ok
+INSERT INTO test_date_agg VALUES (1, '2023-01-01'), (1, '2023-02-01'), (2, '2023-03-01'), (2, '2023-04-01');
+
+# COUNT on Date
+query II rowsort
+SELECT grp, COUNT(val) FROM test_date_agg GROUP BY grp;
+----
+1 2
+2 2
+
+statement error
+SELECT grp, SUM(val) FROM test_date_agg GROUP BY grp;
+
+statement error
+SELECT grp, AVG(val) FROM test_date_agg GROUP BY grp;
+
+query IT rowsort
+SELECT grp, MIN(val) FROM test_date_agg GROUP BY grp;
+----
+1 2023-01-01
+2 2023-03-01
+
+query IT rowsort
+SELECT grp, MAX(val) FROM test_date_agg GROUP BY grp;
+----
+1 2023-02-01
+2 2023-04-01
+
+query IT rowsort
+SELECT grp, FIRST(val) FROM test_date_agg GROUP BY grp;
+----
+1 2023-01-01
+2 2023-03-01
+
+statement ok
+DROP TABLE test_date_agg;
+
+# ============================================================================
+# Time Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_time_agg;
+
+statement ok
+CREATE TABLE test_time_agg (grp INTEGER, val TIME);
+
+statement ok
+INSERT INTO test_time_agg VALUES (1, '10:30:00'), (1, '14:45:00'), (2, '09:00:00'), (2, '17:30:00');
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_time_agg GROUP BY grp;
+----
+1 2
+2 2
+
+statement error
+SELECT grp, SUM(val) FROM test_time_agg GROUP BY grp;
+
+statement error
+SELECT grp, AVG(val) FROM test_time_agg GROUP BY grp;
+
+query IT rowsort
+SELECT grp, MIN(val) FROM test_time_agg GROUP BY grp;
+----
+1 10:30:00
+2 09:00:00
+
+query IT rowsort
+SELECT grp, MAX(val) FROM test_time_agg GROUP BY grp;
+----
+1 14:45:00
+2 17:30:00
+
+query IT rowsort
+SELECT grp, FIRST(val) FROM test_time_agg GROUP BY grp;
+----
+1 10:30:00
+2 09:00:00
+
+statement ok
+DROP TABLE test_time_agg;
+
+# ============================================================================
+# DateTime Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_datetime_agg;
+
+statement ok
+CREATE TABLE test_datetime_agg (grp INTEGER, val DATETIME);
+
+statement ok
+INSERT INTO test_datetime_agg VALUES (1, '2023-01-01 10:00:00'), (1, '2023-01-02 14:00:00'), (2, '2023-01-03 09:00:00'), (2, '2023-01-04 17:00:00');
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_datetime_agg GROUP BY grp;
+----
+1 2
+2 2
+
+statement error
+SELECT grp, SUM(val) FROM test_datetime_agg GROUP BY grp;
+
+statement error
+SELECT grp, AVG(val) FROM test_datetime_agg GROUP BY grp;
+
+query IT rowsort
+SELECT grp, MIN(val) FROM test_datetime_agg GROUP BY grp;
+----
+1 2023-01-01 10:00:00
+2 2023-01-03 09:00:00
+
+query IT rowsort
+SELECT grp, MAX(val) FROM test_datetime_agg GROUP BY grp;
+----
+1 2023-01-02 14:00:00
+2 2023-01-04 17:00:00
+
+query IT rowsort
+SELECT grp, FIRST(val) FROM test_datetime_agg GROUP BY grp;
+----
+1 2023-01-01 10:00:00
+2 2023-01-03 09:00:00
+
+statement ok
+DROP TABLE test_datetime_agg;
+
+# ============================================================================
+# Timestamp Tests
+# ============================================================================
+
+statement ok
+DROP TABLE IF EXISTS test_timestamp_agg;
+
+statement ok
+CREATE TABLE test_timestamp_agg (grp INTEGER, val TIMESTAMP);
+
+statement ok
+INSERT INTO test_timestamp_agg VALUES (1, '2023-01-01 10:00:00'), (1, '2023-01-02 14:00:00'), (2, '2023-01-03 09:00:00'), (2, '2023-01-04 17:00:00');
+
+query II rowsort
+SELECT grp, COUNT(val) FROM test_timestamp_agg GROUP BY grp;
+----
+1 2
+2 2
+
+statement error
+SELECT grp, SUM(val) FROM test_timestamp_agg GROUP BY grp;
+
+statement error
+SELECT grp, AVG(val) FROM test_timestamp_agg GROUP BY grp;
+
+query IT rowsort
+SELECT grp, MIN(val) FROM test_timestamp_agg GROUP BY grp;
+----
+1 2023-01-01 10:00:00
+2 2023-01-03 09:00:00
+
+query IT rowsort
+SELECT grp, MAX(val) FROM test_timestamp_agg GROUP BY grp;
+----
+1 2023-01-02 14:00:00
+2 2023-01-04 17:00:00
+
+query IT rowsort
+SELECT grp, FIRST(val) FROM test_timestamp_agg GROUP BY grp;
+----
+1 2023-01-01 10:00:00
+2 2023-01-03 09:00:00
+
+statement ok
+DROP TABLE test_timestamp_agg;
+
+# ============================================================================
+# NULL Value Handling Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_null_agg;
+
+statement ok
+CREATE TABLE test_null_agg (id INTEGER, str_val VARCHAR);
+
+statement ok
+INSERT INTO test_null_agg VALUES
+  (1, '100'),
+  (2, 'abcdef200'),
+  (3, '300test'),
+  (4, 'hello'),
+  (5, 'mysql'),
+  (6, 'Abcdef'),
+  (7, '500');
+
+query IT
+SELECT CAST(str_val AS INT) FROM test_null_agg;
+----
+100
+null
+300
+null
+null
+null
+500
+
+query I
+SELECT COUNT(*), COUNT(CAST(str_val AS INT)) FROM test_null_agg;
+----
+7 3
+
+# Test COUNT with CAST that returns NULL
+query I
+SELECT SUM(CAST(str_val AS INT)), AVG(CAST(str_val AS INT)), MIN(CAST(str_val AS INT)), MAX(CAST(str_val AS INT)) FROM test_null_agg;
+----
+900 300.000000 100 500
+
+statement ok
+DROP TABLE test_null_agg;
+
+# ============================================================================
+# Aggregate Functions on Empty Table Tests
+# ============================================================================
+statement ok
+DROP TABLE IF EXISTS test_empty_int_agg;
+
+statement ok
+CREATE TABLE test_empty_int_agg (c1 INTEGER);
+
+# Test all aggregate functions on empty table
+query I
+SELECT COUNT(c1), SUM(c1), AVG(c1), MIN(c1), MAX(c1), FIRST(c1) FROM test_empty_int_agg;
+----
+0 null null null null null
+
+query R
+SELECT AVG(c1) FROM test_empty_int_agg;
+----
+null
+
+statement ok
+DROP TABLE test_empty_int_agg;
+
+# Test with empty varchar table
+statement ok
+DROP TABLE IF EXISTS test_empty_varchar_agg;
+
+statement ok
+CREATE TABLE test_empty_varchar_agg (c1 VARCHAR);
+
+# Test all aggregate functions on empty varchar table
+query I
+SELECT COUNT(c1), MIN(c1), MAX(c1), FIRST(c1) FROM test_empty_varchar_agg;
+----
+0 null null null
+
+statement ok
+DROP TABLE test_empty_varchar_agg;
+
+# Test with empty date table
+statement ok
+DROP TABLE IF EXISTS test_empty_date_agg;
+
+statement ok
+CREATE TABLE test_empty_date_agg (c1 DATE);
+
+# Test all aggregate functions on empty date table
+query I
+SELECT COUNT(c1), MIN(c1), MAX(c1), FIRST(c1) FROM test_empty_date_agg;
+----
+0 null null null
+
+statement ok
+DROP TABLE test_empty_date_agg;

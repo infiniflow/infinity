@@ -64,7 +64,19 @@ public:
                 size_t row_count = input_column_vector->Size();
                 auto *input_ptr = (InputType *)(input_column_vector->data());
                 for (size_t idx = 0; idx < row_count; ++idx) {
-                    ((AggregateState *)state)->Update(input_ptr, idx);
+                    // Check if this row is NULL before updating state
+                    // For aggregate functions, we should skip NULL values
+                    if (input_column_vector->nulls_ptr_->IsTrue(idx)) {
+                        if constexpr (requires { AggregateState::need_column_vector_; }) {
+                            if constexpr (AggregateState::need_column_vector_) {
+                                ((AggregateState *)state)->Update(input_ptr, idx, input_column_vector.get());
+                            } else {
+                                ((AggregateState *)state)->Update(input_ptr, idx);
+                            }
+                        } else {
+                            ((AggregateState *)state)->Update(input_ptr, idx);
+                        }
+                    }
                 }
                 break;
             }
@@ -79,7 +91,15 @@ public:
                     break;
                 }
                 auto *input_ptr = (InputType *)(input_column_vector->data());
-                ((AggregateState *)state)->Update(input_ptr, 0);
+                if constexpr (requires { AggregateState::need_column_vector_; }) {
+                    if constexpr (AggregateState::need_column_vector_) {
+                        ((AggregateState *)state)->Update(input_ptr, 0, input_column_vector.get());
+                    } else {
+                        ((AggregateState *)state)->Update(input_ptr, 0);
+                    }
+                } else {
+                    ((AggregateState *)state)->Update(input_ptr, 0);
+                }
                 break;
             }
             case ColumnVectorType::kHeterogeneous: {

@@ -30,6 +30,8 @@ export class AggregateExpression;
 export class ExpressionState;
 export class BaseExpression;
 
+class AggregateFunction;
+
 export class ExpressionEvaluator {
 public:
     void Init(const DataBlock *input_data_block);
@@ -76,6 +78,11 @@ public:
 private:
     const DataBlock *input_data_block_{};
     bool in_aggregate_{false};
+
+    static void AppendAggregateResult(const AggregateFunction &aggregate_func,
+                                      const char *result_ptr,
+                                      const std::shared_ptr<ColumnVector> &child_output_col,
+                                      std::shared_ptr<ColumnVector> &output_column_vector);
 };
 
 } // namespace infinity
