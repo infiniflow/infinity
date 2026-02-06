@@ -26,17 +26,30 @@ import :db_meta;
 import :table_meta;
 import :txn_state;
 import :logger;
+import :kv_store;
+import :kv_code;
+import :infinity_context;
 
 import third_party;
 
 namespace infinity {
 
 Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const std::string &snapshot_name) {
+    // Check if snapshot has been dropped
+    auto *storage = InfinityContext::instance().storage();
+    auto *kv_store = storage->kv_store();
+    std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+    std::string drop_ts_str;
+    Status status = kv_store->Get(drop_key, drop_ts_str);
+    if (status.ok()) {
+        // Snapshot has been dropped
+        return Status::NotFound(fmt::format("Snapshot: {} has been dropped", snapshot_name));
+    }
+
     auto *txn_ptr = query_context->GetNewTxn();
     std::string snapshot_dir = query_context->global_config()->SnapshotDir();
 
     std::shared_ptr<DatabaseSnapshotInfo> database_snapshot;
-    Status status;
     std::tie(database_snapshot, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
     if (!status.ok()) {
         return status;
@@ -48,15 +61,6 @@ Status Snapshot::RestoreDatabaseSnapshot(QueryContext *query_context, const std:
     if (!status.ok()) {
         return status;
     }
-
-    // print txn state
-    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
-    // txn_ptr->Commit();
-    // LOG_INFO(fmt::format("txn state: {}", TxnState2Str(txn_ptr->GetTxnState())));
-    //    if(!status.ok()) {
-    //        return status;
-    //    }for
-    //    txn_ptr->ApplyTableSnapshot(table_snapshot);
     return Status::OK();
 }
 

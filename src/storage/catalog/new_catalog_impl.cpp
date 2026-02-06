@@ -245,6 +245,8 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
                                                                    std::move(meta_infos[2]),
                                                                    std::stoull(meta_infos[3]),
                                                                    std::stoull(meta_infos[4])));
+        } else if (type_str == "snapshot") {
+            // Snapshot is not metadata, skip it
         } else {
             UnrecoverableError("Unknown meta key type.");
         }
@@ -254,7 +256,7 @@ Status NewCatalog::GetCleanedMeta(TxnTimeStamp ts,
     auto iter = kv_instance->GetIterator();
     iter->Seek(drop_prefix);
 
-    while (iter->Valid() && iter->Key().starts_with(drop_prefix)) {
+    while (iter->Valid() && iter->Key().starts_with(drop_prefix) && !iter->Key().starts_with("drop|snapshot")) {
         std::string drop_key = iter->Key().ToString();
         std::string commit_ts_str = iter->Value().ToString();
         TxnTimeStamp drop_ts = std::stoull(commit_ts_str);

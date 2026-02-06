@@ -161,6 +161,15 @@ export struct CreateSystemSnapshotTxnStore final : public BaseTxnStore {
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
 };
 
+export struct DropSnapshotTxnStore final : public BaseTxnStore {
+    DropSnapshotTxnStore() : BaseTxnStore(TransactionType::kDropSnapshot) {}
+
+    std::string snapshot_name_{};
+
+    std::string ToString() const final;
+    std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
+};
+
 export struct RestoreTableTxnStore final : public BaseTxnStore {
     RestoreTableTxnStore() : BaseTxnStore(TransactionType::kRestoreTable) {}
 

@@ -59,6 +59,7 @@ struct WalCmdCleanup;
 struct WalCmdCreateTableSnapshot;
 struct WalCmdCreateDBSnapshot;
 struct WalCmdCreateSystemSnapshot;
+struct WalCmdDropSnapshot;
 struct WalCmdRestoreTableSnapshot;
 struct WalCmdRestoreDatabaseSnapshot;
 struct WalCmdRestoreSystemSnapshot;
@@ -103,6 +104,7 @@ struct UpdateTxnStore;
 struct CreateTableSnapshotTxnStore;
 struct CreateDBSnapshotTxnStore;
 struct CreateSystemSnapshotTxnStore;
+struct DropSnapshotTxnStore;
 struct CleanupTxnStore;
 class IndexBase;
 class IndexSecondaryFunctional;
@@ -283,6 +285,7 @@ public:
     Status CreateTableSnapshot(const std::string &db_name, const std::string &table_name, const std::string &snapshot_name);
     Status CreateDBSnapshot(const std::string &db_name, const std::string &snapshot_name);
     Status CreateSystemSnapshot(const std::string &snapshot_name);
+    Status DropSnapshot(const std::string &snapshot_name);
 
     // std::tuple<std::shared_ptr<TableSnapshotInfo>, Status> GetTableSnapshotInfo(const std::string &db_name, const std::string &table_name);
 
@@ -335,6 +338,7 @@ private:
     Status ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_table_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id);
     Status ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id);
+    Status ReplayDropSnapshot(WalCmdDropSnapshot *drop_snapshot_cmd, TxnTimeStamp commit_ts, i64 txn_id);
 
 public:
     Status Append(const std::string &db_name, const std::string &table_name, const std::shared_ptr<DataBlock> &input_block);
@@ -366,6 +370,7 @@ public:
 
 private:
     Status CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas);
+    Status CleanupDroppedSnapshots(TxnTimeStamp visible_ts);
 
 public:
     Status Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint);
@@ -633,6 +638,7 @@ private:
     Status PrepareCommitCreateTableSnapshot(const WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status PrepareCommitCreateDBSnapshot(const WalCmdCreateDBSnapshot *create_db_snapshot_cmd);
     Status PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapshot *create_system_snapshot_cmd);
+    Status PrepareCommitDropSnapshot(const WalCmdDropSnapshot *drop_snapshot_cmd);
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd);

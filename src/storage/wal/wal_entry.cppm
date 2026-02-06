@@ -83,6 +83,7 @@ export enum class WalCommandType : i8 {
     RESTORE_TABLE_SNAPSHOT = 113,
     RESTORE_DATABASE_SNAPSHOT = 114,
     RESTORE_SYSTEM_SNAPSHOT = 115,
+    DROP_SNAPSHOT = 116,
     // -----------------------------
     // Other
     // -----------------------------
@@ -896,6 +897,20 @@ export struct WalCmdRestoreSystemSnapshot : public WalCmd {
 
     std::string snapshot_name_;
     std::vector<WalCmdRestoreDatabaseSnapshot> restore_database_wal_cmds_;
+};
+
+export struct WalCmdDropSnapshot : public WalCmd {
+    WalCmdDropSnapshot(const std::string &snapshot_name) : WalCmd(WalCommandType::DROP_SNAPSHOT), snapshot_name_(snapshot_name) {}
+
+    bool operator==(const WalCmd &other) const final;
+    [[nodiscard]] i32 GetSizeInBytes() const final;
+    void WriteAdv(char *&buf) const final;
+
+    [[nodiscard]] std::string ToString() const final;
+    [[nodiscard]] std::string CompactInfo() const final;
+    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
+
+    std::string snapshot_name_;
 };
 
 export struct WalEntryHeader {
