@@ -2519,6 +2519,9 @@ std::string WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::CREATE_SYSTEM_SNAPSHOT:
             command = "CREATE_SYSTEM_SNAPSHOT";
             break;
+        case WalCommandType::DROP_SNAPSHOT:
+            command = "DROP_SNAPSHOT";
+            break;
         default: {
             UnrecoverableError("Unknown command type");
         }
