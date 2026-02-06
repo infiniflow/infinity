@@ -1406,6 +1406,13 @@ Status NewTxn::CreateSystemSnapshot(const std::string &snapshot_name) {
     return Status::OK(); // Success
 }
 
+Status NewTxn::DropSnapshot(const std::string &snapshot_name) {
+    base_txn_store_ = std::make_shared<DropSnapshotTxnStore>();
+    DropSnapshotTxnStore *txn_store = static_cast<DropSnapshotTxnStore *>(base_txn_store_.get());
+    txn_store->snapshot_name_ = snapshot_name;
+    return Status::OK();
+}
+
 std::tuple<std::shared_ptr<DatabaseSnapshotInfo>, Status> NewTxn::GetDatabaseSnapshotInfo(const std::string &db_name) {
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -1564,8 +1571,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
     Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
-    }
-    if (status.code() != ErrorCode::kDBNotExist) {
+    } else if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
     auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
@@ -1592,7 +1598,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
         LOG_TRACE(
             fmt::format("NewTxn::RestoreTableSnapshot, old_table_id: {}, new_table_id: {}", table_snapshot_info->table_id_str_, next_table_id_str));
 
-        // copy files from snapshot to data dir
+        // copy files from snapshot to tmp dir
         std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
         std::string snapshot_name = table_snapshot_info->snapshot_name_;
         std::vector<std::string> restored_file_paths;
@@ -2539,6 +2545,14 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::DROP_SNAPSHOT: {
+                auto *drop_snapshot_cmd = static_cast<WalCmdDropSnapshot *>(command.get());
+                Status status = PrepareCommitDropSnapshot(drop_snapshot_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
@@ -2726,6 +2740,17 @@ Status NewTxn::PrepareCommitCreateSystemSnapshot(const WalCmdCreateSystemSnapsho
         return status;
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommitDropSnapshot(const WalCmdDropSnapshot *drop_snapshot_cmd) {
+    const std::string &snapshot_name = drop_snapshot_cmd->snapshot_name_;
+
+    // Write drop marker instead of deleting immediately
+    std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+    kv_instance_->Put(drop_key, std::to_string(txn_context_ptr_->commit_ts_));
+
+    LOG_INFO(fmt::format("Marked snapshot for deletion: {}", snapshot_name));
     return Status::OK();
 }
 
@@ -5350,6 +5375,12 @@ Status NewTxn::Cleanup() {
         }
     }
 
+    // Clean dropped snapshots
+    status = CleanupDroppedSnapshots(visible_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     auto data_dir_str = fileworker_mgr->GetFullDataDir();
     auto data_dir = static_cast<std::filesystem::path>(*data_dir_str);
@@ -5563,6 +5594,42 @@ Status NewTxn::CleanupInner(const std::vector<std::shared_ptr<MetaKey>> &metas) 
     return status;
 }
 
+Status NewTxn::CleanupDroppedSnapshots(TxnTimeStamp visible_ts) {
+    std::string snapshot_prefix = "drop|snapshot";
+    auto iter = kv_instance_->GetIterator();
+    iter->Seek(snapshot_prefix);
+
+    while (iter->Valid() && iter->Key().starts_with(snapshot_prefix)) {
+        std::string drop_key = iter->Key().ToString();
+        std::string commit_ts_str = iter->Value().ToString();
+        TxnTimeStamp drop_ts = std::stoull(commit_ts_str);
+
+        LOG_INFO(fmt::format("CleanupDroppedSnapshots: found drop marker: {}, drop_ts: {}, visible_ts: {}", drop_key, drop_ts, visible_ts));
+
+        if (drop_ts <= visible_ts) {
+            // Extract snapshot name from key: "drop|snapshot|snapshot_name"
+            std::string snapshot_name = drop_key.substr(snapshot_prefix.length() + 1); // +1 to skip the '|'
+
+            std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+            std::string snapshot_path = fmt::format("{}/{}", snapshot_dir, snapshot_name);
+
+            if (VirtualStore::Exists(snapshot_path)) {
+                LOG_INFO(fmt::format("Cleaning up snapshot: {}", snapshot_name));
+                VirtualStore::RemoveDirectory(snapshot_path);
+            } else {
+                LOG_WARN(fmt::format("Snapshot path does not exist: {}", snapshot_path));
+            }
+
+            // Delete the drop marker
+            kv_instance_->Delete(drop_key);
+        } else {
+            LOG_INFO(fmt::format("Skipping cleanup: drop_ts {} > visible_ts {}", drop_ts, visible_ts));
+        }
+        iter->Next();
+    }
+    return Status::OK();
+}
+
 bool NewTxn::IsReplay() const { return txn_context_ptr_->txn_type_ == TransactionType::kReplay; }
 
 Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp commit_ts, i64 txn_id) {
@@ -5737,6 +5804,14 @@ Status NewTxn::ReplayWalCmd(const std::shared_ptr<WalCmd> &command, TxnTimeStamp
             auto *restore_system_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
 
             Status status = ReplayRestoreSystemSnapshot(restore_system_cmd, commit_ts, txn_id);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DROP_SNAPSHOT: {
+            auto *drop_snapshot_cmd = static_cast<WalCmdDropSnapshot *>(command.get());
+            Status status = ReplayDropSnapshot(drop_snapshot_cmd, commit_ts, txn_id);
             if (!status.ok()) {
                 return status;
             }
@@ -6190,9 +6265,6 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
 
     if (status.ok()) {
-        // if (conflict_type == ConflictType::kIgnore) {
-        //     return Status::OK();
-        // }
         return Status(ErrorCode::kDuplicateTableName, std::make_unique<std::string>(fmt::format("Table: {} already exists", table_name)));
     } else if (status.code() != ErrorCode::kTableNotExist) {
         return status;
@@ -6204,9 +6276,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    // copy files from snapshot to data dir
     std::vector<std::string> restored_file_paths;
-
     status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
                                                        snapshot_name,
                                                        table_snapshot_info->GetFiles(),
@@ -6214,6 +6284,11 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
                                                        db_meta->db_id_str(),
                                                        restored_file_paths,
                                                        false);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = PrepareCommitRestoreTableSnapshot(restore_table_cmd);
     if (!status.ok()) {
         return status;
     }
@@ -6241,8 +6316,7 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
     status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
-    }
-    if (status.code() != ErrorCode::kDBNotExist) {
+    } else if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
     auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
@@ -6257,9 +6331,7 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         std::string next_table_id_str;
         std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
 
-        // copy files from snapshot to data dir
         std::vector<std::string> restored_file_paths;
-
         status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
                                                            snapshot_name,
                                                            table_snapshot_info->GetFiles(),
@@ -6272,6 +6344,12 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
             return status;
         }
     }
+
+    status = PrepareCommitRestoreDatabaseSnapshot(restore_database_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -6297,8 +6375,7 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
         status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
         if (status.ok()) {
             return Status::DuplicateDatabase(db_name);
-        }
-        if (status.code() != ErrorCode::kDBNotExist) {
+        } else if (status.code() != ErrorCode::kDBNotExist) {
             return status;
         }
         auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
@@ -6313,9 +6390,7 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
             std::string next_table_id_str;
             std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
 
-            // copy files from snapshot to data dir
             std::vector<std::string> restored_file_paths;
-
             status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
                                                                snapshot_name,
                                                                table_snapshot_info->GetFiles(),
@@ -6329,6 +6404,39 @@ Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_
             }
         }
     }
+    status = PrepareCommitRestoreSystemSnapshot(restore_system_cmd);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::ReplayDropSnapshot(WalCmdDropSnapshot *drop_snapshot_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
+    const std::string &snapshot_name = drop_snapshot_cmd->snapshot_name_;
+
+    // Check if the snapshot is already dropped in kv store
+    std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+    std::string drop_commit_ts_str;
+    Status status = kv_instance_->Get(drop_key, drop_commit_ts_str);
+    if (status.ok()) {
+        TxnTimeStamp drop_commit_ts = std::stoull(drop_commit_ts_str);
+        if (drop_commit_ts == commit_ts) {
+            LOG_WARN(fmt::format("Skipping replay drop snapshot: {} already dropped with commit ts: {}, txn: {}", snapshot_name, commit_ts, txn_id));
+            return Status::OK();
+        } else {
+            LOG_ERROR(fmt::format("Replay drop snapshot: {} already dropped with different commit ts: {}, current: {}, txn: {}",
+                                  snapshot_name,
+                                  drop_commit_ts,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Snapshot commit timestamp mismatch during replay of snapshot drop.");
+        }
+    }
+
+    // Write drop marker
+    kv_instance_->Put(drop_key, std::to_string(commit_ts));
+    LOG_INFO(fmt::format("Replayed drop snapshot: {} with commit_ts: {}, txn: {}", snapshot_name, commit_ts, txn_id));
     return Status::OK();
 }
 

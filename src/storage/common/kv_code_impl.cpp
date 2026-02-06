@@ -290,4 +290,6 @@ std::string KeyEncode::DropChunkIndexKey(const std::string &db_id_str,
     return fmt::format("drop|idx_chunk|{}/{}/{}/{}/{}", db_id_str, table_id_str, index_id_str, segment_id, chunk_id);
 }
 
+std::string KeyEncode::DropSnapshotKey(const std::string &snapshot_name) { return fmt::format("drop|snapshot|{}", snapshot_name); }
+
 } // namespace infinity

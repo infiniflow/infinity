@@ -115,6 +115,16 @@ std::shared_ptr<WalEntry> CreateSystemSnapshotTxnStore::ToWalEntry(TxnTimeStamp 
     return wal_entry;
 }
 
+std::string DropSnapshotTxnStore::ToString() const { return fmt::format("{}: snapshot: {}", TransactionType2Str(type_), snapshot_name_); }
+
+std::shared_ptr<WalEntry> DropSnapshotTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
+    std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
+    wal_entry->commit_ts_ = commit_ts;
+    std::shared_ptr<WalCmd> wal_command = std::make_shared<WalCmdDropSnapshot>(snapshot_name_);
+    wal_entry->cmds_.push_back(wal_command);
+    return wal_entry;
+}
+
 std::string DropTableTxnStore::ToString() const {
     return fmt::format("{}: database: {}, table: {}, table_id: {}, create_ts: {}",
                        TransactionType2Str(type_),

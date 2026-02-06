@@ -718,6 +718,11 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = std::make_shared<WalCmdRestoreSystemSnapshot>(snapshot_name, restore_database_wal_cmds);
             break;
         }
+        case WalCommandType::DROP_SNAPSHOT: {
+            std::string snapshot_name = ReadBufAdv<std::string>(ptr);
+            cmd = std::make_shared<WalCmdDropSnapshot>(snapshot_name);
+            break;
+        }
         default: {
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type)));
         }
@@ -1024,6 +1029,11 @@ bool WalCmdRestoreSystemSnapshot::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdDropSnapshot::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDropSnapshot *>(&other);
+    return other_cmd != nullptr && snapshot_name_ == other_cmd->snapshot_name_;
+}
+
 i32 WalCmdCreateDatabaseV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(i32) + this->db_comment_.size();
 }
@@ -1212,6 +1222,8 @@ i32 WalCmdRestoreSystemSnapshot::GetSizeInBytes() const {
     return size;
 }
 
+i32 WalCmdDropSnapshot::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + snapshot_name_.size(); }
+
 void WalCmdCreateDatabaseV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE_V2);
     WriteBufAdv(buf, this->db_name_);
@@ -1342,6 +1354,11 @@ void WalCmdRestoreSystemSnapshot::WriteAdv(char *&buf) const {
     for (const auto &restore_database_wal_cmd : restore_database_wal_cmds_) {
         restore_database_wal_cmd.WriteAdv(buf);
     }
+}
+
+void WalCmdDropSnapshot::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DROP_SNAPSHOT);
+    WriteBufAdv(buf, this->snapshot_name_);
 }
 
 void WalCmdAppendV2::WriteAdv(char *&buf) const {
@@ -2025,6 +2042,12 @@ std::string WalCmdRestoreSystemSnapshot::ToString() const {
     return std::move(ss).str();
 }
 
+std::string WalCmdDropSnapshot::ToString() const {
+    std::stringstream ss;
+    ss << "snapshot_name: " << snapshot_name_ << std::endl;
+    return std::move(ss).str();
+}
+
 std::string WalCmdRestoreDatabaseSnapshot::CompactInfo() const {
     std::stringstream ss;
     ss << "db_name: " << db_name_ << std::endl;
@@ -2046,6 +2069,10 @@ std::string WalCmdRestoreSystemSnapshot::CompactInfo() const {
         ss << "  restore_database_wal_cmd " << i << ": " << restore_database_wal_cmds_[i].CompactInfo();
     }
     return std::move(ss).str();
+}
+
+std::string WalCmdDropSnapshot::CompactInfo() const {
+    return fmt::format("{}: snapshot: {}", WalCmd::WalCommandTypeToString(GetType()), snapshot_name_);
 }
 
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdDummy::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
@@ -2193,6 +2220,8 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdRestoreSystemSnapshot::ToCach
     std::vector<std::shared_ptr<EraseBaseCache>> cache_items;
     return cache_items;
 }
+
+std::vector<std::shared_ptr<EraseBaseCache>> WalCmdDropSnapshot::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {

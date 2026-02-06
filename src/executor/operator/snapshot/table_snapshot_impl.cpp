@@ -26,12 +26,26 @@ import :db_meta;
 import :table_meta;
 import :txn_state;
 import :logger;
+import :kv_store;
+import :kv_code;
+import :infinity_context;
 
 import third_party;
 
 namespace infinity {
 
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const std::string &snapshot_name) {
+    // Check if snapshot has been dropped
+    auto *storage = InfinityContext::instance().storage();
+    auto *kv_store = storage->kv_store();
+    std::string drop_key = KeyEncode::DropSnapshotKey(snapshot_name);
+    std::string drop_ts_str;
+    Status status = kv_store->Get(drop_key, drop_ts_str);
+    if (status.ok()) {
+        // Snapshot has been dropped
+        return Status::NotFound(fmt::format("Snapshot: {} has been dropped", snapshot_name));
+    }
+
     auto *txn_ptr = query_context->GetNewTxn();
     // might need to change this
     const std::string &db_name = query_context->schema_name();
@@ -41,7 +55,7 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const std::st
 
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
-    Status status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
+    status = txn_ptr->GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }

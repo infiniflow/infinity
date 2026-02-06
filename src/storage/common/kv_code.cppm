@@ -243,6 +243,8 @@ public:
                                          const std::string &index_id_str,
                                          SegmentID segment_id,
                                          ChunkID chunk_id);
+
+    static std::string DropSnapshotKey(const std::string &snapshot_name);
 };
 
 } // namespace infinity
