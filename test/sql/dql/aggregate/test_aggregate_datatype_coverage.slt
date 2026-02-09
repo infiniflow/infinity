@@ -742,6 +742,11 @@ SELECT COUNT(c1), SUM(c1), AVG(c1), MIN(c1), MAX(c1), FIRST(c1) FROM test_empty_
 ----
 0 null null null null null
 
+query I
+SELECT COUNT(distinct c1), SUM(distinct c1), AVG(distinct c1), MIN(distinct c1), MAX(distinct c1), FIRST(distinct c1) FROM test_empty_int_agg;
+----
+0 null null null null null
+
 query R
 SELECT AVG(c1) FROM test_empty_int_agg;
 ----
