@@ -6254,15 +6254,20 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
 
     db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
     status = kv_instance_->Get(db_key, db_id);
-    if (!status.ok()) {
+    if (status.ok()) {
+        if (db_id != restore_database_cmd->db_id_str_) {
+            LOG_INFO(fmt::format("In kv_instance: {}, but in restore_database_cmd: {}", db_id, restore_database_cmd->db_id_str_));
+            return Status::UnexpectedError("Database ID mismatch during replay of databse restore.");
+        }
+    } else {
         status = IncrLatestID(db_id, NEXT_DATABASE_ID);
         if (!status.ok()) {
             return status;
         }
-    }
-    if (std::stoull(db_id) != std::stoull(restore_database_cmd->db_id_str_) + 1) {
-        LOG_INFO(fmt::format("In kv_instance: {}, but in restore_database_cmd: {}", db_id, restore_database_cmd->db_id_str_));
-        return Status::UnexpectedError("Database ID mismatch during replay of databse restore.");
+        if (std::stoull(db_id) != std::stoull(restore_database_cmd->db_id_str_) + 1) {
+            LOG_INFO(fmt::format("In kv_instance: {}, but in restore_database_cmd: {}", db_id, restore_database_cmd->db_id_str_));
+            return Status::UnexpectedError("Database ID mismatch during replay of databse restore.");
+        }
     }
 
     std::shared_ptr<DBMeta> db_meta;
