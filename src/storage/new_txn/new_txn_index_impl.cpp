@@ -532,6 +532,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                                                     std::move(chunk_infos),
                                                     std::move(deprecate_ids));
 
+    optimize_index_txn_store->file_worker_paths_.push_back(index_file_worker->GetPath());
     return Status::OK();
 }
 
@@ -2505,6 +2506,16 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
+    }
+
+    if (!IsReplay()) {
+        if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kOptimizeIndex) {
+            auto *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
+            if (!optimize_index_txn_store->file_worker_paths_.empty()) {
+                auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+                fileworker_mgr->MoveFiles(optimize_index_txn_store->file_worker_paths_);
+            }
+        }
     }
 
     return Status::OK();

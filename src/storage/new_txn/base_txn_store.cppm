@@ -297,6 +297,7 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     std::vector<std::string> db_names_{};
     std::map<std::string, std::vector<std::string>> table_names_in_db_{};
     std::vector<OptimizeIndexStoreEntry> entries_;
+    std::vector<std::string> file_worker_paths_{}; // Index file worker paths to move in PrepareCommit
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;
@@ -362,6 +363,7 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::string table_key_{};
     std::string import_tmp_path_{};
     std::vector<std::string> import_file_names_{}; // used during rollback
+    std::vector<std::string> file_worker_paths_{}; // File worker paths to move in PrepareCommit
     std::vector<WalSegmentInfo> segment_infos_{};
 
     std::vector<std::string> index_names_{};

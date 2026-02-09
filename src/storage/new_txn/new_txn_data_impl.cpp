@@ -180,18 +180,30 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     Status status;
     [[maybe_unused]] auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::vector<size_t> block_row_cnts;
+    std::vector<std::string> all_file_worker_paths;
 
     for (size_t i = 0; i < input_blocks.size(); ++i) {
         std::vector<std::shared_ptr<DataType>> column_types;
         block_row_cnts.emplace_back(input_blocks[i]->row_count());
-        status = WriteDataBlockToFile(db_name, table_name, input_blocks[i], i);
+        std::vector<std::string> file_worker_paths;
+        status = WriteDataBlockToFile(db_name, table_name, input_blocks[i], i, &file_worker_paths);
         if (!status.ok()) {
             return status;
         }
+        all_file_worker_paths.insert(all_file_worker_paths.end(), file_worker_paths.begin(), file_worker_paths.end());
     }
 
     status = Import(db_name, table_name, block_row_cnts);
-    return status;
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
+        auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        import_txn_store->file_worker_paths_ = std::move(all_file_worker_paths);
+    }
+
+    return Status::OK();
 }
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts) {
@@ -1352,6 +1364,13 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
         handler.HandleWriteResult(result);
     }
 
+    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
+        auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        if (!import_txn_store->file_worker_paths_.empty()) {
+            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            fileworker_mgr->MoveFiles(import_txn_store->file_worker_paths_);
+        }
+    }
     return Status::OK();
 }
 
