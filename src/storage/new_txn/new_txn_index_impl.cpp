@@ -2437,6 +2437,35 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         LOG_TRACE(fmt::format("Created new fulltext index cache for index: {}", *create_index_cmd->index_base_->index_name_));
     }
 
+    if (!IsReplay()) {
+        std::vector<std::string> all_file_paths;
+
+        auto [segment_index_ids_ptr, seg_status] = table_index_meta_ptr->GetSegmentIndexIDs1();
+        if (seg_status.ok()) {
+            for (SegmentID segment_id : *segment_index_ids_ptr) {
+                SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_ptr);
+
+                auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+                if (chunk_status.ok()) {
+                    for (ChunkID chunk_id : *chunk_ids_ptr) {
+                        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+
+                        std::vector<std::string> chunk_file_paths;
+                        Status fp_status = chunk_index_meta.FilePaths(chunk_file_paths);
+                        if (fp_status.ok()) {
+                            all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!all_file_paths.empty()) {
+            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            fileworker_mgr->MoveFiles(all_file_paths);
+        }
+    }
+
     return Status::OK();
 }
 
