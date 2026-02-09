@@ -560,6 +560,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments[0]);
             auto aggregate_function_ptr = std::make_shared<AggregateExpression>(aggregate_function, arguments);
             aggregate_function_ptr->SetCountStar(is_count_star);
+            aggregate_function_ptr->SetDistinct(expr.distinct_);
             return aggregate_function_ptr;
         }
         case FunctionType::kTable: {

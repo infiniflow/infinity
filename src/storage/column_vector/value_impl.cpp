@@ -1563,6 +1563,39 @@ std::string Value::ToString() const {
     return {};
 }
 
+uint64_t Value::Hash() const {
+    // Only hash types that are used in aggregate functions
+    switch (type_.type()) {
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kHugeInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
+        case LogicalType::kDecimal:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp: {
+            // Hash raw bytes for fixed-size types
+            size_t size = type_.Size();
+            return std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(&value_), size));
+        }
+        case LogicalType::kVarchar: {
+            const auto &str = value_info_->Get<StringValueInfo>().GetString();
+            return std::hash<std::string_view>{}(std::string_view(str));
+        }
+        default: {
+            UnrecoverableError(fmt::format("Value::Hash() not supported for data type: {}", type_.ToString()));
+            return 0;
+        }
+    }
+    return 0;
+}
 Value Value::StringToValue(const std::string &str, const DataType &data_type) {
     Value value(data_type);
     value.type_ = data_type;

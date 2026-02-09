@@ -1,0 +1,84 @@
+statement ok
+DROP TABLE IF EXISTS test_distinct;
+
+statement ok
+CREATE TABLE test_distinct (c1 INTEGER, c2 INTEGER, c3 VARCHAR);
+
+statement ok
+INSERT INTO test_distinct VALUES (1, 1, '123'), (1, 2, '123'), (2, 1, 'apple'), (1, 1, '123'), (3, 2, '456');
+
+query IIT rowsort
+SELECT * FROM test_distinct
+----
+1 1 123
+1 1 123
+1 2 123
+2 1 apple
+3 2 456
+
+query I rowsort
+SELECT DISTINCT c1 FROM test_distinct
+----
+1
+2
+3
+
+query IT rowsort
+SELECT DISTINCT c1, c3 FROM test_distinct
+----
+1 123
+2 apple
+3 456
+
+query IIT rowsort
+SELECT DISTINCT c1, c2, c3 FROM test_distinct
+----
+1 1 123
+1 2 123
+2 1 apple
+3 2 456
+
+query IIT
+SELECT DISTINCT c1, c2, c3 FROM test_distinct order by c1,c2
+----
+1 1 123
+1 2 123
+2 1 apple
+3 2 456
+
+query I
+SELECT COUNT(DISTINCT c1) FROM test_distinct
+----
+3
+
+query I
+SELECT COUNT(DISTINCT c1, c3) FROM test_distinct
+----
+3
+
+query I
+SELECT SUM(DISTINCT c1) FROM test_distinct
+----
+6
+
+statement error
+SELECT SUM(DISTINCT c1, c3) FROM test_distinct
+
+
+query I rowsort
+SELECT DISTINCT CAST(c3 AS INTEGER) FROM test_distinct
+----
+123
+456
+null
+
+
+query I
+SELECT COUNT(DISTINCT CAST(c3 AS INTEGER)) FROM test_distinct
+----
+2
+
+query I
+SELECT SUM(DISTINCT CAST(c3 AS INTEGER)) FROM test_distinct
+----
+579

@@ -369,6 +369,7 @@ public:
     [[nodiscard]] const DataType &type() const { return type_; }
 
     [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] uint64_t Hash() const;
 
     static Value StringToValue(const std::string &str, const DataType &target_type);
 

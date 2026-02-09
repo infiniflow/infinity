@@ -2337,6 +2337,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, size_t from, size_t cou
             // Null/Missing/Invalid
         }
     }
+
+    // Copy the null mask
+    for (size_t idx = 0; idx < count; ++idx) {
+        if (!other.nulls_ptr_->IsTrue(from + idx)) {
+            this->nulls_ptr_->SetFalse(tail_index + idx);
+        }
+    }
+
     tail_index_.fetch_add(count);
     // LOG_TRACE(fmt::format("ColumnVector::AppendWith: data_ptr_ {:p}, tail_index {}, from {}, count {}", data_ptr_, tail_index, from, count));
 }
