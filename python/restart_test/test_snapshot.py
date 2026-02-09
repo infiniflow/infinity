@@ -139,7 +139,6 @@ class TestSnapshot:
         def part3(infinity_obj):
             time.sleep(3)
             db_obj = infinity_obj.get_database("default_db")
-
             # Verify restored table still exists
             table_obj = db_obj.get_table("test_snapshot1")
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
