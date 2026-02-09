@@ -2542,6 +2542,9 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_TABLE_SNAPSHOT: {
+                if (IsReplay()) {
+                    break;
+                }
                 auto *restore_table_snapshot_cmd = static_cast<WalCmdRestoreTableSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreTableSnapshot(restore_table_snapshot_cmd);
                 if (!status.ok()) {
@@ -2550,6 +2553,9 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_DATABASE_SNAPSHOT: {
+                if (IsReplay()) {
+                    break;
+                }
                 auto *restore_database_snapshot_cmd = static_cast<WalCmdRestoreDatabaseSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreDatabaseSnapshot(restore_database_snapshot_cmd);
                 if (!status.ok()) {
@@ -2558,6 +2564,9 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::RESTORE_SYSTEM_SNAPSHOT: {
+                if (IsReplay()) {
+                    break;
+                }
                 auto *restore_system_snapshot_cmd = static_cast<WalCmdRestoreSystemSnapshot *>(command.get());
                 Status status = PrepareCommitRestoreSystemSnapshot(restore_system_snapshot_cmd);
                 if (!status.ok()) {
