@@ -1704,6 +1704,85 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         handler.HandleWriteResult(result);
     }
 
+    // Move files from tmp to data directory (only in normal execution, not during WAL replay)
+    if (!IsReplay()) {
+        std::vector<std::string> all_file_paths;
+
+        // 1. Collect data file paths from blocks
+        auto [block_ids_ptr, block_status] = segment_meta.GetBlockIDs1();
+        if (block_status.ok()) {
+            for (BlockID block_id : *block_ids_ptr) {
+                BlockMeta block_meta(block_id, segment_meta);
+
+                // Get all column file paths for this block
+                auto [column_ids_ptr, col_status] = block_meta.GetColumnIDs();
+                if (col_status.ok()) {
+                    for (ColumnID column_id : *column_ids_ptr) {
+                        ColumnMeta column_meta(column_id, block_meta);
+
+                        // Get data file path
+                        DataFileWorker *data_file_worker{};
+                        col_status = column_meta.GetFileWorker(data_file_worker);
+                        if (col_status.ok() && data_file_worker != nullptr) {
+                            all_file_paths.push_back(data_file_worker->GetPath());
+                        }
+
+                        // Get var file path
+                        VarFileWorker *var_file_worker{};
+                        col_status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
+                        if (col_status.ok() && var_file_worker != nullptr) {
+                            all_file_paths.push_back(var_file_worker->GetPath());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Collect index file paths
+        std::vector<std::string> *index_id_strs_ptr{};
+        std::vector<std::string> *index_name_strs_ptr{};
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
+        if (status.ok()) {
+            for (size_t idx = 0; idx < index_id_strs_ptr->size(); ++idx) {
+                const std::string &index_id_str = index_id_strs_ptr->at(idx);
+                const std::string &index_name_str = index_name_strs_ptr->at(idx);
+
+                TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+
+                // Get segment indexes for the new segment
+                auto [segment_index_ids_ptr, seg_status] = table_index_meta.GetSegmentIndexIDs1();
+                if (seg_status.ok()) {
+                    // Find the segment index for our new segment
+                    auto iter = std::find(segment_index_ids_ptr->begin(), segment_index_ids_ptr->end(), segment_info.segment_id_);
+                    if (iter != segment_index_ids_ptr->end()) {
+                        SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
+
+                        // Get all chunk indexes for this segment index
+                        auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+                        if (chunk_status.ok()) {
+                            for (ChunkID chunk_id : *chunk_ids_ptr) {
+                                ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+
+                                // Get file paths for this chunk index
+                                std::vector<std::string> chunk_file_paths;
+                                Status fp_status = chunk_index_meta.FilePaths(chunk_file_paths);
+                                if (fp_status.ok()) {
+                                    all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Move all files
+        if (!all_file_paths.empty()) {
+            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            fileworker_mgr->MoveFiles(all_file_paths);
+        }
+    }
+
     return Status::OK();
 }
 
