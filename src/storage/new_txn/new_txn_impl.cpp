@@ -1511,7 +1511,7 @@ Status NewTxn::RestoreTableSnapshot(const std::string &db_name, std::shared_ptr<
                                                          std::make_shared<std::string>(table_name),
                                                          std::make_shared<std::string>(table_snapshot_info->table_comment_),
                                                          table_snapshot_info->columns_);
-    // copy files from snapshot to data dir
+    // copy files from snapshot to tmp dir
     std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
     std::vector<std::string> restored_file_paths;
@@ -1616,6 +1616,7 @@ Status NewTxn::RestoreDatabaseSnapshot(std::shared_ptr<DatabaseSnapshotInfo> &da
                                                              table_snapshot_info->columns_);
 
         std::shared_ptr<RestoreTableTxnStore> tmp_txn_store = std::make_shared<RestoreTableTxnStore>();
+        tmp_txn_store->files_ = restored_file_paths;
 
         // Use the helper function to process snapshot restoration data
         status = ProcessSnapshotRestorationData(db_name,
@@ -1676,7 +1677,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
                                   table_snapshot_info->table_id_str_,
                                   next_table_id_str));
 
-            // copy files from snapshot to data dir
+            // copy files from snapshot to tmp dir
             std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
             std::string snapshot_name = table_snapshot_info->snapshot_name_;
             std::vector<std::string> restored_file_paths;
@@ -1699,6 +1700,7 @@ Status NewTxn::RestoreSystemSnapshot(std::shared_ptr<SystemSnapshotInfo> &system
                                                                  table_snapshot_info->columns_);
 
             std::shared_ptr<RestoreTableTxnStore> tmp_txn_store = std::make_shared<RestoreTableTxnStore>();
+            tmp_txn_store->files_ = restored_file_paths;
 
             status = ProcessSnapshotRestorationData(db_name,
                                                     db_id_str,
@@ -2944,6 +2946,7 @@ Status NewTxn::PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapsho
         return status;
     }
 
+    fileworker_mgr_->MoveFiles(restore_table_snapshot_cmd->files_);
     return Status::OK();
 }
 
@@ -3015,6 +3018,7 @@ Status NewTxn::PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseS
         if (!status.ok()) {
             return status;
         }
+        fileworker_mgr_->MoveFiles(restore_table_snapshot_cmd.files_);
     }
     return Status::OK();
 }
@@ -6166,17 +6170,33 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     // }
 
     LOG_TRACE(fmt::format("Replay restore table: {} with id {}.", restore_table_cmd->table_name_, restore_table_cmd->table_id_));
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = restore_table_cmd->snapshot_name_;
-    std::shared_ptr<TableSnapshotInfo> table_snapshot_info;
-    Status status;
-    std::tie(table_snapshot_info, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if (!status.ok()) {
-        return status;
+
+    // Check if the table already exists
+    std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
+    std::string table_id;
+    Status status = kv_instance_->Get(table_key, table_id);
+    bool is_link_files = false;
+    if (status.ok()) {
+        if (table_id == restore_table_cmd->table_id_) {
+            LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
+                                 *restore_table_cmd->table_def_->table_name(),
+                                 restore_table_cmd->table_id_,
+                                 commit_ts,
+                                 txn_id));
+            is_link_files = true;
+        } else {
+            LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
+                                  *restore_table_cmd->table_def_->table_name(),
+                                  restore_table_cmd->table_id_,
+                                  table_id,
+                                  commit_ts,
+                                  txn_id));
+            return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
+        }
     }
 
-    const std::string &table_name = table_snapshot_info->table_name_;
-    const std::string &db_name = table_snapshot_info->db_name_;
+    const std::string &table_name = restore_table_cmd->table_name_;
+    const std::string &db_name = restore_table_cmd->db_name_;
 
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
@@ -6184,15 +6204,11 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
     if (!status.ok()) {
         return status;
     }
+
     std::string table_id_str;
-    std::string table_key;
     TxnTimeStamp table_create_ts;
     status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
-
     if (status.ok()) {
-        // if (conflict_type == ConflictType::kIgnore) {
-        //     return Status::OK();
-        // }
         return Status(ErrorCode::kDuplicateTableName, std::make_unique<std::string>(fmt::format("Table: {} already exists", table_name)));
     } else if (status.code() != ErrorCode::kTableNotExist) {
         return status;
@@ -6204,48 +6220,28 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    // copy files from snapshot to data dir
-    std::vector<std::string> restored_file_paths;
-
-    status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
-                                                       snapshot_name,
-                                                       table_snapshot_info->GetFiles(),
-                                                       table_id_str,
-                                                       db_meta->db_id_str(),
-                                                       restored_file_paths,
-                                                       false);
+    status = RestoreTableFromSnapshot(restore_table_cmd, *db_meta, is_link_files);
     if (!status.ok()) {
         return status;
     }
+
     return Status::OK();
 }
 
 Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *restore_database_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     LOG_TRACE(fmt::format("Replay restore database: {} with id {}.", restore_database_cmd->db_name_, restore_database_cmd->db_id_str_));
 
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = restore_database_cmd->snapshot_name_;
-
-    std::shared_ptr<DatabaseSnapshotInfo> database_snapshot_info;
-    Status status;
-    std::tie(database_snapshot_info, status) = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if (!status.ok()) {
-        return status;
-    }
-
     CatalogMeta catalog_meta(this);
     TxnTimeStamp db_create_ts;
     std::string db_key;
     std::string db_id;
-    const std::string &db_name = database_snapshot_info->db_name_;
-    status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
+    const std::string &db_name = restore_database_cmd->db_name_;
+    Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
-    }
-    if (status.code() != ErrorCode::kDBNotExist) {
+    } else if (status.code() != ErrorCode::kDBNotExist) {
         return status;
     }
-    auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
 
     std::string db_id_str;
     status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
@@ -6253,81 +6249,16 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         return status;
     }
 
-    for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
-        std::string next_table_id_str;
-        std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
-
-        // copy files from snapshot to data dir
-        std::vector<std::string> restored_file_paths;
-
-        status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
-                                                           snapshot_name,
-                                                           table_snapshot_info->GetFiles(),
-                                                           next_table_id_str,
-                                                           db_id_str,
-                                                           restored_file_paths,
-                                                           false);
-
-        if (!status.ok()) {
-            return status;
-        }
+    for (auto &restore_table_cmd : restore_database_cmd->restore_table_wal_cmds_) {
+        ReplayRestoreTableSnapshot(&restore_table_cmd, commit_ts, txn_id);
     }
     return Status::OK();
 }
 
 Status NewTxn::ReplayRestoreSystemSnapshot(WalCmdRestoreSystemSnapshot *restore_system_cmd, TxnTimeStamp commit_ts, i64 txn_id) {
     LOG_TRACE("Replay restore system");
-
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
-    std::string snapshot_name = restore_system_cmd->snapshot_name_;
-
-    std::shared_ptr<SystemSnapshotInfo> system_snapshot_info;
-    Status status;
-    std::tie(system_snapshot_info, status) = SystemSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    for (auto &database_snapshot_info : system_snapshot_info->database_snapshots_) {
-        CatalogMeta catalog_meta(this);
-        TxnTimeStamp db_create_ts;
-        std::string db_key;
-        std::string db_id;
-        const std::string &db_name = database_snapshot_info->db_name_;
-        status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
-        if (status.ok()) {
-            return Status::DuplicateDatabase(db_name);
-        }
-        if (status.code() != ErrorCode::kDBNotExist) {
-            return status;
-        }
-        auto db_meta = std::make_shared<DBMeta>(db_id, db_name, this);
-
-        std::string db_id_str;
-        status = IncrLatestID(db_id_str, NEXT_DATABASE_ID);
-        if (!status.ok()) {
-            return status;
-        }
-
-        for (const auto &table_snapshot_info : database_snapshot_info->table_snapshots_) {
-            std::string next_table_id_str;
-            std::tie(next_table_id_str, status) = db_meta->GetNextTableID();
-
-            // copy files from snapshot to data dir
-            std::vector<std::string> restored_file_paths;
-
-            status = table_snapshot_info->RestoreSnapshotFiles(snapshot_dir,
-                                                               snapshot_name,
-                                                               table_snapshot_info->GetFiles(),
-                                                               next_table_id_str,
-                                                               db_id_str,
-                                                               restored_file_paths,
-                                                               false);
-
-            if (!status.ok()) {
-                return status;
-            }
-        }
+    for (auto &restore_database_cmd : restore_system_cmd->restore_database_wal_cmds_) {
+        ReplayRestoreDatabaseSnapshot(&restore_database_cmd, commit_ts, txn_id);
     }
     return Status::OK();
 }
