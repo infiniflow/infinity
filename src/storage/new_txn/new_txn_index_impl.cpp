@@ -2541,8 +2541,7 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kOptimizeIndex) {
             auto *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
             if (!optimize_index_txn_store->file_worker_paths_.empty()) {
-                auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-                fileworker_mgr->MoveFiles(optimize_index_txn_store->file_worker_paths_);
+                fileworker_mgr_->MoveFiles(optimize_index_txn_store->file_worker_paths_);
             }
         }
     }

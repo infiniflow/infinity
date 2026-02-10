@@ -1376,8 +1376,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
         }
 
         if (!import_txn_store->file_worker_paths_.empty()) {
-            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-            fileworker_mgr->MoveFiles(import_txn_store->file_worker_paths_);
+            fileworker_mgr_->MoveFiles(import_txn_store->file_worker_paths_);
         }
     }
     return Status::OK();
@@ -1746,8 +1745,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         }
 
         if (!all_file_paths.empty()) {
-            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-            fileworker_mgr->MoveFiles(all_file_paths);
+            fileworker_mgr_->MoveFiles(all_file_paths);
         }
     }
     return Status::OK();
