@@ -180,27 +180,19 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     Status status;
     [[maybe_unused]] auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::vector<size_t> block_row_cnts;
-    std::vector<std::string> all_file_worker_paths;
 
     for (size_t i = 0; i < input_blocks.size(); ++i) {
         std::vector<std::shared_ptr<DataType>> column_types;
         block_row_cnts.emplace_back(input_blocks[i]->row_count());
-        std::vector<std::string> file_worker_paths;
-        status = WriteDataBlockToFile(db_name, table_name, input_blocks[i], i, &file_worker_paths);
+        status = WriteDataBlockToFile(db_name, table_name, input_blocks[i], i);
         if (!status.ok()) {
             return status;
         }
-        all_file_worker_paths.insert(all_file_worker_paths.end(), file_worker_paths.begin(), file_worker_paths.end());
     }
 
     status = Import(db_name, table_name, block_row_cnts);
     if (!status.ok()) {
         return status;
-    }
-
-    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
-        auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-        import_txn_store->file_worker_paths_ = std::move(all_file_worker_paths);
     }
 
     return Status::OK();
@@ -294,10 +286,9 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         auto new_block_dir = *block_meta->GetBlockDir();
         auto new_block_path = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), new_block_dir);
 
-        std::vector<std::string> import_file_paths{};
         for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
             auto file_name = entry.path().filename().string();
-            import_file_paths.emplace_back(fmt::format("{}/{}", new_block_path, file_name));
+            import_txn_store->file_worker_paths_.emplace_back(fmt::format("{}/{}", new_block_dir, file_name));
         }
 
         auto rename_status = VirtualStore::Rename(old_block_path, new_block_path);
