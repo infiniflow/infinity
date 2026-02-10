@@ -1354,7 +1354,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
         handler.HandleWriteResult(result);
     }
 
-    if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
+    if (!IsReplay() && base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
         auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
         std::vector<std::string> *index_id_strs_ptr{};
