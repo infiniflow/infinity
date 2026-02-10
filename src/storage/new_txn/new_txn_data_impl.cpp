@@ -1690,7 +1690,6 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
@@ -1699,38 +1698,35 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     if (!IsReplay()) {
         std::vector<std::string> all_file_paths;
 
-        // Collect file paths for all new segments
+        std::vector<std::string> *index_id_strs_ptr{};
+        std::vector<std::string> *index_name_strs_ptr{};
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+
         for (const WalSegmentInfo &seg_info : compact_cmd->new_segment_infos_) {
             SegmentMeta seg_meta(seg_info.segment_id_, table_meta);
 
-            // 1. Collect data file paths for this segment
             Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, all_file_paths, nullptr);
             if (!path_status.ok()) {
                 LOG_WARN(fmt::format("Failed to get segment file paths: {}", path_status.message()));
             }
 
-            // 2. Collect index file paths for this segment
-            std::vector<std::string> *index_id_strs_ptr{};
-            std::vector<std::string> *index_name_strs_ptr{};
-            status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
-            if (status.ok()) {
-                for (size_t idx = 0; idx < index_id_strs_ptr->size(); ++idx) {
-                    const std::string &index_id_str = index_id_strs_ptr->at(idx);
-                    const std::string &index_name_str = index_name_strs_ptr->at(idx);
+            for (size_t idx = 0; idx < index_id_strs_ptr->size(); ++idx) {
+                const std::string &index_id_str = index_id_strs_ptr->at(idx);
+                const std::string &index_name_str = index_name_strs_ptr->at(idx);
 
-                    TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+                TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
 
-                    // Get segment index meta for this specific segment
-                    SegmentIndexMeta segment_index_meta(seg_info.segment_id_, table_index_meta);
-                    Status index_status = NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, all_file_paths);
-                    if (!index_status.ok()) {
-                        LOG_WARN(fmt::format("Failed to get segment index file paths: {}", index_status.message()));
-                    }
+                SegmentIndexMeta segment_index_meta(seg_info.segment_id_, table_index_meta);
+                Status index_status = NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, all_file_paths);
+                if (!index_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to get segment index file paths: {}", index_status.message()));
                 }
             }
         }
 
-        // 3. Move all files to persist them
         if (!all_file_paths.empty()) {
             auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
             fileworker_mgr->MoveFiles(all_file_paths);
