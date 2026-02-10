@@ -532,7 +532,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                                                     std::move(chunk_infos),
                                                     std::move(deprecate_ids));
 
-    optimize_index_txn_store->file_worker_paths_.push_back(index_file_worker->GetPath());
+    optimize_index_txn_store->file_worker_paths_.push_back(*index_file_worker->rel_file_path_);
     return Status::OK();
 }
 
