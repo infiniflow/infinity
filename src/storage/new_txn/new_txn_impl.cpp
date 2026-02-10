@@ -6223,7 +6223,7 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    // Get the latest table id
+    // Prevents table ID reuse in case of KV persistence failures.
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
     if (!status.ok()) {
         return status;
@@ -6241,10 +6241,10 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
     LOG_TRACE(fmt::format("Replay restore database: {} with id {}.", restore_database_cmd->db_name_, restore_database_cmd->db_id_str_));
 
     CatalogMeta catalog_meta(this);
-    TxnTimeStamp db_create_ts;
+    const std::string &db_name = restore_database_cmd->db_name_;
     std::string db_key;
     std::string db_id;
-    const std::string &db_name = restore_database_cmd->db_name_;
+    TxnTimeStamp db_create_ts;
     Status status = catalog_meta.GetDBID(db_name, db_key, db_id, db_create_ts);
     if (status.ok()) {
         return Status::DuplicateDatabase(db_name);
@@ -6252,23 +6252,20 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         return status;
     }
 
-    db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
-    status = kv_instance_->Get(db_key, db_id);
+    // Prevents database ID reuse in case of KV persistence failures.
+    status = IncrLatestID(db_id, NEXT_DATABASE_ID);
     if (!status.ok()) {
-        status = IncrLatestID(db_id, NEXT_DATABASE_ID);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    if (std::stoull(db_id) != std::stoull(restore_database_cmd->db_id_str_) + 1) {
-        LOG_INFO(fmt::format("In kv_instance: {}, but in restore_database_cmd: {}", db_id, restore_database_cmd->db_id_str_));
-        return Status::UnexpectedError("Database ID mismatch during replay of databse restore.");
+        return status;
     }
 
-    std::shared_ptr<DBMeta> db_meta;
     const std::string *db_comment = restore_database_cmd->db_comment_.empty() ? nullptr : &restore_database_cmd->db_comment_;
+    std::shared_ptr<DBMeta> db_meta;
     status = NewCatalog::AddNewDB(this, restore_database_cmd->db_id_str_, commit_ts, restore_database_cmd->db_name_, db_comment, db_meta);
+    if (!status.ok()) {
+        return status;
+    }
 
+    // Set table ID
     u64 max_table_id = 0;
     for (auto &restore_table_cmd : restore_database_cmd->restore_table_wal_cmds_) {
         if (max_table_id < std::stoull(restore_table_cmd.table_id_)) {
