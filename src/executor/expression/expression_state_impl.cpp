@@ -74,7 +74,16 @@ std::shared_ptr<ExpressionState> ExpressionState::CreateState(const std::shared_
 
 std::shared_ptr<ExpressionState>
 ExpressionState::CreateState(const std::shared_ptr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
-    if (agg_expr->arguments().size() != 1) {
+    // Validation for DISTINCT with multiple arguments
+    if (agg_expr->distinct() && agg_expr->arguments().size() > 1) {
+        // DISTINCT with multiple columns is only supported for COUNT
+        if (agg_expr->aggregate_function_.name() != "COUNT") {
+            Status status =
+                Status::FunctionArgsError(fmt::format("{}: DISTINCT with multiple arguments is only supported for COUNT", agg_expr->ToString()));
+            RecoverableError(status);
+        }
+    } else if (agg_expr->arguments().size() != 1) {
+        // Non-DISTINCT aggregates only support single argument
         Status status = Status::FunctionArgsError(agg_expr->ToString());
         RecoverableError(status);
     }
@@ -82,7 +91,11 @@ ExpressionState::CreateState(const std::shared_ptr<AggregateExpression> &agg_exp
     std::shared_ptr<ExpressionState> result = std::make_shared<ExpressionState>();
     result->agg_state_ = agg_state;
     result->agg_flag_ = agg_flag;
-    result->AddChild(agg_expr->arguments()[0]);
+
+    // Add all argument children
+    for (const auto &arg : agg_expr->arguments()) {
+        result->AddChild(arg);
+    }
 
     // Aggregate function will only have one output value.
     result->column_vector_ = std::make_shared<ColumnVector>(std::make_shared<DataType>(agg_expr->Type()));
