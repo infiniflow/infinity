@@ -2374,12 +2374,17 @@ Status ExplainLogicalPlan::Explain(const BaseExpression *base_expression, std::s
     switch (base_expression->type()) {
         case ExpressionType::kAggregate: {
             auto *aggregate_expression = (AggregateExpression *)base_expression;
-            if (aggregate_expression->arguments().size() != 1) {
-                UnrecoverableError("More than one argument in aggregate function");
-            }
             expr_str += aggregate_expression->aggregate_function_.name();
             expr_str += "(";
-            Explain(aggregate_expression->arguments()[0].get(), expr_str);
+            if (aggregate_expression->distinct()) {
+                expr_str += "DISTINCT ";
+            }
+            for (size_t i = 0; i < aggregate_expression->arguments().size(); ++i) {
+                if (i > 0) {
+                    expr_str += ", ";
+                }
+                Explain(aggregate_expression->arguments()[i].get(), expr_str);
+            }
             expr_str += ")";
             break;
         }

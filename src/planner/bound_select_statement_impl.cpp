@@ -392,43 +392,146 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
         root = having_filter;
     }
 
-    if (!order_by_expressions_.empty()) {
-        if (order_by_expressions_.size() != order_by_types_.size()) {
-            UnrecoverableError("Unknown error on order by expression");
-        }
+    // Helper lambdas for plan construction (improves readability and reusability)
 
+    // Create column expressions that reference a specific table output
+    auto create_column_exprs_from_table = [&](u64 table_index, const std::string &table_name) {
+        std::vector<std::shared_ptr<BaseExpression>> exprs;
+        exprs.reserve(projection_expressions_.size());
+        for (size_t i = 0; i < projection_expressions_.size(); ++i) {
+            const std::string &expr_name = names_ptr_->at(i);
+            auto col_expr = ColumnExpression::Make(*types_ptr_->at(i), table_name, table_index, expr_name, i, 0);
+            exprs.push_back(col_expr);
+        }
+        return exprs;
+    };
+
+    // Rewrite ORDER BY expressions to reference a different table (e.g., after DISTINCT)
+    auto rewrite_order_by_expressions = [&](u64 table_index, const std::string &table_name) {
+        std::vector<std::shared_ptr<BaseExpression>> new_exprs;
+        new_exprs.reserve(order_by_expressions_.size());
+        for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
+            const auto &order_expr = order_by_expressions_[i];
+
+            // Find matching projection by name
+            size_t found_idx = 0;
+            for (size_t j = 0; j < projection_expressions_.size(); ++j) {
+                if (projection_expressions_[j]->Name() == order_expr->Name()) {
+                    found_idx = j;
+                    break;
+                }
+            }
+
+            const std::string &expr_name = names_ptr_->at(found_idx);
+            auto col_expr = ColumnExpression::Make(*types_ptr_->at(found_idx), table_name, table_index, expr_name, found_idx, 0);
+            new_exprs.push_back(col_expr);
+        }
+        return new_exprs;
+    };
+
+    // Add SORT or TOP (with LIMIT) node to the plan
+    auto add_sort_or_top_node = [&](const std::vector<std::shared_ptr<BaseExpression>> &order_exprs) {
         if (limit_expression_.get() == nullptr) {
-            std::shared_ptr<LogicalNode> sort =
-                std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
+            auto sort = std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_exprs, order_by_types_);
             sort->set_left_node(root);
             root = sort;
         } else {
-            std::shared_ptr<LogicalNode> top = std::make_shared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
-                                                                            std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
-                                                                            limit_expression_,
-                                                                            offset_expression_,
-                                                                            order_by_expressions_,
-                                                                            order_by_types_,
-                                                                            total_hits_count_flag_);
-            top->set_left_node(root);
-            root = top;
-        }
-    } else if (limit_expression_.get() != nullptr) {
-        auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+            auto top = std::make_shared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
                                                     std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
                                                     limit_expression_,
                                                     offset_expression_,
+                                                    order_exprs,
+                                                    order_by_types_,
                                                     total_hits_count_flag_);
-        limit->set_left_node(root);
-        root = limit;
-    }
+            top->set_left_node(root);
+            root = top;
+        }
+    };
 
-    auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                    projection_expressions_,
-                                                    projection_index_,
-                                                    std::move(highlight_columns_));
-    project->set_left_node(root);
-    root = project;
+    // Create a DISTINCT AGGREGATE node
+    auto create_distinct_aggregate_node = [&](u64 table_index) {
+        auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+        auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                            base_table_ref,
+                                                            projection_expressions_,
+                                                            table_index,
+                                                            std::vector<std::shared_ptr<BaseExpression>>(),
+                                                            table_index);
+        aggregate->set_left_node(root);
+        return aggregate;
+    };
+
+    // Main plan construction logic
+    bool has_order_by = !order_by_expressions_.empty();
+    bool has_limit = limit_expression_.get() != nullptr;
+
+    if (distinct_ && has_order_by) {
+        // Case 1: DISTINCT with ORDER BY
+        // Flow: ... → AGGREGATE(DISTINCT) → SORT/TOP → PROJECT
+        u64 distinct_table_index = bind_context->GenerateTableIndex();
+        std::string distinct_project_name = fmt::format("distinct_project_{}", distinct_table_index);
+
+        // Step 1: Add AGGREGATE for DISTINCT
+        root = create_distinct_aggregate_node(distinct_table_index);
+
+        // Step 2: Add SORT/TOP with rewritten ORDER BY expressions
+        auto new_order_by_exprs = rewrite_order_by_expressions(distinct_table_index, distinct_project_name);
+        add_sort_or_top_node(new_order_by_exprs);
+
+        // Step 3: Add PROJECT node
+        auto output_project_exprs = create_column_exprs_from_table(distinct_table_index, distinct_project_name);
+        auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                        output_project_exprs,
+                                                        projection_index_,
+                                                        std::map<size_t, std::shared_ptr<HighlightInfo>>());
+        project->set_left_node(root);
+        root = project;
+
+    } else {
+        // Case 2: All other cases (no DISTINCT, or no ORDER BY)
+
+        // Subcase 2a: Add ORDER BY/LIMIT nodes if present
+        if (has_order_by) {
+            if (order_by_expressions_.size() != order_by_types_.size()) {
+                UnrecoverableError("Unknown error on order by expression");
+            }
+            add_sort_or_top_node(order_by_expressions_);
+        } else if (has_limit) {
+            auto limit = std::make_shared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                        std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                        limit_expression_,
+                                                        offset_expression_,
+                                                        total_hits_count_flag_);
+            limit->set_left_node(root);
+            root = limit;
+        }
+
+        // Subcase 2b: Add DISTINCT or final PROJECT node
+        if (distinct_) {
+            u64 distinct_table_index = bind_context->GenerateTableIndex();
+            std::string distinct_project_name = fmt::format("distinct_project_{}", distinct_table_index);
+
+            // Add AGGREGATE for DISTINCT
+            root = create_distinct_aggregate_node(distinct_table_index);
+
+            // Add PROJECT for DISTINCT output
+            auto distinct_project_exprs = create_column_exprs_from_table(distinct_table_index, distinct_project_name);
+            auto distinct_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                                     distinct_project_exprs,
+                                                                     projection_index_,
+                                                                     std::map<size_t, std::shared_ptr<HighlightInfo>>());
+            distinct_project->set_left_node(root);
+            root = distinct_project;
+        } else {
+            // Regular PROJECT (no DISTINCT)
+            auto project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                            projection_expressions_,
+                                                            projection_index_,
+                                                            std::move(highlight_columns_));
+            project->set_left_node(root);
+            root = project;
+        }
+    }
 
     if (!pruned_expression_.empty()) {
         UnrecoverableError("Projection method changed!");
