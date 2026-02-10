@@ -1624,6 +1624,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     const std::string &db_id_str = compact_cmd->db_id_;
     const std::string &table_id_str = compact_cmd->table_id_;
     const std::string &table_name = compact_cmd->table_name_;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     std::vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
@@ -1703,42 +1704,21 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
     }
-    /*
-        // Move files from tmp to data directory (only in normal execution, not during WAL replay)
-        if (!IsReplay()) {
-            std::vector<std::string> all_file_paths;
 
-            // 1. Collect data file paths from blocks
-            auto [block_ids_ptr, block_status] = segment_meta.GetBlockIDs1();
-            if (block_status.ok()) {
-                for (BlockID block_id : *block_ids_ptr) {
-                    BlockMeta block_meta(block_id, segment_meta);
+    if (!IsReplay()) {
+        std::vector<std::string> all_file_paths;
 
-                    // Get all column file paths for this block
-                    auto [column_ids_ptr, col_status] = block_meta.GetColumnIDs();
-                    if (col_status.ok()) {
-                        for (ColumnID column_id : *column_ids_ptr) {
-                            ColumnMeta column_meta(column_id, block_meta);
+        // Collect file paths for all new segments
+        for (const WalSegmentInfo &seg_info : compact_cmd->new_segment_infos_) {
+            SegmentMeta seg_meta(seg_info.segment_id_, table_meta);
 
-                            // Get data file path
-                            DataFileWorker *data_file_worker{};
-                            col_status = column_meta.GetFileWorker(data_file_worker);
-                            if (col_status.ok() && data_file_worker != nullptr) {
-                                all_file_paths.push_back(data_file_worker->GetPath());
-                            }
-
-                            // Get var file path
-                            VarFileWorker *var_file_worker{};
-                            col_status = column_meta.GetFileWorker(data_file_worker, var_file_worker);
-                            if (col_status.ok() && var_file_worker != nullptr) {
-                                all_file_paths.push_back(var_file_worker->GetPath());
-                            }
-                        }
-                    }
-                }
+            // 1. Collect data file paths for this segment
+            Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, all_file_paths, nullptr);
+            if (!path_status.ok()) {
+                LOG_WARN(fmt::format("Failed to get segment file paths: {}", path_status.message()));
             }
 
-            // 2. Collect index file paths
+            // 2. Collect index file paths for this segment
             std::vector<std::string> *index_id_strs_ptr{};
             std::vector<std::string> *index_name_strs_ptr{};
             status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
@@ -1749,40 +1729,22 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
 
                     TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
 
-                    // Get segment indexes for the new segment
-                    auto [segment_index_ids_ptr, seg_status] = table_index_meta.GetSegmentIndexIDs1();
-                    if (seg_status.ok()) {
-                        // Find the segment index for our new segment
-                        auto iter = std::find(segment_index_ids_ptr->begin(), segment_index_ids_ptr->end(), segment_info.segment_id_);
-                        if (iter != segment_index_ids_ptr->end()) {
-                            SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
-
-                            // Get all chunk indexes for this segment index
-                            auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
-                            if (chunk_status.ok()) {
-                                for (ChunkID chunk_id : *chunk_ids_ptr) {
-                                    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-
-                                    // Get file paths for this chunk index
-                                    std::vector<std::string> chunk_file_paths;
-                                    Status fp_status = chunk_index_meta.FilePaths(chunk_file_paths);
-                                    if (fp_status.ok()) {
-                                        all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
-                                    }
-                                }
-                            }
-                        }
+                    // Get segment index meta for this specific segment
+                    SegmentIndexMeta segment_index_meta(seg_info.segment_id_, table_index_meta);
+                    Status index_status = NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, all_file_paths);
+                    if (!index_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to get segment index file paths: {}", index_status.message()));
                     }
                 }
             }
-
-            // 3. Move all files
-            if (!all_file_paths.empty()) {
-                auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-                fileworker_mgr->MoveFiles(all_file_paths);
-            }
         }
-    */
+
+        // 3. Move all files to persist them
+        if (!all_file_paths.empty()) {
+            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            fileworker_mgr->MoveFiles(all_file_paths);
+        }
+    }
     return Status::OK();
 }
 
