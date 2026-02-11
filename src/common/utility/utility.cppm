@@ -88,4 +88,16 @@ std::string TrimPath(const std::string &path) {
 //     offset = align_up(offset, alignof(T));
 // }
 
+template <typename GrowFn, typename OpFn>
+auto GrowThenRetry(GrowFn &&grow_fn, OpFn &&op_fn) {
+    while (true) {
+        try {
+            return op_fn();
+        } catch (...) // std::bad_alloc or boost::bad_alloc ????
+        {
+            grow_fn();
+        }
+    }
+}
+
 } // namespace infinity

@@ -143,59 +143,39 @@ void VarBufferManager::SetToCatalog(VarFileWorker *var_file_worker) {
 }
 
 std::shared_ptr<VarBuffer> VarBufferManager::GetInnerNoLock() {
-    std::shared_ptr<VarBuffer> var_buffer;
     switch (type_) {
         case BufferType::kBuffer: {
-            if (mem_buffer_ == nullptr) {
+            if (!mem_buffer_) {
                 mem_buffer_ = std::make_shared<VarBuffer>();
             }
-            // my_var_buffer_ = mem_buffer_;
-            // // my_var_buffer_ = std::move(mem_buffer_);
-            // return var_buffer
-            // if (mem_buffer_->TotalSize() == 0) {
-            //     // std::println("..................");
-            // }
-            var_buffer = mem_buffer_;
-            return var_buffer; // copy eliminate
+            return mem_buffer_;
         }
         case BufferType::kNewCatalog: {
-            // std::shared_ptr<VarBuffer> var_buffer;
-            if (my_var_buffer_) {
-                var_buffer = my_var_buffer_;
-                return var_buffer;
+            if (!var_buffer_) {
+                FileWorker::Read(var_file_worker_, var_buffer_);
             }
-            FileWorker::Read(var_file_worker_, var_buffer);
-            my_var_buffer_ = var_buffer;
-            // if (var_buffer->TotalSize() == 0) {
-            //     std::println("//////////////////");
-            // }
-            return var_buffer;
+            return var_buffer_;
         }
     }
 }
 
 const char *VarBufferManager::Get(size_t offset, size_t size) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    // std::weak_ptr<VarBuffer> some_buffer = GetInnerNoLock();
+    std::unique_lock lock(mutex_);
     return GetInnerNoLock()->Get(offset, size);
-    // return some_buffer.lock()->Get(offset, size);
-    // return my_var_buffer_->Get(offset, size);
-    // return some_ptr;
 }
 
 size_t VarBufferManager::Write(char *ptr) {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock lock(mutex_);
     return GetInnerNoLock()->Write(ptr);
 }
 
 size_t VarBufferManager::Write(char *ptr, size_t offset, size_t size) {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock lock(mutex_);
     return GetInnerNoLock()->Write(ptr, offset, size);
 }
 
 size_t VarBufferManager::TotalSize() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    // return GetInnerNoLock()->TotalSize();
+    std::unique_lock lock(mutex_);
     return GetInnerNoLock()->TotalSize();
 }
 

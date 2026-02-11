@@ -39,6 +39,8 @@ namespace infinity {
 class LocalFileHandle;
 class Status;
 export struct RawFileWorker;
+export struct VersionFileWorker;
+export struct HnswFileWorker;
 // export class FileWorkerManager;
 // export class BMPHandler;
 // using BMPHandlerPtr = BMPHandler *;
@@ -119,7 +121,13 @@ export struct FileWorker {
         std::unique_lock l(file_worker->mutex_);
         size_t file_size{};
 
-        if (file_worker->mmap_) {
+        if constexpr (std::same_as<FileWorkerT, VersionFileWorker>) {
+            if (file_worker->inited_) {
+                std::unique_ptr<LocalFileHandle> file_handle;
+                file_worker->Read(data, file_handle, file_size);
+                return;
+            }
+        } else if (file_worker->mmap_) {
             std::unique_ptr<LocalFileHandle> file_handle;
             file_worker->Read(data, file_handle, file_size);
             return;
@@ -176,6 +184,8 @@ export struct FileWorker {
             close(file_handle->fd());
             return;
         }
+        auto ps = std::filesystem::path(working_path).parent_path().string();
+        VirtualStore::MakeDirectory(ps);
         std::unique_ptr<LocalFileHandle> file_handle;
         file_worker->Read(data, file_handle, file_size);
     }
@@ -184,7 +194,11 @@ export struct FileWorker {
     static void MoveFile(FileWorkerT *file_worker) {
         // boost::unique_lock l(boost_rw_mutex_);
         std::unique_lock l(file_worker->mutex_);
-        msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
+        if constexpr (std::same_as<FileWorkerT, VersionFileWorker>) {
+            file_worker->segment_.flush();
+        } else {
+            msync(file_worker->mmap_, file_worker->mmap_size_, MS_SYNC);
+        }
         auto working_path = file_worker->GetWorkingPath();
         auto data_path = file_worker->GetPath();
 

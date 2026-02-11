@@ -1873,7 +1873,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
 
                 // Read version info
-                std::shared_ptr<BlockVersion> block_version;
+                BlockVersion *block_version{};
                 FileWorker::Read(version_file_worker_, block_version);
                 // Write snapshot file
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
