@@ -736,9 +736,7 @@ func TestRenameTable(t *testing.T) {
 	// Rename table directly using table object
 	_, err = table.Rename(newTableName)
 	if err != nil {
-		t.Logf("Server may not support RENAME TABLE operation. Error: %v", err)
-		// Skip remaining tests if rename is not supported
-		t.SkipNow()
+		t.Fatalf("Server may not support RENAME TABLE operation. Error: %v", err)
 	}
 	t.Logf("Table renamed successfully from %s to %s", oldTableName, newTableName)
 
@@ -787,5 +785,3 @@ func TestRenameTable(t *testing.T) {
 
 	t.Logf("Test %s completed successfully", suffix)
 }
-
-
