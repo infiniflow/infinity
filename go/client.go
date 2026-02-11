@@ -15,8 +15,17 @@
 package infinity
 
 import (
+	"context"
 	"fmt"
+	"time"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
+
+// ClientVersion is the version of this Go SDK client
+// This should match the protocol version expected by the server
+const ClientVersion = 36 // version: 0.7.0.dev2
 
 // Connect creates a new connection to Infinity
 // This is a factory function that creates the appropriate connection type based on the URI
@@ -29,8 +38,6 @@ import (
 //	    log.Fatal(err)
 //	}
 //	defer conn.Disconnect()
-//
-//	db, err := conn.GetDatabase("default_db")
 func Connect(uri URI) (InfinityConnection, error) {
 	switch u := uri.(type) {
 	case NetworkAddress:
@@ -45,22 +52,83 @@ func Connect(uri URI) (InfinityConnection, error) {
 
 // RemoteThriftConnection implements InfinityConnection for remote thrift connections
 type RemoteThriftConnection struct {
-	uri           URI
-	client        interface{} // Placeholder for thrift client
-	isConnected   bool
-	dbName        string
+	uri         URI
+	transport   thrift.TTransport
+	client      *thriftapi.InfinityServiceClient
+	sessionID   int64
+	isConnected bool
+	dbName      string
 }
 
 // NewRemoteThriftConnection creates a new remote thrift connection
 func NewRemoteThriftConnection(address NetworkAddress) (*RemoteThriftConnection, error) {
-	// TODO: Implement actual thrift client initialization
-	// For now, this is a placeholder implementation
+	// Create thrift transport
+	// Use TBufferedTransport for sync communication (matching Python's TBufferedTransport)
+	transport, err := thrift.NewTSocketTimeout(
+		fmt.Sprintf("%s:%d", address.IP, address.Port),
+		5*time.Second,
+		5*time.Second,
+	)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create socket: %v", err),
+		)
+	}
+
+	// Use buffered transport
+	bufferedTransport := thrift.NewTBufferedTransport(transport, 8192)
+
+	// Create binary protocol (matching Python's TBinaryProtocol)
+	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
+	protocol := protocolFactory.GetProtocol(bufferedTransport)
+
+	// Create client
+	client := thriftapi.NewInfinityServiceClientProtocol(bufferedTransport, protocol, protocol)
+
+	// Open transport
+	if err := bufferedTransport.Open(); err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to connect to server at %s:%d: %v", address.IP, address.Port, err),
+		)
+	}
+
+	// Create connection object
 	conn := &RemoteThriftConnection{
 		uri:         address,
+		transport:   bufferedTransport,
+		client:      client,
 		isConnected: true,
 		dbName:      "default_db",
-		client:      nil,
 	}
+
+	// Perform connect handshake with server
+	ctx := context.Background()
+	connectReq := thriftapi.NewConnectRequest()
+	connectReq.ClientVersion = ClientVersion
+
+	resp, err := client.Connect(ctx, connectReq)
+	if err != nil {
+		bufferedTransport.Close()
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to connect: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		bufferedTransport.Close()
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Server rejected connection: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Store session ID from server
+	conn.sessionID = resp.SessionID
+
 	return conn, nil
 }
 
@@ -70,11 +138,38 @@ func (c *RemoteThriftConnection) Disconnect() (interface{}, error) {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection already closed")
 	}
 
-	// TODO: Implement actual thrift disconnect
-	// c.client.Disconnect()
+	// Send disconnect request to server
+	ctx := context.Background()
+	disconnectReq := thriftapi.NewCommonRequest()
+	disconnectReq.SessionID = c.sessionID
+
+	resp, err := c.client.Disconnect(ctx, disconnectReq)
+	if err != nil {
+		// Log error but still close transport
+		fmt.Printf("Warning: error during disconnect: %v\n", err)
+	} else if resp.ErrorCode != 0 {
+		// Log server error but still close transport
+		fmt.Printf("Warning: server error during disconnect: %s\n", resp.ErrorMsg)
+	}
+
+	// Close transport
+	if c.transport != nil {
+		c.transport.Close()
+	}
 
 	c.isConnected = false
+	c.sessionID = 0
 	return struct{}{}, nil
+}
+
+// IsConnected returns whether the connection is still active
+func (c *RemoteThriftConnection) IsConnected() bool {
+	return c.isConnected
+}
+
+// GetSessionID returns the session ID
+func (c *RemoteThriftConnection) GetSessionID() int64 {
+	return c.sessionID
 }
 
 // CreateDatabase creates a new database
