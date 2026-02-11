@@ -6,11 +6,14 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 
-# Install basic packages
+# Configure APT to use aliyun mirrors and install basic packages
 RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
-    apt-get update \
-    && apt-get update && apt-get install -y \
+    apt-get update  \
+    && apt-get install -y software-properties-common  \
+    && add-apt-repository ppa:deadsnakes/ppa  \
+    && apt-get update \
+    && apt-get install -y \
         git make wget curl vim file gettext \
         libssl-dev unzip bzip2 libtool m4 tree \
         autoconf automake pkg-config autoconf-archive libtool \
@@ -21,8 +24,10 @@ RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
         postgresql graphviz sudo bridge-utils iptables \
         libpcap-dev libpcre3-dev \
         perl flex bison binutils gdb zip rpm iproute2 \
+        python3.11-dev \
     && echo '/usr/local/lib' >> /etc/ld.so.conf.d/local.conf \
-    && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf
+    && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311
 
 # Add LLVM APT repository and install clang 20
 RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
@@ -52,11 +57,7 @@ RUN --mount=type=bind,source=gcc-15.2.0.tar.gz,target=/root/gcc-15.2.0.tar.gz \
         --enable-languages=c,c++ \
         --enable-shared \
         --enable-static \
-        --enable-libstdcxx \
-        --enable-libstdcxx-time \
-        --enable-libstdcxx-filesystem-ts \
         --disable-multilib \
-        --with-system-zlib \
         --program-suffix=-15 \
     && make -j$(nproc) \
     && make install \
@@ -151,10 +152,10 @@ RUN --mount=type=bind,source=vcpkg.json,target=/tmp/vcpkg.json \
 
 # Set vcpkg toolchain path for CMake
 # Set Python paths for CMake to find the correct Python installation
-ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake  \
-    Python3_EXECUTABLE=/usr/local/bin/python3.11 \
-    Python3_INCLUDE_DIR=/usr/local/include/python3.11 \
-    Python3_LIBRARY=/usr/local/lib/libpython3.11.so
+ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+    Python3_EXECUTABLE=/usr/bin/python3.11 \
+    Python3_INCLUDE_DIR=/usr/include/python3.11 \
+    Python3_LIBRARY=/usr/lib/libpython3.11.so
 
 # Add thrift compiler to PATH
 RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift \
@@ -172,7 +173,7 @@ RUN --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv-
     && uv python install 3.10 3.11 3.12
 
 
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+#RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 
 COPY nltk_data /root/nltk_data

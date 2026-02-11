@@ -79,7 +79,6 @@ def main() -> int:
     urls = [
         "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz",
         "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip",
-        "https://www.python.org/ftp/python/3.11.14/Python-3.11.14.tar.xz",
         "https://github.com/gcc-mirror/gcc/archive/refs/tags/releases/gcc-15.2.0.tar.gz",
         "https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2",
         "https://github.com/gperftools/gperftools/releases/download/gperftools-2.17.2/gperftools-2.17.2.tar.gz",
