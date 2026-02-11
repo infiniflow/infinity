@@ -13,7 +13,6 @@
     "brotli",
     "cli11",
     "fmt",
-    "glib",
     "gtest",
     "inih",
     "libevent",
