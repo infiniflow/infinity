@@ -48,9 +48,9 @@ type Database struct {
 }
 
 // CreateTable creates a new table
-func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error) {
+func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (*Table, error) {
 	// TODO: Implement thrift call
-	return &RemoteTable{db: d, tableName: tableName}, nil
+	return &Table{db: d, tableName: tableName}, nil
 }
 
 // DropTable drops a table
@@ -72,7 +72,7 @@ func (d *Database) ShowTable(tableName string) (interface{}, error) {
 }
 
 // GetTable gets a table object
-func (d *Database) GetTable(tableName string) (Table, error) {
+func (d *Database) GetTable(tableName string) (*Table, error) {
 	if d.conn == nil || !d.conn.IsConnected() {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
@@ -101,7 +101,7 @@ func (d *Database) GetTable(tableName string) (Table, error) {
 		)
 	}
 
-	return &RemoteTable{db: d, tableName: tableName}, nil
+	return &Table{db: d, tableName: tableName}, nil
 }
 
 // CreateTableSnapshot creates a snapshot of a table

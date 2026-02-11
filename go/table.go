@@ -14,391 +14,263 @@
 
 package infinity
 
-// Table defines the interface for table operations
-type Table interface {
-	// Rename renames the table
-	Rename(newTableName string) (interface{}, error)
 
-	// CreateIndex creates an index on the table
-	CreateIndex(indexName string, indexInfo *IndexInfo, conflictType ConflictType, indexComment string) (interface{}, error)
 
-	// DropIndex drops an index from the table
-	DropIndex(indexName string, conflictType ConflictType) (interface{}, error)
-
-	// ShowIndex shows details of a specific index
-	ShowIndex(indexName string) (interface{}, error)
-
-	// ListIndexes lists all indexes on the table
-	ListIndexes() (interface{}, error)
-
-	// DumpIndex dumps index information
-	DumpIndex(indexName string) (interface{}, error)
-
-	// ShowColumns shows all columns in the table
-	ShowColumns() (interface{}, error)
-
-	// ShowSegments shows all segments in the table
-	ShowSegments() (interface{}, error)
-
-	// ShowSegment shows details of a specific segment
-	ShowSegment(segmentID int) (interface{}, error)
-
-	// ShowBlocks shows all blocks in a segment
-	ShowBlocks(segmentID int) (interface{}, error)
-
-	// ShowBlock shows details of a specific block
-	ShowBlock(segmentID int, blockID int) (interface{}, error)
-
-	// ShowBlockColumn shows column information for a block
-	ShowBlockColumn(segmentID int, blockID int, columnID int) (interface{}, error)
-
-	// Insert inserts data into the table
-	// data can be a single map or a slice of maps
-	Insert(data interface{}) (interface{}, error)
-
-	// ImportData imports data from a file
-	ImportData(filePath string, importOptions *ImportOption) (interface{}, error)
-
-	// ExportData exports data to a file
-	ExportData(filePath string, exportOptions *ExportOption, columns []string) (interface{}, error)
-
-	// Delete deletes rows from the table based on a condition
-	Delete(cond string) (interface{}, error)
-
-	// Update updates rows in the table based on a condition
-	Update(cond string, data map[string]interface{}) (interface{}, error)
-
-	// MatchDense performs dense vector search (KNN)
-	MatchDense(vectorColumnName string, embeddingData VEC, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) Table
-
-	// MatchText performs full-text search
-	MatchText(fields string, matchingText string, topN int, extraOptions map[string]interface{}) Table
-
-	// MatchTensor performs tensor search
-	MatchTensor(columnName string, queryData VEC, queryDataType string, topN int, extraOption map[string]interface{}) Table
-
-	// MatchSparse performs sparse vector search
-	MatchSparse(vectorColumnName string, sparseData interface{}, distanceType string, topN int, optParams map[string]string) Table
-
-	// Fusion combines multiple search results
-	Fusion(method string, topN int, fusionParams map[string]interface{}) Table
-
-	// Output specifies which columns to return in the result
-	Output(columns []string) Table
-
-	// Highlight specifies which columns to highlight
-	Highlight(columns []string) Table
-
-	// Filter applies a filter condition to the query
-	Filter(filter string) Table
-
-	// Limit sets the maximum number of results to return
-	Limit(limit int) Table
-
-	// Offset sets the number of results to skip
-	Offset(offset int) Table
-
-	// GroupBy groups results by the given expressions
-	GroupBy(groupByExprList interface{}) Table
-
-	// Having applies a having clause to grouped results
-	Having(havingExpr string) Table
-
-	// Sort sorts the results by the given expressions
-	Sort(orderByExprList [][2]interface{}) Table
-
-	// Option sets query options
-	Option(optionKV map[string]interface{}) Table
-
-	// ToString returns the query as a string representation
-	ToString() string
-
-	// ToResult executes the query and returns the result
-	ToResult() (interface{}, error)
-
-	// ToDF executes the query and returns a DataFrame-like result
-	ToDF() (interface{}, error)
-
-	// ToPL executes the query and returns a Polars-like result
-	ToPL() (interface{}, error)
-
-	// ToArrow executes the query and returns an Arrow-like result
-	ToArrow() (interface{}, error)
-
-	// Explain returns the query execution plan
-	Explain(explainType ExplainType) (interface{}, error)
-
-	// Optimize optimizes the table
-	Optimize() (interface{}, error)
-
-	// AlterIndex alters an index on the table
-	AlterIndex(indexName string, optParams map[string]string) (interface{}, error)
-
-	// AddColumns adds columns to the table
-	AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error)
-
-	// DropColumns drops columns from the table
-	DropColumns(columnNames interface{}) (interface{}, error)
-
-	// Compact compacts the table
-	Compact() (interface{}, error)
-}
-
-// RemoteTable implements Table interface for remote connections
-type RemoteTable struct {
+// Table represents a table for remote operations
+type Table struct {
 	db        *Database
 	tableName string
 }
 
 // Rename renames the table
-func (t *RemoteTable) Rename(newTableName string) (interface{}, error) {
+func (t *Table) Rename(newTableName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	t.tableName = newTableName
 	return nil, nil
 }
 
 // CreateIndex creates an index
-func (t *RemoteTable) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType ConflictType, indexComment string) (interface{}, error) {
+func (t *Table) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType ConflictType, indexComment string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // DropIndex drops an index
-func (t *RemoteTable) DropIndex(indexName string, conflictType ConflictType) (interface{}, error) {
+func (t *Table) DropIndex(indexName string, conflictType ConflictType) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowIndex shows index details
-func (t *RemoteTable) ShowIndex(indexName string) (interface{}, error) {
+func (t *Table) ShowIndex(indexName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ListIndexes lists all indexes
-func (t *RemoteTable) ListIndexes() (interface{}, error) {
+func (t *Table) ListIndexes() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // DumpIndex dumps index information
-func (t *RemoteTable) DumpIndex(indexName string) (interface{}, error) {
+func (t *Table) DumpIndex(indexName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowColumns shows all columns
-func (t *RemoteTable) ShowColumns() (interface{}, error) {
+func (t *Table) ShowColumns() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowSegments shows all segments
-func (t *RemoteTable) ShowSegments() (interface{}, error) {
+func (t *Table) ShowSegments() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowSegment shows segment details
-func (t *RemoteTable) ShowSegment(segmentID int) (interface{}, error) {
+func (t *Table) ShowSegment(segmentID int) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowBlocks shows all blocks in a segment
-func (t *RemoteTable) ShowBlocks(segmentID int) (interface{}, error) {
+func (t *Table) ShowBlocks(segmentID int) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowBlock shows block details
-func (t *RemoteTable) ShowBlock(segmentID int, blockID int) (interface{}, error) {
+func (t *Table) ShowBlock(segmentID int, blockID int) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowBlockColumn shows column information for a block
-func (t *RemoteTable) ShowBlockColumn(segmentID int, blockID int, columnID int) (interface{}, error) {
+func (t *Table) ShowBlockColumn(segmentID int, blockID int, columnID int) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Insert inserts data
-func (t *RemoteTable) Insert(data interface{}) (interface{}, error) {
+func (t *Table) Insert(data interface{}) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ImportData imports data from a file
-func (t *RemoteTable) ImportData(filePath string, importOptions *ImportOption) (interface{}, error) {
+func (t *Table) ImportData(filePath string, importOptions *ImportOption) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ExportData exports data to a file
-func (t *RemoteTable) ExportData(filePath string, exportOptions *ExportOption, columns []string) (interface{}, error) {
+func (t *Table) ExportData(filePath string, exportOptions *ExportOption, columns []string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Delete deletes rows
-func (t *RemoteTable) Delete(cond string) (interface{}, error) {
+func (t *Table) Delete(cond string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Update updates rows
-func (t *RemoteTable) Update(cond string, data map[string]interface{}) (interface{}, error) {
+func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // MatchDense performs dense vector search
-func (t *RemoteTable) MatchDense(vectorColumnName string, embeddingData VEC, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) Table {
+func (t *Table) MatchDense(vectorColumnName string, embeddingData VEC, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // MatchText performs full-text search
-func (t *RemoteTable) MatchText(fields string, matchingText string, topN int, extraOptions map[string]interface{}) Table {
+func (t *Table) MatchText(fields string, matchingText string, topN int, extraOptions map[string]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // MatchTensor performs tensor search
-func (t *RemoteTable) MatchTensor(columnName string, queryData VEC, queryDataType string, topN int, extraOption map[string]interface{}) Table {
+func (t *Table) MatchTensor(columnName string, queryData VEC, queryDataType string, topN int, extraOption map[string]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // MatchSparse performs sparse vector search
-func (t *RemoteTable) MatchSparse(vectorColumnName string, sparseData interface{}, distanceType string, topN int, optParams map[string]string) Table {
+func (t *Table) MatchSparse(vectorColumnName string, sparseData interface{}, distanceType string, topN int, optParams map[string]string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Fusion combines multiple search results
-func (t *RemoteTable) Fusion(method string, topN int, fusionParams map[string]interface{}) Table {
+func (t *Table) Fusion(method string, topN int, fusionParams map[string]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Output specifies output columns
-func (t *RemoteTable) Output(columns []string) Table {
+func (t *Table) Output(columns []string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Highlight specifies highlight columns
-func (t *RemoteTable) Highlight(columns []string) Table {
+func (t *Table) Highlight(columns []string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Filter applies filter
-func (t *RemoteTable) Filter(filter string) Table {
+func (t *Table) Filter(filter string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Limit sets limit
-func (t *RemoteTable) Limit(limit int) Table {
+func (t *Table) Limit(limit int) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Offset sets offset
-func (t *RemoteTable) Offset(offset int) Table {
+func (t *Table) Offset(offset int) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // GroupBy groups results
-func (t *RemoteTable) GroupBy(groupByExprList interface{}) Table {
+func (t *Table) GroupBy(groupByExprList interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Having applies having clause
-func (t *RemoteTable) Having(havingExpr string) Table {
+func (t *Table) Having(havingExpr string) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Sort sorts results
-func (t *RemoteTable) Sort(orderByExprList [][2]interface{}) Table {
+func (t *Table) Sort(orderByExprList [][2]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // Option sets options
-func (t *RemoteTable) Option(optionKV map[string]interface{}) Table {
+func (t *Table) Option(optionKV map[string]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
 
 // ToString returns query as string
-func (t *RemoteTable) ToString() string {
+func (t *Table) ToString() string {
 	// TODO: Implement query builder
 	return ""
 }
 
 // ToResult executes query and returns result
-func (t *RemoteTable) ToResult() (interface{}, error) {
+func (t *Table) ToResult() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ToDF returns result as DataFrame
-func (t *RemoteTable) ToDF() (interface{}, error) {
+func (t *Table) ToDF() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ToPL returns result as Polars
-func (t *RemoteTable) ToPL() (interface{}, error) {
+func (t *Table) ToPL() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ToArrow returns result as Arrow
-func (t *RemoteTable) ToArrow() (interface{}, error) {
+func (t *Table) ToArrow() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Explain returns execution plan
-func (t *RemoteTable) Explain(explainType ExplainType) (interface{}, error) {
+func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Optimize optimizes the table
-func (t *RemoteTable) Optimize() (interface{}, error) {
+func (t *Table) Optimize() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // AlterIndex alters an index
-func (t *RemoteTable) AlterIndex(indexName string, optParams map[string]string) (interface{}, error) {
+func (t *Table) AlterIndex(indexName string, optParams map[string]string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // AddColumns adds columns
-func (t *RemoteTable) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error) {
+func (t *Table) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // DropColumns drops columns
-func (t *RemoteTable) DropColumns(columnNames interface{}) (interface{}, error) {
+func (t *Table) DropColumns(columnNames interface{}) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // Compact compacts the table
-func (t *RemoteTable) Compact() (interface{}, error) {
+func (t *Table) Compact() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
