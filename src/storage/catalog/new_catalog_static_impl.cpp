@@ -1233,12 +1233,15 @@ Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, std::vector<std::str
         std::vector<std::string> paths = block_meta.FilePaths();
         file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
     } else {
-        ColumnID column_idx = 0;
+        ColumnID column_idx = INVALID_COLUMN_ID;
         for (size_t i = 0; i < column_defs_ptr->size(); ++i) {
             if ((*column_defs_ptr)[i]->id() == column_def->id()) {
                 column_idx = i;
                 break;
             }
+        }
+        if (column_idx == INVALID_COLUMN_ID) {
+            return Status::ColumnNotExist(column_def->name());
         }
         ColumnMeta column_meta(column_idx, block_meta);
         status = GetBlockColumnFilePaths(column_meta, file_paths);
