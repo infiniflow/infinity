@@ -23,8 +23,8 @@ import :data_block;
 import :physical_aggregate;
 import :aggregate_expression;
 import :infinity_exception;
-import :hash_table;
 import :column_vector;
+import :aggregate_utils;
 
 import std;
 import third_party;
@@ -39,7 +39,22 @@ namespace infinity {
 template <typename T>
 using MathOperation = std::function<T(T, T)>;
 
-void PhysicalMergeAggregate::Init(QueryContext *query_context) {}
+void PhysicalMergeAggregate::Init(QueryContext *query_context) {
+    // Initialize child operator first
+    if (this->left()) {
+        this->left()->Init(query_context);
+    }
+
+    // Initialize groupby_types_ and hash_key_size_ once (before any Execute() calls)
+    auto *agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
+    if (agg_op && !agg_op->groups_.empty()) {
+        groupby_types_.reserve(agg_op->groups_.size());
+        for (const auto &expr : agg_op->groups_) {
+            groupby_types_.emplace_back(std::make_shared<DataType>(expr->Type()));
+        }
+        hash_key_size_ = CalculateHashKeySize(groupby_types_);
+    }
+}
 
 bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
 
@@ -68,30 +83,32 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
 void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperatorState *op_state) {
     auto *agg_op = static_cast<PhysicalAggregate *>(this->left());
     size_t group_count = agg_op->groups_.size();
-    MergeHashTable &hash_table = op_state->hash_table_;
+    auto &hash_table = op_state->hash_table_;
 
     auto &input_block = op_state->input_data_block_;
-    if (!hash_table.Initialized()) {
-        std::vector<std::shared_ptr<DataType>> groupby_types;
-        groupby_types.reserve(group_count);
-        for (i64 idx = 0; auto &expr : agg_op->groups_) {
-            std::shared_ptr<ColumnDef> col_def =
-                std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
-            groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
-            ++idx;
-        }
-
-        hash_table.Init(groupby_types);
-    }
-
     if (input_block == nullptr) {
         return;
+    }
+
+    const auto &groupby_types = groupby_types_;
+    const size_t key_size = hash_key_size_;
+    std::string hash_key;
+    if (key_size) {
+        hash_key.reserve(key_size);
     }
 
     std::vector<std::shared_ptr<ColumnVector>> input_groupby_columns(input_block->column_vectors_.begin(),
                                                                      input_block->column_vectors_.begin() + group_count);
     if (op_state->data_block_array_.empty()) {
-        hash_table.Append(input_groupby_columns, 0, input_block->row_count());
+        // First block - insert all rows
+        for (size_t row_id = 0; row_id < input_block->row_count(); ++row_id) {
+            BuildHashKey(input_groupby_columns, row_id, groupby_types, hash_key);
+            if (auto iter = hash_table.find(hash_key); iter != hash_table.end()) {
+                UnrecoverableError("Duplicate key in merge hash table");
+            } else {
+                hash_table.emplace_hint(iter, std::move(hash_key), std::pair<size_t, size_t>(0, row_id));
+            }
+        }
         op_state->data_block_array_.emplace_back(std::move(input_block));
         LOG_TRACE("Physical MergeAggregate execute first block");
         return;
@@ -106,11 +123,14 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
             last_data_block->Init(std::move(types), input_block->capacity());
         }
         std::pair<size_t, size_t> block_row_id = {op_state->data_block_array_.size() - 1, last_data_block->row_count()};
-        bool found = hash_table.GetOrInsert(input_groupby_columns, row_id, block_row_id);
-        if (!found) {
+        BuildHashKey(input_groupby_columns, row_id, groupby_types, hash_key);
+        auto iter = hash_table.find(hash_key);
+        if (iter == hash_table.end()) {
+            hash_table.emplace_hint(iter, std::move(hash_key), block_row_id);
             last_data_block->AppendWith(input_block.get(), row_id, 1);
             continue;
         }
+        block_row_id = iter->second;
         size_t agg_count = agg_op->aggregates_.size();
         std::pair<size_t, size_t> input_block_row_id = {0, row_id};
         for (size_t col_idx = group_count; col_idx < group_count + agg_count; ++col_idx) {
