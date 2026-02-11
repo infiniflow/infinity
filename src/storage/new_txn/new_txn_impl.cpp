@@ -6180,40 +6180,17 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
 
     LOG_TRACE(fmt::format("Replay restore table: {} with id {}.", restore_table_cmd->table_name_, restore_table_cmd->table_id_));
 
-    // Check if the table already exists
-    std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd->db_id_, *restore_table_cmd->table_def_->table_name(), commit_ts);
-    std::string table_id;
-    Status status = kv_instance_->Get(table_key, table_id);
-    bool is_link_files = false;
-    if (status.ok()) {
-        if (table_id == restore_table_cmd->table_id_) {
-            LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
-                                 *restore_table_cmd->table_def_->table_name(),
-                                 restore_table_cmd->table_id_,
-                                 commit_ts,
-                                 txn_id));
-            is_link_files = true;
-        } else {
-            LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
-                                  *restore_table_cmd->table_def_->table_name(),
-                                  restore_table_cmd->table_id_,
-                                  table_id,
-                                  commit_ts,
-                                  txn_id));
-            return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
-        }
-    }
-
     const std::string &table_name = restore_table_cmd->table_name_;
     const std::string &db_name = restore_table_cmd->db_name_;
 
     std::shared_ptr<DBMeta> db_meta;
     TxnTimeStamp db_create_ts;
-    status = GetDBMeta(db_name, db_meta, db_create_ts);
+    Status status = GetDBMeta(db_name, db_meta, db_create_ts);
     if (!status.ok()) {
         return status;
     }
 
+    std::string table_key;
     std::string table_id_str;
     TxnTimeStamp table_create_ts;
     status = db_meta->GetTableID(table_name, table_key, table_id_str, table_create_ts);
@@ -6223,13 +6200,12 @@ Status NewTxn::ReplayRestoreTableSnapshot(WalCmdRestoreTableSnapshot *restore_ta
         return status;
     }
 
-    // Prevents table ID reuse in case of KV persistence failures.
     std::tie(table_id_str, status) = db_meta->GetNextTableID();
     if (!status.ok()) {
         return status;
     }
 
-    status = RestoreTableFromSnapshot(restore_table_cmd, *db_meta, is_link_files);
+    status = RestoreTableFromSnapshot(restore_table_cmd, *db_meta);
     if (!status.ok()) {
         return status;
     }
@@ -6252,7 +6228,6 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         return status;
     }
 
-    // Prevents database ID reuse in case of KV persistence failures.
     status = IncrLatestID(db_id, NEXT_DATABASE_ID);
     if (!status.ok()) {
         return status;
@@ -6265,43 +6240,9 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
         return status;
     }
 
-    // Set table ID
     u64 max_table_id = 0;
     for (auto &restore_table_cmd : restore_database_cmd->restore_table_wal_cmds_) {
-        if (max_table_id < std::stoull(restore_table_cmd.table_id_)) {
-            max_table_id = std::stoull(restore_table_cmd.table_id_);
-        }
-    }
-    status = db_meta->SetNextTableID(std::to_string(max_table_id + 1));
-    if (!status.ok()) {
-        return status;
-    }
-
-    for (auto &restore_table_cmd : restore_database_cmd->restore_table_wal_cmds_) {
-        // Check if the table already exists
-        std::string table_key = KeyEncode::CatalogTableKey(restore_table_cmd.db_id_, *restore_table_cmd.table_def_->table_name(), commit_ts);
-        std::string table_id;
-        status = kv_instance_->Get(table_key, table_id);
-        bool is_link_files = false;
-        if (status.ok()) {
-            if (table_id == restore_table_cmd.table_id_) {
-                LOG_WARN(fmt::format("Skipping replay restore table: Table {} with id {} already exists, commit ts: {}, txn: {}.",
-                                     *restore_table_cmd.table_def_->table_name(),
-                                     restore_table_cmd.table_id_,
-                                     commit_ts,
-                                     txn_id));
-                is_link_files = true;
-            } else {
-                LOG_ERROR(fmt::format("Replay restore table: Table {} with id {} already exists with different id {}, commit ts: {}, txn: {}.",
-                                      *restore_table_cmd.table_def_->table_name(),
-                                      restore_table_cmd.table_id_,
-                                      table_id,
-                                      commit_ts,
-                                      txn_id));
-                return Status::UnexpectedError("Table ID mismatch during replay of table restore.");
-            }
-        }
-
+        std::string table_key;
         std::string table_id_str;
         TxnTimeStamp table_create_ts;
         status = db_meta->GetTableID(restore_table_cmd.table_name_, table_key, table_id_str, table_create_ts);
@@ -6312,10 +6253,19 @@ Status NewTxn::ReplayRestoreDatabaseSnapshot(WalCmdRestoreDatabaseSnapshot *rest
             return status;
         }
 
-        status = RestoreTableFromSnapshot(&restore_table_cmd, *db_meta, is_link_files);
+        status = RestoreTableFromSnapshot(&restore_table_cmd, *db_meta);
         if (!status.ok()) {
             return status;
         }
+
+        if (max_table_id < std::stoull(restore_table_cmd.table_id_)) {
+            max_table_id = std::stoull(restore_table_cmd.table_id_);
+        }
+    }
+
+    status = db_meta->SetNextTableID(std::to_string(max_table_id + 1));
+    if (!status.ok()) {
+        return status;
     }
 
     return Status::OK();
