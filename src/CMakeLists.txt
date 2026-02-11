@@ -535,6 +535,7 @@ target_link_libraries(unit_test
         spdlog::spdlog
         fmt::fmt
         resolv.a
+
         atomic.a
         #        ${STDCXX15EXP_STATIC}
         libstdc++exp.a
