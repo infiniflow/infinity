@@ -136,5 +136,26 @@ type VEC interface {
 	IsVector() bool
 }
 
+// Float32Vector represents a vector of float32 values
+type Float32Vector []float32
+
+func (v Float32Vector) IsVector() bool {
+	return true
+}
+
+// Float64Vector represents a vector of float64 values
+type Float64Vector []float64
+
+func (v Float64Vector) IsVector() bool {
+	return true
+}
+
+// Int8Vector represents a vector of int8 values
+type Int8Vector []int8
+
+func (v Int8Vector) IsVector() bool {
+	return true
+}
+
 // InsertData represents data for insert operations
 type InsertData map[string]interface{}
