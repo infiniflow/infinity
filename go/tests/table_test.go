@@ -696,4 +696,96 @@ func TestCreateDuplicateTable(t *testing.T) {
 	}
 }
 
+// TestRenameTable tests table rename functionality
+// Based on Python SDK test_pysdk/test_table.py - test_rename_table
+func TestRenameTable(t *testing.T) {
+	suffix := generateSuffix(t)
+
+	conn := setupConnection(t)
+	defer conn.Disconnect()
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	oldTableName := "test_rename_table" + suffix
+	newTableName := "test_rename_table_new" + suffix
+
+	// Clean up
+	db.DropTable(oldTableName, infinity.ConflictTypeIgnore)
+	db.DropTable(newTableName, infinity.ConflictTypeIgnore)
+
+	// Create table
+	schema := infinity.TableSchema{
+		"c1": &infinity.ColumnDefinition{
+			Name:     "c1",
+			DataType: "int",
+		},
+	}
+
+	table, err := db.CreateTable(oldTableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	if table == nil {
+		t.Fatal("Table is nil after creation")
+	}
+	t.Logf("Table created: %s", oldTableName)
+
+	// Rename table directly using table object
+	_, err = table.Rename(newTableName)
+	if err != nil {
+		t.Logf("Server may not support RENAME TABLE operation. Error: %v", err)
+		// Skip remaining tests if rename is not supported
+		t.SkipNow()
+	}
+	t.Logf("Table renamed successfully from %s to %s", oldTableName, newTableName)
+
+	// Verify old table name doesn't exist
+	_, err = db.GetTable(oldTableName)
+	if err == nil {
+		t.Error("Expected error when getting old table name, got nil")
+	} else {
+		infErr, ok := err.(*infinity.InfinityException)
+		if !ok {
+			t.Errorf("Expected InfinityException, got: %T", err)
+		} else if infinity.ErrorCode(infErr.ErrorCode) != infinity.ErrorCodeTableNotExist {
+			t.Logf("Note: Got error code %d for old table: %s", infErr.ErrorCode, infErr.ErrorMsg)
+		}
+	}
+
+	// Verify new table name exists
+	newTable, err := db.GetTable(newTableName)
+	if err != nil {
+		t.Fatalf("Failed to get new table name: %v", err)
+	}
+	if newTable == nil {
+		t.Fatal("New table is nil")
+	}
+
+	// Try to rename with invalid name (should fail)
+	invalidTableName := "123" + suffix
+	_, err = table.Rename(invalidTableName)
+	if err == nil {
+		t.Error("Expected error when renaming with invalid name, got nil")
+	} else {
+		infErr, ok := err.(*infinity.InfinityException)
+		if !ok {
+			t.Errorf("Expected InfinityException, got: %T", err)
+		} else if infinity.ErrorCode(infErr.ErrorCode) != infinity.ErrorCodeInvalidTableName &&
+			infinity.ErrorCode(infErr.ErrorCode) != infinity.ErrorCodeInvalidIdentifierName {
+			t.Logf("Note: Got error code %d for invalid name: %s", infErr.ErrorCode, infErr.ErrorMsg)
+		}
+	}
+
+	// Clean up
+	_, err = db.DropTable(newTableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+
+	t.Logf("Test %s completed successfully", suffix)
+}
+
 

@@ -29,9 +29,43 @@ type Table struct {
 
 // Rename renames the table
 func (t *Table) Rename(newTableName string) (interface{}, error) {
-	// TODO: Implement thrift call
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewRenameTableRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.NewTableName_ = newTableName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.RenameTable(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to rename table: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to rename table: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Update table name on success
 	t.tableName = newTableName
-	return nil, nil
+
+	return resp, nil
 }
 
 // CreateIndex creates an index
