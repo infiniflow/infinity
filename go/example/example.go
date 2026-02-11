@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -302,7 +302,7 @@ func main() {
 	fmt.Println("\n=== Example 10: Connection Pool ===")
 
 	// Create connection pool
-	pool := infinity.NewConnectionPool(
+	pool, err := infinity.NewConnectionPool(
 		infinity.ConnectionPoolConfig{
 			URI:     infinity.LocalHost,
 			MaxSize: 10,
@@ -311,11 +311,14 @@ func main() {
 			return infinity.Connect(uri)
 		},
 	)
+	if err != nil {
+		log.Printf("Failed to create connection pool: %v", err)
+		return
+	}
 	defer pool.Close()
 
 	// Get connection from pool
-	ctx := context.Background()
-	poolConn, err := pool.Get(ctx)
+	poolConn, err := pool.Get()
 	if err != nil {
 		log.Printf("Pool Get error: %v", err)
 	} else {

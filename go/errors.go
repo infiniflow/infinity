@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -172,6 +172,7 @@ const (
 	ErrorCodeTooManyFollower       ErrorCode = 7027
 	ErrorCodeTooManyLearner        ErrorCode = 7028
 	ErrorCodeCheckpointing         ErrorCode = 7029
+	ErrorCodeTimeout               ErrorCode = 7030
 
 	ErrorCodeInvalidEntry      ErrorCode = 8001
 	ErrorCodeDuplicateEntry    ErrorCode = 8002
