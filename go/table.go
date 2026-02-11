@@ -14,7 +14,12 @@
 
 package infinity
 
+import (
+	"context"
+	"fmt"
 
+	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
+)
 
 // Table represents a table for remote operations
 type Table struct {
@@ -257,16 +262,132 @@ func (t *Table) AlterIndex(indexName string, optParams map[string]string) (inter
 	return nil, nil
 }
 
-// AddColumns adds columns
+// AddColumns adds columns to the table
 func (t *Table) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Convert column definitions to thrift ColumnDefs
+	columnDefsList := make([]*thriftapi.ColumnDef, 0, len(columnDefs))
+	index := 0
+	for columnName, columnInfo := range columnDefs {
+		colDef := thriftapi.NewColumnDef()
+		colDef.ID = int32(index)
+		colDef.Name = columnName
+		colDef.Comment = ""
+
+		// Parse data type
+		dataType, err := parseDataType(columnInfo.DataType)
+		if err != nil {
+			return nil, NewInfinityException(int(ErrorCodeInvalidDataType), fmt.Sprintf("Invalid data type for column %s: %v", columnName, err))
+		}
+		colDef.DataType = dataType
+
+		// Convert constraints
+		constraints := make([]thriftapi.Constraint, 0, len(columnInfo.Constraints))
+		for _, constraint := range columnInfo.Constraints {
+			var thriftConstraint thriftapi.Constraint
+			switch constraint {
+			case ConstraintPrimaryKey:
+				thriftConstraint = thriftapi.Constraint_PrimaryKey
+			case ConstraintNotNull:
+				thriftConstraint = thriftapi.Constraint_NotNull
+			case ConstraintNull:
+				thriftConstraint = thriftapi.Constraint_Null
+			case ConstraintUnique:
+				thriftConstraint = thriftapi.Constraint_Unique
+			default:
+				return nil, NewInfinityException(int(ErrorCodeInvalidConstraintType), fmt.Sprintf("Invalid constraint type: %s", constraint))
+			}
+			constraints = append(constraints, thriftConstraint)
+		}
+		colDef.Constraints = constraints
+
+		// Handle default value if provided
+		if columnInfo.Default != nil {
+			constExpr, err := parseDefaultValue(columnInfo.Default)
+			if err != nil {
+				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnName, err))
+			}
+			colDef.ConstantExpr = constExpr
+		}
+
+		columnDefsList = append(columnDefsList, colDef)
+		index++
+	}
+
+	// Create request
+	req := thriftapi.NewAddColumnsRequest()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SessionID = t.db.conn.GetSessionID()
+	req.ColumnDefs = columnDefsList
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.AddColumns(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to add columns: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to add columns: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
-// DropColumns drops columns
+// DropColumns drops columns from the table
 func (t *Table) DropColumns(columnNames interface{}) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Convert columnNames to []string
+	var columnNamesList []string
+	switch v := columnNames.(type) {
+	case string:
+		columnNamesList = []string{v}
+	case []string:
+		columnNamesList = v
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), "columnNames must be a string or []string")
+	}
+
+	// Create request
+	req := thriftapi.NewDropColumnsRequest()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SessionID = t.db.conn.GetSessionID()
+	req.ColumnNames = columnNamesList
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.DropColumns(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to drop columns: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to drop columns: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // Compact compacts the table
