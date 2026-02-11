@@ -445,6 +445,7 @@ QueryResult Infinity::RenameTable(const std::string &db_name, const std::string 
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     std::unique_ptr<RenameTableStatement> rename_statement = std::make_unique<RenameTableStatement>(db_name.c_str(), table_name.c_str());
     rename_statement->new_table_name_ = new_table_name;
+    ToLower(rename_statement->table_name_);
     ToLower(rename_statement->new_table_name_);
 
     QueryResult result = query_context_ptr->QueryStatement(rename_statement.get());
