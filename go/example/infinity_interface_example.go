@@ -55,16 +55,6 @@ func main() {
 	// Database operations
 	fmt.Println("\n--- 3. Database Operations ---")
 
-	// GetDatabase (already used above, but demonstrate again)
-	fmt.Println("\n- GetDatabase -")
-	default_db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		log.Printf("GetDatabase error: %v", err)
-	} else {
-		fmt.Printf("✓ Got database object for 'example_db'\n")
-		_ = default_db // Use in further examples if needed
-	}
-
 	// CreateDatabase
 	fmt.Println("\n- CreateDatabase -")
 	db, err := conn.CreateDatabase("example_db", infinity.ConflictTypeIgnore, "Example database")
@@ -111,23 +101,33 @@ func main() {
 
 	// GetDatabase (already used above, but demonstrate again)
 	fmt.Println("\n- GetDatabase -")
-	db_default, err := conn.GetDatabase("example_db")
+	db2, err := conn.GetDatabase("example_db")
 	if err != nil {
 		log.Printf("GetDatabase error: %v", err)
 	} else {
 		fmt.Printf("✓ Got database object for 'example_db'\n")
-		_ = db_default // Use in further examples if needed
+		_ = db2 // Use in further examples if needed
+	}
+
+	// GetDatabase (already used above, but demonstrate again)
+	fmt.Println("\n- GetDatabase -")
+	default_db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		log.Printf("GetDatabase error: %v", err)
+	} else {
+		fmt.Printf("✓ Got database object for 'example_db'\n")
+		_ = default_db // Use in further examples if needed
 	}
 
 	// DropDatabase (commented out to avoid destroying data)
 	// Uncomment to test, but be careful!
-	// fmt.Println("\n- DropDatabase -")
-	// _, err = conn.DropDatabase("example_db", infinity.ConflictTypeError)
-	// if err != nil {
-	//     log.Printf("DropDatabase error: %v", err)
-	// } else {
-	//     fmt.Println("✓ Dropped database 'example_db'")
-	// }
+	fmt.Println("\n- DropDatabase -")
+	_, err = conn.DropDatabase("example_db", infinity.ConflictTypeError)
+	if err != nil {
+		log.Printf("DropDatabase error: %v", err)
+	} else {
+		fmt.Println("✓ Dropped database 'example_db'")
+	}
 
 	// Node information
 	fmt.Println("\n--- 4. Node Information ---")

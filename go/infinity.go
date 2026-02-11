@@ -178,11 +178,46 @@ func (c *InfinityConnection) CreateDatabase(dbName string, conflictType Conflict
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
 
-	// TODO: Implement thrift call
-	// res := c.client.CreateDatabase(dbName, conflictType, comment)
-	// if res.ErrorCode != ErrorCodeOK {
-	//     return nil, NewInfinityException(int(res.ErrorCode), res.ErrorMsg)
-	// }
+	// Convert ConflictType to CreateConflict
+	var createConflict thriftapi.CreateConflict
+	switch conflictType {
+	case ConflictTypeIgnore:
+		createConflict = thriftapi.CreateConflict_Ignore
+	case ConflictTypeError:
+		createConflict = thriftapi.CreateConflict_Error
+	case ConflictTypeReplace:
+		createConflict = thriftapi.CreateConflict_Replace
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConflictType), "Invalid conflict type")
+	}
+
+	// Create request
+	req := thriftapi.NewCreateDatabaseRequest()
+	req.DbName = dbName
+	req.SessionID = c.GetSessionID()
+	req.CreateOption = &thriftapi.CreateOption{
+		ConflictType: createConflict,
+		Properties:   []*thriftapi.Property{}, // empty properties
+	}
+	req.DbComment = comment
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.CreateDatabase(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create database: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to create database: %s", resp.ErrorMsg),
+		)
+	}
 
 	return &Database{conn: c, dbName: dbName}, nil
 }
@@ -192,8 +227,30 @@ func (c *InfinityConnection) ListDatabases() (interface{}, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewListDatabaseRequest()
+	req.SessionID = c.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ListDatabase(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to list databases: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to list databases: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowDatabase shows details of a specific database
@@ -201,8 +258,31 @@ func (c *InfinityConnection) ShowDatabase(dbName string) (interface{}, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewShowDatabaseRequest()
+	req.DbName = dbName
+	req.SessionID = c.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ShowDatabase(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show database: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show database: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // DropDatabase drops a database
@@ -210,8 +290,45 @@ func (c *InfinityConnection) DropDatabase(dbName string, conflictType ConflictTy
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Convert ConflictType to DropConflict
+	var dropConflict thriftapi.DropConflict
+	switch conflictType {
+	case ConflictTypeIgnore:
+		dropConflict = thriftapi.DropConflict_Ignore
+	case ConflictTypeError:
+		dropConflict = thriftapi.DropConflict_Error
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConflictType), "Invalid conflict type for drop")
+	}
+
+	// Create request
+	req := thriftapi.NewDropDatabaseRequest()
+	req.DbName = dbName
+	req.SessionID = c.GetSessionID()
+	req.DropOption = &thriftapi.DropOption{
+		ConflictType: dropConflict,
+	}
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.DropDatabase(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to drop database: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to drop database: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // GetDatabase gets a database object
