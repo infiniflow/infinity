@@ -12,13 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-
 module infinity_core:wordnet_lemmatizer.impl;
 
 import :wordnet_lemmatizer;
