@@ -198,6 +198,13 @@ func (p *ConnectionPool) Put(conn *InfinityConnection) error {
 		return NewInfinityException(int(ErrorCodeClientClose), "Connection is dead, removed from pool")
 	}
 
+	// Check if connection is already in available list (double release)
+	for _, available := range p.available {
+		if available.conn == conn {
+			return NewInfinityException(int(ErrorCodeInvalidParameterValue), "Connection is already in pool (double release)")
+		}
+	}
+
 	// Always return connection to pool (no max size limit)
 	pooledConn.lastUsedAt = time.Now()
 	p.available = append(p.available, pooledConn)
