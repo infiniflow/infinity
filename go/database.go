@@ -14,6 +14,12 @@
 
 package infinity
 
+import (
+	"context"
+	"fmt"
+	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
+)
+
 // ColumnConstraint represents a constraint on a column
 type ColumnConstraint string
 
@@ -35,80 +41,77 @@ type ColumnDefinition struct {
 // TableSchema defines the schema of a table
 type TableSchema map[string]*ColumnDefinition
 
-// Database defines the interface for database operations
-type Database interface {
-	// CreateTable creates a new table in the database
-	// columnsDefinition is a map of column name to column definition
-	// Example:
-	//   db.CreateTable("my_table", TableSchema{
-	//       "c1": {Name: "c1", DataType: "int", Constraints: []ColumnConstraint{ConstraintPrimaryKey}},
-	//       "c2": {Name: "c2", DataType: "vector,1024,float32"},
-	//   }, ConflictTypeError)
-	CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error)
-
-	// DropTable drops a table from the database
-	DropTable(tableName string, conflictType ConflictType) (interface{}, error)
-
-	// ListTables lists all tables in the database
-	ListTables() (interface{}, error)
-
-	// ShowTable shows details of a specific table
-	ShowTable(tableName string) (interface{}, error)
-
-	// GetTable gets a table object for operations
-	GetTable(tableName string) (Table, error)
-
-	// CreateTableSnapshot creates a snapshot of a table
-	CreateTableSnapshot(snapshotName string, tableName string) (interface{}, error)
-
-	// RestoreTableSnapshot restores a table from a snapshot
-	RestoreTableSnapshot(snapshotName string) (interface{}, error)
-}
-
-// RemoteDatabase implements Database interface for remote connections
-type RemoteDatabase struct {
+// Database represents a database for operations
+type Database struct {
 	conn   *InfinityConnection
 	dbName string
 }
 
 // CreateTable creates a new table
-func (d *RemoteDatabase) CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error) {
+func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error) {
 	// TODO: Implement thrift call
 	return &RemoteTable{db: d, tableName: tableName}, nil
 }
 
 // DropTable drops a table
-func (d *RemoteDatabase) DropTable(tableName string, conflictType ConflictType) (interface{}, error) {
+func (d *Database) DropTable(tableName string, conflictType ConflictType) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ListTables lists all tables
-func (d *RemoteDatabase) ListTables() (interface{}, error) {
+func (d *Database) ListTables() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // ShowTable shows table details
-func (d *RemoteDatabase) ShowTable(tableName string) (interface{}, error) {
+func (d *Database) ShowTable(tableName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // GetTable gets a table object
-func (d *RemoteDatabase) GetTable(tableName string) (Table, error) {
-	// TODO: Implement thrift call to verify table exists
+func (d *Database) GetTable(tableName string) (Table, error) {
+	if d.conn == nil || !d.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create get table request
+	req := thriftapi.NewGetTableRequest()
+	req.DbName = d.dbName
+	req.TableName = tableName
+	req.SessionID = d.conn.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := d.conn.client.GetTable(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to get table: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to get table: %s", resp.ErrorMsg),
+		)
+	}
+
 	return &RemoteTable{db: d, tableName: tableName}, nil
 }
 
 // CreateTableSnapshot creates a snapshot of a table
-func (d *RemoteDatabase) CreateTableSnapshot(snapshotName string, tableName string) (interface{}, error) {
+func (d *Database) CreateTableSnapshot(snapshotName string, tableName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
 
 // RestoreTableSnapshot restores a table from a snapshot
-func (d *RemoteDatabase) RestoreTableSnapshot(snapshotName string) (interface{}, error) {
+func (d *Database) RestoreTableSnapshot(snapshotName string) (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }

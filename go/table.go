@@ -146,7 +146,7 @@ type Table interface {
 
 // RemoteTable implements Table interface for remote connections
 type RemoteTable struct {
-	db        *RemoteDatabase
+	db        *Database
 	tableName string
 }
 

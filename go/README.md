@@ -33,11 +33,11 @@ The main entry point for connecting to Infinity:
 
 ```go
 type InfinityConnection interface {
-    CreateDatabase(dbName string, conflictType ConflictType, comment string) (Database, error)
+    CreateDatabase(dbName string, conflictType ConflictType, comment string) (*Database, error)
     ListDatabases() (interface{}, error)
     ShowDatabase(dbName string) (interface{}, error)
     DropDatabase(dbName string, conflictType ConflictType) (interface{}, error)
-    GetDatabase(dbName string) (Database, error)
+    GetDatabase(dbName string) (*Database, error)
     ShowCurrentNode() (interface{}, error)
     Disconnect() (interface{}, error)
     // ... snapshot and config methods
@@ -46,16 +46,12 @@ type InfinityConnection interface {
 
 ### Database
 
-Interface for database operations:
+Database for operations:
 
 ```go
-type Database interface {
-    CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error)
-    DropTable(tableName string, conflictType ConflictType) (interface{}, error)
-    ListTables() (interface{}, error)
-    ShowTable(tableName string) (interface{}, error)
-    GetTable(tableName string) (Table, error)
-    // ... snapshot methods
+type Database struct {
+    conn   *InfinityConnection
+    dbName string
 }
 ```
 

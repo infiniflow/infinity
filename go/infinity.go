@@ -173,7 +173,7 @@ func (c *InfinityConnection) GetSessionID() int64 {
 }
 
 // CreateDatabase creates a new database
-func (c *InfinityConnection) CreateDatabase(dbName string, conflictType ConflictType, comment string) (Database, error) {
+func (c *InfinityConnection) CreateDatabase(dbName string, conflictType ConflictType, comment string) (*Database, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
@@ -184,7 +184,7 @@ func (c *InfinityConnection) CreateDatabase(dbName string, conflictType Conflict
 	//     return nil, NewInfinityException(int(res.ErrorCode), res.ErrorMsg)
 	// }
 
-	return &RemoteDatabase{conn: c, dbName: dbName}, nil
+	return &Database{conn: c, dbName: dbName}, nil
 }
 
 // ListDatabases lists all databases
@@ -215,12 +215,35 @@ func (c *InfinityConnection) DropDatabase(dbName string, conflictType ConflictTy
 }
 
 // GetDatabase gets a database object
-func (c *InfinityConnection) GetDatabase(dbName string) (Database, error) {
+func (c *InfinityConnection) GetDatabase(dbName string) (*Database, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call to verify database exists
-	return &RemoteDatabase{conn: c, dbName: dbName}, nil
+
+	// Create get database request
+	req := thriftapi.NewGetDatabaseRequest()
+	req.DbName = dbName
+	req.SessionID = c.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.GetDatabase(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to get database: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to get database: %s", resp.ErrorMsg),
+		)
+	}
+
+	return &Database{conn: c, dbName: dbName}, nil
 }
 
 // ShowCurrentNode shows current node information
