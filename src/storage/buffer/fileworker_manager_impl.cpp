@@ -131,6 +131,45 @@ void FileWorkerMap<FileWorkerT>::MoveFiles() {
     }
 }
 
+template <typename FileWorkerT>
+void FileWorkerMap<FileWorkerT>::MoveFilesByPaths(const std::vector<std::string> &rel_file_paths) {
+    std::unique_lock l(rw_mtx_);
+
+    std::vector<std::future<void>> futs;
+    std::vector<FileWorkerT *> file_workers;
+    file_workers.reserve(rel_file_paths.size());
+
+    for (const auto &rel_file_path : rel_file_paths) {
+        auto it = active_dic_.find(rel_file_path);
+        if (it == active_dic_.end()) {
+            LOG_WARN(fmt::format("FileWorker {} not in active_dic", rel_file_path));
+            continue;
+        }
+
+        auto file_worker = GetFileWorkerNoLock(rel_file_path);
+        if (file_worker == nullptr) {
+            LOG_WARN(fmt::format("FileWorker {} is nullptr", rel_file_path));
+            active_dic_.erase(it);
+            continue;
+        }
+
+        file_workers.push_back(file_worker);
+    }
+
+    for (const auto &rel_file_path : rel_file_paths) {
+        active_dic_.erase(rel_file_path);
+    }
+
+    futs.reserve(file_workers.size());
+    for (auto file_worker : file_workers) {
+        futs.emplace_back(std::async(&FileWorkerT::template MoveFile<FileWorkerT>, file_worker));
+    }
+
+    for (auto &fut : futs) {
+        fut.wait();
+    }
+}
+
 template struct FileWorkerMap<BMPIndexFileWorker>;
 template struct FileWorkerMap<DataFileWorker>;
 template struct FileWorkerMap<EMVBIndexFileWorker>;
@@ -213,6 +252,24 @@ void FileWorkerManager::MoveFiles() {
     futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::MoveFiles, &secondary_map_));
     futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::MoveFiles, &var_map_));
     futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::MoveFiles, &version_map_));
+
+    for (auto &fut : futs) {
+        fut.wait();
+    }
+}
+
+void FileWorkerManager::MoveFiles(const std::vector<std::string> &rel_file_paths) {
+    std::lock_guard l(mutex_);
+    std::vector<std::future<void>> futs;
+
+    futs.emplace_back(std::async(&FileWorkerMap<BMPIndexFileWorker>::MoveFilesByPaths, &bmp_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<DataFileWorker>::MoveFilesByPaths, &data_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<EMVBIndexFileWorker>::MoveFilesByPaths, &emvb_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<HnswFileWorker>::MoveFilesByPaths, &hnsw_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<RawFileWorker>::MoveFilesByPaths, &raw_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<SecondaryIndexFileWorker>::MoveFilesByPaths, &secondary_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<VarFileWorker>::MoveFilesByPaths, &var_map_, rel_file_paths));
+    futs.emplace_back(std::async(&FileWorkerMap<VersionFileWorker>::MoveFilesByPaths, &version_map_, rel_file_paths));
 
     for (auto &fut : futs) {
         fut.wait();
