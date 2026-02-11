@@ -111,12 +111,12 @@ func main() {
 
 	// GetDatabase (already used above, but demonstrate again)
 	fmt.Println("\n- GetDatabase -")
-	default_db, err := conn.GetDatabase("default_db")
+	defaultDb, err := conn.GetDatabase("default_db")
 	if err != nil {
 		log.Printf("GetDatabase error: %v", err)
 	} else {
 		fmt.Printf("✓ Got database object for 'example_db'\n")
-		_ = default_db // Use in further examples if needed
+		_ = defaultDb // Use in further examples if needed
 	}
 
 	// DropDatabase (commented out to avoid destroying data)
