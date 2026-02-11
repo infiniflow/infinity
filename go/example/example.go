@@ -304,8 +304,8 @@ func main() {
 	// Create connection pool
 	pool, err := infinity.NewConnectionPool(
 		infinity.ConnectionPoolConfig{
-			URI:     infinity.LocalHost,
-			MaxSize: 10,
+			URI:         infinity.LocalHost,
+			InitialSize: 10,
 		},
 		func(uri infinity.URI) (*infinity.InfinityConnection, error) {
 			return infinity.Connect(uri)

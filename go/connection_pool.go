@@ -24,7 +24,6 @@ import (
 // ConnectionPoolConfig contains configuration for the connection pool
 type ConnectionPoolConfig struct {
 	URI                 URI
-	MaxSize             int           // Maximum number of connections in the pool
 	InitialSize         int           // Initial number of connections to create
 	MaxIdleTime         time.Duration // Maximum time a connection can be idle
 	HealthCheckInterval time.Duration // Interval for health checks (ignored)
@@ -36,8 +35,7 @@ type ConnectionPoolConfig struct {
 func DefaultConnectionPoolConfig(uri URI) ConnectionPoolConfig {
 	return ConnectionPoolConfig{
 		URI:                 uri,
-		MaxSize:             10,
-		InitialSize:         2,
+		InitialSize:         10,
 		MaxIdleTime:         30 * time.Minute,
 		HealthCheckInterval: 5 * time.Minute,
 		WaitTimeout:         30 * time.Second,
@@ -66,14 +64,8 @@ type ConnectionPool struct {
 
 // NewConnectionPool creates a new connection pool
 func NewConnectionPool(config ConnectionPoolConfig, factory func(URI) (*InfinityConnection, error)) (*ConnectionPool, error) {
-	if config.MaxSize <= 0 {
-		config.MaxSize = 10
-	}
 	if config.InitialSize < 0 {
 		config.InitialSize = 0
-	}
-	if config.InitialSize > config.MaxSize {
-		config.InitialSize = config.MaxSize
 	}
 	if config.MaxIdleTime <= 0 {
 		config.MaxIdleTime = 30 * time.Minute
@@ -86,7 +78,7 @@ func NewConnectionPool(config ConnectionPoolConfig, factory func(URI) (*Infinity
 		uri:          config.URI,
 		config:       config,
 		factory:      factory,
-		available:    make([]*PooledConnection, 0, config.MaxSize),
+		available:    make([]*PooledConnection, 0, config.InitialSize),
 		connToPooled: make(map[*InfinityConnection]*PooledConnection),
 	}
 
@@ -171,32 +163,12 @@ func (p *ConnectionPool) GetContext(ctx context.Context) (*InfinityConnection, e
 		return conn, nil
 	}
 
-	// No available connections, create a new one if under max size
-	if p.createdCount < p.config.MaxSize {
-		// Reserve a slot by incrementing the count while holding the lock
-		p.createdCount++
-		// Release the lock while creating the connection to avoid deadlock
-		conn, err := p.factory(p.uri)
-
-		if err != nil {
-			// Factory failed, decrement the reserved count
-			p.createdCount--
-			return nil, err
-		}
-
-		// Connection created successfully, update pool mapping
-		now := time.Now()
-		pooledConn := &PooledConnection{
-			conn:       conn,
-			createdAt:  now,
-			lastUsedAt: now,
-		}
-		p.connToPooled[conn] = pooledConn
-		return conn, nil
+	// No available connections, create a new one
+	pooledConn, err := p.createConnection()
+	if err != nil {
+		return nil, err
 	}
-
-	// Pool exhausted
-	return nil, NewInfinityException(int(ErrorCodeTooManyConnections), "Connection pool exhausted")
+	return pooledConn.conn, nil
 }
 
 // Put returns a connection to the pool
@@ -226,10 +198,7 @@ func (p *ConnectionPool) Put(conn *InfinityConnection) error {
 		return NewInfinityException(int(ErrorCodeClientClose), "Connection is dead, removed from pool")
 	}
 
-	// Check if pool is full (available slots = MaxSize - createdCount + len(available))
-	// Actually we can always put back; if we exceed MaxSize, we could close the connection,
-	// but we already limit createdCount <= MaxSize, so len(available) <= MaxSize.
-	// Just append to available slice.
+	// Always return connection to pool (no max size limit)
 	pooledConn.lastUsedAt = time.Now()
 	p.available = append(p.available, pooledConn)
 	return nil
@@ -278,7 +247,6 @@ type PoolStats struct {
 	TotalConnections     int
 	AvailableConnections int
 	InUseConnections     int
-	MaxConnections       int
 	Closed               bool
 }
 
@@ -295,7 +263,6 @@ func (p *ConnectionPool) Stats() PoolStats {
 		TotalConnections:     total,
 		AvailableConnections: available,
 		InUseConnections:     inUse,
-		MaxConnections:       p.config.MaxSize,
 		Closed:               p.closed,
 	}
 }

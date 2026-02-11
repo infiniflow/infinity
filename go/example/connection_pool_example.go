@@ -59,7 +59,7 @@ func exampleBasicPoolUsage() {
 	}
 	defer pool.Close()
 
-	fmt.Printf("Pool created with max size: %d\n", config.MaxSize)
+	fmt.Printf("Pool created with initial size: %d\n", config.InitialSize)
 
 	// Get a connection from the pool
 	conn, err := pool.Get()
@@ -97,7 +97,6 @@ func exampleCustomConfig() {
 	// Create custom configuration
 	config := infinity.ConnectionPoolConfig{
 		URI:                 infinity.LocalHost,
-		MaxSize:             5,
 		InitialSize:         2,
 		MaxIdleTime:         10 * time.Minute,
 		HealthCheckInterval: 1 * time.Minute,
@@ -117,7 +116,6 @@ func exampleCustomConfig() {
 	defer pool.Close()
 
 	fmt.Printf("Pool created with custom config:\n")
-	fmt.Printf("  Max Size: %d\n", config.MaxSize)
 	fmt.Printf("  Initial Size: %d\n", config.InitialSize)
 	fmt.Printf("  Max Idle Time: %v\n", config.MaxIdleTime)
 	fmt.Printf("  Wait Timeout: %v\n", config.WaitTimeout)
@@ -142,7 +140,6 @@ func exampleConcurrentAccess() {
 
 	config := infinity.ConnectionPoolConfig{
 		URI:                 infinity.LocalHost,
-		MaxSize:             3,
 		InitialSize:         1,
 		BlockWhenExhausted:  true,
 		WaitTimeout:         5 * time.Second,
@@ -155,7 +152,7 @@ func exampleConcurrentAccess() {
 	}
 	defer pool.Close()
 
-	fmt.Printf("Pool max size: %d, simulating %d concurrent workers\n", config.MaxSize, 5)
+	fmt.Printf("Pool initial size: %d, simulating %d concurrent workers\n", config.InitialSize, 5)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
@@ -240,7 +237,6 @@ func printStats(stats infinity.PoolStats) {
 	fmt.Printf("  Total Connections: %d\n", stats.TotalConnections)
 	fmt.Printf("  Available Connections: %d\n", stats.AvailableConnections)
 	fmt.Printf("  In Use Connections: %d\n", stats.InUseConnections)
-	fmt.Printf("  Max Connections: %d\n", stats.MaxConnections)
 	fmt.Printf("  Closed: %v\n", stats.Closed)
 }
 
@@ -251,7 +247,6 @@ func exampleContextTimeout() {
 	// Create a pool with only 1 connection
 	config := infinity.ConnectionPoolConfig{
 		URI:                 infinity.LocalHost,
-		MaxSize:             1,
 		InitialSize:         1,
 		BlockWhenExhausted:  true,
 		WaitTimeout:         2 * time.Second,
