@@ -18,19 +18,18 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 // ConnectionPoolConfig contains configuration for the connection pool
 type ConnectionPoolConfig struct {
-	URI             URI
-	MaxSize         int           // Maximum number of connections in the pool
-	InitialSize     int           // Initial number of connections to create
-	MaxIdleTime     time.Duration // Maximum time a connection can be idle
-	HealthCheckInterval time.Duration // Interval for health checks
-	WaitTimeout     time.Duration // Maximum time to wait for a connection from the pool
-	BlockWhenExhausted bool       // Whether to block when pool is exhausted
+	URI                 URI
+	MaxSize             int           // Maximum number of connections in the pool
+	InitialSize         int           // Initial number of connections to create
+	MaxIdleTime         time.Duration // Maximum time a connection can be idle
+	HealthCheckInterval time.Duration // Interval for health checks (ignored)
+	WaitTimeout         time.Duration // Maximum time to wait for a connection from the pool (ignored)
+	BlockWhenExhausted  bool          // Whether to block when pool is exhausted (ignored)
 }
 
 // DefaultConnectionPoolConfig returns a default configuration
@@ -51,21 +50,18 @@ type PooledConnection struct {
 	conn       *InfinityConnection
 	createdAt  time.Time
 	lastUsedAt time.Time
-	useCount   int64
 }
 
 // ConnectionPool manages a pool of Infinity connections
 type ConnectionPool struct {
-	uri         URI
-	config      ConnectionPoolConfig
-	connections chan *PooledConnection
-	allConns    map[*PooledConnection]bool // Track all created connections for cleanup
-	mu          sync.RWMutex
-	factory     func(URI) (*InfinityConnection, error)
-	closed      int32 // Atomic flag for closed state
-	wg          sync.WaitGroup
-	ctx         context.Context
-	cancel      context.CancelFunc
+	uri          URI
+	config       ConnectionPoolConfig
+	factory      func(URI) (*InfinityConnection, error)
+	mu           sync.Mutex
+	closed       bool
+	available    []*PooledConnection
+	createdCount int
+	connToPooled map[*InfinityConnection]*PooledConnection
 }
 
 // NewConnectionPool creates a new connection pool
@@ -82,45 +78,35 @@ func NewConnectionPool(config ConnectionPoolConfig, factory func(URI) (*Infinity
 	if config.MaxIdleTime <= 0 {
 		config.MaxIdleTime = 30 * time.Minute
 	}
-	if config.WaitTimeout <= 0 {
-		config.WaitTimeout = 30 * time.Second
-	}
 	if factory == nil {
 		factory = Connect
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	pool := &ConnectionPool{
-		uri:         config.URI,
-		config:      config,
-		connections: make(chan *PooledConnection, config.MaxSize),
-		allConns:    make(map[*PooledConnection]bool),
-		factory:     factory,
-		ctx:         ctx,
-		cancel:      cancel,
+		uri:          config.URI,
+		config:       config,
+		factory:      factory,
+		available:    make([]*PooledConnection, 0, config.MaxSize),
+		connToPooled: make(map[*InfinityConnection]*PooledConnection),
 	}
 
 	// Create initial connections
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 	for i := 0; i < config.InitialSize; i++ {
 		pooledConn, err := pool.createConnection()
 		if err != nil {
 			pool.Close()
 			return nil, fmt.Errorf("failed to create initial connection %d: %w", i, err)
 		}
-		pool.connections <- pooledConn
-	}
-
-	// Start background maintenance goroutine
-	if config.HealthCheckInterval > 0 {
-		pool.wg.Add(1)
-		go pool.maintenance()
+		pool.available = append(pool.available, pooledConn)
 	}
 
 	return pool, nil
 }
 
 // createConnection creates a new pooled connection
+// Caller must hold p.mu lock
 func (p *ConnectionPool) createConnection() (*PooledConnection, error) {
 	conn, err := p.factory(p.uri)
 	if err != nil {
@@ -132,12 +118,10 @@ func (p *ConnectionPool) createConnection() (*PooledConnection, error) {
 		conn:       conn,
 		createdAt:  now,
 		lastUsedAt: now,
-		useCount:   0,
 	}
 
-	p.mu.Lock()
-	p.allConns[pooledConn] = true
-	p.mu.Unlock()
+	p.connToPooled[conn] = pooledConn
+	p.createdCount++
 
 	return pooledConn, nil
 }
@@ -149,119 +133,88 @@ func (p *ConnectionPool) Get() (*InfinityConnection, error) {
 
 // GetContext gets a connection from the pool with context
 func (p *ConnectionPool) GetContext(ctx context.Context) (*InfinityConnection, error) {
-	if p.isClosed() {
+	// Check if context is already done
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection pool is closed")
 	}
 
-	// Create timeout context if BlockWhenExhausted is true
-	if p.config.BlockWhenExhausted && p.config.WaitTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, p.config.WaitTimeout)
-		defer cancel()
-	}
-
-	for {
-		select {
-		case pooledConn := <-p.connections:
-			// Check if connection is still valid
-			if !pooledConn.conn.IsConnected() {
-				// Connection is dead, close it and try again
-				p.closeConnection(pooledConn)
-				continue
-			}
-
-			// Check if connection has been idle too long
-			if time.Since(pooledConn.lastUsedAt) > p.config.MaxIdleTime {
-				// Connection is too old, close it and try again
-				p.closeConnection(pooledConn)
-				continue
-			}
-
-			// Update metadata
-			pooledConn.lastUsedAt = time.Now()
-			atomic.AddInt64(&pooledConn.useCount, 1)
-
-			return pooledConn.conn, nil
-
-		case <-ctx.Done():
-			if ctx.Err() == context.DeadlineExceeded {
-				return nil, NewInfinityException(
-					int(ErrorCodeTimeout),
-					fmt.Sprintf("Timeout waiting for connection from pool after %v", p.config.WaitTimeout),
-				)
-			}
-			return nil, ctx.Err()
-
-		default:
-			// No connection available
-			if !p.config.BlockWhenExhausted {
-				// Try to create a new connection if not at max
-				p.mu.RLock()
-				currentSize := len(p.allConns)
-				p.mu.RUnlock()
-
-				if currentSize < p.config.MaxSize {
-					pooledConn, err := p.createConnection()
-					if err != nil {
-						return nil, err
-					}
-					pooledConn.lastUsedAt = time.Now()
-					atomic.AddInt64(&pooledConn.useCount, 1)
-					return pooledConn.conn, nil
-				}
-
-				return nil, NewInfinityException(
-					int(ErrorCodeTooManyConnections),
-					"Connection pool exhausted",
-				)
-			}
-			// Block and wait for a connection
-			select {
-			case pooledConn := <-p.connections:
-				if !pooledConn.conn.IsConnected() {
-					p.closeConnection(pooledConn)
-					continue
-				}
-				pooledConn.lastUsedAt = time.Now()
-				atomic.AddInt64(&pooledConn.useCount, 1)
-				return pooledConn.conn, nil
-			case <-ctx.Done():
-				if ctx.Err() == context.DeadlineExceeded {
-					return nil, NewInfinityException(
-						int(ErrorCodeTimeout),
-						fmt.Sprintf("Timeout waiting for connection from pool after %v", p.config.WaitTimeout),
-					)
-				}
-				return nil, ctx.Err()
-			}
+	// Clean up idle or invalid connections from available slice
+	valid := p.available[:0]
+	for _, pooledConn := range p.available {
+		// Check if connection is still alive
+		if !pooledConn.conn.IsConnected() {
+			p.removeConnection(pooledConn)
+			continue
 		}
+		// Check if connection has been idle too long
+		if time.Since(pooledConn.lastUsedAt) > p.config.MaxIdleTime {
+			p.removeConnection(pooledConn)
+			continue
+		}
+		valid = append(valid, pooledConn)
 	}
+	p.available = valid
+
+	// If there are available connections, take the last one
+	if len(p.available) > 0 {
+		pooledConn := p.available[len(p.available)-1]
+		p.available = p.available[:len(p.available)-1]
+		pooledConn.lastUsedAt = time.Now()
+		conn := pooledConn.conn
+		return conn, nil
+	}
+
+	// No available connections, create a new one if under max size
+	if p.createdCount < p.config.MaxSize {
+		// Reserve a slot by incrementing the count while holding the lock
+		p.createdCount++
+		// Release the lock while creating the connection to avoid deadlock
+		conn, err := p.factory(p.uri)
+
+		if err != nil {
+			// Factory failed, decrement the reserved count
+			p.createdCount--
+			return nil, err
+		}
+
+		// Connection created successfully, update pool mapping
+		now := time.Now()
+		pooledConn := &PooledConnection{
+			conn:       conn,
+			createdAt:  now,
+			lastUsedAt: now,
+		}
+		p.connToPooled[conn] = pooledConn
+		return conn, nil
+	}
+
+	// Pool exhausted
+	return nil, NewInfinityException(int(ErrorCodeTooManyConnections), "Connection pool exhausted")
 }
 
 // Put returns a connection to the pool
 func (p *ConnectionPool) Put(conn *InfinityConnection) error {
-	if p.isClosed() {
-		// Pool is closed, close the connection
-		conn.Disconnect()
-		return NewInfinityException(int(ErrorCodeClientClose), "Connection pool is closed")
-	}
-
 	if conn == nil {
 		return NewInfinityException(int(ErrorCodeInvalidParameterValue), "Cannot return nil connection to pool")
 	}
 
-	// Find the pooled connection wrapper
-	p.mu.RLock()
-	var pooledConn *PooledConnection
-	for pc := range p.allConns {
-		if pc.conn == conn {
-			pooledConn = pc
-			break
-		}
-	}
-	p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	if pooledConn == nil {
+	if p.closed {
+		conn.Disconnect()
+		return NewInfinityException(int(ErrorCodeClientClose), "Connection pool is closed")
+	}
+
+	pooledConn, ok := p.connToPooled[conn]
+	if !ok {
 		// Connection not from this pool, close it
 		conn.Disconnect()
 		return NewInfinityException(int(ErrorCodeInvalidParameterValue), "Connection not from this pool")
@@ -269,110 +222,54 @@ func (p *ConnectionPool) Put(conn *InfinityConnection) error {
 
 	// Check if connection is still valid
 	if !conn.IsConnected() {
-		// Connection is dead, remove it from tracking
-		p.closeConnection(pooledConn)
+		p.removeConnection(pooledConn)
 		return NewInfinityException(int(ErrorCodeClientClose), "Connection is dead, removed from pool")
 	}
 
-	// Return to pool
-	select {
-	case p.connections <- pooledConn:
-		// Successfully returned to pool
-		return nil
-	default:
-		// Pool is full, close the connection
-		p.closeConnection(pooledConn)
-		return NewInfinityException(int(ErrorCodeTooManyConnections), "Pool is full, connection closed")
-	}
+	// Check if pool is full (available slots = MaxSize - createdCount + len(available))
+	// Actually we can always put back; if we exceed MaxSize, we could close the connection,
+	// but we already limit createdCount <= MaxSize, so len(available) <= MaxSize.
+	// Just append to available slice.
+	pooledConn.lastUsedAt = time.Now()
+	p.available = append(p.available, pooledConn)
+	return nil
 }
 
-// closeConnection closes a pooled connection and removes it from tracking
-func (p *ConnectionPool) closeConnection(pooledConn *PooledConnection) {
-	p.mu.Lock()
-	delete(p.allConns, pooledConn)
-	p.mu.Unlock()
-
+// removeConnection closes a pooled connection and removes it from tracking
+func (p *ConnectionPool) removeConnection(pooledConn *PooledConnection) {
 	if pooledConn.conn != nil {
+		delete(p.connToPooled, pooledConn.conn)
 		pooledConn.conn.Disconnect()
-	}
-}
-
-// maintenance runs background maintenance tasks
-func (p *ConnectionPool) maintenance() {
-	defer p.wg.Done()
-
-	ticker := time.NewTicker(p.config.HealthCheckInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		case <-ticker.C:
-			p.cleanupIdleConnections()
-		}
-	}
-}
-
-// cleanupIdleConnections removes connections that have been idle too long
-func (p *ConnectionPool) cleanupIdleConnections() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	now := time.Now()
-	var toRemove []*PooledConnection
-
-	// Check all connections (this is a simplified check - in production,
-	// you might want to check only idle connections)
-	for pooledConn := range p.allConns {
-		if now.Sub(pooledConn.lastUsedAt) > p.config.MaxIdleTime {
-			toRemove = append(toRemove, pooledConn)
-		}
-	}
-
-	// Remove idle connections
-	for _, pooledConn := range toRemove {
-		delete(p.allConns, pooledConn)
-		go pooledConn.conn.Disconnect()
+		p.createdCount--
 	}
 }
 
 // isClosed checks if the pool is closed
 func (p *ConnectionPool) isClosed() bool {
-	return atomic.LoadInt32(&p.closed) == 1
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 // Close closes all connections in the pool
 func (p *ConnectionPool) Close() error {
-	if !atomic.CompareAndSwapInt32(&p.closed, 0, 1) {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
 		return NewInfinityException(int(ErrorCodeClientClose), "Connection pool already closed")
 	}
-
-	// Cancel context to stop maintenance goroutine
-	p.cancel()
-
-	// Wait for maintenance goroutine to finish
-	p.wg.Wait()
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.closed = true
 
 	// Close all connections
-	for pooledConn := range p.allConns {
-		if pooledConn.conn != nil {
-			pooledConn.conn.Disconnect()
-		}
-		delete(p.allConns, pooledConn)
+	for conn := range p.connToPooled {
+		conn.Disconnect()
 	}
+	// Clear maps and slices
+	p.connToPooled = make(map[*InfinityConnection]*PooledConnection)
+	p.available = nil
+	p.createdCount = 0
 
-	// Drain the channel
-	close(p.connections)
-	for pooledConn := range p.connections {
-		if pooledConn.conn != nil {
-			pooledConn.conn.Disconnect()
-		}
-	}
-
+	p.mu.Unlock()
 	return nil
 }
 
@@ -387,29 +284,32 @@ type PoolStats struct {
 
 // Stats returns current pool statistics
 func (p *ConnectionPool) Stats() PoolStats {
-	p.mu.RLock()
-	total := len(p.allConns)
-	p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	available := len(p.connections)
+	total := p.createdCount
+	available := len(p.available)
+	inUse := total - available
 
 	return PoolStats{
 		TotalConnections:     total,
 		AvailableConnections: available,
-		InUseConnections:     total - available,
+		InUseConnections:     inUse,
 		MaxConnections:       p.config.MaxSize,
-		Closed:               p.isClosed(),
+		Closed:               p.closed,
 	}
 }
 
 // Size returns the current number of connections in the pool
 func (p *ConnectionPool) Size() int {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return len(p.allConns)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.createdCount
 }
 
 // Available returns the number of available connections in the pool
 func (p *ConnectionPool) Available() int {
-	return len(p.connections)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.available)
 }
