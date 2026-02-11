@@ -532,6 +532,8 @@ target_link_libraries(unit_test
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
+        spdlog::spdlog
+        fmt::fmt
         resolv.a
         atomic.a
         #        ${STDCXX15EXP_STATIC}
