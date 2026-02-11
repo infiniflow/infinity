@@ -26,10 +26,9 @@ import :create_index_data;
 import :blocking_queue;
 import :expression_state;
 import :status;
-import :hash_table;
+import :aggregate_utils;
 
 import internal_types;
-// import column_def;
 import data_type;
 
 namespace infinity {
@@ -72,7 +71,7 @@ export struct AggregateOperatorState : public OperatorState {
         : OperatorState(PhysicalOperatorType::kAggregate), states_(std::move(states)) {}
 
     std::vector<std::unique_ptr<char[]>> states_;
-    HashTable hash_table_;
+    GroupByHashTable hash_table_;
 };
 
 // Merge Aggregate
@@ -82,7 +81,7 @@ export struct MergeAggregateOperatorState : public OperatorState {
     /// Since merge agg is the first op, no previous operator state. This ptr is to get input data.
     // std::vector<std::unique_ptr<DataBlock>> input_data_blocks_{nullptr};
     std::unique_ptr<DataBlock> input_data_block_{nullptr};
-    MergeHashTable hash_table_;
+    MergeGroupByHashTable hash_table_;
     bool input_complete_{false};
 };
 
