@@ -48,12 +48,9 @@ func main() {
 	}
 	fmt.Println("✓ Connected to Infinity successfully")
 
-	// Get the underlying connection (type assertion to access additional methods)
-	remoteConn, ok := conn.(*infinity.RemoteThriftConnection)
-	if ok {
-		fmt.Printf("  Session ID: %d\n", remoteConn.GetSessionID())
-		fmt.Printf("  Is Connected: %v\n", remoteConn.IsConnected())
-	}
+	// Access connection properties directly since InfinityConnection is now a struct
+	fmt.Printf("  Session ID: %d\n", conn.GetSessionID())
+	fmt.Printf("  Is Connected: %v\n", conn.IsConnected())
 
 	// Disconnect
 	_, err = conn.Disconnect()
@@ -103,12 +100,8 @@ func main() {
 	fmt.Println("✓ Created second connection")
 
 	// Both connections have different session IDs
-	if rc1, ok := conn3a.(*infinity.RemoteThriftConnection); ok {
-		fmt.Printf("  Connection 1 Session ID: %d\n", rc1.GetSessionID())
-	}
-	if rc2, ok := conn3b.(*infinity.RemoteThriftConnection); ok {
-		fmt.Printf("  Connection 2 Session ID: %d\n", rc2.GetSessionID())
-	}
+	fmt.Printf("  Connection 1 Session ID: %d\n", conn3a.GetSessionID())
+	fmt.Printf("  Connection 2 Session ID: %d\n", conn3b.GetSessionID())
 
 	// Disconnect both
 	conn3a.Disconnect()

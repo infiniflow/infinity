@@ -23,9 +23,9 @@ import (
 type ConnectionPool struct {
 	uri         URI
 	maxSize     int
-	connections chan InfinityConnection
+	connections chan *InfinityConnection
 	mu          sync.Mutex
-	factory     func(URI) (InfinityConnection, error)
+	factory     func(URI) (*InfinityConnection, error)
 }
 
 // ConnectionPoolConfig contains configuration for the connection pool
@@ -35,20 +35,20 @@ type ConnectionPoolConfig struct {
 }
 
 // NewConnectionPool creates a new connection pool
-func NewConnectionPool(config ConnectionPoolConfig, factory func(URI) (InfinityConnection, error)) *ConnectionPool {
+func NewConnectionPool(config ConnectionPoolConfig, factory func(URI) (*InfinityConnection, error)) *ConnectionPool {
 	if config.MaxSize <= 0 {
 		config.MaxSize = 10
 	}
 	return &ConnectionPool{
 		uri:         config.URI,
 		maxSize:     config.MaxSize,
-		connections: make(chan InfinityConnection, config.MaxSize),
+		connections: make(chan *InfinityConnection, config.MaxSize),
 		factory:     factory,
 	}
 }
 
 // Get gets a connection from the pool
-func (p *ConnectionPool) Get(ctx context.Context) (InfinityConnection, error) {
+func (p *ConnectionPool) Get(ctx context.Context) (*InfinityConnection, error) {
 	select {
 	case conn := <-p.connections:
 		return conn, nil
@@ -61,7 +61,7 @@ func (p *ConnectionPool) Get(ctx context.Context) (InfinityConnection, error) {
 }
 
 // Put returns a connection to the pool
-func (p *ConnectionPool) Put(conn InfinityConnection) {
+func (p *ConnectionPool) Put(conn *InfinityConnection) {
 	select {
 	case p.connections <- conn:
 		// Connection returned to pool

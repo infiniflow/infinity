@@ -64,3 +64,51 @@ type Database interface {
 	// RestoreTableSnapshot restores a table from a snapshot
 	RestoreTableSnapshot(snapshotName string) (interface{}, error)
 }
+
+// RemoteDatabase implements Database interface for remote connections
+type RemoteDatabase struct {
+	conn   *InfinityConnection
+	dbName string
+}
+
+// CreateTable creates a new table
+func (d *RemoteDatabase) CreateTable(tableName string, columnsDefinition TableSchema, conflictType ConflictType) (Table, error) {
+	// TODO: Implement thrift call
+	return &RemoteTable{db: d, tableName: tableName}, nil
+}
+
+// DropTable drops a table
+func (d *RemoteDatabase) DropTable(tableName string, conflictType ConflictType) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ListTables lists all tables
+func (d *RemoteDatabase) ListTables() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowTable shows table details
+func (d *RemoteDatabase) ShowTable(tableName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// GetTable gets a table object
+func (d *RemoteDatabase) GetTable(tableName string) (Table, error) {
+	// TODO: Implement thrift call to verify table exists
+	return &RemoteTable{db: d, tableName: tableName}, nil
+}
+
+// CreateTableSnapshot creates a snapshot of a table
+func (d *RemoteDatabase) CreateTableSnapshot(snapshotName string, tableName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// RestoreTableSnapshot restores a table from a snapshot
+func (d *RemoteDatabase) RestoreTableSnapshot(snapshotName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}

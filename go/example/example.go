@@ -307,7 +307,7 @@ func main() {
 			URI:     infinity.LocalHost,
 			MaxSize: 10,
 		},
-		func(uri infinity.URI) (infinity.InfinityConnection, error) {
+		func(uri infinity.URI) (*infinity.InfinityConnection, error) {
 			return infinity.Connect(uri)
 		},
 	)

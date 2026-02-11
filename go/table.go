@@ -143,3 +143,262 @@ type Table interface {
 	// Compact compacts the table
 	Compact() (interface{}, error)
 }
+
+// RemoteTable implements Table interface for remote connections
+type RemoteTable struct {
+	db        *RemoteDatabase
+	tableName string
+}
+
+// Rename renames the table
+func (t *RemoteTable) Rename(newTableName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	t.tableName = newTableName
+	return nil, nil
+}
+
+// CreateIndex creates an index
+func (t *RemoteTable) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType ConflictType, indexComment string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// DropIndex drops an index
+func (t *RemoteTable) DropIndex(indexName string, conflictType ConflictType) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowIndex shows index details
+func (t *RemoteTable) ShowIndex(indexName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ListIndexes lists all indexes
+func (t *RemoteTable) ListIndexes() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// DumpIndex dumps index information
+func (t *RemoteTable) DumpIndex(indexName string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowColumns shows all columns
+func (t *RemoteTable) ShowColumns() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowSegments shows all segments
+func (t *RemoteTable) ShowSegments() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowSegment shows segment details
+func (t *RemoteTable) ShowSegment(segmentID int) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowBlocks shows all blocks in a segment
+func (t *RemoteTable) ShowBlocks(segmentID int) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowBlock shows block details
+func (t *RemoteTable) ShowBlock(segmentID int, blockID int) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ShowBlockColumn shows column information for a block
+func (t *RemoteTable) ShowBlockColumn(segmentID int, blockID int, columnID int) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Insert inserts data
+func (t *RemoteTable) Insert(data interface{}) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ImportData imports data from a file
+func (t *RemoteTable) ImportData(filePath string, importOptions *ImportOption) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ExportData exports data to a file
+func (t *RemoteTable) ExportData(filePath string, exportOptions *ExportOption, columns []string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Delete deletes rows
+func (t *RemoteTable) Delete(cond string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Update updates rows
+func (t *RemoteTable) Update(cond string, data map[string]interface{}) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// MatchDense performs dense vector search
+func (t *RemoteTable) MatchDense(vectorColumnName string, embeddingData VEC, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// MatchText performs full-text search
+func (t *RemoteTable) MatchText(fields string, matchingText string, topN int, extraOptions map[string]interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// MatchTensor performs tensor search
+func (t *RemoteTable) MatchTensor(columnName string, queryData VEC, queryDataType string, topN int, extraOption map[string]interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// MatchSparse performs sparse vector search
+func (t *RemoteTable) MatchSparse(vectorColumnName string, sparseData interface{}, distanceType string, topN int, optParams map[string]string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Fusion combines multiple search results
+func (t *RemoteTable) Fusion(method string, topN int, fusionParams map[string]interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Output specifies output columns
+func (t *RemoteTable) Output(columns []string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Highlight specifies highlight columns
+func (t *RemoteTable) Highlight(columns []string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Filter applies filter
+func (t *RemoteTable) Filter(filter string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Limit sets limit
+func (t *RemoteTable) Limit(limit int) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Offset sets offset
+func (t *RemoteTable) Offset(offset int) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// GroupBy groups results
+func (t *RemoteTable) GroupBy(groupByExprList interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Having applies having clause
+func (t *RemoteTable) Having(havingExpr string) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Sort sorts results
+func (t *RemoteTable) Sort(orderByExprList [][2]interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// Option sets options
+func (t *RemoteTable) Option(optionKV map[string]interface{}) Table {
+	// TODO: Implement query builder
+	return t
+}
+
+// ToString returns query as string
+func (t *RemoteTable) ToString() string {
+	// TODO: Implement query builder
+	return ""
+}
+
+// ToResult executes query and returns result
+func (t *RemoteTable) ToResult() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ToDF returns result as DataFrame
+func (t *RemoteTable) ToDF() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ToPL returns result as Polars
+func (t *RemoteTable) ToPL() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// ToArrow returns result as Arrow
+func (t *RemoteTable) ToArrow() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Explain returns execution plan
+func (t *RemoteTable) Explain(explainType ExplainType) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Optimize optimizes the table
+func (t *RemoteTable) Optimize() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// AlterIndex alters an index
+func (t *RemoteTable) AlterIndex(indexName string, optParams map[string]string) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// AddColumns adds columns
+func (t *RemoteTable) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// DropColumns drops columns
+func (t *RemoteTable) DropColumns(columnNames interface{}) (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
+
+// Compact compacts the table
+func (t *RemoteTable) Compact() (interface{}, error) {
+	// TODO: Implement thrift call
+	return nil, nil
+}
