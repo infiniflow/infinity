@@ -49,6 +49,8 @@ target_link_libraries(
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
+        spdlog::spdlog
+        fmt::fmt
 )
 
 # add_definitions(-march=native)
