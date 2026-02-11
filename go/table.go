@@ -25,6 +25,8 @@ import (
 type Table struct {
 	db        *Database
 	tableName string
+	// Query builder fields
+	outputColumns []string
 }
 
 // Rename renames the table
@@ -142,8 +144,71 @@ func (t *Table) Insert(data interface{}) (interface{}, error) {
 
 // ImportData imports data from a file
 func (t *Table) ImportData(filePath string, importOptions *ImportOption) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Use default import options if nil
+	if importOptions == nil {
+		importOptions = NewImportOption()
+	}
+
+	// Create thrift ImportOption
+	thriftImportOption := thriftapi.NewImportOption()
+	thriftImportOption.Delimiter = string(importOptions.Delimiter)
+	thriftImportOption.HasHeader = importOptions.HasHeader
+
+	// Convert CopyFileType to thrift CopyFileType
+	var thriftCopyFileType thriftapi.CopyFileType
+	switch importOptions.CopyFileType {
+	case CopyFileTypeCSV:
+		thriftCopyFileType = thriftapi.CopyFileType_CSV
+	case CopyFileTypeJSON:
+		thriftCopyFileType = thriftapi.CopyFileType_JSON
+	case CopyFileTypeJSONL:
+		thriftCopyFileType = thriftapi.CopyFileType_JSONL
+	case CopyFileTypeFVECS:
+		thriftCopyFileType = thriftapi.CopyFileType_FVECS
+	case CopyFileTypeCSR:
+		thriftCopyFileType = thriftapi.CopyFileType_CSR
+	case CopyFileTypeBVECS:
+		thriftCopyFileType = thriftapi.CopyFileType_BVECS
+	default:
+		return nil, NewInfinityException(int(ErrorCodeImportFileFormatError), fmt.Sprintf("Invalid copy file type: %d", importOptions.CopyFileType))
+	}
+	thriftImportOption.CopyFileType = thriftCopyFileType
+
+	// Create request
+	req := thriftapi.NewImportRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.FileName = filePath
+	req.ImportOption = thriftImportOption
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Import(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to import data: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to import data: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ExportData exports data to a file
@@ -196,7 +261,8 @@ func (t *Table) Fusion(method string, topN int, fusionParams map[string]interfac
 
 // Output specifies output columns
 func (t *Table) Output(columns []string) *Table {
-	// TODO: Implement query builder
+	// Store the output columns for later use in query execution
+	t.outputColumns = columns
 	return t
 }
 
