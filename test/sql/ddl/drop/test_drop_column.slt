@@ -33,15 +33,26 @@ SELECT * FROM test_drop_column;
 20 30
 200 300
 
-# query I
-# SELECT c3 FROM test_drop_column WHERE c3 = 30;
-# ----
-# 30
+query I
+SELECT c3 FROM test_drop_column WHERE c3 = 30;
+----
+30
 
-# query I
-# SELECT c2 FROM test_drop_column WHERE c2 = 20;
-# ----
-# 20
+query I
+SELECT c3 FROM test_drop_column WHERE c3 = 2;
+----
+
+query I
+SELECT c2 FROM test_drop_column WHERE c2 = 20;
+----
+20
+
+query I
+SELECT c2 FROM test_drop_column WHERE c2 > 0;
+----
+2
+20
+200
 
 # Restore snapshot
 
@@ -58,20 +69,19 @@ SELECT * FROM test_drop_column;
 10 20 30
 100 200 300
 
-# query III
-# SELECT c1, c2, c3 FROM test_drop_column WHERE c3 = 30;
-# ----
-# 10 20 30
+query III
+SELECT c1, c2, c3 FROM test_drop_column WHERE c3 = 30;
+----
+10 20 30
 
-# query I
-# SELECT c2 FROM test_drop_column WHERE c2 = 200;
-# ----
-# 200
+query I
+SELECT c2 FROM test_drop_column WHERE c2 = 200;
+----
+200
 
-# query I
-# SELECT c1 FROM test_drop_column WHERE c1 = 100;
-# ----
-# 100
+query I
+SELECT c1 FROM test_drop_column WHERE c3 = 2;
+----
 
 statement ok
 DROP TABLE test_drop_column;
@@ -86,12 +96,26 @@ SELECT * FROM test_drop_column;
 20 30
 200 300
 
+query I
+SELECT c3 FROM test_drop_column WHERE c3 = 30;
+----
+30
+
+query I
+SELECT c3 FROM test_drop_column WHERE c3 = 2;
+----
+
+query I
+SELECT c2 FROM test_drop_column WHERE c2 = 20;
+----
+20
+
+query I
+SELECT c2 FROM test_drop_column WHERE c2 > 0;
+----
+2
+20
+200
 
 statement ok
 DROP TABLE test_drop_column;
-
-statement ok
-DROP SNAPSHOT snap_before_drop;
-
-statement ok
-DROP SNAPSHOT snap_after_drop;

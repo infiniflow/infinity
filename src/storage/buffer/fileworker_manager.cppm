@@ -182,6 +182,7 @@ struct FileWorkerMap : FileWorkerMapInjectHelper<FileWorkerT> {
     void ClearCleans();
 
     void MoveFiles();
+    void MoveFilesByPaths(const std::vector<std::string> &rel_file_paths);
 
     mutable std::shared_mutex rw_mtx_;
     std::unordered_map<std::string, std::unique_ptr<FileWorkerT>> map_;
@@ -214,6 +215,7 @@ public:
     void RemoveImport(TransactionID txn_id);
 
     void MoveFiles();
+    void MoveFiles(const std::vector<std::string> &rel_file_paths);
 
     FileWorkerMap<BMPIndexFileWorker> bmp_map_;
     FileWorkerMap<DataFileWorker> data_map_;

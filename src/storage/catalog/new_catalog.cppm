@@ -92,8 +92,6 @@ export struct SegmentUpdateTS {
     TxnTimeStamp ts_{0};
 };
 
-struct ChunkInfoForCreateIndex;
-
 export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;

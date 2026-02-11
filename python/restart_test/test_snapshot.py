@@ -139,7 +139,6 @@ class TestSnapshot:
         def part3(infinity_obj):
             time.sleep(3)
             db_obj = infinity_obj.get_database("default_db")
-
             # Verify restored table still exists
             table_obj = db_obj.get_table("test_snapshot1")
             data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
@@ -155,7 +154,7 @@ class TestSnapshot:
             infinity_obj.drop_snapshot("snapshot1")
             db_obj.drop_table("test_snapshot1", ConflictType.Error)
 
-        #part3()
+        part3()
 
     def test_snapshot_during_operations(self, infinity_runner: InfinityRunner):
         """Test snapshot creation during concurrent operations"""
@@ -712,5 +711,100 @@ class TestSnapshot:
                 db_obj.drop_table("test_snapshot_restore_interrupted", ConflictType.Ignore)
             except Exception:
                 pass
+
+        part2()
+
+    def test_snapshot_simple_restore_restart(self, infinity_runner: InfinityRunner):
+        """Test simple snapshot restore and drop across restart"""
+        config1 = "test/data/config/restart_test/test_snapshot/1.toml"
+        config2 = "test/data/config/restart_test/test_snapshot/2.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+
+        @decorator1
+        def part1(infinity_obj):
+            # 1. create table
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_simple_restore",
+                {
+                    "c1": {"type": "int", "constraints": ["primary key"]},
+                    "c2": {"type": "varchar"},
+                    "c3": {"type": "float64"}
+                },
+            )
+
+            # 2. insert
+            table_obj.insert([
+                {"c1": 1, "c2": "data_1", "c3": 1.1},
+                {"c1": 2, "c2": "data_2", "c3": 2.2},
+                {"c1": 3, "c2": "data_3", "c3": 3.3},
+                {"c1": 4, "c2": "data_4", "c3": 4.4},
+                {"c1": 5, "c2": "data_5", "c3": 5.5}
+            ])
+
+            # Verify data before snapshot
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
+            assert data_dict["count(star)"] == [5], f"Expected 5 rows, got {data_dict['count(star)'][0]}"
+
+            # 3. create snapshot
+            res = db_obj.create_table_snapshot("simple_snap", "test_simple_restore")
+            assert res.error_code == infinity.ErrorCode.OK, f"Snapshot creation failed: {res.error_code}"
+
+            # 4. drop table
+            db_obj.drop_table("test_simple_restore", ConflictType.Error)
+
+            # 5. restore snapshot
+            res = db_obj.restore_table_snapshot("simple_snap")
+            assert res.error_code == infinity.ErrorCode.OK, f"Snapshot restore failed: {res.error_code}"
+
+            # Verify restored data
+            restored_table = db_obj.get_table("test_simple_restore")
+            data_dict, _, _ = restored_table.output(["c1", "c2", "c3"]).to_result()
+            assert len(data_dict["c1"]) == 5, f"Expected 5 rows after restore, got {len(data_dict['c1'])}"
+            assert data_dict["c1"] == [1, 2, 3, 4, 5]
+            assert data_dict["c2"] == ["data_1", "data_2", "data_3", "data_4", "data_5"]
+
+            # 6. drop snapshot
+            res = infinity_obj.drop_snapshot("simple_snap")
+            assert res.error_code == infinity.ErrorCode.OK, f"Snapshot drop failed: {res.error_code}"
+
+            # Wait for operations to complete
+            time.sleep(2)
+
+        part1()
+
+        # Phase 2: Restart and verify data
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        @decorator2
+        def part2(infinity_obj):
+            time.sleep(3)
+            db_obj = infinity_obj.get_database("default_db")
+
+            # Verify table still exists after restart
+            table_obj = db_obj.get_table("test_simple_restore")
+            data_dict, _, _ = table_obj.output(["c1", "c2", "c3"]).to_result()
+
+            # Check data integrity
+            assert len(data_dict["c1"]) == 5, f"Expected 5 rows after restart, got {len(data_dict['c1'])}"
+            assert data_dict["c1"] == [1, 2, 3, 4, 5], f"Data mismatch after restart: {data_dict['c1']}"
+            assert data_dict["c2"] == ["data_1", "data_2", "data_3", "data_4", "data_5"], f"Data mismatch after restart: {data_dict['c2']}"
+            assert data_dict["c3"] == [1.1, 2.2, 3.3, 4.4, 5.5], f"Data mismatch after restart: {data_dict['c3']}"
+
+            print("✓ Data verified correctly after restart")
+
+            # Verify snapshot was dropped
+            snapshots_res = infinity_obj.list_snapshots()
+            assert snapshots_res.error_code == infinity.ErrorCode.OK
+            snapshot_names = [s.name for s in snapshots_res.snapshots]
+            assert "simple_snap" not in snapshot_names, "Snapshot should have been dropped"
+
+            # Clean up
+            db_obj.drop_table("test_simple_restore", ConflictType.Error)
+
+            print("Test completed successfully")
 
         part2()
