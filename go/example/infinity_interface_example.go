@@ -139,71 +139,71 @@ func main() {
 		fmt.Printf("✓ Current node info: %v\n", nodeInfo)
 	}
 
-	// Snapshot operations
-	fmt.Println("\n--- 5. Snapshot Operations ---")
-
-	// CreateDatabaseSnapshot
-	fmt.Println("\n- CreateDatabaseSnapshot -")
-	_, err = conn.CreateDatabaseSnapshot("example_snapshot", "example_db")
-	if err != nil {
-		log.Printf("CreateDatabaseSnapshot error (may not be supported): %v", err)
-	} else {
-		fmt.Println("✓ Created database snapshot 'example_snapshot'")
-	}
-
-	// RestoreDatabaseSnapshot
-	fmt.Println("\n- RestoreDatabaseSnapshot -")
-	_, err = conn.RestoreDatabaseSnapshot("example_snapshot")
-	if err != nil {
-		log.Printf("RestoreDatabaseSnapshot error (may not be supported): %v", err)
-	} else {
-		fmt.Println("✓ Restored database from snapshot 'example_snapshot'")
-	}
-
-	// CreateSystemSnapshot
-	fmt.Println("\n- CreateSystemSnapshot -")
-	_, err = conn.CreateSystemSnapshot("system_snapshot")
-	if err != nil {
-		log.Printf("CreateSystemSnapshot error (may not be supported): %v", err)
-	} else {
-		fmt.Println("✓ Created system snapshot 'system_snapshot'")
-	}
-
-	// RestoreSystemSnapshot
-	fmt.Println("\n- RestoreSystemSnapshot -")
-	_, err = conn.RestoreSystemSnapshot("system_snapshot")
-	if err != nil {
-		log.Printf("RestoreSystemSnapshot error (may not be supported): %v", err)
-	} else {
-		fmt.Println("✓ Restored system from snapshot 'system_snapshot'")
-	}
-
-	// ListSnapshots
-	fmt.Println("\n- ListSnapshots -")
-	snapshots, err := conn.ListSnapshots()
-	if err != nil {
-		log.Printf("ListSnapshots error: %v", err)
-	} else {
-		fmt.Printf("✓ Snapshots list: %v\n", snapshots)
-	}
-
-	// ShowSnapshot
-	fmt.Println("\n- ShowSnapshot -")
-	snapshotInfo, err := conn.ShowSnapshot("example_snapshot")
-	if err != nil {
-		log.Printf("ShowSnapshot error (snapshot may not exist): %v", err)
-	} else {
-		fmt.Printf("✓ Snapshot info: %v\n", snapshotInfo)
-	}
-
-	// DropSnapshot
-	fmt.Println("\n- DropSnapshot -")
-	_, err = conn.DropSnapshot("example_snapshot")
-	if err != nil {
-		log.Printf("DropSnapshot error (snapshot may not exist): %v", err)
-	} else {
-		fmt.Println("✓ Dropped snapshot 'example_snapshot'")
-	}
+	//// Snapshot operations
+	//fmt.Println("\n--- 5. Snapshot Operations ---")
+	//
+	//// CreateDatabaseSnapshot
+	//fmt.Println("\n- CreateDatabaseSnapshot -")
+	//_, err = conn.CreateDatabaseSnapshot("example_snapshot", "example_db")
+	//if err != nil {
+	//	log.Printf("CreateDatabaseSnapshot error (may not be supported): %v", err)
+	//} else {
+	//	fmt.Println("✓ Created database snapshot 'example_snapshot'")
+	//}
+	//
+	//// RestoreDatabaseSnapshot
+	//fmt.Println("\n- RestoreDatabaseSnapshot -")
+	//_, err = conn.RestoreDatabaseSnapshot("example_snapshot")
+	//if err != nil {
+	//	log.Printf("RestoreDatabaseSnapshot error (may not be supported): %v", err)
+	//} else {
+	//	fmt.Println("✓ Restored database from snapshot 'example_snapshot'")
+	//}
+	//
+	//// CreateSystemSnapshot
+	//fmt.Println("\n- CreateSystemSnapshot -")
+	//_, err = conn.CreateSystemSnapshot("system_snapshot")
+	//if err != nil {
+	//	log.Printf("CreateSystemSnapshot error (may not be supported): %v", err)
+	//} else {
+	//	fmt.Println("✓ Created system snapshot 'system_snapshot'")
+	//}
+	//
+	//// RestoreSystemSnapshot
+	//fmt.Println("\n- RestoreSystemSnapshot -")
+	//_, err = conn.RestoreSystemSnapshot("system_snapshot")
+	//if err != nil {
+	//	log.Printf("RestoreSystemSnapshot error (may not be supported): %v", err)
+	//} else {
+	//	fmt.Println("✓ Restored system from snapshot 'system_snapshot'")
+	//}
+	//
+	//// ListSnapshots
+	//fmt.Println("\n- ListSnapshots -")
+	//snapshots, err := conn.ListSnapshots()
+	//if err != nil {
+	//	log.Printf("ListSnapshots error: %v", err)
+	//} else {
+	//	fmt.Printf("✓ Snapshots list: %v\n", snapshots)
+	//}
+	//
+	//// ShowSnapshot
+	//fmt.Println("\n- ShowSnapshot -")
+	//snapshotInfo, err := conn.ShowSnapshot("example_snapshot")
+	//if err != nil {
+	//	log.Printf("ShowSnapshot error (snapshot may not exist): %v", err)
+	//} else {
+	//	fmt.Printf("✓ Snapshot info: %v\n", snapshotInfo)
+	//}
+	//
+	//// DropSnapshot
+	//fmt.Println("\n- DropSnapshot -")
+	//_, err = conn.DropSnapshot("example_snapshot")
+	//if err != nil {
+	//	log.Printf("DropSnapshot error (snapshot may not exist): %v", err)
+	//} else {
+	//	fmt.Println("✓ Dropped snapshot 'example_snapshot'")
+	//}
 
 	// Maintenance operations
 	fmt.Println("\n--- 6. Maintenance Operations ---")
@@ -258,7 +258,7 @@ func main() {
 
 	// SetConfig
 	fmt.Println("\n- SetConfig -")
-	setConfigResult, err := conn.SetConfig("example_config", "example_value")
+	setConfigResult, err := conn.SetConfig("log_level", "trace")
 	if err != nil {
 		log.Printf("SetConfig error: %v", err)
 	} else {
@@ -267,15 +267,15 @@ func main() {
 
 	// ShowConfig
 	fmt.Println("\n- ShowConfig -")
-	_, err = conn.ShowConfig("example_config")
+	configResp, err := conn.ShowConfig("log_level")
 	if err != nil {
 		log.Printf("ShowConfig error: %v", err)
 	} else {
 		fmt.Printf("✓ To ShowConfig response:\n")
-		//fmt.Printf("  ConfigName: %s\n", configResp.ConfigName)
-		//fmt.Printf("  ConfigValue: %v\n", configResp.ConfigValue)
-		//fmt.Printf("  ErrorCode: %v\n", configResp.ErrorCode)
-		//fmt.Printf("  ErrorMsg: %s\n", configResp.ErrorMsg)
+		fmt.Printf("  ConfigName: %s\n", configResp.ConfigName)
+		fmt.Printf("  ConfigValue: %v\n", configResp.ConfigValue)
+		fmt.Printf("  ErrorCode: %v\n", configResp.ErrorCode)
+		fmt.Printf("  ErrorMsg: %s\n", configResp.ErrorMsg)
 	}
 
 	fmt.Println("\n=== All Interface Examples Completed ===")

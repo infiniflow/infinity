@@ -413,8 +413,30 @@ func (c *InfinityConnection) ListSnapshots() (interface{}, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewListSnapshotsRequest()
+	req.SessionID = c.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ListSnapshots(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to list snapshots: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to list snapshots: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowSnapshot shows details of a specific snapshot
@@ -422,8 +444,31 @@ func (c *InfinityConnection) ShowSnapshot(snapshotName string) (interface{}, err
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewShowSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.SnapshotName = snapshotName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ShowSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // DropSnapshot drops a snapshot
@@ -467,7 +512,30 @@ func (c *InfinityConnection) FlushData() error {
 	if !c.isConnected {
 		return NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
+
+	// Create request
+	req := thriftapi.NewFlushRequest()
+	req.SessionID = c.GetSessionID()
+	req.FlushType = "data"
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.Flush(ctx, req)
+	if err != nil {
+		return NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to flush data: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to flush data: %s", resp.ErrorMsg),
+		)
+	}
+
 	return nil
 }
 
@@ -485,8 +553,41 @@ func (c *InfinityConnection) SetConfig(configName string, configValue interface{
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Convert configValue to thrift ConfigValue
+	thriftConfigValue, err := configValueFromInterface(configValue)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeInvalidParameterValue),
+			fmt.Sprintf("Invalid config value: %v", err),
+		)
+	}
+
+	// Create request
+	req := thriftapi.NewSetConfigRequest()
+	req.SessionID = c.GetSessionID()
+	req.ConfigName = configName
+	req.ConfigValue = thriftConfigValue
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.SetConfig(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to set config: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to set config: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowConfig shows a configuration value
@@ -494,8 +595,54 @@ func (c *InfinityConnection) ShowConfig(configName string) (*ConfigResponse, err
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewShowConfigRequest()
+	req.SessionID = c.GetSessionID()
+	req.ConfigName = configName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ShowConfig(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show config: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show config: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Extract config value from thrift ConfigValue
+	var configValue interface{}
+	if resp.ConfigValue != nil {
+		if resp.ConfigValue.StringValue != nil {
+			configValue = *resp.ConfigValue.StringValue
+		} else if resp.ConfigValue.IntValue != nil {
+			configValue = *resp.ConfigValue.IntValue
+		} else if resp.ConfigValue.BoolValue != nil {
+			configValue = *resp.ConfigValue.BoolValue
+		} else if resp.ConfigValue.DoubleValue != nil {
+			configValue = *resp.ConfigValue.DoubleValue
+		} else {
+			configValue = nil
+		}
+	} else {
+		configValue = nil
+	}
+
+	return &ConfigResponse{
+		ErrorCode:   ErrorCode(resp.ErrorCode),
+		ErrorMsg:    resp.ErrorMsg,
+		ConfigName:  resp.ConfigName,
+		ConfigValue: configValue,
+	}, nil
 }
 
 // ConfigResponse represents the response from show_config
@@ -504,4 +651,30 @@ type ConfigResponse struct {
 	ErrorMsg    string
 	ConfigName  string
 	ConfigValue interface{}
+}
+
+// configValueFromInterface converts a Go interface{} to a thrift ConfigValue
+func configValueFromInterface(v interface{}) (*thriftapi.ConfigValue, error) {
+	cv := thriftapi.NewConfigValue()
+	switch val := v.(type) {
+	case string:
+		cv.StringValue = &val
+	case int64:
+		cv.IntValue = &val
+	case int:
+		// Convert int to int64
+		i64 := int64(val)
+		cv.IntValue = &i64
+	case bool:
+		cv.BoolValue = &val
+	case float64:
+		cv.DoubleValue = &val
+	case float32:
+		// Convert float32 to float64
+		f64 := float64(val)
+		cv.DoubleValue = &f64
+	default:
+		return nil, fmt.Errorf("unsupported config value type %T", v)
+	}
+	return cv, nil
 }
