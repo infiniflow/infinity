@@ -103,13 +103,6 @@ func TraverseConditions(cond interface{}) interface{} {
 	return cond
 }
 
-// ParseExpr parses an expression string
-func ParseExpr(expr string) (interface{}, error) {
-	// This is a placeholder implementation
-	// In the actual implementation, this would parse the expression
-	return expr, nil
-}
-
 // GetRemoteConstantExprFromValue converts a Go value to a remote constant expression
 func GetRemoteConstantExprFromValue(value interface{}) interface{} {
 	// This is a placeholder implementation
