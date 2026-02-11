@@ -120,7 +120,7 @@ find_package(CLI11 CONFIG REQUIRED)
 #find_package(CURL REQUIRED) # wait for s3
 #darts-clone # wait for fix
 #eigen3 fuck this package
-#find_package(fmt REQUIRED) # wait for fmt:11.2.0
+find_package(fmt CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
@@ -140,7 +140,7 @@ find_package(re2 CONFIG REQUIRED)
 find_package(roaring CONFIG REQUIRED)
 find_package(RocksDB CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
-#find_package(spdlog REQUIRED) # wait for fmt:11.2.0
+find_package(spdlog CONFIG REQUIRED)
 if (ARM64)
     add_library(sse2neon INTERFACE)
     if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
