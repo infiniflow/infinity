@@ -1347,27 +1347,8 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
-    if (!IsReplay() && base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
+    if (!IsReplay() && base_txn_store_) {
         auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-
-        std::vector<std::string> *index_id_strs_ptr{};
-        std::vector<std::string> *index_name_strs_ptr{};
-        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
-        if (status.ok() && !index_id_strs_ptr->empty()) {
-            for (size_t i = 0; i < index_id_strs_ptr->size(); ++i) {
-                const std::string &index_id_str = (*index_id_strs_ptr)[i];
-                const std::string &index_name = (*index_name_strs_ptr)[i];
-
-                TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
-
-                SegmentIndexMeta segment_index_meta(segment_info.segment_id_, table_index_meta);
-                Status index_status = NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, import_txn_store->file_worker_paths_);
-                if (!index_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to get segment index file paths during import: {}", index_status.message()));
-                }
-            }
-        }
-
         if (!import_txn_store->file_worker_paths_.empty()) {
             fileworker_mgr_->MoveFiles(import_txn_store->file_worker_paths_);
         }
@@ -1707,7 +1688,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     }
 
     if (!IsReplay()) {
-        std::vector<std::string> all_file_paths;
+        std::vector<std::string> data_file_paths;
 
         std::vector<std::string> *index_id_strs_ptr{};
         std::vector<std::string> *index_name_strs_ptr{};
@@ -1718,28 +1699,14 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
 
         for (const WalSegmentInfo &seg_info : compact_cmd->new_segment_infos_) {
             SegmentMeta seg_meta(seg_info.segment_id_, table_meta);
-
-            Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, all_file_paths, nullptr);
+            Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, data_file_paths, nullptr);
             if (!path_status.ok()) {
                 LOG_WARN(fmt::format("Failed to get segment file paths: {}", path_status.message()));
             }
-
-            for (size_t idx = 0; idx < index_id_strs_ptr->size(); ++idx) {
-                const std::string &index_id_str = index_id_strs_ptr->at(idx);
-                const std::string &index_name_str = index_name_strs_ptr->at(idx);
-
-                TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
-
-                SegmentIndexMeta segment_index_meta(seg_info.segment_id_, table_index_meta);
-                Status index_status = NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, all_file_paths);
-                if (!index_status.ok()) {
-                    LOG_WARN(fmt::format("Failed to get segment index file paths: {}", index_status.message()));
-                }
-            }
         }
 
-        if (!all_file_paths.empty()) {
-            fileworker_mgr_->MoveFiles(all_file_paths);
+        if (!data_file_paths.empty()) {
+            fileworker_mgr_->MoveFiles(data_file_paths);
         }
     }
 

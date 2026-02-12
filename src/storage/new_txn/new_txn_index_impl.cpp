@@ -2529,29 +2529,38 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
     }
 
     if (!IsReplay()) {
-        std::vector<std::string> all_file_paths;
-
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-        for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
-            ChunkID new_chunk_id = chunk_info.chunk_id_;
-            ChunkIndexMeta new_chunk_meta(new_chunk_id, segment_index_meta);
-
-            std::vector<std::string> chunk_file_paths;
-            Status fp_status = new_chunk_meta.FilePaths(chunk_file_paths);
-            if (fp_status.ok()) {
-                all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
-            } else {
-                LOG_WARN(fmt::format("Failed to get file paths for chunk {}, index {}.{}, segment {}: {}",
-                                     new_chunk_id,
-                                     table_name,
-                                     index_name,
-                                     segment_id,
-                                     fp_status.message()));
+        switch (dump_index_cmd->dump_cause_) {
+            case DumpIndexCause::kCompact:
+                [[fallthrough]];
+            case DumpIndexCause::kOptimizeIndex:
+                [[fallthrough]];
+            case DumpIndexCause::kImport: {
+                std::vector<std::string> index_file_paths;
+                SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+                for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+                    ChunkID new_chunk_id = chunk_info.chunk_id_;
+                    ChunkIndexMeta new_chunk_meta(new_chunk_id, segment_index_meta);
+                    std::vector<std::string> chunk_file_paths;
+                    Status fp_status = new_chunk_meta.FilePaths(chunk_file_paths);
+                    if (fp_status.ok()) {
+                        index_file_paths.insert(index_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+                    } else {
+                        LOG_WARN(fmt::format("Failed to get file paths for chunk {}, index {}.{}, segment {}: {}",
+                                             new_chunk_id,
+                                             table_name,
+                                             index_name,
+                                             segment_id,
+                                             fp_status.message()));
+                    }
+                }
+                if (!index_file_paths.empty()) {
+                    fileworker_mgr_->MoveFiles(index_file_paths);
+                }
+                break;
             }
-        }
-
-        if (!all_file_paths.empty()) {
-            fileworker_mgr_->MoveFiles(all_file_paths);
+            default: {
+                break;
+            }
         }
     }
 
