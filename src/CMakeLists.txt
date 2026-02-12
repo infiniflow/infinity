@@ -295,7 +295,6 @@ target_include_directories(infinity_core PUBLIC ${Python3_INCLUDE_DIRS})
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
@@ -368,10 +367,12 @@ target_link_libraries(infinity
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
+        spdlog::spdlog
+        fmt::fmt
         # turbo::base64
         resolv.a
         atomic.a
-#        ${STDCXX15EXP_STATIC}
+        #        ${STDCXX15EXP_STATIC}
         libstdc++exp.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -531,9 +532,12 @@ target_link_libraries(unit_test
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
+        spdlog::spdlog
+        fmt::fmt
         resolv.a
+
         atomic.a
-#        ${STDCXX15EXP_STATIC}
+        #        ${STDCXX15EXP_STATIC}
         libstdc++exp.a
 )
 

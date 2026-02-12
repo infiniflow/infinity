@@ -23,6 +23,7 @@ import :data_block;
 import :utility;
 import :logger;
 import :column_vector;
+import :aggregate_utils;
 import :infinity_exception;
 import :default_values;
 import :expression_state;
@@ -40,7 +41,18 @@ import data_type;
 
 namespace infinity {
 
-void PhysicalAggregate::Init(QueryContext *query_context) {}
+void PhysicalAggregate::Init(QueryContext *query_context) {
+    // Initialize groupby_types_, groupby_columns_ and groupby_columns_ once (before any Execute() calls)
+    // Thread-safe: set during Init() (single-threaded), read-only during Execute() (potentially multi-threaded)
+    groupby_types_.reserve(groups_.size());
+    groupby_columns_.reserve(groups_.size());
+    for (i64 idx = 0; auto &expr : groups_) {
+        groupby_types_.emplace_back(std::make_shared<DataType>(expr->Type()));
+        groupby_columns_.emplace_back(
+            std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>()));
+    }
+    hash_key_size_ = CalculateHashKeySize(groupby_types_);
+}
 
 bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;
@@ -64,19 +76,8 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 1. Execute group-by expressions to generate unique key.
-    std::vector<std::shared_ptr<ColumnDef>> groupby_columns;
-    groupby_columns.reserve(group_count);
-
-    std::vector<std::shared_ptr<DataType>> groupby_types;
-    groupby_types.reserve(group_count);
-
-    for (i64 idx = 0; auto &expr : groups_) {
-        std::shared_ptr<ColumnDef> col_def =
-            std::make_shared<ColumnDef>(idx, std::make_shared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
-        groupby_columns.emplace_back(col_def);
-        groupby_types.emplace_back(std::make_shared<DataType>(expr->Type()));
-        ++idx;
-    }
+    const auto &groupby_types = groupby_types_;
+    const auto &groupby_columns = groupby_columns_;
 
     std::shared_ptr<TableDef> groupby_tabledef = TableDef::Make(std::make_shared<std::string>("default_db"),
                                                                 std::make_shared<std::string>("groupby"),
@@ -110,17 +111,22 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 2. Use the unique key to get the row list of the same key.
-    HashTable &hash_table = aggregate_operator_state->hash_table_;
-    if (!hash_table.Initialized()) {
-        hash_table.Init(groupby_types);
-    } else {
-        hash_table.Clear();
-    }
+    auto &hash_table = aggregate_operator_state->hash_table_;
+    hash_table.clear();
 
+    const size_t key_size = hash_key_size_;
+    std::string hash_key;
+    if (key_size) {
+        hash_key.reserve(key_size);
+    }
     size_t block_count = groupby_table->DataBlockCount();
     for (size_t block_id = 0; block_id < block_count; ++block_id) {
         const std::shared_ptr<DataBlock> &block_ptr = groupby_table->GetDataBlockById(block_id);
-        hash_table.Append(block_ptr->column_vectors_, block_id, block_ptr->row_count());
+        size_t row_count = block_ptr->row_count();
+        for (size_t row_id = 0; row_id < row_count; ++row_id) {
+            BuildHashKey(block_ptr->column_vectors_, row_id, groupby_types, hash_key);
+            hash_table[std::move(hash_key)][block_id].emplace_back(row_id);
+        }
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
@@ -214,14 +220,14 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 
 void PhysicalAggregate::GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_datablocks,
                                           std::vector<std::unique_ptr<DataBlock>> &output_datablocks,
-                                          HashTable &hash_table) {
+                                          GroupByHashTable &hash_table) {
     // 1. Get output table column types.
     std::vector<std::shared_ptr<DataType>> types = input_datablocks.front()->types();
     size_t column_count = input_datablocks.front()->column_count();
 
     // 2. Generate data blocks and append it into output table according to the group by hash table.
     // const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-    for (const auto &item : hash_table.hash_table_) {
+    for (const auto &item : hash_table) {
 
         // 2.1 Each hash bucket will be insert in to one data block
         std::unique_ptr<DataBlock> output_datablock = DataBlock::MakeUniquePtr();
@@ -262,7 +268,7 @@ void PhysicalAggregate::GroupByInputTable(const std::vector<std::unique_ptr<Data
 
 void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table,
                                               std::shared_ptr<DataTable> &output_table,
-                                              HashTable &hash_table) {
+                                              GroupByHashTable &hash_table) {
 
     size_t column_count = input_table->ColumnCount();
     std::vector<std::shared_ptr<DataType>> types;
@@ -279,7 +285,7 @@ void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &
 
     std::shared_ptr<DataBlock> output_datablock = nullptr;
     const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-    for (const auto &item : hash_table.hash_table_) {
+    for (const auto &item : hash_table) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
         output_datablock->Init(types, 1);
