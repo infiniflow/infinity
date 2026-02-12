@@ -764,8 +764,8 @@ func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
 	}
 
 	// Process column fields to get data
-	for _, colField := range resp.ColumnFields {
-		columnName := colField.ColumnName
+	for idx, colField := range resp.ColumnFields {
+		columnName := resp.ColumnDefs[idx].Name
 		columnType := colField.ColumnType
 		columnVectors := colField.ColumnVectors
 
