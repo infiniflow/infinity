@@ -27,6 +27,7 @@ type Table struct {
 	tableName string
 	// Query builder fields
 	outputColumns []string
+	queryBuilder  *QueryBuilder
 }
 
 // Rename renames the table
@@ -231,80 +232,162 @@ func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, e
 
 // MatchDense performs dense vector search
 func (t *Table) MatchDense(vectorColumnName string, embeddingData interface{}, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.MatchDense(vectorColumnName, embeddingData, embeddingDataType, distanceType, topN, knnParams)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // MatchText performs full-text search
-func (t *Table) MatchText(fields string, matchingText string, topN int, extraOptions map[string]interface{}) *Table {
-	// TODO: Implement query builder
+func (t *Table) MatchText(fields string, matchingText string, topN int, extraOptions map[string]string) *Table {
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.MatchText(fields, matchingText, topN, extraOptions)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // MatchTensor performs tensor search
-func (t *Table) MatchTensor(columnName string, queryData interface{}, queryDataType string, topN int, extraOption map[string]interface{}) *Table {
-	// TODO: Implement query builder
+func (t *Table) MatchTensor(columnName string, queryData interface{}, queryDataType string, topN int, extraOption map[string]string) *Table {
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.MatchTensor(columnName, queryData, queryDataType, topN, extraOption)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // MatchSparse performs sparse vector search
-func (t *Table) MatchSparse(vectorColumnName string, sparseData interface{}, distanceType string, topN int, optParams map[string]string) *Table {
-	// TODO: Implement query builder
+func (t *Table) MatchSparse(vectorColumnName string, sparseData *SparseVector, distanceType string, topN int, optParams map[string]string) *Table {
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.MatchSparse(vectorColumnName, sparseData, distanceType, topN, optParams)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Fusion combines multiple search results
 func (t *Table) Fusion(method string, topN int, fusionParams map[string]interface{}) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Fusion(method, topN, fusionParams)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Output specifies output columns
 func (t *Table) Output(columns []string) *Table {
-	// Store the output columns for later use in query execution
-	t.outputColumns = columns
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Output(columns)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Highlight specifies highlight columns
 func (t *Table) Highlight(columns []string) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Highlight(columns)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Filter applies filter
 func (t *Table) Filter(filter string) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Filter(filter)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Limit sets limit
 func (t *Table) Limit(limit int) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	t.queryBuilder = t.queryBuilder.Limit(limit)
 	return t
 }
 
 // Offset sets offset
 func (t *Table) Offset(offset int) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	t.queryBuilder = t.queryBuilder.Offset(offset)
 	return t
 }
 
 // GroupBy groups results
 func (t *Table) GroupBy(groupByExprList interface{}) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.GroupBy(groupByExprList)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Having applies having clause
 func (t *Table) Having(havingExpr string) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Having(havingExpr)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
 // Sort sorts results
 func (t *Table) Sort(orderByExprList [][2]interface{}) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	queryBuilder, err := t.queryBuilder.Sort(orderByExprList)
+	if err != nil {
+		return nil
+	}
+	t.queryBuilder = queryBuilder
 	return t
 }
 
@@ -322,24 +405,6 @@ func (t *Table) ToString() string {
 
 // ToResult executes query and returns result
 func (t *Table) ToResult() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
-}
-
-// ToDF returns result as DataFrame
-func (t *Table) ToDF() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
-}
-
-// ToPL returns result as Polars
-func (t *Table) ToPL() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
-}
-
-// ToArrow returns result as Arrow
-func (t *Table) ToArrow() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
 }
