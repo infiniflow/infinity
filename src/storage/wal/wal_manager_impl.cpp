@@ -106,6 +106,12 @@ void WalManager::Stop() {
 
     bottom_executor_->Stop();
 
+    // pop all the entries in the queue. and notify the condition variable.
+    new_wait_flush_.Enqueue(nullptr);
+
+    LOG_TRACE("Stop the new flush thread");
+    new_flush_thread_.join();
+
     LOG_TRACE("Begin to stop txn manager.");
     // Notify txn manager to stop.
     if (NewTxnManager *new_txn_mgr = storage_->new_txn_manager(); new_txn_mgr) {
@@ -113,12 +119,6 @@ void WalManager::Stop() {
     } else {
         UnrecoverableError("WAL manager stop failed: txn manager is nullptr");
     }
-
-    // pop all the entries in the queue. and notify the condition variable.
-    new_wait_flush_.Enqueue(nullptr);
-
-    LOG_TRACE("Stop the new flush thread");
-    new_flush_thread_.join();
 
     ofs_.close();
     LOG_INFO("WAL manager is stopped.");
