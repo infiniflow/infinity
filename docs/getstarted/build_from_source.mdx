@@ -110,7 +110,7 @@ This section provides instructions for building Infinity from source on Ubuntu.
    <TabItem value="ubuntu2204">
 
 ```shell
-sudo apt update && sudo apt install git wget unzip software-properties-common pkg-config bison
+sudo apt update && sudo apt install git wget unzip software-properties-common pkg-config bison autoconf-archive libtool
 wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
 tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
 sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
@@ -133,7 +133,7 @@ EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
-sudo apt update && sudo apt install clang-tools-20 flex zlib1g-dev python3-dev autoconf
+sudo apt update && sudo apt install clang-tools-20 flex zlib1g-dev python3-dev autoconf autoconf-archive libtool
 wget https://github.com/jemalloc/jemalloc/archive/refs/tags/5.3.0.tar.gz
 tar zxvf 5.3.0.tar.gz && cd jemalloc-5.3.0 && ./autogen.sh && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && sudo make -j install && cd ..
 sudo ldconfig && sudo rm -rf jemalloc-5.3.0 5.3.0.tar.gz
@@ -148,7 +148,7 @@ sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
   <TabItem value="ubuntu2404">
 
 ```shell
-sudo apt update && sudo apt install -y git wget lsb-release software-properties-common pkg-config bison mold
+sudo apt update && sudo apt install -y git wget lsb-release software-properties-common pkg-config bison mold autoconf-archive libtool
 wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
 tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
 sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
