@@ -75,6 +75,7 @@ public:
 
     bool IsDumping() const;
     void SetIsDumping(bool is_dumping);
+    bool TrySetIsDumping();
     void UpdateBegin();
     void UpdateEnd();
     void WaitUpdate();

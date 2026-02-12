@@ -120,17 +120,20 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            continue;
+        }
+
+        if (!mem_index->TrySetIsDumping()) {
             continue;
         }
 
         ChunkID chunk_id = 0;
         std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
         if (!status.ok()) {
+            mem_index->SetIsDumping(false);
             return status;
         }
-
-        mem_index->SetIsDumping(true);
 
         // Dump Mem Index
         status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -165,15 +168,23 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     // Return when there is no mem index to dump.
-    if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
         (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
-        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist or it is dumped (is_dumping: {})",
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist",
                              db_name,
                              table_name,
                              index_name,
                              segment_id,
-                             begin_row_id.ToUint64(),
-                             mem_index->IsDumping()));
+                             begin_row_id.ToUint64()));
+        return Status::OK();
+    }
+    if (!mem_index->TrySetIsDumping()) {
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it is already being dumped",
+                             db_name,
+                             table_name,
+                             index_name,
+                             segment_id,
+                             begin_row_id.ToUint64()));
         return Status::OK();
     }
 
@@ -199,10 +210,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     ChunkID chunk_id = 0;
     std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
     if (!status.ok()) {
+        mem_index->SetIsDumping(false);
         return status;
     }
-
-    mem_index->SetIsDumping(true);
 
     // Dump Mem Index
     status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -2606,11 +2616,14 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
 
             // 4. Get memory index for this segment
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
                 LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
                 continue;
             }
-            mem_index->SetIsDumping(true);
+            if (!mem_index->TrySetIsDumping()) {
+                LOG_INFO(fmt::format("Skipping segment {} - already being dumped by another thread", segment_id));
+                continue;
+            }
 
             // 4.5. Additional check for EMVB index - ensure it's built before dumping
 
@@ -2618,6 +2631,7 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
             ChunkID chunk_id = 0;
             std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
             if (!status.ok()) {
+                mem_index->SetIsDumping(false);
                 return status;
             }
 
