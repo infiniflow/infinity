@@ -792,7 +792,7 @@ func parseColumnVectors(columnType thriftapi.ColumnType, columnVectors [][]byte,
 		thriftapi.ColumnType_ColumnInt64:
 		// Integer types
 		for _, vector := range columnVectors {
-			ints := parseIntVector(vector)
+			ints := parseIntVector(vector, columnType)
 			for _, v := range ints {
 				values = append(values, v)
 			}
@@ -803,7 +803,7 @@ func parseColumnVectors(columnType thriftapi.ColumnType, columnVectors [][]byte,
 		thriftapi.ColumnType_ColumnBFloat16:
 		// Float types
 		for _, vector := range columnVectors {
-			floats := parseFloatVector(vector)
+			floats := parseFloatVector(vector, columnType)
 			for _, v := range floats {
 				values = append(values, v)
 			}
@@ -854,47 +854,141 @@ func parseColumnVectors(columnType thriftapi.ColumnType, columnVectors [][]byte,
 	return values
 }
 
-// parseIntVector parses integer vector from bytes
-func parseIntVector(data []byte) []int64 {
-	// Simple implementation: assume 8-byte integers
-	if len(data)%8 != 0 {
-		return []int64{}
+// parseIntVector parses integer vector from bytes based on column type
+func parseIntVector(data []byte, columnType thriftapi.ColumnType) []interface{} {
+	switch columnType {
+	case thriftapi.ColumnType_ColumnInt8:
+		result := make([]interface{}, len(data))
+		for i, b := range data {
+			result[i] = int8(b)
+		}
+		return result
+	case thriftapi.ColumnType_ColumnInt16:
+		if len(data)%2 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 2
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			val := int16(data[i*2]) |
+				int16(data[i*2+1])<<8
+			result[i] = val
+		}
+		return result
+	case thriftapi.ColumnType_ColumnInt32:
+		if len(data)%4 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 4
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			val := int32(data[i*4]) |
+				int32(data[i*4+1])<<8 |
+				int32(data[i*4+2])<<16 |
+				int32(data[i*4+3])<<24
+			result[i] = val
+		}
+		return result
+	case thriftapi.ColumnType_ColumnInt64:
+		if len(data)%8 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 8
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			val := int64(data[i*8]) |
+				int64(data[i*8+1])<<8 |
+				int64(data[i*8+2])<<16 |
+				int64(data[i*8+3])<<24 |
+				int64(data[i*8+4])<<32 |
+				int64(data[i*8+5])<<40 |
+				int64(data[i*8+6])<<48 |
+				int64(data[i*8+7])<<56
+			result[i] = val
+		}
+		return result
+	default:
+		return []interface{}{}
 	}
-	count := len(data) / 8
-	result := make([]int64, count)
-	for i := 0; i < count; i++ {
-		result[i] = int64(data[i*8]) |
-			int64(data[i*8+1])<<8 |
-			int64(data[i*8+2])<<16 |
-			int64(data[i*8+3])<<24 |
-			int64(data[i*8+4])<<32 |
-			int64(data[i*8+5])<<40 |
-			int64(data[i*8+6])<<48 |
-			int64(data[i*8+7])<<56
-	}
-	return result
 }
 
-// parseFloatVector parses float vector from bytes
-func parseFloatVector(data []byte) []float64 {
-	// Simple implementation: assume 8-byte floats
-	if len(data)%8 != 0 {
-		return []float64{}
+// parseFloatVector parses float vector from bytes based on column type
+func parseFloatVector(data []byte, columnType thriftapi.ColumnType) []interface{} {
+	switch columnType {
+	case thriftapi.ColumnType_ColumnFloat32:
+		if len(data)%4 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 4
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			bits := uint32(data[i*4]) |
+				uint32(data[i*4+1])<<8 |
+				uint32(data[i*4+2])<<16 |
+				uint32(data[i*4+3])<<24
+			result[i] = math.Float32frombits(bits)
+		}
+		return result
+	case thriftapi.ColumnType_ColumnFloat64:
+		if len(data)%8 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 8
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			bits := uint64(data[i*8]) |
+				uint64(data[i*8+1])<<8 |
+				uint64(data[i*8+2])<<16 |
+				uint64(data[i*8+3])<<24 |
+				uint64(data[i*8+4])<<32 |
+				uint64(data[i*8+5])<<40 |
+				uint64(data[i*8+6])<<48 |
+				uint64(data[i*8+7])<<56
+			result[i] = math.Float64frombits(bits)
+		}
+		return result
+	case thriftapi.ColumnType_ColumnFloat16, thriftapi.ColumnType_ColumnBFloat16:
+		// Float16 and BFloat16 are stored as 2 bytes, convert to float32
+		if len(data)%2 != 0 {
+			return []interface{}{}
+		}
+		count := len(data) / 2
+		result := make([]interface{}, count)
+		for i := 0; i < count; i++ {
+			bits := uint16(data[i*2]) |
+				uint16(data[i*2+1])<<8
+			result[i] = float16ToFloat32(bits)
+		}
+		return result
+	default:
+		return []interface{}{}
 	}
-	count := len(data) / 8
-	result := make([]float64, count)
-	for i := 0; i < count; i++ {
-		bits := uint64(data[i*8]) |
-			uint64(data[i*8+1])<<8 |
-			uint64(data[i*8+2])<<16 |
-			uint64(data[i*8+3])<<24 |
-			uint64(data[i*8+4])<<32 |
-			uint64(data[i*8+5])<<40 |
-			uint64(data[i*8+6])<<48 |
-			uint64(data[i*8+7])<<56
-		result[i] = math.Float64frombits(bits)
+}
+
+// float16ToFloat32 converts a float16 (IEEE 754 half-precision) value to float32
+func float16ToFloat32(bits uint16) float32 {
+	// Extract sign, exponent, and mantissa
+	sign := uint32(bits >> 15)
+	exp := uint32((bits >> 10) & 0x1F)
+	mant := uint32(bits & 0x3FF)
+
+	var floatBits uint32
+	if exp == 0 {
+		if mant == 0 {
+			// Zero
+			floatBits = sign << 31
+		} else {
+			// Subnormal number
+			floatBits = (sign << 31) | (mant << 13)
+		}
+	} else if exp == 0x1F {
+		// Infinity or NaN
+		floatBits = (sign << 31) | (0xFF << 23) | (mant << 13)
+	} else {
+		// Normal number
+		floatBits = (sign << 31) | ((exp + 112) << 23) | (mant << 13)
 	}
-	return result
+	return math.Float32frombits(floatBits)
 }
 
 // parseStringVector parses string vector from bytes

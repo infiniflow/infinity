@@ -67,7 +67,7 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 	// Import data
 	testCSVDir := testDataDir + "embedding_int_dim3.csv"
 	if !fileExists(testCSVDir) {
-		t.Skipf("Test data file does not exist: %s", testCSVDir)
+		t.Fatalf("Test data file does not exist: %s", testCSVDir)
 	}
 
 	_, err = table.ImportData(testCSVDir, infinity.NewImportOption())
@@ -150,7 +150,7 @@ func TestImportDifferentFileFormat(t *testing.T) {
 			// Import data
 			filePath := testDataDir + tc.fileName
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			importOpts := infinity.NewImportOption()
@@ -165,13 +165,13 @@ func TestImportDifferentFileFormat(t *testing.T) {
 
 			_, err = table.ImportData(filePath, importOpts)
 			if err != nil {
-				t.Logf("Import %s result: %v", tc.format, err)
+				t.Fatalf("Import %s result: %v", tc.format, err)
 			}
 
 			// Query data
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -216,7 +216,7 @@ func TestImportFVECS(t *testing.T) {
 	// Import fvecs data
 	filePath := testDataDir + "pysdk_test.fvecs"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -225,13 +225,13 @@ func TestImportFVECS(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import fvecs result: %v", err)
+		t.Fatalf("Import fvecs result: %v", err)
 	}
 
 	// Query data
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -292,17 +292,17 @@ func TestImportEmptyFile(t *testing.T) {
 
 			filePath := testDataDir + tc.fileName
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			_, err = table.ImportData(filePath, infinity.NewImportOption())
 			if err != nil {
-				t.Logf("Import empty %s result: %v", tc.name, err)
+				t.Fatalf("Import empty %s result: %v", tc.name, err)
 			}
 
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -345,13 +345,13 @@ func TestImportFormatUnrecognized(t *testing.T) {
 	if fileExists(filePath) {
 		_, err = table.ImportData(filePath, infinity.NewImportOption())
 		if err != nil {
-			t.Logf("Import txt file error (may or may not be expected): %v", err)
+			t.Fatalf("Import txt file error (may or may not be expected): %v", err)
 		}
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -410,7 +410,7 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 
 				filePath := testDataDir + delim.fileName
 				if !fileExists(filePath) {
-					t.Skipf("Test data file does not exist: %s", filePath)
+					t.Fatalf("Test data file does not exist: %s", filePath)
 				}
 
 				importOpts := &infinity.ImportOption{
@@ -420,12 +420,12 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 
 				_, err = table.ImportData(filePath, importOpts)
 				if err != nil {
-					t.Logf("Import result: %v", err)
+					t.Fatalf("Import result: %v", err)
 				}
 
 				result, err := table.Output([]string{"*"}).ToResult()
 				if err != nil {
-					t.Logf("Query result: %v", err)
+					t.Fatalf("Query result: %v", err)
 				} else {
 					queryResult, ok := result.(*infinity.QueryResult)
 					if ok {
@@ -466,7 +466,7 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_blankspace.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -476,12 +476,12 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -523,7 +523,7 @@ func TestImportCSVWithHeaders(t *testing.T) {
 
 			filePath := testDataDir + "pysdk_test_commas.csv"
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			importOpts := &infinity.ImportOption{
@@ -533,12 +533,12 @@ func TestImportCSVWithHeaders(t *testing.T) {
 
 			_, err = table.ImportData(filePath, importOpts)
 			if err != nil {
-				t.Logf("Import result: %v", err)
+				t.Fatalf("Import result: %v", err)
 			}
 
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -578,7 +578,7 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test.fvecs"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -594,7 +594,7 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -642,7 +642,7 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 
 			filePath := testDataDir + "embedding_int_dim3.csv"
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			importOpts := &infinity.ImportOption{
@@ -651,12 +651,12 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 
 			_, err = table.ImportData(filePath, importOpts)
 			if err != nil {
-				t.Logf("Import result: %v", err)
+				t.Fatalf("Import result: %v", err)
 			}
 
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -696,7 +696,7 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 
 	filePath := testDataDir + "embedding_int_dim3.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -705,12 +705,12 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import with dimension mismatch error (may or may not be expected): %v", err)
+		t.Fatalf("Import with dimension mismatch error (may or may not be expected): %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -748,17 +748,17 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_varchar.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	_, err = table.ImportData(filePath, infinity.NewImportOption())
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -796,17 +796,17 @@ func TestImport10000Columns(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_big_int.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	_, err = table.ImportData(filePath, infinity.NewImportOption())
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -850,7 +850,7 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 
 			filePath := testDataDir + "pysdk_test_commas.csv"
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			_, err = table.ImportData(filePath, infinity.NewImportOption())
@@ -862,7 +862,7 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -907,17 +907,17 @@ func TestImportWithDifferentSize(t *testing.T) {
 			// Use the specific test file
 			filePath := testDataDir + "pysdk_test_import_with_different_size.csv"
 			if !fileExists(filePath) {
-				t.Skipf("Test data file does not exist: %s", filePath)
+				t.Fatalf("Test data file does not exist: %s", filePath)
 			}
 
 			_, err = table.ImportData(filePath, infinity.NewImportOption())
 			if err != nil {
-				t.Logf("Import result: %v", err)
+				t.Fatalf("Import result: %v", err)
 			}
 
 			result, err := table.Output([]string{"count(*)"}).ToResult()
 			if err != nil {
-				t.Logf("Query result: %v", err)
+				t.Fatalf("Query result: %v", err)
 			} else {
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
@@ -957,17 +957,17 @@ func TestImportExceedingRows(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_big_varchar_rows.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	_, err = table.ImportData(filePath, infinity.NewImportOption())
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"count(*)"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1006,17 +1006,17 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 
 	filePath := testDataDir + fileName + ".csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	_, err = table.ImportData(filePath, infinity.NewImportOption())
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"count(*)"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1064,17 +1064,17 @@ func TestImportExceedingColumns(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_big_columns.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	_, err = table.ImportData(filePath, infinity.NewImportOption())
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1120,7 +1120,7 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 
 	filePath := testDataDir + "test_default.jsonl"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -1129,12 +1129,12 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1184,7 +1184,7 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_import_default.csv"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -1193,12 +1193,12 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1253,7 +1253,7 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test_default.json"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -1262,12 +1262,12 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1305,7 +1305,7 @@ func TestImportJSONLFile(t *testing.T) {
 
 	filePath := testDataDir + "pysdk_test.jsonl"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -1314,12 +1314,12 @@ func TestImportJSONLFile(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import result: %v", err)
+		t.Fatalf("Import result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1357,7 +1357,7 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 
 	filePath := testDataDir + "test_empty.jsonl"
 	if !fileExists(filePath) {
-		t.Skipf("Test data file does not exist: %s", filePath)
+		t.Fatalf("Test data file does not exist: %s", filePath)
 	}
 
 	importOpts := &infinity.ImportOption{
@@ -1366,12 +1366,12 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 
 	_, err = table.ImportData(filePath, importOpts)
 	if err != nil {
-		t.Logf("Import empty jsonl result: %v", err)
+		t.Fatalf("Import empty jsonl result: %v", err)
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
@@ -1410,19 +1410,19 @@ func TestImportWithWildcardPath(t *testing.T) {
 	// Find files matching pattern
 	files, err := filepath.Glob(testDataDir + "pysdk_test_commas*.csv")
 	if err != nil || len(files) == 0 {
-		t.Skipf("No files matching pattern found")
+		t.Fatalf("No files matching pattern found")
 	}
 
 	for _, filePath := range files {
 		_, err = table.ImportData(filePath, infinity.NewImportOption())
 		if err != nil {
-			t.Logf("Import result for %s: %v", filePath, err)
+			t.Fatalf("Import result for %s: %v", filePath, err)
 		}
 	}
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
-		t.Logf("Query result: %v", err)
+		t.Fatalf("Query result: %v", err)
 	} else {
 		queryResult, ok := result.(*infinity.QueryResult)
 		if ok {
