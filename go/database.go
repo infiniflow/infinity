@@ -17,6 +17,9 @@ package infinity
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
 
@@ -305,10 +308,23 @@ func (d *Database) RestoreTableSnapshot(snapshotName string) (interface{}, error
 
 // parseDataType parses a string data type into thrift DataType
 func parseDataType(typeStr string) (*thriftapi.DataType, error) {
+	typeStr = strings.ToLower(strings.TrimSpace(typeStr))
+	if typeStr == "" {
+		return nil, fmt.Errorf("empty data type")
+	}
+
+	// Split by comma for complex types like "vector,1024,float32"
+	parts := splitAndTrim(typeStr, ",")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("empty data type")
+	}
+
+	baseType := parts[0]
+
 	dt := thriftapi.NewDataType()
 	pt := thriftapi.NewPhysicalType()
 
-	switch typeStr {
+	switch baseType {
 	case "bool", "boolean":
 		dt.LogicType = thriftapi.LogicType_Boolean
 		pt.NumberType = &thriftapi.NumberType{}
@@ -324,7 +340,7 @@ func parseDataType(typeStr string) (*thriftapi.DataType, error) {
 	case "bigint", "int64":
 		dt.LogicType = thriftapi.LogicType_BigInt
 		pt.NumberType = &thriftapi.NumberType{}
-	case "hugeint":
+	case "hugeint", "int128":
 		dt.LogicType = thriftapi.LogicType_HugeInt
 		pt.NumberType = &thriftapi.NumberType{}
 	case "float", "float32":
@@ -333,9 +349,18 @@ func parseDataType(typeStr string) (*thriftapi.DataType, error) {
 	case "double", "float64":
 		dt.LogicType = thriftapi.LogicType_Double
 		pt.NumberType = &thriftapi.NumberType{}
+	case "float16":
+		dt.LogicType = thriftapi.LogicType_Float16
+		pt.NumberType = &thriftapi.NumberType{}
+	case "bfloat16":
+		dt.LogicType = thriftapi.LogicType_BFloat16
+		pt.NumberType = &thriftapi.NumberType{}
 	case "varchar", "string":
 		dt.LogicType = thriftapi.LogicType_Varchar
 		pt.VarcharType = &thriftapi.VarcharType{}
+	case "json":
+		dt.LogicType = thriftapi.LogicType_Json
+		pt.NumberType = &thriftapi.NumberType{}
 	case "date":
 		dt.LogicType = thriftapi.LogicType_Date
 		pt.NumberType = &thriftapi.NumberType{}
@@ -348,19 +373,154 @@ func parseDataType(typeStr string) (*thriftapi.DataType, error) {
 	case "timestamp":
 		dt.LogicType = thriftapi.LogicType_Timestamp
 		pt.NumberType = &thriftapi.NumberType{}
-	default:
-		// For complex types like "vector,1024,float32", we need more parsing
-		// For now, return as Varchar for unsupported types
-		if len(typeStr) > 0 {
-			dt.LogicType = thriftapi.LogicType_Varchar
-			pt.VarcharType = &thriftapi.VarcharType{}
-		} else {
-			return nil, fmt.Errorf("unsupported data type: %s", typeStr)
+	case "interval":
+		dt.LogicType = thriftapi.LogicType_Interval
+		pt.NumberType = &thriftapi.NumberType{}
+	case "vector", "multivector", "tensor", "tensorarray":
+		// Embedding types: vector,dimension,element_type
+		if len(parts) < 3 {
+			return nil, fmt.Errorf("invalid %s type format, expected: %s,dimension,element_type", baseType, baseType)
 		}
+		embeddingType, err := parseEmbeddingType(baseType, parts[1], parts[2])
+		if err != nil {
+			return nil, err
+		}
+		return embeddingType, nil
+	case "sparse":
+		// Sparse type: sparse,dimension,value_type,index_type
+		if len(parts) < 4 {
+			return nil, fmt.Errorf("invalid sparse type format, expected: sparse,dimension,value_type,index_type")
+		}
+		sparseType, err := parseSparseType(parts[1], parts[2], parts[3])
+		if err != nil {
+			return nil, err
+		}
+		return sparseType, nil
+	case "array":
+		// Array type: array,element_type
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid array type format, expected: array,element_type")
+		}
+		dt.LogicType = thriftapi.LogicType_Array
+		pt.ArrayType = &thriftapi.ArrayType{}
+		elementType, err := parseDataType(strings.Join(parts[1:], ","))
+		if err != nil {
+			return nil, fmt.Errorf("invalid array element type: %v", err)
+		}
+		pt.ArrayType.ElementDataType = elementType
+	default:
+		return nil, fmt.Errorf("unsupported data type: %s", baseType)
 	}
 
 	dt.PhysicalType = pt
 	return dt, nil
+}
+
+// splitAndTrim splits a string by separator and trims spaces from each part
+func splitAndTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// parseEmbeddingType parses embedding types (vector, multivector, tensor, tensorarray)
+func parseEmbeddingType(baseType, dimensionStr, elementTypeStr string) (*thriftapi.DataType, error) {
+	dt := thriftapi.NewDataType()
+	pt := thriftapi.NewPhysicalType()
+
+	switch baseType {
+	case "vector":
+		dt.LogicType = thriftapi.LogicType_Embedding
+	case "multivector":
+		dt.LogicType = thriftapi.LogicType_MultiVector
+	case "tensor":
+		dt.LogicType = thriftapi.LogicType_Tensor
+	case "tensorarray":
+		dt.LogicType = thriftapi.LogicType_TensorArray
+	}
+
+	dimension, err := strconv.ParseInt(dimensionStr, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dimension: %s", dimensionStr)
+	}
+
+	elementType, err := parseElementType(elementTypeStr)
+	if err != nil {
+		return nil, err
+	}
+
+	embeddingType := &thriftapi.EmbeddingType{
+		Dimension:   int32(dimension),
+		ElementType: elementType,
+	}
+	pt.EmbeddingType = embeddingType
+	dt.PhysicalType = pt
+	return dt, nil
+}
+
+// parseSparseType parses sparse type
+func parseSparseType(dimensionStr, valueTypeStr, indexTypeStr string) (*thriftapi.DataType, error) {
+	dt := thriftapi.NewDataType()
+	pt := thriftapi.NewPhysicalType()
+	dt.LogicType = thriftapi.LogicType_Sparse
+
+	dimension, err := strconv.ParseInt(dimensionStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dimension: %s", dimensionStr)
+	}
+
+	elementType, err := parseElementType(valueTypeStr)
+	if err != nil {
+		return nil, err
+	}
+
+	idxType, err := parseElementType(indexTypeStr)
+	if err != nil {
+		return nil, err
+	}
+
+	sparseType := &thriftapi.SparseType{
+		Dimension:   dimension,
+		ElementType: elementType,
+		IndexType:   idxType,
+	}
+	pt.SparseType = sparseType
+	dt.PhysicalType = pt
+	return dt, nil
+}
+
+// parseElementType parses element type string to ElementType
+func parseElementType(typeStr string) (thriftapi.ElementType, error) {
+	switch typeStr {
+	case "bit":
+		return thriftapi.ElementType_ElementBit, nil
+	case "float32", "float", "f32":
+		return thriftapi.ElementType_ElementFloat32, nil
+	case "float64", "double", "f64":
+		return thriftapi.ElementType_ElementFloat64, nil
+	case "float16", "f16":
+		return thriftapi.ElementType_ElementFloat16, nil
+	case "bfloat16", "bf16":
+		return thriftapi.ElementType_ElementBFloat16, nil
+	case "uint8", "u8":
+		return thriftapi.ElementType_ElementUInt8, nil
+	case "int8", "i8":
+		return thriftapi.ElementType_ElementInt8, nil
+	case "int16", "i16":
+		return thriftapi.ElementType_ElementInt16, nil
+	case "int32", "int", "i32":
+		return thriftapi.ElementType_ElementInt32, nil
+	case "int64", "i64":
+		return thriftapi.ElementType_ElementInt64, nil
+	default:
+		return thriftapi.ElementType_ElementBit, fmt.Errorf("unsupported element type: %s", typeStr)
+	}
 }
 
 // parseDefaultValue parses a default value into thrift ConstantExpr
