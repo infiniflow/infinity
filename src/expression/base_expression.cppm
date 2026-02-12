@@ -62,7 +62,9 @@ public:
 
     [[nodiscard]] inline ExpressionType type() const { return type_; }
 
-    inline std::vector<std::shared_ptr<BaseExpression>> &arguments() { return arguments_; }
+    [[nodiscard]] inline std::vector<std::shared_ptr<BaseExpression>> &arguments() { return arguments_; }
+
+    [[nodiscard]] inline const std::vector<std::shared_ptr<BaseExpression>> &arguments() const { return arguments_; }
 
     [[nodiscard]] virtual std::string ToString() const = 0;
 

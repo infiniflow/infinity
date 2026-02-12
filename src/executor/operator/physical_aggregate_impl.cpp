@@ -353,31 +353,45 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
     }
 
     if (output_blocks.empty()) {
-        for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
-            output_blocks.emplace_back(DataBlock::MakeUniquePtr());
-            auto out_put_block = output_blocks.back().get();
-            out_put_block->Init(*GetOutputTypes());
-        }
+        // For simple aggregate (no GROUP BY), we need ONE output block
+        // All input blocks will be processed into this single output block
+        // The aggregate state accumulates across all input blocks
+        output_blocks.emplace_back(DataBlock::MakeUniquePtr());
+        output_blocks[0]->Init(*GetOutputTypes());
     }
 
+    DataBlock *output_data_block = output_blocks[0].get();
     for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
         DataBlock *input_data_block = input_blocks[block_idx].get();
-
-        DataBlock *output_data_block = output_blocks[block_idx].get();
+        bool is_last_block = (block_idx == input_block_count - 1);
 
         ExpressionEvaluator evaluator;
         evaluator.Init(input_data_block);
 
         size_t expression_count = aggregates_count;
-        // calculate every columns value
+
+        // We need to set the correct aggregate flag based on which block we're
+        // processing to ensure we only append the result once.
+        // - First block (block_idx == 0): Use kUninitialized to initialize the state
+        // - Middle blocks: Use kRunning to update the state without appending
+        // - Last block (is_last_block && task_completed): Use kFinish to finalize and append
+        AggregateFlag block_flag;
+        if (block_idx == 0) {
+            block_flag = is_last_block && task_completed ? AggregateFlag::kRunAndFinish : AggregateFlag::kUninitialized;
+        } else {
+            block_flag = is_last_block && task_completed ? AggregateFlag::kFinish : AggregateFlag::kRunning;
+        }
+
         for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-            LOG_TRACE("Physical aggregate Execute");
+            expr_states[expr_idx]->agg_flag_ = block_flag;
+        }
+
+        for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
         }
-        if (task_completed) {
-            // Finalize the output block (e.g. calculate the average value
-            output_data_block->Finalize();
-        }
+    }
+    if (task_completed) {
+        output_data_block->Finalize();
     }
     return true;
 }

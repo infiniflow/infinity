@@ -4,7 +4,7 @@ import argparse
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
-    row_n = 9000
+    row_n = 5000
     sort_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql/aggregate"
 
@@ -58,15 +58,23 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("\n")
         slt_file.write("query I\n")
+        slt_file.write(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
+                table_name, copy_path
+            )
+        )
+
+        slt_file.write("\n")
+        slt_file.write("query I\n")
         slt_file.write("SELECT * FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        for i in sequence:
-            slt_file.write(str(i) + " " + str(i)+".000000")
-            slt_file.write("\n")
+        for _ in range(2):
+            for i in sequence:
+                slt_file.write(str(i) + " " + str(i)+".000000")
+                slt_file.write("\n")
         slt_file.write("\n")
 
         # select max(c1) from test_simple_agg_big
-
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write("SELECT max(c1) FROM {};\n".format(table_name))
@@ -89,7 +97,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT sum(c1) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        slt_file.write(str(np.sum(sequence)))
+        slt_file.write(str(np.sum(sequence) * 2))
         slt_file.write("\n")
 
         # select avg(c1) from test_simple_agg_big
@@ -105,7 +113,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT count(c1) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        slt_file.write(str(row_n))
+        slt_file.write(str(row_n * 2))
         slt_file.write("\n")
 
         # select count(*) from test_simple_agg_big
@@ -113,7 +121,23 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT count(*) FROM {};\n".format(table_name))
         slt_file.write("----\n")
+        slt_file.write(str(row_n * 2))
+        slt_file.write("\n")
+
+        # select count(distinct c1, c2) from test_simple_agg_big
+        slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT count(distinct c1, c2) FROM {};\n".format(table_name))
+        slt_file.write("----\n")
         slt_file.write(str(row_n))
+        slt_file.write("\n")
+
+        # select count(distinct c1, c2) from test_simple_agg_big
+        slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT sum(distinct c1), count(distinct c2) FROM {};\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write(str(np.sum(sequence)) + " " + str(row_n))
         slt_file.write("\n")
 
         slt_file.write("\n")
@@ -177,7 +201,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT AVG(c2) FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        slt_file.write(str(np.around(np.sum(np.arange(1, 128)) / 9000, 6)))
+        slt_file.write(f"{np.around(np.sum(np.arange(1, 128)) / row_n, 6):.6f}")
         slt_file.write("\n")
 
         # select count(c1) from test_simple_agg_big
