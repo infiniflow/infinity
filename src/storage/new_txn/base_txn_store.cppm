@@ -362,6 +362,7 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::string table_key_{};
     std::string import_tmp_path_{};
     std::vector<std::string> import_file_names_{}; // used during rollback
+    std::vector<std::string> file_worker_paths_{}; // File worker paths to move in PrepareCommit
     std::vector<WalSegmentInfo> segment_infos_{};
 
     std::vector<std::string> index_names_{};
