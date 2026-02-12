@@ -1223,8 +1223,8 @@ Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, std::vector<std::str
         return status;
     }
     if (column_def == nullptr) {
-        for (const auto &column_def_ptr : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def_ptr->id(), block_meta);
+        for (size_t i = 0; i < column_defs_ptr->size(); ++i) {
+            ColumnMeta column_meta(i, block_meta);
             status = GetBlockColumnFilePaths(column_meta, file_paths);
             if (!status.ok()) {
                 return status;
@@ -1233,7 +1233,17 @@ Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, std::vector<std::str
         std::vector<std::string> paths = block_meta.FilePaths();
         file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
     } else {
-        ColumnMeta column_meta(column_def->id(), block_meta);
+        ColumnID column_idx = INVALID_COLUMN_ID;
+        for (size_t i = 0; i < column_defs_ptr->size(); ++i) {
+            if ((*column_defs_ptr)[i]->id() == column_def->id()) {
+                column_idx = i;
+                break;
+            }
+        }
+        if (column_idx == INVALID_COLUMN_ID) {
+            return Status::ColumnNotExist(column_def->name());
+        }
+        ColumnMeta column_meta(column_idx, block_meta);
         status = GetBlockColumnFilePaths(column_meta, file_paths);
         if (!status.ok()) {
             return status;
