@@ -1347,13 +1347,6 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result);
-    }
-
     if (!IsReplay() && base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kImport) {
         auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
 
@@ -1379,6 +1372,14 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
             fileworker_mgr_->MoveFiles(import_txn_store->file_worker_paths_);
         }
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
     return Status::OK();
 }
 
@@ -1705,13 +1706,6 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         }
     }
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm != nullptr) {
-        PersistResultHandler handler(pm);
-        PersistWriteResult result = pm->CurrentObjFinalize();
-        handler.HandleWriteResult(result);
-    }
-
     if (!IsReplay()) {
         std::vector<std::string> all_file_paths;
 
@@ -1748,6 +1742,14 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
             fileworker_mgr_->MoveFiles(all_file_paths);
         }
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        PersistResultHandler handler(pm);
+        PersistWriteResult result = pm->CurrentObjFinalize();
+        handler.HandleWriteResult(result);
+    }
+
     return Status::OK();
 }
 
