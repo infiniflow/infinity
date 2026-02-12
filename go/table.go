@@ -17,6 +17,7 @@ package infinity
 import (
 	"context"
 	"fmt"
+	"math"
 
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
@@ -393,7 +394,10 @@ func (t *Table) Sort(orderByExprList [][2]interface{}) *Table {
 
 // Option sets options
 func (t *Table) Option(optionKV map[string]interface{}) *Table {
-	// TODO: Implement query builder
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+	t.queryBuilder.Option(optionKV)
 	return t
 }
 
@@ -405,14 +409,190 @@ func (t *Table) ToString() string {
 
 // ToResult executes query and returns result
 func (t *Table) ToResult() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Initialize query builder if not exists
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+
+	// Build select request from query builder
+	req := thriftapi.NewSelectRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Set select list (columns)
+	if columns := t.queryBuilder.GetColumns(); columns != nil {
+		req.SelectList = columns
+	}
+
+	// Set highlight list
+	if highlight := t.queryBuilder.GetHighlight(); highlight != nil {
+		req.HighlightList = &highlight
+	}
+
+	// Set search expression
+	if search := t.queryBuilder.GetSearch(); search != nil {
+		req.SearchExpr = search
+	}
+
+	// Set where expression (filter)
+	if filter := t.queryBuilder.GetFilter(); filter != nil {
+		req.WhereExpr = filter
+	}
+
+	// Set limit expression
+	if limit := t.queryBuilder.GetLimit(); limit != nil {
+		req.LimitExpr = limit
+	}
+
+	// Set offset expression
+	if offset := t.queryBuilder.GetOffset(); offset != nil {
+		req.OffsetExpr = offset
+	}
+
+	// Set order by list (sort)
+	if sort := t.queryBuilder.GetSort(); sort != nil {
+		req.OrderByList = &sort
+	}
+
+	// Set total hits count
+	totalHitsCount := t.queryBuilder.GetTotalHitsCount()
+	req.TotalHitsCount = &totalHitsCount
+
+	// Call thrift Select
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Select(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to execute query: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to execute query: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Reset query builder after execution
+	t.queryBuilder.Reset()
+
+	// Build and return result
+	return buildResult(resp)
 }
 
 // Explain returns execution plan
 func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Initialize query builder if not exists
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+
+	// Build explain request from query builder
+	req := thriftapi.NewExplainRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Set select list (columns)
+	if columns := t.queryBuilder.GetColumns(); columns != nil {
+		req.SelectList = columns
+	}
+
+	// Set highlight list
+	if highlight := t.queryBuilder.GetHighlight(); highlight != nil {
+		req.HighlightList = &highlight
+	}
+
+	// Set search expression
+	if search := t.queryBuilder.GetSearch(); search != nil {
+		req.SearchExpr = search
+	}
+
+	// Set where expression (filter)
+	if filter := t.queryBuilder.GetFilter(); filter != nil {
+		req.WhereExpr = filter
+	}
+
+	// Set limit expression
+	if limit := t.queryBuilder.GetLimit(); limit != nil {
+		req.LimitExpr = limit
+	}
+
+	// Set offset expression
+	if offset := t.queryBuilder.GetOffset(); offset != nil {
+		req.OffsetExpr = offset
+	}
+
+	// Set order by list (sort)
+	if sort := t.queryBuilder.GetSort(); sort != nil {
+		req.OrderByList = &sort
+	}
+
+	// Set explain type
+	var thriftExplainType thriftapi.ExplainType
+	switch explainType {
+	case ExplainTypeAnalyze:
+		thriftExplainType = thriftapi.ExplainType_Analyze
+	case ExplainTypeAst:
+		thriftExplainType = thriftapi.ExplainType_Ast
+	case ExplainTypeUnOpt:
+		thriftExplainType = thriftapi.ExplainType_UnOpt
+	case ExplainTypeOpt:
+		thriftExplainType = thriftapi.ExplainType_Opt
+	case ExplainTypePhysical:
+		thriftExplainType = thriftapi.ExplainType_Physical
+	case ExplainTypePipeline:
+		thriftExplainType = thriftapi.ExplainType_Pipeline
+	case ExplainTypeFragment:
+		thriftExplainType = thriftapi.ExplainType_Fragment
+	default:
+		thriftExplainType = thriftapi.ExplainType_Physical
+	}
+	req.ExplainType = thriftExplainType
+
+	// Call thrift Explain
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Explain(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to execute explain: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to execute explain: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Reset query builder after execution
+	t.queryBuilder.Reset()
+
+	// Return result
+	return buildResult(resp)
 }
 
 // Optimize optimizes the table
@@ -559,4 +739,188 @@ func (t *Table) DropColumns(columnNames interface{}) (interface{}, error) {
 func (t *Table) Compact() (interface{}, error) {
 	// TODO: Implement thrift call
 	return nil, nil
+}
+
+// QueryResult represents the result of a query
+type QueryResult struct {
+	Data      map[string][]interface{}
+	DataTypes map[string]string
+	ExtraInfo string
+}
+
+// buildResult builds a QueryResult from SelectResponse
+func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
+	result := &QueryResult{
+		Data:      make(map[string][]interface{}),
+		DataTypes: make(map[string]string),
+		ExtraInfo: resp.ExtraResult_,
+	}
+
+	// Process column definitions to get data types
+	for _, colDef := range resp.ColumnDefs {
+		if colDef.DataType != nil {
+			result.DataTypes[colDef.Name] = colDef.DataType.LogicType.String()
+		}
+	}
+
+	// Process column fields to get data
+	for _, colField := range resp.ColumnFields {
+		columnName := colField.ColumnName
+		columnType := colField.ColumnType
+		columnVectors := colField.ColumnVectors
+
+		// Parse column vectors based on column type
+		values := parseColumnVectors(columnType, columnVectors, colField.Bitmasks)
+		result.Data[columnName] = values
+	}
+
+	return result, nil
+}
+
+// parseColumnVectors parses column vectors based on column type
+func parseColumnVectors(columnType thriftapi.ColumnType, columnVectors [][]byte, bitmasks []bool) []interface{} {
+	if len(columnVectors) == 0 {
+		return []interface{}{}
+	}
+
+	values := make([]interface{}, 0)
+
+	switch columnType {
+	case thriftapi.ColumnType_ColumnInt8,
+		thriftapi.ColumnType_ColumnInt16,
+		thriftapi.ColumnType_ColumnInt32,
+		thriftapi.ColumnType_ColumnInt64:
+		// Integer types
+		for _, vector := range columnVectors {
+			ints := parseIntVector(vector)
+			for _, v := range ints {
+				values = append(values, v)
+			}
+		}
+	case thriftapi.ColumnType_ColumnFloat32,
+		thriftapi.ColumnType_ColumnFloat64,
+		thriftapi.ColumnType_ColumnFloat16,
+		thriftapi.ColumnType_ColumnBFloat16:
+		// Float types
+		for _, vector := range columnVectors {
+			floats := parseFloatVector(vector)
+			for _, v := range floats {
+				values = append(values, v)
+			}
+		}
+	case thriftapi.ColumnType_ColumnVarchar:
+		// String type
+		for _, vector := range columnVectors {
+			strs := parseStringVector(vector)
+			for _, v := range strs {
+				values = append(values, v)
+			}
+		}
+	case thriftapi.ColumnType_ColumnBool:
+		// Boolean type
+		for _, vector := range columnVectors {
+			bools := parseBoolVector(vector)
+			for _, v := range bools {
+				values = append(values, v)
+			}
+		}
+	case thriftapi.ColumnType_ColumnEmbedding,
+		thriftapi.ColumnType_ColumnMultiVector,
+		thriftapi.ColumnType_ColumnTensor,
+		thriftapi.ColumnType_ColumnTensorArray,
+		thriftapi.ColumnType_ColumnSparse:
+		// Complex types - store as bytes for now
+		for _, vector := range columnVectors {
+			values = append(values, vector)
+		}
+	default:
+		// Default: store as bytes
+		for _, vector := range columnVectors {
+			values = append(values, vector)
+		}
+	}
+
+	// Apply bitmasks if present
+	if len(bitmasks) > 0 && len(bitmasks) == len(values) {
+		filteredValues := make([]interface{}, 0)
+		for i, v := range values {
+			if i < len(bitmasks) && !bitmasks[i] {
+				filteredValues = append(filteredValues, v)
+			}
+		}
+		return filteredValues
+	}
+
+	return values
+}
+
+// parseIntVector parses integer vector from bytes
+func parseIntVector(data []byte) []int64 {
+	// Simple implementation: assume 8-byte integers
+	if len(data)%8 != 0 {
+		return []int64{}
+	}
+	count := len(data) / 8
+	result := make([]int64, count)
+	for i := 0; i < count; i++ {
+		result[i] = int64(data[i*8]) |
+			int64(data[i*8+1])<<8 |
+			int64(data[i*8+2])<<16 |
+			int64(data[i*8+3])<<24 |
+			int64(data[i*8+4])<<32 |
+			int64(data[i*8+5])<<40 |
+			int64(data[i*8+6])<<48 |
+			int64(data[i*8+7])<<56
+	}
+	return result
+}
+
+// parseFloatVector parses float vector from bytes
+func parseFloatVector(data []byte) []float64 {
+	// Simple implementation: assume 8-byte floats
+	if len(data)%8 != 0 {
+		return []float64{}
+	}
+	count := len(data) / 8
+	result := make([]float64, count)
+	for i := 0; i < count; i++ {
+		bits := uint64(data[i*8]) |
+			uint64(data[i*8+1])<<8 |
+			uint64(data[i*8+2])<<16 |
+			uint64(data[i*8+3])<<24 |
+			uint64(data[i*8+4])<<32 |
+			uint64(data[i*8+5])<<40 |
+			uint64(data[i*8+6])<<48 |
+			uint64(data[i*8+7])<<56
+		result[i] = math.Float64frombits(bits)
+	}
+	return result
+}
+
+// parseStringVector parses string vector from bytes
+func parseStringVector(data []byte) []string {
+	// Simple implementation: split by null terminator
+	result := make([]string, 0)
+	start := 0
+	for i, b := range data {
+		if b == 0 {
+			if i > start {
+				result = append(result, string(data[start:i]))
+			}
+			start = i + 1
+		}
+	}
+	if start < len(data) {
+		result = append(result, string(data[start:]))
+	}
+	return result
+}
+
+// parseBoolVector parses boolean vector from bytes
+func parseBoolVector(data []byte) []bool {
+	result := make([]bool, len(data))
+	for i, b := range data {
+		result[i] = b != 0
+	}
+	return result
 }
