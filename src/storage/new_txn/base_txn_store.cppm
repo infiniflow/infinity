@@ -297,7 +297,6 @@ export struct OptimizeIndexTxnStore final : public BaseTxnStore {
     std::vector<std::string> db_names_{};
     std::map<std::string, std::vector<std::string>> table_names_in_db_{};
     std::vector<OptimizeIndexStoreEntry> entries_;
-    std::vector<std::string> file_worker_paths_{}; // Index file worker paths to move in PrepareCommit
 
     std::string ToString() const final;
     std::shared_ptr<WalEntry> ToWalEntry(TxnTimeStamp commit_ts) const final;

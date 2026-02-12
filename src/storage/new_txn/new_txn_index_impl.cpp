@@ -532,7 +532,6 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                                                     std::move(chunk_infos),
                                                     std::move(deprecate_ids));
 
-    optimize_index_txn_store->file_worker_paths_.push_back(*index_file_worker->rel_file_path_);
     return Status::OK();
 }
 
@@ -2529,21 +2528,38 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
 
+    if (!IsReplay()) {
+        std::vector<std::string> all_file_paths;
+
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+        for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+            ChunkID new_chunk_id = chunk_info.chunk_id_;
+            ChunkIndexMeta new_chunk_meta(new_chunk_id, segment_index_meta);
+
+            std::vector<std::string> chunk_file_paths;
+            Status fp_status = new_chunk_meta.FilePaths(chunk_file_paths);
+            if (fp_status.ok()) {
+                all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+            } else {
+                LOG_WARN(fmt::format("Failed to get file paths for chunk {}, index {}.{}, segment {}: {}",
+                                     new_chunk_id,
+                                     table_name,
+                                     index_name,
+                                     segment_id,
+                                     fp_status.message()));
+            }
+        }
+
+        if (!all_file_paths.empty()) {
+            fileworker_mgr_->MoveFiles(all_file_paths);
+        }
+    }
+
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
-    }
-
-    if (!IsReplay()) {
-        if (base_txn_store_ != nullptr && base_txn_store_->type_ == TransactionType::kOptimizeIndex) {
-            auto *optimize_index_txn_store = static_cast<OptimizeIndexTxnStore *>(base_txn_store_.get());
-            if (!optimize_index_txn_store->file_worker_paths_.empty()) {
-                fileworker_mgr_->MoveFiles(optimize_index_txn_store->file_worker_paths_);
-            }
-        }
     }
 
     return Status::OK();
