@@ -69,6 +69,11 @@ func (fde FDE) String() string {
 	return fmt.Sprintf("FDE(tensor_data=%v, target_dimension=%d)", fde.TensorData, fde.TargetDimension)
 }
 
+// IsVector implements VEC interface
+func (fde FDE) IsVector() bool {
+	return true
+}
+
 // ConflictType represents the conflict handling type
 type ConflictType int
 

@@ -230,7 +230,7 @@ func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, e
 }
 
 // MatchDense performs dense vector search
-func (t *Table) MatchDense(vectorColumnName string, embeddingData VEC, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) *Table {
+func (t *Table) MatchDense(vectorColumnName string, embeddingData interface{}, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) *Table {
 	// TODO: Implement query builder
 	return t
 }
@@ -242,7 +242,7 @@ func (t *Table) MatchText(fields string, matchingText string, topN int, extraOpt
 }
 
 // MatchTensor performs tensor search
-func (t *Table) MatchTensor(columnName string, queryData VEC, queryDataType string, topN int, extraOption map[string]interface{}) *Table {
+func (t *Table) MatchTensor(columnName string, queryData interface{}, queryDataType string, topN int, extraOption map[string]interface{}) *Table {
 	// TODO: Implement query builder
 	return t
 }
