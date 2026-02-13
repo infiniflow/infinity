@@ -53,7 +53,7 @@ func TestCreateTableWithValidOptions(t *testing.T) {
 
 	for _, option := range validOptions {
 		schema := infinity.TableSchema{
-			"c1": &infinity.ColumnDefinition{
+			{
 				Name:     "c1",
 				DataType: "int",
 			},
@@ -100,7 +100,7 @@ func TestDropTableWithValidOptions(t *testing.T) {
 
 	for _, option := range validOptions {
 		schema := infinity.TableSchema{
-			"c1": &infinity.ColumnDefinition{
+			{
 				Name:     "c1",
 				DataType: "int",
 			},
@@ -141,7 +141,7 @@ func TestTableWithValidColumnNames(t *testing.T) {
 		db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 		schema := infinity.TableSchema{
-			columnName: &infinity.ColumnDefinition{
+			{
 				Name:     columnName,
 				DataType: "int",
 			},
@@ -183,7 +183,7 @@ func TestCreateTableWithInvalidColumnName(t *testing.T) {
 
 	for _, columnName := range invalidNameArray {
 		schema := infinity.TableSchema{
-			columnName: &infinity.ColumnDefinition{
+			{
 				Name:     columnName,
 				DataType: "int",
 			},
@@ -230,7 +230,7 @@ func TestCreateTableWithInvalidOptions(t *testing.T) {
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -276,7 +276,7 @@ func TestDropTableWithInvalidOptions(t *testing.T) {
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -330,7 +330,7 @@ func TestCreateOrDropSameTableInDifferentThread(t *testing.T) {
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -419,7 +419,7 @@ func TestListTables(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -464,7 +464,7 @@ func TestShowTable(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -522,7 +522,7 @@ func TestGetTable(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -567,26 +567,26 @@ func TestCreateTableWithMultipleColumns(t *testing.T) {
 
 	// Create table with multiple columns
 	schema := infinity.TableSchema{
-		"id": &infinity.ColumnDefinition{
+		{
 			Name:        "id",
 			DataType:    "int",
 			Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey},
 		},
-		"name": &infinity.ColumnDefinition{
+		{
 			Name:     "name",
 			DataType: "varchar",
 		},
-		"age": &infinity.ColumnDefinition{
+		{
 			Name:     "age",
 			DataType: "int",
 			Default:  0,
 		},
-		"score": &infinity.ColumnDefinition{
+		{
 			Name:     "score",
 			DataType: "float",
 			Default:  0.0,
 		},
-		"active": &infinity.ColumnDefinition{
+		{
 			Name:     "active",
 			DataType: "bool",
 			Default:  true,
@@ -658,7 +658,7 @@ func TestCreateDuplicateTable(t *testing.T) {
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -718,7 +718,7 @@ func TestRenameTable(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},

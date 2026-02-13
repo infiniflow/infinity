@@ -42,7 +42,7 @@ type ColumnDefinition struct {
 }
 
 // TableSchema defines the schema of a table
-type TableSchema map[string]*ColumnDefinition
+type TableSchema []*ColumnDefinition
 
 // Database represents a database for operations
 type Database struct {
@@ -71,17 +71,16 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 
 	// Convert column definitions to thrift ColumnDefs
 	columnDefs := make([]*thriftapi.ColumnDef, 0, len(columnsDefinition))
-	index := 0
-	for columnName, columnInfo := range columnsDefinition {
+	for index, columnInfo := range columnsDefinition {
 		colDef := thriftapi.NewColumnDef()
 		colDef.ID = int32(index)
-		colDef.Name = columnName
+		colDef.Name = columnInfo.Name
 		colDef.Comment = ""
 
 		// Parse data type
 		dataType, err := parseDataType(columnInfo.DataType)
 		if err != nil {
-			return nil, NewInfinityException(int(ErrorCodeInvalidDataType), fmt.Sprintf("Invalid data type for column %s: %v", columnName, err))
+			return nil, NewInfinityException(int(ErrorCodeInvalidDataType), fmt.Sprintf("Invalid data type for column %s: %v", columnInfo.Name, err))
 		}
 		colDef.DataType = dataType
 
@@ -109,13 +108,12 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 		if columnInfo.Default != nil {
 			constExpr, err := parseDefaultValue(columnInfo.Default)
 			if err != nil {
-				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnName, err))
-			}
+				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
+		}
 			colDef.ConstantExpr = constExpr
 		}
 
 		columnDefs = append(columnDefs, colDef)
-		index++
 	}
 
 	// Create request

@@ -95,7 +95,7 @@ type Table interface {
     // Maintenance
     Optimize() (interface{}, error)
     Compact() (interface{}, error)
-    AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error)
+    AddColumns(columnDefs TableSchema) (interface{}, error)
     DropColumns(columnNames interface{}) (interface{}, error)
 }
 ```
@@ -123,12 +123,12 @@ func main() {
 
     // Create table
     schema := infinity.TableSchema{
-        "id": &infinity.ColumnDefinition{
+        {
             Name:        "id",
             DataType:    "integer",
             Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey},
         },
-        "embedding": &infinity.ColumnDefinition{
+        {
             Name:     "embedding",
             DataType: "vector,128,float32",
         },

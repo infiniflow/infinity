@@ -77,16 +77,16 @@ func main() {
 
 	// Create a table with schema
 	schema := infinity.TableSchema{
-		"id": &infinity.ColumnDefinition{
+		{
 			Name:        "id",
 			DataType:    "integer",
 			Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey},
 		},
-		"name": &infinity.ColumnDefinition{
+		{
 			Name:     "name",
 			DataType: "varchar",
 		},
-		"embedding": &infinity.ColumnDefinition{
+		{
 			Name:     "embedding",
 			DataType: "vector,128,float32",
 		},
@@ -288,8 +288,8 @@ func main() {
 	}
 
 	// Add columns
-	_, err = table.AddColumns(map[string]*infinity.ColumnDefinition{
-		"new_col": {Name: "new_col", DataType: "varchar"},
+	_, err = table.AddColumns(infinity.TableSchema{
+		{Name: "new_col", DataType: "varchar"},
 	})
 	if err != nil {
 		log.Printf("AddColumns error: %v", err)

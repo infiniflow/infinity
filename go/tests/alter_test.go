@@ -38,11 +38,11 @@ func TestSimpleAddColumns(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 		},
@@ -57,8 +57,8 @@ func TestSimpleAddColumns(t *testing.T) {
 	}
 
 	// Add column with default value (basic test)
-	_, err = table.AddColumns(map[string]*infinity.ColumnDefinition{
-		"c3": {
+	_, err = table.AddColumns(infinity.TableSchema{
+		{
 			Name:     "c3",
 			DataType: "varchar",
 			Default:  "default",
@@ -93,15 +93,15 @@ func TestSimpleDropColumns(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 		},
-		"c3": &infinity.ColumnDefinition{
+		{
 			Name:     "c3",
 			DataType: "varchar",
 		},
@@ -146,11 +146,11 @@ func TestInsertAfterDropColumns(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"num": &infinity.ColumnDefinition{
+		{
 			Name:     "num",
 			DataType: "int",
 		},
-		"body": &infinity.ColumnDefinition{
+		{
 			Name:     "body",
 			DataType: "varchar",
 		},
@@ -165,8 +165,8 @@ func TestInsertAfterDropColumns(t *testing.T) {
 	}
 
 	// Try to add columns (server may or may not support this)
-	_, err = table.AddColumns(map[string]*infinity.ColumnDefinition{
-		"column_name1": {
+	_, err = table.AddColumns(infinity.TableSchema{
+		{
 			Name:     "column_name1",
 			DataType: "int",
 			Default:  0,
@@ -201,19 +201,19 @@ func TestDropMultipleColumns(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 		},
-		"c3": &infinity.ColumnDefinition{
+		{
 			Name:     "c3",
 			DataType: "int",
 		},
-		"c4": &infinity.ColumnDefinition{
+		{
 			Name:     "c4",
 			DataType: "int",
 		},
@@ -258,7 +258,7 @@ func TestAddMultipleColumns(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -273,18 +273,18 @@ func TestAddMultipleColumns(t *testing.T) {
 	}
 
 	// Try to add multiple columns (server may or may not support this)
-	_, err = table.AddColumns(map[string]*infinity.ColumnDefinition{
-		"c2": {
+	_, err = table.AddColumns(infinity.TableSchema{
+		{
 			Name:     "c2",
 			DataType: "int",
 			Default:  0,
 		},
-		"c3": {
+		{
 			Name:     "c3",
 			DataType: "varchar",
 			Default:  "default",
 		},
-		"c4": {
+		{
 			Name:     "c4",
 			DataType: "float",
 			Default:  0.0,
@@ -319,7 +319,7 @@ func TestAddColumnsWithDifferentDefaults(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
@@ -334,8 +334,8 @@ func TestAddColumnsWithDifferentDefaults(t *testing.T) {
 	}
 
 	// Try to add column with int default (server may or may not support this)
-	_, err = table.AddColumns(map[string]*infinity.ColumnDefinition{
-		"int_col": {
+	_, err = table.AddColumns(infinity.TableSchema{
+		{
 			Name:     "int_col",
 			DataType: "int",
 			Default:  42,
@@ -370,7 +370,7 @@ func TestDropColumnsInvalidType(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},

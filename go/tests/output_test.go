@@ -39,15 +39,15 @@ func TestOutput(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "varchar",
 		},
-		"c3": &infinity.ColumnDefinition{
+		{
 			Name:     "c3",
 			DataType: "float",
 		},
@@ -110,15 +110,15 @@ func TestOutputChaining(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"id": &infinity.ColumnDefinition{
+		{
 			Name:     "id",
 			DataType: "int",
 		},
-		"name": &infinity.ColumnDefinition{
+		{
 			Name:     "name",
 			DataType: "varchar",
 		},
-		"value": &infinity.ColumnDefinition{
+		{
 			Name:     "value",
 			DataType: "float",
 		},

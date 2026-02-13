@@ -608,24 +608,23 @@ func (t *Table) AlterIndex(indexName string, optParams map[string]string) (inter
 }
 
 // AddColumns adds columns to the table
-func (t *Table) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}, error) {
+func (t *Table) AddColumns(columnDefs TableSchema) (interface{}, error) {
 	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
 
 	// Convert column definitions to thrift ColumnDefs
 	columnDefsList := make([]*thriftapi.ColumnDef, 0, len(columnDefs))
-	index := 0
-	for columnName, columnInfo := range columnDefs {
+	for index, columnInfo := range columnDefs {
 		colDef := thriftapi.NewColumnDef()
 		colDef.ID = int32(index)
-		colDef.Name = columnName
+		colDef.Name = columnInfo.Name
 		colDef.Comment = ""
 
 		// Parse data type
 		dataType, err := parseDataType(columnInfo.DataType)
 		if err != nil {
-			return nil, NewInfinityException(int(ErrorCodeInvalidDataType), fmt.Sprintf("Invalid data type for column %s: %v", columnName, err))
+			return nil, NewInfinityException(int(ErrorCodeInvalidDataType), fmt.Sprintf("Invalid data type for column %s: %v", columnInfo.Name, err))
 		}
 		colDef.DataType = dataType
 
@@ -653,13 +652,12 @@ func (t *Table) AddColumns(columnDefs map[string]*ColumnDefinition) (interface{}
 		if columnInfo.Default != nil {
 			constExpr, err := parseDefaultValue(columnInfo.Default)
 			if err != nil {
-				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnName, err))
+				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
 			}
 			colDef.ConstantExpr = constExpr
 		}
 
 		columnDefsList = append(columnDefsList, colDef)
-		index++
 	}
 
 	// Create request

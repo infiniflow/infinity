@@ -53,11 +53,11 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 
 	// Create table
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "vector,3,int",
 		},
@@ -109,24 +109,24 @@ func TestImportDifferentFileFormat(t *testing.T) {
 			format:   "csv",
 			fileName: "pysdk_test.csv",
 			schema: infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "vector,3,int"},
 			},
 		},
 		{
 			format:   "json",
 			fileName: "pysdk_test.json",
 			schema: infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "vector,3,int"},
 			},
 		},
 		{
 			format:   "jsonl",
 			fileName: "pysdk_test.jsonl",
 			schema: infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "vector,3,int"},
 			},
 		},
 	}
@@ -217,7 +217,7 @@ func TestImportFVECS(t *testing.T) {
 
 	// Create table for fvecs
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "vector,128,float",
 		},
@@ -275,7 +275,7 @@ func TestImportEmptyFile(t *testing.T) {
 			fileName: "test_empty.fvecs",
 			format:   "fvecs",
 			schema: infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "vector,128,float"},
+				{Name: "c1", DataType: "vector,128,float"},
 			},
 		},
 		{
@@ -283,8 +283,8 @@ func TestImportEmptyFile(t *testing.T) {
 			fileName: "test_empty.csv",
 			format:   "csv",
 			schema: infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "vector,3,int"},
 			},
 		},
 	}
@@ -362,8 +362,8 @@ func TestImportFormatUnrecognized(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -438,8 +438,8 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 				}
 
 				schema := infinity.TableSchema{
-					"c1": &infinity.ColumnDefinition{Name: "c1", DataType: dataType},
-					"c2": &infinity.ColumnDefinition{Name: "c2", DataType: dataType},
+					{Name: "c1", DataType: dataType},
+					{Name: "c2", DataType: dataType},
 				}
 
 				table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -502,8 +502,8 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -567,8 +567,8 @@ func TestImportCSVWithHeaders(t *testing.T) {
 			}
 
 			schema := infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "int"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "int"},
 			}
 
 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -630,8 +630,8 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,128,float"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,128,float"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -698,8 +698,8 @@ func TestImportEmbeddingWithCompatibleDefinition(t *testing.T) {
 			}
 
 			schema := infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: dataType},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: dataType},
 			}
 
 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -765,8 +765,8 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 			}
 
 			schema := infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: dataType},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: dataType},
 			}
 
 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -817,8 +817,8 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector, 2, int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector, 2, int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -879,8 +879,8 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "varchar"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "varchar"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -935,8 +935,8 @@ func TestImport10000Columns(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -974,11 +974,11 @@ func TestImport10000Columns(t *testing.T) {
 // TestTableWithNotMatchedColumns tests importing with mismatched column count
 func TestTableWithNotMatchedColumns(t *testing.T) {
 	columns := []infinity.TableSchema{
-		{"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"}},
+		{{Name: "c1", DataType: "int"}},
 		{
-			"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-			"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "int"},
-			"c3": &infinity.ColumnDefinition{Name: "c3", DataType: "int"},
+			{Name: "c1", DataType: "int"},
+			{Name: "c2", DataType: "int"},
+			{Name: "c3", DataType: "int"},
 		},
 	}
 
@@ -1061,8 +1061,8 @@ func TestImportWithDifferentSize(t *testing.T) {
 			}
 
 			schema := infinity.TableSchema{
-				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "varchar"},
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "varchar"},
 			}
 
 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1120,8 +1120,8 @@ func TestImportExceedingRows(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "varchar"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "varchar"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1177,8 +1177,8 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "varchar"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "varchar"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1241,10 +1241,10 @@ func TestImportExceedingColumns(t *testing.T) {
 	}
 
 	// Create schema with 1024 columns
-	schema := make(infinity.TableSchema)
+	schema := make(infinity.TableSchema, 0, 1024)
 	for i := 0; i < 1024; i++ {
 		colName := fmt.Sprintf("c%d", i)
-		schema[colName] = &infinity.ColumnDefinition{Name: colName, DataType: "int"}
+		schema = append(schema, &infinity.ColumnDefinition{Name: colName, DataType: "int"})
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1299,12 +1299,12 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 			Default:  1,
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 			Default:  4,
@@ -1367,17 +1367,17 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 			Default:  1,
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 			Default:  4,
 		},
-		"c4": &infinity.ColumnDefinition{
+		{
 			Name:     "c4",
 			DataType: "vector, 3, float",
 		},
@@ -1439,22 +1439,22 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{
+		{
 			Name:     "c1",
 			DataType: "int",
 			Default:  1,
 		},
-		"c2": &infinity.ColumnDefinition{
+		{
 			Name:     "c2",
 			DataType: "int",
 			Default:  4,
 		},
-		"c3": &infinity.ColumnDefinition{
+		{
 			Name:     "c3",
 			DataType: "int",
 			Default:  7,
 		},
-		"c4": &infinity.ColumnDefinition{
+		{
 			Name:     "c4",
 			DataType: "vector, 3, float",
 		},
@@ -1516,8 +1516,8 @@ func TestImportJSONLFile(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1576,8 +1576,8 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "vector,3,int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
@@ -1636,8 +1636,8 @@ func TestImportWithWildcardPath(t *testing.T) {
 	}
 
 	schema := infinity.TableSchema{
-		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
-		"c2": &infinity.ColumnDefinition{Name: "c2", DataType: "int"},
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "int"},
 	}
 
 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
