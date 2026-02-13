@@ -273,9 +273,98 @@ func (t *Table) ShowBlockColumn(segmentID int, blockID int, columnID int) (inter
 }
 
 // Insert inserts data
+// data can be a single map (one row) or a slice of maps (multiple rows)
+// Each map represents a row with column names as keys and values as column values
 func (t *Table) Insert(data interface{}) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Convert data to slice of maps
+	var rows []map[string]interface{}
+	switch d := data.(type) {
+	case map[string]interface{}:
+		rows = []map[string]interface{}{d}
+	case []map[string]interface{}:
+		rows = d
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "Invalid data type for insert, expected map or slice of maps")
+	}
+
+	if len(rows) == 0 {
+		return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "No data to insert")
+	}
+
+	// Build fields
+	var fields []*thriftapi.Field
+	for _, row := range rows {
+		field := thriftapi.NewField()
+		var columnNames []string
+		var parseExprs []*thriftapi.ParsedExpr
+
+		for columnName, value := range row {
+			columnNames = append(columnNames, columnName)
+
+			var parsedExpr *thriftapi.ParsedExpr
+
+			// Check if value is FDE object
+			if fde, ok := value.(*FDE); ok && fde != nil {
+				// Create function expression for FDE
+				functionExpr := GetRemoteFunctionExprFromFDE(fde)
+				exprType := thriftapi.NewParsedExprType()
+				exprType.FunctionExpr = functionExpr
+				parsedExpr = thriftapi.NewParsedExpr()
+				parsedExpr.Type = exprType
+			} else {
+				// Create constant expression for regular values
+				constantExpr, err := ParseConstantValue(value)
+				if err != nil {
+					return nil, err
+				}
+				exprType := thriftapi.NewParsedExprType()
+				exprType.ConstantExpr = constantExpr
+				parsedExpr = thriftapi.NewParsedExpr()
+				parsedExpr.Type = exprType
+			}
+
+			parseExprs = append(parseExprs, parsedExpr)
+		}
+
+		field.ColumnNames = columnNames
+		field.ParseExprs = parseExprs
+		fields = append(fields, field)
+	}
+
+	// Create request
+	req := thriftapi.NewInsertRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.Fields = fields
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Insert(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to insert data: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to insert data: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ImportData imports data from a file

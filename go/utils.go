@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
 
 // ValidNamePattern is the pattern for valid names
@@ -111,10 +113,43 @@ func GetRemoteConstantExprFromValue(value interface{}) interface{} {
 }
 
 // GetRemoteFunctionExprFromFDE converts an FDE to a remote function expression
-func GetRemoteFunctionExprFromFDE(fde *FDE) interface{} {
-	// This is a placeholder implementation
-	// In the actual implementation, this would convert the FDE to a remote function expression
-	return fde
+func GetRemoteFunctionExprFromFDE(fde *FDE) *thriftapi.FunctionExpr {
+	if fde == nil {
+		return nil
+	}
+
+	// Flatten 2D tensor data to 1D array
+	var flatTensorData []float64
+	for _, row := range fde.TensorData {
+		flatTensorData = append(flatTensorData, row...)
+	}
+
+	// Create tensor data constant expression
+	tensorConstExpr := thriftapi.NewConstantExpr()
+	tensorConstExpr.LiteralType = thriftapi.LiteralType_DoubleArray
+	tensorConstExpr.F64ArrayValue = flatTensorData
+
+	// Create target dimension constant expression
+	dimConstExpr := thriftapi.NewConstantExpr()
+	dimConstExpr.LiteralType = thriftapi.LiteralType_Int64
+	dimValue := int64(fde.TargetDimension)
+	dimConstExpr.I64Value = &dimValue
+
+	// Create parsed expressions for arguments
+	tensorParsedExpr := thriftapi.NewParsedExpr()
+	tensorParsedExpr.Type = thriftapi.NewParsedExprType()
+	tensorParsedExpr.Type.ConstantExpr = tensorConstExpr
+
+	dimParsedExpr := thriftapi.NewParsedExpr()
+	dimParsedExpr.Type = thriftapi.NewParsedExprType()
+	dimParsedExpr.Type.ConstantExpr = dimConstExpr
+
+	// Create FDE function expression
+	functionExpr := thriftapi.NewFunctionExpr()
+	functionExpr.FunctionName = "fde"
+	functionExpr.Arguments = []*thriftapi.ParsedExpr{tensorParsedExpr, dimParsedExpr}
+
+	return functionExpr
 }
 
 // GetOrdinaryInfo extracts ordinary column information from column info
