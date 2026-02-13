@@ -88,6 +88,7 @@ public:
         }
     }
 
+private:
     bool Evict(const std::string &path) {
         std::lock_guard l(mutex_);
 
@@ -112,7 +113,6 @@ public:
         return true;
     }
 
-private:
     bool Evict(size_t request_space) {
         // First check: even if we free all space, is it enough?
         if (request_space > MAX_CAPACITY_) {
