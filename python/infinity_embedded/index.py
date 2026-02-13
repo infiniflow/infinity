@@ -29,6 +29,7 @@ class IndexType(Enum):
     EMVB = 5
     BMP = 6
     DiskAnn = 7
+    PLAID = 8
 
     def to_local_type(self):
         match self:
@@ -46,6 +47,8 @@ class IndexType(Enum):
                 return LocalIndexType.kBMP
             case IndexType.DiskAnn:
                 return LocalIndexType.kDiskAnn
+            case IndexType.PLAID:
+                return LocalIndexType.kPLAID
             case _:
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 

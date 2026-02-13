@@ -193,7 +193,7 @@ std::ostream &operator<<(std::ostream &out, const ColumnType::type &val);
 std::string to_string(const ColumnType::type &val);
 
 struct IndexType {
-    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, SecondaryFunctional = 5, EMVB = 6, DiskAnn = 7 };
+    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, SecondaryFunctional = 5, EMVB = 6, DiskAnn = 7, PLAID = 8 };
 };
 
 extern const std::map<int, const char *> _IndexType_VALUES_TO_NAMES;
