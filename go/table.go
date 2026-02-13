@@ -438,8 +438,75 @@ func (t *Table) ImportData(filePath string, importOptions *ImportOption) (interf
 
 // ExportData exports data to a file
 func (t *Table) ExportData(filePath string, exportOptions *ExportOption, columns []string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Use default export options if nil
+	if exportOptions == nil {
+		exportOptions = NewExportOption()
+	}
+
+	// Create thrift ExportOption
+	thriftExportOption := thriftapi.NewExportOption()
+	thriftExportOption.Delimiter = string(exportOptions.Delimiter)
+	thriftExportOption.HasHeader = exportOptions.HasHeader
+	thriftExportOption.Offset = int64(exportOptions.Offset)
+	thriftExportOption.Limit = int64(exportOptions.Limit)
+	thriftExportOption.RowLimit = int64(exportOptions.RowLimit)
+
+	// Convert CopyFileType to thrift CopyFileType
+	var thriftCopyFileType thriftapi.CopyFileType
+	switch exportOptions.CopyFileType {
+	case CopyFileTypeCSV:
+		thriftCopyFileType = thriftapi.CopyFileType_CSV
+	case CopyFileTypeJSON:
+		thriftCopyFileType = thriftapi.CopyFileType_JSON
+	case CopyFileTypeJSONL:
+		thriftCopyFileType = thriftapi.CopyFileType_JSONL
+	case CopyFileTypeFVECS:
+		thriftCopyFileType = thriftapi.CopyFileType_FVECS
+	case CopyFileTypeCSR:
+		thriftCopyFileType = thriftapi.CopyFileType_CSR
+	case CopyFileTypeBVECS:
+		thriftCopyFileType = thriftapi.CopyFileType_BVECS
+	default:
+		return nil, NewInfinityException(int(ErrorCodeImportFileFormatError), fmt.Sprintf("Invalid copy file type: %d", exportOptions.CopyFileType))
+	}
+	thriftExportOption.CopyFileType = thriftCopyFileType
+
+	// Create request
+	req := thriftapi.NewExportRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.FileName = filePath
+	req.ExportOption = thriftExportOption
+	req.Columns = columns
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Export(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to export data: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to export data: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // Delete deletes rows

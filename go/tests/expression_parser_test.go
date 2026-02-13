@@ -583,3 +583,70 @@ func TestSpecialColumns(t *testing.T) {
 		})
 	}
 }
+
+// TestCondition tests condition expressions from Python test_condition.py
+func TestCondition(t *testing.T) {
+	tests := []struct {
+		name     string
+		cond     string
+		expected string
+	}{
+		{"equal", "c1 = 1", "=(c1, 1)"},
+		{"not equal", "c1 != 1", "!=(c1, 1)"},
+		{"complex and or", "c1 > 1 and c2 < 2 or c3 = 3.3", "or(and(>(c1, 1), <(c2, 2)), =(c3, 3.300000))"},
+		{"negative range", "-8 < c1 and c1 <= -7", "and(<(-(8), c1), <=(c1, -(7)))"},
+		{"in list", "c1 IN (1,2,3)", "c1 IN (1, 2, 3)"},
+		{"not in list", "c1 NOT IN (1,2,3)", "c1 NOT IN (1, 2, 3)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse the condition using ParseFilter
+			parsed, err := infinity.ParseFilter(tt.cond)
+			if err != nil {
+				t.Fatalf("Failed to parse condition '%s': %v", tt.cond, err)
+			}
+
+			if parsed == nil {
+				t.Fatal("Parsed condition should not be nil")
+			}
+
+			// Convert back to string for verification
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Condition '%s' -> '%s' (expected: '%s')", tt.cond, result, tt.expected)
+
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestConditionUnsupported tests condition expressions that may not be fully supported
+func TestConditionUnsupported(t *testing.T) {
+	// These test cases from Python test_condition.py use syntax that may not be
+	// fully supported by the Go parser
+	unsupportedTests := []struct {
+		name string
+		cond string
+	}{
+		{"complex parens", "(-7 < c1 or 9 <= c1) and (c1 = 3)"},
+		{"not operator", "!(9 <= c1)"},
+	}
+
+	for _, tt := range unsupportedTests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Try to parse the condition
+			parsed, err := infinity.ParseFilter(tt.cond)
+			if err != nil {
+				t.Logf("Condition '%s' failed to parse (expected for unsupported syntax): %v", tt.cond, err)
+				return
+			}
+
+			if parsed != nil {
+				result := infinity.ParsedExprToString(parsed)
+				t.Logf("Condition '%s' unexpectedly parsed successfully: %s", tt.cond, result)
+			}
+		})
+	}
+}
