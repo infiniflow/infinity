@@ -77,7 +77,6 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
 
 bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
                                   std::unique_ptr<LocalFileHandle> &file_handle,
-                                  size_t rel_size,
                                   bool &prepare_success,
                                   const FileWorkerSaveCtx &ctx) {
     if (data.data() == nullptr) {
@@ -85,13 +84,14 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
     }
 
     const auto *buffer = static_cast<const VarBuffer *>(data.data());
-    if (buffer->TotalSize() == 0) {
+    size_t total_size = buffer->TotalSize();
+    if (total_size == 0) {
         return false;
     }
 
-    auto buffer_data = std::make_unique<char[]>(rel_size);
-    size_t total_size = buffer->Write(buffer_data.get(), rel_size);
-    Status status = file_handle->Append(buffer_data.get(), total_size);
+    auto buffer_data = std::make_unique<char[]>(total_size);
+    size_t write_size = buffer->Write(buffer_data.get(), total_size);
+    Status status = file_handle->Append(buffer_data.get(), write_size);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

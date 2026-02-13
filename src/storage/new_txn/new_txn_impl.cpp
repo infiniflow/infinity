@@ -1822,7 +1822,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
     std::string table_name = table_snapshot_info->table_name_;
     std::string snapshot_name = table_snapshot_info->snapshot_name_;
 
-    [[maybe_unused]] PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
     std::string data_dir = InfinityContext::instance().config()->DataDir();
     std::string temp_dir = InfinityContext::instance().config()->TempDir();
@@ -1861,12 +1860,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 return status;
             }
 
-            BlockOffset rel_row_cnt = 0;
-            std::pair<BlockOffset, BlockOffset> range;
-            while (state.Next(rel_row_cnt, range)) {
-                rel_row_cnt = range.second;
-            }
-
             {
                 auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
                 auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
@@ -1879,11 +1872,15 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
                 auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!status.ok()) {
-                    RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
+                    return status;
                 }
 
                 block_version->SaveToFile(option.checkpoint_ts_, *handle);
-                // close(handle->fd());
+
+                status = handle->Close();
+                if (!status.ok()) {
+                    return status;
+                }
             }
 
             {
@@ -1896,12 +1893,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     auto column_def = column_defs->at(column_idx);
                     ColumnMeta column_meta(column_idx, block_meta);
-
-                    size_t rel_data_size = 0;
-                    std::tie(rel_data_size, status) = column_meta.GetColumnSize(rel_row_cnt, column_def);
-                    if (!status.ok()) {
-                        return status;
-                    }
 
                     size_t full_data_size = 0;
                     std::tie(full_data_size, status) = column_meta.GetColumnSize(block_meta.block_capacity(), column_def);
@@ -1922,16 +1913,21 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
                         auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                         if (!status.ok()) {
-                            RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
+                            return status;
                         }
 
                         bool prepare_success{false};
-                        std::span<char> data_span(data.get(), rel_data_size);
+                        std::span<char> data_span(data.get(), full_data_size);
                         data_file_worker_->WriteSnapshot(data_span, handle, prepare_success, {});
+
+                        status = handle->Close();
+                        if (!status.ok()) {
+                            return status;
+                        }
                     }
 
                     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
-                    if (buffer_type == VectorBufferType::kVarBuffer && rel_row_cnt != 0) {
+                    if (buffer_type == VectorBufferType::kVarBuffer) {
                         auto read_path = std::make_shared<std::string>(fmt::format("{}/col_{}_out", *block_dir_ptr, column_def->id()));
                         auto var_file_worker = std::make_unique<VarFileWorker>(read_path, 0);
                         auto var_file_worker_ = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(var_file_worker));
@@ -1944,11 +1940,16 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
                         auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                         if (!status.ok()) {
-                            RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
+                            return status;
                         }
 
                         bool prepare_success{};
-                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, rel_data_size, prepare_success, {});
+                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, prepare_success, {});
+
+                        status = handle->Close();
+                        if (!status.ok()) {
+                            return status;
+                        }
                     }
                 }
             }
