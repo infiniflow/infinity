@@ -72,11 +72,6 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
         std::memcpy((char *)mmap_ + old_mmap_size, ptr + old_mmap_size, diff);
     }
     prepare_success = true;
-
-    auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->var_map_.cache_manager_;
-    cache_manager.Evict(path);
-
     return true;
 }
 
