@@ -2446,6 +2446,7 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         LOG_TRACE(fmt::format("Created new fulltext index cache for index: {}", *create_index_cmd->index_base_->index_name_));
     }
 
+    // Persist index files
     if (!IsReplay()) {
         std::vector<std::string> all_file_paths;
 
@@ -2538,8 +2539,11 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
 
+    // Persist index files
     if (!IsReplay()) {
         switch (dump_index_cmd->dump_cause_) {
+            case DumpIndexCause::kDumpMemIndex:
+                [[fallthrough]];
             case DumpIndexCause::kCompact:
                 [[fallthrough]];
             case DumpIndexCause::kOptimizeIndex:
