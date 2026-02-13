@@ -1158,15 +1158,15 @@ func TestInsertWithInvalidDataType(t *testing.T) {
 		t.Fatalf("Failed to create table: %v", err)
 	}
 
-	// Test invalid data types
+	// Test invalid data types - these should all fail when inserting into vector column
 	invalidTypes := []struct {
 		value     interface{}
 		shouldErr bool
 	}{
-		{1, false},
-		{1.1, false},
-		{"1#$@!adf", false},
-		{[]int{1, 2, 3}, true},
+		{1, true},           // int cannot be cast to vector
+		{1.1, true},         // float cannot be cast to vector
+		{"1#$@!adf", true}, // string cannot be cast to vector
+		{[]int{1, 2, 3}, false}, // valid vector should succeed
 	}
 
 	for _, tc := range invalidTypes {
@@ -1175,6 +1175,8 @@ func TestInsertWithInvalidDataType(t *testing.T) {
 			t.Errorf("Expected error for %v, but got none", tc.value)
 		} else if !tc.shouldErr && err != nil {
 			t.Errorf("Unexpected error for %v: %v", tc.value, err)
+		} else if tc.shouldErr && err != nil {
+			t.Logf("Got expected error for %v: %v", tc.value, err)
 		}
 	}
 

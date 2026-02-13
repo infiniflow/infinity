@@ -1094,6 +1094,32 @@ func ParseConstantValue(value interface{}) (*thriftapi.ConstantExpr, error) {
 		expr.StrValue = &v
 	case nil:
 		expr.LiteralType = thriftapi.LiteralType_Null
+	case SparseVector:
+		// Handle SparseVector type
+		expr.LiteralType = thriftapi.LiteralType_SparseDoubleArray
+		expr.I64ArrayIdx = make([]int64, len(v.Indices))
+		expr.F64ArrayValue = make([]float64, len(v.Values))
+		for i, idx := range v.Indices {
+			expr.I64ArrayIdx[i] = int64(idx)
+		}
+		for i, val := range v.Values {
+			expr.F64ArrayValue[i] = val
+		}
+	case *SparseVector:
+		// Handle pointer to SparseVector
+		if v == nil {
+			expr.LiteralType = thriftapi.LiteralType_Null
+		} else {
+			expr.LiteralType = thriftapi.LiteralType_SparseDoubleArray
+			expr.I64ArrayIdx = make([]int64, len(v.Indices))
+			expr.F64ArrayValue = make([]float64, len(v.Values))
+			for i, idx := range v.Indices {
+				expr.I64ArrayIdx[i] = int64(idx)
+			}
+			for i, val := range v.Values {
+				expr.F64ArrayValue[i] = val
+			}
+		}
 	default:
 		// Use reflection for complex types
 		rv := reflect.ValueOf(value)
