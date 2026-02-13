@@ -43,11 +43,11 @@ func TestParseExprColumnReference(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -76,11 +76,11 @@ func TestParseExprConstant(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -108,11 +108,11 @@ func TestParseExprComparison(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -137,11 +137,11 @@ func TestParseExprLogical(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -168,11 +168,11 @@ func TestParseExprArithmetic(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -198,11 +198,11 @@ func TestParseExprFunction(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -226,11 +226,11 @@ func TestParseExprIn(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -253,11 +253,11 @@ func TestParseExprBetween(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -282,11 +282,11 @@ func TestParseExprCast(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -310,11 +310,11 @@ func TestParseExprParentheses(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -350,11 +350,11 @@ func TestParseExprComplex(t *testing.T) {
 				t.Fatalf("Failed to parse expression '%s': %v", tt.expr, err)
 			}
 
-		result := infinity.ParsedExprToString(parsed)
-		t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
-		if result != tt.expected {
-			t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-		}
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
 		})
 	}
 }
@@ -435,8 +435,8 @@ func TestParsedExprToStringRoundTrip(t *testing.T) {
 // TestMapSQLTypeToDataType tests SQL type mapping
 func TestMapSQLTypeToDataType(t *testing.T) {
 	tests := []struct {
-		sqlType    string
-		logicType  thriftapi.LogicType
+		sqlType   string
+		logicType thriftapi.LogicType
 	}{
 		{"INT", thriftapi.LogicType_Integer},
 		{"INTEGER", thriftapi.LogicType_Integer},
@@ -473,9 +473,9 @@ func TestMapSQLTypeToDataType(t *testing.T) {
 // TestConstantExprTypes tests different constant expression types
 func TestConstantExprTypes(t *testing.T) {
 	tests := []struct {
-		name         string
-		expr         string
-		literalType  thriftapi.LiteralType
+		name        string
+		expr        string
+		literalType thriftapi.LiteralType
 	}{
 		{"boolean true", "true", thriftapi.LiteralType_Boolean},
 		{"boolean false", "false", thriftapi.LiteralType_Boolean},
@@ -597,6 +597,8 @@ func TestCondition(t *testing.T) {
 		{"negative range", "-8 < c1 and c1 <= -7", "and(<(-(8), c1), <=(c1, -(7)))"},
 		{"in list", "c1 IN (1,2,3)", "c1 IN (1, 2, 3)"},
 		{"not in list", "c1 NOT IN (1,2,3)", "c1 NOT IN (1, 2, 3)"},
+		{"complex parens", "(-7 < c1 or 9 <= c1) and (c1 = 3)", "and(or(<(-(7), c1), <=(9, c1)), =(c1, 3))"},
+		{"not operator", "!(9 <= c1)", "not(<=(9, c1))"},
 	}
 
 	for _, tt := range tests {
@@ -617,35 +619,6 @@ func TestCondition(t *testing.T) {
 
 			if result != tt.expected {
 				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
-
-// TestConditionUnsupported tests condition expressions that may not be fully supported
-func TestConditionUnsupported(t *testing.T) {
-	// These test cases from Python test_condition.py use syntax that may not be
-	// fully supported by the Go parser
-	unsupportedTests := []struct {
-		name string
-		cond string
-	}{
-		{"complex parens", "(-7 < c1 or 9 <= c1) and (c1 = 3)"},
-		{"not operator", "!(9 <= c1)"},
-	}
-
-	for _, tt := range unsupportedTests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Try to parse the condition
-			parsed, err := infinity.ParseFilter(tt.cond)
-			if err != nil {
-				t.Logf("Condition '%s' failed to parse (expected for unsupported syntax): %v", tt.cond, err)
-				return
-			}
-
-			if parsed != nil {
-				result := infinity.ParsedExprToString(parsed)
-				t.Logf("Condition '%s' unexpectedly parsed successfully: %s", tt.cond, result)
 			}
 		})
 	}

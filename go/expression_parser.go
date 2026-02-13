@@ -78,12 +78,6 @@ func ParseExpr(expr string) (*thriftapi.ParsedExpr, error) {
 func parseExpressionInternal(expr string) (*Expression, error) {
 	expr = strings.TrimSpace(expr)
 
-	// Check for parentheses
-	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
-		// Remove outer parentheses
-		return parseExpressionInternal(expr[1 : len(expr)-1])
-	}
-
 	// Check for star
 	if expr == "*" {
 		return &Expression{Type: ExprTypeStar, IsStar: true}, nil
@@ -94,7 +88,20 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		return parseCastExpression(expr)
 	}
 
-	// Check for unary NOT (must be before binary operators)
+	// Check for unary NOT with ! operator (before parentheses check)
+	if strings.HasPrefix(expr, "!") {
+		inner, err := parseExpressionInternal(expr[1:])
+		if err != nil {
+			return nil, err
+		}
+		return &Expression{
+			Type:     ExprTypeUnary,
+			Operator: "not",
+			Left:     inner,
+		}, nil
+	}
+
+	// Check for unary NOT keyword (must be before binary operators)
 	if strings.HasPrefix(strings.ToUpper(expr), "NOT ") {
 		inner, err := parseExpressionInternal(expr[4:])
 		if err != nil {
@@ -105,6 +112,16 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 			Operator: "not",
 			Left:     inner,
 		}, nil
+	}
+
+	// Check for parentheses - only remove if the entire expression is wrapped
+	// and parentheses are balanced
+	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
+		// Check if the outer parentheses are matched (not just prefix/suffix)
+		if isBalancedParentheses(expr) && isOuterParentheses(expr) {
+			// Remove outer parentheses and parse inner
+			return parseExpressionInternal(expr[1 : len(expr)-1])
+		}
 	}
 
 	// Check for binary operators with lowest precedence (must be before IN/BETWEEN)
@@ -515,6 +532,45 @@ func splitByComma(expr string) []string {
 // isAlphaNum checks if a character is alphanumeric
 func isAlphaNum(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
+}
+
+// isBalancedParentheses checks if all parentheses in the expression are balanced
+func isBalancedParentheses(expr string) bool {
+	count := 0
+	for _, ch := range expr {
+		if ch == '(' {
+			count++
+		} else if ch == ')' {
+			count--
+			if count < 0 {
+				return false
+			}
+		}
+	}
+	return count == 0
+}
+
+// isOuterParentheses checks if the first and last parentheses are a matching pair
+// that wraps the entire expression (not just prefix/suffix of sub-expressions)
+func isOuterParentheses(expr string) bool {
+	if !strings.HasPrefix(expr, "(") || !strings.HasSuffix(expr, ")") {
+		return false
+	}
+	
+	// Track parentheses depth - the outermost pair should close at the end
+	depth := 0
+	for i, ch := range expr {
+		if ch == '(' {
+			depth++
+		} else if ch == ')' {
+			depth--
+			// If we close back to 0 before the end, the outer parens don't match
+			if depth == 0 && i < len(expr)-1 {
+				return false
+			}
+		}
+	}
+	return depth == 0
 }
 
 // mapSQLTypeToDataType maps SQL type names to thrift DataType
