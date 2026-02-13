@@ -74,14 +74,148 @@ func (t *Table) Rename(newTableName string) (interface{}, error) {
 
 // CreateIndex creates an index
 func (t *Table) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType ConflictType, indexComment string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Convert ConflictType to CreateConflict
+	var createConflict thriftapi.CreateConflict
+	switch conflictType {
+	case ConflictTypeIgnore:
+		createConflict = thriftapi.CreateConflict_Ignore
+	case ConflictTypeError:
+		createConflict = thriftapi.CreateConflict_Error
+	case ConflictTypeReplace:
+		createConflict = thriftapi.CreateConflict_Replace
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConflictType), "Invalid conflict type")
+	}
+
+	// Convert IndexType to thrift IndexType
+	var thriftIndexType thriftapi.IndexType
+	switch indexInfo.IndexType {
+	case IndexTypeIVF:
+		thriftIndexType = thriftapi.IndexType_IVF
+	case IndexTypeHnsw:
+		thriftIndexType = thriftapi.IndexType_Hnsw
+	case IndexTypeFullText:
+		thriftIndexType = thriftapi.IndexType_FullText
+	case IndexTypeSecondary:
+		thriftIndexType = thriftapi.IndexType_Secondary
+	case IndexTypeSecondaryFunctional:
+		thriftIndexType = thriftapi.IndexType_SecondaryFunctional
+	case IndexTypeEMVB:
+		thriftIndexType = thriftapi.IndexType_EMVB
+	case IndexTypeBMP:
+		thriftIndexType = thriftapi.IndexType_BMP
+	case IndexTypeDiskAnn:
+		thriftIndexType = thriftapi.IndexType_DiskAnn
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidIndexType), "Invalid index type")
+	}
+
+	// Build InitParameter list
+	var initParams []*thriftapi.InitParameter
+	if indexInfo.Params != nil {
+		for key, value := range indexInfo.Params {
+			param := thriftapi.NewInitParameter()
+			param.ParamName = key
+			param.ParamValue = value
+			initParams = append(initParams, param)
+		}
+	}
+
+	// Build thrift IndexInfo
+	thriftIndexInfo := thriftapi.NewIndexInfo()
+	thriftIndexInfo.ColumnName = indexInfo.TargetName
+	thriftIndexInfo.IndexType = thriftIndexType
+	thriftIndexInfo.IndexParamList = initParams
+
+	// Create request
+	req := thriftapi.NewCreateIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.IndexName = indexName
+	req.IndexComment = indexComment
+	req.IndexInfo = thriftIndexInfo
+	req.CreateOption = thriftapi.NewCreateOption()
+	req.CreateOption.ConflictType = createConflict
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.CreateIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create index: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to create index: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // DropIndex drops an index
 func (t *Table) DropIndex(indexName string, conflictType ConflictType) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Convert ConflictType to DropConflict
+	var dropConflict thriftapi.DropConflict
+	switch conflictType {
+	case ConflictTypeIgnore:
+		dropConflict = thriftapi.DropConflict_Ignore
+	case ConflictTypeError:
+		dropConflict = thriftapi.DropConflict_Error
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConflictType), "Invalid conflict type")
+	}
+
+	// Create request
+	req := thriftapi.NewDropIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.IndexName = indexName
+	req.DropOption = thriftapi.NewDropOption()
+	req.DropOption.ConflictType = dropConflict
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.DropIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to drop index: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to drop index: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowIndex shows index details
