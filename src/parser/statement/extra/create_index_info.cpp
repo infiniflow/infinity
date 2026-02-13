@@ -48,6 +48,9 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kSecondaryFunctional: {
             return "SECONDARYFUNCTIONAL";
         }
+        case IndexType::kPLAID: {
+            return "PLAID";
+        }
         case IndexType::kInvalid: {
             ParserError("Invalid conflict type.");
         }
@@ -72,6 +75,8 @@ IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
         return IndexType::kDiskAnn;
     } else if (index_type_str == "SECONDARYFUNCTIONAL") {
         return IndexType::kSecondaryFunctional;
+    } else if (index_type_str == "PLAID") {
+        return IndexType::kPLAID;
     } else {
         return IndexType::kInvalid;
     }
