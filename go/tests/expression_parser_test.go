@@ -591,14 +591,44 @@ func TestCondition(t *testing.T) {
 		cond     string
 		expected string
 	}{
+		// Basic comparison operators
 		{"equal", "c1 = 1", "=(c1, 1)"},
 		{"not equal", "c1 != 1", "!=(c1, 1)"},
+		{"greater than", "c1 > 1", ">(c1, 1)"},
+		{"less than", "c1 < 1", "<(c1, 1)"},
+		{"greater equal", "c1 >= 1", ">=(c1, 1)"},
+		{"less equal", "c1 <= 1", "<=(c1, 1)"},
+		// Complex logical expressions
 		{"complex and or", "c1 > 1 and c2 < 2 or c3 = 3.3", "or(and(>(c1, 1), <(c2, 2)), =(c3, 3.300000))"},
 		{"negative range", "-8 < c1 and c1 <= -7", "and(<(-(8), c1), <=(c1, -(7)))"},
+		// IN expressions
 		{"in list", "c1 IN (1,2,3)", "c1 IN (1, 2, 3)"},
 		{"not in list", "c1 NOT IN (1,2,3)", "c1 NOT IN (1, 2, 3)"},
+		// Parentheses and NOT
 		{"complex parens", "(-7 < c1 or 9 <= c1) and (c1 = 3)", "and(or(<(-(7), c1), <=(9, c1)), =(c1, 3))"},
 		{"not operator", "!(9 <= c1)", "not(<=(9, c1))"},
+		{"not keyword", "NOT c1 = 1", "not(=(c1, 1))"},
+		// BETWEEN expressions
+		{"between", "c1 BETWEEN 1 AND 10", "between(c1, 1, 10)"},
+		// Arithmetic in conditions
+		{"addition in condition", "c1 + c2 > 10", ">(+(c1, c2), 10)"},
+		{"subtraction in condition", "c1 - c2 = 0", "=(-(c1, c2), 0)"},
+		{"multiplication in condition", "c1 * 2 < 100", "<(*(c1, 2), 100)"},
+		{"complex arithmetic", "(c1 + c2) * c3 > 100", ">(*(+(c1, c2), c3), 100)"},
+		// String comparisons
+		{"string equal", "name = 'test'", "=(name, 'test')"},
+		{"string not equal", "name != 'test'", "!=(name, 'test')"},
+		// Function calls in conditions
+		{"function in condition", "upper(c1) = 'TEST'", "=(upper(c1), 'TEST')"},
+		{"count star", "count(*) > 0", ">(count(*), 0)"},
+		// Nested logical expressions (right associative is the current implementation)
+		{"triple and", "c1 = 1 AND c2 = 2 AND c3 = 3", "and(=(c1, 1), and(=(c2, 2), =(c3, 3)))"},
+		{"triple or", "c1 = 1 OR c2 = 2 OR c3 = 3", "or(=(c1, 1), or(=(c2, 2), =(c3, 3)))"},
+		{"mixed logic", "c1 = 1 AND (c2 = 2 OR c3 = 3) AND c4 = 4", "and(=(c1, 1), and(or(=(c2, 2), =(c3, 3)), =(c4, 4)))"},
+		// CAST in conditions
+		{"cast in condition", "CAST(c1 AS INTEGER) = 1", "=(CAST(c1 AS INTEGER), 1)"},
+		{"cast with arithmetic", "CAST(c1 + 1 AS FLOAT) > 0.5", ">(CAST(+(c1, 1) AS FLOAT), 0.500000)"},
+		{"cast standalone", "CAST(c1 AS VARCHAR)", "CAST(c1 AS VARCHAR)"},
 	}
 
 	for _, tt := range tests {

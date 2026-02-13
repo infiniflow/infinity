@@ -83,8 +83,9 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		return &Expression{Type: ExprTypeStar, IsStar: true}, nil
 	}
 
-	// Check for CAST expression
-	if strings.HasPrefix(strings.ToUpper(expr), "CAST(") {
+	// Check for CAST expression - only if it's the complete expression (not part of comparison)
+	// We check this by verifying the CAST ends properly and is not followed by operators
+	if strings.HasPrefix(strings.ToUpper(expr), "CAST(") && isCompleteCastExpression(expr) {
 		return parseCastExpression(expr)
 	}
 
@@ -532,6 +533,54 @@ func splitByComma(expr string) []string {
 // isAlphaNum checks if a character is alphanumeric
 func isAlphaNum(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'
+}
+
+// isCompleteCastExpression checks if the expression is a complete CAST expression
+// and not part of a larger expression like "CAST(c1 AS INTEGER) = 1"
+func isCompleteCastExpression(expr string) bool {
+	// Check if this CAST expression is followed by any binary operator
+	// Find the matching closing parenthesis for CAST(
+	if !strings.HasPrefix(strings.ToUpper(expr), "CAST(") {
+		return false
+	}
+
+	// Find the position after the matching closing paren of CAST
+	parenCount := 0
+	castEnd := -1
+	for i, ch := range expr {
+		if ch == '(' {
+			parenCount++
+		} else if ch == ')' {
+			parenCount--
+			if parenCount == 0 {
+				castEnd = i
+				break
+			}
+		}
+	}
+
+	// If we didn't find a matching closing paren, it's not a complete CAST
+	if castEnd == -1 {
+		return false
+	}
+
+	// If there's more content after the CAST, check if it's an operator
+	if castEnd < len(expr)-1 {
+		remaining := strings.TrimSpace(expr[castEnd+1:])
+		// If remaining starts with a comparison or arithmetic operator,
+		// then this CAST is part of a larger expression
+		if len(remaining) > 0 {
+			// Check for operators: =, !=, <>, >, <, >=, <=, +, -, *, /, %
+			operators := []string{"!=", "<>", ">=", "<=", "=", ">", "<", "+", "-", "*", "/", "%"}
+			for _, op := range operators {
+				if strings.HasPrefix(remaining, op) {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 // isBalancedParentheses checks if all parentheses in the expression are balanced
