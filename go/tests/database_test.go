@@ -15,6 +15,7 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -40,9 +41,6 @@ var invalidNameArray = []string{
 	"my_table!@#",
 }
 
-// emptyDBName is tested separately as it returns a different error code
-var emptyDBName = ""
-
 // generateSuffix generates a unique suffix for test names
 func generateSuffix(t *testing.T) string {
 	return fmt.Sprintf("_%s", strings.ReplaceAll(t.Name(), "/", "_"))
@@ -57,16 +55,27 @@ func setupConnection(t *testing.T) *infinity.InfinityConnection {
 	return conn
 }
 
+func closeConnection(t *testing.T, conn *infinity.InfinityConnection) {
+	_, err := conn.Disconnect()
+	if err != nil {
+		t.Fatalf("Failed to disconnect: %v", err)
+	}
+}
+
 // TestDatabase tests basic database operations
 func TestDatabase(t *testing.T) {
 	suffix := generateSuffix(t)
 	dbName := "test_my_database" + suffix
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	// Clean up if exists
-	conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
 
 	// 1. Create database
 	db, err := conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
@@ -89,7 +98,8 @@ func TestDatabase(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", name)
 		} else {
-			infinityErr, ok := err.(*infinity.InfinityException)
+			var infinityErr *infinity.InfinityException
+			ok := errors.As(err, &infinityErr)
 			if !ok {
 				t.Errorf("Expected InfinityException for name: %s, got: %T", name, err)
 			}
@@ -112,13 +122,14 @@ func TestDatabase(t *testing.T) {
 	_, err = conn.DropDatabase("default_db", infinity.ConflictTypeError)
 	if err == nil {
 		t.Fatal("Expected error when dropping default_db")
-	} else {
-		infinityErr, ok := err.(*infinity.InfinityException)
-		if !ok {
-			t.Fatalf("Expected InfinityException, got: %T", err)
-		} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDroppingUsingDB {
-			t.Errorf("Expected ErrorCodeDroppingUsingDB, got: %d", infinityErr.ErrorCode)
-		}
+	}
+
+	var infinityErr *infinity.InfinityException
+	ok := errors.As(err, &infinityErr)
+	if !ok {
+		t.Fatalf("Expected InfinityException, got: %T", err)
+	} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDroppingUsingDB {
+		t.Errorf("Expected ErrorCodeDroppingUsingDB, got: %d", infinityErr.ErrorCode)
 	}
 }
 
@@ -127,14 +138,15 @@ func TestCreateDatabaseInvalidName(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	for _, dbName := range invalidNameArray {
 		_, err := conn.CreateDatabase(dbName+suffix, infinity.ConflictTypeError, "")
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", dbName)
 		} else {
-			infinityErr, ok := err.(*infinity.InfinityException)
+			var infinityErr *infinity.InfinityException
+			ok := errors.As(err, &infinityErr)
 			if !ok {
 				t.Errorf("Expected InfinityException for name: %s, got: %T", dbName, err)
 			} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidIdentifierName {
@@ -151,7 +163,7 @@ func TestRepeatedlyCreateDropShowDatabases(t *testing.T) {
 	dbName := "test_repeatedly_create_drop_show_databases" + suffix
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	for i := 0; i < loopCount; i++ {
 		// Create database
@@ -182,14 +194,15 @@ func TestDropDatabaseWithInvalidName(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	for _, dbName := range invalidNameArray {
 		_, err := conn.DropDatabase(dbName+suffix, infinity.ConflictTypeError)
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", dbName)
 		} else {
-			infinityErr, ok := err.(*infinity.InfinityException)
+			var infinityErr *infinity.InfinityException
+			ok := errors.As(err, &infinityErr)
 			if !ok {
 				t.Errorf("Expected InfinityException for name: %s, got: %T", dbName, err)
 			} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidIdentifierName {
@@ -205,22 +218,27 @@ func TestGetDB(t *testing.T) {
 	dbName := "my_database" + suffix
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
-	// Clean up
-	conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	// Clean up if exists
+	_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
 
 	// 1. Get non-existent database (should fail)
-	_, err := conn.GetDatabase("db1_non_existent")
+	_, err = conn.GetDatabase("db1_non_existent")
 	if err == nil {
 		t.Fatal("Expected error for non-existent database")
-	} else {
-		infinityErr, ok := err.(*infinity.InfinityException)
-		if !ok {
-			t.Fatalf("Expected InfinityException, got: %T", err)
-		} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDBNotExist {
-			t.Errorf("Expected ErrorCodeDBNotExist, got: %d", infinityErr.ErrorCode)
-		}
+	}
+
+	var infinityErr *infinity.InfinityException
+	ok := errors.As(err, &infinityErr)
+	if !ok {
+		t.Fatalf("Expected InfinityException, got: %T", err)
+	} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDBNotExist {
+		t.Errorf("Expected ErrorCodeDBNotExist, got: %d", infinityErr.ErrorCode)
 	}
 
 	// 2. Create database
@@ -259,7 +277,8 @@ func TestGetDB(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", name)
 		} else {
-			infinityErr, ok := err.(*infinity.InfinityException)
+			var infinityErr *infinity.InfinityException
+			ok := errors.As(err, &infinityErr)
 			if !ok {
 				t.Errorf("Expected InfinityException for name: %s, got: %T", name, err)
 			} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidIdentifierName {
@@ -272,19 +291,20 @@ func TestGetDB(t *testing.T) {
 // TestDropNonExistentDB tests dropping non-existent databases
 func TestDropNonExistentDB(t *testing.T) {
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	// Try to drop non-existent database
 	_, err := conn.DropDatabase("my_non_existent_database", infinity.ConflictTypeError)
 	if err == nil {
 		t.Fatal("Expected error for non-existent database")
-	} else {
-		infinityErr, ok := err.(*infinity.InfinityException)
-		if !ok {
-			t.Fatalf("Expected InfinityException, got: %T", err)
-		} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDBNotExist {
-			t.Errorf("Expected ErrorCodeDBNotExist, got: %d", infinityErr.ErrorCode)
-		}
+	}
+
+	var infinityErr *infinity.InfinityException
+	ok := errors.As(err, &infinityErr)
+	if !ok {
+		t.Fatalf("Expected InfinityException, got: %T", err)
+	} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeDBNotExist {
+		t.Errorf("Expected ErrorCodeDBNotExist, got: %d", infinityErr.ErrorCode)
 	}
 }
 
@@ -293,7 +313,7 @@ func TestCreateWithValidOption(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	validOptions := []infinity.ConflictType{
 		infinity.ConflictTypeError,
@@ -302,9 +322,14 @@ func TestCreateWithValidOption(t *testing.T) {
 
 	for i, option := range validOptions {
 		dbName := fmt.Sprintf("test_create_option_%d%s", i, suffix)
-		conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+		// Clean up if exists
+		_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+		if err != nil {
+			t.Fatalf("Failed to drop database: %v", err)
+			return
+		}
 
-		_, err := conn.CreateDatabase(dbName, option, "")
+		_, err = conn.CreateDatabase(dbName, option, "")
 		if err != nil {
 			t.Errorf("Failed to create database with option %v: %v", option, err)
 		}
@@ -323,28 +348,37 @@ func TestCreateWithInvalidOption(t *testing.T) {
 	dbName := "test_create_invalid_option" + suffix
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
-	// Clean up
-	conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	// Clean up if exists
+	_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
 
 	// Create with invalid option (using a value out of range)
 	// Note: Go's type system prevents passing invalid ConflictType directly
 	// This test validates the type system works correctly
-	_, err := conn.CreateDatabase(dbName, infinity.ConflictType(999), "")
+	_, err = conn.CreateDatabase(dbName, infinity.ConflictType(999), "")
 	if err == nil {
 		t.Fatal("Expected error for invalid conflict type")
-	} else {
-		infinityErr, ok := err.(*infinity.InfinityException)
-		if !ok {
-			t.Fatalf("Expected InfinityException, got: %T", err)
-		} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidConflictType {
-			t.Errorf("Expected ErrorCodeInvalidConflictType, got: %d", infinityErr.ErrorCode)
-		}
 	}
 
-	// Clean up
-	conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	var infinityErr *infinity.InfinityException
+	ok := errors.As(err, &infinityErr)
+	if !ok {
+		t.Fatalf("Expected InfinityException, got: %T", err)
+	} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidConflictType {
+		t.Errorf("Expected ErrorCodeInvalidConflictType, got: %d", infinityErr.ErrorCode)
+	}
+
+	// Clean up if exists
+	_, err = conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
 }
 
 // TestDropOptionWithValidOption tests dropping databases with valid conflict options
@@ -352,7 +386,7 @@ func TestDropOptionWithValidOption(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	validOptions := []infinity.ConflictType{
 		infinity.ConflictTypeError,
@@ -361,10 +395,15 @@ func TestDropOptionWithValidOption(t *testing.T) {
 
 	for i, option := range validOptions {
 		dbName := fmt.Sprintf("test_drop_option_%d%s", i, suffix)
-		conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+		// Clean up if exists
+		_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+		if err != nil {
+			t.Fatalf("Failed to drop database: %v", err)
+			return
+		}
 
 		// Create database
-		_, err := conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
+		_, err = conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
 		if err != nil {
 			t.Fatalf("Failed to create database: %v", err)
 		}
@@ -390,11 +429,16 @@ func TestDropOptionWithInvalidOption(t *testing.T) {
 	dbName := "test_drop_option" + suffix
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	// Clean up and create
-	conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
-	_, err := conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
+	_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
+
+	_, err = conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
@@ -403,13 +447,14 @@ func TestDropOptionWithInvalidOption(t *testing.T) {
 	_, err = conn.DropDatabase(dbName, infinity.ConflictTypeReplace)
 	if err == nil {
 		t.Fatal("Expected error for invalid conflict type")
-	} else {
-		infinityErr, ok := err.(*infinity.InfinityException)
-		if !ok {
-			t.Fatalf("Expected InfinityException, got: %T", err)
-		} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidConflictType {
-			t.Errorf("Expected ErrorCodeInvalidConflictType, got: %d", infinityErr.ErrorCode)
-		}
+	}
+
+	var infinityErr *infinity.InfinityException
+	ok := errors.As(err, &infinityErr)
+	if !ok {
+		t.Fatalf("Expected InfinityException, got: %T", err)
+	} else if infinity.ErrorCode(infinityErr.ErrorCode) != infinity.ErrorCodeInvalidConflictType {
+		t.Errorf("Expected ErrorCodeInvalidConflictType, got: %d", infinityErr.ErrorCode)
 	}
 
 	// Clean up
@@ -426,10 +471,14 @@ func TestCreateUpperDatabaseName(t *testing.T) {
 	dbLowerName := "my_database" + strings.ToLower(suffix)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
-	// Clean up
-	conn.DropDatabase(dbLowerName, infinity.ConflictTypeIgnore)
+	// Clean up if exists
+	_, err := conn.DropDatabase(dbLowerName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop database: %v", err)
+		return
+	}
 
 	// Create with uppercase name
 	db, err := conn.CreateDatabase(dbUpperName, infinity.ConflictTypeError, "")
