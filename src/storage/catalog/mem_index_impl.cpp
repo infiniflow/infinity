@@ -22,6 +22,7 @@ import :emvb_index_in_mem;
 import :memory_indexer;
 import :hnsw_handler;
 import :bmp_handler;
+import :plaid_index_in_mem;
 
 import std;
 
@@ -48,6 +49,10 @@ RowID MemIndex::GetBeginRowID() {
     if (emvb_index != nullptr) {
         return emvb_index->GetBeginRowID();
     }
+    std::shared_ptr<PlaidIndexInMem> plaid_index = GetPlaidIndex();
+    if (plaid_index != nullptr) {
+        return plaid_index->GetBeginRowID();
+    }
     return RowID();
 }
 
@@ -60,13 +65,17 @@ size_t MemIndex::GetRowCount() {
     if (emvb_index != nullptr) {
         return emvb_index->GetRowCount();
     }
+    std::shared_ptr<PlaidIndexInMem> plaid_index = GetPlaidIndex();
+    if (plaid_index != nullptr) {
+        return plaid_index->GetRowCount();
+    }
     return 0;
 }
 
 bool MemIndex::IsNull() const {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_hnsw_index_ == nullptr && memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
-           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_dummy_index_ == nullptr;
+           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_plaid_index_ == nullptr && memory_dummy_index_ == nullptr;
 }
 
 void MemIndex::ClearMemIndex() {
@@ -78,6 +87,7 @@ void MemIndex::ClearMemIndex() {
     memory_secondary_index_.reset();
     memory_emvb_index_.reset();
     memory_bmp_index_.reset();
+    memory_plaid_index_.reset();
 
     is_dumping_ = false;
 }
@@ -162,6 +172,16 @@ std::shared_ptr<BMPIndexInMem> MemIndex::GetBMPIndex() {
 void MemIndex::SetBMPIndex(std::shared_ptr<BMPIndexInMem> bmp_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_bmp_index_ = bmp_index;
+}
+
+std::shared_ptr<PlaidIndexInMem> MemIndex::GetPlaidIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_plaid_index_;
+}
+
+void MemIndex::SetPlaidIndex(std::shared_ptr<PlaidIndexInMem> plaid_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_plaid_index_ = plaid_index;
 }
 
 std::shared_ptr<DummyIndexInMem> MemIndex::GetDummyIndex() {

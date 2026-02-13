@@ -23,6 +23,7 @@ import :data_file_worker;
 import :emvb_index_file_worker;
 import :hnsw_file_worker;
 import :ivf_index_file_worker;
+import :plaid_index_file_worker;
 import :raw_file_worker;
 import :secondary_index_file_worker;
 import :var_file_worker;
@@ -222,6 +223,7 @@ public:
     FileWorkerMap<EMVBIndexFileWorker> emvb_map_;
     FileWorkerMap<HnswFileWorker> hnsw_map_;
     FileWorkerMap<IVFIndexFileWorker> ivf_map_;
+    FileWorkerMap<PlaidIndexFileWorker> plaid_map_;
     FileWorkerMap<RawFileWorker> raw_map_;
     FileWorkerMap<SecondaryIndexFileWorker> secondary_map_;
     FileWorkerMap<VarFileWorker> var_map_;
