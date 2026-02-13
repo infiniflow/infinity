@@ -21,7 +21,7 @@ commonly used with ColBERT-style late interaction models. Each document is repre
 ### Create Index
 
 ```sql
-CREATE INDEX idx_plaid ON table_name(tensor_column) USING PLAID WITH (nbits 4, n_centroids 1000);
+CREATE INDEX idx_plaid ON table_name(tensor_column) USING PLAID WITH (nbits=4, n_centroids=1000);
 ```
 
 Parameters:

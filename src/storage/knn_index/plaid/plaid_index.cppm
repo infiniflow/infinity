@@ -102,6 +102,30 @@ public:
     u32 GetEmbeddingDimension() const { return embedding_dimension_; }
     bool IsMmap() const { return is_mmap_; }
 
+    // Get document length (number of tokens)
+    u32 GetDocLen(u32 doc_id) const;
+
+    // Reconstruct embeddings for a document
+    // Returns: [doc_len, embedding_dim] flattened array
+    std::unique_ptr<f32[]> ReconstructDocument(u32 doc_id, u32 &doc_len) const;
+
+    // Reconstruct multiple documents
+    std::vector<std::unique_ptr<f32[]>> ReconstructDocuments(const std::vector<u32> &doc_ids, std::vector<u32> &doc_lens) const;
+
+    // Centroid expansion for incremental updates
+    // Expands centroids with new embeddings using partial K-means
+    void ExpandCentroids(const f32 *new_embeddings, u64 new_embedding_count, u32 expand_iter = 4);
+
+    // Search without bitmask (for testing/simple use cases)
+    PlaidQueryResultType GetQueryResult(const f32 *query_ptr,
+                                        u32 query_embedding_num,
+                                        u32 n_ivf_probe,
+                                        f32 centroid_score_threshold,
+                                        u32 n_doc_to_score,
+                                        u32 n_full_scores,
+                                        u32 top_k,
+                                        f32 threshold_final = 0.0f) const;
+
 private:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;
@@ -142,15 +166,6 @@ private:
 
     // Private methods
     u64 ExpectLeastTrainingDataNum() const;
-
-    PlaidQueryResultType GetQueryResult(const f32 *query_ptr,
-                                        u32 query_embedding_num,
-                                        u32 n_ivf_probe,
-                                        f32 centroid_score_threshold,
-                                        u32 n_doc_to_score,
-                                        u32 n_full_scores,
-                                        u32 top_k,
-                                        f32 threshold_final = 0.0f) const;
 
     PlaidQueryResultType GetQueryResultWithBitmask(const f32 *query_ptr,
                                                    u32 query_embedding_num,

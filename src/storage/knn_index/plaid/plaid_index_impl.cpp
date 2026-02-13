@@ -818,4 +818,144 @@ void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
     read(packed_residuals_.get(), packed_residuals_size_);
 }
 
+u32 PlaidIndex::GetDocLen(u32 doc_id) const {
+    std::shared_lock lock(rw_mutex_);
+    if (doc_id >= n_docs_.load()) {
+        UnrecoverableError(fmt::format("PlaidIndex::GetDocLen: Invalid doc_id {}, total docs {}", doc_id, n_docs_.load()));
+    }
+    return doc_lens_[doc_id];
+}
+
+std::unique_ptr<f32[]> PlaidIndex::ReconstructDocument(u32 doc_id, u32 &doc_len) const {
+    std::shared_lock lock(rw_mutex_);
+
+    if (doc_id >= n_docs_.load()) {
+        UnrecoverableError(fmt::format("PlaidIndex::ReconstructDocument: Invalid doc_id {}, total docs {}", doc_id, n_docs_.load()));
+    }
+
+    // Get document range
+    u32 start = doc_offsets_[doc_id];
+    u32 end = (doc_id + 1 < n_docs_.load()) ? doc_offsets_[doc_id + 1] : n_total_embeddings_;
+    doc_len = end - start;
+
+    if (doc_len == 0) {
+        return nullptr;
+    }
+
+    // Allocate output buffer
+    auto output = std::make_unique_for_overwrite<f32[]>(doc_len * embedding_dimension_);
+
+    // Calculate packed residual offset and size per embedding
+    u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
+
+    // Dequantize using the quantizer
+    quantizer_->Dequantize(&centroid_ids_[start],
+                           packed_residuals_.get() + start * packed_dim,
+                           doc_len,
+                           output.get(),
+                           centroids_data_.data(),
+                           n_centroids_);
+
+    return output;
+}
+
+std::vector<std::unique_ptr<f32[]>> PlaidIndex::ReconstructDocuments(const std::vector<u32> &doc_ids, std::vector<u32> &doc_lens) const {
+    std::vector<std::unique_ptr<f32[]>> results;
+    doc_lens.resize(doc_ids.size());
+
+    for (size_t i = 0; i < doc_ids.size(); ++i) {
+        u32 len = 0;
+        results.push_back(ReconstructDocument(doc_ids[i], len));
+        doc_lens[i] = len;
+    }
+
+    return results;
+}
+
+void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedding_count, const u32 expand_iter) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (new_embedding_count == 0) {
+        return;
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanding with {} new embeddings", new_embedding_count));
+
+    // Find outliers: embeddings that are far from existing centroids
+    const auto dist_table = std::make_unique_for_overwrite<f32[]>(new_embedding_count * n_centroids_);
+    matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings,
+                                                   centroids_data_.data(),
+                                                   new_embedding_count,
+                                                   n_centroids_,
+                                                   embedding_dimension_,
+                                                   dist_table.get());
+
+    // Find embeddings with max distance below threshold (outliers)
+    std::vector<u32> outlier_indices;
+    std::vector<f32> outlier_embeddings;
+    const f32 outlier_threshold = -0.5f; // Threshold for cosine similarity
+
+    for (u64 i = 0; i < new_embedding_count; ++i) {
+        f32 max_sim = std::numeric_limits<f32>::lowest();
+        for (u32 j = 0; j < n_centroids_; ++j) {
+            f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+            max_sim = std::max(max_sim, sim);
+        }
+        if (max_sim < outlier_threshold) {
+            // This is an outlier, add to list
+            outlier_indices.push_back(static_cast<u32>(i));
+            for (u32 d = 0; d < embedding_dimension_; ++d) {
+                outlier_embeddings.push_back(new_embeddings[i * embedding_dimension_ + d]);
+            }
+        }
+    }
+
+    if (outlier_indices.size() < 8) {
+        LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Too few outliers ({}), skipping expansion", outlier_indices.size()));
+        return;
+    }
+
+    // Compute new centroids from outliers using K-means
+    u32 n_new_centroids = static_cast<u32>(std::sqrt(outlier_indices.size()));
+    n_new_centroids = ((n_new_centroids + 7) / 8) * 8;               // Round to multiple of 8
+    n_new_centroids = std::max(8u, std::min(n_new_centroids, 128u)); // Clamp between 8 and 128
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Creating {} new centroids from {} outliers", n_new_centroids, outlier_indices.size()));
+
+    std::vector<f32> new_centroids(n_new_centroids * embedding_dimension_);
+    const auto result_centroid_num = GetKMeansCentroids(MetricType::kMetricL2,
+                                                        embedding_dimension_,
+                                                        outlier_embeddings.size() / embedding_dimension_,
+                                                        outlier_embeddings.data(),
+                                                        new_centroids,
+                                                        n_new_centroids,
+                                                        expand_iter);
+
+    if (result_centroid_num != n_new_centroids) {
+        LOG_WARN(fmt::format("PlaidIndex::ExpandCentroids: KMeans failed to get {} centroids, got {} instead", n_new_centroids, result_centroid_num));
+        return;
+    }
+
+    // Merge new centroids with existing ones
+    u32 old_n_centroids = n_centroids_;
+    n_centroids_ += n_new_centroids;
+
+    // Extend centroids data
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dimension_);
+    std::copy(new_centroids.begin(), new_centroids.end(), centroids_data_.begin() + old_n_centroids * embedding_dimension_);
+
+    // Extend centroid norms
+    centroid_norms_neg_half_.resize(n_centroids_);
+    const f32 *centroid_data = centroids_data_.data() + old_n_centroids * embedding_dimension_;
+    for (u32 i = old_n_centroids; i < n_centroids_; ++i) {
+        centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_data, embedding_dimension_);
+        centroid_data += embedding_dimension_;
+    }
+
+    // Extend IVF lists
+    ivf_lists_.resize(n_centroids_);
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanded from {} to {} centroids", old_n_centroids, n_centroids_));
+}
+
 } // namespace infinity
