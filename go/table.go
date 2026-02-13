@@ -823,14 +823,76 @@ func parseColumnVectors(columnType thriftapi.ColumnType, physicalType *thriftapi
 				values = append(values, v)
 			}
 		}
-	case thriftapi.ColumnType_ColumnEmbedding,
-		thriftapi.ColumnType_ColumnMultiVector,
-		thriftapi.ColumnType_ColumnTensor,
-		thriftapi.ColumnType_ColumnTensorArray,
-		thriftapi.ColumnType_ColumnSparse:
-		// Complex types - store as bytes for now
-		for _, vector := range columnVectors {
-			values = append(values, vector)
+	case thriftapi.ColumnType_ColumnEmbedding:
+		// Embedding type - parse based on element type and dimension
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			for _, vector := range columnVectors {
+				embeddings := parseEmbeddingVector(vector, physicalType.EmbeddingType)
+				for _, v := range embeddings {
+					values = append(values, v)
+				}
+			}
+		} else {
+			for _, vector := range columnVectors {
+				values = append(values, vector)
+			}
+		}
+	case thriftapi.ColumnType_ColumnMultiVector,
+		thriftapi.ColumnType_ColumnTensor:
+		// Tensor types - parse with length prefix
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			for _, vector := range columnVectors {
+				tensors := parseTensorVector(vector, physicalType.EmbeddingType)
+				for _, v := range tensors {
+					values = append(values, v)
+				}
+			}
+		} else {
+			for _, vector := range columnVectors {
+				values = append(values, vector)
+			}
+		}
+	case thriftapi.ColumnType_ColumnTensorArray:
+		// TensorArray type - parse array of tensors
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			for _, vector := range columnVectors {
+				tensorArrays := parseTensorArrayVector(vector, physicalType.EmbeddingType)
+				for _, v := range tensorArrays {
+					values = append(values, v)
+				}
+			}
+		} else {
+			for _, vector := range columnVectors {
+				values = append(values, vector)
+			}
+		}
+	case thriftapi.ColumnType_ColumnSparse:
+		// Sparse type - parse based on element type and index type
+		if physicalType != nil && physicalType.SparseType != nil {
+			for _, vector := range columnVectors {
+				sparseVectors := parseSparseVector(vector, physicalType.SparseType)
+				for _, v := range sparseVectors {
+					values = append(values, v)
+				}
+			}
+		} else {
+			for _, vector := range columnVectors {
+				values = append(values, vector)
+			}
+		}
+	case thriftapi.ColumnType_ColumnArray:
+		// Array type - parse based on element data type
+		if physicalType != nil && physicalType.ArrayType != nil {
+			for _, vector := range columnVectors {
+				arrays := parseArrayVector(vector, physicalType.ArrayType)
+				for _, v := range arrays {
+					values = append(values, v)
+				}
+			}
+		} else {
+			for _, vector := range columnVectors {
+				values = append(values, vector)
+			}
 		}
 	default:
 		// Default: store as bytes
@@ -1016,4 +1078,424 @@ func parseBoolVector(data []byte) []bool {
 		result[i] = b != 0
 	}
 	return result
+}
+
+// parseEmbeddingVector parses embedding vector from bytes based on embedding type
+func parseEmbeddingVector(data []byte, embeddingType *thriftapi.EmbeddingType) []interface{} {
+	dimension := embeddingType.Dimension
+	elementType := embeddingType.ElementType
+
+	var allValues []interface{}
+
+	switch elementType {
+	case thriftapi.ElementType_ElementBit:
+		// Bit type: each byte contains 8 bits
+		if dimension%8 != 0 {
+			return []interface{}{}
+		}
+		subDim := dimension / 8
+		for i := 0; i < len(data); i += int(subDim) {
+			if i+int(subDim) > len(data) {
+				break
+			}
+			midRes := data[i : i+int(subDim)]
+			midResInt := uint64(0)
+			for j := len(midRes) - 1; j >= 0; j-- {
+				midResInt = midResInt*256 + uint64(midRes[j])
+			}
+			// Format as binary string with leading zeros
+			formatStr := fmt.Sprintf("%%0%db", dimension)
+			binaryStr := fmt.Sprintf(formatStr, midResInt)
+			// Reverse the string
+			runes := []rune(binaryStr)
+			for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+				runes[i], runes[j] = runes[j], runes[i]
+			}
+			allValues = append(allValues, string(runes))
+		}
+		return allValues
+	case thriftapi.ElementType_ElementUInt8:
+		allValues = parseBytesToSlice(data, 1, func(b []byte) interface{} { return uint8(b[0]) })
+	case thriftapi.ElementType_ElementInt8:
+		allValues = parseBytesToSlice(data, 1, func(b []byte) interface{} { return int8(b[0]) })
+	case thriftapi.ElementType_ElementInt16:
+		allValues = parseBytesToSlice(data, 2, func(b []byte) interface{} {
+			return int16(b[0]) | int16(b[1])<<8
+		})
+	case thriftapi.ElementType_ElementInt32:
+		allValues = parseBytesToSlice(data, 4, func(b []byte) interface{} {
+			return int32(b[0]) | int32(b[1])<<8 | int32(b[2])<<16 | int32(b[3])<<24
+		})
+	case thriftapi.ElementType_ElementInt64:
+		allValues = parseBytesToSlice(data, 8, func(b []byte) interface{} {
+			return int64(b[0]) | int64(b[1])<<8 | int64(b[2])<<16 | int64(b[3])<<24 |
+				int64(b[4])<<32 | int64(b[5])<<40 | int64(b[6])<<48 | int64(b[7])<<56
+		})
+	case thriftapi.ElementType_ElementFloat32:
+		allValues = parseBytesToSlice(data, 4, func(b []byte) interface{} {
+			bits := uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+			return math.Float32frombits(bits)
+		})
+	case thriftapi.ElementType_ElementFloat64:
+		allValues = parseBytesToSlice(data, 8, func(b []byte) interface{} {
+			bits := uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
+				uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+			return math.Float64frombits(bits)
+		})
+	case thriftapi.ElementType_ElementFloat16:
+		allValues = parseBytesToSlice(data, 2, func(b []byte) interface{} {
+			bits := uint16(b[0]) | uint16(b[1])<<8
+			return float16ToFloat32(bits)
+		})
+	case thriftapi.ElementType_ElementBFloat16:
+		allValues = parseBytesToSlice(data, 2, func(b []byte) interface{} {
+			// BFloat16: convert to float32 by padding with zeros in the lower 16 bits
+			bits := uint32(b[0]) | uint32(b[1])<<8
+			return math.Float32frombits(bits << 16)
+		})
+	default:
+		return []interface{}{}
+	}
+
+	// Split into embeddings of dimension size
+	result := make([]interface{}, 0)
+	for i := 0; i < len(allValues); i += int(dimension) {
+		end := i + int(dimension)
+		if end > len(allValues) {
+			end = len(allValues)
+		}
+		embedding := make([]interface{}, end-i)
+		copy(embedding, allValues[i:end])
+		result = append(result, embedding)
+	}
+	return result
+}
+
+// parseBytesToSlice is a helper function to parse bytes into a slice
+func parseBytesToSlice(data []byte, elementSize int, parser func([]byte) interface{}) []interface{} {
+	if len(data)%elementSize != 0 {
+		return []interface{}{}
+	}
+	count := len(data) / elementSize
+	result := make([]interface{}, count)
+	for i := 0; i < count; i++ {
+		result[i] = parser(data[i*elementSize : (i+1)*elementSize])
+	}
+	return result
+}
+
+// parseTensorVector parses tensor vector (multivector/tensor) from bytes
+func parseTensorVector(data []byte, embeddingType *thriftapi.EmbeddingType) []interface{} {
+	result := make([]interface{}, 0)
+	offset := 0
+
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			break
+		}
+		// Read length prefix (4 bytes, little-endian)
+		length := int(data[offset]) | int(data[offset+1])<<8 | int(data[offset+2])<<16 | int(data[offset+3])<<24
+		offset += 4
+
+		if offset+length > len(data) {
+			break
+		}
+
+		// Parse tensor data using embedding parser
+		tensorData := data[offset : offset+length]
+		offset += length
+
+		embeddings := parseEmbeddingVector(tensorData, embeddingType)
+		if len(embeddings) > 0 {
+			result = append(result, embeddings[0])
+		}
+	}
+
+	return result
+}
+
+// parseTensorArrayVector parses tensor array vector from bytes
+func parseTensorArrayVector(data []byte, embeddingType *thriftapi.EmbeddingType) []interface{} {
+	result := make([]interface{}, 0)
+	offset := 0
+
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			break
+		}
+		// Read tensor count (4 bytes, little-endian)
+		tensorCount := int(data[offset]) | int(data[offset+1])<<8 | int(data[offset+2])<<16 | int(data[offset+3])<<24
+		offset += 4
+
+		tensorArray := make([]interface{}, 0, tensorCount)
+		for i := 0; i < tensorCount; i++ {
+			if offset+4 > len(data) {
+				break
+			}
+			// Read length prefix
+			length := int(data[offset]) | int(data[offset+1])<<8 | int(data[offset+2])<<16 | int(data[offset+3])<<24
+			offset += 4
+
+			if offset+length > len(data) {
+				break
+			}
+
+			tensorData := data[offset : offset+length]
+			offset += length
+
+			embeddings := parseEmbeddingVector(tensorData, embeddingType)
+			if len(embeddings) > 0 {
+				tensorArray = append(tensorArray, embeddings[0])
+			}
+		}
+		result = append(result, tensorArray)
+	}
+
+	return result
+}
+
+// parseSparseVector parses sparse vector from bytes
+func parseSparseVector(data []byte, sparseType *thriftapi.SparseType) []interface{} {
+	result := make([]interface{}, 0)
+	offset := 0
+
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			break
+		}
+		// Read nnz (number of non-zero elements)
+		nnz := int(data[offset]) | int(data[offset+1])<<8 | int(data[offset+2])<<16 | int(data[offset+3])<<24
+		offset += 4
+
+		// Parse indices based on index type
+		var indices []interface{}
+		switch sparseType.IndexType {
+		case thriftapi.ElementType_ElementInt8:
+			if offset+nnz > len(data) {
+				break
+			}
+			indices = parseBytesToSlice(data[offset:offset+nnz], 1, func(b []byte) interface{} { return int8(b[0]) })
+			offset += nnz
+		case thriftapi.ElementType_ElementInt16:
+			if offset+nnz*2 > len(data) {
+				break
+			}
+			indices = parseBytesToSlice(data[offset:offset+nnz*2], 2, func(b []byte) interface{} {
+				return int16(b[0]) | int16(b[1])<<8
+			})
+			offset += nnz * 2
+		case thriftapi.ElementType_ElementInt32:
+			if offset+nnz*4 > len(data) {
+				break
+			}
+			indices = parseBytesToSlice(data[offset:offset+nnz*4], 4, func(b []byte) interface{} {
+				return int32(b[0]) | int32(b[1])<<8 | int32(b[2])<<16 | int32(b[3])<<24
+			})
+			offset += nnz * 4
+		case thriftapi.ElementType_ElementInt64:
+			if offset+nnz*8 > len(data) {
+				break
+			}
+			indices = parseBytesToSlice(data[offset:offset+nnz*8], 8, func(b []byte) interface{} {
+				return int64(b[0]) | int64(b[1])<<8 | int64(b[2])<<16 | int64(b[3])<<24 |
+					int64(b[4])<<32 | int64(b[5])<<40 | int64(b[6])<<48 | int64(b[7])<<56
+			})
+			offset += nnz * 8
+		default:
+			return []interface{}{}
+		}
+
+		// Parse values based on element type
+		var values []interface{}
+		switch sparseType.ElementType {
+		case thriftapi.ElementType_ElementUInt8:
+			if offset+nnz > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz], 1, func(b []byte) interface{} { return uint8(b[0]) })
+			offset += nnz
+		case thriftapi.ElementType_ElementInt8:
+			if offset+nnz > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz], 1, func(b []byte) interface{} { return int8(b[0]) })
+			offset += nnz
+		case thriftapi.ElementType_ElementInt16:
+			if offset+nnz*2 > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz*2], 2, func(b []byte) interface{} {
+				return int16(b[0]) | int16(b[1])<<8
+			})
+			offset += nnz * 2
+		case thriftapi.ElementType_ElementInt32:
+			if offset+nnz*4 > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz*4], 4, func(b []byte) interface{} {
+				return int32(b[0]) | int32(b[1])<<8 | int32(b[2])<<16 | int32(b[3])<<24
+			})
+			offset += nnz * 4
+		case thriftapi.ElementType_ElementInt64:
+			if offset+nnz*8 > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz*8], 8, func(b []byte) interface{} {
+				return int64(b[0]) | int64(b[1])<<8 | int64(b[2])<<16 | int64(b[3])<<24 |
+					int64(b[4])<<32 | int64(b[5])<<40 | int64(b[6])<<48 | int64(b[7])<<56
+			})
+			offset += nnz * 8
+		case thriftapi.ElementType_ElementFloat32:
+			if offset+nnz*4 > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz*4], 4, func(b []byte) interface{} {
+				bits := uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
+				return math.Float32frombits(bits)
+			})
+			offset += nnz * 4
+		case thriftapi.ElementType_ElementFloat64:
+			if offset+nnz*8 > len(data) {
+				break
+			}
+			values = parseBytesToSlice(data[offset:offset+nnz*8], 8, func(b []byte) interface{} {
+				bits := uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
+					uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+				return math.Float64frombits(bits)
+			})
+			offset += nnz * 8
+		default:
+			return []interface{}{}
+		}
+
+		// Create sparse vector map
+		sparseMap := make(map[string]interface{})
+		sparseMap["indices"] = indices
+		sparseMap["values"] = values
+		result = append(result, sparseMap)
+	}
+
+	return result
+}
+
+// parseArrayVector parses array vector from bytes
+func parseArrayVector(data []byte, arrayType *thriftapi.ArrayType) []interface{} {
+	result := make([]interface{}, 0)
+	offset := 0
+
+	elementDataType := arrayType.ElementDataType
+	if elementDataType == nil {
+		return []interface{}{}
+	}
+
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			break
+		}
+		// Read element count (4 bytes, little-endian)
+		elementCount := int(data[offset]) | int(data[offset+1])<<8 | int(data[offset+2])<<16 | int(data[offset+3])<<24
+		offset += 4
+
+		arrayData := make([]interface{}, 0, elementCount)
+		for i := 0; i < elementCount; i++ {
+			elementValue, newOffset := parseSingleArrayElement(data, offset, elementDataType)
+			if newOffset <= offset {
+				break
+			}
+			offset = newOffset
+			arrayData = append(arrayData, elementValue)
+		}
+		result = append(result, arrayData)
+	}
+
+	return result
+}
+
+// parseSingleArrayElement parses a single array element from bytes
+func parseSingleArrayElement(data []byte, offset int, elementDataType *thriftapi.DataType) (interface{}, int) {
+	if elementDataType == nil || elementDataType.PhysicalType == nil {
+		return nil, offset
+	}
+
+	physicalType := elementDataType.PhysicalType
+	logicType := elementDataType.LogicType
+
+	switch logicType {
+	case thriftapi.LogicType_TinyInt:
+		if offset+1 > len(data) {
+			return nil, offset
+		}
+		return int8(data[offset]), offset + 1
+	case thriftapi.LogicType_SmallInt:
+		if offset+2 > len(data) {
+			return nil, offset
+		}
+		val := int16(data[offset]) | int16(data[offset+1])<<8
+		return val, offset + 2
+	case thriftapi.LogicType_Integer:
+		if offset+4 > len(data) {
+			return nil, offset
+		}
+		val := int32(data[offset]) | int32(data[offset+1])<<8 | int32(data[offset+2])<<16 | int32(data[offset+3])<<24
+		return val, offset + 4
+	case thriftapi.LogicType_BigInt:
+		if offset+8 > len(data) {
+			return nil, offset
+		}
+		val := int64(data[offset]) | int64(data[offset+1])<<8 | int64(data[offset+2])<<16 | int64(data[offset+3])<<24 |
+			int64(data[offset+4])<<32 | int64(data[offset+5])<<40 | int64(data[offset+6])<<48 | int64(data[offset+7])<<56
+		return val, offset + 8
+	case thriftapi.LogicType_Float:
+		if offset+4 > len(data) {
+			return nil, offset
+		}
+		bits := uint32(data[offset]) | uint32(data[offset+1])<<8 | uint32(data[offset+2])<<16 | uint32(data[offset+3])<<24
+		return math.Float32frombits(bits), offset + 4
+	case thriftapi.LogicType_Double:
+		if offset+8 > len(data) {
+			return nil, offset
+		}
+		bits := uint64(data[offset]) | uint64(data[offset+1])<<8 | uint64(data[offset+2])<<16 | uint64(data[offset+3])<<24 |
+			uint64(data[offset+4])<<32 | uint64(data[offset+5])<<40 | uint64(data[offset+6])<<48 | uint64(data[offset+7])<<56
+		return math.Float64frombits(bits), offset + 8
+	case thriftapi.LogicType_Varchar:
+		// For varchar, read until null terminator
+		start := offset
+		for offset < len(data) && data[offset] != 0 {
+			offset++
+		}
+		str := string(data[start:offset])
+		if offset < len(data) && data[offset] == 0 {
+			offset++ // Skip null terminator
+		}
+		return str, offset
+	default:
+		// For complex types, try to use physical type info
+		if physicalType.EmbeddingType != nil {
+			embeddings := parseEmbeddingVector(data[offset:], physicalType.EmbeddingType)
+			if len(embeddings) > 0 {
+				return embeddings[0], offset + calculateEmbeddingSize(physicalType.EmbeddingType)
+			}
+		}
+		return nil, offset
+	}
+}
+
+// calculateEmbeddingSize calculates the size in bytes of an embedding
+func calculateEmbeddingSize(embeddingType *thriftapi.EmbeddingType) int {
+	dimension := int(embeddingType.Dimension)
+	switch embeddingType.ElementType {
+	case thriftapi.ElementType_ElementBit:
+		return (dimension + 7) / 8
+	case thriftapi.ElementType_ElementUInt8, thriftapi.ElementType_ElementInt8:
+		return dimension
+	case thriftapi.ElementType_ElementInt16, thriftapi.ElementType_ElementFloat16, thriftapi.ElementType_ElementBFloat16:
+		return dimension * 2
+	case thriftapi.ElementType_ElementInt32, thriftapi.ElementType_ElementFloat32:
+		return dimension * 4
+	case thriftapi.ElementType_ElementInt64, thriftapi.ElementType_ElementFloat64:
+		return dimension * 8
+	default:
+		return dimension * 4
+	}
 }

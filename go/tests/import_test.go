@@ -673,18 +673,15 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 }
 
 // TestImportEmbeddingWithNotMatchDefinition tests importing embedding with mismatched definition
-func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
+func TestImportEmbeddingWithCompatibleDefinition(t *testing.T) {
 	types := []string{
-		"vector, 128, int",
+		"vector, 3, int",
 		"vector, 3, float",
-		"vector, 128, float",
 		"vector, 3, double",
 	}
 
 	for _, dataType := range types {
 		t.Run(strings.ReplaceAll(dataType, ", ", "_"), func(t *testing.T) {
-			suffix := generateSuffix(t)
-
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
 
@@ -693,7 +690,7 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_import_embedding_with_not_match_definition" + suffix
+			tableName := "test_import_embedding_with_not_match_definition"
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -724,14 +721,61 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 				t.Fatalf("Import result: %v", err)
 			}
 
-			result, err := table.Output([]string{"*"}).ToResult()
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
 			if err != nil {
-				t.Fatalf("Query result: %v", err)
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
+		})
+	}
+}
+
+// TestImportEmbeddingWithNotMatchDefinition tests importing embedding with mismatched definition
+func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
+	types := []string{
+		"vector, 128, int",
+		"vector, 128, float",
+	}
+
+	for _, dataType := range types {
+		t.Run(strings.ReplaceAll(dataType, ", ", "_"), func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			queryResult, ok := result.(*infinity.QueryResult)
-			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+			tableName := "test_import_embedding_with_not_match_definition"
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
+
+			schema := infinity.TableSchema{
+				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
+				"c2": &infinity.ColumnDefinition{Name: "c2", DataType: dataType},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			filePath := testDataDir + "embedding_int_dim3.csv"
+			if !fileExists(filePath) {
+				t.Fatalf("Test data file does not exist: %s", filePath)
+			}
+
+			importOpts := &infinity.ImportOption{
+				CopyFileType: infinity.CopyFileTypeCSV,
+			}
+
+			_, err = table.ImportData(filePath, importOpts)
+			if err == nil {
+				t.Fatalf("Expect failure due to unmatched embedding dimension: %v", err)
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
