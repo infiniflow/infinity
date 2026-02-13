@@ -508,21 +508,25 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, std::shared
 }
 
 Status LogicalPlanner::BuildCreate(CreateStatement *statement, std::shared_ptr<BindContext> &bind_context_ptr) {
-    BindSchemaName(statement->create_info_->schema_name_);
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
+            BindSchemaName(statement->create_info_->schema_name_);
             return BuildCreateTable(statement, bind_context_ptr);
         }
         case DDLType::kCollection: {
+            BindSchemaName(statement->create_info_->schema_name_);
             return BuildCreateCollection(statement, bind_context_ptr);
         }
         case DDLType::kView: {
+            BindSchemaName(statement->create_info_->schema_name_);
             return BuildCreateView(statement, bind_context_ptr);
         }
         case DDLType::kIndex: {
+            BindSchemaName(statement->create_info_->schema_name_);
             return BuildCreateIndex(statement, bind_context_ptr);
         }
         case DDLType::kDatabase: {
+            // if db_name is empty, create database shouldn't provide default db name
             return BuildCreateDatabase(statement, bind_context_ptr);
         }
         default: {

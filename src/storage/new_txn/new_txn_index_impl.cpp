@@ -117,17 +117,20 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            continue;
+        }
+
+        if (!mem_index->TrySetIsDumping()) {
             continue;
         }
 
         ChunkID chunk_id = 0;
         std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
         if (!status.ok()) {
+            mem_index->SetIsDumping(false);
             return status;
         }
-
-        mem_index->SetIsDumping(true);
 
         // Dump Mem Index
         status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -162,15 +165,23 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     // Return when there is no mem index to dump.
-    if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
         (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
-        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist or it is dumped (is_dumping: {})",
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist",
                              db_name,
                              table_name,
                              index_name,
                              segment_id,
-                             begin_row_id.ToUint64(),
-                             mem_index->IsDumping()));
+                             begin_row_id.ToUint64()));
+        return Status::OK();
+    }
+    if (!mem_index->TrySetIsDumping()) {
+        LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it is already being dumped",
+                             db_name,
+                             table_name,
+                             index_name,
+                             segment_id,
+                             begin_row_id.ToUint64()));
         return Status::OK();
     }
 
@@ -196,10 +207,9 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     ChunkID chunk_id = 0;
     std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
     if (!status.ok()) {
+        mem_index->SetIsDumping(false);
         return status;
     }
-
-    mem_index->SetIsDumping(true);
 
     // Dump Mem Index
     status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
@@ -2436,6 +2446,35 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         LOG_TRACE(fmt::format("Created new fulltext index cache for index: {}", *create_index_cmd->index_base_->index_name_));
     }
 
+    if (!IsReplay()) {
+        std::vector<std::string> all_file_paths;
+
+        auto [segment_index_ids_ptr, seg_status] = table_index_meta_ptr->GetSegmentIndexIDs1();
+        if (seg_status.ok()) {
+            for (SegmentID segment_id : *segment_index_ids_ptr) {
+                SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_ptr);
+
+                auto [chunk_ids_ptr, chunk_status] = segment_index_meta.GetChunkIDs1();
+                if (chunk_status.ok()) {
+                    for (ChunkID chunk_id : *chunk_ids_ptr) {
+                        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+
+                        std::vector<std::string> chunk_file_paths;
+                        Status fp_status = chunk_index_meta.FilePaths(chunk_file_paths);
+                        if (fp_status.ok()) {
+                            all_file_paths.insert(all_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!all_file_paths.empty()) {
+            auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+            fileworker_mgr->MoveFiles(all_file_paths);
+        }
+    }
+
     return Status::OK();
 }
 
@@ -2499,9 +2538,44 @@ Status NewTxn::PrepareCommitDumpIndex(const WalCmdDumpIndexV2 *dump_index_cmd, K
         kv_instance_->Put(KeyEncode::DropChunkIndexKey(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id), ts_str);
     }
 
+    if (!IsReplay()) {
+        switch (dump_index_cmd->dump_cause_) {
+            case DumpIndexCause::kCompact:
+                [[fallthrough]];
+            case DumpIndexCause::kOptimizeIndex:
+                [[fallthrough]];
+            case DumpIndexCause::kImport: {
+                std::vector<std::string> index_file_paths;
+                SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+                for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+                    ChunkID new_chunk_id = chunk_info.chunk_id_;
+                    ChunkIndexMeta new_chunk_meta(new_chunk_id, segment_index_meta);
+                    std::vector<std::string> chunk_file_paths;
+                    Status fp_status = new_chunk_meta.FilePaths(chunk_file_paths);
+                    if (fp_status.ok()) {
+                        index_file_paths.insert(index_file_paths.end(), chunk_file_paths.begin(), chunk_file_paths.end());
+                    } else {
+                        LOG_WARN(fmt::format("Failed to get file paths for chunk {}, index {}.{}, segment {}: {}",
+                                             new_chunk_id,
+                                             table_name,
+                                             index_name,
+                                             segment_id,
+                                             fp_status.message()));
+                    }
+                }
+                if (!index_file_paths.empty()) {
+                    fileworker_mgr_->MoveFiles(index_file_paths);
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
@@ -2628,11 +2702,14 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
 
             // 4. Get memory index for this segment
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || mem_index->IsDumping() || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
                 LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
                 continue;
             }
-            mem_index->SetIsDumping(true);
+            if (!mem_index->TrySetIsDumping()) {
+                LOG_INFO(fmt::format("Skipping segment {} - already being dumped by another thread", segment_id));
+                continue;
+            }
 
             // 4.5. Additional check for EMVB index - ensure it's built before dumping
 
@@ -2640,6 +2717,7 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
             ChunkID chunk_id = 0;
             std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
             if (!status.ok()) {
+                mem_index->SetIsDumping(false);
                 return status;
             }
 

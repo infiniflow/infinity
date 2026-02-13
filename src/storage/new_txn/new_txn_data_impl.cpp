@@ -191,7 +191,11 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
     }
 
     status = Import(db_name, table_name, block_row_cnts);
-    return status;
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status NewTxn::Import(const std::string &db_name, const std::string &table_name, const std::vector<size_t> &block_row_cnts) {
@@ -282,10 +286,9 @@ Status NewTxn::Import(const std::string &db_name, const std::string &table_name,
         auto new_block_dir = *block_meta->GetBlockDir();
         auto new_block_path = fmt::format("{}/{}", InfinityContext::instance().config()->TempDir(), new_block_dir);
 
-        std::vector<std::string> import_file_paths{};
         for (const auto &entry : std::filesystem::directory_iterator(old_block_path)) {
             auto file_name = entry.path().filename().string();
-            import_file_paths.emplace_back(fmt::format("{}/{}", new_block_path, file_name));
+            import_txn_store->file_worker_paths_.emplace_back(fmt::format("{}/{}", new_block_dir, file_name));
         }
 
         auto rename_status = VirtualStore::Rename(old_block_path, new_block_path);
@@ -1338,9 +1341,15 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
+    if (!IsReplay() && base_txn_store_) {
+        auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
+        if (!import_txn_store->file_worker_paths_.empty()) {
+            fileworker_mgr_->MoveFiles(import_txn_store->file_worker_paths_);
+        }
+    }
+
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
@@ -1599,6 +1608,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     const std::string &db_id_str = compact_cmd->db_id_;
     const std::string &table_id_str = compact_cmd->table_id_;
     const std::string &table_name = compact_cmd->table_name_;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     std::vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
@@ -1671,9 +1681,31 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         }
     }
 
+    if (!IsReplay()) {
+        std::vector<std::string> data_file_paths;
+
+        std::vector<std::string> *index_id_strs_ptr{};
+        std::vector<std::string> *index_name_strs_ptr{};
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (const WalSegmentInfo &seg_info : compact_cmd->new_segment_infos_) {
+            SegmentMeta seg_meta(seg_info.segment_id_, table_meta);
+            Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, data_file_paths, nullptr);
+            if (!path_status.ok()) {
+                LOG_WARN(fmt::format("Failed to get segment file paths: {}", path_status.message()));
+            }
+        }
+
+        if (!data_file_paths.empty()) {
+            fileworker_mgr_->MoveFiles(data_file_paths);
+        }
+    }
+
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        // When all data and index is write to disk, try to finalize the
         PersistResultHandler handler(pm);
         PersistWriteResult result = pm->CurrentObjFinalize();
         handler.HandleWriteResult(result);
