@@ -1,0 +1,47 @@
+# name: test/sql/ddl/index/test_plaid.slt
+# description: Test create PLAID index
+# group: [ddl, test_plaid]
+
+statement ok
+DROP TABLE IF EXISTS test_plaid;
+
+# PLAID index requires tensor column type
+statement ok
+CREATE TABLE test_plaid (col1 tensor(float,4));
+
+# Import data - tensor array format
+statement ok
+INSERT INTO test_plaid VALUES ([[0.1, 0.2, 0.3, 0.4]]);
+
+# Create PLAID index with parameters
+statement ok
+CREATE INDEX idx1 ON test_plaid (col1) USING PLAID WITH (nbits = 4, n_centroids = 100);
+
+# Duplicate index name should fail
+statement error
+CREATE INDEX idx1 ON test_plaid (col1) USING PLAID WITH (nbits = 4, n_centroids = 100);
+
+# IF NOT EXISTS should work
+statement ok
+CREATE INDEX IF NOT EXISTS idx1 ON test_plaid (col1) USING PLAID WITH (nbits = 4, n_centroids = 100);
+
+statement ok
+DROP INDEX idx1 ON test_plaid;
+
+# Test invalid nbits (must be 2 or 4)
+statement error
+CREATE INDEX idx1 ON test_plaid (col1) USING PLAID WITH (nbits = 3, n_centroids = 100);
+
+# Test nbits = 2
+statement ok
+CREATE INDEX idx2 ON test_plaid (col1) USING PLAID WITH (nbits = 2, n_centroids = 50);
+
+statement ok
+DROP INDEX idx2 ON test_plaid;
+
+# Test default parameters
+statement ok
+CREATE INDEX idx3 ON test_plaid (col1) USING PLAID;
+
+statement ok
+DROP TABLE test_plaid;

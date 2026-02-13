@@ -2112,6 +2112,8 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kBMP;
         case infinity_thrift_rpc::IndexType::DiskAnn:
             return IndexType::kDiskAnn;
+        case infinity_thrift_rpc::IndexType::PLAID:
+            return IndexType::kPLAID;
         default:
             return IndexType::kInvalid;
     }

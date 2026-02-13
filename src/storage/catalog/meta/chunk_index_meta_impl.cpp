@@ -38,6 +38,7 @@ import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :secondary_index_file_worker;
+import :plaid_index_file_worker;
 import :file_worker;
 
 import std;
@@ -216,6 +217,21 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
             }
             case IndexType::kDiskAnn: {
                 LOG_WARN("Not implemented");
+                break;
+            }
+            case IndexType::kPLAID: {
+                auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+                const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
+                auto file_worker = std::make_unique<PlaidIndexFileWorker>(
+                    std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                    index_dir,
+                    std::move(index_file_name),
+                    index_base,
+                    column_def,
+                    segment_start_offset,
+                    buffer_mgr->persistence_manager());
+                index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
                 break;
             }
             default: {
@@ -457,17 +473,25 @@ Status ChunkIndexMeta::RestoreSet() {
 
             break;
         }
-        default: {
+        case IndexType::kPLAID: {
+            auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            auto file_worker = std::make_unique<PlaidIndexFileWorker>(
+                std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                index_dir,
+                std::move(index_file_name),
+                index_base,
+                column_def,
+                segment_start_offset,
+                buffer_mgr->persistence_manager());
+            index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            index_buffer_->AddObjRc();
+            break;
+        }
+    default: {
             UnrecoverableError("Not implemented yet");
         }
-    }
-    auto *buffer_obj = buffer_mgr->GetBufferObject(index_file_worker->GetFilePath());
-    if (buffer_obj == nullptr) {
-        index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-        index_buffer_->AddObjRc();
-    }
-    if (index_buffer_ == nullptr) {
-        return Status::BufferManagerError("GetBufferObject failed");
     }
 
     return Status::OK();
@@ -602,7 +626,10 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         case IndexType::kIVF:
         case IndexType::kSecondary:
         case IndexType::kSecondaryFunctional:
-        case IndexType::kBMP: {
+            [[fallthrough]];
+        case IndexType::kBMP:
+            [[fallthrough]];
+        case IndexType::kPLAID: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
             paths.push_back(file_path);
@@ -644,6 +671,15 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
         case IndexType::kHnsw:
         case IndexType::kBMP:
         case IndexType::kEMVB: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
+            if (index_buffer_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetBufferObject failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kPLAID: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
