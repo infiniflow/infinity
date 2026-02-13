@@ -17,7 +17,6 @@ package infinity
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
@@ -64,17 +63,7 @@ type InfinityConnection struct {
 func NewInfinityConnection(address NetworkAddress) (*InfinityConnection, error) {
 	// Create thrift transport
 	// Use TBufferedTransport for sync communication (matching Python's TBufferedTransport)
-	transport, err := thrift.NewTSocketTimeout(
-		fmt.Sprintf("%s:%d", address.IP, address.Port),
-		5*time.Second,
-		5*time.Second,
-	)
-	if err != nil {
-		return nil, NewInfinityException(
-			int(ErrorCodeCantConnectServer),
-			fmt.Sprintf("Failed to create socket: %v", err),
-		)
-	}
+	transport := thrift.NewTSocketConf(fmt.Sprintf("%s:%d", address.IP, address.Port), &thrift.TConfiguration{})
 
 	// Use buffered transport
 	bufferedTransport := thrift.NewTBufferedTransport(transport, 8192)

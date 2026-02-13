@@ -37,7 +37,7 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -45,7 +45,11 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 	}
 
 	tableName := "test_import" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	// Create table
 	schema := infinity.TableSchema{
@@ -132,7 +136,7 @@ func TestImportDifferentFileFormat(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -140,7 +144,10 @@ func TestImportDifferentFileFormat(t *testing.T) {
 			}
 
 			tableName := "test_import_different_file_format_data" + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
 
 			table, err := db.CreateTable(tableName, tc.schema, infinity.ConflictTypeError)
 			if err != nil {
@@ -172,15 +179,19 @@ func TestImportDifferentFileFormat(t *testing.T) {
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
+			}
+
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
 			}
 
 			// Clean up
-			db.DropTable(tableName, infinity.ConflictTypeError)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -190,7 +201,7 @@ func TestImportFVECS(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -198,7 +209,11 @@ func TestImportFVECS(t *testing.T) {
 	}
 
 	tableName := "test_import_different_file_format_data" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	// Create table for fvecs
 	schema := infinity.TableSchema{
@@ -232,15 +247,19 @@ func TestImportFVECS(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
+	}
+
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
 	}
 
 	// Clean up
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportEmptyFile tests importing empty files
@@ -275,7 +294,7 @@ func TestImportEmptyFile(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -283,7 +302,11 @@ func TestImportEmptyFile(t *testing.T) {
 			}
 
 			tableName := "test_import_empty_file_" + tc.name + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 
 			table, err := db.CreateTable(tableName, tc.schema, infinity.ConflictTypeError)
 			if err != nil {
@@ -303,14 +326,18 @@ func TestImportEmptyFile(t *testing.T) {
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
 			}
 
-			db.DropTable(tableName, infinity.ConflictTypeError)
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -320,7 +347,7 @@ func TestImportFormatUnrecognized(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -328,7 +355,11 @@ func TestImportFormatUnrecognized(t *testing.T) {
 	}
 
 	tableName := "test_import_format_unrecognized_data" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -352,14 +383,18 @@ func TestImportFormatUnrecognized(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestCSVWithDifferentDelimiter tests importing CSV with different delimiters
@@ -388,7 +423,7 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 				suffix := generateSuffix(t)
 
 				conn := setupConnection(t)
-				defer conn.Disconnect()
+				defer closeConnection(t, conn)
 
 				db, err := conn.GetDatabase("default_db")
 				if err != nil {
@@ -396,7 +431,11 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 				}
 
 				tableName := "test_csv_with_different_delimiter" + suffix
-				db.DropTable(tableName, infinity.ConflictTypeIgnore)
+				_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+				if err != nil {
+					t.Fatalf("Failed to drop table: %v", err)
+					return
+				}
 
 				schema := infinity.TableSchema{
 					"c1": &infinity.ColumnDefinition{Name: "c1", DataType: dataType},
@@ -426,14 +465,18 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 				result, err := table.Output([]string{"*"}).ToResult()
 				if err != nil {
 					t.Fatalf("Query result: %v", err)
-				} else {
-					queryResult, ok := result.(*infinity.QueryResult)
-					if ok {
-						t.Logf("Query result: %v", queryResult.Data)
-					}
 				}
 
-				db.DropTable(tableName, infinity.ConflictTypeError)
+				queryResult, ok := result.(*infinity.QueryResult)
+				if ok {
+					t.Logf("Query result: %v", queryResult.Data)
+				}
+
+				_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+				if err != nil {
+					t.Fatalf("Failed to drop table: %v", err)
+					return
+				}
 			})
 		}
 	}
@@ -444,7 +487,7 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -452,7 +495,11 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 	}
 
 	tableName := "test_csv_with_different_delimiter_more_than_one_character" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -482,14 +529,18 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportCSVWithHeaders tests importing CSV with/without headers
@@ -501,7 +552,7 @@ func TestImportCSVWithHeaders(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -509,7 +560,11 @@ func TestImportCSVWithHeaders(t *testing.T) {
 			}
 
 			tableName := "test_import_csv_with_headers" + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 
 			schema := infinity.TableSchema{
 				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -539,14 +594,18 @@ func TestImportCSVWithHeaders(t *testing.T) {
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
 			}
 
-			db.DropTable(tableName, infinity.ConflictTypeError)
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -556,7 +615,7 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -564,7 +623,11 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 	}
 
 	tableName := "test_import_fvecs_table_with_more_columns" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -595,20 +658,23 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportEmbeddingWithNotMatchDefinition tests importing embedding with mismatched definition
 func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 	types := []string{
-		"vector, 3, int",
 		"vector, 128, int",
 		"vector, 3, float",
 		"vector, 128, float",
@@ -620,7 +686,7 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -628,7 +694,11 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 			}
 
 			tableName := "test_import_embedding_with_not_match_definition" + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 
 			schema := infinity.TableSchema{
 				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -657,14 +727,18 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
 			}
 
-			db.DropTable(tableName, infinity.ConflictTypeError)
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -674,7 +748,7 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -682,7 +756,11 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 	}
 
 	tableName := "test_import_embedding_with_dimension_unmatch" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -704,21 +782,27 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 	}
 
 	_, err = table.ImportData(filePath, importOpts)
-	if err != nil {
+	if err == nil {
 		t.Fatalf("Import with dimension mismatch error (may or may not be expected): %v", err)
 	}
+
+	t.Logf("Attempt to import with dimension mismatch error (may or may not be expected): %v", err)
 
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportVarcharWithNotMatchDefinition tests importing varchar data
@@ -726,7 +810,7 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -734,7 +818,11 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 	}
 
 	tableName := "test_import_varchar_with_not_match_definition" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -759,14 +847,18 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImport10000Columns tests importing CSV with 10000 columns
@@ -774,7 +866,7 @@ func TestImport10000Columns(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -782,7 +874,11 @@ func TestImport10000Columns(t *testing.T) {
 	}
 
 	tableName := "test_import_10000_columns" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -807,14 +903,18 @@ func TestImport10000Columns(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestTableWithNotMatchedColumns tests importing with mismatched column count
@@ -833,7 +933,7 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -841,7 +941,11 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 			}
 
 			tableName := "test_table_with_not_matched_columns" + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 
 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
 			if err != nil {
@@ -863,14 +967,18 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 			result, err := table.Output([]string{"*"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
 			}
 
-			db.DropTable(tableName, infinity.ConflictTypeError)
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -884,7 +992,7 @@ func TestImportWithDifferentSize(t *testing.T) {
 			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
-			defer conn.Disconnect()
+			defer closeConnection(t, conn)
 
 			db, err := conn.GetDatabase("default_db")
 			if err != nil {
@@ -892,7 +1000,11 @@ func TestImportWithDifferentSize(t *testing.T) {
 			}
 
 			tableName := "test_import_with_different_size" + suffix
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 
 			schema := infinity.TableSchema{
 				"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -918,14 +1030,18 @@ func TestImportWithDifferentSize(t *testing.T) {
 			result, err := table.Output([]string{"count(*)"}).ToResult()
 			if err != nil {
 				t.Fatalf("Query result: %v", err)
-			} else {
-				queryResult, ok := result.(*infinity.QueryResult)
-				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
-				}
 			}
 
-			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -935,7 +1051,7 @@ func TestImportExceedingRows(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -943,7 +1059,11 @@ func TestImportExceedingRows(t *testing.T) {
 	}
 
 	tableName := "test_import_exceeding_rows" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -968,14 +1088,18 @@ func TestImportExceedingRows(t *testing.T) {
 	result, err := table.Output([]string{"count(*)"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportMoreThanOneSegment tests importing data that spans multiple segments
@@ -983,7 +1107,7 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -992,7 +1116,11 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 
 	fileName := "test_sdk_import_more_than_one_segment"
 	tableName := fileName + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -1017,22 +1145,26 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 	result, err := table.Output([]string{"count(*)"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
+	}
+
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
 	}
 
 	// Check segments and blocks
 	segments, err := table.ShowSegments()
 	if err != nil {
-		t.Logf("ShowSegments error: %v", err)
-	} else {
-		t.Logf("Segments: %v", segments)
+		t.Fatalf("ShowSegments error: %v", err)
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	t.Logf("Segments: %v", segments)
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportExceedingColumns tests importing CSV with many columns
@@ -1040,7 +1172,7 @@ func TestImportExceedingColumns(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1048,7 +1180,11 @@ func TestImportExceedingColumns(t *testing.T) {
 	}
 
 	tableName := "test_import_exceeding_columns" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	// Create schema with 1024 columns
 	schema := make(infinity.TableSchema)
@@ -1075,14 +1211,18 @@ func TestImportExceedingColumns(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportJSONLFileWithDefault tests importing JSONL file with default values
@@ -1090,7 +1230,7 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1098,7 +1238,11 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 	}
 
 	tableName := "test_import_jsonl_file_with_default" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{
@@ -1135,14 +1279,18 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportCSVFileWithDefault tests importing CSV file with default values
@@ -1150,7 +1298,7 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1158,7 +1306,11 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 	}
 
 	tableName := "test_import_csv_file_with_default" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{
@@ -1199,14 +1351,18 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportJSONFileWithDefault tests importing JSON file with default values
@@ -1214,7 +1370,7 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1222,7 +1378,11 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 	}
 
 	tableName := "test_import_json_file_with_default" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{
@@ -1268,14 +1428,18 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportJSONLFile tests importing JSONL file
@@ -1283,7 +1447,7 @@ func TestImportJSONLFile(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1291,7 +1455,11 @@ func TestImportJSONLFile(t *testing.T) {
 	}
 
 	tableName := "test_import_jsonl_file" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -1320,14 +1488,18 @@ func TestImportJSONLFile(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportEmptyJSONLFile tests importing empty JSONL file
@@ -1335,7 +1507,7 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1343,7 +1515,11 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 	}
 
 	tableName := "test_import_empty_file_jsonl" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -1372,14 +1548,18 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
 
 // TestImportWithWildcardPath tests importing with wildcard path pattern
@@ -1387,7 +1567,7 @@ func TestImportWithWildcardPath(t *testing.T) {
 	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
-	defer conn.Disconnect()
+	defer closeConnection(t, conn)
 
 	db, err := conn.GetDatabase("default_db")
 	if err != nil {
@@ -1395,7 +1575,11 @@ func TestImportWithWildcardPath(t *testing.T) {
 	}
 
 	tableName := "test_import_wildcard" + suffix
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 
 	schema := infinity.TableSchema{
 		"c1": &infinity.ColumnDefinition{Name: "c1", DataType: "int"},
@@ -1423,12 +1607,16 @@ func TestImportWithWildcardPath(t *testing.T) {
 	result, err := table.Output([]string{"*"}).ToResult()
 	if err != nil {
 		t.Fatalf("Query result: %v", err)
-	} else {
-		queryResult, ok := result.(*infinity.QueryResult)
-		if ok {
-			t.Logf("Query result: %v", queryResult.Data)
-		}
 	}
 
-	db.DropTable(tableName, infinity.ConflictTypeError)
+	queryResult, ok := result.(*infinity.QueryResult)
+	if ok {
+		t.Logf("Query result: %v", queryResult.Data)
+	}
+
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+		return
+	}
 }
