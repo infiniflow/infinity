@@ -1754,8 +1754,10 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             std::vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             std::string default_val = "0";
-            if (embedding_info->Dimension() < ele_str_views.size()) {
-                Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
+            if (embedding_info->Dimension() != ele_str_views.size()) {
+                Status status = Status::ImportFileFormatError(fmt::format("Expect embedding dimension: {}, but got: {}.",
+                                                                          embedding_info->Dimension(),
+                                                                          ele_str_views.size()));
                 RecoverableError(status);
             }
             if (ele_str_views.size() < embedding_info->Dimension()) {
