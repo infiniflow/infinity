@@ -26,6 +26,7 @@ import (
 type Table struct {
 	db        *Database
 	tableName string
+	err       error // accumulated error from chainable methods
 	// Query builder fields
 	outputColumns []string
 	queryBuilder  *QueryBuilder
@@ -523,12 +524,16 @@ func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, e
 
 // MatchDense performs dense vector search
 func (t *Table) MatchDense(vectorColumnName string, embeddingData interface{}, embeddingDataType string, distanceType string, topN int, knnParams map[string]string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.MatchDense(vectorColumnName, embeddingData, embeddingDataType, distanceType, topN, knnParams)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -536,12 +541,16 @@ func (t *Table) MatchDense(vectorColumnName string, embeddingData interface{}, e
 
 // MatchText performs full-text search
 func (t *Table) MatchText(fields string, matchingText string, topN int, extraOptions map[string]string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.MatchText(fields, matchingText, topN, extraOptions)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -549,12 +558,16 @@ func (t *Table) MatchText(fields string, matchingText string, topN int, extraOpt
 
 // MatchTensor performs tensor search
 func (t *Table) MatchTensor(columnName string, queryData interface{}, queryDataType string, topN int, extraOption map[string]string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.MatchTensor(columnName, queryData, queryDataType, topN, extraOption)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -562,12 +575,16 @@ func (t *Table) MatchTensor(columnName string, queryData interface{}, queryDataT
 
 // MatchSparse performs sparse vector search
 func (t *Table) MatchSparse(vectorColumnName string, sparseData *SparseVector, distanceType string, topN int, optParams map[string]string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.MatchSparse(vectorColumnName, sparseData, distanceType, topN, optParams)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -575,12 +592,16 @@ func (t *Table) MatchSparse(vectorColumnName string, sparseData *SparseVector, d
 
 // Fusion combines multiple search results
 func (t *Table) Fusion(method string, topN int, fusionParams map[string]interface{}) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Fusion(method, topN, fusionParams)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -588,12 +609,16 @@ func (t *Table) Fusion(method string, topN int, fusionParams map[string]interfac
 
 // Output specifies output columns
 func (t *Table) Output(columns []string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Output(columns)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -601,12 +626,16 @@ func (t *Table) Output(columns []string) *Table {
 
 // Highlight specifies highlight columns
 func (t *Table) Highlight(columns []string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Highlight(columns)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -614,12 +643,16 @@ func (t *Table) Highlight(columns []string) *Table {
 
 // Filter applies filter
 func (t *Table) Filter(filter string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Filter(filter)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -627,6 +660,9 @@ func (t *Table) Filter(filter string) *Table {
 
 // Limit sets limit
 func (t *Table) Limit(limit int) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
@@ -636,6 +672,9 @@ func (t *Table) Limit(limit int) *Table {
 
 // Offset sets offset
 func (t *Table) Offset(offset int) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
@@ -645,12 +684,16 @@ func (t *Table) Offset(offset int) *Table {
 
 // GroupBy groups results
 func (t *Table) GroupBy(groupByExprList interface{}) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.GroupBy(groupByExprList)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -658,12 +701,16 @@ func (t *Table) GroupBy(groupByExprList interface{}) *Table {
 
 // Having applies having clause
 func (t *Table) Having(havingExpr string) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Having(havingExpr)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -671,12 +718,16 @@ func (t *Table) Having(havingExpr string) *Table {
 
 // Sort sorts results
 func (t *Table) Sort(orderByExprList [][2]interface{}) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
 	queryBuilder, err := t.queryBuilder.Sort(orderByExprList)
 	if err != nil {
-		return nil
+		t.err = err
+		return t
 	}
 	t.queryBuilder = queryBuilder
 	return t
@@ -684,6 +735,9 @@ func (t *Table) Sort(orderByExprList [][2]interface{}) *Table {
 
 // Option sets options
 func (t *Table) Option(optionKV map[string]interface{}) *Table {
+	if t.err != nil {
+		return t
+	}
 	if t.queryBuilder == nil {
 		t.queryBuilder = NewQueryBuilder()
 	}
