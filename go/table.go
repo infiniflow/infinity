@@ -756,21 +756,20 @@ func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
 		ExtraInfo: resp.ExtraResult_,
 	}
 
-	// Process column definitions to get data types
-	for _, colDef := range resp.ColumnDefs {
+	// Process column fields to get data
+	for idx, colField := range resp.ColumnFields {
+		colDef := resp.ColumnDefs[idx]
 		if colDef.DataType != nil {
 			result.DataTypes[colDef.Name] = colDef.DataType.LogicType.String()
 		}
-	}
 
-	// Process column fields to get data
-	for idx, colField := range resp.ColumnFields {
 		columnName := resp.ColumnDefs[idx].Name
 		columnType := colField.ColumnType
+		physicalDataType := colDef.DataType.PhysicalType
 		columnVectors := colField.ColumnVectors
 
 		// Parse column vectors based on column type
-		values := parseColumnVectors(columnType, columnVectors, colField.Bitmasks)
+		values := parseColumnVectors(columnType, physicalDataType, columnVectors, colField.Bitmasks)
 		result.Data[columnName] = values
 	}
 
@@ -778,7 +777,7 @@ func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
 }
 
 // parseColumnVectors parses column vectors based on column type
-func parseColumnVectors(columnType thriftapi.ColumnType, columnVectors [][]byte, bitmasks []bool) []interface{} {
+func parseColumnVectors(columnType thriftapi.ColumnType, physicalType *thriftapi.PhysicalType, columnVectors [][]byte, bitmasks []bool) []interface{} {
 	if len(columnVectors) == 0 {
 		return []interface{}{}
 	}
