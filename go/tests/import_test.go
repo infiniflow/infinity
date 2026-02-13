@@ -721,6 +721,16 @@ func TestImportEmbeddingWithCompatibleDefinition(t *testing.T) {
 				t.Fatalf("Import result: %v", err)
 			}
 
+			result, err := table.Output([]string{"*"}).ToResult()
+			if err != nil {
+				t.Fatalf("Query result: %v", err)
+			}
+
+			queryResult, ok := result.(*infinity.QueryResult)
+			if ok {
+				t.Logf("Query result: %v", queryResult.Data)
+			}
+
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
