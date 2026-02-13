@@ -14,9 +14,6 @@
 
 module;
 
-#include <string>
-#include <vector>
-
 module infinity_core:physical_operator.impl;
 
 import :physical_operator;

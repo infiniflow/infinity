@@ -45,7 +45,7 @@ export struct HnswFileWorker : IndexFileWorker {
 
     void Read(std::shared_ptr<HnswHandler> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    size_t index_size_{};
+    // size_t index_size_{};
 };
 
 } // namespace infinity

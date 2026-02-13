@@ -103,7 +103,7 @@ public:
 
     std::shared_ptr<VarBuffer> mem_buffer_;
 
-    std::shared_ptr<VarBuffer> my_var_buffer_;
+    std::shared_ptr<VarBuffer> var_buffer_;
 
 private:
     std::shared_ptr<VarBuffer> GetInnerNoLock();

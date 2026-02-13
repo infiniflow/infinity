@@ -47,16 +47,16 @@ HnswFileWorker::HnswFileWorker(std::shared_ptr<std::string> file_path,
                                std::shared_ptr<ColumnDef> column_def,
                                size_t index_size)
     : IndexFileWorker(std::move(file_path), std::move(index_base), std::move(column_def)) {
-    if (index_size == 0) {
-
-        std::string index_path = GetPath();
-        auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
-        if (status.ok()) {
-            // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
-            index_size = file_handle->FileSize();
-        }
-    }
-    index_size_ = index_size;
+    // if (index_size == 0) {
+    //
+    //     std::string index_path = GetPath();
+    //     auto [file_handle, status] = VirtualStore::Open(index_path, FileAccessMode::kReadWrite);
+    //     if (status.ok()) {
+    //         // When replay by checkpoint, the data is deleted, but catalog is recovered. Do not read file in recovery.
+    //         index_size = file_handle->FileSize();
+    //     }
+    // }
+    // index_size_ = index_size;
 }
 
 HnswFileWorker::~HnswFileWorker() {

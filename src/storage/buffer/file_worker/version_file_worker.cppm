@@ -28,19 +28,21 @@ export struct VersionFileWorkerSaveCtx : FileWorkerSaveCtx {
 };
 
 export struct VersionFileWorker : FileWorker {
-    static constexpr BlockVersion *has_cache_manager_{};
+    // static constexpr BlockVersion *has_cache_manager_{};
     explicit VersionFileWorker(std::shared_ptr<std::string> file_path, size_t capacity);
-
-    ~VersionFileWorker();
 
     [[nodiscard]] FileWorkerType Type() const { return FileWorkerType::kVersionDataFile; }
 
-    bool
-    Write(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, bool &prepare_success, const FileWorkerSaveCtx &ctx);
+    void Read(BlockVersion *&data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
 
-    void Read(std::shared_ptr<BlockVersion> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size);
+    void Grow();
+
+    void GrowNolock();
+
+    boost::interprocess::managed_mapped_file segment_;
 
     size_t capacity_{};
+    bool inited_{};
 };
 
 } // namespace infinity
