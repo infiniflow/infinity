@@ -1868,6 +1868,12 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             }
 
             {
+                // CreateSnapShot
+                // Drop table
+
+                // Checkpoint
+                // Cleanup
+
                 auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
                 auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
                 auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
@@ -1910,45 +1916,16 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                     }
 
                     {
-                        auto read_path = std::make_shared<std::string>(fmt::format("{}/{}.col", *block_dir_ptr, column_def->id()));
-                        auto data_file_worker = std::make_unique<DataFileWorker>(read_path, full_data_size);
-                        auto data_file_worker_ = fileworker_mgr->data_map_.EmplaceFileWorker(std::move(data_file_worker));
-
-                        // Read data file
-                        std::shared_ptr<char[]> data;
-                        FileWorker::Read(data_file_worker_, data);
-
-                        // Write snapshot file
-                        auto write_path = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
-                        auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                        if (!status.ok()) {
-                            RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
-                        }
-
-                        bool prepare_success{false};
-                        std::span<char> data_span(data.get(), rel_data_size);
-                        data_file_worker_->WriteSnapshot(data_span, handle, prepare_success, {});
+                        auto src = fmt::format("{}/{}/{}.col", temp_dir, *block_dir_ptr, column_def->id());
+                        auto dst = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
+                        VirtualStore::Copy(src, dst);
                     }
 
                     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
-                    if (buffer_type == VectorBufferType::kVarBuffer && rel_row_cnt != 0) {
-                        auto read_path = std::make_shared<std::string>(fmt::format("{}/col_{}_out", *block_dir_ptr, column_def->id()));
-                        auto var_file_worker = std::make_unique<VarFileWorker>(read_path, 0);
-                        auto var_file_worker_ = fileworker_mgr->var_map_.EmplaceFileWorker(std::move(var_file_worker));
-
-                        // Read variable data file
-                        std::shared_ptr<VarBuffer> var_buffer;
-                        FileWorker::Read(var_file_worker_, var_buffer);
-
-                        // Write snapshot file
-                        auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
-                        auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                        if (!status.ok()) {
-                            RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
-                        }
-
-                        bool prepare_success{};
-                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, rel_data_size, prepare_success, {});
+                    if (buffer_type == VectorBufferType::kVarBuffer) {
+                        auto src = fmt::format("{}/{}/col_{}_out", temp_dir, *block_dir_ptr, column_def->id());
+                        auto dst = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
+                        VirtualStore::Copy(src, dst);
                     }
                 }
             }
