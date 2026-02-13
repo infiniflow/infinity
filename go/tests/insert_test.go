@@ -25,8 +25,8 @@ import (
 
 // TestInsertBasic tests basic insert operations
 func TestInsertBasic(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_basic" + suffix
+
+	tableName := "test_insert_basic"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -97,8 +97,8 @@ func TestInsertBasic(t *testing.T) {
 
 // TestInsertBool tests insert with bool column
 func TestInsertBool(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_bool" + suffix
+
+	tableName := "test_insert_bool"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -140,8 +140,8 @@ func TestInsertBool(t *testing.T) {
 
 // TestInsertDefaultValues tests insert with default values
 func TestInsertDefaultValues(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_default" + suffix
+
+	tableName := "test_insert_default"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -190,8 +190,8 @@ func TestInsertDefaultValues(t *testing.T) {
 
 // TestInsertFloat16BFloat16 tests insert with float16/bfloat16 columns
 func TestInsertFloat16BFloat16(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_fp16_bf16" + suffix
+
+	tableName := "test_insert_fp16_bf16"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -237,8 +237,8 @@ func TestInsertFloat16BFloat16(t *testing.T) {
 
 // TestInsertVarchar tests insert with varchar column
 func TestInsertVarchar(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_varchar" + suffix
+
+	tableName := "test_insert_varchar"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -284,8 +284,8 @@ func TestInsertVarchar(t *testing.T) {
 
 // TestInsertBigVarchar tests insert with large varchar
 func TestInsertBigVarchar(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_big_varchar" + suffix
+
+	tableName := "test_insert_big_varchar"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -327,7 +327,6 @@ func TestInsertBigVarchar(t *testing.T) {
 
 // TestInsertEmbedding tests insert with embedding/vector column
 func TestInsertEmbedding(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -338,7 +337,7 @@ func TestInsertEmbedding(t *testing.T) {
 	}
 
 	// Test int embedding
-	tableName1 := "test_insert_embedding_int" + suffix
+	tableName1 := "test_insert_embedding_int"
 	db.DropTable(tableName1, infinity.ConflictTypeIgnore)
 
 	schema1 := infinity.TableSchema{
@@ -379,7 +378,7 @@ func TestInsertEmbedding(t *testing.T) {
 	db.DropTable(tableName1, infinity.ConflictTypeError)
 
 	// Test float embedding
-	tableName2 := "test_insert_embedding_float" + suffix
+	tableName2 := "test_insert_embedding_float"
 	db.DropTable(tableName2, infinity.ConflictTypeIgnore)
 
 	schema2 := infinity.TableSchema{
@@ -410,7 +409,6 @@ func TestInsertEmbedding(t *testing.T) {
 
 // TestInsertBigEmbedding tests insert with big embedding dimension
 func TestInsertBigEmbedding(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -421,7 +419,7 @@ func TestInsertBigEmbedding(t *testing.T) {
 	}
 
 	// Test int embedding with big dimension
-	tableName := "test_insert_big_embedding" + suffix
+	tableName := "test_insert_big_embedding"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -466,7 +464,6 @@ func TestInsertBigEmbedding(t *testing.T) {
 
 // TestInsertBigEmbeddingFloat tests insert with big float embedding
 func TestInsertBigEmbeddingFloat(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -476,7 +473,7 @@ func TestInsertBigEmbeddingFloat(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_insert_big_embedding_float" + suffix
+	tableName := "test_insert_big_embedding_float"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -521,8 +518,8 @@ func TestInsertBigEmbeddingFloat(t *testing.T) {
 
 // TestInsertExceedBlockSize tests insert that exceeds block size limit
 func TestInsertExceedBlockSize(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_exceed_block" + suffix
+
+	tableName := "test_insert_exceed_block"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -561,8 +558,8 @@ func TestInsertExceedBlockSize(t *testing.T) {
 
 // TestInsertIntoNonExistentTable tests insert into dropped table
 func TestInsertIntoNonExistentTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_nonexistent" + suffix
+
+	tableName := "test_insert_nonexistent"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -601,8 +598,8 @@ func TestInsertIntoNonExistentTable(t *testing.T) {
 
 // TestInsertIntoIndexCreatedTable tests insert into table with index
 func TestInsertIntoIndexCreatedTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_with_index" + suffix
+
+	tableName := "test_insert_with_index"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -669,8 +666,8 @@ func TestInsertIntoIndexCreatedTable(t *testing.T) {
 
 // TestBatchInsert tests batch insert within limit
 func TestBatchInsert(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_batch_insert" + suffix
+
+	tableName := "test_batch_insert"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -712,8 +709,8 @@ func TestBatchInsert(t *testing.T) {
 
 // TestInsertZeroColumn tests insert with empty data
 func TestInsertZeroColumn(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_zero" + suffix
+
+	tableName := "test_insert_zero"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -747,8 +744,8 @@ func TestInsertZeroColumn(t *testing.T) {
 
 // TestInsertSparse tests insert with sparse vector
 func TestInsertSparse(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_sparse" + suffix
+
+	tableName := "test_insert_sparse"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -793,7 +790,6 @@ func TestInsertSparse(t *testing.T) {
 
 // TestInsertTensor tests insert with tensor column
 func TestInsertTensor(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -804,7 +800,7 @@ func TestInsertTensor(t *testing.T) {
 	}
 
 	// Test int tensor
-	tableName1 := "test_insert_tensor_int" + suffix
+	tableName1 := "test_insert_tensor_int"
 	db.DropTable(tableName1, infinity.ConflictTypeIgnore)
 
 	schema1 := infinity.TableSchema{
@@ -829,7 +825,7 @@ func TestInsertTensor(t *testing.T) {
 	db.DropTable(tableName1, infinity.ConflictTypeError)
 
 	// Test float tensor
-	tableName2 := "test_insert_tensor_float" + suffix
+	tableName2 := "test_insert_tensor_float"
 	db.DropTable(tableName2, infinity.ConflictTypeIgnore)
 
 	schema2 := infinity.TableSchema{
@@ -855,8 +851,8 @@ func TestInsertTensor(t *testing.T) {
 
 // TestInsertTensorArray tests insert with tensor array column
 func TestInsertTensorArray(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_tensor_array" + suffix
+
+	tableName := "test_insert_tensor_array"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -892,8 +888,8 @@ func TestInsertTensorArray(t *testing.T) {
 
 // TestInsertRowsMismatch tests insert with mismatched rows
 func TestInsertRowsMismatch(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_mismatch" + suffix
+
+	tableName := "test_insert_mismatch"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -931,7 +927,6 @@ func TestInsertRowsMismatch(t *testing.T) {
 
 // TestInsertBigEmbeddingVariousTypes tests insert with various embedding types
 func TestInsertBigEmbeddingVariousTypes(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -950,7 +945,7 @@ func TestInsertBigEmbeddingVariousTypes(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tableName := fmt.Sprintf("test_insert_big_emb_%d%s", i, suffix)
+		tableName := fmt.Sprintf("test_insert_big_emb_%d", i)
 		db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 		schema := infinity.TableSchema{
@@ -986,8 +981,8 @@ func TestInsertBigEmbeddingVariousTypes(t *testing.T) {
 
 // TestInsertDataNotAligned tests insert with data not matching table definition
 func TestInsertDataNotAligned(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_not_aligned" + suffix
+
+	tableName := "test_insert_not_aligned"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1026,8 +1021,8 @@ func TestInsertDataNotAligned(t *testing.T) {
 
 // TestInsertEmptyIntoTable tests insert empty row
 func TestInsertEmptyIntoTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_empty" + suffix
+
+	tableName := "test_insert_empty"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1062,8 +1057,8 @@ func TestInsertEmptyIntoTable(t *testing.T) {
 
 // TestInsertWithNotMatchedColumns tests insert with columns not in table
 func TestInsertWithNotMatchedColumns(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_not_matched" + suffix
+
+	tableName := "test_insert_not_matched"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1098,8 +1093,8 @@ func TestInsertWithNotMatchedColumns(t *testing.T) {
 
 // TestInsertWithExceedingInvalidValueRange tests insert with value exceeding range
 func TestInsertWithExceedingInvalidValueRange(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_exceed_range" + suffix
+
+	tableName := "test_insert_exceed_range"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1135,8 +1130,8 @@ func TestInsertWithExceedingInvalidValueRange(t *testing.T) {
 
 // TestInsertWithInvalidDataType tests insert with invalid data types
 func TestInsertWithInvalidDataType(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_invalid_type" + suffix
+
+	tableName := "test_insert_invalid_type"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1163,9 +1158,9 @@ func TestInsertWithInvalidDataType(t *testing.T) {
 		value     interface{}
 		shouldErr bool
 	}{
-		{1, true},           // int cannot be cast to vector
-		{1.1, true},         // float cannot be cast to vector
-		{"1#$@!adf", true}, // string cannot be cast to vector
+		{1, true},               // int cannot be cast to vector
+		{1.1, true},             // float cannot be cast to vector
+		{"1#$@!adf", true},      // string cannot be cast to vector
 		{[]int{1, 2, 3}, false}, // valid vector should succeed
 	}
 
@@ -1185,8 +1180,8 @@ func TestInsertWithInvalidDataType(t *testing.T) {
 
 // TestInsertNoMatchColumn tests insert with non-existent column
 func TestInsertNoMatchColumn(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_insert_no_match_col" + suffix
+
+	tableName := "test_insert_no_match_col"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1228,7 +1223,6 @@ func TestInsertNoMatchColumn(t *testing.T) {
 
 // TestInsertVariousTypes tests insert with various data types
 func TestInsertVariousTypes(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1239,7 +1233,7 @@ func TestInsertVariousTypes(t *testing.T) {
 	}
 
 	// Test varchar with array values
-	tableName := "test_insert_various_types" + suffix
+	tableName := "test_insert_various_types"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1274,8 +1268,7 @@ func TestInsertWithLargeData(t *testing.T) {
 		t.Skip("Skipping large data test in short mode")
 	}
 
-	suffix := generateSuffix(t)
-	tableName := "test_insert_large_data" + suffix
+	tableName := "test_insert_large_data"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1333,10 +1326,28 @@ func TestInsertWithLargeData(t *testing.T) {
 		}
 	}
 
-	// Verify count
-	// Note: In actual implementation, we would query count
-	// For now, just verify no error during insertion
-	t.Logf("Successfully inserted %d rows in large data test", totalRows)
+	// Verify count using count(*)
+	result, err := table.Output([]string{"count(*)"}).ToResult()
+	if err != nil {
+		t.Errorf("Failed to query count(*): %v", err)
+	} else {
+		t.Logf("Query result: %v", result)
+
+		// Try to extract count from result
+		var actualCount int64
+		v := result.(*infinity.QueryResult)
+		if data, ok := v.Data["count(star)"]; ok && len(data) > 0 {
+			actualCount = data[0].(int64)
+		} else {
+			t.Errorf("Failed to extract count from result")
+		}
+
+		if actualCount != int64(totalRows) {
+			t.Errorf("Count mismatch: expected %d, got %d", totalRows, actualCount)
+		} else {
+			t.Logf("Successfully verified count: %d rows", actualCount)
+		}
+	}
 
 	// Clean up
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1352,8 +1363,7 @@ func TestInsertWithIndexLargeData(t *testing.T) {
 		t.Skip("Skipping large data test in short mode")
 	}
 
-	suffix := generateSuffix(t)
-	tableName := "test_insert_index_large_data" + suffix
+	tableName := "test_insert_index_large_data"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1403,7 +1413,28 @@ func TestInsertWithIndexLargeData(t *testing.T) {
 		}
 	}
 
-	t.Logf("Successfully inserted %d rows into indexed table", totalRows)
+	// Verify count using count(*)
+	result, err := table.Output([]string{"count(*)"}).ToResult()
+	if err != nil {
+		t.Errorf("Failed to query count(*): %v", err)
+	} else {
+		t.Logf("Query result: %v", result)
+
+		// Try to extract count from result
+		var actualCount int64
+		v := result.(*infinity.QueryResult)
+		if data, ok := v.Data["count(star)"]; ok && len(data) > 0 {
+			actualCount = data[0].(int64)
+		} else {
+			t.Errorf("Failed to extract count from result")
+		}
+
+		if actualCount != int64(totalRows) {
+			t.Errorf("Count mismatch: expected %d, got %d", totalRows, actualCount)
+		} else {
+			t.Logf("Successfully verified count: %d rows", actualCount)
+		}
+	}
 
 	// Clean up
 	_, err = table.DropIndex("my_index", infinity.ConflictTypeError)
@@ -1420,7 +1451,6 @@ func TestInsertWithIndexLargeData(t *testing.T) {
 // TestInsertBigEmbeddingVariousTypeComprehensive comprehensively tests insert with various embedding types and examples
 // This covers the full parameterized test from Python version (2 types × 5 examples = 10 combinations)
 func TestInsertBigEmbeddingVariousTypeComprehensive(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1516,7 +1546,7 @@ func TestInsertBigEmbeddingVariousTypeComprehensive(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tableName := "test_insert_big_emb_comp_" + tc.name + suffix
+			tableName := "test_insert_big_emb_comp_" + tc.name
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			schema := infinity.TableSchema{
@@ -1543,7 +1573,6 @@ func TestInsertBigEmbeddingVariousTypeComprehensive(t *testing.T) {
 // TestInsertEmptyIntoTableComprehensive comprehensively tests insert empty rows for various data types
 // This covers the full parameterized test from Python version (13 types from types_array)
 func TestInsertEmptyIntoTableComprehensive(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1569,7 +1598,7 @@ func TestInsertEmptyIntoTableComprehensive(t *testing.T) {
 
 	for _, dataType := range typesArray {
 		t.Run(dataType, func(t *testing.T) {
-			tableName := fmt.Sprintf("test_insert_empty_%s%s", strings.ReplaceAll(dataType, ",", "_"), suffix)
+			tableName := fmt.Sprintf("test_insert_empty_%s", strings.ReplaceAll(dataType, ",", "_"))
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			schema := infinity.TableSchema{
@@ -1599,7 +1628,6 @@ func TestInsertEmptyIntoTableComprehensive(t *testing.T) {
 // TestInsertDataNotAlignedComprehensive comprehensively tests insert with data not aligned with table definition
 // This covers the full parameterized test from Python version (5 examples: 1, 1, 6, 'hello', True)
 func TestInsertDataNotAlignedComprehensive(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1622,7 +1650,7 @@ func TestInsertDataNotAlignedComprehensive(t *testing.T) {
 
 	for _, iv := range invalidValues {
 		t.Run(iv.name, func(t *testing.T) {
-			tableName := fmt.Sprintf("test_insert_not_aligned_%s%s", iv.name, suffix)
+			tableName := fmt.Sprintf("test_insert_not_aligned_%s", iv.name)
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			schema := infinity.TableSchema{
@@ -1652,7 +1680,6 @@ func TestInsertDataNotAlignedComprehensive(t *testing.T) {
 // TestInsertWithInvalidDataTypeComprehensive comprehensively tests insert with invalid data types
 // This covers the full parameterized test from Python version (2 batches × 4 types = 8 combinations)
 func TestInsertWithInvalidDataTypeComprehensive(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1684,7 +1711,7 @@ func TestInsertWithInvalidDataTypeComprehensive(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tableName := fmt.Sprintf("test_insert_invalid_type_%s%s", tc.name, suffix)
+			tableName := fmt.Sprintf("test_insert_invalid_type_%s", tc.name)
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			schema := infinity.TableSchema{
@@ -1722,7 +1749,6 @@ func TestInsertWithInvalidDataTypeComprehensive(t *testing.T) {
 // TestBatchInsertWithInvalidColumnCount tests batch insert with invalid column count
 // This covers test_batch_insert_with_invalid_column_count from Python
 func TestBatchInsertWithInvalidColumnCount(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1742,7 +1768,7 @@ func TestBatchInsertWithInvalidColumnCount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tableName := fmt.Sprintf("test_insert_invalid_col_count_%s%s", tc.name, suffix)
+			tableName := fmt.Sprintf("test_insert_invalid_col_count_%s", tc.name)
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			schema := infinity.TableSchema{

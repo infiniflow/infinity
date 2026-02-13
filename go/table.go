@@ -296,7 +296,7 @@ func (t *Table) Insert(data interface{}) (interface{}, error) {
 	}
 
 	if len(rows) == 0 {
-		return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "No data to insert")
+		return nil, NewInfinityException(int(ErrorCodeDataNotExist), "No data to insert")
 	}
 
 	// Build fields
