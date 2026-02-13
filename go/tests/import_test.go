@@ -1380,6 +1380,7 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 		{
 			Name:     "c4",
 			DataType: "vector, 3, float",
+			Default:  []float32{1.0, 2.0, 3.0},
 		},
 	}
 
@@ -1457,6 +1458,7 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 		{
 			Name:     "c4",
 			DataType: "vector, 3, float",
+			Default:  []float32{1.0, 2.0, 3.0},
 		},
 	}
 

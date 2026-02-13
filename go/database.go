@@ -17,6 +17,7 @@ package infinity
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -106,10 +107,10 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 
 		// Handle default value if provided
 		if columnInfo.Default != nil {
-			constExpr, err := parseDefaultValue(columnInfo.Default)
+			constExpr, err := ParseConstantValue(columnInfo.Default)
 			if err != nil {
 				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
-		}
+			}
 			colDef.ConstantExpr = constExpr
 		}
 
@@ -521,8 +522,8 @@ func parseElementType(typeStr string) (thriftapi.ElementType, error) {
 	}
 }
 
-// parseDefaultValue parses a default value into thrift ConstantExpr
-func parseDefaultValue(value interface{}) (*thriftapi.ConstantExpr, error) {
+// ParseConstantValue parses a default value into thrift ConstantExpr
+func ParseConstantValue(value interface{}) (*thriftapi.ConstantExpr, error) {
 	expr := thriftapi.NewConstantExpr()
 
 	switch v := value.(type) {
@@ -561,7 +562,196 @@ func parseDefaultValue(value interface{}) (*thriftapi.ConstantExpr, error) {
 	case nil:
 		expr.LiteralType = thriftapi.LiteralType_Null
 	default:
-		return nil, fmt.Errorf("unsupported default value type: %T", value)
+		// Use reflection for complex types
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Slice, reflect.Array:
+			return parseSliceConstantValue(rv, expr)
+		case reflect.Map:
+			return parseMapConstantValue(rv, expr)
+		default:
+			return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Invalid constant type: %T", value))
+		}
+	}
+
+	return expr, nil
+}
+
+// parseSliceConstantValue handles slices and arrays for constant expressions
+func parseSliceConstantValue(rv reflect.Value, expr *thriftapi.ConstantExpr) (*thriftapi.ConstantExpr, error) {
+	if rv.Len() == 0 {
+		// Empty slice - cannot determine type, treat as empty integer array
+		expr.LiteralType = thriftapi.LiteralType_IntegerArray
+		expr.I64ArrayValue = []int64{}
+		return expr, nil
+	}
+
+	// Determine dimension and element type
+	dim := 1
+	elemType := rv.Type().Elem()
+	for elemType.Kind() == reflect.Slice {
+		dim++
+		elemType = elemType.Elem()
+	}
+
+	// Check if element type is supported
+	switch elemType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		// Integer type
+		switch dim {
+		case 1:
+			expr.LiteralType = thriftapi.LiteralType_IntegerArray
+			arr := make([]int64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				arr[i] = rv.Index(i).Int()
+			}
+			expr.I64ArrayValue = arr
+		case 2:
+			expr.LiteralType = thriftapi.LiteralType_IntegerTensor
+			tensor := make([][]int64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				inner := rv.Index(i)
+				if inner.Kind() != reflect.Slice {
+					return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "2D slice must contain slices")
+				}
+				tensor[i] = make([]int64, inner.Len())
+				for j := 0; j < inner.Len(); j++ {
+					tensor[i][j] = inner.Index(j).Int()
+				}
+			}
+			expr.I64TensorValue = tensor
+		case 3:
+			expr.LiteralType = thriftapi.LiteralType_IntegerTensorArray
+			tensorArray := make([][][]int64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				mid := rv.Index(i)
+				if mid.Kind() != reflect.Slice {
+					return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "3D slice must contain slices")
+				}
+				tensorArray[i] = make([][]int64, mid.Len())
+				for j := 0; j < mid.Len(); j++ {
+					inner := mid.Index(j)
+					if inner.Kind() != reflect.Slice {
+						return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "3D slice must contain slices of slices")
+					}
+					tensorArray[i][j] = make([]int64, inner.Len())
+					for k := 0; k < inner.Len(); k++ {
+						tensorArray[i][j][k] = inner.Index(k).Int()
+					}
+				}
+			}
+			expr.I64TensorArrayValue = tensorArray
+		default:
+			return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported slice dimension: %d", dim))
+		}
+	case reflect.Float32, reflect.Float64:
+		// Float type
+		switch dim {
+		case 1:
+			expr.LiteralType = thriftapi.LiteralType_DoubleArray
+			arr := make([]float64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				arr[i] = rv.Index(i).Float()
+			}
+			expr.F64ArrayValue = arr
+		case 2:
+			expr.LiteralType = thriftapi.LiteralType_DoubleTensor
+			tensor := make([][]float64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				inner := rv.Index(i)
+				if inner.Kind() != reflect.Slice {
+					return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "2D slice must contain slices")
+				}
+				tensor[i] = make([]float64, inner.Len())
+				for j := 0; j < inner.Len(); j++ {
+					tensor[i][j] = inner.Index(j).Float()
+				}
+			}
+			expr.F64TensorValue = tensor
+		case 3:
+			expr.LiteralType = thriftapi.LiteralType_DoubleTensorArray
+			tensorArray := make([][][]float64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				mid := rv.Index(i)
+				if mid.Kind() != reflect.Slice {
+					return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "3D slice must contain slices")
+				}
+				tensorArray[i] = make([][]float64, mid.Len())
+				for j := 0; j < mid.Len(); j++ {
+					inner := mid.Index(j)
+					if inner.Kind() != reflect.Slice {
+						return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "3D slice must contain slices of slices")
+				}
+					tensorArray[i][j] = make([]float64, inner.Len())
+					for k := 0; k < inner.Len(); k++ {
+						tensorArray[i][j][k] = inner.Index(k).Float()
+					}
+				}
+			}
+			expr.F64TensorArrayValue = tensorArray
+		default:
+			return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported slice dimension: %d", dim))
+		}
+	case reflect.Interface:
+		// []interface{} - try to treat as CurlyBracketsArray
+		children := make([]*thriftapi.ConstantExpr, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			elem := rv.Index(i).Interface()
+			childExpr, err := ParseConstantValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			children = append(children, childExpr)
+		}
+		expr.LiteralType = thriftapi.LiteralType_CurlyBracketsArray
+		expr.CurlyBracketsArray = children
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported slice element type: %v", elemType.Kind()))
+	}
+
+	return expr, nil
+}
+
+// parseMapConstantValue handles maps for sparse array constant expressions
+func parseMapConstantValue(rv reflect.Value, expr *thriftapi.ConstantExpr) (*thriftapi.ConstantExpr, error) {
+	if rv.Len() == 0 {
+		return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "Empty sparse vector")
+	}
+
+	// Check key type - must be integer
+	if rv.Type().Key().Kind() != reflect.Int && rv.Type().Key().Kind() != reflect.Int64 {
+		return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), "Sparse vector keys must be integers")
+	}
+
+	// Determine value type
+	valueType := rv.Type().Elem()
+	switch valueType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		// Sparse integer array
+		expr.LiteralType = thriftapi.LiteralType_SparseIntegerArray
+		indices := make([]int64, 0, rv.Len())
+		values := make([]int64, 0, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			indices = append(indices, iter.Key().Int())
+			values = append(values, iter.Value().Int())
+		}
+		expr.I64ArrayIdx = indices
+		expr.I64ArrayValue = values
+	case reflect.Float32, reflect.Float64:
+		// Sparse double array
+		expr.LiteralType = thriftapi.LiteralType_SparseDoubleArray
+		indices := make([]int64, 0, rv.Len())
+		values := make([]float64, 0, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			indices = append(indices, iter.Key().Int())
+			values = append(values, iter.Value().Float())
+		}
+		expr.I64ArrayIdx = indices
+		expr.F64ArrayValue = values
+	default:
+		return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported sparse vector value type: %v", valueType.Kind()))
 	}
 
 	return expr, nil

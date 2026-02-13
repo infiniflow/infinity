@@ -650,7 +650,7 @@ func (t *Table) AddColumns(columnDefs TableSchema) (interface{}, error) {
 
 		// Handle default value if provided
 		if columnInfo.Default != nil {
-			constExpr, err := parseDefaultValue(columnInfo.Default)
+			constExpr, err := ParseConstantValue(columnInfo.Default)
 			if err != nil {
 				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
 			}
