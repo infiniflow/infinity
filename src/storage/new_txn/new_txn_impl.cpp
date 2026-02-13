@@ -1936,21 +1936,19 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                         std::shared_ptr<VarBuffer> var_buffer;
                         FileWorker::Read(var_file_worker_, var_buffer);
 
-                        if (var_buffer->TotalSize() > 0) {
-                            // Write snapshot file
-                            auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
-                            auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                            if (!status.ok()) {
-                                return status;
-                            }
+                        // Write snapshot file
+                        auto write_path = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
+                        auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
+                        if (!status.ok()) {
+                            return status;
+                        }
 
-                            bool prepare_success{};
-                            var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, prepare_success, {});
+                        bool prepare_success{};
+                        var_file_worker_->WriteSnapshot({var_buffer.get(), 1}, handle, prepare_success, {});
 
-                            status = handle->Close();
-                            if (!status.ok()) {
-                                return status;
-                            }
+                        status = handle->Close();
+                        if (!status.ok()) {
+                            return status;
                         }
                     }
                 }
