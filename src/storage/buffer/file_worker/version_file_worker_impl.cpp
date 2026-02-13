@@ -48,6 +48,8 @@ bool VersionFileWorker::Write(std::shared_ptr<BlockVersion> &data,
     const auto &ctx = static_cast<const VersionFileWorkerSaveCtx &>(base_ctx);
     TxnTimeStamp ckp_ts = ctx.checkpoint_ts_;
     bool is_full = data->SaveToFile(mmap_, mmap_size_, *rel_file_path_, ckp_ts, *file_handle);
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->version_map_.cache_manager_;
+    cache_manager.Set(*rel_file_path_, data, mmap_size_);
     if (is_full) {
         LOG_TRACE(fmt::format("Version file is full: {}", GetPath()));
         // if the version file is full, return true to spill to file

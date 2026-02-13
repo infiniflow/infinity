@@ -79,6 +79,9 @@ bool HnswFileWorker::Write(std::shared_ptr<HnswHandler> &data,
     size_t offset{};
     data->SaveToPtr(mmap_, offset);
 
+    auto &path = *rel_file_path_;
+    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->hnsw_map_.cache_manager_;
+    cache_manager.Set(path, data, data->MemUsage());
     prepare_success = true;
     return true;
 }
