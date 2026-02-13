@@ -1347,6 +1347,7 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
+    // Persist data files
     if (!IsReplay() && base_txn_store_) {
         auto *import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
         if (!import_txn_store->file_worker_paths_.empty()) {
@@ -1687,6 +1688,7 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         }
     }
 
+    // Persist data files
     if (!IsReplay()) {
         std::vector<std::string> data_file_paths;
 
