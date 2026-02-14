@@ -34,7 +34,6 @@ func fileExists(path string) bool {
 
 // TestImportEmbeddingIntDim3 tests importing embedding_int_dim3.csv
 func TestImportEmbeddingIntDim3(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -44,7 +43,7 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import" + suffix
+	tableName := "test_import"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -133,7 +132,6 @@ func TestImportDifferentFileFormat(t *testing.T) {
 
 	for _, tc := range fileFormats {
 		t.Run(tc.format, func(t *testing.T) {
-			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
@@ -143,7 +141,7 @@ func TestImportDifferentFileFormat(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_import_different_file_format_data" + suffix
+			tableName := "test_import_different_file_format_data"
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -198,7 +196,6 @@ func TestImportDifferentFileFormat(t *testing.T) {
 
 // TestImportFVECS tests importing fvecs format
 func TestImportFVECS(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -208,7 +205,7 @@ func TestImportFVECS(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_different_file_format_data" + suffix
+	tableName := "test_import_different_file_format_data"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -291,7 +288,6 @@ func TestImportEmptyFile(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
@@ -301,7 +297,7 @@ func TestImportEmptyFile(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_import_empty_file_" + tc.name + suffix
+			tableName := "test_import_empty_file_" + tc.name
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -344,7 +340,6 @@ func TestImportEmptyFile(t *testing.T) {
 
 // TestImportFormatUnrecognized tests importing unrecognized format
 func TestImportFormatUnrecognized(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -354,7 +349,7 @@ func TestImportFormatUnrecognized(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_format_unrecognized_data" + suffix
+	tableName := "test_import_format_unrecognized_data"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -420,7 +415,6 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 		for _, dataType := range types {
 			testName := fmt.Sprintf("%s_%s", delim.name, dataType)
 			t.Run(testName, func(t *testing.T) {
-				suffix := generateSuffix(t)
 
 				conn := setupConnection(t)
 				defer closeConnection(t, conn)
@@ -430,7 +424,7 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 					t.Fatalf("Failed to get database: %v", err)
 				}
 
-				tableName := "test_csv_with_different_delimiter" + suffix
+				tableName := "test_csv_with_different_delimiter"
 				_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 				if err != nil {
 					t.Fatalf("Failed to drop table: %v", err)
@@ -484,7 +478,6 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 
 // TestCSVWithDifferentDelimiterMoreThanOneChar tests importing CSV with multi-char delimiter
 func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -494,7 +487,7 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_csv_with_different_delimiter_more_than_one_character" + suffix
+	tableName := "test_csv_with_different_delimiter_more_than_one_character"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -549,7 +542,6 @@ func TestImportCSVWithHeaders(t *testing.T) {
 
 	for _, hasHeader := range hasHeaders {
 		t.Run(fmt.Sprintf("header_%v", hasHeader), func(t *testing.T) {
-			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
@@ -559,7 +551,7 @@ func TestImportCSVWithHeaders(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_import_csv_with_headers" + suffix
+			tableName := "test_import_csv_with_headers"
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -612,7 +604,6 @@ func TestImportCSVWithHeaders(t *testing.T) {
 
 // TestImportFVECSTableWithMoreColumns tests importing fvecs with mismatched columns
 func TestImportFVECSTableWithMoreColumns(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -622,7 +613,7 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_fvecs_table_with_more_columns" + suffix
+	tableName := "test_import_fvecs_table_with_more_columns"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -799,7 +790,6 @@ func TestImportEmbeddingWithNotMatchDefinition(t *testing.T) {
 
 // TestImportEmbeddingWithDimensionUnmatch tests importing embedding with dimension mismatch
 func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -809,7 +799,7 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_embedding_with_dimension_unmatch" + suffix
+	tableName := "test_import_embedding_with_dimension_unmatch"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -861,7 +851,6 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 
 // TestImportVarcharWithNotMatchDefinition tests importing varchar data
 func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -871,7 +860,7 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_varchar_with_not_match_definition" + suffix
+	tableName := "test_import_varchar_with_not_match_definition"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -917,7 +906,6 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 
 // TestImport10000Columns tests importing CSV with 10000 columns
 func TestImport10000Columns(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -927,7 +915,7 @@ func TestImport10000Columns(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_10000_columns" + suffix
+	tableName := "test_import_10000_columns"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -984,7 +972,6 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 
 	for i, schema := range columns {
 		t.Run(fmt.Sprintf("columns_%d", i), func(t *testing.T) {
-			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
@@ -994,7 +981,7 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_table_with_not_matched_columns" + suffix
+			tableName := "test_table_with_not_matched_columns"
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -1043,7 +1030,6 @@ func TestImportWithDifferentSize(t *testing.T) {
 
 	for _, dataSize := range dataSizes {
 		t.Run(fmt.Sprintf("size_%d", dataSize), func(t *testing.T) {
-			suffix := generateSuffix(t)
 
 			conn := setupConnection(t)
 			defer closeConnection(t, conn)
@@ -1053,7 +1039,7 @@ func TestImportWithDifferentSize(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := "test_import_with_different_size" + suffix
+			tableName := "test_import_with_different_size"
 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 			if err != nil {
 				t.Fatalf("Failed to drop table: %v", err)
@@ -1102,7 +1088,6 @@ func TestImportWithDifferentSize(t *testing.T) {
 
 // TestImportExceedingRows tests importing large number of rows
 func TestImportExceedingRows(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1112,7 +1097,7 @@ func TestImportExceedingRows(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_exceeding_rows" + suffix
+	tableName := "test_import_exceeding_rows"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1158,7 +1143,6 @@ func TestImportExceedingRows(t *testing.T) {
 
 // TestImportMoreThanOneSegment tests importing data that spans multiple segments
 func TestImportMoreThanOneSegment(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1169,7 +1153,7 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 	}
 
 	fileName := "test_sdk_import_more_than_one_segment"
-	tableName := fileName + suffix
+	tableName := fileName
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1223,7 +1207,6 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 
 // TestImportExceedingColumns tests importing CSV with many columns
 func TestImportExceedingColumns(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1233,7 +1216,7 @@ func TestImportExceedingColumns(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_exceeding_columns" + suffix
+	tableName := "test_import_exceeding_columns"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1281,7 +1264,6 @@ func TestImportExceedingColumns(t *testing.T) {
 
 // TestImportJSONLFileWithDefault tests importing JSONL file with default values
 func TestImportJSONLFileWithDefault(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1291,7 +1273,7 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_jsonl_file_with_default" + suffix
+	tableName := "test_import_jsonl_file_with_default"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1349,7 +1331,6 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 
 // TestImportCSVFileWithDefault tests importing CSV file with default values
 func TestImportCSVFileWithDefault(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1359,7 +1340,7 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_csv_file_with_default" + suffix
+	tableName := "test_import_csv_file_with_default"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1422,7 +1403,6 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 
 // TestImportJSONFileWithDefault tests importing JSON file with default values
 func TestImportJSONFileWithDefault(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1432,7 +1412,7 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_json_file_with_default" + suffix
+	tableName := "test_import_json_file_with_default"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1500,7 +1480,6 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 
 // TestImportJSONLFile tests importing JSONL file
 func TestImportJSONLFile(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1510,7 +1489,7 @@ func TestImportJSONLFile(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_jsonl_file" + suffix
+	tableName := "test_import_jsonl_file"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1560,7 +1539,6 @@ func TestImportJSONLFile(t *testing.T) {
 
 // TestImportEmptyJSONLFile tests importing empty JSONL file
 func TestImportEmptyJSONLFile(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1570,7 +1548,7 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_empty_file_jsonl" + suffix
+	tableName := "test_import_empty_file_jsonl"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
@@ -1620,7 +1598,6 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 
 // TestImportWithWildcardPath tests importing with wildcard path pattern
 func TestImportWithWildcardPath(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -1630,7 +1607,7 @@ func TestImportWithWildcardPath(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_import_wildcard" + suffix
+	tableName := "test_import_wildcard"
 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)

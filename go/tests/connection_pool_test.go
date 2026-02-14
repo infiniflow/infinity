@@ -24,8 +24,6 @@ import (
 // TestConnectionPool tests connection pool functionality
 // Based on Python SDK test_pysdk/test_connection_pool.py
 func TestConnectionPool(t *testing.T) {
-	suffix := generateSuffix(t)
-
 	// Create connection pool with initial size 8 (max_size in Python)
 	config := infinity.ConnectionPoolConfig{
 		URI:         testLocalHost,
@@ -67,7 +65,7 @@ func TestConnectionPool(t *testing.T) {
 	}
 
 	// Use conn1 to create and drop database
-	dbName := "my_database" + suffix
+	dbName := "my_database"
 
 	// Drop database first with Ignore conflict type
 	_, err = conn1.DropDatabase(dbName, infinity.ConflictTypeIgnore)
@@ -169,7 +167,7 @@ func TestConnectionPool(t *testing.T) {
 		t.Fatalf("Failed to put connection back: %v", err)
 	}
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test completed successfully")
 }
 
 // TestConnectionPoolStats tests pool statistics
@@ -244,7 +242,6 @@ func TestConnectionPoolStats(t *testing.T) {
 
 // TestConnectionPoolWithDatabaseOperations tests using connection pool for database operations
 func TestConnectionPoolWithDatabaseOperations(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	config := infinity.ConnectionPoolConfig{
 		URI:         testLocalHost,
@@ -257,7 +254,7 @@ func TestConnectionPoolWithDatabaseOperations(t *testing.T) {
 	}
 	defer pool.Close()
 
-	dbName := "test_db_pool" + suffix
+	dbName := "test_db_pool"
 
 	// Get a connection
 	conn, err := pool.Get()
@@ -314,7 +311,7 @@ func TestConnectionPoolWithDatabaseOperations(t *testing.T) {
 		t.Fatalf("Failed to put connection back: %v", err)
 	}
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test completed successfully")
 }
 
 // TestConnectionPoolMultipleConnections tests getting multiple connections concurrently

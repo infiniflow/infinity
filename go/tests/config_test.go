@@ -30,8 +30,6 @@ func TestSetConfig(t *testing.T) {
 	}
 	defer conn.Disconnect()
 
-	suffix := generateSuffix(t)
-
 	// Test 1: log_level (string type)
 	// Get current log_level value
 	resp, err := conn.ShowConfig("log_level")
@@ -179,19 +177,19 @@ func TestSetConfig(t *testing.T) {
 			if err == nil {
 				t.Error("Expected error when setting read-only config mem_index_capacity, got nil")
 			}
-		if infErr, ok := err.(*infinity.InfinityException); ok {
-			// Server may return different error codes for read-only config
-			if infErr.ErrorCode != int(infinity.ErrorCodeInvalidCommand) &&
-				infErr.ErrorCode != int(infinity.ErrorCodeSystemVarReadOnly) &&
-				infErr.ErrorCode != int(infinity.ErrorCodeInvalidParameterValue) {
-				t.Logf("Note: Server returned error code %d for read-only config: %s",
-					infErr.ErrorCode, infErr.ErrorMsg)
+			if infErr, ok := err.(*infinity.InfinityException); ok {
+				// Server may return different error codes for read-only config
+				if infErr.ErrorCode != int(infinity.ErrorCodeInvalidCommand) &&
+					infErr.ErrorCode != int(infinity.ErrorCodeSystemVarReadOnly) &&
+					infErr.ErrorCode != int(infinity.ErrorCodeInvalidParameterValue) {
+					t.Logf("Note: Server returned error code %d for read-only config: %s",
+						infErr.ErrorCode, infErr.ErrorMsg)
+				}
 			}
-		}
 		} else {
 			t.Logf("mem_index_capacity is not an int64, type is %T", resp.ConfigValue)
 		}
 	}
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test %s completed successfully")
 }

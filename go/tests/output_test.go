@@ -22,8 +22,6 @@ import (
 
 // TestOutput tests the Output method for query building
 func TestOutput(t *testing.T) {
-	suffix := generateSuffix(t)
-
 	conn := setupConnection(t)
 	defer conn.Disconnect()
 
@@ -32,7 +30,7 @@ func TestOutput(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_output_table" + suffix
+	tableName := "test_output_table"
 
 	// Clean up
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
@@ -88,13 +86,11 @@ func TestOutput(t *testing.T) {
 	// Clean up
 	db.DropTable(tableName, infinity.ConflictTypeError)
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test completed successfully")
 }
 
 // TestOutputChaining tests method chaining with Output
 func TestOutputChaining(t *testing.T) {
-	suffix := generateSuffix(t)
-
 	conn := setupConnection(t)
 	defer conn.Disconnect()
 
@@ -103,7 +99,7 @@ func TestOutputChaining(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_output_chain_table" + suffix
+	tableName := "test_output_chain_table"
 
 	// Clean up
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
@@ -143,5 +139,5 @@ func TestOutputChaining(t *testing.T) {
 	// Clean up
 	db.DropTable(tableName, infinity.ConflictTypeError)
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test completed successfully")
 }

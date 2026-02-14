@@ -64,8 +64,8 @@ func closeConnection(t *testing.T, conn *infinity.InfinityConnection) {
 
 // TestDatabase tests basic database operations
 func TestDatabase(t *testing.T) {
-	suffix := generateSuffix(t)
-	dbName := "test_my_database" + suffix
+
+	dbName := "test_my_database"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -135,13 +135,12 @@ func TestDatabase(t *testing.T) {
 
 // TestCreateDatabaseInvalidName tests creating databases with invalid names
 func TestCreateDatabaseInvalidName(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
 
 	for _, dbName := range invalidNameArray {
-		_, err := conn.CreateDatabase(dbName+suffix, infinity.ConflictTypeError, "")
+		_, err := conn.CreateDatabase(dbName, infinity.ConflictTypeError, "")
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", dbName)
 		} else {
@@ -158,9 +157,9 @@ func TestCreateDatabaseInvalidName(t *testing.T) {
 
 // TestRepeatedlyCreateDropShowDatabases tests repeatedly creating, dropping and showing databases
 func TestRepeatedlyCreateDropShowDatabases(t *testing.T) {
-	suffix := generateSuffix(t)
+
 	loopCount := 10 // Reduced from 100 for faster testing
-	dbName := "test_repeatedly_create_drop_show_databases" + suffix
+	dbName := "test_repeatedly_create_drop_show_databases"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -191,13 +190,12 @@ func TestRepeatedlyCreateDropShowDatabases(t *testing.T) {
 
 // TestDropDatabaseWithInvalidName tests dropping databases with invalid names
 func TestDropDatabaseWithInvalidName(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
 
 	for _, dbName := range invalidNameArray {
-		_, err := conn.DropDatabase(dbName+suffix, infinity.ConflictTypeError)
+		_, err := conn.DropDatabase(dbName, infinity.ConflictTypeError)
 		if err == nil {
 			t.Errorf("Expected error for invalid name: %s", dbName)
 		} else {
@@ -214,8 +212,8 @@ func TestDropDatabaseWithInvalidName(t *testing.T) {
 
 // TestGetDB tests getting databases
 func TestGetDB(t *testing.T) {
-	suffix := generateSuffix(t)
-	dbName := "my_database" + suffix
+
+	dbName := "my_database"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -310,7 +308,6 @@ func TestDropNonExistentDB(t *testing.T) {
 
 // TestCreateWithValidOption tests creating databases with valid conflict options
 func TestCreateWithValidOption(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -321,7 +318,7 @@ func TestCreateWithValidOption(t *testing.T) {
 	}
 
 	for i, option := range validOptions {
-		dbName := fmt.Sprintf("test_create_option_%d%s", i, suffix)
+		dbName := fmt.Sprintf("test_create_option_%d", i)
 		// Clean up if exists
 		_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
 		if err != nil {
@@ -344,8 +341,8 @@ func TestCreateWithValidOption(t *testing.T) {
 
 // TestCreateWithInvalidOption tests creating databases with invalid conflict options
 func TestCreateWithInvalidOption(t *testing.T) {
-	suffix := generateSuffix(t)
-	dbName := "test_create_invalid_option" + suffix
+
+	dbName := "test_create_invalid_option"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -383,7 +380,6 @@ func TestCreateWithInvalidOption(t *testing.T) {
 
 // TestDropOptionWithValidOption tests dropping databases with valid conflict options
 func TestDropOptionWithValidOption(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -394,7 +390,7 @@ func TestDropOptionWithValidOption(t *testing.T) {
 	}
 
 	for i, option := range validOptions {
-		dbName := fmt.Sprintf("test_drop_option_%d%s", i, suffix)
+		dbName := fmt.Sprintf("test_drop_option_%d", i)
 		// Clean up if exists
 		_, err := conn.DropDatabase(dbName, infinity.ConflictTypeIgnore)
 		if err != nil {
@@ -425,8 +421,8 @@ func TestDropOptionWithValidOption(t *testing.T) {
 
 // TestDropOptionWithInvalidOption tests dropping databases with invalid conflict options
 func TestDropOptionWithInvalidOption(t *testing.T) {
-	suffix := generateSuffix(t)
-	dbName := "test_drop_option" + suffix
+
+	dbName := "test_drop_option"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)
@@ -466,9 +462,9 @@ func TestDropOptionWithInvalidOption(t *testing.T) {
 
 // TestCreateUpperDatabaseName tests creating databases with uppercase names
 func TestCreateUpperDatabaseName(t *testing.T) {
-	suffix := generateSuffix(t)
-	dbUpperName := "MY_DATABASE" + strings.ToUpper(suffix)
-	dbLowerName := "my_database" + strings.ToLower(suffix)
+
+	dbUpperName := "MY_DATABASE"
+	dbLowerName := "my_database"
 
 	conn := setupConnection(t)
 	defer closeConnection(t, conn)

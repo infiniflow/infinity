@@ -32,8 +32,8 @@ var ValidNameArray = []string{
 
 // TestCreateTableWithValidOptions tests creating tables with valid conflict options
 func TestCreateTableWithValidOptions(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_table_with_valid_options" + suffix
+
+	tableName := "test_create_table_with_valid_options"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -79,8 +79,8 @@ func TestCreateTableWithValidOptions(t *testing.T) {
 
 // TestDropTableWithValidOptions tests dropping tables with valid conflict options
 func TestDropTableWithValidOptions(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_drop_table_with_valid_options" + suffix
+
+	tableName := "test_drop_table_with_valid_options"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -125,8 +125,8 @@ func TestDropTableWithValidOptions(t *testing.T) {
 
 // TestTableWithValidColumnNames tests creating tables with valid column names
 func TestTableWithValidColumnNames(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_table_with_valid_column_names" + suffix
+
+	tableName := "test_table_with_valid_column_names"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -167,8 +167,8 @@ func TestTableWithValidColumnNames(t *testing.T) {
 
 // TestCreateTableWithInvalidColumnName tests creating tables with invalid column names
 func TestCreateTableWithInvalidColumnName(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_table_with_invalid_column_name" + suffix
+
+	tableName := "test_create_table_with_invalid_column_name"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -215,8 +215,8 @@ func TestCreateTableWithInvalidColumnName(t *testing.T) {
 
 // TestCreateTableWithInvalidOptions tests creating tables with invalid conflict options
 func TestCreateTableWithInvalidOptions(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_table_with_invalid_options" + suffix
+
+	tableName := "test_create_table_with_invalid_options"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -261,8 +261,8 @@ func TestCreateTableWithInvalidOptions(t *testing.T) {
 
 // TestDropTableWithInvalidOptions tests dropping tables with invalid conflict options
 func TestDropTableWithInvalidOptions(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_drop_table_with_invalid_options" + suffix
+
+	tableName := "test_drop_table_with_invalid_options"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -315,8 +315,8 @@ func TestDropTableWithInvalidOptions(t *testing.T) {
 
 // TestCreateOrDropSameTableInDifferentThread tests creating/dropping same table in different threads
 func TestCreateOrDropSameTableInDifferentThread(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_or_drop_same_table_in_different_thread" + suffix
+
+	tableName := "test_create_or_drop_same_table_in_different_thread"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -394,8 +394,8 @@ func TestCreateOrDropSameTableInDifferentThread(t *testing.T) {
 
 // TestListTables tests listing tables
 func TestListTables(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_list_tables" + suffix
+
+	tableName := "test_list_tables"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -448,8 +448,8 @@ func TestListTables(t *testing.T) {
 
 // TestShowTable tests showing table details
 func TestShowTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_show_table" + suffix
+
+	tableName := "test_show_table"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -493,8 +493,8 @@ func TestShowTable(t *testing.T) {
 
 // TestGetTable tests getting a table object
 func TestGetTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_get_table" + suffix
+
+	tableName := "test_get_table"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -551,8 +551,8 @@ func TestGetTable(t *testing.T) {
 
 // TestCreateTableWithMultipleColumns tests creating tables with multiple columns
 func TestCreateTableWithMultipleColumns(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_table_with_multiple_columns" + suffix
+
+	tableName := "test_create_table_with_multiple_columns"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -610,8 +610,8 @@ func TestCreateTableWithMultipleColumns(t *testing.T) {
 
 // TestDropNonExistentTable tests dropping non-existent tables
 func TestDropNonExistentTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_drop_non_existent_table" + suffix
+
+	tableName := "test_drop_non_existent_table"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -643,8 +643,8 @@ func TestDropNonExistentTable(t *testing.T) {
 
 // TestCreateDuplicateTable tests creating duplicate tables
 func TestCreateDuplicateTable(t *testing.T) {
-	suffix := generateSuffix(t)
-	tableName := "test_create_duplicate_table" + suffix
+
+	tableName := "test_create_duplicate_table"
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -699,7 +699,6 @@ func TestCreateDuplicateTable(t *testing.T) {
 // TestRenameTable tests table rename functionality
 // Based on Python SDK test_pysdk/test_table.py - test_rename_table
 func TestRenameTable(t *testing.T) {
-	suffix := generateSuffix(t)
 
 	conn := setupConnection(t)
 	defer conn.Disconnect()
@@ -709,8 +708,8 @@ func TestRenameTable(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	oldTableName := "test_rename_table" + suffix
-	newTableName := "test_rename_table_new" + suffix
+	oldTableName := "test_rename_table"
+	newTableName := "test_rename_table_new"
 
 	// Clean up
 	db.DropTable(oldTableName, infinity.ConflictTypeIgnore)
@@ -763,7 +762,7 @@ func TestRenameTable(t *testing.T) {
 	}
 
 	// Try to rename with invalid name (should fail)
-	invalidTableName := "123" + suffix
+	invalidTableName := "123"
 	_, err = table.Rename(invalidTableName)
 	if err == nil {
 		t.Error("Expected error when renaming with invalid name, got nil")
@@ -783,5 +782,5 @@ func TestRenameTable(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 
-	t.Logf("Test %s completed successfully", suffix)
+	t.Logf("Test %s completed successfully")
 }
