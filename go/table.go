@@ -16,8 +16,10 @@ package infinity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 
 	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
@@ -848,10 +850,75 @@ func (t *Table) Delete(cond string) (*thriftapi.DeleteResponse, error) {
 	return resp, nil
 }
 
-// Update updates rows
+// Update updates rows matching the condition with the provided data
 func (t *Table) Update(cond string, data map[string]interface{}) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Parse the condition if provided
+	var whereExpr *thriftapi.ParsedExpr
+	var err error
+	if cond != "" {
+		whereExpr, err = ParseFilter(cond)
+		if err != nil {
+			return nil, NewInfinityException(
+				int(ErrorCodeInvalidParameterValue),
+				fmt.Sprintf("Failed to parse update condition: %v", err),
+			)
+		}
+	}
+
+	// Build update expressions
+	var updateExprArray []*thriftapi.UpdateExpr
+	for columnName, value := range data {
+		// Create constant expression for the value
+		constantExpr, err := ParseConstantValue(value)
+		if err != nil {
+			return nil, NewInfinityException(
+				int(ErrorCodeInvalidParameterValue),
+				fmt.Sprintf("Failed to parse update value for column %s: %v", columnName, err),
+			)
+		}
+
+		exprType := thriftapi.NewParsedExprType()
+		exprType.ConstantExpr = constantExpr
+		parsedExpr := thriftapi.NewParsedExpr()
+		parsedExpr.Type = exprType
+
+		updateExpr := thriftapi.NewUpdateExpr()
+		updateExpr.ColumnName = columnName
+		updateExpr.Value = parsedExpr
+		updateExprArray = append(updateExprArray, updateExpr)
+	}
+
+	// Create request
+	req := thriftapi.NewUpdateRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.WhereExpr = whereExpr
+	req.UpdateExprArray = updateExprArray
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Update(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to update rows: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to update rows: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // MatchDense performs dense vector search
@@ -1079,8 +1146,78 @@ func (t *Table) Option(optionKV map[string]interface{}) *Table {
 
 // ToString returns query as string
 func (t *Table) ToString() string {
-	// TODO: Implement query builder
-	return ""
+	if t.queryBuilder == nil {
+		return fmt.Sprintf(`{"db": "%s", "table": "%s"}`, t.db.dbName, t.tableName)
+	}
+
+	// Build result map
+	result := map[string]interface{}{
+		"db":    t.db.dbName,
+		"table": t.tableName,
+	}
+
+	// Add columns if present
+	if columns := t.queryBuilder.GetColumns(); columns != nil {
+		colStrs := make([]string, 0, len(columns))
+		for _, col := range columns {
+			colStrs = append(colStrs, ParsedExprToString(col))
+		}
+		result["columns"] = colStrs
+	}
+
+	// Add highlight if present
+	if highlight := t.queryBuilder.GetHighlight(); highlight != nil {
+		highlightStrs := make([]string, 0, len(highlight))
+		for _, h := range highlight {
+			highlightStrs = append(highlightStrs, ParsedExprToString(h))
+		}
+		result["highlights"] = highlightStrs
+	}
+
+	// Add search if present
+	if search := t.queryBuilder.GetSearch(); search != nil {
+		result["search"] = searchToString(search)
+	}
+
+	// Add filter if present
+	if filter := t.queryBuilder.GetFilter(); filter != nil {
+		result["filter"] = ParsedExprToString(filter)
+	}
+
+	// Add limit if present
+	if limit := t.queryBuilder.GetLimit(); limit != nil {
+		result["limit"] = ParsedExprToString(limit)
+	}
+
+	// Add offset if present
+	if offset := t.queryBuilder.GetOffset(); offset != nil {
+		result["offset"] = ParsedExprToString(offset)
+	}
+
+	// Add group by if present
+	if groupby := t.queryBuilder.GetGroupBy(); groupby != nil {
+		groupbyStrs := make([]string, 0, len(groupby))
+		for _, g := range groupby {
+			groupbyStrs = append(groupbyStrs, ParsedExprToString(g))
+		}
+		result["groupby"] = groupbyStrs
+	}
+
+	// Add sort if present
+	if sort := t.queryBuilder.GetSort(); sort != nil {
+		sortStrs := make([]string, 0, len(sort))
+		for _, s := range sort {
+			sortStrs = append(sortStrs, orderByExprToString(s))
+		}
+		result["sort"] = sortStrs
+	}
+
+	// Convert to JSON string
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Sprintf(`{"error": "%s"}`, err.Error())
+	}
+	return string(jsonBytes)
 }
 
 // ToResult executes query and returns result
@@ -1293,14 +1430,83 @@ func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
 
 // Optimize optimizes the table
 func (t *Table) Optimize() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewOptimizeRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Optimize(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to optimize table: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to optimize table: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
-// AlterIndex alters an index
+// AlterIndex alters an index with the provided parameters
 func (t *Table) AlterIndex(indexName string, optParams map[string]string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Build InitParameter list from optParams
+	var optParamsList []*thriftapi.InitParameter
+	for key, value := range optParams {
+		param := thriftapi.NewInitParameter()
+		param.ParamName = key
+		param.ParamValue = value
+		optParamsList = append(optParamsList, param)
+	}
+
+	// Build AlterIndexOptions
+	alterIndexOptions := thriftapi.NewAlterIndexOptions()
+	alterIndexOptions.IndexName = indexName
+	alterIndexOptions.OptParams = optParamsList
+
+	// Create request
+	req := thriftapi.NewAlterIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.AlterIndexOptions = alterIndexOptions
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.AlterIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to alter index: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to alter index: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // AddColumns adds columns to the table
@@ -2256,4 +2462,76 @@ func calculateEmbeddingSize(embeddingType *thriftapi.EmbeddingType) int {
 	default:
 		return dimension * 4
 	}
+}
+
+// searchToString converts a SearchExpr to string representation
+func searchToString(search *thriftapi.SearchExpr) string {
+	if search == nil {
+		return ""
+	}
+
+	parts := []string{}
+
+	// Handle match expressions
+	for _, matchExpr := range search.MatchExprs {
+		if matchExpr == nil {
+			continue
+		}
+
+		// Handle KNN (dense vector search)
+		if matchExpr.MatchVectorExpr != nil {
+			knn := matchExpr.MatchVectorExpr
+			part := fmt.Sprintf("match_dense(column=%v, topn=%d", knn.ColumnExpr, knn.Topn)
+			part += ")"
+			parts = append(parts, part)
+		}
+
+		// Handle match text
+		if matchExpr.MatchTextExpr != nil {
+			match := matchExpr.MatchTextExpr
+			part := fmt.Sprintf("match_text(fields=%s, matching_text=%s", match.Fields, match.MatchingText)
+			part += ")"
+			parts = append(parts, part)
+		}
+
+		// Handle match tensor
+		if matchExpr.MatchTensorExpr != nil {
+			mt := matchExpr.MatchTensorExpr
+			part := fmt.Sprintf("match_tensor(column=%v", mt.ColumnExpr)
+			part += ")"
+			parts = append(parts, part)
+		}
+
+		// Handle match sparse
+		if matchExpr.MatchSparseExpr != nil {
+			ms := matchExpr.MatchSparseExpr
+			part := fmt.Sprintf("match_sparse(column=%v, topn=%d", ms.ColumnExpr, ms.Topn)
+			part += ")"
+			parts = append(parts, part)
+		}
+	}
+
+	// Handle fusion expressions
+	for _, fusion := range search.FusionExprs {
+		if fusion != nil {
+			part := fmt.Sprintf("fusion(method=%s", fusion.Method)
+			part += ")"
+			parts = append(parts, part)
+		}
+	}
+
+	return strings.Join(parts, ", ")
+}
+
+// orderByExprToString converts an OrderByExpr to string representation
+func orderByExprToString(orderBy *thriftapi.OrderByExpr) string {
+	if orderBy == nil {
+		return ""
+	}
+
+	exprStr := ParsedExprToString(orderBy.Expr)
+	if orderBy.Asc {
+		return fmt.Sprintf("%s ASC", exprStr)
+	}
+	return fmt.Sprintf("%s DESC", exprStr)
 }
