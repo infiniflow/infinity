@@ -310,6 +310,9 @@ public:
     // Expands centroids with new embeddings using partial K-means
     void ExpandCentroids(const f32 *new_embeddings, u64 new_embedding_count, u32 expand_iter = 4);
 
+    // Internal version of ExpandCentroids - assumes caller holds the lock
+    void ExpandCentroidsInternal(const f32 *new_embeddings, u64 new_embedding_count, u32 expand_iter);
+
     // Store raw embeddings for potential rebuild (start_from_scratch mode)
     void StoreRawEmbeddings(const f32 *embedding_data, u64 embedding_num);
     void ClearRawEmbeddings();

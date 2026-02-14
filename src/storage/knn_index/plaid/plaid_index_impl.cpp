@@ -1069,9 +1069,10 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
             LOG_INFO(
                 fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Found {} outliers out of {}, expanding centroids", outlier_count, embedding_num));
 
-            // Re-acquire lock for expansion
+            // Lock is already released above, acquire it for expansion
             std::unique_lock relock(rw_mutex_);
-            ExpandCentroids(embedding_data, embedding_num, 4);
+            // ExpandCentroids assumes lock is held by caller
+            ExpandCentroidsInternal(embedding_data, embedding_num, 4);
             new_centroids = n_centroids_;
         } else {
             // Re-acquire lock
@@ -1084,9 +1085,8 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
     return new_centroids;
 }
 
-void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedding_count, const u32 expand_iter) {
-    std::unique_lock lock(rw_mutex_);
-
+void PlaidIndex::ExpandCentroidsInternal(const f32 *new_embeddings, const u64 new_embedding_count, const u32 expand_iter) {
+    // Assume lock is already held by caller
     if (new_embedding_count == 0) {
         return;
     }
@@ -1168,6 +1168,11 @@ void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedd
     ivf_lists_.resize(n_centroids_);
 
     LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanded from {} to {} centroids", old_n_centroids, n_centroids_));
+}
+
+void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedding_count, const u32 expand_iter) {
+    std::unique_lock lock(rw_mutex_);
+    ExpandCentroidsInternal(new_embeddings, new_embedding_count, expand_iter);
 }
 
 // ============================================================================

@@ -39,11 +39,10 @@ std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMem(const std::
                                                                      const std::shared_ptr<ColumnDef> &column_def,
                                                                      const RowID begin_row_id) {
     const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
-    return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_,
-                                             index_plaid->n_centroids_,
-                                             static_cast<EmbeddingInfo *>(column_def->type()->type_info().get())->Dimension(),
-                                             begin_row_id,
-                                             column_def);
+    const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
+    const u32 embedding_dimension = embedding_info->Dimension();
+    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMem: embedding_dimension={}", embedding_dimension));
+    return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_, index_plaid->n_centroids_, embedding_dimension, begin_row_id, column_def);
 }
 
 PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
@@ -178,7 +177,8 @@ bool PlaidIndexInMem::BuildIndex() {
     }
 
     // Store raw embeddings for start_from_scratch mode if document count is small
-    const bool store_raw_embeddings = ShouldUseStartFromScratch();
+    // Note: We already hold the lock, so directly access row_count_
+    const bool store_raw_embeddings = row_count_ < START_FROM_SCRATCH_THRESHOLD;
 
     // Determine number of centroids
     u32 n_centroids = local_requested_n_centroids;
@@ -248,7 +248,7 @@ bool PlaidIndexInMem::BuildIndex() {
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
-    lock.unlock();
+    // Lock will be automatically released when function returns
     return true;
 }
 
@@ -485,9 +485,19 @@ Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkI
     }
 
     // Determine update mode
+    // Note: We already hold the lock, so directly compute the mode
+    // In DumpIncremental, we're dumping all buffered data, so new_docs = row_count_
     const u32 new_docs = row_count_;
     const u32 new_embeddings = buffered_embedding_count_;
-    const int mode = GetUpdateMode(new_docs, new_embeddings);
+    const u32 total_docs = row_count_ + new_docs; // total = existing + new (which is all buffered)
+    int mode;
+    if (total_docs < START_FROM_SCRATCH_THRESHOLD) {
+        mode = 0;
+    } else if (new_embeddings < BUFFER_THRESHOLD) {
+        mode = 1;
+    } else {
+        mode = 2;
+    }
 
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, new_docs={}, new_embeddings={}", mode, new_docs, new_embeddings));
 
