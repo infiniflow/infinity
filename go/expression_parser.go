@@ -64,11 +64,21 @@ func ParseExpr(expr string) (*thriftapi.ParsedExpr, error) {
 		return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "Empty expression")
 	}
 
+	// Check for AS alias at the top level
+	alias := ""
+	if asExpr, aliasPart, found := splitByAlias(expr); found {
+		expr = asExpr
+		alias = aliasPart
+	}
+
 	// Parse the expression
 	parsedExpr, err := parseExpressionInternal(expr)
 	if err != nil {
 		return nil, err
 	}
+
+	// Set alias if present
+	parsedExpr.Alias = alias
 
 	// Convert to thrift ParsedExpr
 	return convertToThriftParsedExpr(parsedExpr)
@@ -513,6 +523,42 @@ func isAlpha(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
 
+// splitByAlias splits an expression by the AS keyword for aliasing
+// Returns the expression without alias, the alias name, and true if found
+func splitByAlias(expr string) (string, string, bool) {
+	expr = strings.TrimSpace(expr)
+	exprUpper := strings.ToUpper(expr)
+
+	// Find AS keyword at top level (not inside parentheses)
+	parenCount := 0
+	for i := 0; i <= len(expr)-4; i++ {
+		if expr[i] == '(' {
+			parenCount++
+		} else if expr[i] == ')' {
+			parenCount--
+		} else if parenCount == 0 {
+			// Check for " AS " with word boundaries
+			if i+4 <= len(expr) && exprUpper[i:i+4] == " AS " {
+				// Make sure it's not part of a larger word on the left
+				// e.g., "base" contains "as" but is not an alias
+				if i > 0 && isAlphaNum(expr[i-1]) {
+					continue
+				}
+
+				leftExpr := strings.TrimSpace(expr[:i])
+				aliasExpr := strings.TrimSpace(expr[i+4:])
+
+				// The alias should be a valid identifier
+				if aliasExpr != "" && isColumnReference(aliasExpr) {
+					return leftExpr, aliasExpr, true
+				}
+			}
+		}
+	}
+
+	return expr, "", false
+}
+
 // splitByComma splits a string by commas, respecting parentheses
 func splitByComma(expr string) []string {
 	parts := []string{}
@@ -796,6 +842,7 @@ func convertToThriftParsedExpr(expr *Expression) (*thriftapi.ParsedExpr, error) 
 	}
 
 	parsedExpr.Type = exprType
+	parsedExpr.AliasName = expr.Alias
 	return parsedExpr, nil
 }
 
@@ -848,46 +895,46 @@ func ParsedExprToString(expr *thriftapi.ParsedExpr) string {
 	}
 
 	exprType := expr.Type
+	result := ""
 
 	if exprType.ConstantExpr != nil {
-		return constantExprToString(exprType.ConstantExpr)
-	}
-
-	if exprType.ColumnExpr != nil {
+		result = constantExprToString(exprType.ConstantExpr)
+	} else if exprType.ColumnExpr != nil {
 		if exprType.ColumnExpr.Star {
-			return "*"
+			result = "*"
+		} else {
+			result = strings.Join(exprType.ColumnExpr.ColumnName, ".")
 		}
-		return strings.Join(exprType.ColumnExpr.ColumnName, ".")
-	}
-
-	if exprType.FunctionExpr != nil {
+	} else if exprType.FunctionExpr != nil {
 		funcName := exprType.FunctionExpr.FunctionName
 		args := []string{}
 		for _, arg := range exprType.FunctionExpr.Arguments {
 			args = append(args, ParsedExprToString(arg))
 		}
-		return fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
-	}
-
-	if exprType.CastExpr != nil {
+		result = fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
+	} else if exprType.CastExpr != nil {
 		inner := ParsedExprToString(exprType.CastExpr.Expr)
 		typeName := logicTypeToString(exprType.CastExpr.DataType.LogicType)
-		return fmt.Sprintf("CAST(%s AS %s)", inner, typeName)
-	}
-
-	if exprType.InExpr != nil {
+		result = fmt.Sprintf("CAST(%s AS %s)", inner, typeName)
+	} else if exprType.InExpr != nil {
 		left := ParsedExprToString(exprType.InExpr.LeftOperand)
 		values := []string{}
 		for _, arg := range exprType.InExpr.Arguments {
 			values = append(values, ParsedExprToString(arg))
 		}
 		if exprType.InExpr.InType {
-			return fmt.Sprintf("%s IN (%s)", left, strings.Join(values, ", "))
+			result = fmt.Sprintf("%s IN (%s)", left, strings.Join(values, ", "))
+		} else {
+			result = fmt.Sprintf("%s NOT IN (%s)", left, strings.Join(values, ", "))
 		}
-		return fmt.Sprintf("%s NOT IN (%s)", left, strings.Join(values, ", "))
 	}
 
-	return ""
+	// Append alias if present
+	if expr.AliasName != "" {
+		result = fmt.Sprintf("%s as %s", result, expr.AliasName)
+	}
+
+	return result
 }
 
 // constantExprToString converts a ConstantExpr to string

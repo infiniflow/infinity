@@ -245,6 +245,7 @@ func TestParseExprFunction(t *testing.T) {
 		{"function multiple args", "substring(name, 1, 5)", "substring(name, 1, 5)"},
 		{"aggregate function", "count(*)", "count(*)"},
 		{"aggregate with column", "sum(c1)", "sum(c1)"},
+		{"aggregate with column and alias", "sum(c1) as sum_c1", "sum(c1) as sum_c1"},
 	}
 
 	for _, tt := range tests {
