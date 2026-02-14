@@ -362,7 +362,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             std::shared_ptr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
             std::shared_ptr<PlaidIndexInMem> plaid_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetPlaidIndex();
-            
+
             // 1. in mem index - EMVB
             if (emvb_index_in_mem) {
                 const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
@@ -448,10 +448,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             if (!index_status.ok()) {
                 UnrecoverableError(index_status.message());
             }
-            
+
             for (ChunkID chunk_id : *chunk_ids_ptr) {
                 ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                
+
                 if (index_base->index_type_ == IndexType::kEMVB) {
                     EMVBIndexFileWorker *index_file_worker{};
                     Status status = chunk_index_meta.GetFileWorker(index_file_worker);
