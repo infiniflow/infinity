@@ -802,9 +802,50 @@ func (t *Table) ExportData(filePath string, exportOptions *ExportOption, columns
 }
 
 // Delete deletes rows
-func (t *Table) Delete(cond string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+func (t *Table) Delete(cond string) (*thriftapi.DeleteResponse, error) {
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Parse the condition if provided
+	var whereExpr *thriftapi.ParsedExpr
+	var err error
+	if cond != "" {
+		whereExpr, err = ParseFilter(cond)
+		if err != nil {
+			return nil, NewInfinityException(
+				int(ErrorCodeInvalidParameterValue),
+				fmt.Sprintf("Failed to parse delete condition: %v", err),
+			)
+		}
+	}
+
+	// Create request
+	req := thriftapi.NewDeleteRequest()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SessionID = t.db.conn.GetSessionID()
+	req.WhereExpr = whereExpr
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Delete(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to delete rows: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to delete rows: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // Update updates rows
