@@ -130,7 +130,8 @@ u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_
     }
 
     if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
-        const auto error_msg = fmt::format("PlaidIndex::TrainWithSampling: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
+        const auto error_msg =
+            fmt::format("PlaidIndex::TrainWithSampling: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
         UnrecoverableError(error_msg);
     }
 
@@ -139,31 +140,30 @@ u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_
     // This balances training quality and speed for large datasets
     const u64 max_sample_size = static_cast<u64>(16.0 * std::sqrt(120.0 * static_cast<f64>(embedding_num)));
     const u64 actual_sample_size = std::min(max_sample_size, embedding_num);
-    
+
     const f32 *training_data = embedding_data;
     std::unique_ptr<f32[]> sampled_data;
     u64 training_num = embedding_num;
 
     if (actual_sample_size < embedding_num) {
         LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Using sampling. Total embeddings: {}, Sample size: {} ({}%)",
-                             embedding_num, actual_sample_size,
+                             embedding_num,
+                             actual_sample_size,
                              static_cast<int>(100.0 * actual_sample_size / embedding_num)));
-        
+
         // Random sampling
         sampled_data = std::make_unique_for_overwrite<f32[]>(actual_sample_size * embedding_dimension_);
         std::vector<u32> indices(embedding_num);
         std::iota(indices.begin(), indices.end(), 0u);
-        
+
         std::random_device rd;
         std::mt19937 gen(rd());
         std::shuffle(indices.begin(), indices.end(), gen);
-        
+
         for (u64 i = 0; i < actual_sample_size; ++i) {
-            std::copy_n(embedding_data + indices[i] * embedding_dimension_,
-                        embedding_dimension_,
-                        sampled_data.get() + i * embedding_dimension_);
+            std::copy_n(embedding_data + indices[i] * embedding_dimension_, embedding_dimension_, sampled_data.get() + i * embedding_dimension_);
         }
-        
+
         training_data = sampled_data.get();
         training_num = actual_sample_size;
     } else {
@@ -753,7 +753,7 @@ size_t PlaidIndex::CalcSize() const {
     size += sizeof(u32) + packed_residuals_size_;
 
     // Quantizer size (nbits_ and embedding_dimension_ are already counted in PlaidIndex header)
-    size += sizeof(f32);                                             // avg_residual_
+    size += sizeof(f32);                                               // avg_residual_
     size += sizeof(u32) + (quantizer_->n_buckets() - 1) * sizeof(f32); // bucket_cutoffs (n_buckets - 1)
     size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32);       // bucket_weights
 
@@ -927,20 +927,20 @@ std::vector<std::unique_ptr<f32[]>> PlaidIndex::ReconstructDocuments(const std::
 
 void PlaidIndex::StoreRawEmbeddings(const f32 *embedding_data, const u64 embedding_num) {
     std::unique_lock lock(rw_mutex_);
-    
+
     // Store raw embeddings for potential rebuild
     const u64 new_size = raw_embeddings_.size() + embedding_num * embedding_dimension_;
     std::vector<f32> new_raw(new_size);
-    
+
     // Copy existing embeddings
     std::copy(raw_embeddings_.begin(), raw_embeddings_.end(), new_raw.begin());
-    
+
     // Copy new embeddings
     std::copy_n(embedding_data, embedding_num * embedding_dimension_, new_raw.begin() + raw_embeddings_.size());
-    
+
     raw_embeddings_ = std::move(new_raw);
     raw_embeddings_count_ += embedding_num;
-    
+
     LOG_INFO(fmt::format("PlaidIndex::StoreRawEmbeddings: Stored {} raw embeddings, total: {}", embedding_num, raw_embeddings_count_));
 }
 
@@ -954,19 +954,19 @@ void PlaidIndex::ClearRawEmbeddings() {
 
 void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32 iter_cnt) {
     std::unique_lock lock(rw_mutex_);
-    
+
     if (raw_embeddings_.empty() || raw_embeddings_count_ == 0) {
         LOG_WARN("PlaidIndex::RebuildFromRawEmbeddings: No raw embeddings stored, cannot rebuild");
         return;
     }
-    
+
     LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuilding from {} raw embeddings", raw_embeddings_count_));
-    
+
     // Save current document metadata for reconstruction
     const auto old_doc_lens = doc_lens_;
     const auto old_doc_offsets = doc_offsets_;
     const u32 old_n_docs = n_docs_.load();
-    
+
     // Clear current index state (but keep raw embeddings)
     n_centroids_ = 0;
     centroids_data_.clear();
@@ -980,10 +980,10 @@ void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32
     doc_lens_.clear();
     doc_offsets_.clear();
     quantizer_ = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
-    
+
     // Release lock during training to avoid blocking
     lock.unlock();
-    
+
     // Determine number of centroids
     u32 centroids_num = new_centroids_num;
     if (centroids_num == 0) {
@@ -995,13 +995,13 @@ void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32
         centroids_num = ((centroids_num + 7) / 8) * 8;
         centroids_num = std::max(8u, centroids_num);
     }
-    
+
     // Retrain with sampling
     TrainWithSampling(centroids_num, raw_embeddings_.data(), raw_embeddings_count_, iter_cnt);
-    
+
     // Re-acquire lock
     lock.lock();
-    
+
     // Re-add all documents
     u64 offset = 0;
     for (u32 i = 0; i < old_n_docs; ++i) {
@@ -1009,22 +1009,21 @@ void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32
         AddOneDocEmbeddings(raw_embeddings_.data() + offset, doc_len);
         offset += doc_len * embedding_dimension_;
     }
-    
-    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuild complete with {} centroids, {} docs", 
-                         n_centroids_, n_docs_.load()));
+
+    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuild complete with {} centroids, {} docs", n_centroids_, n_docs_.load()));
 }
 
 u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 embedding_num, const bool allow_centroid_expansion) {
     std::unique_lock lock(rw_mutex_);
-    
+
     if (n_centroids_ == 0) {
         LOG_WARN("PlaidIndex::UpdateWithNewEmbeddings: Index not trained yet, cannot update");
         return 0;
     }
-    
-    LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Adding {} new embeddings, allow_expansion={}", 
-                         embedding_num, allow_centroid_expansion));
-    
+
+    LOG_INFO(
+        fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Adding {} new embeddings, allow_expansion={}", embedding_num, allow_centroid_expansion));
+
     // Store raw embeddings if in start_from_scratch mode
     if (!raw_embeddings_.empty()) {
         // Extend raw embeddings storage
@@ -1034,23 +1033,23 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
         std::copy_n(embedding_data, embedding_num * embedding_dimension_, raw_embeddings_.begin() + old_size);
         raw_embeddings_count_ += embedding_num;
     }
-    
+
     // Expand centroids if enabled and needed
     u32 new_centroids = 0;
     if (allow_centroid_expansion && embedding_num > 0) {
         // Check if expansion is needed by finding outliers
         const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
-        
+
         // Release lock during computation to allow concurrent reads
         lock.unlock();
-        
+
         matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
                                                        centroids_data_.data(),
                                                        embedding_num,
                                                        n_centroids_,
                                                        embedding_dimension_,
                                                        dist_table.get());
-        
+
         // Count outliers
         u32 outlier_count = 0;
         const f32 outlier_threshold = -0.1f; // Adjust based on your similarity metric
@@ -1064,12 +1063,12 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
                 outlier_count++;
             }
         }
-        
+
         // If more than 10% are outliers, trigger expansion
         if (outlier_count > embedding_num / 10) {
-            LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Found {} outliers out of {}, expanding centroids", 
-                                 outlier_count, embedding_num));
-            
+            LOG_INFO(
+                fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Found {} outliers out of {}, expanding centroids", outlier_count, embedding_num));
+
             // Re-acquire lock for expansion
             std::unique_lock relock(rw_mutex_);
             ExpandCentroids(embedding_data, embedding_num, 4);
@@ -1079,10 +1078,9 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
             lock.lock();
         }
     }
-    
-    LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Added {} new embeddings, {} new centroids", 
-                         embedding_num, new_centroids));
-    
+
+    LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Added {} new embeddings, {} new centroids", embedding_num, new_centroids));
+
     return new_centroids;
 }
 
@@ -1220,7 +1218,7 @@ void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id, const std::v
     // Remove old entries for this chunk
     // TODO: Implement chunk-based doc_id filtering
     (void)chunk_id;
-    
+
     // Add new entries
     // TODO: Implement proper centroid id extraction and posting list update
     (void)doc_ids;
@@ -1267,11 +1265,11 @@ void PlaidGlobalIVF::Save(const std::string &file_path) const {
     // Write header
     file_handle->Append(&n_centroids_, sizeof(n_centroids_));
     file_handle->Append(&embedding_dimension_, sizeof(embedding_dimension_));
-    
+
     // Write centroids
     file_handle->Append(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
     file_handle->Append(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
-    
+
     // Write IVF lists
     for (u32 i = 0; i < n_centroids_; ++i) {
         u32 list_size = ivf_lists_[i].size();
