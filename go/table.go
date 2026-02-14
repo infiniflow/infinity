@@ -1370,8 +1370,35 @@ func (t *Table) DropColumns(columnNames interface{}) (interface{}, error) {
 
 // Compact compacts the table
 func (t *Table) Compact() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil || !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewCompactRequest()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SessionID = t.db.conn.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Compact(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to compact table: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to compact table: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // QueryResult represents the result of a query
