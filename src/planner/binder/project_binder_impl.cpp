@@ -74,6 +74,11 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
         }
         auto function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->new_catalog(), function_expression);
+        // Check for AVG with DISTINCT - don't convert it, it will be handled specially in bound_select_statement
+        bool is_avg_with_distinct = function_set_ptr->name() == std::string("AVG") && function_expression.distinct_;
+        if (is_avg_with_distinct) {
+            return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
+        }
 
         if (function_set_ptr->name() == std::string("AVG") && function_expression.arguments_->size() == 1 &&
             (*function_expression.arguments_)[0]->type_ == ParsedExprType::kColumn) {
