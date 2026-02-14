@@ -500,20 +500,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             break;
         }
         case IndexType::kPLAID: {
-            SegmentMeta segment_meta(segment_id, table_meta);
-            std::shared_ptr<ColumnDef> column_def;
-            {
-                auto [col_def, status] = table_index_meta.GetColumnDef();
-                if (!status.ok()) {
-                    return status;
-                }
-                column_def = std::move(col_def);
-            }
-
-            std::shared_ptr<PlaidIndex> data_ptr;
-            FileWorker::Read(static_cast<PlaidIndexFileWorker *>(index_file_worker), data_ptr);
-            data_ptr->BuildPlaidIndex(base_rowid, row_cnt, segment_meta, column_def);
-            FileWorker::Write(static_cast<PlaidIndexFileWorker *>(index_file_worker), std::span{data_ptr.get(), 1});
+            // PLAID index is fully built during PopulatePlaidIndexInner, no additional optimization needed
             break;
         }
         default: {
