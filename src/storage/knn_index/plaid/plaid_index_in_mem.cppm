@@ -59,10 +59,10 @@ export class PlaidIndexInMem {
     std::atomic_flag is_built_;
     mutable std::shared_mutex rw_mutex_;
     u32 build_index_threshold_ = 0;
-    
+
     // next-plaid update mode thresholds
-    static constexpr u32 BUFFER_THRESHOLD = 100;           // Buffer mode threshold
-    static constexpr u32 APPEND_THRESHOLD = 2000;          // Chunk append threshold
+    static constexpr u32 BUFFER_THRESHOLD = 100;             // Buffer mode threshold
+    static constexpr u32 APPEND_THRESHOLD = 2000;            // Chunk append threshold
     static constexpr u32 START_FROM_SCRATCH_THRESHOLD = 999; // Full rebuild threshold
 
 public:
@@ -125,30 +125,30 @@ public:
                      KVInstance &kv_instance,
                      TxnTimeStamp begin_ts,
                      MetaCache *meta_cache);
-    
+
     // ===== Incremental Update Interface (next-plaid style) =====
-    
+
     // Check if we should use start-from-scratch mode (< 999 docs)
     bool ShouldUseStartFromScratch() const;
-    
+
     // Check if we should use buffer mode (< 100 new embeddings)
     bool ShouldUseBufferMode(u32 new_embeddings) const;
-    
+
     // Get current update mode based on existing and new data
     // Returns: 0=start-from-scratch, 1=buffer-mode, 2=centroid-expansion
     int GetUpdateMode(u32 new_doc_count, u32 new_embedding_count) const;
-    
+
     // Dump with incremental update support
     // Supports three modes: start-from-scratch, buffer-mode, centroid-expansion
     Status DumpIncremental(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
-    
+
     // Memory usage for triggering dump
     size_t MemUsage() const;
-    
+
     // Get buffered document count
     u32 GetBufferedDocCount() const;
-    
-    // Get buffered embedding count  
+
+    // Get buffered embedding count
     u32 GetBufferedEmbeddingCount() const;
 
 private:
@@ -162,11 +162,11 @@ private:
     std::vector<u8> buffer_packed_residuals_;
     std::vector<u32> buffer_doc_lens_;
     u32 buffer_embedding_count_ = 0;
-    
+
     // Raw embeddings storage for start-from-scratch mode
     std::vector<f32> raw_embeddings_storage_;
     std::vector<u32> raw_doc_lens_;
-    
+
     // Incremental capacity tracking
     u32 incremental_embedding_capacity_ = 0;
 
@@ -175,15 +175,15 @@ private:
 
     // Collect all embeddings (buffered + incremental) into contiguous array
     std::unique_ptr<f32[]> CollectAllEmbeddings(u64 &total_count) const;
-    
+
     // Calculate optimal centroid count (next-plaid formula: 2^floor(log2(16*sqrt(N))))
     static u32 CalcOptimalNCentroids(u32 n_embeddings);
-    
+
     // Internal dump methods for different modes
     Status DumpStartFromScratch(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
     Status DumpBufferMode(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
     Status DumpCentroidExpansion(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
-    
+
     // Prepare data from buffers for dump
     void PrepareDumpData(std::vector<u32> &out_centroid_ids,
                          std::vector<u8> &out_packed_residuals,
