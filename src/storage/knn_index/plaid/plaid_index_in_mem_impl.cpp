@@ -64,6 +64,47 @@ u32 PlaidIndexInMem::GetRowCount() const {
 bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
     std::unique_lock lock(rw_mutex_);
 
+    // Check if index is already built - handle incremental insertion
+    if (is_built_.test() && plaid_index_) {
+        // Index already built, handle incremental update
+        lock.unlock();
+        
+        // Collect all embeddings from this batch
+        u64 total_embeddings = 0;
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
+            total_embeddings += embedding_num;
+        }
+        
+        // Copy to contiguous buffer
+        auto all_embeddings = std::make_unique_for_overwrite<f32[]>(total_embeddings * embedding_dimension_);
+        u64 offset = 0;
+        std::vector<u32> doc_lens;
+        doc_lens.reserve(row_count);
+        
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
+            const auto *tensor_data = reinterpret_cast<const f32 *>(raw_data.data());
+            std::copy_n(tensor_data, embedding_num * embedding_dimension_, all_embeddings.get() + offset);
+            offset += embedding_num * embedding_dimension_;
+            doc_lens.push_back(embedding_num);
+        }
+        
+        // Add to existing index with centroid expansion support
+        offset = 0;
+        for (u32 doc_len : doc_lens) {
+            plaid_index_->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
+            offset += doc_len * embedding_dimension_;
+        }
+        
+        // Try to update index with centroid expansion if needed
+        plaid_index_->UpdateWithNewEmbeddings(all_embeddings.get(), total_embeddings, true);
+        
+        std::unique_lock relock(rw_mutex_);
+        row_count_ += row_count;
+        return true;
+    }
+
     for (u32 i = 0; i < row_count; ++i) {
         auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
         const auto *tensor_data = reinterpret_cast<const f32 *>(raw_data.data());
@@ -135,6 +176,9 @@ bool PlaidIndexInMem::BuildIndex() {
         offset += doc_len * local_embedding_dim;
     }
 
+    // Store raw embeddings for start_from_scratch mode if document count is small
+    const bool store_raw_embeddings = ShouldUseStartFromScratch();
+
     // Determine number of centroids
     u32 n_centroids = local_requested_n_centroids;
     if (n_centroids == 0) {
@@ -151,10 +195,6 @@ bool PlaidIndexInMem::BuildIndex() {
     const auto time_0 = std::chrono::high_resolution_clock::now();
 
     // Create and train index without holding PlaidIndexInMem lock
-    // This prevents deadlock because:
-    // - Search threads hold PlaidIndexInMem shared lock, then try to get PlaidIndex shared lock
-    // - BuildIndex would hold PlaidIndexInMem unique lock, then try to get PlaidIndex unique lock
-    // By releasing PlaidIndexInMem lock during training, we avoid the lock ordering issue
     auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, local_requested_n_centroids);
 
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training with {} centroids", n_centroids));
@@ -163,6 +203,12 @@ bool PlaidIndexInMem::BuildIndex() {
     const auto time_1 = std::chrono::high_resolution_clock::now();
     auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training took {} ms", train_ms));
+
+    // Store raw embeddings if in start_from_scratch mode
+    if (store_raw_embeddings) {
+        temp_index->StoreRawEmbeddings(all_embeddings.get(), local_embedding_count);
+        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Stored {} raw embeddings for start_from_scratch mode", local_embedding_count));
+    }
 
     // Add documents to the trained index
     offset = 0;
@@ -185,16 +231,67 @@ bool PlaidIndexInMem::BuildIndex() {
         return true; // Another thread already built it
     }
 
-    // Move the trained index to member variable
+    // Safely swap the index pointer using atomic flag for synchronization
+    // This ensures search threads see a consistent state
     plaid_index_ = std::move(temp_index);
+
+    // Memory barrier to ensure plaid_index_ is visible to other threads before is_built_ is set
+    std::atomic_thread_fence(std::memory_order_release);
 
     // Clear buffers to free memory
     buffered_embeddings_.clear();
     buffered_doc_lens_.clear();
 
+    // Set is_built_ AFTER plaid_index_ is fully constructed and visible
     is_built_.test_and_set();
+    
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
+    lock.unlock();
+    return true;
+}
+
+bool PlaidIndexInMem::RebuildIndex() {
+    std::unique_lock lock(rw_mutex_);
+    
+    if (!is_built_.test() || !plaid_index_) {
+        LOG_WARN("PlaidIndexInMem::RebuildIndex: Index not built yet, cannot rebuild");
+        return false;
+    }
+    
+    if (!plaid_index_->HasRawEmbeddings()) {
+        LOG_WARN("PlaidIndexInMem::RebuildIndex: No raw embeddings stored, cannot use start_from_scratch mode");
+        return false;
+    }
+    
+    LOG_INFO(fmt::format("PlaidIndexInMem::RebuildIndex: Rebuilding index from {} raw embeddings", 
+                         plaid_index_->GetRawEmbeddingCount()));
+    
+    // Release lock during rebuild
+    lock.unlock();
+    
+    // Rebuild from stored raw embeddings
+    plaid_index_->RebuildFromRawEmbeddings(0, 4);
+    
+    LOG_INFO("PlaidIndexInMem::RebuildIndex: Rebuild complete");
+    return true;
+}
+
+bool PlaidIndexInMem::UpdateIndex(const f32 *embedding_data, const u32 embedding_num, const bool allow_expansion) {
+    std::shared_lock lock(rw_mutex_);
+    
+    if (!is_built_.test() || !plaid_index_) {
+        LOG_WARN("PlaidIndexInMem::UpdateIndex: Index not built yet, cannot update");
+        return false;
+    }
+    
+    lock.unlock();
+    
+    // Update index with centroid expansion support
+    u32 new_centroids = plaid_index_->UpdateWithNewEmbeddings(embedding_data, embedding_num, allow_expansion);
+    
+    LOG_INFO(fmt::format("PlaidIndexInMem::UpdateIndex: Updated index with {} embeddings, {} new centroids added", 
+                         embedding_num, new_centroids));
     return true;
 }
 
@@ -232,10 +329,19 @@ PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_pt
                                                              const f32 centroid_score_threshold,
                                                              const u32 n_doc_to_score,
                                                              const u32 n_full_scores) const {
-    std::shared_lock lock(rw_mutex_);
-
-    if (!is_built_.test() || !plaid_index_) {
+    // Memory barrier to ensure we see the latest is_built_ value
+    std::atomic_thread_fence(std::memory_order_acquire);
+    
+    // Double-checked locking pattern for safe concurrent access
+    if (!is_built_.test()) {
         // Return empty result if index not built
+        return std::make_tuple(0, nullptr, nullptr);
+    }
+    
+    std::shared_lock lock(rw_mutex_);
+    
+    // Second check after acquiring lock
+    if (!is_built_.test() || !plaid_index_) {
         return std::make_tuple(0, nullptr, nullptr);
     }
 

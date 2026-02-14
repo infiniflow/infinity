@@ -119,18 +119,54 @@ u32 PlaidIndex::GetTotalEmbeddingNum() const {
 
 u64 PlaidIndex::ExpectLeastTrainingDataNum() const { return std::max<u64>(32ul * n_centroids_, 32ul * quantizer_->n_buckets()); }
 
-void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
+u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
     std::unique_lock lock(rw_mutex_);
 
     n_centroids_ = centroids_num;
     if (n_centroids_ == 0 || (n_centroids_ % 8) != 0) {
-        const auto error_msg = fmt::format("PlaidIndex::Train: n_centroids_ must be a multiple of 8, got {} instead.", n_centroids_);
+        const auto error_msg = fmt::format("PlaidIndex::TrainWithSampling: n_centroids_ must be a multiple of 8, got {} instead.", n_centroids_);
         UnrecoverableError(error_msg);
     }
 
     if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
-        const auto error_msg = fmt::format("PlaidIndex::Train: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
+        const auto error_msg = fmt::format("PlaidIndex::TrainWithSampling: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
         UnrecoverableError(error_msg);
+    }
+
+    // Smart sampling similar to next-plaid
+    // Sample size formula: min(16 * sqrt(120 * N), N)
+    // This balances training quality and speed for large datasets
+    const u64 max_sample_size = static_cast<u64>(16.0 * std::sqrt(120.0 * static_cast<f64>(embedding_num)));
+    const u64 actual_sample_size = std::min(max_sample_size, embedding_num);
+    
+    const f32 *training_data = embedding_data;
+    std::unique_ptr<f32[]> sampled_data;
+    u64 training_num = embedding_num;
+
+    if (actual_sample_size < embedding_num) {
+        LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Using sampling. Total embeddings: {}, Sample size: {} ({}%)",
+                             embedding_num, actual_sample_size,
+                             static_cast<int>(100.0 * actual_sample_size / embedding_num)));
+        
+        // Random sampling
+        sampled_data = std::make_unique_for_overwrite<f32[]>(actual_sample_size * embedding_dimension_);
+        std::vector<u32> indices(embedding_num);
+        std::iota(indices.begin(), indices.end(), 0u);
+        
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::shuffle(indices.begin(), indices.end(), gen);
+        
+        for (u64 i = 0; i < actual_sample_size; ++i) {
+            std::copy_n(embedding_data + indices[i] * embedding_dimension_,
+                        embedding_dimension_,
+                        sampled_data.get() + i * embedding_dimension_);
+        }
+        
+        training_data = sampled_data.get();
+        training_num = actual_sample_size;
+    } else {
+        LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Using all {} embeddings for training", embedding_num));
     }
 
     // Allocate space for centroids
@@ -140,17 +176,17 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
 
     const auto time_0 = std::chrono::high_resolution_clock::now();
 
-    // Train centroids using K-means
+    // Train centroids using K-means on sampled data
     const auto result_centroid_num =
-        GetKMeansCentroids(MetricType::kMetricL2, embedding_dimension_, embedding_num, embedding_data, centroids_data_, n_centroids_, iter_cnt);
+        GetKMeansCentroids(MetricType::kMetricL2, embedding_dimension_, training_num, training_data, centroids_data_, n_centroids_, iter_cnt);
 
     if (result_centroid_num != n_centroids_) {
         const auto error_msg =
-            fmt::format("PlaidIndex::Train: KMeans failed to get {} centroids, got {} instead.", n_centroids_, result_centroid_num);
+            fmt::format("PlaidIndex::TrainWithSampling: KMeans failed to get {} centroids, got {} instead.", n_centroids_, result_centroid_num);
         UnrecoverableError(error_msg);
     }
 
-    LOG_INFO(fmt::format("PlaidIndex::Train: KMeans got {} centroids.", result_centroid_num));
+    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: KMeans got {} centroids using {} samples.", result_centroid_num, training_num));
 
     // Compute centroid norms
     const f32 *centroid_data = centroids_data_.data();
@@ -161,9 +197,9 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
 
     const auto time_1 = std::chrono::high_resolution_clock::now();
     auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
-    LOG_INFO(fmt::format("PlaidIndex::Train: Finish train centroids, time cost: {} ms", train_ms));
+    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Finish train centroids, time cost: {} ms", train_ms));
 
-    // Compute residuals and train quantizer
+    // Compute residuals on FULL dataset (not just samples) for quantizer training
     const auto residuals = std::make_unique_for_overwrite<f32[]>(embedding_num * embedding_dimension_);
     {
         const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
@@ -197,14 +233,21 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
 
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto residual_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
-    LOG_INFO(fmt::format("PlaidIndex::Train: Finish calculate residuals, time cost: {} ms", residual_ms));
+    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Finish calculate residuals on {} embeddings, time cost: {} ms", embedding_num, residual_ms));
 
     // Train residual quantizer
     quantizer_->Train(residuals.get(), embedding_num);
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
     auto quantizer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_2).count();
-    LOG_INFO(fmt::format("PlaidIndex::Train: Finish train residual quantizer, time cost: {} ms", quantizer_ms));
+    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Finish train residual quantizer, time cost: {} ms", quantizer_ms));
+
+    return training_num;
+}
+
+void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
+    // Use sampling by default for better performance with large datasets
+    TrainWithSampling(centroids_num, embedding_data, embedding_num, iter_cnt);
 }
 
 void PlaidIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embedding_num) {
@@ -879,6 +922,167 @@ std::vector<std::unique_ptr<f32[]>> PlaidIndex::ReconstructDocuments(const std::
     }
 
     return results;
+}
+
+void PlaidIndex::StoreRawEmbeddings(const f32 *embedding_data, const u64 embedding_num) {
+    std::unique_lock lock(rw_mutex_);
+    
+    // Store raw embeddings for potential rebuild
+    const u64 new_size = raw_embeddings_.size() + embedding_num * embedding_dimension_;
+    std::vector<f32> new_raw(new_size);
+    
+    // Copy existing embeddings
+    std::copy(raw_embeddings_.begin(), raw_embeddings_.end(), new_raw.begin());
+    
+    // Copy new embeddings
+    std::copy_n(embedding_data, embedding_num * embedding_dimension_, new_raw.begin() + raw_embeddings_.size());
+    
+    raw_embeddings_ = std::move(new_raw);
+    raw_embeddings_count_ += embedding_num;
+    
+    LOG_INFO(fmt::format("PlaidIndex::StoreRawEmbeddings: Stored {} raw embeddings, total: {}", embedding_num, raw_embeddings_count_));
+}
+
+void PlaidIndex::ClearRawEmbeddings() {
+    std::unique_lock lock(rw_mutex_);
+    raw_embeddings_.clear();
+    raw_embeddings_.shrink_to_fit();
+    raw_embeddings_count_ = 0;
+    LOG_INFO("PlaidIndex::ClearRawEmbeddings: Cleared all raw embeddings");
+}
+
+void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32 iter_cnt) {
+    std::unique_lock lock(rw_mutex_);
+    
+    if (raw_embeddings_.empty() || raw_embeddings_count_ == 0) {
+        LOG_WARN("PlaidIndex::RebuildFromRawEmbeddings: No raw embeddings stored, cannot rebuild");
+        return;
+    }
+    
+    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuilding from {} raw embeddings", raw_embeddings_count_));
+    
+    // Save current document metadata for reconstruction
+    const auto old_doc_lens = doc_lens_;
+    const auto old_doc_offsets = doc_offsets_;
+    const u32 old_n_docs = n_docs_.load();
+    
+    // Clear current index state (but keep raw embeddings)
+    n_centroids_ = 0;
+    centroids_data_.clear();
+    centroid_norms_neg_half_.clear();
+    centroid_ids_.clear();
+    packed_residuals_.reset();
+    packed_residuals_size_ = 0;
+    ivf_lists_.clear();
+    n_docs_ = 0;
+    n_total_embeddings_ = 0;
+    doc_lens_.clear();
+    doc_offsets_.clear();
+    quantizer_ = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
+    
+    // Release lock during training to avoid blocking
+    lock.unlock();
+    
+    // Determine number of centroids
+    u32 centroids_num = new_centroids_num;
+    if (centroids_num == 0) {
+        centroids_num = requested_n_centroids_;
+    }
+    if (centroids_num == 0) {
+        // Auto: sqrt(N) rounded to multiple of 8
+        centroids_num = static_cast<u32>(std::sqrt(raw_embeddings_count_));
+        centroids_num = ((centroids_num + 7) / 8) * 8;
+        centroids_num = std::max(8u, centroids_num);
+    }
+    
+    // Retrain with sampling
+    TrainWithSampling(centroids_num, raw_embeddings_.data(), raw_embeddings_count_, iter_cnt);
+    
+    // Re-acquire lock
+    lock.lock();
+    
+    // Re-add all documents
+    u64 offset = 0;
+    for (u32 i = 0; i < old_n_docs; ++i) {
+        u32 doc_len = old_doc_lens[i];
+        AddOneDocEmbeddings(raw_embeddings_.data() + offset, doc_len);
+        offset += doc_len * embedding_dimension_;
+    }
+    
+    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuild complete with {} centroids, {} docs", 
+                         n_centroids_, n_docs_.load()));
+}
+
+u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 embedding_num, const bool allow_centroid_expansion) {
+    std::unique_lock lock(rw_mutex_);
+    
+    if (n_centroids_ == 0) {
+        LOG_WARN("PlaidIndex::UpdateWithNewEmbeddings: Index not trained yet, cannot update");
+        return 0;
+    }
+    
+    LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Adding {} new embeddings, allow_expansion={}", 
+                         embedding_num, allow_centroid_expansion));
+    
+    // Store raw embeddings if in start_from_scratch mode
+    if (!raw_embeddings_.empty()) {
+        // Extend raw embeddings storage
+        const u64 old_size = raw_embeddings_.size();
+        const u64 new_size = old_size + embedding_num * embedding_dimension_;
+        raw_embeddings_.resize(new_size);
+        std::copy_n(embedding_data, embedding_num * embedding_dimension_, raw_embeddings_.begin() + old_size);
+        raw_embeddings_count_ += embedding_num;
+    }
+    
+    // Expand centroids if enabled and needed
+    u32 new_centroids = 0;
+    if (allow_centroid_expansion && embedding_num > 0) {
+        // Check if expansion is needed by finding outliers
+        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
+        
+        // Release lock during computation to allow concurrent reads
+        lock.unlock();
+        
+        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
+                                                       centroids_data_.data(),
+                                                       embedding_num,
+                                                       n_centroids_,
+                                                       embedding_dimension_,
+                                                       dist_table.get());
+        
+        // Count outliers
+        u32 outlier_count = 0;
+        const f32 outlier_threshold = -0.1f; // Adjust based on your similarity metric
+        for (u64 i = 0; i < embedding_num; ++i) {
+            f32 max_sim = std::numeric_limits<f32>::lowest();
+            for (u32 j = 0; j < n_centroids_; ++j) {
+                f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+                max_sim = std::max(max_sim, sim);
+            }
+            if (max_sim < outlier_threshold) {
+                outlier_count++;
+            }
+        }
+        
+        // If more than 10% are outliers, trigger expansion
+        if (outlier_count > embedding_num / 10) {
+            LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Found {} outliers out of {}, expanding centroids", 
+                                 outlier_count, embedding_num));
+            
+            // Re-acquire lock for expansion
+            std::unique_lock relock(rw_mutex_);
+            ExpandCentroids(embedding_data, embedding_num, 4);
+            new_centroids = n_centroids_;
+        } else {
+            // Re-acquire lock
+            lock.lock();
+        }
+    }
+    
+    LOG_INFO(fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Added {} new embeddings, {} new centroids", 
+                         embedding_num, new_centroids));
+    
+    return new_centroids;
 }
 
 void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedding_count, const u32 expand_iter) {

@@ -80,6 +80,15 @@ public:
     // Returns true if index was built, false if not enough data
     bool BuildIndex();
 
+    // Rebuild index from stored raw embeddings (start_from_scratch mode)
+    // Use when index quality has degraded
+    bool RebuildIndex();
+
+    // Update index with new embeddings after initial build
+    // Supports centroid expansion for outlier handling
+    // Returns true if update was successful
+    bool UpdateIndex(const f32 *embedding_data, u32 embedding_num, bool allow_expansion = true);
+
     void Dump(PlaidIndexFileWorker *index_file_worker);
 
     // Search
@@ -109,6 +118,24 @@ private:
     std::vector<std::unique_ptr<f32[]>> buffered_embeddings_;
     std::vector<u32> buffered_doc_lens_;
     u32 buffered_embedding_count_ = 0;
+
+    // For incremental updates after index is built
+    std::unique_ptr<f32[]> incremental_embeddings_buffer_;
+    u32 incremental_embedding_count_ = 0;
+    u32 incremental_embedding_capacity_ = 0;
+
+    // Configuration for start_from_scratch threshold
+    // If document count <= this threshold, store raw embeddings for potential rebuild
+    static constexpr u32 START_FROM_SCRATCH_THRESHOLD = 999;
+
+    // Check if we should use start_from_scratch mode
+    bool ShouldUseStartFromScratch() const { return row_count_ <= START_FROM_SCRATCH_THRESHOLD; }
+
+    // Incrementally update existing index with new data
+    void IncrementalUpdate(const f32 *embedding_data, u64 embedding_num);
+
+    // Collect all embeddings (buffered + incremental) into contiguous array
+    std::unique_ptr<f32[]> CollectAllEmbeddings(u64 &total_count) const;
 };
 
 } // namespace infinity

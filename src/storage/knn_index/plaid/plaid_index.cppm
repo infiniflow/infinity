@@ -54,10 +54,25 @@ public:
     void BuildPlaidIndex(const RowID base_rowid, u32 row_count, SegmentMeta &segment_meta, const std::shared_ptr<ColumnDef> &column_def);
 
     // Train the index with embedding data
+    // Uses intelligent sampling when embedding_num is large to improve performance
+    // Sample size: min(16 * sqrt(120 * embedding_num), embedding_num)
     void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 4);
+
+    // Train with sampling strategy similar to next-plaid
+    // Returns actual number of embeddings used for training (after sampling)
+    u64 TrainWithSampling(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 4);
 
     // Add one document's embeddings
     void AddOneDocEmbeddings(const f32 *embedding_data, u32 embedding_num);
+
+    // Incrementally update index with new embeddings
+    // Supports centroid expansion when outliers are detected
+    // Returns number of new centroids added (0 if no expansion)
+    u32 UpdateWithNewEmbeddings(const f32 *embedding_data, u64 embedding_num, bool allow_centroid_expansion = true);
+
+    // Rebuild index from stored raw embeddings (start_from_scratch mode)
+    // Used when index quality degrades or for recovery
+    void RebuildFromRawEmbeddings(u32 new_centroids_num = 0, u32 iter_cnt = 4);
 
     // Search with bitmask filtering
     PlaidQueryResultType SearchWithBitmask(const f32 *query_ptr,
@@ -116,6 +131,12 @@ public:
     // Expands centroids with new embeddings using partial K-means
     void ExpandCentroids(const f32 *new_embeddings, u64 new_embedding_count, u32 expand_iter = 4);
 
+    // Store raw embeddings for potential rebuild (start_from_scratch mode)
+    void StoreRawEmbeddings(const f32 *embedding_data, u64 embedding_num);
+    void ClearRawEmbeddings();
+    bool HasRawEmbeddings() const { return !raw_embeddings_.empty(); }
+    u64 GetRawEmbeddingCount() const { return raw_embeddings_count_; }
+
     // Search without bitmask (for testing/simple use cases)
     PlaidQueryResultType GetQueryResult(const f32 *query_ptr,
                                         u32 query_embedding_num,
@@ -160,6 +181,11 @@ private:
     size_t mmap_size_ = 0;
     bool is_mmap_ = false;
     bool owns_data_ = true;
+
+    // Raw embeddings storage for start_from_scratch rebuild mode
+    // Stored as flattened array: [n_embeddings, embedding_dimension]
+    std::vector<f32> raw_embeddings_;
+    u64 raw_embeddings_count_ = 0;
 
     // Thread safety
     mutable std::shared_mutex rw_mutex_;
