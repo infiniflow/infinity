@@ -240,12 +240,73 @@ func TestParseExprFunction(t *testing.T) {
 		expr     string
 		expected string
 	}{
+		// Basic function calls
 		{"function no args", "now()", "now()"},
 		{"function single arg", "upper(name)", "upper(name)"},
 		{"function multiple args", "substring(name, 1, 5)", "substring(name, 1, 5)"},
 		{"aggregate function", "count(*)", "count(*)"},
 		{"aggregate with column", "sum(c1)", "sum(c1)"},
 		{"aggregate with column and alias", "sum(c1) as sum_c1", "sum(c1) as sum_c1"},
+
+		// Common SQL functions
+		{"lower function", "lower(name)", "lower(name)"},
+		{"length function", "length(name)", "length(name)"},
+		{"concat function", "concat(c1, c2)", "concat(c1, c2)"},
+		{"concat multiple args", "concat(c1, c2, c3)", "concat(c1, c2, c3)"},
+		{"trim function", "trim(name)", "trim(name)"},
+		{"ltrim function", "ltrim(name)", "ltrim(name)"},
+		{"rtrim function", "rtrim(name)", "rtrim(name)"},
+		{"replace function", "replace(name, 'a', 'b')", "replace(name, 'a', 'b')"},
+		{"substring two args", "substring(name, 1)", "substring(name, 1)"},
+
+		// Aggregate functions
+		{"avg function", "avg(c1)", "avg(c1)"},
+		{"min function", "min(c1)", "min(c1)"},
+		{"max function", "max(c1)", "max(c1)"},
+		{"count column", "count(c1)", "count(c1)"},
+
+		// Function with expression arguments
+		{"function with arithmetic", "abs(c1 + c2)", "abs(+(c1, c2))"},
+		{"function with column ref", "upper(t1.name)", "upper(t1.name)"},
+		{"nested function", "upper(lower(name))", "upper(lower(name))"},
+		{"function with constant", "substring(name, 1, 10)", "substring(name, 1, 10)"},
+
+		// Alias variations
+		{"function with alias uppercase", "sum(c1) AS total", "sum(c1) as total"},
+		{"function with alias mixed", "avg(c1) As avg_val", "avg(c1) as avg_val"},
+		{"complex expression with alias", "upper(c1) as upper_c1", "upper(c1) as upper_c1"},
+
+		// Date/Time functions
+		{"date function", "date('2024-01-01')", "date('2024-01-01')"},
+		{"datetime function", "datetime('2024-01-01 10:00:00')", "datetime('2024-01-01 10:00:00')"},
+		{"year function", "year(date_col)", "year(date_col)"},
+		{"month function", "month(date_col)", "month(date_col)"},
+		{"day function", "day(date_col)", "day(date_col)"},
+
+		// Math functions
+		{"abs function", "abs(c1)", "abs(c1)"},
+		{"round function", "round(c1, 2)", "round(c1, 2)"},
+		{"ceil function", "ceil(c1)", "ceil(c1)"},
+		{"floor function", "floor(c1)", "floor(c1)"},
+		{"sqrt function", "sqrt(c1)", "sqrt(c1)"},
+		{"power function", "power(c1, 2)", "power(c1, 2)"},
+		{"mod function", "mod(c1, 10)", "mod(c1, 10)"},
+
+		// String functions
+		{"left function", "left(name, 5)", "left(name, 5)"},
+		{"right function", "right(name, 5)", "right(name, 5)"},
+		{"instr function", "instr(name, 'test')", "instr(name, 'test')"},
+		{"char_length function", "char_length(name)", "char_length(name)"},
+
+		// Window functions
+		{"row_number function", "row_number()", "row_number()"},
+		{"rank function", "rank()", "rank()"},
+		{"dense_rank function", "dense_rank()", "dense_rank()"},
+
+		// Special functions
+		{"coalesce function", "coalesce(c1, c2, 0)", "coalesce(c1, c2, 0)"},
+		{"nullif function", "nullif(c1, c2)", "nullif(c1, c2)"},
+		{"if function", "if(c1 > 0, 'yes', 'no')", "if(>(c1, 0), 'yes', 'no')"},
 	}
 
 	for _, tt := range tests {
