@@ -69,20 +69,20 @@ bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
     if (is_built_.test() && plaid_index_) {
         // Index already built, handle incremental update
         lock.unlock();
-        
+
         // Collect all embeddings from this batch
         u64 total_embeddings = 0;
         for (u32 i = 0; i < row_count; ++i) {
             auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
             total_embeddings += embedding_num;
         }
-        
+
         // Copy to contiguous buffer
         auto all_embeddings = std::make_unique_for_overwrite<f32[]>(total_embeddings * embedding_dimension_);
         u64 offset = 0;
         std::vector<u32> doc_lens;
         doc_lens.reserve(row_count);
-        
+
         for (u32 i = 0; i < row_count; ++i) {
             auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
             const auto *tensor_data = reinterpret_cast<const f32 *>(raw_data.data());
@@ -90,17 +90,17 @@ bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
             offset += embedding_num * embedding_dimension_;
             doc_lens.push_back(embedding_num);
         }
-        
+
         // Add to existing index with centroid expansion support
         offset = 0;
         for (u32 doc_len : doc_lens) {
             plaid_index_->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
             offset += doc_len * embedding_dimension_;
         }
-        
+
         // Try to update index with centroid expansion if needed
         plaid_index_->UpdateWithNewEmbeddings(all_embeddings.get(), total_embeddings, true);
-        
+
         std::unique_lock relock(rw_mutex_);
         row_count_ += row_count;
         return true;
@@ -229,7 +229,7 @@ bool PlaidIndexInMem::BuildIndex() {
     // Double-check that index wasn't built by another thread while we were training
     if (is_built_.test()) {
         lock.unlock(); // Must unlock before returning
-        return true; // Another thread already built it
+        return true;   // Another thread already built it
     }
 
     // Safely swap the index pointer using atomic flag for synchronization
@@ -245,7 +245,7 @@ bool PlaidIndexInMem::BuildIndex() {
 
     // Set is_built_ AFTER plaid_index_ is fully constructed and visible
     is_built_.test_and_set();
-    
+
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
     lock.unlock();
@@ -254,45 +254,43 @@ bool PlaidIndexInMem::BuildIndex() {
 
 bool PlaidIndexInMem::RebuildIndex() {
     std::unique_lock lock(rw_mutex_);
-    
+
     if (!is_built_.test() || !plaid_index_) {
         LOG_WARN("PlaidIndexInMem::RebuildIndex: Index not built yet, cannot rebuild");
         return false;
     }
-    
+
     if (!plaid_index_->HasRawEmbeddings()) {
         LOG_WARN("PlaidIndexInMem::RebuildIndex: No raw embeddings stored, cannot use start_from_scratch mode");
         return false;
     }
-    
-    LOG_INFO(fmt::format("PlaidIndexInMem::RebuildIndex: Rebuilding index from {} raw embeddings", 
-                         plaid_index_->GetRawEmbeddingCount()));
-    
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::RebuildIndex: Rebuilding index from {} raw embeddings", plaid_index_->GetRawEmbeddingCount()));
+
     // Release lock during rebuild
     lock.unlock();
-    
+
     // Rebuild from stored raw embeddings
     plaid_index_->RebuildFromRawEmbeddings(0, 4);
-    
+
     LOG_INFO("PlaidIndexInMem::RebuildIndex: Rebuild complete");
     return true;
 }
 
 bool PlaidIndexInMem::UpdateIndex(const f32 *embedding_data, const u32 embedding_num, const bool allow_expansion) {
     std::shared_lock lock(rw_mutex_);
-    
+
     if (!is_built_.test() || !plaid_index_) {
         LOG_WARN("PlaidIndexInMem::UpdateIndex: Index not built yet, cannot update");
         return false;
     }
-    
+
     lock.unlock();
-    
+
     // Update index with centroid expansion support
     u32 new_centroids = plaid_index_->UpdateWithNewEmbeddings(embedding_data, embedding_num, allow_expansion);
-    
-    LOG_INFO(fmt::format("PlaidIndexInMem::UpdateIndex: Updated index with {} embeddings, {} new centroids added", 
-                         embedding_num, new_centroids));
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::UpdateIndex: Updated index with {} embeddings, {} new centroids added", embedding_num, new_centroids));
     return true;
 }
 
@@ -332,15 +330,15 @@ PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_pt
                                                              const u32 n_full_scores) const {
     // Memory barrier to ensure we see the latest is_built_ value
     std::atomic_thread_fence(std::memory_order_acquire);
-    
+
     // Double-checked locking pattern for safe concurrent access
     if (!is_built_.test()) {
         // Return empty result if index not built
         return std::make_tuple(0, nullptr, nullptr);
     }
-    
+
     std::shared_lock lock(rw_mutex_);
-    
+
     // Second check after acquiring lock
     if (!is_built_.test() || !plaid_index_) {
         return std::make_tuple(0, nullptr, nullptr);
@@ -378,25 +376,23 @@ bool PlaidIndexInMem::ShouldUseStartFromScratch() const {
     return row_count_ < START_FROM_SCRATCH_THRESHOLD;
 }
 
-bool PlaidIndexInMem::ShouldUseBufferMode(const u32 new_embeddings) const {
-    return new_embeddings < BUFFER_THRESHOLD;
-}
+bool PlaidIndexInMem::ShouldUseBufferMode(const u32 new_embeddings) const { return new_embeddings < BUFFER_THRESHOLD; }
 
 int PlaidIndexInMem::GetUpdateMode(const u32 new_doc_count, const u32 new_embedding_count) const {
     std::shared_lock lock(rw_mutex_);
-    
+
     const u32 total_docs = row_count_ + new_doc_count;
-    
+
     // Mode 0: Start-from-scratch
     if (total_docs < START_FROM_SCRATCH_THRESHOLD) {
         return 0;
     }
-    
+
     // Mode 1: Buffer mode
     if (new_embedding_count < BUFFER_THRESHOLD) {
         return 1;
     }
-    
+
     // Mode 2: Centroid expansion
     return 2;
 }
@@ -405,33 +401,33 @@ u32 PlaidIndexInMem::CalcOptimalNCentroids(const u32 n_embeddings) {
     // next-plaid formula: 2^floor(log2(16*sqrt(N)))
     f32 val = 16.0f * std::sqrt(static_cast<f32>(n_embeddings));
     u32 k = 1u << static_cast<u32>(std::log2(val));
-    
+
     // Clamp between 512 and 8192
     return std::clamp(k, 512u, 8192u);
 }
 
 size_t PlaidIndexInMem::MemUsage() const {
     std::shared_lock lock(rw_mutex_);
-    
+
     size_t usage = 0;
-    
+
     // Buffered embeddings
     for (const auto &buf : buffered_embeddings_) {
         usage += buffered_doc_lens_[&buf - &buffered_embeddings_[0]] * embedding_dimension_ * sizeof(f32);
     }
-    
+
     // Raw embeddings storage
     usage += raw_embeddings_storage_.size() * sizeof(f32);
-    
+
     // Buffer mode data
     usage += buffer_centroid_ids_.size() * sizeof(u32);
     usage += buffer_packed_residuals_.size();
-    
+
     // Index memory
     if (plaid_index_) {
         usage += plaid_index_->MemUsage();
     }
-    
+
     return usage;
 }
 
@@ -446,30 +442,30 @@ u32 PlaidIndexInMem::GetBufferedEmbeddingCount() const {
 }
 
 void PlaidIndexInMem::PrepareDumpData(std::vector<u32> &out_centroid_ids,
-                                       std::vector<u8> &out_packed_residuals,
-                                       std::vector<u32> &out_doc_lens,
-                                       u32 &out_embedding_count) {
+                                      std::vector<u8> &out_packed_residuals,
+                                      std::vector<u32> &out_doc_lens,
+                                      u32 &out_embedding_count) {
     std::unique_lock lock(rw_mutex_);
-    
+
     if (!plaid_index_) {
         out_embedding_count = 0;
         return;
     }
-    
+
     // Get data from main index
     // Note: This is a simplified version - real implementation needs proper data extraction
     out_doc_lens.resize(plaid_index_->GetDocNum());
     for (u32 i = 0; i < plaid_index_->GetDocNum(); ++i) {
         out_doc_lens[i] = plaid_index_->GetDocLen(i);
     }
-    
+
     out_embedding_count = plaid_index_->GetTotalEmbeddingNum();
-    
+
     // Centroid IDs and residuals would need to be extracted from PlaidIndex
     // For now, use placeholder logic
     out_centroid_ids.resize(out_embedding_count);
     // ... fill centroid ids
-    
+
     // Calculate packed residuals size
     u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
     out_packed_residuals.resize(out_embedding_count * packed_dim);
@@ -480,24 +476,23 @@ Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkI
     if (!segment_index) {
         return Status::UnexpectedError("PlaidIndexInMem::DumpIncremental: segment_index is null");
     }
-    
+
     std::unique_lock lock(rw_mutex_);
-    
+
     if (!is_built_.test() || !plaid_index_) {
         LOG_INFO("PlaidIndexInMem::DumpIncremental: Index not built, skipping dump");
         return Status::OK();
     }
-    
+
     // Determine update mode
     const u32 new_docs = row_count_;
     const u32 new_embeddings = buffered_embedding_count_;
     const int mode = GetUpdateMode(new_docs, new_embeddings);
-    
-    LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, new_docs={}, new_embeddings={}", 
-                         mode, new_docs, new_embeddings));
-    
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, new_docs={}, new_embeddings={}", mode, new_docs, new_embeddings));
+
     lock.unlock();
-    
+
     switch (mode) {
         case 0:
             return DumpStartFromScratch(segment_index, out_chunk_id);
@@ -512,125 +507,111 @@ Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkI
 
 Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
     LOG_INFO("PlaidIndexInMem::DumpStartFromScratch: Using start-from-scratch mode");
-    
+
     std::unique_lock lock(rw_mutex_);
-    
+
     // Collect all raw embeddings
     std::vector<f32> all_embeddings;
     std::vector<u32> all_doc_lens;
-    
+
     for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
         u32 doc_len = buffered_doc_lens_[i];
         all_doc_lens.push_back(doc_len);
-        
+
         const f32 *emb_data = buffered_embeddings_[i].get();
-        all_embeddings.insert(all_embeddings.end(), 
-                              emb_data, 
-                              emb_data + doc_len * embedding_dimension_);
+        all_embeddings.insert(all_embeddings.end(), emb_data, emb_data + doc_len * embedding_dimension_);
     }
-    
+
     if (all_embeddings.empty()) {
         return Status::OK();
     }
-    
+
     // Calculate optimal centroids
     u32 n_centroids = requested_n_centroids_;
     if (n_centroids == 0) {
         n_centroids = CalcOptimalNCentroids(all_embeddings.size() / embedding_dimension_);
     }
-    
+
     // Train centroids
     auto *global_ivf = segment_index->GetGlobalIVF();
-    global_ivf->RebuildCentroids(all_embeddings.data(), 
-                                  all_embeddings.size() / embedding_dimension_,
-                                  embedding_dimension_,
-                                  n_centroids);
-    
+    global_ivf->RebuildCentroids(all_embeddings.data(), all_embeddings.size() / embedding_dimension_, embedding_dimension_, n_centroids);
+
     // Encode all data
     std::vector<u32> centroid_ids;
     std::vector<u8> packed_residuals;
-    
+
     // Encode embeddings (simplified)
     for (u32 doc_len : all_doc_lens) {
         for (u32 i = 0; i < doc_len; ++i) {
             // Find nearest centroid
             // TODO: Implement proper encoding using centroids from global IVF
-            (void)global_ivf;  // Mark as used for now
+            (void)global_ivf;          // Mark as used for now
             centroid_ids.push_back(0); // placeholder
         }
     }
-    
+
     lock.unlock();
-    
+
     // Append to segment
-    return segment_index->AppendData(centroid_ids, packed_residuals, all_doc_lens, 
-                                      all_embeddings.size() / embedding_dimension_,
-                                      out_chunk_id);
+    return segment_index->AppendData(centroid_ids, packed_residuals, all_doc_lens, all_embeddings.size() / embedding_dimension_, out_chunk_id);
 }
 
 Status PlaidIndexInMem::DumpBufferMode(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
     LOG_INFO("PlaidIndexInMem::DumpBufferMode: Using buffer mode");
-    
+
     std::unique_lock lock(rw_mutex_);
-    
+
     // Prepare data for dump
     std::vector<u32> centroid_ids;
     std::vector<u8> packed_residuals;
     std::vector<u32> doc_lens;
     u32 embedding_count = 0;
-    
+
     PrepareDumpData(centroid_ids, packed_residuals, doc_lens, embedding_count);
-    
+
     lock.unlock();
-    
+
     if (doc_lens.empty()) {
         return Status::OK();
     }
-    
+
     // Append to last chunk or create new chunk
     return segment_index->AppendToLastChunk(centroid_ids, packed_residuals, doc_lens, out_chunk_id);
 }
 
 Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
     LOG_INFO("PlaidIndexInMem::DumpCentroidExpansion: Using centroid expansion mode");
-    
+
     std::unique_lock lock(rw_mutex_);
-    
+
     // Collect new embeddings
     std::vector<f32> new_embeddings;
     for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
         u32 doc_len = buffered_doc_lens_[i];
         const f32 *emb_data = buffered_embeddings_[i].get();
-        new_embeddings.insert(new_embeddings.end(),
-                              emb_data,
-                              emb_data + doc_len * embedding_dimension_);
+        new_embeddings.insert(new_embeddings.end(), emb_data, emb_data + doc_len * embedding_dimension_);
     }
-    
+
     if (new_embeddings.empty()) {
         return Status::OK();
     }
-    
+
     lock.unlock();
-    
+
     // Expand centroids in global IVF
     auto *global_ivf = segment_index->GetGlobalIVF();
-    u32 n_new_centroids = global_ivf->ExpandCentroids(
-        new_embeddings.data(),
-        new_embeddings.size() / embedding_dimension_,
-        embedding_dimension_,
-        4
-    );
-    
+    u32 n_new_centroids = global_ivf->ExpandCentroids(new_embeddings.data(), new_embeddings.size() / embedding_dimension_, embedding_dimension_, 4);
+
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Added {} new centroids", n_new_centroids));
-    
+
     // Now encode and append data with new centroids
     std::vector<u32> centroid_ids;
     std::vector<u8> packed_residuals;
     std::vector<u32> doc_lens = buffered_doc_lens_;
-    
+
     // Re-encode all data with expanded centroids
     // ... encoding logic
-    
+
     return segment_index->AppendToLastChunk(centroid_ids, packed_residuals, doc_lens, out_chunk_id);
 }
 
