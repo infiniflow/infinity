@@ -890,16 +890,26 @@ func TestFilterWithInvalidExpression(t *testing.T) {
 
 			// Delete with invalid filter - should fail
 			_, err = table.Delete(filter)
-			if err != nil {
-				t.Logf("Delete with invalid filter '%s' failed as expected: %v", filter, err)
-			} else {
+			if err == nil {
 				t.Errorf("Delete with invalid filter '%s' did not fail (may be accepted)", filter)
 			}
 
 			// Query to verify
 			res, _ := table.Output([]string{"*"}).ToResult()
 			if result, ok := res.(*infinity.QueryResult); ok {
-				t.Logf("Result after delete: %v", result.Data)
+				if len(result.Data) > 0 {
+					// Get row count from first column
+					var rowCount int
+					for _, col := range result.Data {
+						rowCount = len(col)
+						break
+					}
+					if rowCount != 100 {
+						t.Errorf("Expected 100 rows after delete, got %d", rowCount)
+					}
+				} else {
+					t.Errorf("Expected 100 rows after delete, got 0")
+				}
 			}
 
 			// Drop table
