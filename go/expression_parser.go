@@ -56,6 +56,7 @@ type Expression struct {
 	CastType     *thriftapi.DataType
 	InValues     []*Expression
 	InType       bool // true for IN, false for NOT IN
+	Distinct     bool // true if this argument has DISTINCT modifier
 }
 
 // ParseExpr parses an expression string and returns a ParsedExpr
@@ -97,6 +98,11 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 	// We check this by verifying the CAST ends properly and is not followed by operators
 	if strings.HasPrefix(strings.ToUpper(expr), "CAST(") && isCompleteCastExpression(expr) {
 		return parseCastExpression(expr)
+	}
+
+	// Check for CASE WHEN expression
+	if strings.HasPrefix(strings.ToUpper(expr), "CASE ") {
+		return parseCaseWhenExpression(expr)
 	}
 
 	// Check for unary NOT with ! operator (before parentheses check)
@@ -246,6 +252,116 @@ func parseCastExpression(expr string) (*Expression, error) {
 	}, nil
 }
 
+// parseCaseWhenExpression parses a CASE WHEN expression
+// Syntax: CASE WHEN condition1 THEN result1 [WHEN condition2 THEN result2 ...] [ELSE default_result] END
+func parseCaseWhenExpression(expr string) (*Expression, error) {
+	exprUpper := strings.ToUpper(expr)
+
+	// Verify it starts with CASE and ends with END
+	if !strings.HasPrefix(exprUpper, "CASE ") || !strings.HasSuffix(exprUpper, " END") {
+		return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "Invalid CASE WHEN expression")
+	}
+
+	// Remove CASE and END
+	inner := strings.TrimSpace(expr[5 : len(expr)-3])
+
+	// Parse WHEN clauses and optional ELSE
+	args := []*Expression{}
+
+	// Split by WHEN and ELSE keywords
+	remaining := inner
+	for {
+		remaining = strings.TrimSpace(remaining)
+		remainingUpper := strings.ToUpper(remaining)
+
+		// Find the next WHEN or ELSE
+		whenIdx := strings.Index(remainingUpper, "WHEN ")
+		elseIdx := strings.Index(remainingUpper, "ELSE ")
+
+		// Determine which comes first
+		nextIdx := -1
+		nextType := ""
+		if whenIdx != -1 && (elseIdx == -1 || whenIdx < elseIdx) {
+			nextIdx = whenIdx
+			nextType = "WHEN"
+		} else if elseIdx != -1 {
+			nextIdx = elseIdx
+			nextType = "ELSE"
+		}
+
+		if nextIdx == -1 {
+			break
+		}
+
+		if nextType == "WHEN" {
+			// Parse WHEN clause
+			whenContent := strings.TrimSpace(remaining[nextIdx+5:])
+			// Find THEN
+			thenIdx := strings.Index(strings.ToUpper(whenContent), " THEN ")
+			if thenIdx == -1 {
+				return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "Invalid CASE WHEN: missing THEN")
+			}
+
+			condition := strings.TrimSpace(whenContent[:thenIdx])
+			remaining = strings.TrimSpace(whenContent[thenIdx+6:])
+
+			// Find the end of the result (next WHEN, ELSE, or end)
+			resultEnd := len(remaining)
+			nextWhenIdx := strings.Index(strings.ToUpper(remaining), "WHEN ")
+			nextElseIdx := strings.Index(strings.ToUpper(remaining), "ELSE ")
+
+			if nextWhenIdx != -1 && nextWhenIdx < resultEnd {
+				resultEnd = nextWhenIdx
+			}
+			if nextElseIdx != -1 && nextElseIdx < resultEnd {
+				resultEnd = nextElseIdx
+			}
+
+			result := strings.TrimSpace(remaining[:resultEnd])
+			remaining = remaining[resultEnd:]
+
+			// Parse condition and result
+			parsedCondition, err := parseExpressionInternal(condition)
+			if err != nil {
+				return nil, err
+			}
+			parsedResult, err := parseExpressionInternal(result)
+			if err != nil {
+				return nil, err
+			}
+
+			// Store as a "when" function with condition and result
+			whenClause := &Expression{
+				Type:         ExprTypeFunction,
+				FunctionName: "when",
+				Arguments:    []*Expression{parsedCondition, parsedResult},
+			}
+			args = append(args, whenClause)
+		} else if nextType == "ELSE" {
+			// Parse ELSE clause
+			elseContent := strings.TrimSpace(remaining[nextIdx+5:])
+			elseExpr, err := parseExpressionInternal(elseContent)
+			if err != nil {
+				return nil, err
+			}
+			// Store as an "else" function
+			elseClause := &Expression{
+				Type:         ExprTypeFunction,
+				FunctionName: "else",
+				Arguments:    []*Expression{elseExpr},
+			}
+			args = append(args, elseClause)
+			break
+		}
+	}
+
+	return &Expression{
+		Type:         ExprTypeFunction,
+		FunctionName: "case",
+		Arguments:    args,
+	}, nil
+}
+
 // parseInExpression parses an IN or NOT IN expression
 func parseInExpression(expr string) *Expression {
 	exprUpper := strings.ToUpper(expr)
@@ -364,12 +480,26 @@ func parseFunctionCall(expr string) (*Expression, error) {
 	args := []*Expression{}
 	if argsStr != "" {
 		argParts := splitByComma(argsStr)
-		for _, part := range argParts {
-			arg, err := parseExpressionInternal(part)
-			if err != nil {
-				return nil, err
+		for i, part := range argParts {
+			part = strings.TrimSpace(part)
+			// Check for DISTINCT keyword (only valid as first argument modifier for aggregate functions)
+			if i == 0 && strings.HasPrefix(strings.ToUpper(part), "DISTINCT ") {
+				// Parse the expression after DISTINCT
+				distinctExpr := strings.TrimSpace(part[9:])
+				arg, err := parseExpressionInternal(distinctExpr)
+				if err != nil {
+					return nil, err
+				}
+				// Mark this argument as DISTINCT
+				arg.Distinct = true
+				args = append(args, arg)
+			} else {
+				arg, err := parseExpressionInternal(part)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, arg)
 			}
-			args = append(args, arg)
 		}
 	}
 
@@ -539,11 +669,7 @@ func splitByAlias(expr string) (string, string, bool) {
 		} else if parenCount == 0 {
 			// Check for " AS " with word boundaries
 			if i+4 <= len(expr) && exprUpper[i:i+4] == " AS " {
-				// Make sure it's not part of a larger word on the left
-				// e.g., "base" contains "as" but is not an alias
-				if i > 0 && isAlphaNum(expr[i-1]) {
-					continue
-				}
+				// " AS " is already a unique pattern with spaces, no need for extra boundary check
 
 				leftExpr := strings.TrimSpace(expr[:i])
 				aliasExpr := strings.TrimSpace(expr[i+4:])
@@ -757,6 +883,18 @@ func convertToThriftParsedExpr(expr *Expression) (*thriftapi.ParsedExpr, error) 
 			if err != nil {
 				return nil, err
 			}
+			// Handle DISTINCT modifier by wrapping the argument
+			if arg.Distinct {
+				// Wrap in a "distinct" function call
+				thriftArg = &thriftapi.ParsedExpr{
+					Type: &thriftapi.ParsedExprType{
+						FunctionExpr: &thriftapi.FunctionExpr{
+							FunctionName: "distinct",
+							Arguments:    []*thriftapi.ParsedExpr{thriftArg},
+						},
+					},
+				}
+			}
 			funcExpr.Arguments = append(funcExpr.Arguments, thriftArg)
 		}
 		exprType.FunctionExpr = funcExpr
@@ -911,7 +1049,30 @@ func ParsedExprToString(expr *thriftapi.ParsedExpr) string {
 		for _, arg := range exprType.FunctionExpr.Arguments {
 			args = append(args, ParsedExprToString(arg))
 		}
-		result = fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
+		// Special handling for "distinct" function - output as "distinct arg" not "distinct(arg)"
+		if funcName == "distinct" && len(args) == 1 {
+			result = fmt.Sprintf("distinct %s", args[0])
+		} else if funcName == "case" {
+			// Special handling for CASE WHEN expression
+			// Arguments: [when(condition, result), when(condition, result), ..., else(value)]
+			result = "case"
+			for _, arg := range exprType.FunctionExpr.Arguments {
+				if arg.Type != nil && arg.Type.FunctionExpr != nil {
+					subFuncName := arg.Type.FunctionExpr.FunctionName
+					subArgs := arg.Type.FunctionExpr.Arguments
+					if subFuncName == "when" && len(subArgs) >= 2 {
+						cond := ParsedExprToString(subArgs[0])
+						res := ParsedExprToString(subArgs[1])
+						result += fmt.Sprintf(" when %s then %s", cond, res)
+					} else if subFuncName == "else" && len(subArgs) >= 1 {
+						result += fmt.Sprintf(" else %s", ParsedExprToString(subArgs[0]))
+					}
+				}
+			}
+			result += " end"
+		} else {
+			result = fmt.Sprintf("%s(%s)", funcName, strings.Join(args, ", "))
+		}
 	} else if exprType.CastExpr != nil {
 		inner := ParsedExprToString(exprType.CastExpr.Expr)
 		typeName := logicTypeToString(exprType.CastExpr.DataType.LogicType)

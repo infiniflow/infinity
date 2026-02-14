@@ -263,7 +263,9 @@ func TestParseExprFunction(t *testing.T) {
 		{"avg function", "avg(c1)", "avg(c1)"},
 		{"min function", "min(c1)", "min(c1)"},
 		{"max function", "max(c1)", "max(c1)"},
+		{"count distinct", "count(distinct c1)", "count(distinct c1)"},
 		{"count column", "count(c1)", "count(c1)"},
+		{"sum distinct", "sum(distinct c1)", "sum(distinct c1)"},
 
 		// Function with expression arguments
 		{"function with arithmetic", "abs(c1 + c2)", "abs(+(c1, c2))"},
@@ -274,6 +276,8 @@ func TestParseExprFunction(t *testing.T) {
 		// Alias variations
 		{"function with alias uppercase", "sum(c1) AS total", "sum(c1) as total"},
 		{"function with alias mixed", "avg(c1) As avg_val", "avg(c1) as avg_val"},
+		{"column with alias", "c1 as col1", "c1 as col1"},
+		{"expression with alias", "c1 + c2 as sum_col", "+(c1, c2) as sum_col"},
 		{"complex expression with alias", "upper(c1) as upper_c1", "upper(c1) as upper_c1"},
 
 		// Date/Time functions
@@ -306,6 +310,9 @@ func TestParseExprFunction(t *testing.T) {
 		// Special functions
 		{"coalesce function", "coalesce(c1, c2, 0)", "coalesce(c1, c2, 0)"},
 		{"nullif function", "nullif(c1, c2)", "nullif(c1, c2)"},
+		{"case when simple", "case when c1 > 0 then 'positive' else 'negative' end", "case when >(c1, 0) then 'positive' else 'negative' end"},
+		{"case when no else", "case when c1 = 1 then 'one' end", "case when =(c1, 1) then 'one' end"},
+		{"case when multiple", "case when c1 > 0 then 'pos' when c1 < 0 then 'neg' else 'zero' end", "case when >(c1, 0) then 'pos' when <(c1, 0) then 'neg' else 'zero' end"},
 		{"if function", "if(c1 > 0, 'yes', 'no')", "if(>(c1, 0), 'yes', 'no')"},
 	}
 
