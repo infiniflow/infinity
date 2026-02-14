@@ -1691,14 +1691,6 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
     // Persist data files
     if (!IsReplay()) {
         std::vector<std::string> data_file_paths;
-
-        std::vector<std::string> *index_id_strs_ptr{};
-        std::vector<std::string> *index_name_strs_ptr{};
-        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-
         for (const WalSegmentInfo &seg_info : compact_cmd->new_segment_infos_) {
             SegmentMeta seg_meta(seg_info.segment_id_, table_meta);
             Status path_status = NewCatalog::GetSegmentFilePaths(begin_ts, seg_meta, data_file_paths, nullptr);
