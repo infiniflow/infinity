@@ -541,6 +541,9 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
         const f32 *query_vec = query_ptr + q * embedding_dimension_;
         f32 max_score = std::numeric_limits<f32>::lowest();
 
+        // Precompute IP distance table for this query token
+        auto ip_table = quantizer_->GetIPDistanceTable(query_vec);
+
         for (u32 d = 0; d < doc_len; ++d) {
             u32 embedding_idx = doc_offset + d;
             u32 cid = centroid_ids_[embedding_idx];
@@ -558,7 +561,7 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
             f32 residual_score = quantizer_->GetSingleIPDistance(embedding_idx,
                                                                  q,
                                                                  n_query_tokens,
-                                                                 query_ptr,
+                                                                 ip_table.get(),
                                                                  packed_residuals_.get(),
                                                                  centroid_ids_.data(),
                                                                  centroids_data_.data());
