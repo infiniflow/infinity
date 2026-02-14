@@ -1196,6 +1196,15 @@ void PlaidGlobalIVF::Initialize(const u32 n_centroids, const u32 embedding_dim, 
     }
 }
 
+void PlaidGlobalIVF::ClearPostingLists() {
+    std::unique_lock lock(rw_mutex_);
+    for (auto &posting_list : ivf_lists_) {
+        posting_list.clear();
+        posting_list.shrink_to_fit();
+    }
+    LOG_INFO("PlaidGlobalIVF::ClearPostingLists: Cleared all posting lists");
+}
+
 void PlaidGlobalIVF::AddToPostingLists(const u32 doc_id_start, const std::vector<u32> &centroid_ids, const std::vector<u32> &doc_lens) {
     std::unique_lock lock(rw_mutex_);
 
@@ -1224,11 +1233,9 @@ void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id,
     std::unique_lock lock(rw_mutex_);
 
     // Calculate the range of doc_ids for this chunk
+    // chunk_end_doc is the document count, not embedding count
     u32 chunk_start_doc = start_doc_id;
-    u32 chunk_end_doc = start_doc_id;
-    for (u32 len : doc_lens) {
-        chunk_end_doc += len;
-    }
+    u32 chunk_end_doc = start_doc_id + doc_lens.size(); // P1 fix: use document count, not embedding count
 
     // Remove old entries for this chunk from all posting lists
     for (auto &posting_list : ivf_lists_) {
@@ -1736,6 +1743,13 @@ Status PlaidSegmentIndex::RewriteLastChunk(const std::vector<u32> &new_centroid_
     // Note: IVF update should be handled separately with full reindexing
 
     return Status::OK();
+}
+
+void PlaidSegmentIndex::ClearAllChunks() {
+    std::unique_lock lock(rw_mutex_);
+    chunks_.clear();
+    next_doc_id_ = 0;
+    LOG_INFO("PlaidSegmentIndex::ClearAllChunks: Cleared all chunks and reset doc ID counter");
 }
 
 u32 PlaidSegmentIndex::GetTotalDocCount() const {

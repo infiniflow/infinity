@@ -70,6 +70,9 @@ public:
     // Rebuild all centroids from raw embeddings (start-from-scratch mode)
     void RebuildCentroids(const f32 *all_embeddings, u64 total_embeddings, u32 embedding_dim, u32 target_n_centroids);
 
+    // Clear all posting lists (used before centroid expansion to avoid stale entries)
+    void ClearPostingLists();
+
 private:
     u32 n_centroids_ = 0;
     u32 embedding_dimension_ = 0;
@@ -163,6 +166,9 @@ public:
                             const std::vector<u8> &new_packed_residuals,
                             const std::vector<u32> &new_doc_lens,
                             u32 new_embedding_count);
+
+    // Clear all chunks and reset doc ID counter (for centroid expansion mode)
+    void ClearAllChunks();
 
     // Get global IVF for centroid management
     PlaidGlobalIVF *GetGlobalIVF() { return &global_ivf_; }

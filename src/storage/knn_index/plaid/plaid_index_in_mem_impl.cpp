@@ -495,13 +495,13 @@ Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkI
     }
 
     // Determine update mode
-    // Note: We already hold the lock, so directly compute the mode
-    // In DumpIncremental, we're dumping all buffered data, so new_docs = row_count_
-    const u32 new_docs = row_count_;
+    // P1 fix: total_docs should be the total documents in the memory index
+    // row_count_ is the number of documents in the memory index
+    const u32 total_docs = row_count_;
     const u32 new_embeddings = buffered_embedding_count_;
-    const u32 total_docs = row_count_ + new_docs; // total = existing + new (which is all buffered)
     int mode;
-    if (total_docs < START_FROM_SCRATCH_THRESHOLD) {
+    // P2 fix: use <= to match next-plaid behavior
+    if (total_docs <= START_FROM_SCRATCH_THRESHOLD) {
         mode = 0;
     } else if (new_embeddings < BUFFER_THRESHOLD) {
         mode = 1;
@@ -509,7 +509,7 @@ Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkI
         mode = 2;
     }
 
-    LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, new_docs={}, new_embeddings={}", mode, new_docs, new_embeddings));
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, total_docs={}, new_embeddings={}", mode, total_docs, new_embeddings));
 
     lock.unlock();
 
@@ -680,8 +680,14 @@ Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, 
     const u64 total_embeddings = all_embeddings.size() / embedding_dimension_;
     lock.unlock();
 
-    // Expand centroids in global IVF
+    // P0 fix: Clear old data before centroid expansion
+    // This ensures we don't have stale IVF entries or duplicate chunks
     auto *global_ivf = segment_index->GetGlobalIVF();
+    global_ivf->ClearPostingLists();
+    segment_index->ClearAllChunks();
+    LOG_INFO("PlaidIndexInMem::DumpCentroidExpansion: Cleared old IVF posting lists and chunks");
+
+    // Expand centroids in global IVF
     u32 n_new_centroids = global_ivf->ExpandCentroids(all_embeddings.data(), total_embeddings, embedding_dimension_, 4);
 
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Added {} new centroids", n_new_centroids));
@@ -736,7 +742,7 @@ Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, 
 
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Re-encoded {} embeddings with {} centroids", total_embeddings, actual_n_centroids));
 
-    // Rewrite last chunk with re-encoded data
+    // Now append the re-encoded data to the cleared segment
     return segment_index->AppendData(centroid_ids, packed_residuals_vec, all_doc_lens, static_cast<u32>(total_embeddings), out_chunk_id);
 }
 
