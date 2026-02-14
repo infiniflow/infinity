@@ -162,7 +162,9 @@ void PlaidIndexInMem::Dump(PlaidIndexFileWorker *index_file_worker) {
     std::unique_lock lock(rw_mutex_);
 
     if (!is_built_.test() || !plaid_index_) {
-        UnrecoverableError("PlaidIndexInMem::Dump: Index not built");
+        // Index not built (e.g., not enough data), skip dumping
+        LOG_INFO("PlaidIndexInMem::Dump: Index not built, skipping dump.");
+        return;
     }
 
     bool prepare_success = false;

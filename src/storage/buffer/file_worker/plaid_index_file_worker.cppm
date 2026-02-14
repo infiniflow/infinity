@@ -50,10 +50,6 @@ export struct PlaidIndexFileWorker : IndexFileWorker {
     const EmbeddingInfo *GetEmbeddingInfo() const;
 
     const u32 start_segment_offset_;
-
-private:
-    void *mmap_addr_ = nullptr;
-    size_t mmap_size_ = 0;
 };
 
 } // namespace infinity

@@ -47,9 +47,9 @@ import internal_types;
 namespace infinity {
 
 PlaidIndexFileWorker::~PlaidIndexFileWorker() {
-    if (mmap_addr_ != nullptr && mmap_addr_ != MAP_FAILED) {
-        munmap(mmap_addr_, mmap_size_);
-        mmap_addr_ = nullptr;
+    if (mmap_ != nullptr && mmap_ != MAP_FAILED) {
+        munmap(mmap_, mmap_size_);
+        mmap_ = nullptr;
     }
 }
 
@@ -73,14 +73,14 @@ bool PlaidIndexFileWorker::Write(std::span<PlaidIndex> data,
         UnrecoverableError(fmt::format("PlaidIndexFileWorker::Write: ftruncate failed: {}", strerror(errno)));
     }
 
-    mmap_addr_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-    if (mmap_addr_ == MAP_FAILED) {
+    mmap_ = mmap(nullptr, mmap_size_, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+    if (mmap_ == MAP_FAILED) {
         UnrecoverableError(fmt::format("PlaidIndexFileWorker::Write: mmap failed: {}", strerror(errno)));
     }
 
     // Write index to mmap
     size_t offset = 0;
-    index->SaveToPtr(mmap_addr_, offset);
+    index->SaveToPtr(mmap_, offset);
 
     // TODO: Add to cache manager for fast access when plaid_map_ is added to FileWorkerManager
     // auto &path = *rel_file_path_;
@@ -116,18 +116,18 @@ void PlaidIndexFileWorker::Read(std::shared_ptr<PlaidIndex> &data, std::unique_p
     const auto n_centroids = index_plaid->n_centroids_;
 
     // Create index with mmap
-    if (!mmap_addr_) {
+    if (!mmap_) {
         mmap_size_ = file_handle->FileSize();
         auto fd = file_handle->fd();
-        mmap_addr_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0);
-        if (mmap_addr_ == MAP_FAILED) {
+        mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0);
+        if (mmap_ == MAP_FAILED) {
             UnrecoverableError(fmt::format("PlaidIndexFileWorker::Read: mmap failed: {}", strerror(errno)));
         }
     }
 
     // Create index and load from mmap
-    data = std::make_shared<PlaidIndex>(start_segment_offset_, column_embedding_dim, nbits, n_centroids, mmap_addr_, mmap_size_);
-    data->LoadFromPtr(mmap_addr_, mmap_size_, file_size);
+    data = std::make_shared<PlaidIndex>(start_segment_offset_, column_embedding_dim, nbits, n_centroids, mmap_, mmap_size_);
+    data->LoadFromPtr(mmap_, mmap_size_, file_size);
 
     // TODO: Add to cache when plaid_map_ is added to FileWorkerManager
     // cache_manager.Set(path, *data, data->MemUsage());

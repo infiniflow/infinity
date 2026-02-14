@@ -51,6 +51,8 @@ import :index_bmp;
 import :index_secondary;
 import :index_secondary_functional;
 import :emvb_index_in_mem;
+import :plaid_index_in_mem;
+import :plaid_index_file_worker;
 import :emvb_index;
 import :meta_key;
 import :data_access_state;
@@ -908,6 +910,24 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
             break;
         }
+        case IndexType::kPLAID: {
+            std::shared_ptr<PlaidIndexInMem> memory_plaid_index;
+            auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+            if (is_null) {
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+                memory_plaid_index->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
+                mem_index->SetPlaidIndex(memory_plaid_index);
+            } else {
+                memory_plaid_index = mem_index->GetPlaidIndex();
+            }
+            MetaCache *meta_cache = table_meta.meta_cache();
+            memory_plaid_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1051,6 +1071,13 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
         case IndexType::kDiskAnn: { // TODO
             LOG_WARN("Not implemented yet");
             return Status::OK();
+        }
+        case IndexType::kPLAID: {
+            auto status = PopulatePlaidIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
         }
         default: {
             UnrecoverableError("Invalid index type");
@@ -1372,6 +1399,85 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     return Status::OK();
 }
 
+Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
+                                       SegmentIndexMeta &segment_index_meta,
+                                       SegmentMeta &segment_meta,
+                                       std::shared_ptr<ColumnDef> column_def,
+                                       std::vector<ChunkID> &new_chunk_ids) {
+    RowID base_row_id(segment_index_meta.segment_id(), 0);
+    u32 row_count = 0;
+    {
+        auto [rc, status] = segment_meta.GetRowCnt1();
+        if (!status.ok()) {
+            return status;
+        }
+        row_count = rc;
+    }
+    ChunkID chunk_id = 0;
+    Status status;
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+    new_chunk_ids.push_back(chunk_id);
+    PlaidIndexFileWorker *index_file_worker{};
+    {
+        std::optional<ChunkIndexMeta> chunk_index_meta;
+        status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                               this,
+                                               chunk_id,
+                                               base_row_id,
+                                               row_count,
+                                               0 /*term_count*/,
+                                               "" /*base_name*/,
+                                               0 /*index_size*/,
+                                               chunk_index_meta);
+        status = chunk_index_meta->GetFileWorker(index_file_worker);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        // Create in-memory PLAID index and build it from segment data
+        auto mem_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+        mem_index->SetSegmentID("", "", segment_index_meta.segment_id());
+        
+        // Read all blocks and insert data
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        if (!block_status.ok()) {
+            return block_status;
+        }
+        
+        ColumnID column_id = column_def->id();
+        for (BlockID block_id : *block_ids) {
+            BlockMeta block_meta(block_id, segment_meta);
+            ColumnMeta column_meta(column_id, block_meta);
+            
+            size_t row_cnt = 0;
+            auto [block_row_cnt, row_status] = block_meta.GetRowCnt1();
+            if (!row_status.ok()) {
+                return row_status;
+            }
+            row_cnt = block_row_cnt;
+            
+            ColumnVector col;
+            status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
+            }
+            
+            mem_index->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+        }
+        
+        // Build the index
+        mem_index->BuildIndex(segment_meta);
+        
+        // Dump to file
+        mem_index->Dump(index_file_worker);
+    }
+    return Status::OK();
+}
+
 Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
                                       SegmentIndexMeta &segment_index_meta,
                                       SegmentMeta &segment_meta,
@@ -1438,6 +1544,8 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex()) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex()) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -1764,6 +1872,8 @@ Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex()) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex()) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -2040,7 +2150,7 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     auto mem_index = segment_index_meta.PopMemIndex();
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
@@ -2056,6 +2166,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
     std::shared_ptr<BMPIndexInMem> memory_bmp_index;
     std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
+    std::shared_ptr<PlaidIndexInMem> memory_plaid_index;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
@@ -2107,6 +2218,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             UnrecoverableError("Not implemented yet");
             break;
         }
+        case IndexType::kPLAID: {
+            memory_plaid_index = mem_index->GetPlaidIndex();
+            if (memory_plaid_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -2118,6 +2236,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -2179,6 +2299,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
         case IndexType::kEMVB: {
             memory_emvb_index->Dump(static_cast<EMVBIndexFileWorker *>(index_file_worker));
+            break;
+        }
+        case IndexType::kPLAID: {
+            memory_plaid_index->Dump(static_cast<PlaidIndexFileWorker *>(index_file_worker));
             break;
         }
         default: {
