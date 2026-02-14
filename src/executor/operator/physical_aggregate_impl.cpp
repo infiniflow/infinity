@@ -285,6 +285,16 @@ void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &
 
     std::shared_ptr<DataBlock> output_datablock = nullptr;
     const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
+
+    if (hash_table.empty()) {
+        // Empty input table - create one row with NULL values for group by columns
+        output_datablock = DataBlock::Make();
+        output_datablock->Init(types, 1);
+        output_datablock->Finalize();
+        output_table->Append(output_datablock);
+        return;
+    }
+
     for (const auto &item : hash_table) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
@@ -333,8 +343,9 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
     std::vector<std::shared_ptr<DataType>> output_types;
     output_types.reserve(aggregates_count);
 
-    AggregateFlag flag = output_blocks.empty() ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
-                                               : (!task_completed ? AggregateFlag::kRunning : AggregateFlag::kFinish);
+    bool was_output_empty = output_blocks.empty();
+    AggregateFlag flag = was_output_empty ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
+                                          : (!task_completed ? AggregateFlag::kRunning : AggregateFlag::kFinish);
 
     for (i64 idx = 0; auto &expr : aggregates_) {
         // expression state
@@ -372,11 +383,11 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
 
         // We need to set the correct aggregate flag based on which block we're
         // processing to ensure we only append the result once.
-        // - First block (block_idx == 0): Use kUninitialized to initialize the state
-        // - Middle blocks: Use kRunning to update the state without appending
+        // - First Execute call (was_output_empty): Use kUninitialized to initialize the state
+        // - Subsequent Execute calls: Use kRunning to update the state without appending
         // - Last block (is_last_block && task_completed): Use kFinish to finalize and append
         AggregateFlag block_flag;
-        if (block_idx == 0) {
+        if (was_output_empty && block_idx == 0) {
             block_flag = is_last_block && task_completed ? AggregateFlag::kRunAndFinish : AggregateFlag::kUninitialized;
         } else {
             block_flag = is_last_block && task_completed ? AggregateFlag::kFinish : AggregateFlag::kRunning;

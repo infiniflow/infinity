@@ -135,7 +135,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         # select count(distinct c1, c2) from test_simple_agg_big
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write("SELECT sum(distinct c1), count(distinct c2) FROM {};\n".format(table_name))
+        slt_file.write("SELECT sum(distinct c1), count(distinct c1) FROM {};\n".format(table_name))
         slt_file.write("----\n")
         slt_file.write(str(np.sum(sequence)) + " " + str(row_n))
         slt_file.write("\n")

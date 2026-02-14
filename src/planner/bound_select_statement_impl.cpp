@@ -396,27 +396,59 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             }
         }
 
-        // Transform  aggregates with DISTINCT to two-level aggregation
+        // Transform aggregates with DISTINCT to two-level aggregation
         if (has_distinct_agg) {
-            // Step 1: Collect DISTINCT arguments and original GROUP BY columns as GROUP BY keys
-            std::vector<std::shared_ptr<BaseExpression>> first_level_groups;
-            std::vector<AggregateExpression *> distinct_aggs_to_process;
-            std::set<BaseExpression *> seen_distinct_args;
+            std::set<std::vector<std::string>> distinct_arg_sets;
 
             for (const auto &agg_expr : aggregate_expressions_) {
                 auto *ae = static_cast<AggregateExpression *>(agg_expr.get());
                 const auto &args = ae->arguments();
+                std::vector<std::string> arg_strs;
                 for (const auto &arg : args) {
-                    if (!seen_distinct_args.contains(arg.get())) {
-                        first_level_groups.push_back(arg);
-                        seen_distinct_args.insert(arg.get());
+                    arg_strs.push_back(arg->ToString());
+                }
+                distinct_arg_sets.insert(arg_strs);
+
+                if (args.size() > 1) {
+                    std::string func_name = ae->aggregate_function_.name();
+                    // Only COUNT(DISTINCT) supports multiple arguments.
+                    if (func_name != "COUNT") {
+                        Status status = Status::NotSupport(fmt::format("{}(DISTINCT) with multiple arguments is not supported.", func_name));
+                        RecoverableError(status);
                     }
                 }
-                distinct_aggs_to_process.push_back(ae);
+            }
+
+            // Reject multiple distinct aggregates on different columns (e.g. sum(DISTINCT c1), sum(DISTINCT c2))
+            // as it requires separate aggregation paths
+            if (distinct_arg_sets.size() > 1) {
+                Status status = Status::NotSupport("Multiple DISTINCT aggregates on different columns are not supported.");
+                RecoverableError(status);
+            }
+
+            // Step 1: Collect DISTINCT arguments and original GROUP BY columns as GROUP BY keys
+            std::vector<std::shared_ptr<BaseExpression>> first_level_groups;
+            std::vector<AggregateExpression *> distinct_aggs_to_process;
+
+            auto *first_distinct_agg = static_cast<AggregateExpression *>(aggregate_expressions_[0].get());
+            std::set<BaseExpression *> distinct_arg_ptrs;
+            for (const auto &arg : first_distinct_agg->arguments()) {
+                first_level_groups.push_back(arg);
+                distinct_arg_ptrs.insert(arg.get());
+            }
+            for (const auto &agg_expr : aggregate_expressions_) {
+                distinct_aggs_to_process.push_back(static_cast<AggregateExpression *>(agg_expr.get()));
             }
 
             for (const auto &group_by_expr : group_by_expressions_) {
-                if (!seen_distinct_args.contains(group_by_expr.get())) {
+                bool already_in_distinct = false;
+                for (const auto *arg_ptr : distinct_arg_ptrs) {
+                    if (arg_ptr->ToString() == group_by_expr->ToString()) {
+                        already_in_distinct = true;
+                        break;
+                    }
+                }
+                if (!already_in_distinct) {
                     first_level_groups.push_back(group_by_expr);
                 }
             }
@@ -428,7 +460,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
 
                 for (const auto &arg : args) {
                     for (size_t i = 0; i < first_level_groups.size(); ++i) {
-                        if (first_level_groups[i].get() == arg.get()) {
+                        if (first_level_groups[i]->ToString() == arg->ToString()) {
                             groupby_col_indices.push_back(i);
                             break;
                         }
@@ -495,7 +527,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 for (const auto &group_by_expr : group_by_expressions_) {
                     size_t col_idx = 0;
                     for (size_t i = 0; i < first_level_groups.size(); ++i) {
-                        if (first_level_groups[i].get() == group_by_expr.get()) {
+                        if (first_level_groups[i]->ToString() == group_by_expr->ToString()) {
                             col_idx = i;
                             break;
                         }
@@ -531,21 +563,20 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
             bind_context->aggregate_table_index_ = second_agg_output_index;
             bind_context->aggregate_table_name_ = second_agg_table_name;
 
-            size_t agg_col_idx = 0;
             for (size_t i = 0; i < projection_expressions_.size(); ++i) {
                 auto &proj_expr = projection_expressions_[i];
                 if (auto *col_expr = dynamic_cast<ColumnExpression *>(proj_expr.get())) {
                     if (col_expr->source_position_.source_type_ == ExprSourceType::kAggregate) {
+                        size_t output_col_idx = col_expr->binding().column_idx;
                         auto new_col_expr = ColumnExpression::Make(col_expr->Type(),
                                                                    second_agg_table_name,
                                                                    second_agg_output_index,
                                                                    col_expr->column_name(),
-                                                                   agg_col_idx, // Use the correct column index
+                                                                   output_col_idx,
                                                                    col_expr->depth());
                         new_col_expr->source_position_ = col_expr->source_position_;
                         new_col_expr->alias_ = col_expr->alias_;
                         projection_expressions_[i] = new_col_expr;
-                        agg_col_idx++;
                     }
                 }
             }
