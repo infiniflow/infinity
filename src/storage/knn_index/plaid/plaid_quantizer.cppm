@@ -77,6 +77,10 @@ public:
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
 
+    // Mmap support
+    void SaveToPtr(void *ptr, size_t &offset) const;
+    void LoadFromPtr(void *ptr, size_t &offset);
+
     // Accessors
     u32 nbits() const { return nbits_; }
     u32 embedding_dim() const { return embedding_dim_; }

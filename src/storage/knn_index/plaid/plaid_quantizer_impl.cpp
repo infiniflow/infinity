@@ -357,4 +357,63 @@ void PlaidQuantizer::Load(LocalFileHandle &file_handle) {
     BuildLookupTables();
 }
 
+void PlaidQuantizer::SaveToPtr(void *ptr, size_t &offset) const {
+    std::shared_lock lock(rw_mutex_);
+    char *dst = static_cast<char *>(ptr);
+
+    auto append = [&dst, &offset](const void *src, size_t len) {
+        std::memcpy(dst + offset, src, len);
+        offset += len;
+    };
+
+    // Note: nbits_ and embedding_dim_ are already saved by PlaidIndex::SaveToPtr
+    // Only save quantizer-specific data
+    append(&avg_residual_, sizeof(avg_residual_));
+
+    // Save bucket cutoffs
+    u32 n_cutoffs = n_buckets_ - 1;
+    append(&n_cutoffs, sizeof(n_cutoffs));
+    if (n_cutoffs > 0) {
+        append(bucket_cutoffs_.get(), n_cutoffs * sizeof(f32));
+    }
+
+    // Save bucket weights
+    append(&n_buckets_, sizeof(n_buckets_));
+    append(bucket_weights_.get(), n_buckets_ * sizeof(f32));
+}
+
+void PlaidQuantizer::LoadFromPtr(void *ptr, size_t &offset) {
+    std::unique_lock lock(rw_mutex_);
+    char *src = static_cast<char *>(ptr);
+
+    auto read = [&src, &offset](void *dst, size_t len) {
+        std::memcpy(dst, src + offset, len);
+        offset += len;
+    };
+
+    // Note: nbits_ and embedding_dim_ are already loaded by PlaidIndex::LoadFromPtr
+    // Only load quantizer-specific data
+    read(&avg_residual_, sizeof(avg_residual_));
+
+    // Load bucket cutoffs
+    u32 n_cutoffs;
+    read(&n_cutoffs, sizeof(n_cutoffs));
+    if (n_cutoffs > 0) {
+        bucket_cutoffs_ = std::make_unique<f32[]>(n_cutoffs);
+        read(bucket_cutoffs_.get(), n_cutoffs * sizeof(f32));
+    }
+
+    // Load bucket weights
+    u32 n_buckets;
+    read(&n_buckets, sizeof(n_buckets));
+    if (n_buckets != n_buckets_) {
+        UnrecoverableError("PlaidQuantizer::LoadFromPtr: n_buckets mismatch");
+    }
+    bucket_weights_ = std::make_unique<f32[]>(n_buckets_);
+    read(bucket_weights_.get(), n_buckets_ * sizeof(f32));
+
+    // Rebuild lookup tables
+    BuildLookupTables();
+}
+
 } // namespace infinity

@@ -92,7 +92,8 @@ bool PlaidIndexFileWorker::Write(std::span<PlaidIndex> data,
 }
 
 void PlaidIndexFileWorker::Read(std::shared_ptr<PlaidIndex> &data, std::unique_ptr<LocalFileHandle> &file_handle, size_t file_size) {
-    std::unique_lock lock(mutex_);
+    // Note: Caller (FileWorker::Read) already holds mutex_ lock
+    // std::unique_lock lock(mutex_);
 
     // TODO: Try to get from cache when plaid_map_ is added to FileWorkerManager
     // const auto &path = *rel_file_path_;
@@ -104,11 +105,6 @@ void PlaidIndexFileWorker::Read(std::shared_ptr<PlaidIndex> &data, std::unique_p
     //     return;
     // }
 
-    // Load from file
-    if (!file_handle) {
-        return;
-    }
-
     // Get index parameters
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
     const auto *index_plaid = static_cast<IndexPLAID *>(index_base_.get());
@@ -117,6 +113,10 @@ void PlaidIndexFileWorker::Read(std::shared_ptr<PlaidIndex> &data, std::unique_p
 
     // Create index with mmap
     if (!mmap_) {
+        // Load from file
+        if (!file_handle) {
+            return;
+        }
         mmap_size_ = file_handle->FileSize();
         auto fd = file_handle->fd();
         mmap_ = mmap(nullptr, mmap_size_, PROT_READ, MAP_SHARED, fd, 0);

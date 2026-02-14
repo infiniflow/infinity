@@ -484,6 +484,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                     }
                     std::shared_ptr<PlaidIndex> plaid_index;
                     FileWorker::Read(index_file_worker, plaid_index);
+                    if (!plaid_index) {
+                        UnrecoverableError("Failed to load PLAID index from file");
+                    }
 
                     const auto [result_num, score_ptr, row_id_ptr] =
                         plaid_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),

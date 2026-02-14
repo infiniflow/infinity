@@ -100,6 +100,7 @@ void PlaidIndexInMem::InsertBatch(const std::vector<const ColumnVector *> &cols,
 }
 
 bool PlaidIndexInMem::BuildIndex() {
+    // First, check if already built and copy data while holding lock
     std::unique_lock lock(rw_mutex_);
 
     if (is_built_.test()) {
@@ -114,48 +115,78 @@ bool PlaidIndexInMem::BuildIndex() {
         return false;
     }
 
-    const auto time_0 = std::chrono::high_resolution_clock::now();
+    // Copy all necessary data to local variables
+    const u64 local_embedding_count = buffered_embedding_count_;
+    const u32 local_embedding_dim = embedding_dimension_;
+    const u32 local_nbits = nbits_;
+    const u32 local_requested_n_centroids = requested_n_centroids_;
+    const u32 local_start_segment_offset = begin_row_id_.segment_offset_;
+    const size_t doc_count = buffered_embeddings_.size();
 
-    // Create index
-    plaid_index_ = std::make_unique<PlaidIndex>(begin_row_id_.segment_offset_, embedding_dimension_, nbits_, requested_n_centroids_);
+    // Copy document lengths
+    std::vector<u32> local_doc_lens(buffered_doc_lens_.begin(), buffered_doc_lens_.end());
 
-    // Train the index
-    // Collect all embeddings for training
-    const auto all_embeddings = std::make_unique_for_overwrite<f32[]>(buffered_embedding_count_ * embedding_dimension_);
+    // Copy embeddings data
+    const auto all_embeddings = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
     u64 offset = 0;
-    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
-        u32 doc_len = buffered_doc_lens_[i];
-        std::copy_n(buffered_embeddings_[i].get(), doc_len * embedding_dimension_, all_embeddings.get() + offset);
-        offset += doc_len * embedding_dimension_;
+    for (size_t i = 0; i < doc_count; ++i) {
+        u32 doc_len = local_doc_lens[i];
+        std::copy_n(buffered_embeddings_[i].get(), doc_len * local_embedding_dim, all_embeddings.get() + offset);
+        offset += doc_len * local_embedding_dim;
     }
 
     // Determine number of centroids
-    u32 n_centroids = requested_n_centroids_;
+    u32 n_centroids = local_requested_n_centroids;
     if (n_centroids == 0) {
         // Auto: sqrt(N) rounded to multiple of 8
-        n_centroids = static_cast<u32>(std::sqrt(buffered_embedding_count_));
+        n_centroids = static_cast<u32>(std::sqrt(local_embedding_count));
         n_centroids = ((n_centroids + 7) / 8) * 8;
         n_centroids = std::max(8u, n_centroids);
     }
 
+    // Release lock before training to prevent deadlock
+    // Other threads can still search using buffered data (is_built_ is still false)
+    lock.unlock();
+
+    const auto time_0 = std::chrono::high_resolution_clock::now();
+
+    // Create and train index without holding PlaidIndexInMem lock
+    // This prevents deadlock because:
+    // - Search threads hold PlaidIndexInMem shared lock, then try to get PlaidIndex shared lock
+    // - BuildIndex would hold PlaidIndexInMem unique lock, then try to get PlaidIndex unique lock
+    // By releasing PlaidIndexInMem lock during training, we avoid the lock ordering issue
+    auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, local_requested_n_centroids);
+
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training with {} centroids", n_centroids));
-    plaid_index_->Train(n_centroids, all_embeddings.get(), buffered_embedding_count_, 4);
+    temp_index->Train(n_centroids, all_embeddings.get(), local_embedding_count, 4);
 
     const auto time_1 = std::chrono::high_resolution_clock::now();
     auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training took {} ms", train_ms));
 
-    // Add documents
+    // Add documents to the trained index
     offset = 0;
-    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
-        u32 doc_len = buffered_doc_lens_[i];
-        plaid_index_->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
-        offset += doc_len * embedding_dimension_;
+    for (size_t i = 0; i < doc_count; ++i) {
+        u32 doc_len = local_doc_lens[i];
+        temp_index->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
+        offset += doc_len * local_embedding_dim;
     }
 
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto add_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Adding documents took {} ms", add_ms));
+
+    // Re-acquire lock to update member variables
+    lock.lock();
+
+    // Double-check that index wasn't built by another thread while we were training
+    if (is_built_.test()) {
+        lock.unlock(); // Must unlock before returning
+        return true; // Another thread already built it
+    }
+
+    // Move the trained index to member variable
+    plaid_index_ = std::move(temp_index);
 
     // Clear buffers to free memory
     buffered_embeddings_.clear();

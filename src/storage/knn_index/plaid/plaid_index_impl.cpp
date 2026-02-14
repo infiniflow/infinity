@@ -56,7 +56,8 @@ PlaidIndex::PlaidIndex(const u32 start_segment_offset,
                        void *mmap_addr,
                        const size_t mmap_size)
     : start_segment_offset_(start_segment_offset), embedding_dimension_(embedding_dimension), nbits_(nbits), requested_n_centroids_(n_centroids),
-      mmap_addr_(mmap_addr), mmap_size_(mmap_size), is_mmap_(true), owns_data_(false) {}
+      quantizer_(std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)), mmap_addr_(mmap_addr), mmap_size_(mmap_size), is_mmap_(true),
+      owns_data_(false) {}
 
 PlaidIndex::~PlaidIndex() = default;
 
@@ -707,11 +708,10 @@ size_t PlaidIndex::CalcSize() const {
 
     size += sizeof(u32) + packed_residuals_size_;
 
-    // Quantizer size
-    size += sizeof(nbits_) + sizeof(embedding_dimension_);
-    size += sizeof(f32);                                         // avg_residual_
-    size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32); // bucket_cutoffs
-    size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32); // bucket_weights
+    // Quantizer size (nbits_ and embedding_dimension_ are already counted in PlaidIndex header)
+    size += sizeof(f32);                                             // avg_residual_
+    size += sizeof(u32) + (quantizer_->n_buckets() - 1) * sizeof(f32); // bucket_cutoffs (n_buckets - 1)
+    size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32);       // bucket_weights
 
     return size;
 }
@@ -759,6 +759,9 @@ void PlaidIndex::SaveToPtr(void *ptr, size_t &offset) const {
     u32 packed_size = packed_residuals_size_;
     append(&packed_size, sizeof(packed_size));
     append(packed_residuals_.get(), packed_residuals_size_);
+
+    // Save quantizer data
+    quantizer_->SaveToPtr(ptr, offset);
 }
 
 void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
@@ -819,6 +822,9 @@ void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
     packed_residuals_size_ = packed_size;
     packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
     read(packed_residuals_.get(), packed_residuals_size_);
+
+    // Load quantizer data
+    quantizer_->LoadFromPtr(ptr, offset);
 }
 
 u32 PlaidIndex::GetDocLen(u32 doc_id) const {

@@ -35,17 +35,22 @@ export struct MatchTensorScanIndexOptions {
     u32 topn_ = 0;
     u32 emvb_centroid_nprobe_ = EMVB_CENTROID_NPROBE;
     f32 emvb_threshold_first_ = EMVB_THRESHOLD_FIRST;
-    u32 emvb_n_doc_to_score_ = topn_ * EMVB_N_DOC_TO_SCORE_FACTOR;
-    u32 emvb_n_doc_out_second_stage_ = topn_ * EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR;
+    u32 emvb_n_doc_to_score_ = 0;  // Will be set in constructor
+    u32 emvb_n_doc_out_second_stage_ = 0;  // Will be set in constructor
     f32 emvb_threshold_final_ = EMVB_THRESHOLD_FINAL;
 
     // plaid index options
     u32 plaid_n_ivf_probe_ = PLAID_N_IVF_PROBE;
     f32 plaid_centroid_score_threshold_ = PLAID_CENTROID_SCORE_THRESHOLD;
-    u32 plaid_n_doc_to_score_ = topn_ * PLAID_N_DOC_TO_SCORE_FACTOR;
-    u32 plaid_n_full_scores_ = topn_ * PLAID_N_FULL_SCORES_FACTOR;
+    u32 plaid_n_doc_to_score_ = 0;  // Will be set in constructor
+    u32 plaid_n_full_scores_ = 0;  // Will be set in constructor
 
-    explicit MatchTensorScanIndexOptions(u32 topn) : topn_(topn) {}
+    explicit MatchTensorScanIndexOptions(u32 topn)
+        : topn_(topn),
+          emvb_n_doc_to_score_(topn * EMVB_N_DOC_TO_SCORE_FACTOR),
+          emvb_n_doc_out_second_stage_(topn * EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR),
+          plaid_n_doc_to_score_(topn * PLAID_N_DOC_TO_SCORE_FACTOR),
+          plaid_n_full_scores_(topn * PLAID_N_FULL_SCORES_FACTOR) {}
 
     bool operator==(const MatchTensorScanIndexOptions &other) const {
         return topn_ == other.topn_ && emvb_centroid_nprobe_ == other.emvb_centroid_nprobe_ && emvb_threshold_first_ == other.emvb_threshold_first_ &&
