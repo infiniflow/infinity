@@ -241,22 +241,6 @@ func main() {
 	queryStr := table.MatchDense("embedding", infinity.Float32Vector(queryVec), "float32", "l2", 10, nil).ToString()
 	fmt.Printf("Query string: %s\n", queryStr)
 
-	// Execute query and get results in different formats
-	_, err = table.Output([]string{"*"}).ToDF()
-	if err != nil {
-		log.Printf("ToDF error: %v", err)
-	}
-
-	_, err = table.Output([]string{"*"}).ToPL()
-	if err != nil {
-		log.Printf("ToPL error: %v", err)
-	}
-
-	_, err = table.Output([]string{"*"}).ToArrow()
-	if err != nil {
-		log.Printf("ToArrow error: %v", err)
-	}
-
 	// Example 8: Explain query
 	fmt.Println("\n=== Example 8: Explain Query ===")
 
