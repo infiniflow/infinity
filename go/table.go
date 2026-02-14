@@ -221,56 +221,347 @@ func (t *Table) DropIndex(indexName string, conflictType ConflictType) (interfac
 
 // ShowIndex shows index details
 func (t *Table) ShowIndex(indexName string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.IndexName = indexName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show index: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show index: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ListIndexes lists all indexes
 func (t *Table) ListIndexes() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewListIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ListIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to list indexes: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to list indexes: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // DumpIndex dumps index information
 func (t *Table) DumpIndex(indexName string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewDumpIndexRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.IndexName = indexName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.DumpIndex(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to dump index: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to dump index: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowColumns shows all columns
 func (t *Table) ShowColumns() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowColumnsRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowColumns(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show columns: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show columns: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Build and return result
+	return buildResult(resp)
 }
 
 // ShowSegments shows all segments
 func (t *Table) ShowSegments() (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowSegmentsRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowSegments(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show segments: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show segments: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Build and return result
+	return buildResult(resp)
 }
 
 // ShowSegment shows segment details
 func (t *Table) ShowSegment(segmentID int) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowSegmentRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SegmentID = int64(segmentID)
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowSegment(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show segment: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show segment: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowBlocks shows all blocks in a segment
 func (t *Table) ShowBlocks(segmentID int) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowBlocksRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SegmentID = int64(segmentID)
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowBlocks(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show blocks: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show blocks: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Build and return result
+	return buildResult(resp)
 }
 
 // ShowBlock shows block details
 func (t *Table) ShowBlock(segmentID int, blockID int) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowBlockRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SegmentID = int64(segmentID)
+	req.BlockID = int64(blockID)
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowBlock(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show block: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show block: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ShowBlockColumn shows column information for a block
 func (t *Table) ShowBlockColumn(segmentID int, blockID int, columnID int) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewShowBlockColumnRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+	req.SegmentID = int64(segmentID)
+	req.BlockID = int64(blockID)
+	req.ColumnID = int64(columnID)
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := t.db.conn.client.ShowBlockColumn(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show block column: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show block column: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // Insert inserts data

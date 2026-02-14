@@ -357,8 +357,30 @@ func (c *InfinityConnection) ShowCurrentNode() (interface{}, error) {
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewShowCurrentNodeRequest()
+	req.SessionID = c.GetSessionID()
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.ShowCurrentNode(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to show current node: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to show current node: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // CreateDatabaseSnapshot creates a snapshot of a database
