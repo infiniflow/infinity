@@ -16,6 +16,7 @@ module infinity_core:plaid_index_in_mem.impl;
 
 import :plaid_index_in_mem;
 import :plaid_index;
+import :plaid_quantizer;
 import :plaid_index_file_worker;
 import :index_plaid;
 import :column_vector;
@@ -452,24 +453,31 @@ void PlaidIndexInMem::PrepareDumpData(std::vector<u32> &out_centroid_ids,
         return;
     }
 
-    // Get data from main index
-    // Note: This is a simplified version - real implementation needs proper data extraction
-    out_doc_lens.resize(plaid_index_->GetDocNum());
-    for (u32 i = 0; i < plaid_index_->GetDocNum(); ++i) {
+    // Get document info from index
+    const u32 doc_num = plaid_index_->GetDocNum();
+    out_doc_lens.resize(doc_num);
+    for (u32 i = 0; i < doc_num; ++i) {
         out_doc_lens[i] = plaid_index_->GetDocLen(i);
     }
 
     out_embedding_count = plaid_index_->GetTotalEmbeddingNum();
 
-    // Centroid IDs and residuals would need to be extracted from PlaidIndex
-    // For now, use placeholder logic
-    out_centroid_ids.resize(out_embedding_count);
-    // ... fill centroid ids
+    // Extract centroid IDs and residuals from PlaidIndex using accessor methods
+    const auto &centroid_ids = plaid_index_->GetCentroidIds();
+    const u8 *packed_residuals = plaid_index_->GetPackedResiduals();
+    const size_t packed_residuals_size = plaid_index_->GetPackedResidualsSize();
 
-    // Calculate packed residuals size
-    u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
-    out_packed_residuals.resize(out_embedding_count * packed_dim);
-    // ... fill residuals
+    // Copy centroid IDs
+    out_centroid_ids = centroid_ids;
+
+    // Copy packed residuals
+    out_packed_residuals.resize(packed_residuals_size);
+    if (packed_residuals_size > 0 && packed_residuals != nullptr) {
+        std::copy_n(packed_residuals, packed_residuals_size, out_packed_residuals.data());
+    }
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::PrepareDumpData: Prepared {} docs, {} embeddings, {} bytes of residuals",
+                         out_doc_lens.size(), out_embedding_count, packed_residuals_size));
 }
 
 Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
@@ -536,34 +544,76 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
         return Status::OK();
     }
 
+    const u64 total_embeddings = all_embeddings.size() / embedding_dimension_;
+
     // Calculate optimal centroids
     u32 n_centroids = requested_n_centroids_;
     if (n_centroids == 0) {
-        n_centroids = CalcOptimalNCentroids(all_embeddings.size() / embedding_dimension_);
+        n_centroids = CalcOptimalNCentroids(static_cast<u32>(total_embeddings));
     }
 
     // Train centroids
     auto *global_ivf = segment_index->GetGlobalIVF();
-    global_ivf->RebuildCentroids(all_embeddings.data(), all_embeddings.size() / embedding_dimension_, embedding_dimension_, n_centroids);
+    global_ivf->RebuildCentroids(all_embeddings.data(), total_embeddings, embedding_dimension_, n_centroids);
 
-    // Encode all data
-    std::vector<u32> centroid_ids;
-    std::vector<u8> packed_residuals;
+    // Get trained centroids data for encoding
+    const auto &centroids_data = global_ivf->GetCentroids();
+    const u32 actual_n_centroids = global_ivf->GetNCentroids();
 
-    // Encode embeddings (simplified)
-    for (u32 doc_len : all_doc_lens) {
-        for (u32 i = 0; i < doc_len; ++i) {
-            // Find nearest centroid
-            // TODO: Implement proper encoding using centroids from global IVF
-            (void)global_ivf;          // Mark as used for now
-            centroid_ids.push_back(0); // placeholder
+    // Create a temporary quantizer for residual quantization
+    auto quantizer = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
+
+    // Compute residuals for training the quantizer
+    std::vector<f32> residuals(total_embeddings * embedding_dimension_);
+    std::vector<u32> centroid_ids(total_embeddings);
+
+    // Find nearest centroid for each embedding and compute residuals
+    for (u64 i = 0; i < total_embeddings; ++i) {
+        const f32 *emb = all_embeddings.data() + i * embedding_dimension_;
+
+        // Find nearest centroid
+        f32 min_dist = std::numeric_limits<f32>::max();
+        u32 best_centroid = 0;
+
+        for (u32 c = 0; c < actual_n_centroids; ++c) {
+            const f32 *centroid = centroids_data.data() + c * embedding_dimension_;
+            f32 dist = 0.0f;
+            for (u32 d = 0; d < embedding_dimension_; ++d) {
+                f32 diff = emb[d] - centroid[d];
+                dist += diff * diff;
+            }
+            if (dist < min_dist) {
+                min_dist = dist;
+                best_centroid = c;
+            }
+        }
+
+        centroid_ids[i] = best_centroid;
+
+        // Compute residual
+        const f32 *best_centroid_data = centroids_data.data() + best_centroid * embedding_dimension_;
+        for (u32 d = 0; d < embedding_dimension_; ++d) {
+            residuals[i * embedding_dimension_ + d] = emb[d] - best_centroid_data[d];
         }
     }
 
+    // Train quantizer with residuals
+    quantizer->Train(residuals.data(), total_embeddings);
+
+    // Quantize residuals
+    u32 packed_dim = 0;
+    auto packed_residuals = quantizer->Quantize(residuals.data(), total_embeddings, packed_dim);
+
+    // Convert to vector for AppendData
+    std::vector<u8> packed_residuals_vec(packed_residuals.get(), packed_residuals.get() + total_embeddings * packed_dim);
+
     lock.unlock();
 
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpStartFromScratch: Encoded {} embeddings with {} centroids, {} bits",
+                         total_embeddings, actual_n_centroids, nbits_));
+
     // Append to segment
-    return segment_index->AppendData(centroid_ids, packed_residuals, all_doc_lens, all_embeddings.size() / embedding_dimension_, out_chunk_id);
+    return segment_index->AppendData(centroid_ids, packed_residuals_vec, all_doc_lens, static_cast<u32>(total_embeddings), out_chunk_id);
 }
 
 Status PlaidIndexInMem::DumpBufferMode(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
@@ -594,35 +644,97 @@ Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, 
 
     std::unique_lock lock(rw_mutex_);
 
-    // Collect new embeddings
-    std::vector<f32> new_embeddings;
-    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
-        u32 doc_len = buffered_doc_lens_[i];
-        const f32 *emb_data = buffered_embeddings_[i].get();
-        new_embeddings.insert(new_embeddings.end(), emb_data, emb_data + doc_len * embedding_dimension_);
+    // Collect all embeddings (existing + new)
+    // First, get existing data from plaid_index_
+    std::vector<f32> all_embeddings;
+    std::vector<u32> all_doc_lens;
+
+    if (plaid_index_) {
+        const u32 doc_num = plaid_index_->GetDocNum();
+        for (u32 doc_id = 0; doc_id < doc_num; ++doc_id) {
+            u32 doc_len = 0;
+            auto doc_embeddings = plaid_index_->ReconstructDocument(doc_id, doc_len);
+            if (doc_embeddings && doc_len > 0) {
+                all_doc_lens.push_back(doc_len);
+                all_embeddings.insert(all_embeddings.end(), doc_embeddings.get(), doc_embeddings.get() + doc_len * embedding_dimension_);
+            }
+        }
     }
 
-    if (new_embeddings.empty()) {
+    // Add new buffered embeddings
+    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
+        u32 doc_len = buffered_doc_lens_[i];
+        all_doc_lens.push_back(doc_len);
+        const f32 *emb_data = buffered_embeddings_[i].get();
+        all_embeddings.insert(all_embeddings.end(), emb_data, emb_data + doc_len * embedding_dimension_);
+    }
+
+    if (all_embeddings.empty()) {
         return Status::OK();
     }
 
+    const u64 total_embeddings = all_embeddings.size() / embedding_dimension_;
     lock.unlock();
 
     // Expand centroids in global IVF
     auto *global_ivf = segment_index->GetGlobalIVF();
-    u32 n_new_centroids = global_ivf->ExpandCentroids(new_embeddings.data(), new_embeddings.size() / embedding_dimension_, embedding_dimension_, 4);
+    u32 n_new_centroids = global_ivf->ExpandCentroids(all_embeddings.data(), total_embeddings, embedding_dimension_, 4);
 
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Added {} new centroids", n_new_centroids));
 
-    // Now encode and append data with new centroids
-    std::vector<u32> centroid_ids;
-    std::vector<u8> packed_residuals;
-    std::vector<u32> doc_lens = buffered_doc_lens_;
+    // Get updated centroids data
+    const auto &centroids_data = global_ivf->GetCentroids();
+    const u32 actual_n_centroids = global_ivf->GetNCentroids();
 
     // Re-encode all data with expanded centroids
-    // ... encoding logic
+    std::vector<f32> residuals(total_embeddings * embedding_dimension_);
+    std::vector<u32> centroid_ids(total_embeddings);
 
-    return segment_index->AppendToLastChunk(centroid_ids, packed_residuals, doc_lens, out_chunk_id);
+    // Find nearest centroid for each embedding
+    for (u64 i = 0; i < total_embeddings; ++i) {
+        const f32 *emb = all_embeddings.data() + i * embedding_dimension_;
+
+        f32 min_dist = std::numeric_limits<f32>::max();
+        u32 best_centroid = 0;
+
+        for (u32 c = 0; c < actual_n_centroids; ++c) {
+            const f32 *centroid = centroids_data.data() + c * embedding_dimension_;
+            f32 dist = 0.0f;
+            for (u32 d = 0; d < embedding_dimension_; ++d) {
+                f32 diff = emb[d] - centroid[d];
+                dist += diff * diff;
+            }
+            if (dist < min_dist) {
+                min_dist = dist;
+                best_centroid = c;
+            }
+        }
+
+        centroid_ids[i] = best_centroid;
+
+        // Compute residual
+        const f32 *best_centroid_data = centroids_data.data() + best_centroid * embedding_dimension_;
+        for (u32 d = 0; d < embedding_dimension_; ++d) {
+            residuals[i * embedding_dimension_ + d] = emb[d] - best_centroid_data[d];
+        }
+    }
+
+    // Train quantizer with new residuals
+    auto quantizer = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
+    quantizer->Train(residuals.data(), total_embeddings);
+
+    // Quantize residuals
+    u32 packed_dim = 0;
+    auto packed_residuals = quantizer->Quantize(residuals.data(), total_embeddings, packed_dim);
+
+    // Convert to vector
+    std::vector<u8> packed_residuals_vec(packed_residuals.get(), packed_residuals.get() + total_embeddings * packed_dim);
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Re-encoded {} embeddings with {} centroids",
+                         total_embeddings, actual_n_centroids));
+
+    // Rewrite last chunk with re-encoded data
+    return segment_index->AppendData(centroid_ids, packed_residuals_vec, all_doc_lens, static_cast<u32>(total_embeddings), out_chunk_id);
 }
 
 } // namespace infinity

@@ -1217,17 +1217,51 @@ void PlaidGlobalIVF::AddToPostingLists(const u32 doc_id_start, const std::vector
     }
 }
 
-void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id, const std::vector<u32> &doc_ids, const std::vector<u32> &centroid_ids) {
+void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id,
+                                                 const u32 start_doc_id,
+                                                 const std::vector<u32> &doc_lens,
+                                                 const std::vector<u32> &centroid_ids) {
     std::unique_lock lock(rw_mutex_);
 
-    // Remove old entries for this chunk
-    // TODO: Implement chunk-based doc_id filtering
-    (void)chunk_id;
+    // Calculate the range of doc_ids for this chunk
+    u32 chunk_start_doc = start_doc_id;
+    u32 chunk_end_doc = start_doc_id;
+    for (u32 len : doc_lens) {
+        chunk_end_doc += len;
+    }
+
+    // Remove old entries for this chunk from all posting lists
+    for (auto &posting_list : ivf_lists_) {
+        posting_list.erase(std::remove_if(posting_list.begin(),
+                                          posting_list.end(),
+                                          [chunk_start_doc, chunk_end_doc](u32 doc_id) {
+                                              return doc_id >= chunk_start_doc && doc_id < chunk_end_doc;
+                                          }),
+                           posting_list.end());
+    }
 
     // Add new entries
-    // TODO: Implement proper centroid id extraction and posting list update
-    (void)doc_ids;
-    (void)centroid_ids;
+    u32 current_doc_id = start_doc_id;
+    u32 centroid_offset = 0;
+
+    for (u32 doc_len : doc_lens) {
+        // Track which centroids this doc is already added to (to avoid duplicates)
+        std::vector<bool> added_to_centroid(n_centroids_, false);
+
+        for (u32 i = 0; i < doc_len; ++i) {
+            u32 cid = centroid_ids[centroid_offset + i];
+            if (cid < n_centroids_ && !added_to_centroid[cid]) {
+                ivf_lists_[cid].push_back(current_doc_id);
+                added_to_centroid[cid] = true;
+            }
+        }
+
+        centroid_offset += doc_len;
+        ++current_doc_id;
+    }
+
+    LOG_INFO(fmt::format("PlaidGlobalIVF::UpdatePostingListsForChunk: Updated chunk {} (doc range: {}-{}), {} docs, {} embeddings",
+                         chunk_id, chunk_start_doc, chunk_end_doc, doc_lens.size(), centroid_ids.size()));
 }
 
 std::unique_ptr<f32[]> PlaidGlobalIVF::ComputeQueryScores(const f32 *query_ptr, const u32 query_len) const {

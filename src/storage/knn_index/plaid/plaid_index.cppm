@@ -43,7 +43,11 @@ public:
     void AddToPostingLists(u32 doc_id_start, const std::vector<u32> &centroid_ids, const std::vector<u32> &doc_lens);
 
     // Update posting lists during chunk rewrite
-    void UpdatePostingListsForChunk(u32 chunk_id, const std::vector<u32> &doc_ids, const std::vector<u32> &centroid_ids);
+    // chunk_id: the chunk being rewritten
+    // start_doc_id: starting doc_id of the chunk
+    // doc_lens: document lengths in the chunk
+    // centroid_ids: centroid assignments for all embeddings in the chunk
+    void UpdatePostingListsForChunk(u32 chunk_id, u32 start_doc_id, const std::vector<u32> &doc_lens, const std::vector<u32> &centroid_ids);
 
     // Compute query-centroid scores
     std::unique_ptr<f32[]> ComputeQueryScores(const f32 *query_ptr, u32 query_len) const;
@@ -318,6 +322,15 @@ public:
     void ClearRawEmbeddings();
     bool HasRawEmbeddings() const { return !raw_embeddings_.empty(); }
     u64 GetRawEmbeddingCount() const { return raw_embeddings_count_; }
+
+    // Get internal data for dump operations (used by PlaidIndexInMem::PrepareDumpData)
+    // Returns pointers to internal data - caller must not modify
+    const std::vector<u32> &GetCentroidIds() const { return centroid_ids_; }
+    const u8 *GetPackedResiduals() const { return packed_residuals_.get(); }
+    size_t GetPackedResidualsSize() const { return packed_residuals_size_; }
+    const std::vector<u32> &GetDocLens() const { return doc_lens_; }
+    const std::vector<u32> &GetDocOffsets() const { return doc_offsets_; }
+    const PlaidQuantizer *GetQuantizer() const { return quantizer_.get(); }
 
     // Search without bitmask (for testing/simple use cases)
     PlaidQueryResultType GetQueryResult(const f32 *query_ptr,
