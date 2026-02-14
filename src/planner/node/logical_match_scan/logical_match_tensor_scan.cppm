@@ -38,12 +38,21 @@ export struct MatchTensorScanIndexOptions {
     u32 emvb_n_doc_to_score_ = topn_ * EMVB_N_DOC_TO_SCORE_FACTOR;
     u32 emvb_n_doc_out_second_stage_ = topn_ * EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR;
     f32 emvb_threshold_final_ = EMVB_THRESHOLD_FINAL;
+
+    // plaid index options
+    u32 plaid_n_ivf_probe_ = PLAID_N_IVF_PROBE;
+    f32 plaid_centroid_score_threshold_ = PLAID_CENTROID_SCORE_THRESHOLD;
+    u32 plaid_n_doc_to_score_ = topn_ * PLAID_N_DOC_TO_SCORE_FACTOR;
+    u32 plaid_n_full_scores_ = topn_ * PLAID_N_FULL_SCORES_FACTOR;
+
     explicit MatchTensorScanIndexOptions(u32 topn) : topn_(topn) {}
 
     bool operator==(const MatchTensorScanIndexOptions &other) const {
         return topn_ == other.topn_ && emvb_centroid_nprobe_ == other.emvb_centroid_nprobe_ && emvb_threshold_first_ == other.emvb_threshold_first_ &&
                emvb_n_doc_to_score_ == other.emvb_n_doc_to_score_ && emvb_n_doc_out_second_stage_ == other.emvb_n_doc_out_second_stage_ &&
-               emvb_threshold_final_ == other.emvb_threshold_final_;
+               emvb_threshold_final_ == other.emvb_threshold_final_ && plaid_n_ivf_probe_ == other.plaid_n_ivf_probe_ &&
+               plaid_centroid_score_threshold_ == other.plaid_centroid_score_threshold_ && plaid_n_doc_to_score_ == other.plaid_n_doc_to_score_ &&
+               plaid_n_full_scores_ == other.plaid_n_full_scores_;
     }
 };
 

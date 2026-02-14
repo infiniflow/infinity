@@ -39,6 +39,9 @@ import :filter_value_type_classification;
 import :roaring_bitmap;
 import :emvb_index_in_mem;
 import :emvb_index;
+import :plaid_index_in_mem;
+import :plaid_index;
+import :plaid_index_file_worker;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
@@ -205,7 +208,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     continue;
                 }
                 // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB) {
+                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
                     LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -235,8 +238,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB) {
-                Status error_status = Status::InvalidIndexType("invalid index");
+            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
+                Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB or PLAID");
                 RecoverableError(std::move(error_status));
             }
             table_index_meta_ = std::move(table_index_meta);
@@ -352,16 +355,16 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         if (has_some_result) {
             LOG_TRACE(
                 fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
-            // TODO: now only have EMVB index
             auto [chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             std::shared_ptr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
-            // 1. in mem index
+            std::shared_ptr<PlaidIndexInMem> plaid_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetPlaidIndex();
+            
+            // 1. in mem index - EMVB
             if (emvb_index_in_mem) {
-                // TODO: fix the parameters
                 const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
                                                                          calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                                          topn_,
@@ -423,31 +426,81 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                              }},
                     result);
             }
-            // 2. chunk index
-            for (ChunkID chunk_id : *chunk_ids_ptr) {
-                ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-                EMVBIndexFileWorker *index_file_worker{};
-                Status status = chunk_index_meta.GetFileWorker(index_file_worker);
-                if (!status.ok()) {
-                    UnrecoverableError(status.message());
-                }
-                std::shared_ptr<EMVBIndex> emvb_index;
-                FileWorker::Read(index_file_worker, emvb_index); // yee todo1
-
+            // 1b. in mem index - PLAID
+            else if (plaid_index_in_mem) {
                 const auto [result_num, score_ptr, row_id_ptr] =
-                    emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
-                                                  calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
-                                                  topn_,
-                                                  segment_bitmask,
-                                                  block_index,
-                                                  begin_ts,
-                                                  index_options_->emvb_centroid_nprobe_,
-                                                  index_options_->emvb_threshold_first_,
-                                                  index_options_->emvb_n_doc_to_score_,
-                                                  index_options_->emvb_n_doc_out_second_stage_,
-                                                  index_options_->emvb_threshold_final_);
+                    plaid_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                          calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                          topn_,
+                                                          segment_bitmask,
+                                                          block_index,
+                                                          begin_ts,
+                                                          index_options_->plaid_n_ivf_probe_,
+                                                          index_options_->plaid_centroid_score_threshold_,
+                                                          index_options_->plaid_n_doc_to_score_,
+                                                          index_options_->plaid_n_full_scores_);
                 for (u32 i = 0; i < result_num; ++i) {
                     function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                }
+            }
+            // 2. chunk index
+            auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
+            if (!index_status.ok()) {
+                UnrecoverableError(index_status.message());
+            }
+            
+            for (ChunkID chunk_id : *chunk_ids_ptr) {
+                ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+                
+                if (index_base->index_type_ == IndexType::kEMVB) {
+                    EMVBIndexFileWorker *index_file_worker{};
+                    Status status = chunk_index_meta.GetFileWorker(index_file_worker);
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                    std::shared_ptr<EMVBIndex> emvb_index;
+                    FileWorker::Read(index_file_worker, emvb_index);
+
+                    const auto [result_num, score_ptr, row_id_ptr] =
+                        emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                      calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                      topn_,
+                                                      segment_bitmask,
+                                                      block_index,
+                                                      begin_ts,
+                                                      index_options_->emvb_centroid_nprobe_,
+                                                      index_options_->emvb_threshold_first_,
+                                                      index_options_->emvb_n_doc_to_score_,
+                                                      index_options_->emvb_n_doc_out_second_stage_,
+                                                      index_options_->emvb_threshold_final_);
+                    for (u32 i = 0; i < result_num; ++i) {
+                        function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                } else if (index_base->index_type_ == IndexType::kPLAID) {
+                    PlaidIndexFileWorker *index_file_worker{};
+                    Status status = chunk_index_meta.GetFileWorker(index_file_worker);
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                    std::shared_ptr<PlaidIndex> plaid_index;
+                    FileWorker::Read(index_file_worker, plaid_index);
+
+                    const auto [result_num, score_ptr, row_id_ptr] =
+                        plaid_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                       calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                       topn_,
+                                                       segment_bitmask,
+                                                       block_index,
+                                                       begin_ts,
+                                                       index_options_->plaid_n_ivf_probe_,
+                                                       index_options_->plaid_centroid_score_threshold_,
+                                                       index_options_->plaid_n_doc_to_score_,
+                                                       index_options_->plaid_n_full_scores_);
+                    for (u32 i = 0; i < result_num; ++i) {
+                        function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                } else {
+                    UnrecoverableError(fmt::format("Unsupported index type for tensor search: {}", static_cast<int>(index_base->index_type_)));
                 }
             }
         }

@@ -1081,6 +1081,12 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
             if (!status.ok()) {
                 return status;
             }
+            // If no chunk was created (not enough data), remove the segment from index
+            // so that queries will fall back to brute force search
+            if (new_chunk_ids.empty()) {
+                // Remove segment from index - it will be added later when more data is inserted
+                table_index_meta.RemoveSegmentIndexIDs({segment_meta.segment_id()});
+            }
             break;
         }
         default: {
@@ -1417,6 +1423,49 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         }
         row_count = rc;
     }
+
+    // Create in-memory PLAID index and check if we have enough data
+    auto mem_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+    mem_index->SetSegmentID("", "", segment_index_meta.segment_id());
+
+    // Read all blocks and insert data
+    auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+    if (!block_status.ok()) {
+        return block_status;
+    }
+
+    ColumnID column_id = column_def->id();
+    for (BlockID block_id : *block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
+
+        size_t row_cnt = 0;
+        auto [block_row_cnt, row_status] = block_meta.GetRowCnt1();
+        if (!row_status.ok()) {
+            return row_status;
+        }
+        row_cnt = block_row_cnt;
+
+        ColumnVector col;
+        Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+
+        mem_index->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+    }
+
+    // Build the index - check if we have enough data
+    if (!mem_index->BuildIndex()) {
+        LOG_INFO(fmt::format("PopulatePlaidIndexInner: Not enough data to build PLAID index for segment {}. "
+                             "Index will be built incrementally as more data is added.",
+                             segment_index_meta.segment_id()));
+        // Don't create chunk if index not built - return without error
+        // Index will be built later when more data is inserted
+        return Status::OK();
+    }
+
+    // Only create chunk after successful build
     ChunkID chunk_id = 0;
     Status status;
     std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
@@ -1424,6 +1473,7 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         return status;
     }
     new_chunk_ids.push_back(chunk_id);
+
     PlaidIndexFileWorker *index_file_worker{};
     {
         std::optional<ChunkIndexMeta> chunk_index_meta;
@@ -1436,49 +1486,18 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
                                                "" /*base_name*/,
                                                0 /*index_size*/,
                                                chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
         status = chunk_index_meta->GetFileWorker(index_file_worker);
         if (!status.ok()) {
             return status;
         }
     }
-    {
-        // Create in-memory PLAID index and build it from segment data
-        auto mem_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
-        mem_index->SetSegmentID("", "", segment_index_meta.segment_id());
 
-        // Read all blocks and insert data
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
-        if (!block_status.ok()) {
-            return block_status;
-        }
+    // Dump to file
+    mem_index->Dump(index_file_worker);
 
-        ColumnID column_id = column_def->id();
-        for (BlockID block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta);
-            ColumnMeta column_meta(column_id, block_meta);
-
-            size_t row_cnt = 0;
-            auto [block_row_cnt, row_status] = block_meta.GetRowCnt1();
-            if (!row_status.ok()) {
-                return row_status;
-            }
-            row_cnt = block_row_cnt;
-
-            ColumnVector col;
-            status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
-            if (!status.ok()) {
-                return status;
-            }
-
-            mem_index->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
-        }
-
-        // Build the index
-        mem_index->BuildIndex(segment_meta);
-
-        // Dump to file
-        mem_index->Dump(index_file_worker);
-    }
     return Status::OK();
 }
 

@@ -61,7 +61,7 @@ u32 PlaidIndexInMem::GetRowCount() const {
     return row_count_;
 }
 
-void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
+bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
     std::unique_lock lock(rw_mutex_);
 
     for (u32 i = 0; i < row_count; ++i) {
@@ -77,6 +77,14 @@ void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
         buffered_embedding_count_ += embedding_num;
         row_count_++;
     }
+
+    // Auto-trigger training if not built and threshold reached
+    if (!is_built_.test() && buffered_embedding_count_ >= build_index_threshold_) {
+        lock.unlock(); // Release lock before BuildIndex which takes its own lock
+        return BuildIndex();
+    }
+
+    return false;
 }
 
 void PlaidIndexInMem::InsertBatch(const std::vector<const ColumnVector *> &cols,
@@ -91,11 +99,11 @@ void PlaidIndexInMem::InsertBatch(const std::vector<const ColumnVector *> &cols,
     }
 }
 
-void PlaidIndexInMem::BuildIndex(SegmentMeta &segment_meta) {
+bool PlaidIndexInMem::BuildIndex() {
     std::unique_lock lock(rw_mutex_);
 
     if (is_built_.test()) {
-        return;
+        return true; // Already built
     }
 
     if (buffered_embedding_count_ < build_index_threshold_) {
@@ -103,7 +111,7 @@ void PlaidIndexInMem::BuildIndex(SegmentMeta &segment_meta) {
                              "Have {} embeddings, need {}.",
                              buffered_embedding_count_,
                              build_index_threshold_));
-        return;
+        return false;
     }
 
     const auto time_0 = std::chrono::high_resolution_clock::now();
@@ -156,6 +164,7 @@ void PlaidIndexInMem::BuildIndex(SegmentMeta &segment_meta) {
     is_built_.test_and_set();
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
+    return true;
 }
 
 void PlaidIndexInMem::Dump(PlaidIndexFileWorker *index_file_worker) {

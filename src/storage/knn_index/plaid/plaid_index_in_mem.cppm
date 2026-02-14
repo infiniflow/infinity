@@ -73,10 +73,12 @@ public:
     u32 GetRowCount() const;
 
     // Insert data - supports incremental updates
-    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
+    // Returns true if index was built during this insert
+    bool Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts, MetaCache *meta_cache);
 
     // Build index from accumulated data
-    void BuildIndex(SegmentMeta &segment_meta);
+    // Returns true if index was built, false if not enough data
+    bool BuildIndex();
 
     void Dump(PlaidIndexFileWorker *index_file_worker);
 
