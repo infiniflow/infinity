@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,7 +34,15 @@ class PlaidIndexFileWorker;
 
 using PlaidInMemQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
 
+// Forward declarations
+class PlaidIndexFileWorker;
+class PlaidSegmentIndex;
+
 // In-memory PLAID index with incremental update support
+// Follows next-plaid's three-mode update strategy:
+// 1. Start-from-scratch: < 999 docs, store raw embeddings and rebuild on each update
+// 2. Buffer mode: < 100 new embeddings, append without centroid expansion
+// 3. Centroid expansion: >= 100 new embeddings, expand centroids and rebuild
 export class PlaidIndexInMem {
     const u32 nbits_ = 4;
     const u32 requested_n_centroids_ = 0;
@@ -51,6 +59,11 @@ export class PlaidIndexInMem {
     std::atomic_flag is_built_;
     mutable std::shared_mutex rw_mutex_;
     u32 build_index_threshold_ = 0;
+    
+    // next-plaid update mode thresholds
+    static constexpr u32 BUFFER_THRESHOLD = 100;           // Buffer mode threshold
+    static constexpr u32 APPEND_THRESHOLD = 2000;          // Chunk append threshold
+    static constexpr u32 START_FROM_SCRATCH_THRESHOLD = 999; // Full rebuild threshold
 
 public:
     std::string db_name_;
@@ -112,6 +125,31 @@ public:
                      KVInstance &kv_instance,
                      TxnTimeStamp begin_ts,
                      MetaCache *meta_cache);
+    
+    // ===== Incremental Update Interface (next-plaid style) =====
+    
+    // Check if we should use start-from-scratch mode (< 999 docs)
+    bool ShouldUseStartFromScratch() const;
+    
+    // Check if we should use buffer mode (< 100 new embeddings)
+    bool ShouldUseBufferMode(u32 new_embeddings) const;
+    
+    // Get current update mode based on existing and new data
+    // Returns: 0=start-from-scratch, 1=buffer-mode, 2=centroid-expansion
+    int GetUpdateMode(u32 new_doc_count, u32 new_embedding_count) const;
+    
+    // Dump with incremental update support
+    // Supports three modes: start-from-scratch, buffer-mode, centroid-expansion
+    Status DumpIncremental(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
+    
+    // Memory usage for triggering dump
+    size_t MemUsage() const;
+    
+    // Get buffered document count
+    u32 GetBufferedDocCount() const;
+    
+    // Get buffered embedding count  
+    u32 GetBufferedEmbeddingCount() const;
 
 private:
     // Buffer for incremental updates before index build
@@ -119,23 +157,38 @@ private:
     std::vector<u32> buffered_doc_lens_;
     u32 buffered_embedding_count_ = 0;
 
-    // For incremental updates after index is built
-    std::unique_ptr<f32[]> incremental_embeddings_buffer_;
-    u32 incremental_embedding_count_ = 0;
+    // For incremental updates after index is built (buffer mode)
+    std::vector<u32> buffer_centroid_ids_;
+    std::vector<u8> buffer_packed_residuals_;
+    std::vector<u32> buffer_doc_lens_;
+    u32 buffer_embedding_count_ = 0;
+    
+    // Raw embeddings storage for start-from-scratch mode
+    std::vector<f32> raw_embeddings_storage_;
+    std::vector<u32> raw_doc_lens_;
+    
+    // Incremental capacity tracking
     u32 incremental_embedding_capacity_ = 0;
-
-    // Configuration for start_from_scratch threshold
-    // If document count <= this threshold, store raw embeddings for potential rebuild
-    static constexpr u32 START_FROM_SCRATCH_THRESHOLD = 999;
-
-    // Check if we should use start_from_scratch mode
-    bool ShouldUseStartFromScratch() const { return row_count_ <= START_FROM_SCRATCH_THRESHOLD; }
 
     // Incrementally update existing index with new data
     void IncrementalUpdate(const f32 *embedding_data, u64 embedding_num);
 
     // Collect all embeddings (buffered + incremental) into contiguous array
     std::unique_ptr<f32[]> CollectAllEmbeddings(u64 &total_count) const;
+    
+    // Calculate optimal centroid count (next-plaid formula: 2^floor(log2(16*sqrt(N))))
+    static u32 CalcOptimalNCentroids(u32 n_embeddings);
+    
+    // Internal dump methods for different modes
+    Status DumpStartFromScratch(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
+    Status DumpBufferMode(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
+    Status DumpCentroidExpansion(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id);
+    
+    // Prepare data from buffers for dump
+    void PrepareDumpData(std::vector<u32> &out_centroid_ids,
+                         std::vector<u8> &out_packed_residuals,
+                         std::vector<u32> &out_doc_lens,
+                         u32 &out_embedding_count);
 };
 
 } // namespace infinity

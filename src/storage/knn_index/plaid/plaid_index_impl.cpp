@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import :block_meta;
 import :column_meta;
 import :kv_store;
 import :local_file_handle;
+import :virtual_store;
 
 import std.compat;
 import third_party;
@@ -1169,6 +1170,648 @@ void PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedd
     ivf_lists_.resize(n_centroids_);
 
     LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanded from {} to {} centroids", old_n_centroids, n_centroids_));
+}
+
+// ============================================================================
+// PlaidGlobalIVF Implementation
+// ============================================================================
+
+void PlaidGlobalIVF::Initialize(const u32 n_centroids, const u32 embedding_dim, const f32 *centroids_data) {
+    std::unique_lock lock(rw_mutex_);
+    n_centroids_ = n_centroids;
+    embedding_dimension_ = embedding_dim;
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dim);
+    centroid_norms_neg_half_.resize(n_centroids_);
+    ivf_lists_.resize(n_centroids_);
+
+    std::copy_n(centroids_data, static_cast<u64>(n_centroids_) * embedding_dim, centroids_data_.data());
+
+    const f32 *centroid_ptr = centroids_data_.data();
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_ptr, embedding_dim);
+        centroid_ptr += embedding_dim;
+    }
+}
+
+void PlaidGlobalIVF::AddToPostingLists(const u32 doc_id_start, const std::vector<u32> &centroid_ids, const std::vector<u32> &doc_lens) {
+    std::unique_lock lock(rw_mutex_);
+
+    u32 current_doc_id = doc_id_start;
+    u32 offset = 0;
+
+    for (u32 doc_len : doc_lens) {
+        for (u32 i = 0; i < doc_len; ++i) {
+            u32 centroid_id = centroid_ids[offset + i];
+            if (centroid_id < ivf_lists_.size()) {
+                // Only add if not already present for this doc
+                if (ivf_lists_[centroid_id].empty() || ivf_lists_[centroid_id].back() != current_doc_id) {
+                    ivf_lists_[centroid_id].push_back(current_doc_id);
+                }
+            }
+        }
+        offset += doc_len;
+        ++current_doc_id;
+    }
+}
+
+void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id, const std::vector<u32> &doc_ids, const std::vector<u32> &centroid_ids) {
+    std::unique_lock lock(rw_mutex_);
+
+    // Remove old entries for this chunk
+    // TODO: Implement chunk-based doc_id filtering
+    (void)chunk_id;
+    
+    // Add new entries
+    // TODO: Implement proper centroid id extraction and posting list update
+    (void)doc_ids;
+    (void)centroid_ids;
+}
+
+std::unique_ptr<f32[]> PlaidGlobalIVF::ComputeQueryScores(const f32 *query_ptr, const u32 query_len) const {
+    std::shared_lock lock(rw_mutex_);
+
+    auto scores = std::make_unique_for_overwrite<f32[]>(query_len * n_centroids_);
+
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, centroids_data_.data(), query_len, n_centroids_, embedding_dimension_, scores.get());
+
+    for (u32 i = 0; i < query_len; ++i) {
+        for (u32 j = 0; j < n_centroids_; ++j) {
+            scores[i * n_centroids_ + j] += centroid_norms_neg_half_[j];
+        }
+    }
+
+    return scores;
+}
+
+std::vector<u32> PlaidGlobalIVF::GetCandidates(const std::vector<u32> &centroid_ids) const {
+    std::shared_lock lock(rw_mutex_);
+
+    std::unordered_set<u32> candidate_set;
+    for (u32 cid : centroid_ids) {
+        if (cid < ivf_lists_.size()) {
+            candidate_set.insert(ivf_lists_[cid].begin(), ivf_lists_[cid].end());
+        }
+    }
+
+    return std::vector<u32>(candidate_set.begin(), candidate_set.end());
+}
+
+void PlaidGlobalIVF::Save(const std::string &file_path) const {
+    std::shared_lock lock(rw_mutex_);
+
+    auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("PlaidGlobalIVF::Save: Failed to open file: {}", file_path));
+    }
+
+    // Write header
+    file_handle->Append(&n_centroids_, sizeof(n_centroids_));
+    file_handle->Append(&embedding_dimension_, sizeof(embedding_dimension_));
+    
+    // Write centroids
+    file_handle->Append(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
+    file_handle->Append(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
+    
+    // Write IVF lists
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        u32 list_size = ivf_lists_[i].size();
+        file_handle->Append(&list_size, sizeof(list_size));
+        if (list_size > 0) {
+            file_handle->Append(ivf_lists_[i].data(), list_size * sizeof(u32));
+        }
+    }
+}
+
+void PlaidGlobalIVF::Load(const std::string &file_path) {
+    std::unique_lock lock(rw_mutex_);
+
+    auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("PlaidGlobalIVF::Load: Failed to open file: {}", file_path));
+    }
+
+    // Read header
+    std::ignore = file_handle->Read(&n_centroids_, sizeof(n_centroids_));
+    std::ignore = file_handle->Read(&embedding_dimension_, sizeof(embedding_dimension_));
+
+    // Read centroids
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dimension_);
+    centroid_norms_neg_half_.resize(n_centroids_);
+
+    std::ignore = file_handle->Read(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
+    std::ignore = file_handle->Read(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
+
+    // Read IVF lists
+    ivf_lists_.resize(n_centroids_);
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        u32 list_size;
+        std::ignore = file_handle->Read(&list_size, sizeof(list_size));
+        ivf_lists_[i].resize(list_size);
+        if (list_size > 0) {
+            std::ignore = file_handle->Read(ivf_lists_[i].data(), list_size * sizeof(u32));
+        }
+    }
+}
+
+u32 PlaidGlobalIVF::ExpandCentroids(const f32 *new_embeddings, const u64 new_embedding_count, const u32 embedding_dim, const u32 expand_iter) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (new_embedding_count == 0) {
+        return 0;
+    }
+
+    // Find outliers
+    const auto dist_table = std::make_unique_for_overwrite<f32[]>(new_embedding_count * n_centroids_);
+    matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings,
+                                                   centroids_data_.data(),
+                                                   new_embedding_count,
+                                                   n_centroids_,
+                                                   embedding_dim,
+                                                   dist_table.get());
+
+    std::vector<u32> outlier_indices;
+    std::vector<f32> outlier_embeddings;
+    const f32 outlier_threshold = -0.5f;
+
+    for (u64 i = 0; i < new_embedding_count; ++i) {
+        f32 max_sim = std::numeric_limits<f32>::lowest();
+        for (u32 j = 0; j < n_centroids_; ++j) {
+            f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+            max_sim = std::max(max_sim, sim);
+        }
+        if (max_sim < outlier_threshold) {
+            outlier_indices.push_back(static_cast<u32>(i));
+            for (u32 d = 0; d < embedding_dim; ++d) {
+                outlier_embeddings.push_back(new_embeddings[i * embedding_dim + d]);
+            }
+        }
+    }
+
+    if (outlier_indices.size() < 8) {
+        LOG_INFO(fmt::format("PlaidGlobalIVF::ExpandCentroids: Too few outliers ({}), skipping expansion", outlier_indices.size()));
+        return 0;
+    }
+
+    // Compute new centroids
+    u32 n_new_centroids = static_cast<u32>(std::sqrt(outlier_indices.size()));
+    n_new_centroids = ((n_new_centroids + 7) / 8) * 8;
+    n_new_centroids = std::max(8u, std::min(n_new_centroids, 128u));
+
+    std::vector<f32> new_centroids(n_new_centroids * embedding_dim);
+    const auto result_centroid_num = GetKMeansCentroids(MetricType::kMetricL2,
+                                                        embedding_dim,
+                                                        outlier_embeddings.size() / embedding_dim,
+                                                        outlier_embeddings.data(),
+                                                        new_centroids,
+                                                        n_new_centroids,
+                                                        expand_iter);
+
+    if (result_centroid_num != n_new_centroids) {
+        LOG_WARN(fmt::format("PlaidGlobalIVF::ExpandCentroids: KMeans failed, expected {}, got {}", n_new_centroids, result_centroid_num));
+        return 0;
+    }
+
+    // Merge new centroids
+    u32 old_n_centroids = n_centroids_;
+    n_centroids_ += n_new_centroids;
+
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dim);
+    centroid_norms_neg_half_.resize(n_centroids_);
+    ivf_lists_.resize(n_centroids_);
+
+    std::copy(new_centroids.begin(), new_centroids.end(), centroids_data_.begin() + old_n_centroids * embedding_dim);
+
+    const f32 *centroid_ptr = centroids_data_.data() + old_n_centroids * embedding_dim;
+    for (u32 i = old_n_centroids; i < n_centroids_; ++i) {
+        centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_ptr, embedding_dim);
+        centroid_ptr += embedding_dim;
+    }
+
+    LOG_INFO(fmt::format("PlaidGlobalIVF::ExpandCentroids: Expanded from {} to {} centroids", old_n_centroids, n_centroids_));
+    return n_new_centroids;
+}
+
+void PlaidGlobalIVF::RebuildCentroids(const f32 *all_embeddings, const u64 total_embeddings, const u32 embedding_dim, const u32 target_n_centroids) {
+    std::unique_lock lock(rw_mutex_);
+
+    n_centroids_ = target_n_centroids;
+    embedding_dimension_ = embedding_dim;
+
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dim);
+    centroid_norms_neg_half_.resize(n_centroids_);
+    ivf_lists_.clear();
+    ivf_lists_.resize(n_centroids_);
+
+    const auto result_centroid_num =
+        GetKMeansCentroids(MetricType::kMetricL2, embedding_dim, total_embeddings, all_embeddings, centroids_data_, n_centroids_, 4);
+
+    if (result_centroid_num != n_centroids_) {
+        LOG_WARN(fmt::format("PlaidGlobalIVF::RebuildCentroids: KMeans failed, expected {}, got {}", n_centroids_, result_centroid_num));
+        n_centroids_ = result_centroid_num;
+        centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dim);
+        centroid_norms_neg_half_.resize(n_centroids_);
+        ivf_lists_.resize(n_centroids_);
+    }
+
+    const f32 *centroid_ptr = centroids_data_.data();
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_ptr, embedding_dim);
+        centroid_ptr += embedding_dim;
+    }
+
+    LOG_INFO(fmt::format("PlaidGlobalIVF::RebuildCentroids: Rebuilt with {} centroids", n_centroids_));
+}
+
+// ============================================================================
+// PlaidIndexChunk Implementation
+// ============================================================================
+
+PlaidIndexChunk::PlaidIndexChunk(const u32 chunk_id, const u32 start_doc_id) : chunk_id_(chunk_id), start_doc_id_(start_doc_id) {}
+
+void PlaidIndexChunk::Load(const std::string &chunk_dir) {
+    std::unique_lock lock(rw_mutex_);
+
+    // Load centroid ids (codes.npy style)
+    std::string codes_path = chunk_dir + "/codes.bin";
+    auto [codes_file, codes_status] = VirtualStore::Open(codes_path, FileAccessMode::kRead);
+    if (codes_status.ok()) {
+        size_t file_size = codes_file->FileSize();
+        centroid_ids_.resize(file_size / sizeof(u32));
+        std::ignore = codes_file->Read(centroid_ids_.data(), file_size);
+    }
+
+    // Load residuals (residuals.npy style)
+    std::string residuals_path = chunk_dir + "/residuals.bin";
+    auto [res_file, res_status] = VirtualStore::Open(residuals_path, FileAccessMode::kRead);
+    if (res_status.ok()) {
+        size_t file_size = res_file->FileSize();
+        packed_residuals_.resize(file_size);
+        std::ignore = res_file->Read(packed_residuals_.data(), file_size);
+    }
+
+    // Load doc lens (doclens.json style - simplified binary format)
+    std::string doclens_path = chunk_dir + "/doclens.bin";
+    auto [doc_file, doc_status] = VirtualStore::Open(doclens_path, FileAccessMode::kRead);
+    if (doc_status.ok()) {
+        size_t file_size = doc_file->FileSize();
+        doc_lens_.resize(file_size / sizeof(u32));
+        std::ignore = doc_file->Read(doc_lens_.data(), file_size);
+    }
+
+    // Rebuild doc offsets
+    doc_offsets_.resize(doc_lens_.size());
+    u32 offset = 0;
+    for (size_t i = 0; i < doc_lens_.size(); ++i) {
+        doc_offsets_[i] = offset;
+        offset += doc_lens_[i];
+    }
+}
+
+void PlaidIndexChunk::Save(const std::string &chunk_dir) const {
+    std::shared_lock lock(rw_mutex_);
+
+    // Create directory if not exists
+    std::ignore = VirtualStore::MakeDirectory(chunk_dir);
+
+    // Save centroid ids
+    std::string codes_path = chunk_dir + "/codes.bin";
+    auto [codes_file, codes_status] = VirtualStore::Open(codes_path, FileAccessMode::kWrite);
+    if (codes_status.ok() && !centroid_ids_.empty()) {
+        codes_file->Append(centroid_ids_.data(), centroid_ids_.size() * sizeof(u32));
+    }
+
+    // Save residuals
+    std::string residuals_path = chunk_dir + "/residuals.bin";
+    auto [res_file, res_status] = VirtualStore::Open(residuals_path, FileAccessMode::kWrite);
+    if (res_status.ok() && !packed_residuals_.empty()) {
+        res_file->Append(packed_residuals_.data(), packed_residuals_.size());
+    }
+
+    // Save doc lens
+    std::string doclens_path = chunk_dir + "/doclens.bin";
+    auto [doc_file, doc_status] = VirtualStore::Open(doclens_path, FileAccessMode::kWrite);
+    if (doc_status.ok() && !doc_lens_.empty()) {
+        doc_file->Append(doc_lens_.data(), doc_lens_.size() * sizeof(u32));
+    }
+}
+
+bool PlaidIndexChunk::AppendData(const std::vector<u32> &centroid_ids, const std::vector<u8> &packed_residuals, const std::vector<u32> &doc_lens) {
+    std::unique_lock lock(rw_mutex_);
+
+    // Check if we can append (chunk size limit)
+    if (doc_lens_.size() + doc_lens.size() > DEFAULT_CHUNK_SIZE) {
+        return false;
+    }
+
+    // Append centroid ids
+    centroid_ids_.insert(centroid_ids_.end(), centroid_ids.begin(), centroid_ids.end());
+
+    // Append residuals
+    packed_residuals_.insert(packed_residuals_.end(), packed_residuals.begin(), packed_residuals.end());
+
+    // Append doc lens and update offsets
+    u32 offset = centroid_ids_.size();
+    for (u32 doc_len : doc_lens) {
+        doc_lens_.push_back(doc_len);
+        doc_offsets_.push_back(offset);
+        offset += doc_len;
+    }
+
+    return true;
+}
+
+void PlaidIndexChunk::Rewrite(const std::vector<u32> &centroid_ids,
+                              const std::vector<u8> &packed_residuals,
+                              const std::vector<u32> &doc_lens,
+                              const u32 embedding_count) {
+    std::unique_lock lock(rw_mutex_);
+
+    centroid_ids_ = centroid_ids;
+    packed_residuals_ = packed_residuals;
+    doc_lens_ = doc_lens;
+
+    // Rebuild offsets
+    doc_offsets_.resize(doc_lens_.size());
+    u32 offset = 0;
+    for (size_t i = 0; i < doc_lens_.size(); ++i) {
+        doc_offsets_[i] = offset;
+        offset += doc_lens_[i];
+    }
+}
+
+bool PlaidIndexChunk::CanAppend(const u32 additional_docs) const {
+    std::shared_lock lock(rw_mutex_);
+    return doc_lens_.size() + additional_docs <= DEFAULT_CHUNK_SIZE;
+}
+
+// ============================================================================
+// PlaidSegmentIndex Implementation
+// ============================================================================
+
+PlaidSegmentIndex::PlaidSegmentIndex(const SegmentID segment_id, const std::string &index_dir) : segment_id_(segment_id), index_dir_(index_dir) {
+    ivf_file_path_ = index_dir + "/ivf.bin";
+    meta_file_path_ = index_dir + "/meta.bin";
+}
+
+void PlaidSegmentIndex::Load() {
+    std::unique_lock lock(rw_mutex_);
+
+    // Load IVF
+    if (VirtualStore::Exists(ivf_file_path_)) {
+        global_ivf_.Load(ivf_file_path_);
+    }
+
+    // Load metadata and chunk list
+    if (VirtualStore::Exists(meta_file_path_)) {
+        auto [meta_file, meta_status] = VirtualStore::Open(meta_file_path_, FileAccessMode::kRead);
+        if (meta_status.ok()) {
+            u32 chunk_count;
+            std::ignore = meta_file->Read(&chunk_count, sizeof(chunk_count));
+            std::ignore = meta_file->Read(&next_doc_id_, sizeof(next_doc_id_));
+
+            chunks_.clear();
+            for (u32 i = 0; i < chunk_count; ++i) {
+                u32 chunk_id;
+                u32 start_doc_id;
+                std::ignore = meta_file->Read(&chunk_id, sizeof(chunk_id));
+                std::ignore = meta_file->Read(&start_doc_id, sizeof(start_doc_id));
+
+                auto chunk = std::make_unique<PlaidIndexChunk>(chunk_id, start_doc_id);
+                chunk->Load(GetChunkDir(chunk_id));
+                chunks_.push_back(std::move(chunk));
+            }
+        }
+    }
+}
+
+void PlaidSegmentIndex::Save() const {
+    std::shared_lock lock(rw_mutex_);
+
+    // Save IVF
+    global_ivf_.Save(ivf_file_path_);
+
+    // Save metadata
+    std::ignore = VirtualStore::MakeDirectory(index_dir_);
+    auto [meta_file, meta_status] = VirtualStore::Open(meta_file_path_, FileAccessMode::kWrite);
+    if (meta_status.ok()) {
+        u32 chunk_count = chunks_.size();
+        meta_file->Append(&chunk_count, sizeof(chunk_count));
+        meta_file->Append(&next_doc_id_, sizeof(next_doc_id_));
+
+        for (const auto &chunk : chunks_) {
+            u32 chunk_id = chunk->GetChunkID();
+            u32 start_doc_id = chunk->GetStartDocID();
+            meta_file->Append(&chunk_id, sizeof(chunk_id));
+            meta_file->Append(&start_doc_id, sizeof(start_doc_id));
+        }
+    }
+
+    // Save each chunk
+    for (const auto &chunk : chunks_) {
+        chunk->Save(GetChunkDir(chunk->GetChunkID()));
+    }
+}
+
+Status PlaidSegmentIndex::AppendData(const std::vector<u32> &centroid_ids,
+                                     const std::vector<u8> &packed_residuals,
+                                     const std::vector<u32> &doc_lens,
+                                     const u32 embedding_count,
+                                     ChunkID &out_chunk_id) {
+    std::unique_lock lock(rw_mutex_);
+
+    // Try to append to last chunk
+    if (!chunks_.empty() && chunks_.back()->CanAppend(doc_lens.size())) {
+        auto &last_chunk = chunks_.back();
+        u32 start_doc_id = last_chunk->GetEndDocID();
+
+        if (last_chunk->AppendData(centroid_ids, packed_residuals, doc_lens)) {
+            out_chunk_id = last_chunk->GetChunkID();
+
+            // Update IVF
+            global_ivf_.AddToPostingLists(start_doc_id, centroid_ids, doc_lens);
+
+            return Status::OK();
+        }
+    }
+
+    // Create new chunk
+    out_chunk_id = CreateNewChunk(centroid_ids, packed_residuals, doc_lens);
+    return Status::OK();
+}
+
+Status PlaidSegmentIndex::AppendToLastChunk(const std::vector<u32> &centroid_ids,
+                                            const std::vector<u8> &packed_residuals,
+                                            const std::vector<u32> &doc_lens,
+                                            ChunkID &out_chunk_id) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (chunks_.empty()) {
+        out_chunk_id = CreateNewChunk(centroid_ids, packed_residuals, doc_lens);
+        return Status::OK();
+    }
+
+    auto &last_chunk = chunks_.back();
+    u32 start_doc_id = last_chunk->GetEndDocID();
+
+    if (!last_chunk->AppendData(centroid_ids, packed_residuals, doc_lens)) {
+        out_chunk_id = CreateNewChunk(centroid_ids, packed_residuals, doc_lens);
+    } else {
+        out_chunk_id = last_chunk->GetChunkID();
+        global_ivf_.AddToPostingLists(start_doc_id, centroid_ids, doc_lens);
+    }
+
+    return Status::OK();
+}
+
+ChunkID
+PlaidSegmentIndex::CreateNewChunk(const std::vector<u32> &centroid_ids, const std::vector<u8> &packed_residuals, const std::vector<u32> &doc_lens) {
+    ChunkID chunk_id = chunks_.size();
+    u32 start_doc_id = next_doc_id_;
+
+    auto chunk = std::make_unique<PlaidIndexChunk>(chunk_id, start_doc_id);
+    chunk->AppendData(centroid_ids, packed_residuals, doc_lens);
+
+    chunks_.push_back(std::move(chunk));
+    next_doc_id_ += doc_lens.size();
+
+    // Update IVF
+    global_ivf_.AddToPostingLists(start_doc_id, centroid_ids, doc_lens);
+
+    return chunk_id;
+}
+
+Status PlaidSegmentIndex::RewriteLastChunk(const std::vector<u32> &new_centroid_ids,
+                                           const std::vector<u8> &new_packed_residuals,
+                                           const std::vector<u32> &new_doc_lens,
+                                           const u32 new_embedding_count) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (chunks_.empty()) {
+        return Status::UnexpectedError("No chunks to rewrite");
+    }
+
+    auto &last_chunk = chunks_.back();
+    last_chunk->Rewrite(new_centroid_ids, new_packed_residuals, new_doc_lens, new_embedding_count);
+
+    // Note: IVF update should be handled separately with full reindexing
+
+    return Status::OK();
+}
+
+u32 PlaidSegmentIndex::GetTotalDocCount() const {
+    std::shared_lock lock(rw_mutex_);
+    u32 total = 0;
+    for (const auto &chunk : chunks_) {
+        total += chunk->GetDocCount();
+    }
+    return total;
+}
+
+u32 PlaidSegmentIndex::GetTotalEmbeddingCount() const {
+    std::shared_lock lock(rw_mutex_);
+    u32 total = 0;
+    for (const auto &chunk : chunks_) {
+        total += chunk->GetEmbeddingCount();
+    }
+    return total;
+}
+
+std::vector<std::pair<ChunkID, u32>> PlaidSegmentIndex::GetChunkInfos() const {
+    std::shared_lock lock(rw_mutex_);
+    std::vector<std::pair<ChunkID, u32>> infos;
+    for (const auto &chunk : chunks_) {
+        infos.emplace_back(chunk->GetChunkID(), chunk->GetDocCount());
+    }
+    return infos;
+}
+
+std::string PlaidSegmentIndex::GetChunkDir(const ChunkID chunk_id) const { return index_dir_ + "/chunk_" + std::to_string(chunk_id); }
+
+PlaidQueryResultType PlaidSegmentIndex::Search(const f32 *query_ptr,
+                                               const u32 query_embedding_num,
+                                               const u32 top_n,
+                                               Bitmask &bitmask,
+                                               const BlockIndex *block_index,
+                                               const TxnTimeStamp begin_ts,
+                                               const u32 n_ivf_probe,
+                                               const f32 centroid_score_threshold,
+                                               const u32 n_doc_to_score,
+                                               const u32 n_full_scores) const {
+    std::shared_lock lock(rw_mutex_);
+
+    // Compute query-centroid scores using global IVF
+    auto query_centroid_scores = global_ivf_.ComputeQueryScores(query_ptr, query_embedding_num);
+
+    // Find top centroids per query token
+    const u32 n_centroids = global_ivf_.GetNCentroids();
+    std::vector<std::vector<u32>> token_top_centroids(query_embedding_num);
+
+    for (u32 i = 0; i < query_embedding_num; ++i) {
+        const f32 *scores = query_centroid_scores.get() + i * n_centroids;
+
+        // Collect centroids above threshold
+        for (u32 j = 0; j < n_centroids; ++j) {
+            if (scores[j] >= centroid_score_threshold) {
+                token_top_centroids[i].push_back(j);
+            }
+        }
+
+        // If too few, take top n_ivf_probe
+        if (token_top_centroids[i].size() < n_ivf_probe) {
+            std::vector<std::pair<f32, u32>> centroid_scores;
+            for (u32 j = 0; j < n_centroids; ++j) {
+                centroid_scores.emplace_back(scores[j], j);
+            }
+            std::partial_sort(centroid_scores.begin(),
+                              centroid_scores.begin() + std::min(n_ivf_probe, n_centroids),
+                              centroid_scores.end(),
+                              std::greater<>());
+            token_top_centroids[i].clear();
+            for (u32 j = 0; j < n_ivf_probe && j < n_centroids; ++j) {
+                token_top_centroids[i].push_back(centroid_scores[j].second);
+            }
+        }
+    }
+
+    // Get global candidates from IVF
+    std::vector<u32> all_centroids;
+    for (const auto &centroids : token_top_centroids) {
+        all_centroids.insert(all_centroids.end(), centroids.begin(), centroids.end());
+    }
+    auto global_candidates = global_ivf_.GetCandidates(all_centroids);
+
+    // Score candidates (simplified - real implementation needs proper scoring)
+    std::vector<std::pair<f32, u32>> doc_scores;
+    for (u32 global_doc_id : global_candidates) {
+        // Apply bitmask filter
+        if (!bitmask.IsTrue(global_doc_id)) {
+            continue;
+        }
+
+        // Find which chunk this doc belongs to
+        for (const auto &chunk : chunks_) {
+            if (global_doc_id >= chunk->GetStartDocID() && global_doc_id < chunk->GetEndDocID()) {
+                // Compute approximate score (simplified)
+                f32 score = 0.0f;
+                doc_scores.emplace_back(score, global_doc_id);
+                break;
+            }
+        }
+    }
+
+    // Sort and return top results
+    std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(top_n, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
+
+    const u32 result_count = std::min(top_n, (u32)doc_scores.size());
+    auto scores = std::make_unique_for_overwrite<f32[]>(result_count);
+    auto ids = std::make_unique_for_overwrite<u32[]>(result_count);
+
+    for (u32 i = 0; i < result_count; ++i) {
+        scores[i] = doc_scores[i].first;
+        ids[i] = doc_scores[i].second;
+    }
+
+    return std::make_tuple(result_count, std::move(scores), std::move(ids));
 }
 
 } // namespace infinity

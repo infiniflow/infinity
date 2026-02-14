@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2026 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import :status;
 import :logger;
 import :infinity_exception;
 import :local_file_handle;
+import :virtual_store;
 
 import column_def;
 import internal_types;
@@ -366,6 +367,271 @@ const ChunkIndexMetaInfo PlaidIndexInMem::GetChunkIndexMetaInfo() const {
     }
 
     return ChunkIndexMetaInfo{"", begin_row_id_, row_count_, embedding_count, 0};
+}
+
+// ============================================================================
+// Incremental Update Methods (next-plaid style)
+// ============================================================================
+
+bool PlaidIndexInMem::ShouldUseStartFromScratch() const {
+    std::shared_lock lock(rw_mutex_);
+    return row_count_ < START_FROM_SCRATCH_THRESHOLD;
+}
+
+bool PlaidIndexInMem::ShouldUseBufferMode(const u32 new_embeddings) const {
+    return new_embeddings < BUFFER_THRESHOLD;
+}
+
+int PlaidIndexInMem::GetUpdateMode(const u32 new_doc_count, const u32 new_embedding_count) const {
+    std::shared_lock lock(rw_mutex_);
+    
+    const u32 total_docs = row_count_ + new_doc_count;
+    
+    // Mode 0: Start-from-scratch
+    if (total_docs < START_FROM_SCRATCH_THRESHOLD) {
+        return 0;
+    }
+    
+    // Mode 1: Buffer mode
+    if (new_embedding_count < BUFFER_THRESHOLD) {
+        return 1;
+    }
+    
+    // Mode 2: Centroid expansion
+    return 2;
+}
+
+u32 PlaidIndexInMem::CalcOptimalNCentroids(const u32 n_embeddings) {
+    // next-plaid formula: 2^floor(log2(16*sqrt(N)))
+    f32 val = 16.0f * std::sqrt(static_cast<f32>(n_embeddings));
+    u32 k = 1u << static_cast<u32>(std::log2(val));
+    
+    // Clamp between 512 and 8192
+    return std::clamp(k, 512u, 8192u);
+}
+
+size_t PlaidIndexInMem::MemUsage() const {
+    std::shared_lock lock(rw_mutex_);
+    
+    size_t usage = 0;
+    
+    // Buffered embeddings
+    for (const auto &buf : buffered_embeddings_) {
+        usage += buffered_doc_lens_[&buf - &buffered_embeddings_[0]] * embedding_dimension_ * sizeof(f32);
+    }
+    
+    // Raw embeddings storage
+    usage += raw_embeddings_storage_.size() * sizeof(f32);
+    
+    // Buffer mode data
+    usage += buffer_centroid_ids_.size() * sizeof(u32);
+    usage += buffer_packed_residuals_.size();
+    
+    // Index memory
+    if (plaid_index_) {
+        usage += plaid_index_->MemUsage();
+    }
+    
+    return usage;
+}
+
+u32 PlaidIndexInMem::GetBufferedDocCount() const {
+    std::shared_lock lock(rw_mutex_);
+    return row_count_;
+}
+
+u32 PlaidIndexInMem::GetBufferedEmbeddingCount() const {
+    std::shared_lock lock(rw_mutex_);
+    return buffered_embedding_count_;
+}
+
+void PlaidIndexInMem::PrepareDumpData(std::vector<u32> &out_centroid_ids,
+                                       std::vector<u8> &out_packed_residuals,
+                                       std::vector<u32> &out_doc_lens,
+                                       u32 &out_embedding_count) {
+    std::unique_lock lock(rw_mutex_);
+    
+    if (!plaid_index_) {
+        out_embedding_count = 0;
+        return;
+    }
+    
+    // Get data from main index
+    // Note: This is a simplified version - real implementation needs proper data extraction
+    out_doc_lens.resize(plaid_index_->GetDocNum());
+    for (u32 i = 0; i < plaid_index_->GetDocNum(); ++i) {
+        out_doc_lens[i] = plaid_index_->GetDocLen(i);
+    }
+    
+    out_embedding_count = plaid_index_->GetTotalEmbeddingNum();
+    
+    // Centroid IDs and residuals would need to be extracted from PlaidIndex
+    // For now, use placeholder logic
+    out_centroid_ids.resize(out_embedding_count);
+    // ... fill centroid ids
+    
+    // Calculate packed residuals size
+    u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
+    out_packed_residuals.resize(out_embedding_count * packed_dim);
+    // ... fill residuals
+}
+
+Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
+    if (!segment_index) {
+        return Status::UnexpectedError("PlaidIndexInMem::DumpIncremental: segment_index is null");
+    }
+    
+    std::unique_lock lock(rw_mutex_);
+    
+    if (!is_built_.test() || !plaid_index_) {
+        LOG_INFO("PlaidIndexInMem::DumpIncremental: Index not built, skipping dump");
+        return Status::OK();
+    }
+    
+    // Determine update mode
+    const u32 new_docs = row_count_;
+    const u32 new_embeddings = buffered_embedding_count_;
+    const int mode = GetUpdateMode(new_docs, new_embeddings);
+    
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpIncremental: mode={}, new_docs={}, new_embeddings={}", 
+                         mode, new_docs, new_embeddings));
+    
+    lock.unlock();
+    
+    switch (mode) {
+        case 0:
+            return DumpStartFromScratch(segment_index, out_chunk_id);
+        case 1:
+            return DumpBufferMode(segment_index, out_chunk_id);
+        case 2:
+            return DumpCentroidExpansion(segment_index, out_chunk_id);
+        default:
+            return Status::UnexpectedError("Invalid update mode");
+    }
+}
+
+Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
+    LOG_INFO("PlaidIndexInMem::DumpStartFromScratch: Using start-from-scratch mode");
+    
+    std::unique_lock lock(rw_mutex_);
+    
+    // Collect all raw embeddings
+    std::vector<f32> all_embeddings;
+    std::vector<u32> all_doc_lens;
+    
+    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
+        u32 doc_len = buffered_doc_lens_[i];
+        all_doc_lens.push_back(doc_len);
+        
+        const f32 *emb_data = buffered_embeddings_[i].get();
+        all_embeddings.insert(all_embeddings.end(), 
+                              emb_data, 
+                              emb_data + doc_len * embedding_dimension_);
+    }
+    
+    if (all_embeddings.empty()) {
+        return Status::OK();
+    }
+    
+    // Calculate optimal centroids
+    u32 n_centroids = requested_n_centroids_;
+    if (n_centroids == 0) {
+        n_centroids = CalcOptimalNCentroids(all_embeddings.size() / embedding_dimension_);
+    }
+    
+    // Train centroids
+    auto *global_ivf = segment_index->GetGlobalIVF();
+    global_ivf->RebuildCentroids(all_embeddings.data(), 
+                                  all_embeddings.size() / embedding_dimension_,
+                                  embedding_dimension_,
+                                  n_centroids);
+    
+    // Encode all data
+    std::vector<u32> centroid_ids;
+    std::vector<u8> packed_residuals;
+    
+    // Encode embeddings (simplified)
+    for (u32 doc_len : all_doc_lens) {
+        for (u32 i = 0; i < doc_len; ++i) {
+            // Find nearest centroid
+            // TODO: Implement proper encoding using centroids from global IVF
+            (void)global_ivf;  // Mark as used for now
+            centroid_ids.push_back(0); // placeholder
+        }
+    }
+    
+    lock.unlock();
+    
+    // Append to segment
+    return segment_index->AppendData(centroid_ids, packed_residuals, all_doc_lens, 
+                                      all_embeddings.size() / embedding_dimension_,
+                                      out_chunk_id);
+}
+
+Status PlaidIndexInMem::DumpBufferMode(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
+    LOG_INFO("PlaidIndexInMem::DumpBufferMode: Using buffer mode");
+    
+    std::unique_lock lock(rw_mutex_);
+    
+    // Prepare data for dump
+    std::vector<u32> centroid_ids;
+    std::vector<u8> packed_residuals;
+    std::vector<u32> doc_lens;
+    u32 embedding_count = 0;
+    
+    PrepareDumpData(centroid_ids, packed_residuals, doc_lens, embedding_count);
+    
+    lock.unlock();
+    
+    if (doc_lens.empty()) {
+        return Status::OK();
+    }
+    
+    // Append to last chunk or create new chunk
+    return segment_index->AppendToLastChunk(centroid_ids, packed_residuals, doc_lens, out_chunk_id);
+}
+
+Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
+    LOG_INFO("PlaidIndexInMem::DumpCentroidExpansion: Using centroid expansion mode");
+    
+    std::unique_lock lock(rw_mutex_);
+    
+    // Collect new embeddings
+    std::vector<f32> new_embeddings;
+    for (size_t i = 0; i < buffered_embeddings_.size(); ++i) {
+        u32 doc_len = buffered_doc_lens_[i];
+        const f32 *emb_data = buffered_embeddings_[i].get();
+        new_embeddings.insert(new_embeddings.end(),
+                              emb_data,
+                              emb_data + doc_len * embedding_dimension_);
+    }
+    
+    if (new_embeddings.empty()) {
+        return Status::OK();
+    }
+    
+    lock.unlock();
+    
+    // Expand centroids in global IVF
+    auto *global_ivf = segment_index->GetGlobalIVF();
+    u32 n_new_centroids = global_ivf->ExpandCentroids(
+        new_embeddings.data(),
+        new_embeddings.size() / embedding_dimension_,
+        embedding_dimension_,
+        4
+    );
+    
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Added {} new centroids", n_new_centroids));
+    
+    // Now encode and append data with new centroids
+    std::vector<u32> centroid_ids;
+    std::vector<u8> packed_residuals;
+    std::vector<u32> doc_lens = buffered_doc_lens_;
+    
+    // Re-encode all data with expanded centroids
+    // ... encoding logic
+    
+    return segment_index->AppendToLastChunk(centroid_ids, packed_residuals, doc_lens, out_chunk_id);
 }
 
 } // namespace infinity
