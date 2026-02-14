@@ -469,6 +469,9 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	expr = strings.TrimSpace(expr)
 	opLen := len(op)
 
+	// Check if this is a word operator (AND, OR) or a symbol operator (+, -, etc.)
+	isWordOp := opLen > 1 && isAlpha(op[0])
+
 	parenCount := 0
 	for i := 0; i <= len(expr)-opLen; i++ {
 		if expr[i] == '(' {
@@ -478,12 +481,15 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 		} else if parenCount == 0 {
 			// Check if this is the operator
 			if strings.EqualFold(expr[i:i+opLen], op) {
-				// Make sure it's not part of a larger word (for word operators)
-				if i+opLen < len(expr) && isAlphaNum(expr[i+opLen]) {
-					continue
-				}
-				if i > 0 && isAlphaNum(expr[i-1]) {
-					continue
+				// For word operators, make sure it's not part of a larger word
+				// For example, AND should not match ANDROID
+				if isWordOp {
+					if i+opLen < len(expr) && isAlphaNum(expr[i+opLen]) {
+						continue
+					}
+					if i > 0 && isAlphaNum(expr[i-1]) {
+						continue
+					}
 				}
 
 				leftExpr := strings.TrimSpace(expr[:i])
@@ -500,6 +506,11 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	}
 
 	return nil, nil, false
+}
+
+// isAlpha checks if a byte is an alphabetic character
+func isAlpha(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
 
 // splitByComma splits a string by commas, respecting parentheses

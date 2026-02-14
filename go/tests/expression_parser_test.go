@@ -153,12 +153,68 @@ func TestParseExprArithmetic(t *testing.T) {
 		expr     string
 		expected string
 	}{
+		// Basic arithmetic with spaces
 		{"addition", "c1 + 1", "+(c1, 1)"},
 		{"subtraction", "c1 - 1", "-(c1, 1)"},
 		{"multiplication", "c1 * 2", "*(c1, 2)"},
 		{"division", "c1 / 2", "/(c1, 2)"},
 		{"modulo", "c1 % 2", "%(c1, 2)"},
+
+		// Arithmetic without spaces
+		{"addition_slim", "c1+1", "+(c1, 1)"},
+		{"subtraction_slim", "c1-1", "-(c1, 1)"},
+		{"multiplication_slim", "c1*2", "*(c1, 2)"},
+		{"division_slim", "c1/2", "/(c1, 2)"},
+		{"modulo_slim", "c1%2", "%(c1, 2)"},
+
+		// Multiple operations (right associative - parser behavior)
+		{"chain_addition", "c1 + c2 + c3", "+(c1, +(c2, c3))"},
+		{"chain_subtraction", "c1 - c2 - c3", "-(c1, -(c2, c3))"},
+		{"chain_multiplication", "c1 * c2 * c3", "*(c1, *(c2, c3))"},
+
+		// Mixed operations (precedence)
+		{"add_mul_precedence", "c1 + c2 * c3", "+(c1, *(c2, c3))"},
+		{"sub_div_precedence", "c1 - c2 / c3", "-(c1, /(c2, c3))"},
+		{"mul_add_precedence", "c1 * c2 + c3", "+(*(c1, c2), c3)"},
+		{"div_sub_precedence", "c1 / c2 - c3", "-(/(c1, c2), c3)"},
 		{"complex arithmetic", "c1 + c2 * 2", "+(c1, *(c2, 2))"},
+
+		// Operations with negative numbers
+		{"add_negative", "c1 + -5", "+(c1, -(5))"},
+		{"sub_negative", "c1 - -5", "-(c1, -(5))"},
+		{"mul_negative", "c1 * -2", "*(c1, -(2))"},
+		{"div_negative", "c1 / -2", "/(c1, -(2))"},
+
+		// Reverse order (number first)
+		{"add_reverse", "1 + c1", "+(1, c1)"},
+		{"sub_reverse", "10 - c1", "-(10, c1)"},
+		{"mul_reverse", "2 * c1", "*(2, c1)"},
+		{"div_reverse", "100 / c1", "/(100, c1)"},
+
+		// Multiple terms (right associative - parser behavior)
+		{"three_terms_add", "c1 + c2 + c3", "+(c1, +(c2, c3))"},
+		{"mixed_three_terms", "c1 + c2 - c3", "+(c1, -(c2, c3))"},
+		{"four_terms", "c1 + c2 + c3 + c4", "+(c1, +(c2, +(c3, c4)))"},
+
+		// Complex expressions
+		{"complex_nested", "c1 * c2 + c3 * c4", "+(*(c1, c2), *(c3, c4))"},
+		{"complex_nested2", "(c1 + c2) * (c3 - c4)", "*(+(c1, c2), -(c3, c4))"},
+		// Complex expression with all operators - parser groups right due to equal precedence
+		{"all_operators", "c1 + c2 - c3 * c4 / c5 % c6", "+(c1, -(c2, *(c3, /(c4, %(c5, c6)))))"},
+
+		// Arithmetic with floats
+		{"add_float", "c1 + 3.14", "+(c1, 3.140000)"},
+		{"mul_float", "c1 * 2.5", "*(c1, 2.500000)"},
+		{"float_arithmetic", "3.14 + 2.5", "+(3.140000, 2.500000)"},
+
+		// Multiple digits
+		{"large_numbers", "c1 + 12345", "+(c1, 12345)"},
+		{"large_mul", "c1 * 100", "*(c1, 100)"},
+
+		// Column to column operations
+		{"col_add_col", "c1 + c2", "+(c1, c2)"},
+		{"col_mul_col", "c1 * c2", "*(c1, c2)"},
+		{"col_div_col", "c1 / c2", "/(c1, c2)"},
 	}
 
 	for _, tt := range tests {

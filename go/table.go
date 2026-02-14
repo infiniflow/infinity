@@ -1124,6 +1124,16 @@ func (t *Table) ToResult() (interface{}, error) {
 		req.WhereExpr = filter
 	}
 
+	// Set group by list
+	if groupby := t.queryBuilder.GetGroupBy(); groupby != nil {
+		req.GroupByList = &groupby
+	}
+
+	// Set having expression
+	if having := t.queryBuilder.GetHaving(); having != nil {
+		req.HavingExpr = having
+	}
+
 	// Set limit expression
 	if limit := t.queryBuilder.GetLimit(); limit != nil {
 		req.LimitExpr = limit
@@ -1207,6 +1217,16 @@ func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
 	// Set where expression (filter)
 	if filter := t.queryBuilder.GetFilter(); filter != nil {
 		req.WhereExpr = filter
+	}
+
+	// Set group by list
+	if groupby := t.queryBuilder.GetGroupBy(); groupby != nil {
+		req.GroupByList = &groupby
+	}
+
+	// Set having expression
+	if having := t.queryBuilder.GetHaving(); having != nil {
+		req.HavingExpr = having
 	}
 
 	// Set limit expression
