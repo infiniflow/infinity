@@ -175,6 +175,7 @@ template struct FileWorkerMap<DataFileWorker>;
 template struct FileWorkerMap<EMVBIndexFileWorker>;
 template struct FileWorkerMap<HnswFileWorker>;
 template struct FileWorkerMap<IVFIndexFileWorker>;
+template struct FileWorkerMap<PlaidIndexFileWorker>;
 template struct FileWorkerMap<RawFileWorker>;
 template struct FileWorkerMap<SecondaryIndexFileWorker>;
 template struct FileWorkerMap<VarFileWorker>;

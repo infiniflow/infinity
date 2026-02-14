@@ -148,6 +148,12 @@ export {
     constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
     constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
 
+    // default plaid index parameters
+    constexpr u32 PLAID_N_IVF_PROBE = 8;
+    constexpr f32 PLAID_CENTROID_SCORE_THRESHOLD = 0.5f;
+    constexpr u32 PLAID_N_DOC_TO_SCORE_FACTOR = 100;
+    constexpr u32 PLAID_N_FULL_SCORES_FACTOR = 10;
+
     // default diskann parameter
     constexpr size_t DISKANN_R = 16;
     constexpr size_t DISKANN_L = 200;
