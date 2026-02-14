@@ -191,5 +191,5 @@ func TestSetConfig(t *testing.T) {
 		}
 	}
 
-	t.Logf("Test %s completed successfully")
+	t.Logf("Test completed successfully")
 }

@@ -1686,8 +1686,45 @@ func float16ToFloat32(bits uint16) float32 {
 }
 
 // parseStringVector parses string vector from bytes
+// It first tries length-prefixed format (4-byte little-endian length + string bytes),
+// then falls back to null terminator separated format for backward compatibility
 func parseStringVector(data []byte) []string {
-	// Simple implementation: split by null terminator
+	result := make([]string, 0)
+	offset := 0
+
+	// First, try length-prefixed parsing
+	for offset < len(data) {
+		if offset+4 > len(data) {
+			break
+		}
+
+		// Read 4-byte length prefix (little-endian)
+		length := int(data[offset]) | int(data[offset+1])<<8 |
+			int(data[offset+2])<<16 | int(data[offset+3])<<24
+		offset += 4
+
+		if offset+length > len(data) {
+			// Invalid length, fallback to null terminator separated format
+			return parseStringVectorFallback(data)
+		}
+
+		// Extract string
+		strBytes := data[offset : offset+length]
+		result = append(result, string(strBytes))
+		offset += length
+	}
+
+	// If no strings parsed and data is not empty, fallback to null terminator format
+	if len(result) == 0 && len(data) > 0 {
+		return parseStringVectorFallback(data)
+	}
+
+	return result
+}
+
+// parseStringVectorFallback parses string vector using null terminator separator
+// This is for backward compatibility
+func parseStringVectorFallback(data []byte) []string {
 	result := make([]string, 0)
 	start := 0
 	for i, b := range data {

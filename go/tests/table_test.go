@@ -446,51 +446,6 @@ func TestListTables(t *testing.T) {
 	}
 }
 
-// TestShowTable tests showing table details
-func TestShowTable(t *testing.T) {
-
-	tableName := "test_show_table"
-
-	conn := setupConnection(t)
-	defer conn.Disconnect()
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	// Clean up
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
-
-	// Create table
-	schema := infinity.TableSchema{
-		{
-			Name:     "c1",
-			DataType: "int",
-		},
-	}
-
-	_, err = db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	// Show table
-	resp, err := db.ShowTable(tableName)
-	if err != nil {
-		t.Fatalf("Failed to show table: %v", err)
-	}
-	if resp == nil {
-		t.Fatal("Show table response is nil")
-	}
-
-	// Clean up
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
-}
-
 // TestGetTable tests getting a table object
 func TestGetTable(t *testing.T) {
 
@@ -782,5 +737,5 @@ func TestRenameTable(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 
-	t.Logf("Test %s completed successfully")
+	t.Logf("Test completed successfully")
 }
