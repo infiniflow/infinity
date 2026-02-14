@@ -1444,6 +1444,34 @@ func ParseConstantValue(value interface{}) (*thriftapi.ConstantExpr, error) {
 				expr.F64ArrayValue[i] = val
 			}
 		}
+	case Array:
+		// Handle Array type - convert to CurlyBracketsArray
+		expr.LiteralType = thriftapi.LiteralType_CurlyBracketsArray
+		children := make([]*thriftapi.ConstantExpr, 0, len(v.Elements))
+		for _, elem := range v.Elements {
+			childExpr, err := ParseConstantValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			children = append(children, childExpr)
+		}
+		expr.CurlyBracketsArray = children
+	case *Array:
+		// Handle pointer to Array
+		if v == nil {
+			expr.LiteralType = thriftapi.LiteralType_Null
+		} else {
+			expr.LiteralType = thriftapi.LiteralType_CurlyBracketsArray
+			children := make([]*thriftapi.ConstantExpr, 0, len(v.Elements))
+			for _, elem := range v.Elements {
+				childExpr, err := ParseConstantValue(elem)
+				if err != nil {
+					return nil, err
+				}
+				children = append(children, childExpr)
+			}
+			expr.CurlyBracketsArray = children
+		}
 	default:
 		// Use reflection for complex types
 		rv := reflect.ValueOf(value)
