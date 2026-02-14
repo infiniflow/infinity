@@ -499,6 +499,23 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             FileWorker::Write(static_cast<EMVBIndexFileWorker *>(index_file_worker), std::span{data_ptr.get(), 1});
             break;
         }
+        case IndexType::kPLAID: {
+            SegmentMeta segment_meta(segment_id, table_meta);
+            std::shared_ptr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+
+            std::shared_ptr<PlaidIndex> data_ptr;
+            FileWorker::Read(static_cast<PlaidIndexFileWorker *>(index_file_worker), data_ptr);
+            data_ptr->BuildPlaidIndex(base_rowid, row_cnt, segment_meta, column_def);
+            FileWorker::Write(static_cast<PlaidIndexFileWorker *>(index_file_worker), std::span{data_ptr.get(), 1});
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1441,37 +1458,37 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         // Create in-memory PLAID index and build it from segment data
         auto mem_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
         mem_index->SetSegmentID("", "", segment_index_meta.segment_id());
-        
+
         // Read all blocks and insert data
         auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         if (!block_status.ok()) {
             return block_status;
         }
-        
+
         ColumnID column_id = column_def->id();
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta);
             ColumnMeta column_meta(column_id, block_meta);
-            
+
             size_t row_cnt = 0;
             auto [block_row_cnt, row_status] = block_meta.GetRowCnt1();
             if (!row_status.ok()) {
                 return row_status;
             }
             row_cnt = block_row_cnt;
-            
+
             ColumnVector col;
             status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
-            
+
             mem_index->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
         }
-        
+
         // Build the index
         mem_index->BuildIndex(segment_meta);
-        
+
         // Dump to file
         mem_index->Dump(index_file_worker);
     }
@@ -2150,7 +2167,8 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     auto mem_index = segment_index_meta.PopMemIndex();
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
+    if (mem_index == nullptr ||
+        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
