@@ -477,7 +477,9 @@ void PlaidIndexInMem::PrepareDumpData(std::vector<u32> &out_centroid_ids,
     }
 
     LOG_INFO(fmt::format("PlaidIndexInMem::PrepareDumpData: Prepared {} docs, {} embeddings, {} bytes of residuals",
-                         out_doc_lens.size(), out_embedding_count, packed_residuals_size));
+                         out_doc_lens.size(),
+                         out_embedding_count,
+                         packed_residuals_size));
 }
 
 Status PlaidIndexInMem::DumpIncremental(PlaidSegmentIndex *segment_index, ChunkID &out_chunk_id) {
@@ -610,7 +612,9 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
     lock.unlock();
 
     LOG_INFO(fmt::format("PlaidIndexInMem::DumpStartFromScratch: Encoded {} embeddings with {} centroids, {} bits",
-                         total_embeddings, actual_n_centroids, nbits_));
+                         total_embeddings,
+                         actual_n_centroids,
+                         nbits_));
 
     // Append to segment
     return segment_index->AppendData(centroid_ids, packed_residuals_vec, all_doc_lens, static_cast<u32>(total_embeddings), out_chunk_id);
@@ -730,8 +734,7 @@ Status PlaidIndexInMem::DumpCentroidExpansion(PlaidSegmentIndex *segment_index, 
     // Convert to vector
     std::vector<u8> packed_residuals_vec(packed_residuals.get(), packed_residuals.get() + total_embeddings * packed_dim);
 
-    LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Re-encoded {} embeddings with {} centroids",
-                         total_embeddings, actual_n_centroids));
+    LOG_INFO(fmt::format("PlaidIndexInMem::DumpCentroidExpansion: Re-encoded {} embeddings with {} centroids", total_embeddings, actual_n_centroids));
 
     // Rewrite last chunk with re-encoded data
     return segment_index->AppendData(centroid_ids, packed_residuals_vec, all_doc_lens, static_cast<u32>(total_embeddings), out_chunk_id);

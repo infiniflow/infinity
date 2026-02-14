@@ -1218,9 +1218,9 @@ void PlaidGlobalIVF::AddToPostingLists(const u32 doc_id_start, const std::vector
 }
 
 void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id,
-                                                 const u32 start_doc_id,
-                                                 const std::vector<u32> &doc_lens,
-                                                 const std::vector<u32> &centroid_ids) {
+                                                const u32 start_doc_id,
+                                                const std::vector<u32> &doc_lens,
+                                                const std::vector<u32> &centroid_ids) {
     std::unique_lock lock(rw_mutex_);
 
     // Calculate the range of doc_ids for this chunk
@@ -1232,12 +1232,11 @@ void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id,
 
     // Remove old entries for this chunk from all posting lists
     for (auto &posting_list : ivf_lists_) {
-        posting_list.erase(std::remove_if(posting_list.begin(),
-                                          posting_list.end(),
-                                          [chunk_start_doc, chunk_end_doc](u32 doc_id) {
-                                              return doc_id >= chunk_start_doc && doc_id < chunk_end_doc;
-                                          }),
-                           posting_list.end());
+        posting_list.erase(
+            std::remove_if(posting_list.begin(),
+                           posting_list.end(),
+                           [chunk_start_doc, chunk_end_doc](u32 doc_id) { return doc_id >= chunk_start_doc && doc_id < chunk_end_doc; }),
+            posting_list.end());
     }
 
     // Add new entries
@@ -1261,7 +1260,11 @@ void PlaidGlobalIVF::UpdatePostingListsForChunk(const u32 chunk_id,
     }
 
     LOG_INFO(fmt::format("PlaidGlobalIVF::UpdatePostingListsForChunk: Updated chunk {} (doc range: {}-{}), {} docs, {} embeddings",
-                         chunk_id, chunk_start_doc, chunk_end_doc, doc_lens.size(), centroid_ids.size()));
+                         chunk_id,
+                         chunk_start_doc,
+                         chunk_end_doc,
+                         doc_lens.size(),
+                         centroid_ids.size()));
 }
 
 std::unique_ptr<f32[]> PlaidGlobalIVF::ComputeQueryScores(const f32 *query_ptr, const u32 query_len) const {
