@@ -332,17 +332,16 @@ PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_pt
     // Memory barrier to ensure we see the latest is_built_ value
     std::atomic_thread_fence(std::memory_order_acquire);
 
-    // Double-checked locking pattern for safe concurrent access
+    // If index is not built, return data range for exhaustive search
     if (!is_built_.test()) {
-        // Return empty result if index not built
-        return std::make_tuple(0, nullptr, nullptr);
+        return std::make_pair(begin_row_id_.segment_offset_, row_count_);
     }
 
     std::shared_lock lock(rw_mutex_);
 
     // Second check after acquiring lock
     if (!is_built_.test() || !plaid_index_) {
-        return std::make_tuple(0, nullptr, nullptr);
+        return std::make_pair(begin_row_id_.segment_offset_, row_count_);
     }
 
     return plaid_index_->SearchWithBitmask(query_ptr,

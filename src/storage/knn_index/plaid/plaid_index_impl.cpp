@@ -490,12 +490,14 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
     }
 
     // Step 2: Collect candidates with bitmask filtering
+    // Note: bitmask is segment-level with indices 0 to segment_row_count-1
+    // doc_id is already a segment-relative index (0 to n_docs_-1)
     std::unordered_set<u32> candidate_set;
     for (const auto &centroids : token_top_centroids) {
         for (u32 cid : centroids) {
             for (u32 doc_id : ivf_lists_[cid]) {
-                // Apply bitmask filter
-                if (!bitmask.IsTrue(doc_id + start_segment_offset))
+                // Apply bitmask filter - doc_id is already segment-relative
+                if (!bitmask.IsTrue(doc_id))
                     continue;
                 candidate_set.insert(doc_id);
             }

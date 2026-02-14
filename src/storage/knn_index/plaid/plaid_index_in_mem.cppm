@@ -32,7 +32,8 @@ struct ChunkIndexMetaInfo;
 class MetaCache;
 class PlaidIndexFileWorker;
 
-using PlaidInMemQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>;
+// Result type: either search results (when index is built) or data range (for exhaustive search when not built)
+using PlaidInMemQueryResultType = std::variant<std::pair<u32, u32>, std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>;
 
 // Forward declarations
 class PlaidIndexFileWorker;

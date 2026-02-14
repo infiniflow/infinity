@@ -335,7 +335,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         }
 
         bool has_some_result = false;
-        Bitmask segment_bitmask(segment_row_count);  // Initialize with correct row count
+        Bitmask segment_bitmask(segment_row_count); // Initialize with correct row count
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
             segment_bitmask.SetAllTrue();
@@ -428,7 +428,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             // 1b. in mem index - PLAID
             else if (plaid_index_in_mem) {
-                const auto [result_num, score_ptr, row_id_ptr] =
+                const auto result =
                     plaid_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
                                                           calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                           topn_,
@@ -439,9 +439,55 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                           index_options_->plaid_centroid_score_threshold_,
                                                           index_options_->plaid_n_doc_to_score_,
                                                           index_options_->plaid_n_full_scores_);
-                for (u32 i = 0; i < result_num; ++i) {
-                    function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
-                }
+                std::visit(
+                    Overload{[segment_id, &function_data](const std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> &index_result) {
+                                 const auto &[result_num, score_ptr, row_id_ptr] = index_result;
+                                 for (u32 i = 0; i < result_num; ++i) {
+                                     function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                                 }
+                             },
+                             [this, begin_ts, commit_ts, segment_id, &function_data, &segment_meta](const std::pair<u32, u32> &in_mem_result) {
+                                 const auto &[start_offset, total_row_count] = in_mem_result;
+                                 BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
+                                 BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
+                                 u32 row_leftover = total_row_count;
+                                 do {
+                                     const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
+                                     Bitmask block_bitmask;
+                                     if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
+                                         BlockMeta block_meta(block_id, *segment_meta);
+                                         Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                                         if (!status.ok()) {
+                                             UnrecoverableError(status.message());
+                                         }
+                                         ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                         ColumnVector column_vector;
+                                         status = NewCatalog::GetColumnVector(column_meta,
+                                                                              column_meta.get_column_def(),
+                                                                              row_to_read,
+                                                                              ColumnVectorMode::kReadOnly,
+                                                                              column_vector);
+                                         if (!status.ok()) {
+                                             UnrecoverableError(status.message());
+                                         }
+
+                                         // output score will always be float type
+                                         CalculateScoreOnColumnVector(column_vector,
+                                                                      segment_id,
+                                                                      block_id,
+                                                                      block_offset,
+                                                                      row_to_read,
+                                                                      block_bitmask,
+                                                                      *(this->calc_match_tensor_expr_),
+                                                                      function_data);
+                                     }
+                                     // prepare next block
+                                     row_leftover -= row_to_read;
+                                     ++block_id;
+                                     block_offset = 0;
+                                 } while (row_leftover);
+                             }},
+                    result);
             }
             // 2. chunk index
             auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
