@@ -561,12 +561,8 @@ std::shared_ptr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
 
     std::size_t append_row_count = 0;
     for (const auto &input_block : append_blocks_) {
-        std::shared_ptr<WalCmd> wal_append_command = std::make_shared<WalCmdAppendV2>(db_name_,
-                                                                                      db_id_str_,
-                                                                                      table_name_,
-                                                                                      table_id_str_,
-                                                                                      input_block.row_ranges_,
-                                                                                      input_block.block_);
+        std::shared_ptr<WalCmd> wal_append_command =
+            std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, input_block.row_ranges_, input_block.block_);
         wal_entry->cmds_.push_back(wal_append_command);
         append_row_count += input_block.block_->row_count();
     }

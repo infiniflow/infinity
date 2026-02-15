@@ -28,6 +28,7 @@ import :status;
 namespace infinity {
 
 TxnAllocator::TxnAllocator(Storage *storage) : storage_(storage) {}
+
 TxnAllocator::~TxnAllocator() = default;
 
 void TxnAllocator::SetSystemCache(SystemCache *system_cache) { system_cache_ = system_cache; }
@@ -83,16 +84,17 @@ void TxnAllocator::Process() {
                     }
                     case TransactionType::kUpdate: {
                         UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
-                        for (auto& input_block: txn_store->append_blocks_) {
+                        for (auto &input_block : txn_store->append_blocks_) {
                             std::size_t block_size = input_block.block_->row_count();
                             LOG_TRACE(fmt::format("TxnAllocator: Update txn {}: db: {}, {}, table: {}, {}, data size: {}",
-                                          txn->TxnID(),
-                                          txn_store->db_name_,
-                                          txn_store->db_id_,
-                                          txn_store->table_name_,
-                                          txn_store->table_id_,
-                                          block_size));
-                            std::shared_ptr<AppendPrepareInfo> append_info = system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, block_size, txn->TxnID());
+                                                  txn->TxnID(),
+                                                  txn_store->db_name_,
+                                                  txn_store->db_id_,
+                                                  txn_store->table_name_,
+                                                  txn_store->table_id_,
+                                                  block_size));
+                            std::shared_ptr<AppendPrepareInfo> append_info =
+                                system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, block_size, txn->TxnID());
                             input_block.row_ranges_ = append_info->ranges_;
                         }
                         break;
