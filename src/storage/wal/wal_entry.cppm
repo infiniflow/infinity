@@ -952,7 +952,7 @@ export class WalEntryIterator {
 public:
     static std::unique_ptr<WalEntryIterator> Make(const std::string &wal_path, bool is_backward);
 
-    WalEntryIterator(const std::string& file_name, std::vector<char> &&buf, size_t wal_size, bool is_backward)
+    WalEntryIterator(const std::string &file_name, std::vector<char> &&buf, size_t wal_size, bool is_backward)
         : file_name_(file_name), is_backward_(is_backward), off_(0), buf_(std::move(buf)), wal_size_(wal_size) {
         if (is_backward_) {
             off_ = buf_.size();
