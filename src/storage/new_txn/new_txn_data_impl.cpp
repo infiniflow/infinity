@@ -596,15 +596,21 @@ Status NewTxn::Update(const std::string &db_name,
         update_txn_store->table_name_ = table_name;
         update_txn_store->table_id_str_ = table_meta->table_id_str();
         update_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
-        update_txn_store->input_blocks_.emplace_back(input_block);
-        // update_txn_store->row_ranges_ will be populated after conflict check
+        UpdateAppendBlock update_append_block;
+        update_append_block.block_ = input_block;
+        update_txn_store->append_blocks_.emplace_back(update_append_block);
+        // update_txn_store->append_blocks_.row_ranges_ will be populated after conflict check
         update_txn_store->row_ids_ = row_ids;
+        update_txn_store->append_count_ = input_block->row_count();
     } else {
         UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
-        update_txn_store->input_blocks_.emplace_back(input_block);
-        // append_txn_store->row_ranges_ will be populated after conflict check
+        UpdateAppendBlock update_append_block;
+        update_append_block.block_ = input_block;
+        update_txn_store->append_blocks_.emplace_back(update_append_block);
+        // update_txn_store->append_blocks_.row_ranges_ will be populated after conflict check
         update_txn_store->row_ids_.reserve(update_txn_store->row_ids_.size() + row_ids.size());
         update_txn_store->row_ids_.insert(update_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
+        update_txn_store->append_count_ += input_block->row_count();
     }
 
     std::string operation_msg =

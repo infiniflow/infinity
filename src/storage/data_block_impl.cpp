@@ -348,7 +348,9 @@ std::shared_ptr<DataBlock> DataBlock::ReadAdv(const char *&ptr, i32 maxbytes) {
     for (int i = 0; i < column_count; i++) {
         maxbytes = ptr_end - ptr;
         if (maxbytes <= 0) {
-            UnrecoverableError("ptr goes out of range when reading DataBlock");
+            std::string error_message = fmt::format("Fail to read data block column: {}", i);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         std::shared_ptr<ColumnVector> column_vector = ColumnVector::ReadAdv(ptr, maxbytes);
         column_vectors.push_back(column_vector);
@@ -358,7 +360,9 @@ std::shared_ptr<DataBlock> DataBlock::ReadAdv(const char *&ptr, i32 maxbytes) {
     block->Finalize();
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading DataBlock");
+        std::string error_message = "Fail to read data block column: end";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return block;
 }
