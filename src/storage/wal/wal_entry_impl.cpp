@@ -2274,7 +2274,12 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
         header->checksum_ = 0;
         DeferFn defer([&] { header->checksum_ = entry->checksum_; });
         if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_); entry->checksum_ != checksum2) {
-            std::string error_msg = fmt::format("Command: {}, txn_id: {}, entry_size: {} checksum mismatch, expected: {}, actual: {}", WalCmd::WalCommandTypeToString(entry->cmds_[0]->GetType()), entry->txn_id_, entry->size_, entry->checksum_, checksum2);
+            std::string error_msg = fmt::format("Command: {}, txn_id: {}, entry_size: {} checksum mismatch, expected: {}, actual: {}",
+                                                WalCmd::WalCommandTypeToString(entry->cmds_[0]->GetType()),
+                                                entry->txn_id_,
+                                                entry->size_,
+                                                entry->checksum_,
+                                                checksum2);
             LOG_WARN(error_msg);
             return nullptr;
         }
@@ -2518,7 +2523,12 @@ std::shared_ptr<WalEntry> WalEntryIterator::Next() {
         assert(off_ > 0);
         const i32 entry_size = ReadBuf<i32>(buf_.data() + off_ - sizeof(i32));
         if ((size_t)entry_size > off_) {
-            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}", file_name_, buf_.size(), entry_size, off_, is_backward_));
+            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}",
+                                 file_name_,
+                                 buf_.size(),
+                                 entry_size,
+                                 off_,
+                                 is_backward_));
             return nullptr;
         }
         const char *ptr = buf_.data() + off_ - (size_t)entry_size;
@@ -2531,7 +2541,12 @@ std::shared_ptr<WalEntry> WalEntryIterator::Next() {
         assert(off_ < buf_.size());
         const i32 entry_size = ReadBuf<i32>(buf_.data() + off_);
         if (off_ + (size_t)entry_size > buf_.size()) {
-            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}", file_name_, buf_.size(), entry_size, off_, is_backward_));
+            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}",
+                                 file_name_,
+                                 buf_.size(),
+                                 entry_size,
+                                 off_,
+                                 is_backward_));
             return nullptr;
         }
         const char *ptr = buf_.data() + off_;
