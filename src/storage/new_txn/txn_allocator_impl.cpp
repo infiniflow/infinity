@@ -83,17 +83,18 @@ void TxnAllocator::Process() {
                     }
                     case TransactionType::kUpdate: {
                         UpdateTxnStore *txn_store = static_cast<UpdateTxnStore *>(base_txn_store);
-                        size_t row_count = txn_store->RowCount();
-                        LOG_TRACE(fmt::format("TxnAllocator: Update txn {}: db: {}, {}, table: {}, {}, data size: {}",
-                                              txn->TxnID(),
-                                              txn_store->db_name_,
-                                              txn_store->db_id_,
-                                              txn_store->table_name_,
-                                              txn_store->table_id_,
-                                              row_count));
-                        std::shared_ptr<AppendPrepareInfo> append_info =
-                            system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, row_count, txn->TxnID());
-                        txn_store->row_ranges_ = append_info->ranges_;
+                        for (auto& input_block: txn_store->append_blocks_) {
+                            std::size_t block_size = input_block.block_->row_count();
+                            LOG_TRACE(fmt::format("TxnAllocator: Update txn {}: db: {}, {}, table: {}, {}, data size: {}",
+                                          txn->TxnID(),
+                                          txn_store->db_name_,
+                                          txn_store->db_id_,
+                                          txn_store->table_name_,
+                                          txn_store->table_id_,
+                                          block_size));
+                            std::shared_ptr<AppendPrepareInfo> append_info = system_cache_->PrepareAppend(txn_store->db_id_, txn_store->table_id_, block_size, txn->TxnID());
+                            input_block.row_ranges_ = append_info->ranges_;
+                        }
                         break;
                     }
                     default: {
