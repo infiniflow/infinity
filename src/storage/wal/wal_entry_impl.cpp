@@ -2274,6 +2274,13 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
         header->checksum_ = 0;
         DeferFn defer([&] { header->checksum_ = entry->checksum_; });
         if (const u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_); entry->checksum_ != checksum2) {
+            std::string error_msg = fmt::format("Command: {}, txn_id: {}, entry_size: {} checksum mismatch, expected: {}, actual: {}",
+                                                WalCmd::WalCommandTypeToString(entry->cmds_[0]->GetType()),
+                                                entry->txn_id_,
+                                                entry->size_,
+                                                entry->checksum_,
+                                                checksum2);
+            LOG_WARN(error_msg);
             return nullptr;
         }
     }
@@ -2282,7 +2289,7 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            std::string error_msg = "ptr goes out of range when reading WalEntry";
+            std::string error_msg = "To get WAL command: ptr goes out of range when reading WalEntry";
             LOG_WARN(error_msg);
             return nullptr;
         }
@@ -2292,7 +2299,7 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        std::string error_msg = "ptr goes out of range when reading WalEntry";
+        std::string error_msg = "Check WAL entry tailor: ptr goes out of range when reading WalEntry";
         LOG_WARN(error_msg);
         return nullptr;
     }
@@ -2508,7 +2515,7 @@ std::unique_ptr<WalEntryIterator> WalEntryIterator::Make(const std::string &wal_
     ifs.read(buf.data(), wal_size);
     ifs.close();
 
-    return std::make_unique<WalEntryIterator>(std::move(buf), wal_size, is_backward);
+    return std::make_unique<WalEntryIterator>(wal_path, std::move(buf), wal_size, is_backward);
 }
 
 std::shared_ptr<WalEntry> WalEntryIterator::Next() {
@@ -2516,6 +2523,12 @@ std::shared_ptr<WalEntry> WalEntryIterator::Next() {
         assert(off_ > 0);
         const i32 entry_size = ReadBuf<i32>(buf_.data() + off_ - sizeof(i32));
         if ((size_t)entry_size > off_) {
+            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}",
+                                 file_name_,
+                                 buf_.size(),
+                                 entry_size,
+                                 off_,
+                                 is_backward_));
             return nullptr;
         }
         const char *ptr = buf_.data() + off_ - (size_t)entry_size;
@@ -2528,6 +2541,12 @@ std::shared_ptr<WalEntry> WalEntryIterator::Next() {
         assert(off_ < buf_.size());
         const i32 entry_size = ReadBuf<i32>(buf_.data() + off_);
         if (off_ + (size_t)entry_size > buf_.size()) {
+            LOG_WARN(fmt::format("WAL error: file {} size: {} < entry size: {} + off: {}, backward: {}",
+                                 file_name_,
+                                 buf_.size(),
+                                 entry_size,
+                                 off_,
+                                 is_backward_));
             return nullptr;
         }
         const char *ptr = buf_.data() + off_;
@@ -2567,15 +2586,17 @@ bool WalEntryIterator::IsGood() const { return (is_backward_ && off_ == 0) || (!
 
 WalListIterator::WalListIterator(const std::vector<std::string> &wal_list) {
     assert(!wal_list.empty());
-    for (size_t i = 0; i < wal_list.size(); ++i) {
+    u64 wal_file_count = wal_list.size();
+    for (size_t i = 0; i < wal_file_count; ++i) {
         wal_list_.push_back(wal_list[i]);
     }
-    PurgeBadEntriesAfterLatestCheckpoint();
-    if (!wal_list_.empty())
+    PurgeBadEntriesAfterLatestCheckpoint(wal_list);
+    if (!wal_list_.empty()) {
         iter_ = WalEntryIterator::Make(wal_list_.front(), true);
+    }
 }
 
-void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
+void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint(const std::vector<std::string> &wal_list) {
     bool found_checkpoint = false;
     size_t file_num = 0;
     auto it = wal_list_.begin();

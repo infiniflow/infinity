@@ -952,8 +952,8 @@ export class WalEntryIterator {
 public:
     static std::unique_ptr<WalEntryIterator> Make(const std::string &wal_path, bool is_backward);
 
-    WalEntryIterator(std::vector<char> &&buf, size_t wal_size, bool is_backward)
-        : is_backward_(is_backward), off_(0), buf_(std::move(buf)), wal_size_(wal_size) {
+    WalEntryIterator(const std::string &file_name, std::vector<char> &&buf, size_t wal_size, bool is_backward)
+        : file_name_(file_name), is_backward_(is_backward), off_(0), buf_(std::move(buf)), wal_size_(wal_size) {
         if (is_backward_) {
             off_ = buf_.size();
         }
@@ -970,6 +970,7 @@ public:
     bool IsGood() const;
 
 private:
+    std::string file_name_{};
     bool is_backward_{};
     size_t off_{}; // offset of last returned entry if is_backward, otherwise offset of the entry needs to be returned
     std::vector<char> buf_{};
@@ -987,7 +988,7 @@ public:
 
 private:
     // Locate the latest checkpoint entry, and purge bad entries after it.
-    void PurgeBadEntriesAfterLatestCheckpoint();
+    void PurgeBadEntriesAfterLatestCheckpoint(const std::vector<std::string> &wal_list);
     std::list<std::string> wal_list_;
     std::unique_ptr<WalEntryIterator> iter_;
 };
