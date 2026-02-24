@@ -2796,7 +2796,7 @@ void ColumnVector::AppendVarcharInner(std::span<const char> data, VarcharT &varc
 }
 
 void ColumnVector::AppendVarcharInner(std::span<const char> data, size_t dst_off) {
-    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_.get())[dst_off];
+    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_)[dst_off];
     AppendVarcharInner(data, varchar);
 }
 
@@ -2817,7 +2817,7 @@ std::span<const char> ColumnVector::GetVarcharInner(const VarcharT &varchar) con
 }
 
 std::span<const char> ColumnVector::GetVarchar(size_t index) const {
-    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_.get())[index];
+    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_)[index];
     return GetVarcharInner(varchar);
 }
 

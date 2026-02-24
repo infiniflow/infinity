@@ -70,7 +70,8 @@ public:
 
     void SetupTestTable() {
         using namespace infinity;
-        NewTxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+        [[maybe_unused]] auto fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
+        NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
         db_name = std::make_shared<std::string>("default_db");
         column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
