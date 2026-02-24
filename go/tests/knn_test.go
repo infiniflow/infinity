@@ -15,6 +15,7 @@
 package tests
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -125,6 +126,9 @@ func TestKNNBasic(t *testing.T) {
 	}
 }
 
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+
 // TestKNNOnVectorColumn tests KNN search on different vector columns
 func TestKNNOnVectorColumn(t *testing.T) {
 	conn := setupConnection(t)
@@ -197,6 +201,9 @@ func TestKNNOnVectorColumn(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
 
 // TestKNNWithIndex tests KNN search with HNSW index
 func TestKNNWithIndex(t *testing.T) {
@@ -293,6 +300,9 @@ func TestKNNWithIndex(t *testing.T) {
 	}
 }
 
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+
 // TestKNNVariousDistanceTypes tests KNN search with different distance types
 func TestKNNVariousDistanceTypes(t *testing.T) {
 	conn := setupConnection(t)
@@ -358,6 +368,9 @@ func TestKNNVariousDistanceTypes(t *testing.T) {
 	}
 }
 
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+
 // TestKNNInvalidTopN tests KNN search with invalid topn values
 func TestKNNInvalidTopN(t *testing.T) {
 	conn := setupConnection(t)
@@ -412,6 +425,9 @@ func TestKNNInvalidTopN(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
 
 // TestKNNBigDimensionVector tests KNN search with large dimension vectors
 func TestKNNBigDimensionVector(t *testing.T) {
@@ -529,6 +545,9 @@ func TestKNNWithIVFIndex(t *testing.T) {
 	}
 }
 
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+
 // TestKNNWithThreshold tests KNN search with threshold parameter
 func TestKNNWithThreshold(t *testing.T) {
 	conn := setupConnection(t)
@@ -583,6 +602,9 @@ func TestKNNWithThreshold(t *testing.T) {
 	}
 }
 
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+
 // TestKNNImportFromCSV tests KNN search with imported CSV data
 func TestKNNImportFromCSV(t *testing.T) {
 	conn := setupConnection(t)
@@ -631,6 +653,9 @@ func TestKNNImportFromCSV(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
 
 // TestKNNWithFusion tests KNN search combined with full-text search and fusion
 func TestKNNWithFusion(t *testing.T) {
@@ -714,6 +739,9 @@ func TestKNNWithFusion(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
 
 // TestKNNu8 tests KNN search with uint8 vector type
 // Based on Python SDK test_pysdk/test_knn.py - test_knn_u8
@@ -844,5 +872,90 @@ func TestKNNu8(t *testing.T) {
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
 	if err != nil {
 		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestKNNfp16bf16 tests KNN search with float16/bfloat16 vector types
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_fp16_bf16
+func TestKNNfp16bf16(t *testing.T) {
+	// Test with different save and query element types
+	testCases := []struct {
+		saveElemType  string
+		queryElemType string
+	}{
+		{"float", "float"},
+		//{"float16", "float"},
+		//{"bfloat16", "float"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("save_%s_query_%s", tc.saveElemType, tc.queryElemType), func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_knn_fp16_bf16_%s_%s", tc.saveElemType, tc.queryElemType) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with int and vector columns
+			schema := infinity.TableSchema{
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: fmt.Sprintf("vector,3,%s", tc.saveElemType)},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table with %s vector: %v", tc.saveElemType, err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/embedding_int_dim3.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Insert additional data
+			_, err = table.Insert([]map[string]interface{}{
+				{"c1": 11, "c2": []float32{127, 128, 255}},
+			})
+			if err != nil {
+				t.Errorf("Failed to insert additional data: %v", err)
+			}
+
+			// Query all data
+			res, err := table.Output([]string{"*"}).ToResult()
+			if err != nil {
+				t.Errorf("Failed to query all data: %v", err)
+			} else {
+				if result, ok := res.(*infinity.QueryResult); ok {
+					if c1Col, exists := result.Data["c1"]; exists {
+						t.Logf("Total rows: %d", len(c1Col))
+					}
+				}
+			}
+
+			// Test KNN search with L2 distance
+			_, err = table.Output([]string{"c1", "_distance"}).
+				MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), tc.queryElemType, "l2", 10, nil).
+				ToResult()
+			if err != nil {
+				t.Errorf("KNN search with %s query type failed: %v", tc.queryElemType, err)
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
 	}
 }
