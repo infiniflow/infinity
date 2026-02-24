@@ -292,12 +292,75 @@ func (d *Database) GetTable(tableName string) (*Table, error) {
 
 // CreateTableSnapshot creates a snapshot of a table
 func (d *Database) CreateTableSnapshot(snapshotName string, tableName string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if d.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is nil")
+	}
+
+	if !d.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewCreateTableSnapshotRequest()
+	req.SessionID = d.conn.GetSessionID()
+	req.DbName = d.dbName
+	req.TableName = tableName
+	req.SnapshotName = snapshotName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := d.conn.client.CreateTableSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create table snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to create table snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // RestoreTableSnapshot restores a table from a snapshot
 func (d *Database) RestoreTableSnapshot(snapshotName string) (interface{}, error) {
-	// TODO: Implement thrift call
-	return nil, nil
+	if d.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is nil")
+	}
+
+	if !d.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Create request
+	req := thriftapi.NewRestoreSnapshotRequest()
+	req.SessionID = d.conn.GetSessionID()
+	req.SnapshotName = snapshotName
+	req.Scope = "table"
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := d.conn.client.RestoreSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to restore table snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to restore table snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }

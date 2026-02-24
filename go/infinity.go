@@ -388,8 +388,32 @@ func (c *InfinityConnection) CreateDatabaseSnapshot(snapshotName string, dbName 
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewCreateDatabaseSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.DbName = dbName
+	req.SnapshotName = snapshotName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.CreateDatabaseSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create database snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to create database snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // RestoreDatabaseSnapshot restores a database from a snapshot
@@ -397,8 +421,32 @@ func (c *InfinityConnection) RestoreDatabaseSnapshot(snapshotName string) (inter
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewRestoreSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.SnapshotName = snapshotName
+	req.Scope = "database"
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.RestoreSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to restore database snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to restore database snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // CreateSystemSnapshot creates a system-wide snapshot
@@ -406,8 +454,31 @@ func (c *InfinityConnection) CreateSystemSnapshot(snapshotName string) (interfac
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewCreateSystemSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.SnapshotName = snapshotName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.CreateSystemSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to create system snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to create system snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // RestoreSystemSnapshot restores the system from a snapshot
@@ -415,8 +486,32 @@ func (c *InfinityConnection) RestoreSystemSnapshot(snapshotName string) (interfa
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewRestoreSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.SnapshotName = snapshotName
+	req.Scope = "system"
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.RestoreSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to restore system snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to restore system snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // ListSnapshots lists all snapshots
@@ -487,8 +582,31 @@ func (c *InfinityConnection) DropSnapshot(snapshotName string) (interface{}, err
 	if !c.isConnected {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
 	}
-	// TODO: Implement thrift call
-	return nil, nil
+
+	// Create request
+	req := thriftapi.NewDropSnapshotRequest()
+	req.SessionID = c.GetSessionID()
+	req.SnapshotName = snapshotName
+
+	// Call thrift
+	ctx := context.Background()
+	resp, err := c.client.DropSnapshot(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to drop snapshot: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to drop snapshot: %s", resp.ErrorMsg),
+		)
+	}
+
+	return resp, nil
 }
 
 // Cleanup performs cleanup operations
