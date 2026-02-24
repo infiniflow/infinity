@@ -849,6 +849,150 @@ func TestInsertTensor(t *testing.T) {
 	db.DropTable(tableName2, infinity.ConflictTypeError)
 }
 
+// TestInsertArray tests insert with array column
+// Based on Python SDK test_pysdk/test_insert.py - _test_insert_array
+// Note: Go SDK may handle nested arrays differently than Python, using interface{} for flexibility
+func TestInsertArray(t *testing.T) {
+
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_insert_array"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Test invalid array type (array,array without element type should fail)
+	schemaInvalid := infinity.TableSchema{
+		{Name: "c1", DataType: "array,array"},
+	}
+	_, err = db.CreateTable(tableName, schemaInvalid, infinity.ConflictTypeError)
+	if err == nil {
+		t.Log("Expected error for invalid array type 'array,array', but got none")
+		db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	}
+
+	// Create table with valid array type: array,array,array,int
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "array,array,array,int"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table with array column: %v", err)
+	}
+
+	// Insert nested array data using infinity.Array for proper serialization
+	// Python: Array(Array(Array(1, 2), Array(3, 4)), Array(Array(5, 6)), Array(Array()), Array())
+	// [[[1, 2], [3, 4]], [[5, 6]], [[]], []]
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(
+			infinity.NewArray(infinity.NewArray(1, 2), infinity.NewArray(3, 4)),
+			infinity.NewArray(infinity.NewArray(5, 6)),
+			infinity.NewArray(infinity.NewArray()),
+			infinity.NewArray(),
+		)},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested array 1: %v", err)
+	}
+
+	// Insert [[[]]] - Python: Array(Array(Array()))
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(infinity.NewArray(infinity.NewArray()))},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested array 2: %v", err)
+	}
+
+	// Insert [[]] - Python: Array(Array())
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(infinity.NewArray())},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested array 3: %v", err)
+	}
+
+	// Insert [] - Python: Array()
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray()},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert empty array: %v", err)
+	}
+
+	db.DropTable(tableName, infinity.ConflictTypeError)
+}
+
+// TestInsertArrayVarchar tests insert with array column of varchar
+// Based on Python SDK test_pysdk/test_insert.py - _test_insert_array_varchar
+func TestInsertArrayVarchar(t *testing.T) {
+
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_insert_array_varchar"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with array type: array,array,array,varchar
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "array,array,array,varchar"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table with varchar array column: %v", err)
+	}
+
+	// Insert nested varchar array data using infinity.Array
+	// Python: Array(Array(Array("hello", "world"), Array("!")), Array(Array("Hi! This is an example of long text! Hi! This is an example of long text!")), Array(Array()), Array())
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(
+			infinity.NewArray(infinity.NewArray("hello", "world"), infinity.NewArray("!")),
+			infinity.NewArray(infinity.NewArray("Hi! This is an example of long text! Hi! This is an example of long text!")),
+			infinity.NewArray(infinity.NewArray()),
+			infinity.NewArray(),
+		)},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested varchar array 1: %v", err)
+	}
+
+	// Insert [[[]]] - Python: Array(Array(Array()))
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(infinity.NewArray(infinity.NewArray()))},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested varchar array 2: %v", err)
+	}
+
+	// Insert [[]] - Python: Array(Array())
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray(infinity.NewArray())},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert nested varchar array 3: %v", err)
+	}
+
+	// Insert [] - Python: Array()
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": infinity.NewArray()},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert empty varchar array: %v", err)
+	}
+
+	db.DropTable(tableName, infinity.ConflictTypeError)
+}
+
 // TestInsertTableWith10000Rows tests inserting 10000 rows into a table
 // Based on Python SDK test_pysdk/test_insert.py - _test_insert_table_with_10000_columns
 func TestInsertTableWith10000Rows(t *testing.T) {
