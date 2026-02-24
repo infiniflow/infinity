@@ -48,7 +48,7 @@ std::string SearchExpr::ToString() const {
     return oss.str();
 }
 
-void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
+void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *& exprs) {
     if (exprs == nullptr) {
         ParserError("SearchExpr::SetExprs parameter is nullptr");
     }
@@ -59,6 +59,7 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
     for (ParsedExpr *expr : *exprs) {
         AddExpr(expr);
     }
+    exprs = nullptr;
     Validate();
 }
 
