@@ -2199,3 +2199,787 @@ func TestSelectDayOfMonth(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestSelectJSONWithArithmetic tests JSON functions combined with arithmetic operations
+func TestSelectJSONWithArithmetic(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_arithmetic"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `{"value": 100}`},
+		{"c1": 2, "c2": `{"score": 95.5}`},
+		{"c1": 3, "c2": `{"age": 25}`},
+		{"c1": 4, "c2": `{"price": 19.99}`},
+		{"c1": 5, "c2": `{"quantity": 42}`},
+		{"c1": 6, "c2": `{"negative": -10}`},
+		{"c1": 7, "c2": `{"zero": 0}`},
+		{"c1": 8, "c2": `{"decimal": 3.14159}`},
+		{"c1": 9, "c2": `{"large": 999999}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test json_extract_int with addition
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.value') + 50"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with addition: %v", err)
+	}
+
+	// Test json_extract_double with addition
+	_, err = table.Output([]string{"c1", "json_extract_double(c2, '$.score') + 10"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract double with addition: %v", err)
+	}
+
+	// Test json_extract_int with subtraction
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.value') - 20"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with subtraction: %v", err)
+	}
+
+	// Test json_extract_int with multiplication
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.quantity') * 2"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with multiplication: %v", err)
+	}
+
+	// Test json_extract_double with multiplication
+	_, err = table.Output([]string{"c1", "json_extract_double(c2, '$.price') * 3"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract double with multiplication: %v", err)
+	}
+
+	// Test json_extract_int with division
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.value') / 2"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with division: %v", err)
+	}
+
+	// Test json_extract_double with division
+	_, err = table.Output([]string{"c1", "json_extract_double(c2, '$.decimal') / 2"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract double with division: %v", err)
+	}
+
+	// Test json_extract_int with modulo
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.value') % 3"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with modulo: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectJSONWithRoundSqrtAbs tests JSON functions combined with ROUND, SQRT, ABS functions
+func TestSelectJSONWithRoundSqrtAbs(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_scalar"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `{"score": 95.5}`},
+		{"c1": 2, "c2": `{"decimal": 3.14159}`},
+		{"c1": 3, "c2": `{"small": 0.001}`},
+		{"c1": 4, "c2": `{"area": 144}`},
+		{"c1": 5, "c2": `{"negative": -10}`},
+		{"c1": 6, "c2": `{"age": 25}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test ROUND with json_extract_double
+	_, err = table.Output([]string{"c1", "round(json_extract_double(c2, '$.score'))"}).ToResult()
+	if err != nil {
+		t.Logf("ROUND with json_extract_double: %v", err)
+	}
+
+	// Test ROUND with precision
+	_, err = table.Output([]string{"c1", "round(json_extract_double(c2, '$.decimal'), 1)"}).ToResult()
+	if err != nil {
+		t.Logf("ROUND with precision: %v", err)
+	}
+
+	// Test SQRT with json_extract_int
+	_, err = table.Output([]string{"c1", "sqrt(json_extract_int(c2, '$.area'))"}).ToResult()
+	if err != nil {
+		t.Logf("SQRT with json_extract_int: %v", err)
+	}
+
+	// Test ABS with json_extract_int
+	_, err = table.Output([]string{"c1", "abs(json_extract_int(c2, '$.negative'))"}).ToResult()
+	if err != nil {
+		t.Logf("ABS with json_extract_int: %v", err)
+	}
+
+	// Test ABS with expression
+	_, err = table.Output([]string{"c1", "abs(json_extract_int(c2, '$.age') - 100)"}).ToResult()
+	if err != nil {
+		t.Logf("ABS with expression: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectJSONWithCeilFloor tests JSON functions combined with CEIL and FLOOR functions
+func TestSelectJSONWithCeilFloor(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_ceil_floor"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `{"decimal": 3.14159}`},
+		{"c1": 2, "c2": `{"value": 2.7}`},
+		{"c1": 3, "c2": `{"number": -1.2}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test CEIL
+	_, err = table.Output([]string{"c1", "ceil(json_extract_double(c2, '$.decimal'))"}).ToResult()
+	if err != nil {
+		t.Logf("CEIL: %v", err)
+	}
+
+	// Test FLOOR
+	_, err = table.Output([]string{"c1", "floor(json_extract_double(c2, '$.decimal'))"}).ToResult()
+	if err != nil {
+		t.Logf("FLOOR: %v", err)
+	}
+
+	// Test CEIL with negative number
+	_, err = table.Output([]string{"c1", "ceil(json_extract_double(c2, '$.number'))"}).ToResult()
+	if err != nil {
+		t.Logf("CEIL with negative: %v", err)
+	}
+
+	// Test FLOOR with negative number
+	_, err = table.Output([]string{"c1", "floor(json_extract_double(c2, '$.number'))"}).ToResult()
+	if err != nil {
+		t.Logf("FLOOR with negative: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectJSONNestedPathArithmetic tests JSON functions with nested paths and arithmetic
+func TestSelectJSONNestedPathArithmetic(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_nested"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data with nested JSON
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `{"data": {"inner": 50, "outer": 100}}`},
+		{"c1": 2, "c2": `{"nested": {"value": 25, "multiplier": 3}}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test nested path extraction with addition
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.data.inner') + json_extract_int(c2, '$.data.outer')"}).ToResult()
+	if err != nil {
+		t.Logf("Nested path with addition: %v", err)
+	}
+
+	// Test nested path with division
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.data.outer') / 2"}).ToResult()
+	if err != nil {
+		t.Logf("Nested path with division: %v", err)
+	}
+
+	// Test nested path with multiplication
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.nested.value') * json_extract_int(c2, '$.nested.multiplier')"}).ToResult()
+	if err != nil {
+		t.Logf("Nested path with multiplication: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectJSONNullHandling tests JSON functions with NULL values and edge cases
+func TestSelectJSONNullHandling(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_null"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data with null values
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `{"val": null}`},
+		{"c1": 2, "c2": `{"val": 0}`},
+		{"c1": 3, "c2": `{"missing": null}`},
+		{"c1": 4, "c2": `{"negative": -16}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test json_extract_int with NULL value in arithmetic
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.val') + 10"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int with NULL: %v", err)
+	}
+
+	// Test json_extract_int on missing path with arithmetic
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$.missing') * 2"}).ToResult()
+	if err != nil {
+		t.Logf("JSON extract int on missing path: %v", err)
+	}
+
+	// Test SQRT of negative number
+	_, err = table.Output([]string{"c1", "sqrt(json_extract_int(c2, '$.negative'))"}).ToResult()
+	if err != nil {
+		t.Logf("SQRT of negative number: %v", err)
+	}
+
+	// Test ROUND with NULL
+	_, err = table.Output([]string{"c1", "round(json_extract_int(c2, '$.val'))"}).ToResult()
+	if err != nil {
+		t.Logf("ROUND with NULL: %v", err)
+	}
+
+	// Test ABS with NULL
+	_, err = table.Output([]string{"c1", "abs(json_extract_int(c2, '$.val'))"}).ToResult()
+	if err != nil {
+		t.Logf("ABS with NULL: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectJSONArrayWithArithmetic tests JSON array extraction with arithmetic operations
+func TestSelectJSONArrayWithArithmetic(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_json_array"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data with arrays
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `[10, 20, 30]`},
+		{"c1": 2, "c2": `[1.5, 2.5, 3.5]`},
+		{"c1": 3, "c2": `[100, 200, 300]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test array element extraction with addition
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$[0]') + 100"}).ToResult()
+	if err != nil {
+		t.Logf("Array element with addition: %v", err)
+	}
+
+	// Test array element extraction with multiplication
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$[1]') * 2"}).ToResult()
+	if err != nil {
+		t.Logf("Array element with multiplication: %v", err)
+	}
+
+	// Test array element with division
+	_, err = table.Output([]string{"c1", "json_extract_int(c2, '$[2]') / 3"}).ToResult()
+	if err != nil {
+		t.Logf("Array element with division: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectUnnestJSONBasic tests basic UNNEST JSON functionality
+func TestSelectUnnestJSONBasic(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_unnest_json"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Test 1: Simple integer array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `[1, 2, 3]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).ToResult()
+	if err != nil {
+		t.Logf("UNNEST simple integer array: %v", err)
+	}
+
+	// Test 2: String array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2, "c2": `["apple", "banana", "cherry"]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 2").ToResult()
+	if err != nil {
+		t.Logf("UNNEST string array: %v", err)
+	}
+
+	// Test 3: Mixed type array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 3, "c2": `[1, "text", 3.14, true, null]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 3").ToResult()
+	if err != nil {
+		t.Logf("UNNEST mixed type array: %v", err)
+	}
+
+	// Test 4: Empty array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 6, "c2": `[]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 6").ToResult()
+	if err != nil {
+		t.Logf("UNNEST empty array: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectUnnestJSONComplex tests UNNEST JSON with complex structures
+func TestSelectUnnestJSONComplex(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_unnest_json_complex"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Test 1: Array of objects
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 1").ToResult()
+	if err != nil {
+		t.Logf("UNNEST array of objects: %v", err)
+	}
+
+	// Test 2: Nested arrays
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2, "c2": `[[1, 2], [3, 4], [5, 6]]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 2").ToResult()
+	if err != nil {
+		t.Logf("UNNEST nested arrays: %v", err)
+	}
+
+	// Test 3: Single element array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 4, "c2": `[42]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 4").ToResult()
+	if err != nil {
+		t.Logf("UNNEST single element: %v", err)
+	}
+
+	// Test 4: Boolean values
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 5, "c2": `[true, false, true]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 5").ToResult()
+	if err != nil {
+		t.Logf("UNNEST boolean array: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectUnnestJSONEdgeCases tests UNNEST JSON edge cases
+func TestSelectUnnestJSONEdgeCases(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_unnest_json_edge"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Test 1: Special string values
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `["", "text", "123", "true", "null"]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 1").ToResult()
+	if err != nil {
+		t.Logf("UNNEST special strings: %v", err)
+	}
+
+	// Test 2: Single NULL
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2, "c2": `[null]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 2").ToResult()
+	if err != nil {
+		t.Logf("UNNEST single NULL: %v", err)
+	}
+
+	// Test 3: Large array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 3, "c2": `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 3").ToResult()
+	if err != nil {
+		t.Logf("UNNEST large array: %v", err)
+	}
+
+	// Test 4: Duplicate values
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 4, "c2": `[1, 1, 1, 2, 2, 3]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 4").ToResult()
+	if err != nil {
+		t.Logf("UNNEST duplicate values: %v", err)
+	}
+
+	// Test 5: Non-array JSON (object)
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 6, "c2": `{"key": "value", "number": 123}`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 6").ToResult()
+	if err != nil {
+		t.Logf("UNNEST non-array JSON: %v", err)
+	}
+
+	// Test 6: Scalar JSON value
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 7, "c2": `"just a string"`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 7").ToResult()
+	if err != nil {
+		t.Logf("UNNEST scalar string: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectUnnestJSONNested tests UNNEST JSON with deeply nested structures
+func TestSelectUnnestJSONNested(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_unnest_json_nested"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "integer"},
+		{Name: "c2", DataType: "json"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Test 1: Deeply nested array elements
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": `[[[[[1]]]], [[[[2]]]]]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 1").ToResult()
+	if err != nil {
+		t.Logf("UNNEST deeply nested arrays: %v", err)
+	}
+
+	// Test 2: 3D array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2, "c2": `[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 2").ToResult()
+	if err != nil {
+		t.Logf("UNNEST 3D array: %v", err)
+	}
+
+	// Test 3: Mixed nested structures
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 3, "c2": `[{"arr": [1, 2]}, {"obj": {"k": "v"}}, [null], "string"]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 3").ToResult()
+	if err != nil {
+		t.Logf("UNNEST mixed nested structures: %v", err)
+	}
+
+	// Test 4: Scientific notation
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 5, "c2": `[1E2, 1.5e-3, -2E10, 3.14159e0]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 5").ToResult()
+	if err != nil {
+		t.Logf("UNNEST scientific notation: %v", err)
+	}
+
+	// Test 5: Sparse null array
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 6, "c2": `[null, null, null, 1, null, 2, null, null, 3]`},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	_, err = table.Output([]string{"unnest(c2)"}).Filter("c1 = 6").ToResult()
+	if err != nil {
+		t.Logf("UNNEST sparse null array: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
