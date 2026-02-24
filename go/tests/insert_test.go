@@ -2182,3 +2182,62 @@ func TestInsertMultivector(t *testing.T) {
 
 	db.DropTable(tableName2, infinity.ConflictTypeError)
 }
+
+// TestBatchInsertWithinLimit tests batch insert within limit
+// Based on Python SDK test_pysdk/test_insert.py - test_batch_insert_within_limit
+func TestBatchInsertWithinLimit(t *testing.T) {
+	batchSizes := []int{10, 1024}
+
+	for _, batchSize := range batchSizes {
+		t.Run(fmt.Sprintf("batch_%d", batchSize), func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_batch_insert_within_limit_%d", batchSize)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with two int columns
+			schema := infinity.TableSchema{
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "int"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Insert batch of records
+			values := make([]map[string]interface{}, batchSize)
+			for i := 0; i < batchSize; i++ {
+				values[i] = map[string]interface{}{"c1": 1, "c2": 2}
+			}
+
+			_, err = table.Insert(values)
+			if err != nil {
+				t.Errorf("Failed to batch insert %d records: %v", batchSize, err)
+			}
+
+			// Verify the insert
+			res, err := table.Output([]string{"*"}).ToResult()
+			if err != nil {
+				t.Errorf("Failed to query table: %v", err)
+			} else {
+				if result, ok := res.(*infinity.QueryResult); ok {
+					if c1Col, exists := result.Data["c1"]; exists {
+						if len(c1Col) != batchSize {
+							t.Errorf("Expected %d rows, got %d", batchSize, len(c1Col))
+						}
+					}
+				}
+			}
+
+			db.DropTable(tableName, infinity.ConflictTypeError)
+		})
+	}
+}
