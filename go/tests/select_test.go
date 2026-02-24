@@ -647,3 +647,181 @@ func TestSelectWithGroupBy(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestSelectDateTime tests select operations with date, time, datetime, and timestamp types
+func TestSelectDateTime(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_datetime" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with date, time, datetime, timestamp columns
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "date"},
+		{Name: "c2", DataType: "time"},
+		{Name: "c3", DataType: "datetime"},
+		{Name: "c4", DataType: "timestamp"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2024-09-23", "c2": "20:45:11", "c3": "2024-09-23 20:45:11", "c4": "2024-09-23 20:45:11"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert first row: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2022-05-26", "c2": "21:44:33", "c3": "2022-05-26 21:44:33", "c4": "2022-05-26 21:44:33"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert second row: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2021-03-04", "c2": "20:58:59", "c3": "2021-03-04 20:58:59", "c4": "2021-03-04 20:58:59"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert third row: %v", err)
+	}
+
+	// Test select *
+	_, err = table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select * failed: %v", err)
+	}
+
+	// Test select c1, c2 with filter c1 = DATE '2024-09-23'
+	_, err = table.Output([]string{"c1", "c2"}).Filter("c1 = '2024-09-23'").ToResult()
+	if err != nil {
+		t.Fatalf("Select with date filter failed: %v", err)
+	}
+
+	// Test select * with filter c2 = TIME '21:44:33'
+	_, err = table.Output([]string{"*"}).Filter("c2 = '21:44:33'").ToResult()
+	if err != nil {
+		t.Fatalf("Select with time filter failed: %v", err)
+	}
+
+	// Test select * with filter c3 = DATETIME '2021-03-04 20:58:59'
+	_, err = table.Output([]string{"*"}).Filter("c3 = '2021-03-04 20:58:59'").ToResult()
+	if err != nil {
+		t.Fatalf("Select with datetime filter failed: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectVarchar tests select operations with varchar columns and string comparisons
+func TestSelectVarchar(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_varchar" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with varchar columns (c1 primary key, c2 not null)
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data (a through m)
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "a", "c2": "a"},
+		{"c1": "b", "c2": "b"},
+		{"c1": "c", "c2": "c"},
+		{"c1": "d", "c2": "d"},
+		{"c1": "e", "c2": "e"},
+		{"c1": "f", "c2": "f"},
+		{"c1": "g", "c2": "g"},
+		{"c1": "h", "c2": "h"},
+		{"c1": "i", "c2": "i"},
+		{"c1": "j", "c2": "j"},
+		{"c1": "k", "c2": "k"},
+		{"c1": "l", "c2": "l"},
+		{"c1": "m", "c2": "m"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test select *
+	_, err = table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select * failed: %v", err)
+	}
+
+	// Test select c1, c2 with filter c1 = 'a'
+	_, err = table.Output([]string{"c1", "c2"}).Filter("c1 = 'a'").ToResult()
+	if err != nil {
+		t.Fatalf("Select with c1 = 'a' failed: %v", err)
+	}
+
+	// Test select c1 with filter c1 > 'a' and c2 < 'c' (should return 'b')
+	_, err = table.Output([]string{"c1"}).Filter("c1 > 'a' and c2 < 'c'").ToResult()
+	if err != nil {
+		t.Fatalf("Select with c1 > 'a' and c2 < 'c' failed: %v", err)
+	}
+
+	// Test select c2 with filter ('a' < c1 or 'm' <= c1) and (c1 = 'a')
+	_, err = table.Output([]string{"c2"}).Filter("('a' < c1 or 'm' <= c1) and (c1 = 'a')").ToResult()
+	if err != nil {
+		t.Fatalf("Select with complex filter 1 failed: %v", err)
+	}
+
+	// Test select c2 with filter ('a' < c1 and c1 <= 'b') or (c1 >= 'c' and 'd' > c1)
+	_, err = table.Output([]string{"c2"}).Filter("('a' < c1 and c1 <= 'b') or (c1 >= 'c' and 'd' > c1)").ToResult()
+	if err != nil {
+		t.Fatalf("Select with complex filter 2 failed: %v", err)
+	}
+
+	// Test select c2 with complex nested filter
+	_, err = table.Output([]string{"c2"}).Filter("((c1 >= 'a' and 'd' >= c1) or (c1 >= 'e' and 'j' > c1)) and ((c1 > 'e' and c1 <= 'f') or (c1 > 'a' and c1 < 'c'))").ToResult()
+	if err != nil {
+		t.Fatalf("Select with complex filter 3 failed: %v", err)
+	}
+
+	// Test select c2 with filter ('a' < c1 or 'm' <= c1) and (c2 = 'a')
+	_, err = table.Output([]string{"c2"}).Filter("('a' < c1 or 'm' <= c1) and (c2 = 'a')").ToResult()
+	if err != nil {
+		t.Fatalf("Select with complex filter 4 failed: %v", err)
+	}
+
+	// Test select c2 with filter ('a' < c1 and c2 <= 'b') or (c1 >= 'c' and 'd' > c2)
+	_, err = table.Output([]string{"c2"}).Filter("('a' < c1 and c2 <= 'b') or (c1 >= 'c' and 'd' > c2)").ToResult()
+	if err != nil {
+		t.Fatalf("Select with complex filter 5 failed: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
