@@ -595,6 +595,123 @@ func TestMapSQLTypeToDataType(t *testing.T) {
 	}
 }
 
+// TestCastPhysicalType tests that PhysicalType is correctly set in CAST expressions
+func TestCastPhysicalType(t *testing.T) {
+	tests := []struct {
+		sqlType      string
+		logicType    thriftapi.LogicType
+		hasNumberType bool
+		hasVarcharType bool
+	}{
+		// Numeric types - should have NumberType
+		{"INT", thriftapi.LogicType_Integer, true, false},
+		{"INTEGER", thriftapi.LogicType_Integer, true, false},
+		{"TINYINT", thriftapi.LogicType_TinyInt, true, false},
+		{"SMALLINT", thriftapi.LogicType_SmallInt, true, false},
+		{"BIGINT", thriftapi.LogicType_BigInt, true, false},
+		{"FLOAT", thriftapi.LogicType_Float, true, false},
+		{"DOUBLE", thriftapi.LogicType_Double, true, false},
+		{"BOOL", thriftapi.LogicType_Boolean, true, false},
+		{"BOOLEAN", thriftapi.LogicType_Boolean, true, false},
+		{"DATE", thriftapi.LogicType_Date, true, false},
+		{"TIME", thriftapi.LogicType_Time, true, false},
+		{"DATETIME", thriftapi.LogicType_DateTime, true, false},
+		{"TIMESTAMP", thriftapi.LogicType_Timestamp, true, false},
+		{"JSON", thriftapi.LogicType_Json, true, false},
+
+		// String types - should have VarcharType
+		{"VARCHAR", thriftapi.LogicType_Varchar, false, true},
+		{"TEXT", thriftapi.LogicType_Varchar, false, true},
+		{"STRING", thriftapi.LogicType_Varchar, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.sqlType, func(t *testing.T) {
+			expr := "CAST(c1 AS " + tt.sqlType + ")"
+			parsed, err := infinity.ParseExpr(expr)
+			if err != nil {
+				t.Fatalf("Failed to parse CAST expression: %v", err)
+			}
+
+			if parsed.Type.CastExpr == nil {
+				t.Fatal("CastExpr should not be nil")
+			}
+
+			dataType := parsed.Type.CastExpr.DataType
+
+			// Verify LogicType
+			if dataType.LogicType != tt.logicType {
+				t.Errorf("Expected LogicType %v, got %v", tt.logicType, dataType.LogicType)
+			}
+
+			// Verify PhysicalType is not nil (this was the bug fix)
+			if dataType.PhysicalType == nil {
+				t.Fatal("PhysicalType should not be nil")
+			}
+
+			// Verify correct PhysicalType subtype
+			pt := dataType.PhysicalType
+			if tt.hasNumberType && pt.NumberType == nil {
+				t.Errorf("Expected NumberType to be set for %s", tt.sqlType)
+			}
+			if !tt.hasNumberType && pt.NumberType != nil {
+				t.Errorf("Expected NumberType to be nil for %s", tt.sqlType)
+			}
+			if tt.hasVarcharType && pt.VarcharType == nil {
+				t.Errorf("Expected VarcharType to be set for %s", tt.sqlType)
+			}
+			if !tt.hasVarcharType && pt.VarcharType != nil {
+				t.Errorf("Expected VarcharType to be nil for %s", tt.sqlType)
+			}
+
+			t.Logf("CAST(%s) -> LogicType=%v, PhysicalType.NumberType=%v, PhysicalType.VarcharType=%v",
+				tt.sqlType, dataType.LogicType, pt.NumberType != nil, pt.VarcharType != nil)
+		})
+	}
+}
+
+// TestCastWithComplexExpression tests CAST with complex inner expressions
+func TestCastWithComplexExpression(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected string
+	}{
+		{"cast column to int", "CAST(c1 AS INTEGER)", "CAST(c1 AS INTEGER)"},
+		{"cast arithmetic to int", "CAST(c1 + 1 AS INTEGER)", "CAST(+(c1, 1) AS INTEGER)"},
+		{"cast nested to varchar", "CAST(upper(name) AS VARCHAR)", "CAST(upper(name) AS VARCHAR)"},
+		{"cast function result to float", "CAST(abs(c1) AS FLOAT)", "CAST(abs(c1) AS FLOAT)"},
+		{"cast expression to double", "CAST(c1 * 2 + c2 AS DOUBLE)", "CAST(+(*(c1, 2), c2) AS DOUBLE)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed, err := infinity.ParseExpr(tt.expr)
+			if err != nil {
+				t.Fatalf("Failed to parse CAST expression: %v", err)
+			}
+
+			// Verify CastExpr is properly formed
+			if parsed.Type.CastExpr == nil {
+				t.Fatal("CastExpr should not be nil")
+			}
+
+			// Verify PhysicalType is set
+			if parsed.Type.CastExpr.DataType.PhysicalType == nil {
+				t.Fatal("PhysicalType should not be nil")
+			}
+
+			// Verify the expression can be converted back to string
+			result := infinity.ParsedExprToString(parsed)
+			t.Logf("Expression '%s' -> '%s' (expected: '%s')", tt.expr, result, tt.expected)
+
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
 // TestConstantExprTypes tests different constant expression types
 func TestConstantExprTypes(t *testing.T) {
 	tests := []struct {

@@ -810,38 +810,54 @@ func mapSQLTypeToDataType(typeName string) *thriftapi.DataType {
 	typeName = strings.ToUpper(typeName)
 
 	dataType := &thriftapi.DataType{}
+	physicalType := &thriftapi.PhysicalType{}
 
 	switch typeName {
 	case "INT", "INTEGER":
 		dataType.LogicType = thriftapi.LogicType_Integer
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "TINYINT":
 		dataType.LogicType = thriftapi.LogicType_TinyInt
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "SMALLINT":
 		dataType.LogicType = thriftapi.LogicType_SmallInt
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "BIGINT":
 		dataType.LogicType = thriftapi.LogicType_BigInt
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "FLOAT":
 		dataType.LogicType = thriftapi.LogicType_Float
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "DOUBLE":
 		dataType.LogicType = thriftapi.LogicType_Double
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "VARCHAR", "TEXT", "STRING":
 		dataType.LogicType = thriftapi.LogicType_Varchar
+		physicalType.VarcharType = &thriftapi.VarcharType{}
 	case "BOOL", "BOOLEAN":
 		dataType.LogicType = thriftapi.LogicType_Boolean
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "DATE":
 		dataType.LogicType = thriftapi.LogicType_Date
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "TIME":
 		dataType.LogicType = thriftapi.LogicType_Time
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "DATETIME":
 		dataType.LogicType = thriftapi.LogicType_DateTime
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "TIMESTAMP":
 		dataType.LogicType = thriftapi.LogicType_Timestamp
+		physicalType.NumberType = &thriftapi.NumberType{}
 	case "JSON":
 		dataType.LogicType = thriftapi.LogicType_Json
+		physicalType.NumberType = &thriftapi.NumberType{}
 	default:
 		dataType.LogicType = thriftapi.LogicType_Varchar
+		physicalType.VarcharType = &thriftapi.VarcharType{}
 	}
 
+	dataType.PhysicalType = physicalType
 	return dataType
 }
 
