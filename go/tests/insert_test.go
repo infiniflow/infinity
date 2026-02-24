@@ -919,6 +919,85 @@ func TestInsertTableWith10000Rows(t *testing.T) {
 	db.DropTable(tableName, infinity.ConflictTypeError)
 }
 
+// TestReadAfterShutdown tests reading data after reconnecting
+// Based on Python SDK test_pysdk/test_insert.py - _test_read_after_shutdown
+// Note: This test simulates shutdown by disconnecting and reconnecting
+func TestReadAfterShutdown(t *testing.T) {
+
+	conn := setupConnection(t)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_read_after_shutdown"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with two int columns
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "int"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert some data
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": 2},
+		{"c1": 3, "c2": 4},
+		{"c1": 5, "c2": 6},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Verify data exists before disconnect
+	result, err := table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Failed to query data before disconnect: %v", err)
+	}
+	v := result.(*infinity.QueryResult)
+	t.Logf("Data before disconnect: %v", v.Data)
+
+	// Disconnect (simulate shutdown)
+	conn.Disconnect()
+	t.Log("Disconnected from server")
+
+	// Reconnect
+	conn2 := setupConnection(t)
+	defer closeConnection(t, conn2)
+	t.Log("Reconnected to server")
+
+	db2, err := conn2.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database after reconnect: %v", err)
+	}
+
+	// Get the table again
+	table2, err := db2.GetTable(tableName)
+	if err != nil {
+		t.Fatalf("Failed to get table after reconnect: %v", err)
+	}
+
+	// Read data after reconnect
+	result2, err := table2.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Failed to query data after reconnect: %v", err)
+	}
+	v2 := result2.(*infinity.QueryResult)
+	t.Logf("Data after reconnect: %v", v2.Data)
+
+	// Cleanup
+	_, err = db2.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Errorf("Failed to drop table: %v", err)
+	}
+}
+
 // TestInsertTensorArray tests insert with tensor array column
 func TestInsertTensorArray(t *testing.T) {
 
