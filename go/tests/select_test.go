@@ -1301,3 +1301,59 @@ func TestSelectTimeFunctions(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestSelectEmbeddingInt32 tests selecting embedding int32 vector data
+func TestSelectEmbeddingInt32(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_embedding_int32" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with int column and int vector column
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,int"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data (simulating embedding_int_dim3.csv content)
+	// CSV content: 1,[2,3,4]
+	//              5,[6,7,8]
+	//              9,[10,11,12]
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 1, "c2": []int{2, 3, 4}},
+		{"c1": 5, "c2": []int{6, 7, 8}},
+		{"c1": 9, "c2": []int{10, 11, 12}},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test select c2 (vector column)
+	_, err = table.Output([]string{"c2"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select c2 failed: %v", err)
+	}
+
+	// Test select * (all columns)
+	_, err = table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select * failed: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
