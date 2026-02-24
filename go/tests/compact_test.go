@@ -59,10 +59,7 @@ func TestCompact(t *testing.T) {
 	// Get the test data file path
 	// Try to find the test data file in common locations
 	testDataPaths := []string{
-		"/home/infiniflow/Documents/development/infinity/test/data/csv/embedding_int_dim3.csv",
-		"../../test/data/csv/embedding_int_dim3.csv",
 		"../test/data/csv/embedding_int_dim3.csv",
-		"./test/data/csv/embedding_int_dim3.csv",
 	}
 
 	var testCSVPath string
