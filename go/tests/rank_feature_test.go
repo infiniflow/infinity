@@ -15,6 +15,7 @@
 package tests
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -93,7 +94,7 @@ func TestRankFeaturesBasic(t *testing.T) {
 				t.Errorf("Basic search: expected 3 rows, got %d", len(idCol))
 			}
 		}
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			basicScores = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -127,7 +128,7 @@ func TestRankFeaturesBasic(t *testing.T) {
 				t.Errorf("Rank features search: expected 3 rows, got %d", len(idCol))
 			}
 		}
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			rankScores = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -218,7 +219,7 @@ func TestRankFeaturesDifferentWeights(t *testing.T) {
 
 	var basicScores []float64
 	if result, ok := res.(*infinity.QueryResult); ok {
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			basicScores = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -241,7 +242,7 @@ func TestRankFeaturesDifferentWeights(t *testing.T) {
 
 	var scores1 []float64
 	if result, ok := res.(*infinity.QueryResult); ok {
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			scores1 = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -278,7 +279,7 @@ func TestRankFeaturesDifferentWeights(t *testing.T) {
 
 	var scores2 []float64
 	if result, ok := res.(*infinity.QueryResult); ok {
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			scores2 = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -344,10 +345,11 @@ func TestRankFeaturesWithTopn(t *testing.T) {
 	// Insert test data
 	testData := make([]map[string]interface{}, 10)
 	for i := 0; i < 10; i++ {
+		value := fmt.Sprintf("%d", i+1)
 		testData[i] = map[string]interface{}{
 			"id":      "doc" + string(rune('0'+i)),
 			"content": "search query",
-			"tags":    `[{"tag` + string(rune('0'+i%3)) + `":` + string(rune('1'+i)) + `}]`,
+			"tags":    `[{"tag` + string(rune('0'+i%3)) + `":` + value + `}]`,
 		}
 	}
 	_, err = table.Insert(testData)
@@ -385,7 +387,7 @@ func TestRankFeaturesWithTopn(t *testing.T) {
 				t.Errorf("Basic search: expected 10 rows, got %d", len(idCol))
 			}
 		}
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			basicScores = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -413,7 +415,7 @@ func TestRankFeaturesWithTopn(t *testing.T) {
 				t.Errorf("Topn=3 search: expected 3 rows, got %d", len(idCol))
 			}
 		}
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			scores3 = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
@@ -441,7 +443,7 @@ func TestRankFeaturesWithTopn(t *testing.T) {
 				t.Errorf("Topn=5 search: expected 5 rows, got %d", len(idCol))
 			}
 		}
-		if scoreCol, exists := result.Data["_score"]; exists {
+		if scoreCol, exists := result.Data["SCORE"]; exists {
 			scores5 = make([]float64, len(scoreCol))
 			for i, v := range scoreCol {
 				switch val := v.(type) {
