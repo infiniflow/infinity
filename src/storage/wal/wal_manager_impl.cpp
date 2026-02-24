@@ -258,6 +258,8 @@ void WalManager::NewFlush() {
             continue;
         }
 
+        LOG_TRACE(fmt::format("Attempt to write {} logs", txn_batch.size()));
+
         for (const auto &txn : txn_batch) {
             if (txn == nullptr) {
                 // terminate entry
