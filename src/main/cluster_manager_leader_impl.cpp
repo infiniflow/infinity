@@ -18,6 +18,8 @@ import :cluster_manager;
 import :config;
 import :infinity_context;
 import :peer_thrift_client;
+import :infinity_exception;
+import :logger;
 
 import std;
 import third_party;

@@ -1,7 +1,6 @@
 export module infinity_core:physical_check;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;
@@ -9,7 +8,6 @@ import :logical_show;
 import :load_meta;
 import :infinity_exception;
 import :variables;
-import :data_block;
 import :logger;
 
 import internal_types;
@@ -18,6 +16,8 @@ import data_type;
 import check_statement;
 
 namespace infinity {
+
+struct CheckOperatorState;
 
 export class PhysicalCheck : public PhysicalOperator {
 public:

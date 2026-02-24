@@ -17,18 +17,18 @@ export module infinity_core:physical_merge_aggregate;
 import :base_table_ref;
 import :load_meta;
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :infinity_exception;
 import :value;
-import :data_block;
 import :logger;
 
 import internal_types;
 import data_type;
 
 namespace infinity {
+
+struct MergeAggregateOperatorState;
 
 export class PhysicalMergeAggregate final : public PhysicalOperator {
 public:

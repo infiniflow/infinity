@@ -14,7 +14,6 @@
 
 export module infinity_core:physical_sink;
 
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;
@@ -26,7 +25,13 @@ import data_type;
 
 namespace infinity {
 
-class FragmentContext;
+export class FragmentContext;
+struct SinkState;
+struct MaterializeSinkState;
+struct ResultSinkState;
+struct MessageSinkState;
+struct SummarySinkState;
+struct QueueSinkState;
 
 export enum class SinkType {
     kInvalid,

@@ -20,7 +20,6 @@ import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :operator_state;
-import :data_block;
 import :column_vector;
 import :new_txn;
 import :wal_manager;

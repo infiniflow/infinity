@@ -15,7 +15,6 @@
 export module infinity_core:logical_read_cache;
 
 import :logical_node;
-import :data_block;
 import :column_binding;
 import :base_table_ref;
 import :logical_node_type;

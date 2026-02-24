@@ -17,7 +17,6 @@ export module infinity_core:integer_cast;
 import :bound_cast_func;
 import :column_vector_cast;
 import :infinity_exception;
-import :column_vector;
 import :vector_buffer;
 import :status;
 

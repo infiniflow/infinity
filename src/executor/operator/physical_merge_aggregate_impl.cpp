@@ -19,7 +19,6 @@ import :query_context;
 import :operator_state;
 import :logger;
 import :value;
-import :data_block;
 import :physical_aggregate;
 import :aggregate_expression;
 import :infinity_exception;

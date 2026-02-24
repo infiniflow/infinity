@@ -17,7 +17,7 @@ export module infinity_core:block_column_iter;
 import :column_vector;
 import :sparse_util;
 import :multivector_util;
-import :column_vector;
+import :default_values;
 
 import std;
 

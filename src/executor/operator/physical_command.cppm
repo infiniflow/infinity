@@ -16,7 +16,6 @@ export module infinity_core:physical_command;
 
 import :physical_operator;
 import :physical_operator_type;
-import :operator_state;
 import :load_meta;
 import :infinity_exception;
 import :logger;

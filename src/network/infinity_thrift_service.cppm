@@ -19,9 +19,7 @@ export module infinity_core:infinity_thrift_service;
 import :infinity_thrift_types;
 import :infinity;
 import :query_options;
-import :data_block;
 import :table_def;
-import :column_vector;
 import :query_result;
 import :status;
 
@@ -51,6 +49,9 @@ import select_statement;
 import global_resource_usage;
 
 namespace infinity {
+
+struct DataBlock;
+class ColumnVector;
 
 struct ClientVersions {
     ClientVersions();

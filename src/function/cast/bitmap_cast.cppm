@@ -17,7 +17,6 @@ export module infinity_core:bitmap_cast;
 import :column_vector_cast;
 import :infinity_exception;
 import :bound_cast_func;
-import :column_vector;
 
 #if 0
 namespace infinity {

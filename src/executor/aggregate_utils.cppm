@@ -14,15 +14,16 @@
 
 export module infinity_core:aggregate_utils;
 
-import :column_vector;
+import std.compat;
 
-import std;
+import third_party;
+
 import internal_types;
 import data_type;
-import third_party;
 
 namespace infinity {
 
+class ColumnVector;
 // Type aliases for hash tables used in GROUP BY aggregation
 //
 //                                           Outer key                      Value

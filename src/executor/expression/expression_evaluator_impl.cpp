@@ -25,7 +25,6 @@ import :reference_expression;
 import :value_expression;
 import :in_expression;
 import :filter_fulltext_expression;
-import :data_block;
 import :column_vector;
 import :expression_state;
 import :status;

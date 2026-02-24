@@ -22,8 +22,6 @@ import :base_memindex;
 import :memindex_tracer;
 import :sparse_util;
 import :infinity_exception;
-import :column_vector;
-
 import data_type;
 import column_def;
 import internal_types;

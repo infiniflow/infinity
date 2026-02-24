@@ -16,8 +16,8 @@ module infinity_core:physical_read_cache.impl;
 import :physical_read_cache;
 import :column_binding;
 import :infinity_exception;
-import :data_block;
 import :column_vector;
+import :operator_state;
 
 import std;
 

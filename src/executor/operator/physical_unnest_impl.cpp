@@ -22,7 +22,6 @@ import :physical_operator_type;
 import :operator_state;
 import :expression_state;
 import :expression_selector;
-import :data_block;
 import :logger;
 import :infinity_exception;
 import :column_vector;

@@ -20,6 +20,8 @@ import :persistence_manager;
 
 namespace infinity {
 
+class LocalFileHandle;
+
 export struct DataFileWorker : FileWorker {
     explicit DataFileWorker(std::shared_ptr<std::string> file_path, size_t buffer_sizer);
 

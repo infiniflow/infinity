@@ -16,6 +16,8 @@ export module infinity_core:task_result;
 
 import :data_block;
 
+import std.compat;
+
 import internal_types;
 import data_type;
 

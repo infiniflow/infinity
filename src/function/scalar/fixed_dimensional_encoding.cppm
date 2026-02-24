@@ -15,12 +15,13 @@
 export module infinity_core:fixed_dimensional_encoding;
 
 import :new_catalog;
-import :data_block;
 import :column_vector;
 
 import std;
 
 namespace infinity {
+
+struct DataBlock;
 
 // Fixed Dimensional Encoding , "Fixed Dimensional Encoding" , this function take a tensor as input
 // and output a single vector (the FDE), such that the dot product between a query FDE and a document

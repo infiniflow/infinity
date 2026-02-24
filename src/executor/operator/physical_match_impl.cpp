@@ -25,7 +25,6 @@ import :physical_operator;
 import :physical_operator_type;
 import :query_context;
 import :operator_state;
-import :data_block;
 import :column_vector;
 import :expression_evaluator;
 import :expression_state;

@@ -15,7 +15,6 @@
 export module infinity_core:physical_merge_knn;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;
@@ -31,6 +30,8 @@ import internal_types;
 import data_type;
 
 namespace infinity {
+
+struct MergeKnnOperatorState;
 
 export class PhysicalMergeKnn final : public PhysicalScanBase {
 public:

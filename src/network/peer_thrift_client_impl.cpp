@@ -24,6 +24,7 @@ import :cluster_manager;
 import :node_info;
 import :config;
 import :utility;
+import :logger;
 
 import std;
 import third_party;

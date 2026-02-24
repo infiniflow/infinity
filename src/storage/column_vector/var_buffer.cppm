@@ -14,11 +14,11 @@
 
 export module infinity_core:var_buffer;
 
-import :file_worker;
+import std.compat;
 
 namespace infinity {
 
-class DataFileWorker;
+export struct DataFileWorker;
 export struct VarFileWorker;
 
 export class VarBuffer {

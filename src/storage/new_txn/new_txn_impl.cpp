@@ -1818,15 +1818,12 @@ Status NewTxn::Checkpoint(TxnTimeStamp last_ckp_ts, bool auto_checkpoint) {
 Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_snapshot_info, const SnapshotOption &option) {
     Status status;
 
-    std::string db_name = table_snapshot_info->db_name_;
-    std::string table_name = table_snapshot_info->table_name_;
-    std::string snapshot_name = table_snapshot_info->snapshot_name_;
-
-    [[maybe_unused]] PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    auto *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-    std::string data_dir = InfinityContext::instance().config()->DataDir();
-    std::string temp_dir = InfinityContext::instance().config()->TempDir();
-    std::string snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
+    auto db_name = table_snapshot_info->db_name_;
+    auto table_name = table_snapshot_info->table_name_;
+    auto snapshot_name = table_snapshot_info->snapshot_name_;
+    auto data_dir = InfinityContext::instance().config()->DataDir();
+    auto temp_dir = InfinityContext::instance().config()->TempDir();
+    auto snapshot_dir = InfinityContext::instance().config()->SnapshotDir();
 
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
@@ -1868,28 +1865,18 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
             }
 
             {
-                // CreateSnapShot
-                // Drop table
+                auto src_rel_path = fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH);
+                FileWorker::Load(src_rel_path);
+                auto src = fmt::format("{}/{}", temp_dir, src_rel_path);
+                auto dst = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
+                VirtualStore::Copy(src, dst);
 
-                // Checkpoint
-                // Cleanup
+                auto segment = boost::interprocess::managed_mapped_file(boost::interprocess::open_only_infinity, dst.c_str());
+                auto [raw_block_version, _] = segment.find<BlockVersion>(src_rel_path.c_str());
 
-                auto read_path = std::make_shared<std::string>(fmt::format("{}/{}", *block_dir_ptr, BlockVersion::PATH));
-                auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, block_meta.block_capacity());
-                auto version_file_worker_ = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
+                raw_block_version->FixByCheckpointTs(option.checkpoint_ts_);
 
-                // Read version info
-                BlockVersion *block_version{};
-                FileWorker::Read(version_file_worker_, block_version);
-                // Write snapshot file
-                auto write_path = fmt::format("{}/{}/{}/{}", snapshot_dir, snapshot_name, *block_dir_ptr, BlockVersion::PATH);
-                auto [handle, status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
-                if (!status.ok()) {
-                    RecoverableError(Status::SyntaxError(fmt::format("Open {} failed: {}", write_path, status.message())));
-                }
-
-                block_version->SaveToFile(option.checkpoint_ts_, *handle);
-                // close(handle->fd());
+                segment.flush();
             }
 
             {
@@ -1916,14 +1903,18 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                     }
 
                     {
-                        auto src = fmt::format("{}/{}/{}.col", temp_dir, *block_dir_ptr, column_def->id());
+                        auto src_rel_path = fmt::format("{}/{}.col", *block_dir_ptr, column_def->id());
+                        FileWorker::Load(src_rel_path);
+                        auto src = fmt::format("{}/{}", temp_dir, src_rel_path);
                         auto dst = fmt::format("{}/{}/{}/{}.col", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
                         VirtualStore::Copy(src, dst);
                     }
 
                     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*column_def->type());
                     if (buffer_type == VectorBufferType::kVarBuffer) {
-                        auto src = fmt::format("{}/{}/col_{}_out", temp_dir, *block_dir_ptr, column_def->id());
+                        auto src_rel_path = fmt::format("{}/col_{}_out", *block_dir_ptr, column_def->id());
+                        FileWorker::Load(src_rel_path);
+                        auto src = fmt::format("{}/{}", temp_dir, src_rel_path);
                         auto dst = fmt::format("{}/{}/{}/col_{}_out", snapshot_dir, snapshot_name, *block_dir_ptr, column_def->id());
                         VirtualStore::Copy(src, dst);
                     }

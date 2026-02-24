@@ -18,7 +18,6 @@ import :bound_cast_func;
 import :vector_buffer;
 import :column_vector_cast;
 import :infinity_exception;
-import :column_vector;
 import :status;
 
 import internal_types;

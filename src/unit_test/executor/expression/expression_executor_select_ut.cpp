@@ -20,13 +20,15 @@ module infinity_core:ut.expression_executor_select;
 
 import :ut.base_test;
 import :infinity_exception;
-import third_party;
 import :logger;
 import :infinity_context;
 import :default_values;
 import :value;
 import :logger;
 import :selection;
+import :column_vector;
+
+import third_party;
 
 import global_resource_usage;
 import logical_type;

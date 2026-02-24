@@ -15,7 +15,6 @@
 export module infinity_core:emvb_index_file_worker;
 
 import :index_file_worker;
-import :file_worker;
 import :index_base;
 import :file_worker_type;
 import :emvb_index;

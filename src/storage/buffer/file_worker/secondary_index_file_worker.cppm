@@ -15,7 +15,6 @@
 export module infinity_core:secondary_index_file_worker;
 
 import :index_file_worker;
-import :file_worker;
 import :index_base;
 import :index_secondary_functional;
 import :infinity_exception;

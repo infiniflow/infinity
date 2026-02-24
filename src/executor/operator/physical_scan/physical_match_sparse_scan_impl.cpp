@@ -32,7 +32,6 @@ import :expression_evaluator;
 import :expression_state;
 import :base_expression;
 import :column_vector;
-import :data_block;
 import :knn_result_handler;
 import :match_sparse_scan_function_data;
 import :global_block_id;

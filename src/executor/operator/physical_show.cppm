@@ -15,7 +15,6 @@
 export module infinity_core:physical_show;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;
@@ -23,7 +22,6 @@ import :logical_show;
 import :load_meta;
 import :infinity_exception;
 import :variables;
-import :data_block;
 import :logger;
 
 import show_statement;
@@ -32,6 +30,8 @@ import column_def;
 import data_type;
 
 namespace infinity {
+
+struct ShowOperatorState;
 
 export class PhysicalShow : public PhysicalOperator {
 public:

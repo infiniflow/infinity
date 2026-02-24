@@ -16,7 +16,6 @@ export module infinity_core:physical_create_index_prepare;
 
 import :physical_operator_type;
 import :physical_operator;
-import :operator_state;
 import :load_meta;
 import :base_table_ref;
 import :index_base;

@@ -16,7 +16,6 @@ export module infinity_core:physical_merge_limit;
 
 import :base_expression;
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_limit;
 import :physical_operator_type;

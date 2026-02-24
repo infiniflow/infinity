@@ -19,7 +19,6 @@ import :query_context;
 import :table_def;
 import :data_table;
 import :operator_state;
-import :data_block;
 import :utility;
 import :logger;
 import :column_vector;

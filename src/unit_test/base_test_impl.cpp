@@ -21,6 +21,8 @@ import :ut.base_test;
 
 import :infinity_context;
 import :infinity_exception;
+import :column_vector;
+import :data_block;
 
 import column_def;
 import data_type;

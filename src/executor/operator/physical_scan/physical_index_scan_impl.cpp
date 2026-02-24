@@ -22,7 +22,6 @@ import :operator_state;
 import :default_values;
 import :infinity_exception;
 import :logger;
-import :data_block;
 import :secondary_index_in_mem;
 import :fast_rough_filter;
 import :roaring_bitmap;

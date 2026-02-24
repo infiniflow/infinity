@@ -18,6 +18,7 @@ import :physical_compact;
 import :bg_task;
 import :compaction_process;
 import :infinity_context;
+import :operator_state;
 
 import std;
 

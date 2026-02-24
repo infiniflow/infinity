@@ -16,7 +16,6 @@ export module infinity_core:value_expression;
 
 import :base_expression;
 import :bound_select_statement;
-import :column_vector;
 import :expression_type;
 import :value;
 

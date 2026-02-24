@@ -21,9 +21,7 @@ import :operator_state;
 import :logger;
 import :status;
 import :infinity_exception;
-
 import :default_values;
-import :data_block;
 import :value;
 import :column_vector;
 import :physical_scan_base;

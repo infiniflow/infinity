@@ -27,7 +27,6 @@ import :merge_knn;
 import :block_index;
 
 import :default_values;
-import :data_block;
 import :knn_expression;
 import :value;
 import :column_vector;

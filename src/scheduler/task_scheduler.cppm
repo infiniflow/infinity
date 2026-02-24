@@ -14,7 +14,6 @@
 
 export module infinity_core:task_scheduler;
 
-import :fragment_task;
 import :blocking_queue;
 
 import base_statement;
@@ -23,6 +22,8 @@ namespace infinity {
 
 class QueryContext;
 class PlanFragment;
+export class FragmentTask;
+struct Config;
 
 using FragmentTaskBlockQueue = BlockingQueue<FragmentTask *>;
 

@@ -28,7 +28,7 @@ class CheckpointTaskBase;
 class ForceCheckpointTask;
 class BottomExecutor;
 
-struct WalEntry;
+export struct WalEntry;
 
 export enum class StorageMode {
     kUnInitialized,

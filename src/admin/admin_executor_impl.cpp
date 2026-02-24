@@ -23,7 +23,6 @@ import :status;
 import :log_file;
 import :table_def;
 import :data_table;
-import :data_block;
 import :value;
 import :value_expression;
 import :logical_node;

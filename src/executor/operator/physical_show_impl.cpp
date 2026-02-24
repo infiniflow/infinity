@@ -19,7 +19,6 @@ import :new_txn;
 import :query_context;
 import :profiler;
 import :operator_state;
-import :data_block;
 import :infinity_exception;
 import :value_expression;
 import :logical_show;

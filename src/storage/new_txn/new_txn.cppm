@@ -20,7 +20,6 @@ import :database_detail;
 import :status;
 import :value;
 import :snapshot_info;
-import :column_vector;
 import :fast_rough_filter;
 import :txn_context;
 

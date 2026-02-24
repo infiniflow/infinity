@@ -14,7 +14,6 @@
 
 export module infinity_core:decimal_cast;
 
-import :column_vector;
 import :vector_buffer;
 import :bound_cast_func;
 import :infinity_exception;

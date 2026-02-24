@@ -15,7 +15,6 @@
 export module infinity_core:physical_knn_scan;
 
 import :query_context;
-import :operator_state;
 import :physical_operator_type;
 import :base_table_ref;
 import :meta_info;
@@ -34,6 +33,7 @@ namespace infinity {
 class BlockMeta;
 class TableIndexMeta;
 class SegmentIndexMeta;
+struct KnnScanOperatorState;
 
 export class PhysicalKnnScan final : public PhysicalFilterScanBase {
 public:

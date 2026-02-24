@@ -16,6 +16,8 @@ export module infinity_core:nullary_operation;
 
 import :column_vector;
 
+import std;
+
 import internal_types;
 
 namespace infinity {

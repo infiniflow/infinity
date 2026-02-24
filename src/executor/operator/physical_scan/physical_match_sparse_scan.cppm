@@ -15,7 +15,6 @@
 export module infinity_core:physical_match_sparse_scan;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :match_sparse_expression;
 import :base_table_ref;
@@ -28,9 +27,11 @@ import match_sparse_expr;
 import data_type;
 
 namespace infinity {
+
 struct LoadMeta;
 struct BlockIndex;
 struct ColumnVector;
+struct MatchSparseScanOperatorState;
 
 export class PhysicalMatchSparseScan final : public PhysicalFilterScanBase {
 public:

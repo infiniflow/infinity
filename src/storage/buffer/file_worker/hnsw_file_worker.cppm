@@ -19,7 +19,6 @@ import :hnsw_alg;
 import :index_hnsw;
 import :index_base;
 import :file_worker_type;
-import :file_worker;
 import :persistence_manager;
 import :hnsw_handler;
 

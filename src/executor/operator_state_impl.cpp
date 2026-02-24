@@ -15,7 +15,6 @@
 module infinity_core:operator_state.impl;
 
 import :operator_state;
-import :data_block;
 import :physical_operator_type;
 import :fragment_data;
 import :infinity_exception;

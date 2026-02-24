@@ -15,7 +15,6 @@
 export module infinity_core:physical_table_scan;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :global_block_id;
@@ -33,6 +32,7 @@ import data_type;
 namespace infinity {
 
 struct BlockIndex;
+struct TableScanOperatorState;
 
 export class PhysicalTableScan : public PhysicalScanBase {
 public:

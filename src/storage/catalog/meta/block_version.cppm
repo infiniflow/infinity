@@ -57,17 +57,22 @@ export struct BlockVersion {
           deleted_(capacity, alloc_inst), created_(alloc_inst) {}
     BlockVersion() = default;
 
+    // BlockVersion(const BlockVersion &other);
+    // BlockVersion &operator=(const BlockVersion &other);
+    // BlockVersion(BlockVersion &&other) noexcept;
+    // BlockVersion &operator=(BlockVersion &&other) noexcept;
+
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
     std::pair<BlockOffset, i32> GetCommitRowCount(TxnTimeStamp commit_ts) const;
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
     i64 GetRowCount() const;
-    bool SaveToFile(void *&mmap, size_t &mmap_size, const std::string &rel_path, TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler);
-    bool SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
+    void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const;
+    void FixByCheckpointTs(TxnTimeStamp checkpoint_ts);
 
     static void LoadFromFile(LocalFileHandle *file_handle, BlockVersion *&block_version);
-    static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
+    // static void LoadFromFile(std::shared_ptr<BlockVersion> &data, size_t &mmap_size, void *&mmap, LocalFileHandle *file_handle);
 
     void GetCreateTS(size_t offset, size_t size, ColumnVector &res) const;
 
@@ -86,6 +91,11 @@ export struct BlockVersion {
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
     Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
+
+    ShmemTxnTimeStampVector DeletedVec();
+    ShmemCreateFieldVector CreatedVec();
+
+    void Import(ShmemTxnTimeStampVector &deleted, ShmemCreateFieldVector &created);
 
 private:
     // mutable std::shared_mutex rw_mutex_;

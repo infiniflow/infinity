@@ -15,7 +15,6 @@
 export module infinity_core:physical_alter;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;
@@ -28,6 +27,7 @@ import data_type;
 import alter_statement;
 import column_def;
 import constant_expr;
+import statement_common;
 
 namespace infinity {
 

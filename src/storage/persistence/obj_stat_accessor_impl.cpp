@@ -27,6 +27,7 @@ import :storage;
 import :kv_code;
 import :status;
 import :infinity_context;
+import :persistence_manager;
 
 import std;
 import third_party;

@@ -21,7 +21,6 @@ import :data_table;
 import :physical_operator_type;
 import :operator_state;
 import :infinity_exception;
-import :data_block;
 import :column_vector;
 
 import std;

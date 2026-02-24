@@ -514,7 +514,8 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
     auto file_restore_start = std::chrono::high_resolution_clock::now();
 
     for (const auto &file : files_to_restore) {
-        std::string src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+        auto &src_rel = file;
+        auto src = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, src_rel);
 
         // Replace the old table_id_str with the new one in the file path
         std::string modified_file = file;
@@ -570,28 +571,31 @@ Status SnapshotInfo::RestoreSnapshotFiles(const std::string &snapshot_dir,
         if (!VirtualStore::Exists(dst_dir)) {
             VirtualStore::MakeDirectory(dst_dir);
         }
-        if (src_file_path.find("/version") != std::string::npos) {
-            auto [handle, status] = VirtualStore::Open(src_file_path, FileAccessMode::kRead);
-            auto file_handle = LocalFileHandle{handle->fd(), src_file_path, FileAccessMode::kRead};
+        if (src.find("/version") != std::string::npos) {
+            // auto [handle, status] = VirtualStore::Open(src_file_path, FileAccessMode::kRead);
+            // auto file_handle = LocalFileHandle{handle->fd(), src_file_path, FileAccessMode::kRead};
             FileWorkerManager *fileworker_mgr = InfinityContext::instance().storage()->fileworker_manager();
-            boost::interprocess::file_mapping::remove(dst_file_path.c_str());
+            // boost::interprocess::file_mapping::remove(dst_file_path.c_str());
 
             auto rel_file_path = std::make_shared<std::string>(modified_file);
             auto read_path = std::make_shared<std::string>(fmt::format("{}", *rel_file_path));
             auto version_file_worker = std::make_unique<VersionFileWorker>(read_path, 8192);
             auto version_file_worker1 = fileworker_mgr->version_map_.EmplaceFileWorker(std::move(version_file_worker));
-            // Mmap version info
-            // yee todo ?
-            BlockVersion *block_version{};
-            FileWorker::Read(version_file_worker1, block_version);
 
-            BlockVersion::LoadFromFile(&file_handle, block_version);
+            auto segment = boost::interprocess::managed_mapped_file(boost::interprocess::open_only_infinity, src.c_str());
+            auto [src_block_version, _] = segment.find<BlockVersion>(src_rel.c_str());
 
-            close(handle->fd());
+            BlockVersion *dst_block_version{};
+            FileWorker::Read(version_file_worker1, dst_block_version);
+
+            auto deleted_vec = src_block_version->DeletedVec();
+            auto created_vec = src_block_version->CreatedVec();
+
+            dst_block_version->Import(deleted_vec, created_vec);
         } else {
-            Status status = VirtualStore::Copy(src_file_path, dst_file_path);
+            Status status = VirtualStore::Copy(src, dst_file_path);
             if (!status.ok()) {
-                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src_file_path, dst_file_path, status.message()));
+                LOG_WARN(fmt::format("Failed to copy {} to {}: {}", src, dst_file_path, status.message()));
             } else {
                 restored_file_paths.push_back(modified_file);
             }

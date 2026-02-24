@@ -28,7 +28,6 @@ import :data_table;
 import :physical_operator_type;
 import :operator_state;
 import :expression_state;
-import :data_block;
 import :logger;
 import :defer_op;
 // import :data_file_worker;

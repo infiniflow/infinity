@@ -19,7 +19,6 @@ module;
 export module infinity_core:fileworker_manager;
 
 import :bmp_index_file_worker;
-import :data_file_worker;
 import :emvb_index_file_worker;
 import :hnsw_file_worker;
 import :ivf_index_file_worker;

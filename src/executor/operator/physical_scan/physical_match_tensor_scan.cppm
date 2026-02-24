@@ -17,7 +17,6 @@ module;
 export module infinity_core:physical_match_tensor_scan;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :match_tensor_expression;
 import :base_table_ref;
@@ -31,9 +30,10 @@ import data_type;
 import internal_types;
 
 namespace infinity {
+
 struct LoadMeta;
 struct BlockIndex;
-
+struct MatchTensorScanOperatorState;
 class BlockMeta;
 class TableIndexMeta;
 class SegmentIndexMeta;

@@ -24,7 +24,6 @@ import :segment_meta;
 import :table_meta;
 import :infinity_context;
 import :fileworker_manager;
-import :data_file_worker;
 import :vector_buffer;
 import :column_vector;
 

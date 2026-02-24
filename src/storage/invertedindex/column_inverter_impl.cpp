@@ -34,6 +34,7 @@ import :status;
 import :logger;
 import :buf_writer;
 import :profiler;
+import :column_vector;
 
 import std.compat;
 import third_party;

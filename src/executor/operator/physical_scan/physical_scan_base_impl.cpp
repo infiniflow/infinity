@@ -20,7 +20,6 @@ import :physical_operator_type;
 import :global_block_id;
 import :base_table_ref;
 import :block_index;
-import :data_block;
 import :operator_state;
 import :default_values;
 import :infinity_exception;

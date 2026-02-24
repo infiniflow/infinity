@@ -14,8 +14,7 @@
 
 export module infinity_core:expression_evaluator;
 
-import :data_block;
-import :column_vector;
+import std;
 
 namespace infinity {
 export class FilterFulltextExpression;
@@ -29,6 +28,8 @@ export class CastExpression;
 export class AggregateExpression;
 export class ExpressionState;
 export class BaseExpression;
+struct DataBlock;
+struct ColumnVector;
 
 class AggregateFunction;
 

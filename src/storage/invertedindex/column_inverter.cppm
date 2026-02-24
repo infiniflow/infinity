@@ -15,7 +15,6 @@
 export module infinity_core:column_inverter;
 
 import :analyzer;
-import :column_vector;
 import :term;
 import :string_ref;
 import :posting_writer;
@@ -28,6 +27,8 @@ import std.compat;
 import internal_types;
 
 namespace infinity {
+
+class ColumnVector;
 
 export class ColumnInverter {
 public:

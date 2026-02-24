@@ -14,7 +14,6 @@
 
 export module infinity_core:physical_drop_schema;
 
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;

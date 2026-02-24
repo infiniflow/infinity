@@ -15,14 +15,11 @@
 export module infinity_core:physical_top;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;
 import :expression_state;
 import :data_table;
-import :data_block;
-import :column_vector;
 import :load_meta;
 import :infinity_exception;
 import :physical_limit;

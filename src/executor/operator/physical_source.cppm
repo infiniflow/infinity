@@ -14,7 +14,6 @@
 
 export module infinity_core:physical_source;
 
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;
@@ -25,6 +24,8 @@ import internal_types;
 import data_type;
 
 namespace infinity {
+
+struct SourceState;
 
 export enum class SourceType {
     kInvalid,

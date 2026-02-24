@@ -21,7 +21,6 @@ import :data_table;
 import :physical_operator_type;
 import :operator_state;
 import :column_vector;
-import :data_block;
 import :default_values;
 import :value;
 import :status;

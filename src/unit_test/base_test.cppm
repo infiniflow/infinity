@@ -26,6 +26,9 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 
+struct DataBlock;
+struct Value;
+
 export template <typename T>
 class BaseTestWithParam : public std::conditional_t<std::is_same_v<T, void>, ::testing::Test, ::testing::TestWithParam<T>> {
 public:

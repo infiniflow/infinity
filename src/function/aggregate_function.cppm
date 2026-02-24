@@ -17,7 +17,6 @@ export module infinity_core:aggregate_function;
 import :function;
 import :function_data;
 import :column_vector;
-import :vector_buffer;
 import :infinity_exception;
 import :base_expression;
 

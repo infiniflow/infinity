@@ -18,7 +18,6 @@ export module infinity_core:scalar_function;
 
 import :function;
 import :function_data;
-import :column_vector;
 import :infinity_exception;
 import :data_block;
 import :roaring_bitmap;

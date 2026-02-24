@@ -14,7 +14,6 @@
 
 export module infinity_core:physical_filter;
 
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;

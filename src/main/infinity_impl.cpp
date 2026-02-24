@@ -20,6 +20,9 @@ import :infinity_context;
 import :query_context;
 import :session_manager;
 import :utility;
+import :logger;
+import :infinity_exception;
+import :defer_op;
 
 import std;
 

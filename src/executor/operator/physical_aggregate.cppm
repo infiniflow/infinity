@@ -15,14 +15,12 @@
 export module infinity_core:physical_aggregate;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :data_table;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
-import :data_block;
 import :logger;
 import :aggregate_utils;
 

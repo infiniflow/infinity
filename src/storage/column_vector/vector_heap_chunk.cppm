@@ -16,11 +16,12 @@ export module infinity_core:vector_heap_chunk;
 
 import :allocator;
 import :infinity_exception;
-import :file_worker;
 
 import global_resource_usage;
 
 namespace infinity {
+
+struct FileWorker;
 
 export using ChunkId = i64;
 export constexpr ChunkId INVALID_CHUNK_ID = -1;

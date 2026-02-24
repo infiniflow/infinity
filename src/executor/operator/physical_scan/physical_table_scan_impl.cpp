@@ -21,7 +21,6 @@ import :data_table;
 import :physical_operator_type;
 import :operator_state;
 import :global_block_id;
-import :data_block;
 import :table_scan_function_data;
 import :base_table_ref;
 import :block_index;

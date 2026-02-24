@@ -16,10 +16,10 @@ export module infinity_core:data_table;
 
 import :table_def;
 import :base_table;
-import :data_block;
 import :infinity_exception;
 import :logger;
 import :default_values;
+import :data_block;
 
 import third_party;
 

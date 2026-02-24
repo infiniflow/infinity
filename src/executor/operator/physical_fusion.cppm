@@ -17,7 +17,6 @@ export module infinity_core:physical_fusion;
 import :physical_operator;
 import :base_table_ref;
 import :fusion_expression;
-import :operator_state;
 
 import row_id;
 
@@ -25,6 +24,7 @@ namespace infinity {
 // struct FusionOperatorState;
 // class FusionExpression;
 // struct DataBlock;
+struct FusionOperatorState;
 
 export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor, kMax };
 

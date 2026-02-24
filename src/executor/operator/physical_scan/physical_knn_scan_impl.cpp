@@ -28,7 +28,6 @@ import :column_expression;
 import :fileworker_manager;
 import :merge_knn;
 import :knn_result_handler;
-import :data_block;
 import :index_hnsw;
 import :status;
 import :hnsw_handler;

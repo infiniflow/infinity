@@ -14,14 +14,12 @@
 
 export module infinity_core:physical_export;
 
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;
 import :infinity_exception;
 import :meta_info;
 import :logger;
-import :column_vector;
 import :knn_filter;
 
 import third_party;
@@ -34,6 +32,8 @@ import column_def;
 namespace infinity {
 
 struct BlockIndex;
+struct ExportOperatorState;
+class ColumnVector;
 
 export class PhysicalExport : public PhysicalOperator {
 public:

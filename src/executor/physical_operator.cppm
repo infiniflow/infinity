@@ -25,7 +25,7 @@ import data_type;
 
 namespace infinity {
 class DataTable;
-class OperatorState;
+struct OperatorState;
 class QueryContext;
 struct LoadMeta;
 class FileWorkerManager;

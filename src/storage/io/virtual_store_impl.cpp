@@ -28,6 +28,9 @@ import :virtual_store;
 import :s3_client_minio;
 import :infinity_context;
 import :utility;
+import :infinity_exception;
+import :persistence_manager;
+import :logger;
 
 import std.compat;
 
@@ -358,6 +361,9 @@ Status VirtualStore::Copy(std::string_view src, std::string_view dst) {
     }
     if (!std::filesystem::path(src).is_absolute()) {
         UnrecoverableError(fmt::format("{} isn't absolute path.", src));
+    }
+    if (!VirtualStore::Exists(src)) {
+        return Status::OK(); // yee todo
     }
 
     return CopyRange(src, dst, 0, 0, fs::file_size(src));

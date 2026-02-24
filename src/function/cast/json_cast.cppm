@@ -17,7 +17,6 @@ export module infinity_core:json_cast;
 import :bound_cast_func;
 import :column_vector_cast;
 import :infinity_exception;
-import :column_vector;
 import :vector_buffer;
 import :status;
 import :json_manager;

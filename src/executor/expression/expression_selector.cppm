@@ -15,12 +15,12 @@
 export module infinity_core:expression_selector;
 
 import :base_expression;
-import :data_block;
 import :selection;
 
 namespace infinity {
 class ExpressionState;
-struct ColumnVector;
+class ColumnVector;
+struct DataBlock;
 
 export class ExpressionSelector {
 public:

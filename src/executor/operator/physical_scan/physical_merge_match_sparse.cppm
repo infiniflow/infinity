@@ -15,7 +15,6 @@
 export module infinity_core:physical_merge_match_sparse;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :match_sparse_expression;
 import :base_table_ref;
@@ -26,7 +25,9 @@ import data_type;
 import match_sparse_expr;
 
 namespace infinity {
+
 struct LoadMeta;
+struct MergeMatchSparseOperatorState;
 
 export class PhysicalMergeMatchSparse final : public PhysicalScanBase {
 public:

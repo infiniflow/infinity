@@ -15,13 +15,11 @@
 export module infinity_core:physical_import;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :zsv;
 import :load_meta;
 import :infinity_exception;
-import :column_vector;
 import :logger;
 import :meta_info;
 
@@ -37,6 +35,8 @@ namespace infinity {
 
 struct DataBlock;
 class NewImportCtx;
+struct ImportOperatorState;
+class ColumnVector;
 
 export class PhysicalImport : public PhysicalOperator {
 public:

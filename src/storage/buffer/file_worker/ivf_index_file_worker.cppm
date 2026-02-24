@@ -15,7 +15,6 @@
 export module infinity_core:ivf_index_file_worker;
 
 import :index_file_worker;
-import :file_worker;
 import :index_base;
 import :file_worker_type;
 import :persistence_manager;

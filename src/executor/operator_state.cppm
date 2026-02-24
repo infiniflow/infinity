@@ -16,10 +16,6 @@ export module infinity_core:operator_state;
 
 import :global_block_id;
 import :physical_operator_type;
-import :fragment_data;
-import :data_block;
-import :match_tensor_scan_function_data;
-import :match_sparse_scan_function_data;
 import :table_def;
 import :merge_knn_data;
 import :create_index_data;
@@ -27,6 +23,9 @@ import :blocking_queue;
 import :expression_state;
 import :status;
 import :aggregate_utils;
+import :data_block;
+import :match_tensor_scan_function_data;
+import :match_sparse_scan_function_data;
 
 import internal_types;
 import data_type;
@@ -36,6 +35,7 @@ namespace infinity {
 class TableScanFunctionData;
 class KnnScanFunctionData;
 class CompactStateData;
+struct FragmentDataBase;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}

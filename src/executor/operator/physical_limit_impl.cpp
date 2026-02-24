@@ -24,7 +24,6 @@ import :data_table;
 import :default_values;
 import :physical_operator_type;
 import :operator_state;
-import :data_block;
 import :status;
 import :infinity_exception;
 import :expression_type;

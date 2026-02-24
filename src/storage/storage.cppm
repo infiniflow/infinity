@@ -17,13 +17,12 @@ export module infinity_core:storage;
 import :wal_manager;
 import :log_file;
 import :status;
-
 import :config;
 
 namespace infinity {
 
-class FileWorkerManager;
-class ResultCacheManager;
+export class FileWorkerManager;
+export class ResultCacheManager;
 export struct NewCatalog;
 export class NewTxnManager;
 class KVStore;

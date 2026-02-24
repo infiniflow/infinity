@@ -20,7 +20,6 @@ import :query_context;
 import :operator_state;
 import :base_expression;
 import :expression_state;
-import :data_block;
 import :value_expression;
 import :column_vector;
 import :infinity_exception;

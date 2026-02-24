@@ -21,7 +21,6 @@ import :data_table;
 import :operator_state;
 import :expression_evaluator;
 import :expression_state;
-import :data_block;
 import :column_vector;
 import :infinity_exception;
 import :analyzer_pool;

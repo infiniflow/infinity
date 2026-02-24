@@ -26,7 +26,6 @@ import :base_table_ref;
 import :infinity_exception;
 import :result_cache_manager;
 import :logger;
-import :data_block;
 import :cached_match;
 
 import :block_index;

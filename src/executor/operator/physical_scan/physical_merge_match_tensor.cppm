@@ -15,7 +15,6 @@
 export module infinity_core:physical_merge_match_tensor;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :meta_info;
 import :match_tensor_expression;
@@ -30,6 +29,7 @@ namespace infinity {
 struct LoadMeta;
 class ResultCacheManager;
 struct DataBlock;
+struct MergeMatchTensorOperatorState;
 
 export class PhysicalMergeMatchTensor final : public PhysicalOperator {
 public:

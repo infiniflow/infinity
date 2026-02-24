@@ -20,6 +20,8 @@ import :infinity_thrift_service;
 import :resource_manager;
 import :session_manager;
 import :variables;
+import :logger;
+import :infinity_exception;
 
 import std.compat;
 

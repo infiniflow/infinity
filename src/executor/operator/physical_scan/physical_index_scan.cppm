@@ -15,7 +15,6 @@
 export module infinity_core:physical_index_scan;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :physical_scan_base;
@@ -35,6 +34,8 @@ import internal_types;
 import data_type;
 
 namespace infinity {
+
+struct IndexScanOperatorState;
 
 // for int range filter, x > n is equivalent to x >= n + 1
 // for float range filter, x > f is equivalent to x >= std::nextafter(f, INFINITY)

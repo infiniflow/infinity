@@ -22,7 +22,6 @@ import :value_expression;
 import :expression_state;
 import :infinity_exception;
 import :expression_evaluator;
-import :data_block;
 import :column_vector;
 import :default_values;
 import :physical_top;

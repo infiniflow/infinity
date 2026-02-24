@@ -15,7 +15,6 @@
 export module infinity_core:physical_index_join;
 
 import :query_context;
-import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :load_meta;

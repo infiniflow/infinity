@@ -16,7 +16,6 @@ export module infinity_core:memory_indexer;
 
 import :index_defines;
 import :posting_writer;
-import :column_vector;
 import :column_inverter;
 import :ring;
 import :skiplist;

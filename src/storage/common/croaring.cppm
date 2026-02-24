@@ -19,8 +19,8 @@ module;
 
 export module infinity_core:croaring;
 
-namespace roaring {
-export using roaring::Roaring;
-export using roaring::RoaringSetBitForwardIterator;
-export using roaring::Roaring64Map;
+export namespace roaring {
+using roaring::Roaring;
+using roaring::Roaring64Map;
+using roaring::RoaringSetBitForwardIterator;
 } // namespace roaring

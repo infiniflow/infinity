@@ -14,10 +14,13 @@
 
 export module infinity_core:invert_task;
 
-import :column_vector;
+import :infinity_type;
+
 import internal_types;
 
 namespace infinity {
+
+class ColumnVector;
 
 export struct BatchInvertTask {
 public:

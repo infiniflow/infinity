@@ -19,7 +19,6 @@ import :global_block_id;
 import :merge_knn;
 import :roaring_bitmap;
 import :data_block;
-import :column_vector;
 import :base_expression;
 import :expression_state;
 import :base_table_ref;

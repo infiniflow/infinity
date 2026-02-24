@@ -20,7 +20,6 @@ import :table_def;
 import :data_table;
 import :physical_operator_type;
 import :operator_state;
-import :data_block;
 import :fragment_data;
 import :status;
 import :infinity_exception;

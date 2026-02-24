@@ -21,6 +21,7 @@ import :config;
 import :infinity_context;
 import :peer_task;
 import :peer_thrift_client;
+import :logger;
 
 import std;
 

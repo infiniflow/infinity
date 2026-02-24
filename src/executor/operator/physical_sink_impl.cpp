@@ -20,7 +20,6 @@ import :operator_state;
 import :physical_operator_type;
 import :fragment_context;
 import :fragment_data;
-import :data_block;
 import :status;
 import :infinity_exception;
 import :logger;

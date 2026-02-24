@@ -5,12 +5,14 @@ module;
 module infinity_core:ut.byte_slice_write_read;
 
 import :ut.base_test;
-import third_party;
 import :file_writer;
 import :file_reader;
 import :byte_slice;
 import :byte_slice_reader;
 import :byte_slice_writer;
+import :logger;
+
+import third_party;
 
 import global_resource_usage;
 

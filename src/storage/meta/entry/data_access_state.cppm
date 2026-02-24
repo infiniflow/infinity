@@ -14,8 +14,9 @@
 
 export module infinity_core:data_access_state;
 
-import :data_block;
-import :column_vector;
+import :infinity_type;
+
+import std;
 
 import internal_types;
 

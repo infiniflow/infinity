@@ -21,7 +21,6 @@ import :index_defines;
 import :logger;
 import :status;
 import :default_values;
-import :file_worker;
 
 import third_party;
 

@@ -15,13 +15,11 @@
 export module infinity_core:physical_sort;
 
 import :query_context;
-import :operator_state;
 import :expression_evaluator;
 import :physical_operator;
 import :physical_operator_type;
 import :base_expression;
 import :data_table;
-import :data_block;
 import :load_meta;
 import :infinity_exception;
 import :physical_top;

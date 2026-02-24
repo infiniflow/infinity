@@ -14,13 +14,11 @@
 
 export module infinity_core:fragment_context;
 
-import :fragment_task;
 import :profiler;
 import :physical_operator;
 import :physical_source;
 import :physical_sink;
 import :data_table;
-import :data_block;
 import :knn_scan_data;
 import :create_index_data;
 import :compact_state_data;

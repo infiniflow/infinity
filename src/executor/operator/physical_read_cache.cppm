@@ -13,7 +13,6 @@ export module infinity_core:physical_read_cache;
 
 import :physical_operator;
 import :query_context;
-import :operator_state;
 import :base_table_ref;
 import :result_cache_manager;
 import :physical_operator_type;

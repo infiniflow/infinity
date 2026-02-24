@@ -28,7 +28,7 @@ import :block_version;
 import :emvb_index;
 import :virtual_store;
 import :boost;
-// import :infinity_context;
+import :infinity_context;
 import :persist_result_handler;
 
 import std.compat;
@@ -54,7 +54,7 @@ export struct HnswFileWorker;
 // export struct LowCardinalityTag;
 // export template <typename CardinalityTag>
 // class SecondaryIndexDataBase;
-export class FileWorkerManager;
+// export class FileWorkerManager;
 //
 // export class IVFIndexInChunk;
 //
@@ -116,6 +116,34 @@ export struct FileWorker {
     // template <typename FileWorkerT, typename PayloadT>
     // static void Read<BmpIndexFileW>(FileWorkerT file_worker, PayloadT &data);
 
+    static void Load(std::string_view rel_path) {
+        auto *pm = InfinityContext::instance().persistence_manager();
+        std::string data_dir = InfinityContext::instance().config()->DataDir();
+        std::string temp_dir = InfinityContext::instance().config()->TempDir();
+        auto working_path = fmt::format("{}/{}", temp_dir, rel_path);
+        auto data_path = fmt::format("{}/{}", data_dir, rel_path);
+        // auto file_worker_map = InfinityContext::instance().storage()->fileworker_manager();
+
+        if (VirtualStore::Exists(working_path)) {
+            return;
+        }
+        if (pm) {
+            auto result = pm->GetObjCache(data_path);
+            auto obj_addr = result.obj_addr_;
+            auto true_file_path = fmt::format("{}/{}", pm->workspace(), obj_addr.obj_key_);
+            if (obj_addr.Valid()) {
+                VirtualStore::CopyRange(true_file_path, working_path, obj_addr.part_offset_, 0, obj_addr.part_size_);
+                return;
+            }
+        }
+        if (VirtualStore::Exists(data_path, true)) {
+            VirtualStore::Copy(data_path, working_path);
+            return;
+        }
+        auto ps = std::filesystem::path(working_path).parent_path().string();
+        VirtualStore::MakeDirectory(ps);
+    }
+
     template <typename FileWorkerT, typename PayloadT>
     static void Read(FileWorkerT file_worker, PayloadT &data) {
         std::unique_lock l(file_worker->mutex_);
@@ -133,6 +161,8 @@ export struct FileWorker {
             return;
         }
 
+        FileWorker::Load(*file_worker->rel_file_path_);
+
         auto working_path = file_worker->GetWorkingPath();
         auto data_path = file_worker->GetPath();
         // auto file_worker_map = InfinityContext::instance().storage()->fileworker_manager();
@@ -149,43 +179,6 @@ export struct FileWorker {
             close(file_handle->fd());
             return;
         }
-        auto persistence_manager = file_worker->persistence_manager_;
-        if (persistence_manager) {
-            auto result = persistence_manager->GetObjCache(data_path);
-            auto obj_addr = result.obj_addr_;
-            auto true_file_path = fmt::format("{}/{}", persistence_manager->workspace(), obj_addr.obj_key_);
-            if (obj_addr.Valid()) {
-                VirtualStore::CopyRange(true_file_path, working_path, obj_addr.part_offset_, 0, obj_addr.part_size_);
-                obj_addr.obj_key_.clear();
-                auto [file_handle, status] = VirtualStore::Open(working_path, FileAccessMode::kReadWrite);
-                if (!status.ok()) {
-                    std::unique_ptr<LocalFileHandle> file_handle;
-                    file_worker->Read(data, file_handle, file_size);
-                    // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                    return;
-                }
-                file_worker->Read(data, file_handle, obj_addr.part_size_);
-                close(file_handle->fd());
-                return;
-            }
-        }
-        if (VirtualStore::Exists(data_path, true)) {
-            auto [file_handle, status] = VirtualStore::Open(data_path, FileAccessMode::kReadWrite);
-            if (!status.ok()) {
-                std::unique_ptr<LocalFileHandle> file_handle;
-                file_worker->Read(data, file_handle, file_size);
-                // UnrecoverableError("??????"); // AddSegmentVersion->GetData->Read
-                return;
-            }
-            file_size = file_handle->FileSize();
-
-            VirtualStore::CopyRange(data_path, working_path, 0, 0, file_size);
-            file_worker->Read(data, file_handle, file_size);
-            close(file_handle->fd());
-            return;
-        }
-        auto ps = std::filesystem::path(working_path).parent_path().string();
-        VirtualStore::MakeDirectory(ps);
         std::unique_ptr<LocalFileHandle> file_handle;
         file_worker->Read(data, file_handle, file_size);
     }

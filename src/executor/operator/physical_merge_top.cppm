@@ -15,7 +15,6 @@
 export module infinity_core:physical_merge_top;
 
 import :query_context;
-import :operator_state;
 import :expression_state;
 import :physical_operator;
 import :physical_operator_type;

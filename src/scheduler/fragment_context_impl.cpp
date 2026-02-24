@@ -44,7 +44,6 @@ import :query_context;
 import :physical_source;
 import :physical_sink;
 import :data_table;
-import :data_block;
 import :physical_merge_knn;
 import :merge_knn_data;
 import :create_index_data;
