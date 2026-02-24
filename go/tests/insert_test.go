@@ -849,6 +849,76 @@ func TestInsertTensor(t *testing.T) {
 	db.DropTable(tableName2, infinity.ConflictTypeError)
 }
 
+// TestInsertTableWith10000Rows tests inserting 10000 rows into a table
+// Based on Python SDK test_pysdk/test_insert.py - _test_insert_table_with_10000_columns
+func TestInsertTableWith10000Rows(t *testing.T) {
+
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_insert_table_with_10000_rows"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with two int columns
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "int"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert 100 batches, each with 100 rows, totaling 10000 rows
+	batchSize := 100
+	batchCount := 100
+	totalRows := batchSize * batchCount
+
+	for i := 0; i < batchCount; i++ {
+		values := make([]map[string]interface{}, batchSize)
+		for j := 0; j < batchSize; j++ {
+			values[j] = map[string]interface{}{
+				"c1": i*batchSize + j,
+				"c2": i*batchSize + j + 1,
+			}
+		}
+		_, err = table.Insert(values)
+		if err != nil {
+			t.Fatalf("Failed to insert batch %d: %v", i, err)
+		}
+	}
+
+	t.Logf("Successfully inserted %d rows", totalRows)
+
+	// Query to verify count
+	result, err := table.Output([]string{"count(*)"}).ToResult()
+	if err != nil {
+		t.Errorf("Failed to query count(*): %v", err)
+	} else {
+		// Try to extract count from result
+		v := result.(*infinity.QueryResult)
+		if data, ok := v.Data["count(star)"]; ok && len(data) > 0 {
+			actualCount := data[0].(int64)
+			if actualCount != int64(totalRows) {
+				t.Errorf("Count mismatch: expected %d, got %d", totalRows, actualCount)
+			} else {
+				t.Logf("Successfully verified count: %d rows", actualCount)
+			}
+		} else {
+			t.Errorf("Failed to extract count from result")
+		}
+	}
+
+	// Cleanup
+	db.DropTable(tableName, infinity.ConflictTypeError)
+}
+
 // TestInsertTensorArray tests insert with tensor array column
 func TestInsertTensorArray(t *testing.T) {
 
@@ -1800,4 +1870,92 @@ func TestBatchInsertWithInvalidColumnCount(t *testing.T) {
 			db.DropTable(tableName, infinity.ConflictTypeError)
 		})
 	}
+}
+
+// TestInsertMultivector tests insert with multivector column
+// Based on Python SDK test_pysdk/test_insert.py - _test_insert_multivector
+func TestInsertMultivector(t *testing.T) {
+
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	// Test int multivector
+	tableName1 := "test_insert_multivector_int"
+	db.DropTable(tableName1, infinity.ConflictTypeIgnore)
+
+	schema1 := infinity.TableSchema{
+		{Name: "c1", DataType: "multivector,3,int"},
+	}
+
+	table1, err := db.CreateTable(tableName1, schema1, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create int multivector table: %v", err)
+	}
+
+	// Insert various multivector formats
+	// Simple vector (auto-wrapped as multivector)
+	_, err = table1.Insert([]map[string]interface{}{{"c1": []int{1, 2, 3}}})
+	if err != nil {
+		t.Errorf("Failed to insert simple int vector as multivector: %v", err)
+	}
+
+	// Single-element multivector
+	_, err = table1.Insert([]map[string]interface{}{{"c1": [][]int{{4, 5, 6}}}})
+	if err != nil {
+		t.Errorf("Failed to insert single-element int multivector: %v", err)
+	}
+
+	// Multi-element multivector
+	_, err = table1.Insert([]map[string]interface{}{{"c1": [][]int{{7, 8, 9}, {-7, -8, -9}}}})
+	if err != nil {
+		t.Errorf("Failed to insert multi-element int multivector: %v", err)
+	}
+
+	// Batch insert
+	_, err = table1.Insert([]map[string]interface{}{
+		{"c1": []int{1, 2, 3}},
+		{"c1": []int{4, 5, 6}},
+		{"c1": []int{7, 8, 9, -7, -8, -9}}, // Flattened multi-element
+	})
+	if err != nil {
+		t.Errorf("Failed to batch insert int multivectors: %v", err)
+	}
+
+	db.DropTable(tableName1, infinity.ConflictTypeError)
+
+	// Test float multivector
+	tableName2 := "test_insert_multivector_float"
+	db.DropTable(tableName2, infinity.ConflictTypeIgnore)
+
+	schema2 := infinity.TableSchema{
+		{Name: "c1", DataType: "multivector,3,float"},
+	}
+
+	table2, err := db.CreateTable(tableName2, schema2, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create float multivector table: %v", err)
+	}
+
+	// Insert float multivectors
+	_, err = table2.Insert([]map[string]interface{}{{"c1": []float64{1.1, 2.2, 3.3}}})
+	if err != nil {
+		t.Errorf("Failed to insert simple float vector as multivector: %v", err)
+	}
+
+	_, err = table2.Insert([]map[string]interface{}{{"c1": [][]float64{{4.4, 5.5, 6.6}}}})
+	if err != nil {
+		t.Errorf("Failed to insert single-element float multivector: %v", err)
+	}
+
+	_, err = table2.Insert([]map[string]interface{}{{"c1": [][]float64{{7.7, 8.8, 9.9}, {-7.7, -8.8, -9.9}}}})
+	if err != nil {
+		t.Errorf("Failed to insert multi-element float multivector: %v", err)
+	}
+
+	db.DropTable(tableName2, infinity.ConflictTypeError)
 }
