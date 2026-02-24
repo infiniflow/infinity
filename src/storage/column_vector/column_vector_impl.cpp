@@ -1754,8 +1754,9 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             std::vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             std::string default_val = "0";
-            if (embedding_info->Dimension() < ele_str_views.size()) {
-                Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
+            if (embedding_info->Dimension() != ele_str_views.size()) {
+                Status status = Status::ImportFileFormatError(
+                    fmt::format("Expect embedding dimension: {}, but got: {}.", embedding_info->Dimension(), ele_str_views.size()));
                 RecoverableError(status);
             }
             if (ele_str_views.size() < embedding_info->Dimension()) {
@@ -2490,14 +2491,20 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     // write fixed part
-    WriteBufAdv<i32>(ptr, tail_index_.load());
+    std::size_t tail_index = this->tail_index_.load();
+    WriteBufAdv<i32>(ptr, tail_index);
     if (vector_type_ == ColumnVectorType::kCompactBit) {
-        size_t byte_size = (this->tail_index_.load() + 7) / 8;
+        size_t byte_size = (tail_index + 7) / 8;
         std::memcpy(ptr, this->data_ptr_.get(), byte_size);
         ptr += byte_size;
     } else {
-        std::memcpy(ptr, this->data_ptr_.get(), this->tail_index_.load() * this->data_type_size_);
-        ptr += this->tail_index_.load() * this->data_type_size_;
+        if (tail_index > DEFAULT_VECTOR_SIZE) {
+            std::string error_message = fmt::format("tail_index {} > DEFAULT_VECTOR_SIZE {}", tail_index, DEFAULT_VECTOR_SIZE);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        std::memcpy(ptr, this->data_ptr_.get(), tail_index * this->data_type_size_);
+        ptr += tail_index * this->data_type_size_;
     }
     // write variable part
     buffer_->WriteAdv(ptr, data_type_.get());
@@ -2528,12 +2535,16 @@ std::shared_ptr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbyt
 
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading ColumnVector");
+        std::string error_message = "Fail to read data column vector: null ptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     column_vector->nulls_ptr_ = Bitmask::ReadAdv(ptr, maxbytes);
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading ColumnVector");
+        std::string error_message = "Fail to read data column vector: end";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return column_vector;
 }

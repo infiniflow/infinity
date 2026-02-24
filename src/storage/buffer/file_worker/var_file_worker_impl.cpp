@@ -72,17 +72,11 @@ bool VarFileWorker::Write(std::span<VarBuffer> data,
         std::memcpy((char *)mmap_ + old_mmap_size, ptr + old_mmap_size, diff);
     }
     prepare_success = true;
-
-    auto &path = *rel_file_path_;
-    auto &cache_manager = InfinityContext::instance().storage()->fileworker_manager()->var_map_.cache_manager_;
-    cache_manager.Evict(path);
-
     return true;
 }
 
 bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
                                   std::unique_ptr<LocalFileHandle> &file_handle,
-                                  size_t rel_size,
                                   bool &prepare_success,
                                   const FileWorkerSaveCtx &ctx) {
     if (data.data() == nullptr) {
@@ -90,13 +84,14 @@ bool VarFileWorker::WriteSnapshot(std::span<VarBuffer> data,
     }
 
     const auto *buffer = static_cast<const VarBuffer *>(data.data());
-    if (buffer->TotalSize() == 0) {
+    size_t total_size = buffer->TotalSize();
+    if (total_size == 0) {
         return false;
     }
 
-    auto buffer_data = std::make_unique<char[]>(rel_size);
-    size_t total_size = buffer->Write(buffer_data.get(), rel_size);
-    Status status = file_handle->Append(buffer_data.get(), total_size);
+    auto buffer_data = std::make_unique<char[]>(total_size);
+    size_t write_size = buffer->Write(buffer_data.get(), total_size);
+    Status status = file_handle->Append(buffer_data.get(), write_size);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

@@ -1387,15 +1387,9 @@ class TestInfinity:
             table_obj = db_obj.create_table("test_sparse_scan" + suffix,
                                             {"c1": {"type": "int"}, "c2": {"type": table_params}},
                                             ConflictType.Error)
-            table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-
             with pytest.raises(InfinityException) as e:
-                res, extra_result = (table_obj.output(["*", "_row_id", "_similarity"])
-                                     .match_sparse("c2",
-                                                   SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
-                                                   "ip", 3)
-                                     .to_pl())
-            assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
+                table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+            assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
             res = db_obj.drop_table("test_sparse_scan" + suffix, ConflictType.Error)
             assert res.error_code == ErrorCode.OK
