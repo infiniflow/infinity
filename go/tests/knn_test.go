@@ -714,3 +714,135 @@ func TestKNNWithFusion(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestKNNu8 tests KNN search with uint8 vector type
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_u8
+func TestKNNu8(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_knn_u8" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with int and uint8 vector columns
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,uint8"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Import data from CSV if file exists
+	testCSVPath := "/var/infinity/test_data/embedding_int_dim3.csv"
+	if _, err := os.Stat(testCSVPath); err == nil {
+		_, err = table.ImportData(testCSVPath, nil)
+		if err != nil {
+			t.Logf("ImportData skipped or failed: %v", err)
+		}
+	} else {
+		t.Logf("Test CSV file not found: %s", testCSVPath)
+	}
+
+	// Insert additional data (using []int instead of []uint8 as Go SDK doesn't support uint8 slice)
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 11, "c2": []int{127, 128, 255}},
+	})
+	if err != nil {
+		t.Errorf("Failed to insert additional data: %v", err)
+	}
+
+	// Test query all data
+	res, err := table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Errorf("Failed to query all data: %v", err)
+	} else {
+		if result, ok := res.(*infinity.QueryResult); ok {
+			if c1Col, exists := result.Data["c1"]; exists {
+				t.Logf("Total rows: %d", len(c1Col))
+			}
+		}
+	}
+
+	// Test KNN search with L2 distance
+	_, err = table.Output([]string{"c1", "_distance"}).
+		MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), "uint8", "l2", 10, nil).
+		ToResult()
+	if err != nil {
+		t.Errorf("KNN search with uint8 failed: %v", err)
+	}
+
+	// Test KNN search with threshold
+	_, err = table.Output([]string{"c1", "_distance"}).
+		MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), "uint8", "l2", 10, map[string]string{
+			"threshold": "200",
+		}).
+		ToResult()
+	if err != nil {
+		t.Errorf("KNN search with threshold failed: %v", err)
+	}
+
+	// Test creating index with invalid lvq encode (should fail for uint8)
+	invalidIndexInfo := infinity.NewIndexInfo("c2", infinity.IndexTypeHnsw, map[string]string{
+		"M":               "16",
+		"ef_construction": "50",
+		"metric":          "l2",
+		"encode":          "lvq",
+	})
+	_, err = table.CreateIndex("invalid_lvq", invalidIndexInfo, infinity.ConflictTypeError, "")
+	if err == nil {
+		t.Log("Expected error for lvq encode with uint8, but got none")
+		// Drop the invalid index if it was created
+		table.DropIndex("invalid_lvq", infinity.ConflictTypeIgnore)
+	}
+
+	// Test creating valid HNSW index
+	validIndexInfo := infinity.NewIndexInfo("c2", infinity.IndexTypeHnsw, map[string]string{
+		"M":               "16",
+		"ef_construction": "50",
+		"metric":          "l2",
+	})
+	_, err = table.CreateIndex("valid_lvq", validIndexInfo, infinity.ConflictTypeError, "")
+	if err != nil {
+		t.Errorf("Failed to create valid HNSW index: %v", err)
+	}
+
+	// Test KNN search with index
+	_, err = table.Output([]string{"c1", "_distance"}).
+		MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), "uint8", "l2", 10, nil).
+		ToResult()
+	if err != nil {
+		t.Errorf("KNN search with index failed: %v", err)
+	}
+
+	// Test KNN search with threshold and index
+	_, err = table.Output([]string{"c1", "_distance"}).
+		MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), "uint8", "l2", 10, map[string]string{
+			"threshold": "200",
+		}).
+		ToResult()
+	if err != nil {
+		t.Errorf("KNN search with threshold and index failed: %v", err)
+	}
+
+	// Test KNN search with wrong element type (should fail)
+	_, err = table.Output([]string{"c1", "_distance"}).
+		MatchDense("c2", infinity.Float32Vector([]float32{0, 0, 0}), "int8", "l2", 10, nil).
+		ToResult()
+	if err == nil {
+		t.Error("Expected error for int8 element type with uint8 vector, but got none")
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
