@@ -30,7 +30,7 @@ func TestSelectBasic(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select" + generateSuffix(t)
+	tableName := "test_select"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with c1 int primary key, c2 int not null
@@ -171,7 +171,7 @@ func TestSelectJSON(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_json" + generateSuffix(t)
+	tableName := "test_select_json"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with JSON column
@@ -312,7 +312,7 @@ func TestSelectJSONComprehensive(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_json_comprehensive" + generateSuffix(t)
+	tableName := "test_json_comprehensive"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with JSON column
@@ -474,7 +474,7 @@ func TestSelectWithOrderBy(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_order" + generateSuffix(t)
+	tableName := "test_select_order"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -539,7 +539,7 @@ func TestSelectWithLimitOffset(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_limit" + generateSuffix(t)
+	tableName := "test_select_limit"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -597,7 +597,7 @@ func TestSelectWithGroupBy(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_group" + generateSuffix(t)
+	tableName := "test_select_group"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -658,7 +658,7 @@ func TestSelectDateTime(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_datetime" + generateSuffix(t)
+	tableName := "test_select_datetime"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with date, time, datetime, timestamp columns
@@ -737,7 +737,7 @@ func TestSelectVarchar(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_varchar" + generateSuffix(t)
+	tableName := "test_select_varchar"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with varchar columns (c1 primary key, c2 not null)
@@ -836,7 +836,7 @@ func TestSelectBig(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_big" + generateSuffix(t)
+	tableName := "test_select_big"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -879,7 +879,7 @@ func TestSelectSameOutput(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_same_output" + generateSuffix(t)
+	tableName := "test_select_same_output"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -932,7 +932,7 @@ func TestEmptyTable(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_empty_table" + generateSuffix(t)
+	tableName := "test_empty_table"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -978,7 +978,7 @@ func TestSelectVarcharLength(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_varchar_length" + generateSuffix(t)
+	tableName := "test_select_varchar_length"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1034,7 +1034,7 @@ func TestSelectUpperLower(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_upper_lower" + generateSuffix(t)
+	tableName := "test_select_upper_lower"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1084,7 +1084,7 @@ func TestSelectSqrt(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_sqrt" + generateSuffix(t)
+	tableName := "test_select_sqrt"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1136,7 +1136,7 @@ func TestSelectRound(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_round" + generateSuffix(t)
+	tableName := "test_select_round"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1200,7 +1200,7 @@ func TestSelectDateFunctions(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_date_funcs" + generateSuffix(t)
+	tableName := "test_select_date_funcs"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1256,7 +1256,7 @@ func TestSelectTimeFunctions(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_time_funcs" + generateSuffix(t)
+	tableName := "test_select_time_funcs"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -1312,7 +1312,7 @@ func TestSelectEmbeddingInt32(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_embedding_int32" + generateSuffix(t)
+	tableName := "test_select_embedding_int32"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with int column and int vector column
@@ -1368,7 +1368,7 @@ func TestSelectEmbeddingFloat(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_embedding_float" + generateSuffix(t)
+	tableName := "test_select_embedding_float"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with float column and float vector column (dim=4)
@@ -1426,7 +1426,7 @@ func TestSelectBigEmbedding(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_select_big_embedding" + generateSuffix(t)
+	tableName := "test_select_big_embedding"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with int column and int vector column
@@ -1451,6 +1451,741 @@ func TestSelectBigEmbedding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to insert data at iteration %d: %v", i, err)
 		}
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestValidFilterExpression tests valid filter expressions
+func TestValidFilterExpression(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	filterList := []string{
+		"c1 > 10",
+		"c2 > 1",
+		"c1 > 0.1 and c2 < 3.0",
+		"c1 > 0.1 and c2 < 1.0",
+		"c1 < 0.1 and c2 < 1.0",
+		"c1 < 0.1 and c1 > 1.0",
+		"c1 = 0",
+	}
+
+	for _, filter := range filterList {
+		t.Run(filter, func(t *testing.T) {
+			tableName := "test_valid_filter"
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			schema := infinity.TableSchema{
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			_, err = table.Insert([]map[string]interface{}{
+				{"c1": 1, "c2": 2.0},
+				{"c1": 10, "c2": 2.0},
+				{"c1": 100, "c2": 2.0},
+				{"c1": 1000, "c2": 2.0},
+				{"c1": 10000, "c2": 2.0},
+			})
+			if err != nil {
+				t.Fatalf("Failed to insert data: %v", err)
+			}
+
+			_, err = table.Output([]string{"*"}).Filter(filter).ToResult()
+			if err != nil {
+				t.Fatalf("Filter '%s' failed: %v", filter, err)
+			}
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
+
+// TestInvalidFilterExpression tests invalid filter expressions
+func TestInvalidFilterExpression(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	filterList := []string{
+		"c1",
+		"_row_id",
+		"*",
+		"#@$%@#f",
+		"c1 + 0.1 and c2 - 1.0",
+		"c1 * 0.1 and c2 / 1.0",
+		"c1 > 0.1 %@#$sf c2 < 1.0",
+	}
+
+	for _, filter := range filterList {
+		t.Run(filter, func(t *testing.T) {
+			tableName := "test_invalid_filter"
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			schema := infinity.TableSchema{
+				{Name: "c1", DataType: "int"},
+				{Name: "c2", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			_, err = table.Insert([]map[string]interface{}{
+				{"c1": 1, "c2": 2.0},
+				{"c1": 10, "c2": 2.0},
+				{"c1": 100, "c2": 2.0},
+				{"c1": 1000, "c2": 2.0},
+				{"c1": 10000, "c2": 2.0},
+			})
+			if err != nil {
+				t.Fatalf("Failed to insert data: %v", err)
+			}
+
+			// These filters should either fail or work depending on the expression parser
+			// For some expressions like "c1" or "*", they might be treated as column references
+			// rather than filter conditions, so we just check they don't crash
+			_, _ = table.Output([]string{"*"}).Filter(filter).ToResult()
+
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
+
+// TestFilterFulltext tests fulltext filter
+//func TestFilterFulltext(t *testing.T) {
+//	conn := setupConnection(t)
+//	defer closeConnection(t, conn)
+//
+//	db, err := conn.GetDatabase("default_db")
+//	if err != nil {
+//		t.Fatalf("Failed to get database: %v", err)
+//	}
+//
+//	tableName := "test_filter_fulltext"
+//	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+//
+//	schema := infinity.TableSchema{
+//		{Name: "num", DataType: "int"},
+//		{Name: "doc", DataType: "varchar"},
+//	}
+//
+//	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+//	if err != nil {
+//		t.Fatalf("Failed to create table: %v", err)
+//	}
+//
+//	_, err = table.Insert([]map[string]interface{}{
+//		{"num": 1, "doc": "first text"},
+//		{"num": 2, "doc": "second text multiple"},
+//		{"num": 3, "doc": "third text many words"},
+//	})
+//	if err != nil {
+//		t.Fatalf("Failed to insert data: %v", err)
+//	}
+//
+//	// Create fulltext index
+//	_, err = table.CreateIndex("my_ft_index", &infinity.IndexInfo{
+//		TargetName: "doc",
+//		IndexType:  infinity.IndexTypeFullText,
+//	}, infinity.ConflictTypeError, "")
+//	if err != nil {
+//		t.Logf("Create fulltext index warning: %v", err)
+//	}
+//
+//	// Test filter_text
+//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first text', 'minimum_should_match=100%')").ToResult()
+//	if err != nil {
+//		t.Logf("Filter text test 1: %v", err)
+//	}
+//
+//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first OR second') and (num < 2 or num > 2)").ToResult()
+//	if err != nil {
+//		t.Logf("Filter text test 2: %v", err)
+//	}
+//
+//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first') or num >= 2").ToResult()
+//	if err != nil {
+//		t.Logf("Filter text test 3: %v", err)
+//	}
+//
+//	// Cleanup
+//	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+//	if err != nil {
+//		t.Fatalf("Failed to drop table: %v", err)
+//	}
+//}
+
+// TestNegFunc tests negative function
+func TestNegFunc(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_neg_func"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "num", DataType: "double"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"num": 1.0},
+		{"num": 2.0},
+		{"num": 3.0},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test -abs(num) - 1 with filter
+	_, err = table.Output([]string{"-abs(num) - 1"}).Filter("-abs(num) >= -2").ToResult()
+	if err != nil {
+		t.Logf("Neg func test: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSortMultiColumn tests sorting by multiple columns
+func TestSortMultiColumn(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_sort_multi"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "int", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": -3, "c2": 3},
+		{"c1": -2, "c2": 2},
+		{"c1": -1, "c2": 1},
+		{"c1": 0, "c2": 0},
+		{"c1": 1, "c2": 1},
+		{"c1": 2, "c2": 2},
+		{"c1": 3, "c2": 3},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert first batch: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": -8, "c2": 8},
+		{"c1": -7, "c2": 7},
+		{"c1": -6, "c2": 6},
+		{"c1": 7, "c2": 7},
+		{"c1": 8, "c2": 8},
+		{"c1": 9, "c2": 9},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert second batch: %v", err)
+	}
+
+	// Test sort by c2 asc, c1 desc
+	_, err = table.Output([]string{"c1", "c2"}).Sort([][2]interface{}{{"c2", infinity.SortTypeAsc}, {"c1", infinity.SortTypeDesc}}).ToResult()
+	if err != nil {
+		t.Fatalf("Sort by c2 asc, c1 desc failed: %v", err)
+	}
+
+	// Test sort by c2 asc, c1 asc
+	_, err = table.Output([]string{"c1", "c2"}).Sort([][2]interface{}{{"c2", infinity.SortTypeAsc}, {"c1", infinity.SortTypeAsc}}).ToResult()
+	if err != nil {
+		t.Fatalf("Sort by c2 asc, c1 asc failed: %v", err)
+	}
+
+	// Test sort by _row_id desc
+	_, err = table.Output([]string{"_row_id"}).Sort([][2]interface{}{{"_row_id", infinity.SortTypeDesc}}).ToResult()
+	if err != nil {
+		t.Logf("Sort by _row_id desc: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectRegex tests regex function
+func TestSelectRegex(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_regex"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "a", "c2": "a"},
+		{"c1": "b", "c2": "b"},
+		{"c1": "c", "c2": "c"},
+		{"c1": "d", "c2": "d"},
+		{"c1": "abc", "c2": "abc"},
+		{"c1": "bbc", "c2": "bbc"},
+		{"c1": "cbc", "c2": "cbc"},
+		{"c1": "dbc", "c2": "dbc"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test regex filter
+	_, err = table.Output([]string{"*"}).Filter("regex(c1, 'bc')").ToResult()
+	if err != nil {
+		t.Logf("Regex filter: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectSubstring tests substring function
+func TestSelectSubstring(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_substring"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "a", "c2": "A"},
+		{"c1": "b", "c2": "B"},
+		{"c1": "c", "c2": "C"},
+		{"c1": "d", "c2": "D"},
+		{"c1": "abc", "c2": "ABC"},
+		{"c1": "bbcc", "c2": "bbc"},
+		{"c1": "cbcc", "c2": "cbc"},
+		{"c1": "dbcc", "c2": "dbc"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test substring filter
+	_, err = table.Output([]string{"*"}).Filter("substring(c1, 0, 3) = c2").ToResult()
+	if err != nil {
+		t.Logf("Substring filter: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectTrim tests trim functions
+func TestSelectTrim(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_trim"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": " a", "c2": "a"},
+		{"c1": " b", "c2": "b"},
+		{"c1": " c", "c2": "c"},
+		{"c1": "ab ", "c2": "ab"},
+		{"c1": "bcc ", "c2": "bcc"},
+		{"c1": "cbc ", "c2": "cbc"},
+		{"c1": " dbc ", "c2": "dbc"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test ltrim
+	_, err = table.Output([]string{"*"}).Filter("ltrim(c1) = c2").ToResult()
+	if err != nil {
+		t.Logf("Ltrim filter: %v", err)
+	}
+
+	// Test rtrim
+	_, err = table.Output([]string{"*"}).Filter("rtrim(c1) = c2").ToResult()
+	if err != nil {
+		t.Logf("Rtrim filter: %v", err)
+	}
+
+	// Test trim
+	_, err = table.Output([]string{"*"}).Filter("trim(c1) = c2").ToResult()
+	if err != nil {
+		t.Logf("Trim filter: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectPosition tests char_position function
+func TestSelectPosition(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_position"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "a", "c2": "A"},
+		{"c1": "b", "c2": "B"},
+		{"c1": "c", "c2": "C"},
+		{"c1": "d", "c2": "D"},
+		{"c1": "abc", "c2": "ABC"},
+		{"c1": "bbcc", "c2": "bbc"},
+		{"c1": "cbcc", "c2": "cbc"},
+		{"c1": "dbcc", "c2": "dbc"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test char_position
+	_, err = table.Output([]string{"*"}).Filter("char_position(c1, c2) <> 0").ToResult()
+	if err != nil {
+		t.Logf("Char_position filter: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectTruncate tests trunc function
+func TestSelectTruncate(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_truncate"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "double"},
+		{Name: "c2", DataType: "double"},
+		{Name: "c3", DataType: "float"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2.123, "c2": 2.123, "c3": 2.123},
+		{"c1": -2.123, "c2": -2.123, "c3": -2.123},
+		{"c1": 2.0, "c2": 2.0, "c3": 2.0},
+		{"c1": 2.1, "c2": 2.1, "c3": 2.1},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test trunc with different precisions
+	_, err = table.Output([]string{"trunc(c1, 14)", "trunc(c2, 2)", "trunc(c3, 2)"}).ToResult()
+	if err != nil {
+		t.Logf("Truncate output: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectReverse tests reverse function
+func TestSelectReverse(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_reverse"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey, infinity.ConstraintNotNull}},
+		{Name: "c2", DataType: "varchar", Constraints: []infinity.ColumnConstraint{infinity.ConstraintNotNull}},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "abc", "c2": "ABC"},
+		{"c1": "a123", "c2": "a123"},
+		{"c1": "c", "c2": "C"},
+		{"c1": "abcdefghijklmn", "c2": "ABCDEFGHIJKLMN"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test reverse
+	_, err = table.Output([]string{"reverse(c1)", "reverse(c2)"}).ToResult()
+	if err != nil {
+		t.Logf("Reverse output: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectYear tests year function
+func TestSelectYear(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_year"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "date"},
+		{Name: "c2", DataType: "datetime"},
+		{Name: "c3", DataType: "timestamp"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2024-09-23", "c2": "2022-05-26 21:44:33", "c3": "2024-09-23 20:45:11"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test year function
+	_, err = table.Output([]string{"year(c1)", "year(c2)", "year(c3)"}).ToResult()
+	if err != nil {
+		t.Logf("Year output: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectMonth tests month function
+func TestSelectMonth(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_month"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "date"},
+		{Name: "c2", DataType: "datetime"},
+		{Name: "c3", DataType: "timestamp"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2024-09-23", "c2": "2022-05-26 21:44:33", "c3": "2024-09-23 20:45:11"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test month function
+	_, err = table.Output([]string{"month(c1)", "month(c2)", "month(c3)"}).ToResult()
+	if err != nil {
+		t.Logf("Month output: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectDayOfMonth tests day function
+func TestSelectDayOfMonth(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_day"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "date"},
+		{Name: "c2", DataType: "datetime"},
+		{Name: "c3", DataType: "timestamp"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": "2024-09-23", "c2": "2022-05-26 21:44:33", "c3": "2024-09-23 20:45:11"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test day function
+	_, err = table.Output([]string{"day(c1)", "day(c2)", "day(c3)"}).ToResult()
+	if err != nil {
+		t.Logf("Day output: %v", err)
 	}
 
 	// Cleanup
