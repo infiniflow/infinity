@@ -597,9 +597,13 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             search_expr_list->emplace_back(fusion_expr);
         }
 
-        search_expr = new SearchExpr();
-        search_expr->SetExprs(search_expr_list);
-        search_expr_list = nullptr;
+        try {
+            search_expr = new SearchExpr();
+            search_expr->SetExprs(search_expr_list);
+        } catch (std::exception &e) {
+            ProcessStatus(response, Status::SyntaxError(e.what()));
+            return;
+        }
     }
 
     // filter
@@ -913,7 +917,6 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
         search_expr = new SearchExpr();
         search_expr->SetExprs(search_expr_list);
-        search_expr_list = nullptr;
     }
 
     // filter

@@ -849,7 +849,6 @@ SearchExpr *HTTPSearch::ParseSearchExpr(std::string_view json_sv, HTTPStatus &ht
     auto search_expr = new SearchExpr();
     try {
         search_expr->SetExprs(child_expr);
-        child_expr = nullptr;
     } catch (std::exception &e) {
         delete search_expr;
         search_expr = nullptr;
