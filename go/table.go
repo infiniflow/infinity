@@ -134,9 +134,21 @@ func (t *Table) CreateIndex(indexName string, indexInfo *IndexInfo, conflictType
 
 	// Build thrift IndexInfo
 	thriftIndexInfo := thriftapi.NewIndexInfo()
-	thriftIndexInfo.ColumnName = indexInfo.TargetName
 	thriftIndexInfo.IndexType = thriftIndexType
 	thriftIndexInfo.IndexParamList = initParams
+
+	if thriftIndexType == thriftapi.IndexType_SecondaryFunctional {
+		parsedExpr, err := ParseExpr(indexInfo.TargetName)
+		if err != nil {
+			return nil, err
+		}
+		if parsedExpr.Type == nil || parsedExpr.Type.FunctionExpr == nil {
+			return nil, NewInfinityException(int(ErrorCodeInvalidExpression), "Invalid functional index expression")
+		}
+		thriftIndexInfo.FunctionExpr = parsedExpr.Type.FunctionExpr
+	} else {
+		thriftIndexInfo.ColumnName = indexInfo.TargetName
+	}
 
 	// Create request
 	req := thriftapi.NewCreateIndexRequest()
@@ -1235,6 +1247,9 @@ func (t *Table) ToResult() (interface{}, error) {
 		t.queryBuilder = NewQueryBuilder()
 	}
 
+	// Reset query builder after execution
+	defer t.queryBuilder.Reset()
+
 	// Build select request from query builder
 	req := thriftapi.NewSelectRequest()
 	req.SessionID = t.db.conn.GetSessionID()
@@ -1307,9 +1322,6 @@ func (t *Table) ToResult() (interface{}, error) {
 			fmt.Sprintf("Failed to execute query: %s", resp.ErrorMsg),
 		)
 	}
-
-	// Reset query builder after execution
-	t.queryBuilder.Reset()
 
 	// Build and return result
 	return buildResult(resp)
