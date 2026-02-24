@@ -470,3 +470,58 @@ func TestRankFeaturesWithTopn(t *testing.T) {
 		t.Error("Rank features should change scores from basic search")
 	}
 }
+
+// TestRankFeaturesErrorCases tests rank_features error cases
+func TestRankFeaturesErrorCases(t *testing.T) {
+	tableName := "test_rank_features_errors"
+
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	// Clean up
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table
+	schema := infinity.TableSchema{
+		{Name: "id", DataType: "varchar"},
+		{Name: "content", DataType: "varchar"},
+		{Name: "tags", DataType: "varchar"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+	defer db.DropTable(tableName, infinity.ConflictTypeError)
+
+	// Insert test data
+	_, err = table.Insert(map[string]interface{}{
+		"id":      "test1",
+		"content": "test content",
+		"tags":    `[{"tag1":0.5}]`,
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Create content index only (no rank_features index)
+	indexInfo := infinity.NewIndexInfo("content", infinity.IndexTypeFullText, map[string]string{})
+	_, err = table.CreateIndex("content_idx", indexInfo, infinity.ConflictTypeError, "")
+	if err != nil {
+		t.Fatalf("Failed to create content index: %v", err)
+	}
+	defer table.DropIndex("content_idx", infinity.ConflictTypeError)
+
+	// Test rank_features without proper index - should raise error
+	table2 := table.Output([]string{"id", "_score"})
+	table2.MatchText("content", "test content", 10, map[string]string{"rank_features": "tags^tag1^1.0"})
+	_, err = table2.ToResult()
+	if err == nil {
+		t.Error("Expected error when using rank_features without proper index")
+	}
+}
