@@ -1234,6 +1234,10 @@ func (t *Table) ToString() string {
 
 // ToResult executes query and returns result
 func (t *Table) ToResult() (interface{}, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+
 	if t.db == nil || t.db.conn == nil {
 		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
 	}
