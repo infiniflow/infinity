@@ -1357,3 +1357,105 @@ func TestSelectEmbeddingInt32(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestSelectEmbeddingFloat tests selecting embedding float vector data
+func TestSelectEmbeddingFloat(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_embedding_float" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with float column and float vector column (dim=4)
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "float"},
+		{Name: "c2", DataType: "vector,4,float"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data (simulating embedding_float_dim4.csv content)
+	// CSV content: 2,[0.1,0.2,0.3,-0.2]
+	//              4,[0.2,0.1,0.3,0.4]
+	//              6,[0.3,0.2,0.1,0.4]
+	//              8,[0.4,0.3,0.2,0.1]
+	_, err = table.Insert([]map[string]interface{}{
+		{"c1": 2.0, "c2": []float32{0.1, 0.2, 0.3, -0.2}},
+		{"c1": 4.0, "c2": []float32{0.2, 0.1, 0.3, 0.4}},
+		{"c1": 6.0, "c2": []float32{0.3, 0.2, 0.1, 0.4}},
+		{"c1": 8.0, "c2": []float32{0.4, 0.3, 0.2, 0.1}},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Test select c2 (vector column)
+	_, err = table.Output([]string{"c2"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select c2 failed: %v", err)
+	}
+
+	// Test select * (all columns)
+	_, err = table.Output([]string{"*"}).ToResult()
+	if err != nil {
+		t.Fatalf("Select * failed: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
+
+// TestSelectBigEmbedding tests selecting large embedding data (import 1000 times)
+func TestSelectBigEmbedding(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_select_big_embedding" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with int column and int vector column
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int"},
+		{Name: "c2", DataType: "vector,3,int"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert test data 1000 times (simulating importing CSV 1000 times)
+	// Each batch has 3 rows: (1,[2,3,4]), (5,[6,7,8]), (9,[10,11,12])
+	for i := 0; i < 1000; i++ {
+		_, err = table.Insert([]map[string]interface{}{
+			{"c1": 1, "c2": []int{2, 3, 4}},
+			{"c1": 5, "c2": []int{6, 7, 8}},
+			{"c1": 9, "c2": []int{10, 11, 12}},
+		})
+		if err != nil {
+			t.Fatalf("Failed to insert data at iteration %d: %v", i, err)
+		}
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
