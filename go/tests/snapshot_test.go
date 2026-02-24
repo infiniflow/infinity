@@ -614,3 +614,56 @@ func TestSnapshotShow(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestRestoreTableSnapshotTableExists tests restore when table already exists
+func TestRestoreTableSnapshotTableExists(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_table_restore_exists"
+	snapshotName := "restore_snap"
+
+	// Try to drop snapshot if exists (ignore errors)
+	conn.DropSnapshot(snapshotName)
+
+	// Drop table if it exists
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with simple schema (int primary key column c1)
+	schema := infinity.TableSchema{
+		{Name: "c1", DataType: "int", Constraints: []infinity.ColumnConstraint{infinity.ConstraintPrimaryKey}},
+	}
+
+	_, err = db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Create snapshot with retry logic
+	err = createSnapshotWithRetry(db, snapshotName, tableName, 3, 2*time.Second)
+	if err != nil {
+		if infinityErr, ok := err.(*infinity.InfinityException); ok {
+			if infinityErr.ErrorCode == 3077 { // ErrorCodeCheckpointing
+				t.Skipf("Snapshot creation failed due to checkpointing: %v", err)
+			}
+		}
+		t.Fatalf("Failed to create snapshot: %v", err)
+	}
+
+	// Try to restore without dropping original table - should fail
+	_, err = db.RestoreTableSnapshot(snapshotName)
+	if err == nil {
+		t.Error("Expected error when restoring snapshot while table exists, but got none")
+	} else {
+		t.Logf("Got expected error when restoring snapshot with existing table: %v", err)
+	}
+
+	// Cleanup
+	conn.DropSnapshot(snapshotName)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+}
