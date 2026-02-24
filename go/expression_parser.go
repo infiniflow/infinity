@@ -604,7 +604,7 @@ func parseConstant(expr string) (*thriftapi.ConstantExpr, error) {
 	return nil, fmt.Errorf("unable to parse constant: %s", expr)
 }
 
-// splitByOperator splits an expression by an operator, respecting parentheses
+// splitByOperator splits an expression by an operator, respecting parentheses and string literals
 func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	expr = strings.TrimSpace(expr)
 	opLen := len(op)
@@ -613,10 +613,36 @@ func splitByOperator(expr, op string) (*Expression, *Expression, bool) {
 	isWordOp := opLen > 1 && isAlpha(op[0])
 
 	parenCount := 0
+	inString := false
+	stringQuote := byte(0)
+
 	for i := 0; i <= len(expr)-opLen; i++ {
-		if expr[i] == '(' {
+		ch := expr[i]
+
+		// Handle string literals
+		if !inString && (ch == '\'' || ch == '"') {
+			inString = true
+			stringQuote = ch
+			continue
+		} else if inString && ch == stringQuote {
+			// Check for escaped quote (e.g., 'it''s')
+			if i+1 < len(expr) && expr[i+1] == stringQuote {
+				i++ // Skip the next quote
+				continue
+			}
+			inString = false
+			stringQuote = 0
+			continue
+		}
+
+		// Skip processing when inside a string literal
+		if inString {
+			continue
+		}
+
+		if ch == '(' {
 			parenCount++
-		} else if expr[i] == ')' {
+		} else if ch == ')' {
 			parenCount--
 		} else if parenCount == 0 {
 			// Check if this is the operator

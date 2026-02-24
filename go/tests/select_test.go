@@ -1579,68 +1579,73 @@ func TestInvalidFilterExpression(t *testing.T) {
 }
 
 // TestFilterFulltext tests fulltext filter
-//func TestFilterFulltext(t *testing.T) {
-//	conn := setupConnection(t)
-//	defer closeConnection(t, conn)
-//
-//	db, err := conn.GetDatabase("default_db")
-//	if err != nil {
-//		t.Fatalf("Failed to get database: %v", err)
-//	}
-//
-//	tableName := "test_filter_fulltext"
-//	db.DropTable(tableName, infinity.ConflictTypeIgnore)
-//
-//	schema := infinity.TableSchema{
-//		{Name: "num", DataType: "int"},
-//		{Name: "doc", DataType: "varchar"},
-//	}
-//
-//	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-//	if err != nil {
-//		t.Fatalf("Failed to create table: %v", err)
-//	}
-//
-//	_, err = table.Insert([]map[string]interface{}{
-//		{"num": 1, "doc": "first text"},
-//		{"num": 2, "doc": "second text multiple"},
-//		{"num": 3, "doc": "third text many words"},
-//	})
-//	if err != nil {
-//		t.Fatalf("Failed to insert data: %v", err)
-//	}
-//
-//	// Create fulltext index
-//	_, err = table.CreateIndex("my_ft_index", &infinity.IndexInfo{
-//		TargetName: "doc",
-//		IndexType:  infinity.IndexTypeFullText,
-//	}, infinity.ConflictTypeError, "")
-//	if err != nil {
-//		t.Logf("Create fulltext index warning: %v", err)
-//	}
-//
-//	// Test filter_text
-//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first text', 'minimum_should_match=100%')").ToResult()
-//	if err != nil {
-//		t.Logf("Filter text test 1: %v", err)
-//	}
-//
-//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first OR second') and (num < 2 or num > 2)").ToResult()
-//	if err != nil {
-//		t.Logf("Filter text test 2: %v", err)
-//	}
-//
-//	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first') or num >= 2").ToResult()
-//	if err != nil {
-//		t.Logf("Filter text test 3: %v", err)
-//	}
-//
-//	// Cleanup
-//	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-//	if err != nil {
-//		t.Fatalf("Failed to drop table: %v", err)
-//	}
-//}
+func TestFilterFulltext(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_filter_fulltext"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	schema := infinity.TableSchema{
+		{Name: "num", DataType: "int"},
+		{Name: "doc", DataType: "varchar"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	_, err = table.Insert([]map[string]interface{}{
+		{"num": 1, "doc": "first text"},
+		{"num": 2, "doc": "second text multiple"},
+		{"num": 3, "doc": "third text many words"},
+	})
+	if err != nil {
+		t.Fatalf("Failed to insert data: %v", err)
+	}
+
+	// Create fulltext index
+	_, err = table.CreateIndex("my_ft_index", &infinity.IndexInfo{
+		TargetName: "doc",
+		IndexType:  infinity.IndexTypeFullText,
+	}, infinity.ConflictTypeError, "")
+	if err != nil {
+		t.Logf("Create fulltext index warning: %v", err)
+	}
+
+	// Test filter_text
+	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first text', 'minimum_should_match=100%')").ToResult()
+	if err != nil {
+		t.Logf("Filter text test 1: %v", err)
+	}
+
+	_, err = table.Output([]string{"*"}).Filter("filter_text('', 'first second', 'default_field=doc;minimum_should_match=99%') and not num = 2").ToResult()
+	if err != nil {
+		t.Logf("Filter text test 1: %v", err)
+	}
+
+	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first OR second') and (num < 2 or num > 2)").ToResult()
+	if err != nil {
+		t.Logf("Filter text test 2: %v", err)
+	}
+
+	_, err = table.Output([]string{"*"}).Filter("filter_text('doc', 'first') or num >= 2").ToResult()
+	if err != nil {
+		t.Logf("Filter text test 3: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
 
 // TestNegFunc tests negative function
 func TestNegFunc(t *testing.T) {
