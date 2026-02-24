@@ -15,10 +15,13 @@
 package tests
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/infiniflow/infinity-go-sdk"
+	thriftapi "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
 
 // validNameArray for testing valid column names - exported for use in other test files
@@ -739,3 +742,160 @@ func TestRenameTable(t *testing.T) {
 
 	t.Logf("Test completed successfully")
 }
+
+// TestCreate1KTable tests creating 1000 tables
+// Based on Python SDK test_pysdk/test_table.py - test_create_1K_table
+func TestCreate1KTable(t *testing.T) {
+	conn := setupConnection(t)
+	defer conn.Disconnect()
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tbCount := 1000
+	tablePrefix := "test_create_1k_table"
+
+	// Clean up: drop all tables if they exist
+	for i := 0; i < tbCount; i++ {
+		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+		db.DropTable(tableName, infinity.ConflictTypeIgnore)
+	}
+
+	// Create 1000 tables
+	schema := infinity.TableSchema{
+		{
+			Name:     "c1",
+			DataType: "int",
+		},
+	}
+
+	for i := 0; i < tbCount; i++ {
+		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+		table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+		if err != nil {
+			t.Fatalf("Failed to create table %s: %v", tableName, err)
+		}
+		if table == nil {
+			t.Fatalf("Table is nil for %s", tableName)
+		}
+	}
+	t.Logf("Successfully created %d tables", tbCount)
+
+	// List tables and verify count
+	resp, err := db.ListTables()
+	if err != nil {
+		t.Fatalf("Failed to list tables: %v", err)
+	}
+
+	// Type assert to get the response
+	listResp, ok := resp.(*thriftapi.ListTableResponse)
+	if !ok {
+		t.Fatalf("Expected *thriftapi.ListTableResponse, got %T", resp)
+	}
+
+	// Count tables with our prefix
+	createdCount := 0
+	for _, tableName := range listResp.TableNames {
+		if strings.HasPrefix(tableName, tablePrefix) {
+			createdCount++
+		}
+	}
+
+	if createdCount != tbCount {
+		t.Errorf("Expected %d tables with prefix '%s', got %d", tbCount, tablePrefix, createdCount)
+	} else {
+		t.Logf("Verified %d tables exist", createdCount)
+	}
+
+	// Clean up: drop all tables
+	for i := 0; i < tbCount; i++ {
+		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+		_, err := db.DropTable(tableName, infinity.ConflictTypeError)
+		if err != nil {
+			t.Logf("Warning: Failed to drop table %s: %v", tableName, err)
+		}
+	}
+	t.Logf("Successfully dropped %d tables", tbCount)
+}
+
+// TestCreate10KTable tests creating 10000 tables
+// Based on Python SDK test_pysdk/test_table.py - test_create_10k_table
+// Note: This is a slow test that creates 10000 tables
+//func TestCreate10KTable(t *testing.T) {
+//	conn := setupConnection(t)
+//	defer conn.Disconnect()
+//
+//	db, err := conn.GetDatabase("default_db")
+//	if err != nil {
+//		t.Fatalf("Failed to get database: %v", err)
+//	}
+//
+//	tbCount := 10000
+//	tablePrefix := "test_create_10k_table"
+//
+//	t.Logf("Starting to create %d tables (this may take a while)...", tbCount)
+//
+//	// Clean up: drop all tables if they exist
+//	for i := 0; i < tbCount; i++ {
+//		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+//		db.DropTable(tableName, infinity.ConflictTypeIgnore)
+//	}
+//
+//	// Create 10000 tables
+//	schema := infinity.TableSchema{
+//		{
+//			Name:     "c1",
+//			DataType: "int",
+//		},
+//	}
+//
+//	for i := 0; i < tbCount; i++ {
+//		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+//		table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+//		if err != nil {
+//			t.Fatalf("Failed to create table %s: %v", tableName, err)
+//		}
+//		if table == nil {
+//			t.Fatalf("Table is nil for %s", tableName)
+//		}
+//	}
+//	t.Logf("Successfully created %d tables", tbCount)
+//
+//	// List tables and verify count
+//	resp, err := db.ListTables()
+//	if err != nil {
+//		t.Fatalf("Failed to list tables: %v", err)
+//	}
+//
+//	// Type assert to get the response
+//	listResp, ok := resp.(*thriftapi.ListTableResponse)
+//	if !ok {
+//		t.Fatalf("Expected *thriftapi.ListTableResponse, got %T", resp)
+//	}
+//
+//	// Count tables with our prefix
+//	createdCount := 0
+//	for _, tableName := range listResp.TableNames {
+//		if strings.HasPrefix(tableName, tablePrefix) {
+//			createdCount++
+//		}
+//	}
+//
+//	if createdCount != tbCount {
+//		t.Errorf("Expected %d tables with prefix '%s', got %d", tbCount, tablePrefix, createdCount)
+//	} else {
+//		t.Logf("Verified %d tables exist", createdCount)
+//	}
+//
+//	// Clean up: drop all tables
+//	for i := 0; i < tbCount; i++ {
+//		tableName := fmt.Sprintf("%s%d", tablePrefix, i)
+//		_, err := db.DropTable(tableName, infinity.ConflictTypeError)
+//		if err != nil {
+//			t.Logf("Warning: Failed to drop table %s: %v", tableName, err)
+//		}
+//	}
+//	t.Logf("Successfully dropped %d tables", tbCount)
+//}
