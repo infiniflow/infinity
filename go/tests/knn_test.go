@@ -1340,3 +1340,192 @@ func TestInvalidEmbeddingData(t *testing.T) {
 		})
 	}
 }
+
+// TestValidEmbeddingDataType tests KNN search with valid embedding data types
+// Based on Python SDK test_pysdk/test_knn.py - test_valid_embedding_data_type
+func TestValidEmbeddingDataType(t *testing.T) {
+	// Test with different valid embedding data and types
+	testCases := []struct {
+		name              string
+		embeddingData     interface{}
+		embeddingDataType string
+		useDistance       bool
+	}{
+		{"int_float_l2", []int{1, 1, 1, 1}, "float", true},
+		{"float_float_l2", []float32{1.0, 1.0, 1.0, 1.0}, "float", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_valid_embedding_data_type_%s", tc.name) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple vector columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Convert embedding data to Float32Vector
+			var queryVec infinity.VEC
+			switch v := tc.embeddingData.(type) {
+			case []int:
+				floatVec := make([]float32, len(v))
+				for i, val := range v {
+					floatVec[i] = float32(val)
+				}
+				queryVec = infinity.Float32Vector(floatVec)
+			case []float32:
+				queryVec = infinity.Float32Vector(v)
+			default:
+				t.Fatalf("Unsupported embedding data type: %T", tc.embeddingData)
+			}
+
+			// Test KNN search with valid embedding data type
+			var outputCols []string
+			if tc.useDistance {
+				outputCols = []string{"variant_id", "_distance"}
+			} else {
+				outputCols = []string{"variant_id", "_similarity"}
+			}
+
+			_, err = table.Output(outputCols).
+				MatchDense("gender_vector", queryVec, tc.embeddingDataType, "l2", 2, nil).
+				ToResult()
+			if err != nil {
+				t.Errorf("KNN search with valid embedding data type %s failed: %v", tc.name, err)
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
+
+// TestInvalidEmbeddingDataType tests KNN search with invalid embedding data types (should fail)
+// Based on Python SDK test_pysdk/test_knn.py - test_invalid_embedding_data_type
+func TestInvalidEmbeddingDataType(t *testing.T) {
+	// Test with different invalid embedding data types
+	testCases := []struct {
+		name              string
+		embeddingData     interface{}
+		embeddingDataType string
+		metricType        string
+	}{
+		{"int_type_l2", []int{1, 1, 1, 1}, "int", "l2"},
+		{"float_type_ip", []float32{1.0, 1.0, 1.0, 1.0}, "int", "ip"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_invalid_embedding_data_type_%s", tc.name) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple vector columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Convert embedding data to Float32Vector
+			var queryVec infinity.VEC
+			switch v := tc.embeddingData.(type) {
+			case []int:
+				floatVec := make([]float32, len(v))
+				for i, val := range v {
+					floatVec[i] = float32(val)
+				}
+				queryVec = infinity.Float32Vector(floatVec)
+			case []float32:
+				queryVec = infinity.Float32Vector(v)
+			default:
+				t.Fatalf("Unsupported embedding data type: %T", tc.embeddingData)
+			}
+
+			// Test KNN search with invalid embedding data type (should fail)
+			_, err = table.Output([]string{"variant_id"}).
+				MatchDense("gender_vector", queryVec, tc.embeddingDataType, tc.metricType, 2, nil).
+				ToResult()
+
+			// For invalid embedding data type, we expect an error
+			if err == nil {
+				t.Errorf("Expected error for invalid embedding data type %s, but got none", tc.name)
+			} else {
+				t.Logf("Got expected error for invalid embedding data type %s: %v", tc.name, err)
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
