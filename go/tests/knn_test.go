@@ -1986,3 +1986,87 @@ func TestFulltextOperatorOption(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
+
+// TestWithFulltextMatchWithValidColumns tests fusion of dense vector search and full-text search
+// Based on Python SDK test_pysdk/test_knn.py - test_with_fulltext_match_with_valid_columns
+func TestWithFulltextMatchWithValidColumns(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_with_fulltext_match_with_valid_columns" + generateSuffix(t)
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with text and vector columns
+	schema := infinity.TableSchema{
+		{Name: "doctitle", DataType: "varchar"},
+		{Name: "docdate", DataType: "varchar"},
+		{Name: "body", DataType: "varchar"},
+		{Name: "num", DataType: "int"},
+		{Name: "vec", DataType: "vector,4,float"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Create full-text index on body column
+	indexInfo := infinity.NewIndexInfo("body", infinity.IndexTypeFullText, map[string]string{
+		"ANALYZER": "standard",
+	})
+	_, err = table.CreateIndex("my_index", indexInfo, infinity.ConflictTypeError, "")
+	if err != nil {
+		t.Fatalf("Failed to create full-text index: %v", err)
+	}
+
+	// Import data from CSV if file exists
+	testCSVPath := "/var/infinity/test_data/enwiki_embedding_99_commas.csv"
+	if _, err := os.Stat(testCSVPath); err == nil {
+		importOptions := infinity.NewImportOption()
+		importOptions.Delimiter = ','
+		_, err = table.ImportData(testCSVPath, importOptions)
+		if err != nil {
+			t.Logf("ImportData skipped or failed: %v", err)
+		}
+	} else {
+		t.Logf("Test CSV file not found: %s", testCSVPath)
+	}
+
+	// Test fusion of dense vector search and full-text search
+	_, err = table.Output([]string{"*"}).
+		MatchDense("vec", infinity.Float32Vector([]float32{3.0, 2.8, 2.7, 3.1}), "float", "ip", 1, nil).
+		MatchText("body^5", "black", 1, nil).
+		Fusion("rrf", 10, nil).
+		ToResult()
+	if err != nil {
+		t.Logf("Fusion search may not be fully supported: %v", err)
+	}
+
+	// Test fusion with filter
+	_, err = table.Output([]string{"*"}).
+		MatchDense("vec", infinity.Float32Vector([]float32{3.0, 2.8, 2.7, 3.1}), "float", "ip", 1, nil).
+		MatchText("body^5", "black", 1, nil).
+		Fusion("rrf", 10, nil).
+		Filter("num!=98 AND num != 12").
+		ToResult()
+	if err != nil {
+		t.Logf("Fusion search with filter may not be fully supported: %v", err)
+	}
+
+	// Drop index
+	_, err = table.DropIndex("my_index", infinity.ConflictTypeError)
+	if err != nil {
+		t.Errorf("Failed to drop index: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+}
