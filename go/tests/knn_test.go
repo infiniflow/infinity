@@ -1614,3 +1614,87 @@ func TestVariousDistanceType(t *testing.T) {
 		})
 	}
 }
+
+// TestVariousTopn tests KNN search with various topn values
+// Based on Python SDK test_pysdk/test_knn.py - test_various_topn
+func TestVariousTopn(t *testing.T) {
+	// Test with different topn values
+	testCases := []struct {
+		name       string
+		topn       int
+		shouldWork bool
+	}{
+		{"topn_2", 2, true},
+		{"topn_10", 10, true},
+		{"topn_0", 0, false},
+		{"topn_neg1", -1, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_various_topn_%s", tc.name) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple vector columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Test KNN search with various topn values
+			_, err = table.Output([]string{"variant_id"}).
+				MatchDense("gender_vector", infinity.Float32Vector([]float32{1.0, 1.0, 1.0, 1.0}), "float", "l2", tc.topn, nil).
+				ToResult()
+
+			if tc.shouldWork {
+				if err != nil {
+					t.Errorf("KNN search with topn=%d should work but failed: %v", tc.topn, err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error for topn=%d, but got none", tc.topn)
+				} else {
+					t.Logf("Got expected error for topn=%d: %v", tc.topn, err)
+				}
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
