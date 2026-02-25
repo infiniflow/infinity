@@ -441,7 +441,7 @@ func TestDeleteTableWithOneSegment(t *testing.T) {
 	// Query to verify
 	res, _ := table.Output([]string{"*"}).ToResult()
 	if result, ok := res.(*infinity.QueryResult); ok {
-		t.Logf("Result after deletes: %v", result.Data)
+		t.Logf("Result after deletes: %v", len(result.Data))
 	}
 
 	// Drop table

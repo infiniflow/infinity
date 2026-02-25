@@ -153,7 +153,15 @@ func (c *InfinityConnection) Disconnect() (interface{}, error) {
 
 // IsConnected returns whether the connection is still active
 func (c *InfinityConnection) IsConnected() bool {
-	return c.isConnected
+	if !c.isConnected {
+		return false
+	}
+	// Also check if the transport is still open
+	if c.transport != nil && !c.transport.IsOpen() {
+		c.isConnected = false
+		return false
+	}
+	return true
 }
 
 // GetSessionID returns the session ID

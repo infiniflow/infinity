@@ -88,7 +88,7 @@ func TestImportEmbeddingIntDim3(t *testing.T) {
 	if !ok {
 		t.Fatalf("Unexpected result type")
 	}
-	t.Logf("Query result: %v", queryResult.Data)
+	t.Logf("Query result: %v", len(queryResult.Data))
 
 	// Clean up
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -181,7 +181,7 @@ func TestImportDifferentFileFormat(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			// Clean up
@@ -248,7 +248,7 @@ func TestImportFVECS(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	// Clean up
@@ -326,7 +326,7 @@ func TestImportEmptyFile(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -382,7 +382,7 @@ func TestImportFormatUnrecognized(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -463,7 +463,7 @@ func TestCSVWithDifferentDelimiter(t *testing.T) {
 
 				queryResult, ok := result.(*infinity.QueryResult)
 				if ok {
-					t.Logf("Query result: %v", queryResult.Data)
+					t.Logf("Query result: %v", len(queryResult.Data))
 				}
 
 				_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -526,7 +526,7 @@ func TestCSVWithDifferentDelimiterMoreThanOneChar(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -590,7 +590,7 @@ func TestImportCSVWithHeaders(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -653,7 +653,7 @@ func TestImportFVECSTableWithMoreColumns(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -719,7 +719,7 @@ func TestImportEmbeddingWithCompatibleDefinition(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -839,7 +839,7 @@ func TestImportEmbeddingWithDimensionUnmatch(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -894,7 +894,7 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -949,7 +949,7 @@ func TestImport10000Columns(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1012,7 +1012,7 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1074,7 +1074,7 @@ func TestImportWithDifferentSize(t *testing.T) {
 
 			queryResult, ok := result.(*infinity.QueryResult)
 			if ok {
-				t.Logf("Query result: %v", queryResult.Data)
+				t.Logf("Query result: %v", len(queryResult.Data))
 			}
 
 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1131,7 +1131,7 @@ func TestImportExceedingRows(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1187,7 +1187,7 @@ func TestImportMoreThanOneSegment(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	// Check segments and blocks
@@ -1252,7 +1252,7 @@ func TestImportExceedingColumns(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1319,7 +1319,7 @@ func TestImportJSONLFileWithDefault(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1391,7 +1391,7 @@ func TestImportCSVFileWithDefault(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1468,7 +1468,7 @@ func TestImportJSONFileWithDefault(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1527,7 +1527,7 @@ func TestImportJSONLFile(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1586,7 +1586,7 @@ func TestImportEmptyJSONLFile(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
@@ -1644,7 +1644,7 @@ func TestImportWithWildcardPath(t *testing.T) {
 
 	queryResult, ok := result.(*infinity.QueryResult)
 	if ok {
-		t.Logf("Query result: %v", queryResult.Data)
+		t.Logf("Query result: %v", len(queryResult.Data))
 	}
 
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)

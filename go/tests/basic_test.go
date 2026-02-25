@@ -276,20 +276,7 @@ func TestBasic(t *testing.T) {
 	}
 
 	// Import data from CSV
-	testDataDir := "/tmp/infinity_test_data/"
 	csvFilePath := filepath.Join(testDataDir, testCSVFile)
-
-	// Check if file exists, if not create test data
-	if _, err := os.Stat(csvFilePath); os.IsNotExist(err) {
-		// Create test directory
-		os.MkdirAll(testDataDir, 0755)
-		// Create test CSV file
-		testData := "c1,c2\n1,[1,2,3]\n2,[4,5,6]\n3,[7,8,9]\n"
-		err = os.WriteFile(csvFilePath, []byte(testData), 0644)
-		if err != nil {
-			t.Logf("Failed to create test CSV file: %v", err)
-		}
-	}
 
 	if _, err := os.Stat(csvFilePath); err == nil {
 		// Create import options for CSV
@@ -687,6 +674,12 @@ func TestBasicDatabaseOperations(t *testing.T) {
 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
 	if err != nil {
 		t.Errorf("Failed to drop table: %v", err)
+	}
+
+	// Get database
+	_, err = conn.GetDatabase("default_db")
+	if err != nil {
+		t.Errorf("Failed to get database: %v", err)
 	}
 
 	// Drop database
