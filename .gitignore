@@ -27,7 +27,6 @@
 *.lo
 *.log
 *.log.*
-*.mod
 *.o
 *.obj
 *.orig
