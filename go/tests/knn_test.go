@@ -1062,7 +1062,7 @@ func TestKNNOnVectorColumnWithImport(t *testing.T) {
 			}
 
 			// Import data from CSV if file exists
-			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			testCSVPath := testDataDir + "tmp_20240116.csv"
 			if _, err := os.Stat(testCSVPath); err == nil {
 				_, err = table.ImportData(testCSVPath, nil)
 				if err != nil {
@@ -1128,7 +1128,7 @@ func TestKNNOnNonVectorColumn(t *testing.T) {
 			}
 
 			// Import data from CSV if file exists
-			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			testCSVPath := testDataDir + "tmp_20240116.csv"
 			if _, err := os.Stat(testCSVPath); err == nil {
 				_, err = table.ImportData(testCSVPath, nil)
 				if err != nil {
@@ -1146,6 +1146,92 @@ func TestKNNOnNonVectorColumn(t *testing.T) {
 				t.Errorf("Expected error for KNN search on non-vector column %s, but got none", columnName)
 			} else {
 				t.Logf("Got expected error for non-vector column %s: %v", columnName, err)
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
+
+// TestValidEmbeddingData tests KNN search with valid embedding data formats
+// Based on Python SDK test_pysdk/test_knn.py - test_valid_embedding_data
+func TestValidEmbeddingData(t *testing.T) {
+	// Test with different valid embedding data formats
+	testCases := []struct {
+		name          string
+		embeddingData interface{}
+	}{
+		{"slice_int", []int{1, 1, 1, 1}},
+		{"slice_float", []float32{1.0, 1.0, 1.0, 1.0}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_valid_embedding_data_%s", tc.name) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple vector columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := testDataDir + "tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Test KNN search with valid embedding data
+			var queryVec infinity.VEC
+			switch v := tc.embeddingData.(type) {
+			case []int:
+				floatVec := make([]float32, len(v))
+				for i, val := range v {
+					floatVec[i] = float32(val)
+				}
+				queryVec = infinity.Float32Vector(floatVec)
+			case []float32:
+				queryVec = infinity.Float32Vector(v)
+			default:
+				t.Fatalf("Unsupported embedding data type: %T", tc.embeddingData)
+			}
+
+			_, err = table.Output([]string{"variant_id", "_row_id"}).
+				MatchDense("gender_vector", queryVec, "float", "ip", 2, nil).
+				ToResult()
+			if err != nil {
+				t.Errorf("KNN search with valid embedding data %s failed: %v", tc.name, err)
 			}
 
 			// Cleanup
