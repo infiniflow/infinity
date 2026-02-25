@@ -24,8 +24,6 @@ import (
 	"github.com/infiniflow/infinity-go-sdk"
 )
 
-const testTmpDir = "/var/infinity/test_data/"
-
 // countLines counts the number of lines in a file
 func countLines(filePath string) (int, error) {
 	file, err := os.Open(filePath)
@@ -118,7 +116,7 @@ func TestExportCSV(t *testing.T) {
 	}
 
 	// Import data from CSV
-	testCSVPath := testTmpDir + "enwiki_embedding_9999.csv"
+	testCSVPath := testDataDir + "enwiki_embedding_9999.csv"
 	if _, err := os.Stat(testCSVPath); os.IsNotExist(err) {
 		t.Skipf("Test data file does not exist: %s", testCSVPath)
 	}
@@ -142,7 +140,7 @@ func TestExportCSV(t *testing.T) {
 	t.Logf("Table count result: %v", result)
 
 	// Test 1: Basic CSV export
-	exportCSVPath := filepath.Join(testTmpDir, "test_export_csv.csv")
+	exportCSVPath := filepath.Join(testDataDir, "test_export_csv.csv")
 	deleteFile(exportCSVPath)
 
 	exportOpts := &infinity.ExportOption{
@@ -316,7 +314,7 @@ func TestExportJSONL(t *testing.T) {
 	}
 
 	// Import data from CSV
-	testCSVPath := testTmpDir + "enwiki_embedding_9999.csv"
+	testCSVPath := testDataDir + "enwiki_embedding_9999.csv"
 	if _, err := os.Stat(testCSVPath); os.IsNotExist(err) {
 		t.Skipf("Test data file does not exist: %s", testCSVPath)
 	}
@@ -340,7 +338,7 @@ func TestExportJSONL(t *testing.T) {
 	t.Logf("Table count result: %v", result)
 
 	// Test 1: Basic JSONL export
-	exportJSONLPath := filepath.Join(testTmpDir, "test_export_jsonl.jsonl")
+	exportJSONLPath := filepath.Join(testDataDir, "test_export_jsonl.jsonl")
 	deleteFile(exportJSONLPath)
 
 	exportOpts := &infinity.ExportOption{
@@ -514,7 +512,7 @@ func TestExportFVECS(t *testing.T) {
 	}
 
 	// Import data from CSV
-	testCSVPath := testTmpDir + "enwiki_embedding_9999.csv"
+	testCSVPath := testDataDir + "enwiki_embedding_9999.csv"
 	if _, err := os.Stat(testCSVPath); os.IsNotExist(err) {
 		t.Skipf("Test data file does not exist: %s", testCSVPath)
 	}
@@ -538,7 +536,7 @@ func TestExportFVECS(t *testing.T) {
 	t.Logf("Table count result: %v", result)
 
 	// Test 1: Basic FVECS export
-	exportFVECSPath := filepath.Join(testTmpDir, "test_export_fvecs.fvecs")
+	exportFVECSPath := filepath.Join(testDataDir, "test_export_fvecs.fvecs")
 	deleteFile(exportFVECSPath)
 
 	exportOpts := &infinity.ExportOption{
@@ -675,5 +673,3 @@ func TestExportFVECS(t *testing.T) {
 		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
-
-

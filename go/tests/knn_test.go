@@ -629,7 +629,7 @@ func TestKNNImportFromCSV(t *testing.T) {
 	}
 
 	// Try to import from CSV if file exists
-	testCSVPath := filepath.Join("/var/infinity/test_data", "embedding_int_dim3.csv")
+	testCSVPath := filepath.Join(testDataDir, "embedding_int_dim3.csv")
 	if _, err := os.Stat(testCSVPath); err == nil {
 		_, err = table.ImportData(testCSVPath, nil)
 		if err != nil {
@@ -769,7 +769,7 @@ func TestKNNu8(t *testing.T) {
 	}
 
 	// Import data from CSV if file exists
-	testCSVPath := "/var/infinity/test_data/embedding_int_dim3.csv"
+	testCSVPath := testDataDir + "embedding_int_dim3.csv"
 	if _, err := os.Stat(testCSVPath); err == nil {
 		_, err = table.ImportData(testCSVPath, nil)
 		if err != nil {
@@ -913,7 +913,7 @@ func TestKNNfp16bf16(t *testing.T) {
 			}
 
 			// Import data from CSV if file exists
-			testCSVPath := "/var/infinity/test_data/embedding_int_dim3.csv"
+			testCSVPath := testDataDir + "embedding_int_dim3.csv"
 			if _, err := os.Stat(testCSVPath); err == nil {
 				_, err = table.ImportData(testCSVPath, nil)
 				if err != nil {
