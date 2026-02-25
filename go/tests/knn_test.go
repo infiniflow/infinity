@@ -1088,3 +1088,71 @@ func TestKNNOnVectorColumnWithImport(t *testing.T) {
 		})
 	}
 }
+
+// TestKNNOnNonVectorColumn tests KNN search on non-vector columns (should fail)
+// Based on Python SDK test_pysdk/test_knn.py - test_knn_on_non_vector_column
+func TestKNNOnNonVectorColumn(t *testing.T) {
+	// Test on non-vector columns (should fail)
+	nonVectorColumns := []string{"variant_id", "query_price"}
+
+	for _, columnName := range nonVectorColumns {
+		t.Run(columnName, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_knn_on_non_vector_column_%s", columnName) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Test KNN search on non-vector column (should fail)
+			_, err = table.Output([]string{"variant_id", "_row_id"}).
+				MatchDense(columnName, infinity.Float32Vector([]float32{1.0, 1.0, 1.0, 1.0}), "float", "ip", 2, nil).
+				ToResult()
+			if err == nil {
+				t.Errorf("Expected error for KNN search on non-vector column %s, but got none", columnName)
+			} else {
+				t.Logf("Got expected error for non-vector column %s: %v", columnName, err)
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
