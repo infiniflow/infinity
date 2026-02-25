@@ -103,13 +103,11 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 		colDef.Constraints = constraints
 
 		// Handle default value if provided
-		if columnInfo.Default != nil {
-			constExpr, err := ParseConstantValue(columnInfo.Default)
-			if err != nil {
-				return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
-			}
-			colDef.ConstantExpr = constExpr
+		constExpr, err := ParseConstantValue(columnInfo.Default)
+		if err != nil {
+			return nil, NewInfinityException(int(ErrorCodeInvalidParameterValue), fmt.Sprintf("Invalid default value for column %s: %v", columnInfo.Name, err))
 		}
+		colDef.ConstantExpr = constExpr
 
 		columnDefs = append(columnDefs, colDef)
 	}

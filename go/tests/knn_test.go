@@ -34,7 +34,7 @@ func TestKNNBasic(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_basic" + generateSuffix(t)
+	tableName := "test_knn_basic"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with vector columns
@@ -139,7 +139,7 @@ func TestKNNOnVectorColumn(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_on_vector_column" + generateSuffix(t)
+	tableName := "test_knn_on_vector_column"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -215,7 +215,7 @@ func TestKNNWithIndex(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_with_index" + generateSuffix(t)
+	tableName := "test_knn_with_index"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -313,7 +313,7 @@ func TestKNNVariousDistanceTypes(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_various_distance" + generateSuffix(t)
+	tableName := "test_knn_various_distance"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -381,7 +381,7 @@ func TestKNNInvalidTopN(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_invalid_topn" + generateSuffix(t)
+	tableName := "test_knn_invalid_topn"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -442,7 +442,7 @@ func TestKNNBigDimensionVector(t *testing.T) {
 	dimensions := []int{1000, 16384}
 
 	for _, dim := range dimensions {
-		tableName := "test_knn_big_dim_" + strconv.Itoa(dim) + generateSuffix(t)
+		tableName := "test_knn_big_dim_" + strconv.Itoa(dim)
 		db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 		schema := infinity.TableSchema{
@@ -495,7 +495,7 @@ func TestKNNWithIVFIndex(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_with_ivf_index" + generateSuffix(t)
+	tableName := "test_knn_with_ivf_index"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -558,7 +558,7 @@ func TestKNNWithThreshold(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_with_threshold" + generateSuffix(t)
+	tableName := "test_knn_with_threshold"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -615,7 +615,7 @@ func TestKNNImportFromCSV(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_import_csv" + generateSuffix(t)
+	tableName := "test_knn_import_csv"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -667,7 +667,7 @@ func TestKNNWithFusion(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_with_fusion" + generateSuffix(t)
+	tableName := "test_knn_with_fusion"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	schema := infinity.TableSchema{
@@ -754,7 +754,7 @@ func TestKNNu8(t *testing.T) {
 		t.Fatalf("Failed to get database: %v", err)
 	}
 
-	tableName := "test_knn_u8" + generateSuffix(t)
+	tableName := "test_knn_u8"
 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 	// Create table with int and uint8 vector columns
@@ -898,7 +898,7 @@ func TestKNNfp16bf16(t *testing.T) {
 				t.Fatalf("Failed to get database: %v", err)
 			}
 
-			tableName := fmt.Sprintf("test_knn_fp16_bf16_%s_%s", tc.saveElemType, tc.queryElemType) + generateSuffix(t)
+			tableName := fmt.Sprintf("test_knn_fp16_bf16_%s_%s", tc.saveElemType, tc.queryElemType)
 			db.DropTable(tableName, infinity.ConflictTypeIgnore)
 
 			// Create table with int and vector columns
@@ -957,5 +957,68 @@ func TestKNNfp16bf16(t *testing.T) {
 				t.Fatalf("Failed to drop table: %v", err)
 			}
 		})
+	}
+}
+
+// TestInsertMultiColumn tests insert with missing required column
+// Based on Python SDK test_pysdk/test_knn.py - test_insert_multi_column
+func TestInsertMultiColumn(t *testing.T) {
+	conn := setupConnection(t)
+	defer closeConnection(t, conn)
+
+	db, err := conn.GetDatabase("default_db")
+	if err != nil {
+		t.Fatalf("Failed to get database: %v", err)
+	}
+
+	tableName := "test_insert_multi_column"
+	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+	// Create table with multiple columns (query_color is required but not provided in insert)
+	schema := infinity.TableSchema{
+		{Name: "variant_id", DataType: "varchar"},
+		{Name: "gender_vector", DataType: "vector,4,float"},
+		{Name: "color_vector", DataType: "vector,4,float"},
+		{Name: "category_vector", DataType: "vector,4,float"},
+		{Name: "tag_vector", DataType: "vector,4,float"},
+		{Name: "other_vector", DataType: "vector,4,float"},
+		{Name: "query_is_recommend", DataType: "varchar"},
+		{Name: "query_gender", DataType: "varchar"},
+		{Name: "query_color", DataType: "varchar"},
+		{Name: "query_price", DataType: "float"},
+	}
+
+	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to create table: %v", err)
+	}
+
+	// Insert data without query_color column (should fail with "No default value found")
+	_, err = table.Insert([]map[string]interface{}{
+		{
+			"variant_id":         "123",
+			"gender_vector":      []float32{1.0, 1.0, 1.0, 1.0},
+			"color_vector":       []float32{2.0, 2.0, 2.0, 2.0},
+			"category_vector":    []float32{3.0, 3.0, 3.0, 3.0},
+			"tag_vector":         []float32{4.0, 4.0, 4.0, 4.0},
+			"other_vector":       []float32{5.0, 5.0, 5.0, 5.0},
+			"query_is_recommend": "ok",
+			"query_gender":       "male",
+			// "query_color": "red", // Missing required column
+			"query_price": 1.0,
+		},
+	})
+
+	// Expect error for missing required column
+	if err == nil {
+		t.Error("Expected error for missing required column 'query_color', but got none")
+	} else {
+		t.Logf("Got expected error for missing column: %v", err)
+	}
+
+	// Cleanup
+	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+	if err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
 	}
 }
