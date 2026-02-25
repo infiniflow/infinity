@@ -1529,3 +1529,88 @@ func TestInvalidEmbeddingDataType(t *testing.T) {
 		})
 	}
 }
+
+// TestVariousDistanceType tests KNN search with various distance types
+// Based on Python SDK test_pysdk/test_knn.py - test_various_distance_type
+func TestVariousDistanceType(t *testing.T) {
+	// Test with different distance types
+	testCases := []struct {
+		name         string
+		distanceType string
+		shouldWork   bool
+	}{
+		{"l2", "l2", true},
+		{"cosine", "cosine", true},
+		{"cos", "cos", true},
+		{"ip", "ip", true},
+		{"hamming", "hamming", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := setupConnection(t)
+			defer closeConnection(t, conn)
+
+			db, err := conn.GetDatabase("default_db")
+			if err != nil {
+				t.Fatalf("Failed to get database: %v", err)
+			}
+
+			tableName := fmt.Sprintf("test_various_distance_type_%s", tc.name) + generateSuffix(t)
+			db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+			// Create table with multiple vector columns
+			schema := infinity.TableSchema{
+				{Name: "variant_id", DataType: "varchar"},
+				{Name: "gender_vector", DataType: "vector,4,float"},
+				{Name: "color_vector", DataType: "vector,4,float"},
+				{Name: "category_vector", DataType: "vector,4,float"},
+				{Name: "tag_vector", DataType: "vector,4,float"},
+				{Name: "other_vector", DataType: "vector,4,float"},
+				{Name: "query_is_recommend", DataType: "varchar"},
+				{Name: "query_gender", DataType: "varchar"},
+				{Name: "query_color", DataType: "varchar"},
+				{Name: "query_price", DataType: "float"},
+			}
+
+			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to create table: %v", err)
+			}
+
+			// Import data from CSV if file exists
+			testCSVPath := "/var/infinity/test_data/tmp_20240116.csv"
+			if _, err := os.Stat(testCSVPath); err == nil {
+				_, err = table.ImportData(testCSVPath, nil)
+				if err != nil {
+					t.Logf("ImportData skipped or failed: %v", err)
+				}
+			} else {
+				t.Logf("Test CSV file not found: %s", testCSVPath)
+			}
+
+			// Test KNN search with various distance types
+			_, err = table.Output([]string{"variant_id"}).
+				MatchDense("gender_vector", infinity.Float32Vector([]float32{1.0, 1.0, 1.0, 1.0}), "float", tc.distanceType, 2, nil).
+				ToResult()
+
+			if tc.shouldWork {
+				if err != nil {
+					t.Errorf("KNN search with distance type %s should work but failed: %v", tc.name, err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error for distance type %s, but got none", tc.name)
+				} else {
+					t.Logf("Got expected error for distance type %s: %v", tc.name, err)
+				}
+			}
+
+			// Cleanup
+			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+			if err != nil {
+				t.Fatalf("Failed to drop table: %v", err)
+			}
+		})
+	}
+}
