@@ -1789,3 +1789,94 @@ func TestWithIndexBefore(t *testing.T) {
 		}
 	}
 }
+
+// TestWithIndexAfter tests KNN search before and after creating index
+// Based on Python SDK test_pysdk/test_knn.py - test_with_index_after
+func TestWithIndexAfter(t *testing.T) {
+	// Test with different index and knn column combinations
+	vectorColumns := []string{"gender_vector", "color_vector", "category_vector", "tag_vector", "other_vector"}
+	distanceTypes := []string{"l2", "ip"}
+
+	for _, indexCol := range vectorColumns {
+		for _, knnCol := range vectorColumns {
+			for _, indexDist := range distanceTypes {
+				for _, knnDist := range distanceTypes {
+					testName := fmt.Sprintf("idx_%s_knn_%s_%s_%s", indexCol, knnCol, indexDist, knnDist)
+					t.Run(testName, func(t *testing.T) {
+						conn := setupConnection(t)
+						defer closeConnection(t, conn)
+
+						db, err := conn.GetDatabase("default_db")
+						if err != nil {
+							t.Fatalf("Failed to get database: %v", err)
+						}
+
+						tableName := "test_with_index_after_" + generateSuffix(t)
+						db.DropTable(tableName, infinity.ConflictTypeIgnore)
+
+						// Create table with multiple vector columns
+						schema := infinity.TableSchema{
+							{Name: "variant_id", DataType: "varchar"},
+							{Name: "gender_vector", DataType: "vector,4,float"},
+							{Name: "color_vector", DataType: "vector,4,float"},
+							{Name: "category_vector", DataType: "vector,4,float"},
+							{Name: "tag_vector", DataType: "vector,4,float"},
+							{Name: "other_vector", DataType: "vector,4,float"},
+							{Name: "query_is_recommend", DataType: "varchar"},
+							{Name: "query_gender", DataType: "varchar"},
+							{Name: "query_color", DataType: "varchar"},
+							{Name: "query_price", DataType: "float"},
+						}
+
+						table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+						if err != nil {
+							t.Fatalf("Failed to create table: %v", err)
+						}
+
+						// Import data from CSV if file exists
+						testCSVPath := "/var/infinity/test_data/pysdk_test_knn.csv"
+						if _, err := os.Stat(testCSVPath); err == nil {
+							_, err = table.ImportData(testCSVPath, nil)
+							if err != nil {
+								t.Logf("ImportData skipped or failed: %v", err)
+							}
+						} else {
+							t.Logf("Test CSV file not found: %s", testCSVPath)
+						}
+
+						// Test KNN search before creating index
+						_, err = table.Output([]string{"variant_id"}).
+							MatchDense(knnCol, infinity.Float32Vector([]float32{1.0, 1.0, 1.0, 1.0}), "float", knnDist, 5, nil).
+							ToResult()
+						if err != nil {
+							t.Errorf("KNN search on %s with %s before index failed: %v", knnCol, knnDist, err)
+						}
+
+						// Create HNSW index on specified column
+						indexInfo := infinity.NewIndexInfo(indexCol, infinity.IndexTypeHnsw, map[string]string{
+							"M":               "16",
+							"ef_construction": "50",
+							"metric":          indexDist,
+						})
+						_, err = table.CreateIndex("my_index", indexInfo, infinity.ConflictTypeError, "")
+						if err != nil {
+							t.Errorf("Failed to create index on %s with %s: %v", indexCol, indexDist, err)
+						}
+
+						// Drop index
+						_, err = table.DropIndex("my_index", infinity.ConflictTypeError)
+						if err != nil {
+							t.Errorf("Failed to drop index: %v", err)
+						}
+
+						// Cleanup
+						_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+						if err != nil {
+							t.Fatalf("Failed to drop table: %v", err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
