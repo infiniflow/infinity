@@ -23,16 +23,16 @@ import (
 
 // QueryBuilder provides a fluent interface for building queries
 type QueryBuilder struct {
-	columns          []*thriftapi.ParsedExpr
-	highlight        []*thriftapi.ParsedExpr
-	search           *thriftapi.SearchExpr
-	filter           *thriftapi.ParsedExpr
-	groupby          []*thriftapi.ParsedExpr
-	having           *thriftapi.ParsedExpr
-	limit            *thriftapi.ParsedExpr
-	offset           *thriftapi.ParsedExpr
-	sort             []*thriftapi.OrderByExpr
-	totalHitsCount   bool
+	columns        []*thriftapi.ParsedExpr
+	highlight      []*thriftapi.ParsedExpr
+	search         *thriftapi.SearchExpr
+	filter         *thriftapi.ParsedExpr
+	groupby        []*thriftapi.ParsedExpr
+	having         *thriftapi.ParsedExpr
+	limit          *thriftapi.ParsedExpr
+	offset         *thriftapi.ParsedExpr
+	sort           []*thriftapi.OrderByExpr
+	totalHitsCount bool
 }
 
 // NewQueryBuilder creates a new QueryBuilder instance
@@ -403,6 +403,17 @@ func (qb *QueryBuilder) MatchTensor(
 ) (*QueryBuilder, error) {
 	if qb.search == nil {
 		qb.search = thriftapi.NewSearchExpr()
+	}
+
+	validTypes := map[string]bool{
+		"bit": true, "uint8": true, "int8": true, "int16": true,
+		"int": true, "int32": true, "int64": true,
+		"float": true, "float32": true, "double": true, "float64": true,
+		"float16": true, "bfloat16": true,
+	}
+	if !validTypes[strings.ToLower(queryDataType)] {
+		return nil, NewInfinityException(int(ErrorCodeInvalidEmbeddingDataType),
+			fmt.Sprintf("Invalid embedding data type: %s", queryDataType))
 	}
 
 	optionStr := fmt.Sprintf("topn=%d", topn)
@@ -1013,6 +1024,38 @@ func makeMatchTensorExpr(
 			inner[i] = float64(val)
 		}
 		tensorData = [][]float64{inner}
+	case [][][]float32:
+		// Flatten 3D tensor to 1D array
+		var totalLen int
+		for _, dim1 := range v {
+			for _, dim2 := range dim1 {
+				totalLen += len(dim2)
+			}
+		}
+		flattened := make([]float64, 0, totalLen)
+		for _, dim1 := range v {
+			for _, dim2 := range dim1 {
+				for _, val := range dim2 {
+					flattened = append(flattened, float64(val))
+				}
+			}
+		}
+		tensorData = [][]float64{flattened}
+	case [][][]float64:
+		// Flatten 3D tensor to 1D array
+		var totalLen int
+		for _, dim1 := range v {
+			for _, dim2 := range dim1 {
+				totalLen += len(dim2)
+			}
+		}
+		flattened := make([]float64, 0, totalLen)
+		for _, dim1 := range v {
+			for _, dim2 := range dim1 {
+				flattened = append(flattened, dim2...)
+			}
+		}
+		tensorData = [][]float64{flattened}
 	default:
 		tensorData = [][]float64{}
 	}
