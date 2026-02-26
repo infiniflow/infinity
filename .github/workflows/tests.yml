@@ -436,7 +436,13 @@ jobs:
           uv run python3 tools/sqllogictest.py -jc=1
           cd go
           go version
-          set -o pipefail; go test ./tests/... -v 2>&1 | tee debug_go_test.log
+          go test ./tests/... -v 2>&1 | tee debug_go_test.log
+          exit_code=${PIPESTATUS[0]}
+          if [ $exit_code -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^(FAIL|panic:|^--- FAIL)" debug_go_test.log || true
+            exit $exit_code
+          fi
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -816,7 +822,13 @@ jobs:
           uv run python3 tools/sqllogictest.py -jc=1
           cd go
           go version
-          set -o pipefail; go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
+          go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
+          exit_code=${PIPESTATUS[0]}
+          if [ $exit_code -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^(FAIL|panic:|^--- FAIL)" reldeb_go_test.log || true
+            exit $exit_code
+          fi
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
