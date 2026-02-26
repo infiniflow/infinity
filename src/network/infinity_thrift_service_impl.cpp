@@ -1092,8 +1092,9 @@ void InfinityThriftService::Delete(infinity_thrift_rpc::DeleteResponse &response
         Status parsed_expr_status;
         filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
         if (!parsed_expr_status.ok()) {
-            ProcessStatus(response, parsed_expr_status);
-            return;
+            // No filter, to delete all
+            // ProcessStatus(response, parsed_expr_status);
+            filter = nullptr;
         }
     }
 
