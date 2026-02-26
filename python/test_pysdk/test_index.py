@@ -826,8 +826,6 @@ class TestInfinity:
             "test_create_index_on_deleted_table" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip
-    @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_create_index_on_update_table(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_index_on_update_table" + suffix,
