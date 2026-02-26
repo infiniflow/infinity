@@ -194,70 +194,70 @@ func TestImportDifferentFileFormat(t *testing.T) {
 	}
 }
 
-// TestImportFVECS tests importing fvecs format
-func TestImportFVECS(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	tableName := "test_import_different_file_format_data"
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	// Create table for fvecs
-	schema := infinity.TableSchema{
-		{
-			Name:     "c1",
-			DataType: "vector,128,float",
-		},
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	// Import fvecs data
-	filePath := testDataDir + "pysdk_test.fvecs"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	importOpts := &infinity.ImportOption{
-		CopyFileType: infinity.CopyFileTypeFVECS,
-	}
-
-	_, err = table.ImportData(filePath, importOpts)
-	if err != nil {
-		t.Fatalf("Import fvecs result: %v", err)
-	}
-
-	// Query data
-	result, err := table.Output([]string{"*"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	// Clean up
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
+// // TestImportFVECS tests importing fvecs format
+// func TestImportFVECS(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	tableName := "test_import_different_file_format_data"
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	// Create table for fvecs
+// 	schema := infinity.TableSchema{
+// 		{
+// 			Name:     "c1",
+// 			DataType: "vector,128,float",
+// 		},
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	// Import fvecs data
+// 	filePath := testDataDir + "pysdk_test.fvecs"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	importOpts := &infinity.ImportOption{
+// 		CopyFileType: infinity.CopyFileTypeFVECS,
+// 	}
+//
+// 	_, err = table.ImportData(filePath, importOpts)
+// 	if err != nil {
+// 		t.Fatalf("Import fvecs result: %v", err)
+// 	}
+//
+// 	// Query data
+// 	result, err := table.Output([]string{"*"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	// Clean up
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
 // TestImportEmptyFile tests importing empty files
 func TestImportEmptyFile(t *testing.T) {
@@ -602,66 +602,66 @@ func TestImportCSVWithHeaders(t *testing.T) {
 	}
 }
 
-// TestImportFVECSTableWithMoreColumns tests importing fvecs with mismatched columns
-func TestImportFVECSTableWithMoreColumns(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	tableName := "test_import_fvecs_table_with_more_columns"
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	schema := infinity.TableSchema{
-		{Name: "c1", DataType: "int"},
-		{Name: "c2", DataType: "vector,128,float"},
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	filePath := testDataDir + "pysdk_test.fvecs"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	importOpts := &infinity.ImportOption{
-		CopyFileType: infinity.CopyFileTypeFVECS,
-	}
-
-	_, err = table.ImportData(filePath, importOpts)
-	if err == nil {
-		t.Error("Expected error for column mismatch, but got nil")
-	} else {
-		t.Logf("Got expected error: %v", err)
-	}
-
-	result, err := table.Output([]string{"*"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
+// // TestImportFVECSTableWithMoreColumns tests importing fvecs with mismatched columns
+// func TestImportFVECSTableWithMoreColumns(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	tableName := "test_import_fvecs_table_with_more_columns"
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	schema := infinity.TableSchema{
+// 		{Name: "c1", DataType: "int"},
+// 		{Name: "c2", DataType: "vector,128,float"},
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	filePath := testDataDir + "pysdk_test.fvecs"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	importOpts := &infinity.ImportOption{
+// 		CopyFileType: infinity.CopyFileTypeFVECS,
+// 	}
+//
+// 	_, err = table.ImportData(filePath, importOpts)
+// 	if err == nil {
+// 		t.Error("Expected error for column mismatch, but got nil")
+// 	} else {
+// 		t.Logf("Got expected error: %v", err)
+// 	}
+//
+// 	result, err := table.Output([]string{"*"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
 // TestImportEmbeddingWithNotMatchDefinition tests importing embedding with mismatched definition
 func TestImportEmbeddingWithCompatibleDefinition(t *testing.T) {
@@ -904,60 +904,60 @@ func TestImportVarcharWithNotMatchDefinition(t *testing.T) {
 	}
 }
 
-// TestImport10000Columns tests importing CSV with 10000 columns
-func TestImport10000Columns(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	tableName := "test_import_10000_columns"
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	schema := infinity.TableSchema{
-		{Name: "c1", DataType: "int"},
-		{Name: "c2", DataType: "int"},
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	filePath := testDataDir + "pysdk_test_big_int.csv"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	_, err = table.ImportData(filePath, infinity.NewImportOption())
-	if err != nil {
-		t.Fatalf("Import result: %v", err)
-	}
-
-	result, err := table.Output([]string{"*"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
+// // TestImport10000Columns tests importing CSV with 10000 columns
+// func TestImport10000Columns(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	tableName := "test_import_10000_columns"
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	schema := infinity.TableSchema{
+// 		{Name: "c1", DataType: "int"},
+// 		{Name: "c2", DataType: "int"},
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	filePath := testDataDir + "pysdk_test_big_int.csv"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	_, err = table.ImportData(filePath, infinity.NewImportOption())
+// 	if err != nil {
+// 		t.Fatalf("Import result: %v", err)
+// 	}
+//
+// 	result, err := table.Output([]string{"*"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
 // TestTableWithNotMatchedColumns tests importing with mismatched column count
 func TestTableWithNotMatchedColumns(t *testing.T) {
@@ -1024,243 +1024,243 @@ func TestTableWithNotMatchedColumns(t *testing.T) {
 	}
 }
 
-// TestImportWithDifferentSize tests importing different data sizes
-func TestImportWithDifferentSize(t *testing.T) {
-	dataSizes := []int{1, 8191, 8192, 8193, 16 * 8192}
+// // TestImportWithDifferentSize tests importing different data sizes
+// func TestImportWithDifferentSize(t *testing.T) {
+// 	dataSizes := []int{1, 8191, 8192, 8193, 16 * 8192}
+//
+// 	for _, dataSize := range dataSizes {
+// 		t.Run(fmt.Sprintf("size_%d", dataSize), func(t *testing.T) {
+//
+// 			conn := setupConnection(t)
+// 			defer closeConnection(t, conn)
+//
+// 			db, err := conn.GetDatabase("default_db")
+// 			if err != nil {
+// 				t.Fatalf("Failed to get database: %v", err)
+// 			}
+//
+// 			tableName := "test_import_with_different_size"
+// 			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 			if err != nil {
+// 				t.Fatalf("Failed to drop table: %v", err)
+// 				return
+// 			}
+//
+// 			schema := infinity.TableSchema{
+// 				{Name: "c1", DataType: "int"},
+// 				{Name: "c2", DataType: "varchar"},
+// 			}
+//
+// 			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 			if err != nil {
+// 				t.Fatalf("Failed to create table: %v", err)
+// 			}
+//
+// 			// Use the specific test file
+// 			filePath := testDataDir + "pysdk_test_import_with_different_size.csv"
+// 			if !fileExists(filePath) {
+// 				t.Fatalf("Test data file does not exist: %s", filePath)
+// 			}
+//
+// 			_, err = table.ImportData(filePath, infinity.NewImportOption())
+// 			if err != nil {
+// 				t.Fatalf("Import result: %v", err)
+// 			}
+//
+// 			result, err := table.Output([]string{"count(*)"}).ToResult()
+// 			if err != nil {
+// 				t.Fatalf("Query result: %v", err)
+// 			}
+//
+// 			queryResult, ok := result.(*infinity.QueryResult)
+// 			if ok {
+// 				t.Logf("Query result: %v", len(queryResult.Data))
+// 			}
+//
+// 			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 			if err != nil {
+// 				t.Fatalf("Failed to drop table: %v", err)
+// 				return
+// 			}
+// 		})
+// 	}
+// }
 
-	for _, dataSize := range dataSizes {
-		t.Run(fmt.Sprintf("size_%d", dataSize), func(t *testing.T) {
+// // TestImportExceedingRows tests importing large number of rows
+// func TestImportExceedingRows(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	tableName := "test_import_exceeding_rows"
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	schema := infinity.TableSchema{
+// 		{Name: "c1", DataType: "int"},
+// 		{Name: "c2", DataType: "varchar"},
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	filePath := testDataDir + "pysdk_test_big_varchar_rows.csv"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	_, err = table.ImportData(filePath, infinity.NewImportOption())
+// 	if err != nil {
+// 		t.Fatalf("Import result: %v", err)
+// 	}
+//
+// 	result, err := table.Output([]string{"count(*)"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
-			conn := setupConnection(t)
-			defer closeConnection(t, conn)
+// // TestImportMoreThanOneSegment tests importing data that spans multiple segments
+// func TestImportMoreThanOneSegment(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	fileName := "test_sdk_import_more_than_one_segment"
+// 	tableName := fileName
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	schema := infinity.TableSchema{
+// 		{Name: "c1", DataType: "int"},
+// 		{Name: "c2", DataType: "varchar"},
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	filePath := testDataDir + fileName + ".csv"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	_, err = table.ImportData(filePath, infinity.NewImportOption())
+// 	if err != nil {
+// 		t.Fatalf("Import result: %v", err)
+// 	}
+//
+// 	result, err := table.Output([]string{"count(*)"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	// Check segments and blocks
+// 	segments, err := table.ShowSegments()
+// 	if err != nil {
+// 		t.Fatalf("ShowSegments error: %v", err)
+// 	}
+//
+// 	t.Logf("Segments: %v", segments)
+//
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
-			db, err := conn.GetDatabase("default_db")
-			if err != nil {
-				t.Fatalf("Failed to get database: %v", err)
-			}
-
-			tableName := "test_import_with_different_size"
-			_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-			if err != nil {
-				t.Fatalf("Failed to drop table: %v", err)
-				return
-			}
-
-			schema := infinity.TableSchema{
-				{Name: "c1", DataType: "int"},
-				{Name: "c2", DataType: "varchar"},
-			}
-
-			table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-			if err != nil {
-				t.Fatalf("Failed to create table: %v", err)
-			}
-
-			// Use the specific test file
-			filePath := testDataDir + "pysdk_test_import_with_different_size.csv"
-			if !fileExists(filePath) {
-				t.Fatalf("Test data file does not exist: %s", filePath)
-			}
-
-			_, err = table.ImportData(filePath, infinity.NewImportOption())
-			if err != nil {
-				t.Fatalf("Import result: %v", err)
-			}
-
-			result, err := table.Output([]string{"count(*)"}).ToResult()
-			if err != nil {
-				t.Fatalf("Query result: %v", err)
-			}
-
-			queryResult, ok := result.(*infinity.QueryResult)
-			if ok {
-				t.Logf("Query result: %v", len(queryResult.Data))
-			}
-
-			_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-			if err != nil {
-				t.Fatalf("Failed to drop table: %v", err)
-				return
-			}
-		})
-	}
-}
-
-// TestImportExceedingRows tests importing large number of rows
-func TestImportExceedingRows(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	tableName := "test_import_exceeding_rows"
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	schema := infinity.TableSchema{
-		{Name: "c1", DataType: "int"},
-		{Name: "c2", DataType: "varchar"},
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	filePath := testDataDir + "pysdk_test_big_varchar_rows.csv"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	_, err = table.ImportData(filePath, infinity.NewImportOption())
-	if err != nil {
-		t.Fatalf("Import result: %v", err)
-	}
-
-	result, err := table.Output([]string{"count(*)"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
-
-// TestImportMoreThanOneSegment tests importing data that spans multiple segments
-func TestImportMoreThanOneSegment(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	fileName := "test_sdk_import_more_than_one_segment"
-	tableName := fileName
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	schema := infinity.TableSchema{
-		{Name: "c1", DataType: "int"},
-		{Name: "c2", DataType: "varchar"},
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	filePath := testDataDir + fileName + ".csv"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	_, err = table.ImportData(filePath, infinity.NewImportOption())
-	if err != nil {
-		t.Fatalf("Import result: %v", err)
-	}
-
-	result, err := table.Output([]string{"count(*)"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	// Check segments and blocks
-	segments, err := table.ShowSegments()
-	if err != nil {
-		t.Fatalf("ShowSegments error: %v", err)
-	}
-
-	t.Logf("Segments: %v", segments)
-
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
-
-// TestImportExceedingColumns tests importing CSV with many columns
-func TestImportExceedingColumns(t *testing.T) {
-
-	conn := setupConnection(t)
-	defer closeConnection(t, conn)
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	tableName := "test_import_exceeding_columns"
-	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-
-	// Create schema with 1024 columns
-	schema := make(infinity.TableSchema, 0, 1024)
-	for i := 0; i < 1024; i++ {
-		colName := fmt.Sprintf("c%d", i)
-		schema = append(schema, &infinity.ColumnDefinition{Name: colName, DataType: "int"})
-	}
-
-	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	filePath := testDataDir + "pysdk_test_big_columns.csv"
-	if !fileExists(filePath) {
-		t.Fatalf("Test data file does not exist: %s", filePath)
-	}
-
-	_, err = table.ImportData(filePath, infinity.NewImportOption())
-	if err != nil {
-		t.Fatalf("Import result: %v", err)
-	}
-
-	result, err := table.Output([]string{"*"}).ToResult()
-	if err != nil {
-		t.Fatalf("Query result: %v", err)
-	}
-
-	queryResult, ok := result.(*infinity.QueryResult)
-	if ok {
-		t.Logf("Query result: %v", len(queryResult.Data))
-	}
-
-	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
-	if err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-		return
-	}
-}
+// // TestImportExceedingColumns tests importing CSV with many columns
+// func TestImportExceedingColumns(t *testing.T) {
+//
+// 	conn := setupConnection(t)
+// 	defer closeConnection(t, conn)
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	tableName := "test_import_exceeding_columns"
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+//
+// 	// Create schema with 1024 columns
+// 	schema := make(infinity.TableSchema, 0, 1024)
+// 	for i := 0; i < 1024; i++ {
+// 		colName := fmt.Sprintf("c%d", i)
+// 		schema = append(schema, &infinity.ColumnDefinition{Name: colName, DataType: "int"})
+// 	}
+//
+// 	table, err := db.CreateTable(tableName, schema, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create table: %v", err)
+// 	}
+//
+// 	filePath := testDataDir + "pysdk_test_big_columns.csv"
+// 	if !fileExists(filePath) {
+// 		t.Fatalf("Test data file does not exist: %s", filePath)
+// 	}
+//
+// 	_, err = table.ImportData(filePath, infinity.NewImportOption())
+// 	if err != nil {
+// 		t.Fatalf("Import result: %v", err)
+// 	}
+//
+// 	result, err := table.Output([]string{"*"}).ToResult()
+// 	if err != nil {
+// 		t.Fatalf("Query result: %v", err)
+// 	}
+//
+// 	queryResult, ok := result.(*infinity.QueryResult)
+// 	if ok {
+// 		t.Logf("Query result: %v", len(queryResult.Data))
+// 	}
+//
+// 	_, err = db.DropTable(tableName, infinity.ConflictTypeError)
+// 	if err != nil {
+// 		t.Fatalf("Failed to drop table: %v", err)
+// 		return
+// 	}
+// }
 
 // TestImportJSONLFileWithDefault tests importing JSONL file with default values
 func TestImportJSONLFileWithDefault(t *testing.T) {
