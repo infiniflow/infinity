@@ -24,7 +24,7 @@ import (
 
 // ClientVersion is the version of this Go SDK client
 // This should match the protocol version expected by the server
-const ClientVersion = 36 // version: 0.7.0.dev2
+const ClientVersion = 36 // version: 0.7.0.dev3
 
 // Connect creates a new connection to Infinity
 // This is a factory function that creates the appropriate connection type based on the URI
