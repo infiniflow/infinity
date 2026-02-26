@@ -405,6 +405,71 @@ jobs:
           echo "LCOV file lines: $(wc -l < coverage.lcov)"
           mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
 
+  debug_go_test:
+    name: debug_go_test
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
+          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+
+      - name: Start infinity
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          export LLVM_PROFILE_DUMP_ON_EXIT=1
+          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_go_stderr.log &
+          ./scripts/wait_for_infinity.sh
+
+      - name: Run Go tests
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          uv run python3 tools/sqllogictest.py -jc=1
+          cd go
+          go version
+          go test ./tests/... -v 2>&1 | tee debug_go_test.log
+          exit_code=${PIPESTATUS[0]}
+          if [ $exit_code -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^(FAIL|panic:|^--- FAIL)" debug_go_test.log || true
+            exit $exit_code
+          fi
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_go_test && cp debug_go*.log ${ARTIFACTS_DIR}/debug_go_test/
+          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_go_test/
+          echo "debug go test log" && tail -n 1000 debug_go*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+
+      - name: Generate LCOV report
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          timeout 30s bash -c '
+            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
+              sleep 1s
+            done
+          ' || echo "Warning: infinity*.profraw is still empty after 30s"
+          ls -lh infinity*.profraw
+          
+          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+          head -10 coverage.lcov
+          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_go_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_go_test
+
   debug_http_test:
     name: debug_http_test
     runs-on: [ "self-hosted", "infinity-test" ]
@@ -529,7 +594,7 @@ jobs:
   debug_upload_codecov:
     name: debug_upload_codecov
     runs-on: [ "self-hosted", "infinity-test" ]
-    needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test,debug_pysdk_parallel_test]
+    needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test, debug_pysdk_parallel_test, debug_go_test]
     steps:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
@@ -723,6 +788,54 @@ jobs:
           mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_test/
           echo "reldeb pysdk log" && tail -n 1000 reldeb_pysdk*.log
+
+      - name: Stop infinity
+        if: always()
+        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+
+  reldeb_go_test:
+    name: reldeb_go_test
+    runs-on: [ "self-hosted", "infinity-test" ]
+    needs: reldeb_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
+          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+
+      - name: Start infinity
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_go_stderr.log &
+          ./scripts/wait_for_infinity.sh
+
+      - name: Run Go tests
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          uv run python3 tools/sqllogictest.py -jc=1
+          cd go
+          go version
+          go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
+          exit_code=${PIPESTATUS[0]}
+          if [ $exit_code -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^(FAIL|panic:|^--- FAIL)" reldeb_go_test.log || true
+            exit $exit_code
+          fi
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_go_test && cp reldeb_go*.log ${ARTIFACTS_DIR}/reldeb_go_test/
+          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_go_test/
+          echo "reldeb go test log" && tail -n 1000 reldeb_go*.log
 
       - name: Stop infinity
         if: always()

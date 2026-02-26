@@ -204,10 +204,10 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         }
 
         this->BeginTxn(base_statement);
-        //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
-        //                        session_ptr_->GetTxn()->TxnID(),
-        //                        session_ptr_->GetTxn()->BeginTS(),
-        //                        base_statement->ToString()));
+        // LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
+        //                 session_ptr_->GetNewTxn()->TxnID(),
+        //                 session_ptr_->GetNewTxn()->BeginTS(),
+        //                 base_statement->ToString()));
         RecordQueryProfiler(base_statement->type_);
 
         // Build unoptimized logical plan for each SQL base_statement.
