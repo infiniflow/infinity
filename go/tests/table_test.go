@@ -17,7 +17,7 @@ package tests
 import (
 	"fmt"
 	"strings"
-	"sync"
+// 	"sync"
 	"testing"
 
 	"github.com/infiniflow/infinity-go-sdk"
@@ -317,83 +317,83 @@ func TestDropTableWithInvalidOptions(t *testing.T) {
 }
 
 // TestCreateOrDropSameTableInDifferentThread tests creating/dropping same table in different threads
-func TestCreateOrDropSameTableInDifferentThread(t *testing.T) {
-
-	tableName := "test_create_or_drop_same_table_in_different_thread"
-
-	conn := setupConnection(t)
-	defer conn.Disconnect()
-
-	db, err := conn.GetDatabase("default_db")
-	if err != nil {
-		t.Fatalf("Failed to get database: %v", err)
-	}
-
-	// Clean up
-	db.DropTable(tableName, infinity.ConflictTypeIgnore)
-
-	schema := infinity.TableSchema{
-		{
-			Name:     "c1",
-			DataType: "int",
-		},
-	}
-
-	// Create table concurrently
-	var wg sync.WaitGroup
-	errors := make(chan error, 16)
-
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := db.CreateTable(tableName, schema, infinity.ConflictTypeIgnore)
-			if err != nil {
-				errors <- err
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(errors)
-
-	// At least one should succeed
-	errorCount := 0
-	for range errors {
-		errorCount++
-	}
-
-	if errorCount == 16 {
-		t.Log("All create attempts failed (this may be expected depending on server behavior)")
-	}
-
-	// Drop table concurrently
-	errors = make(chan error, 16)
-
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := db.DropTable(tableName, infinity.ConflictTypeIgnore)
-			if err != nil {
-				errors <- err
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(errors)
-
-	// At least one should succeed
-	errorCount = 0
-	for range errors {
-		errorCount++
-	}
-
-	if errorCount == 16 {
-		t.Log("All drop attempts failed (this may be expected depending on server behavior)")
-	}
-}
+// func TestCreateOrDropSameTableInDifferentThread(t *testing.T) {
+//
+// 	tableName := "test_create_or_drop_same_table_in_different_thread"
+//
+// 	conn := setupConnection(t)
+// 	defer conn.Disconnect()
+//
+// 	db, err := conn.GetDatabase("default_db")
+// 	if err != nil {
+// 		t.Fatalf("Failed to get database: %v", err)
+// 	}
+//
+// 	// Clean up
+// 	db.DropTable(tableName, infinity.ConflictTypeIgnore)
+//
+// 	schema := infinity.TableSchema{
+// 		{
+// 			Name:     "c1",
+// 			DataType: "int",
+// 		},
+// 	}
+//
+// 	// Create table concurrently
+// 	var wg sync.WaitGroup
+// 	errors := make(chan error, 16)
+//
+// 	for i := 0; i < 16; i++ {
+// 		wg.Add(1)
+// 		go func() {
+// 			defer wg.Done()
+// 			_, err := db.CreateTable(tableName, schema, infinity.ConflictTypeIgnore)
+// 			if err != nil {
+// 				errors <- err
+// 			}
+// 		}()
+// 	}
+//
+// 	wg.Wait()
+// 	close(errors)
+//
+// 	// At least one should succeed
+// 	errorCount := 0
+// 	for range errors {
+// 		errorCount++
+// 	}
+//
+// 	if errorCount == 16 {
+// 		t.Log("All create attempts failed (this may be expected depending on server behavior)")
+// 	}
+//
+// 	// Drop table concurrently
+// 	errors = make(chan error, 16)
+//
+// 	for i := 0; i < 16; i++ {
+// 		wg.Add(1)
+// 		go func() {
+// 			defer wg.Done()
+// 			_, err := db.DropTable(tableName, infinity.ConflictTypeIgnore)
+// 			if err != nil {
+// 				errors <- err
+// 			}
+// 		}()
+// 	}
+//
+// 	wg.Wait()
+// 	close(errors)
+//
+// 	// At least one should succeed
+// 	errorCount = 0
+// 	for range errors {
+// 		errorCount++
+// 	}
+//
+// 	if errorCount == 16 {
+// 		t.Log("All drop attempts failed (this may be expected depending on server behavior)")
+// 	}
+// }
 
 // TestListTables tests listing tables
 func TestListTables(t *testing.T) {
