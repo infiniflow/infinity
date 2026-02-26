@@ -721,7 +721,6 @@ class TestSnapshot:
                     except Exception as e:
                         import traceback
                         print(f"Index thread error: {e}")
-                        print(f"Full traceback:")
                         traceback.print_exc()
                         break
 
@@ -742,7 +741,6 @@ class TestSnapshot:
 
                     if result.error_code == ErrorCode.OK:
                         print(f"Snapshot created successfully in {snapshot_time:.2f} seconds")
-                        print(f"During snapshot creation:")
                         print(f"  - {state.insert_count} inserts performed")
                         print(f"  - {state.update_count} updates performed")
                         print(f"  - {state.delete_count} deletes performed")
