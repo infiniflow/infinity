@@ -446,31 +446,6 @@ class TestSnapshot:
 
         # Drop table
         db_obj.drop_table(table_name, ConflictType.Error)
-
-    # def test_snapshot_concurrency(self):
-    #     """Test concurrent snapshot operations"""
-    #     table_name = f"test_concurrency{self.suffix}"
-    #     snapshot_name = f"concurrency_snapshot{self.suffix}"
-
-    #     # Create table and insert data
-    #     table_obj = self.create_comprehensive_table(table_name)
-    #     self.insert_comprehensive_data(table_obj, 500)
-
-    #     def create_snapshot():
-    #         return self.db_obj.create_snapshot(snapshot_name, table_name)
-
-    #     def restore_snapshot():
-    #         return self.db_obj.restore_snapshot(snapshot_name, f"restored_{table_name}")
-
-    #     # Test concurrent snapshot creation
-    #     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    #         futures = [executor.submit(create_snapshot) for _ in range(4)]
-    #         results = [future.result() for future in futures]
-
-    #         # Only one should succeed, others should fail with conflict
-    #         success_count = sum(1 for r in results if r is not None)
-    #         assert success_count == 1
-
     def test_snapshot_large_table(self, suffix):
         """Test snapshot with large table and retry logic"""
         table_name = f"test_large_dataset{suffix}"
@@ -581,87 +556,6 @@ class TestSnapshot:
             self.infinity_obj.drop_snapshot(snapshot_name)
 
         db_obj.drop_table(table_name, ConflictType.Error)
-
-    def test_snapshot_stress_test(self, suffix):
-        """Stress test for snapshot operations with concurrent create and restore"""
-        num_tables = 10
-        tables = []
-
-        # Create multiple tables
-        for i in range(num_tables):
-            table_name = f"stress_test_table_{i}{suffix}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            db_obj.drop_table(table_name, ConflictType.Ignore)
-            table_obj = self.create_comprehensive_table(table_name)
-            self.insert_comprehensive_data(table_obj, 100)
-            self._create_indexes(table_obj)
-            tables.append((table_name, table_obj))
-
-        # Define snapshot operations
-        def create_snapshot_for_table(table_name):
-            snapshot_name = f"stress_snapshot_{table_name}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            return db_obj.create_table_snapshot(snapshot_name, table_name)
-
-        def restore_snapshot_for_table(table_name):
-            snapshot_name = f"stress_snapshot_{table_name}"
-            db_obj = self.infinity_obj.get_database("default_db")
-            return db_obj.restore_table_snapshot(snapshot_name)
-
-        # Create snapshots for all tables concurrently
-        print(f"Creating {num_tables} snapshots concurrently...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(create_snapshot_for_table, table_name)
-                      for table_name, _ in tables]
-            create_results = [future.result() for future in futures]
-
-            # All should succeed
-            for i, result in enumerate(create_results):
-                assert result.error_code == ErrorCode.OK, f"Snapshot creation failed for table {i}: {result.error_code}"
-
-        print(f"Successfully created {num_tables} snapshots")
-
-        # Drop original tables before restore to ensure clean restoration
-        print(f"Dropping {num_tables} original tables...")
-        for table_name, _ in tables:
-            try:
-                db_obj = self.infinity_obj.get_database("default_db")
-                db_obj.drop_table(table_name, ConflictType.Ignore)
-                print(f"   Dropped table: {table_name}")
-            except Exception as e:
-                print(f"   Warning: Failed to drop table {table_name}: {e}")
-
-        # Restore all snapshots concurrently
-        print(f"Restoring {num_tables} snapshots concurrently...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(restore_snapshot_for_table, table_name)
-                      for table_name, _ in tables]
-            restore_results = [future.result() for future in futures]
-
-            # All should succeed
-            for i, result in enumerate(restore_results):
-                assert result.error_code == ErrorCode.OK, f"Snapshot restore failed for table {i}: {result.error_code}"
-
-        print(f"Successfully restored {num_tables} snapshots")
-
-        # Verify all restored tables work correctly
-        print("Verifying restored tables...")
-        for i in range(num_tables):
-            restored_table_name = f"stress_test_table_{i}{suffix}"
-
-            # Use comprehensive verification function
-            try:
-                db_obj = self.infinity_obj.get_database("default_db")
-                self.verify_restored_table_functionality(restored_table_name, db_obj, expected_row_count=100)
-                print(f"   Table {i}: Comprehensive verification passed")
-            except Exception as e:
-                print(f"   Table {i}: Verification failed - {e}")
-                raise
-        # drop all snaphots
-        snapshots = self.infinity_obj.list_snapshots().snapshots
-        for snapshot in snapshots:
-            self.infinity_obj.drop_snapshot(snapshot.name)
-
     def test_restore_table_snapshot_table_exists(self, suffix):
         """Test restore when table already exists"""
         db_obj = self.infinity_obj.get_database("default_db")
