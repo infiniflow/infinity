@@ -433,9 +433,10 @@ jobs:
       - name: Run Go tests
         if: ${{ !cancelled() && !failure() }}
         run: |
+          uv run python3 tools/sqllogictest.py -jc=1
           cd go
           go version
-          go test ./tests/... -v 2>&1 | tee debug_go_test.log
+          set -o pipefail; go test ./tests/... -v 2>&1 | tee debug_go_test.log
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
@@ -812,9 +813,10 @@ jobs:
       - name: Run Go tests
         if: ${{ !cancelled() && !failure() }}
         run: |
+          uv run python3 tools/sqllogictest.py -jc=1
           cd go
           go version
-          go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
+          set -o pipefail; go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
