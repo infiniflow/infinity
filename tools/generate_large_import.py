@@ -92,7 +92,6 @@ def generate_big_rows_csv(num, filename):
 def generate(generate_if_exists: bool, copy_dir: str):
     generate1(generate_if_exists, copy_dir)
     generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
-    generate_big_int_csv(10000, "pysdk_test_big_columns.csv")
     generate_big_int_csv(10000, "pysdk_test_big_int.csv")
     for data_size in [1, 8191, 8192, 8193, 16 * 819]:
         generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
