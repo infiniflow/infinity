@@ -75,8 +75,8 @@ BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kMmap) {
         switch (status_) {
-            case BufferStatus::kUnPinned:
-            case BufferStatus::kPinned: {
+            case BufferStatus::kUnloaded:
+            case BufferStatus::kLoaded: {
                 break;
             }
             case BufferStatus::kFreed:
@@ -88,16 +88,16 @@ BufferHandle BufferObj::Load() {
                 UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
             }
         }
-        status_ = BufferStatus::kPinned;
+        status_ = BufferStatus::kLoaded;
         ++rc_;
         void *data = file_worker_->GetMmapData();
         return BufferHandle(this, data);
     }
     switch (status_) {
-        case BufferStatus::kPinned: {
+        case BufferStatus::kLoaded: {
             break;
         }
-        case BufferStatus::kUnPinned: {
+        case BufferStatus::kUnloaded: {
             if (!buffer_mgr_->RemoveFromGCQueue(this)) {
                 UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
             }
@@ -138,7 +138,7 @@ BufferHandle BufferObj::Load() {
             UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
         }
     }
-    status_ = BufferStatus::kPinned;
+    status_ = BufferStatus::kLoaded;
     ++rc_;
     void *data = file_worker_->GetData();
     return BufferHandle(this, data);
@@ -149,7 +149,7 @@ bool BufferObj::Free() {
     if (!locker.try_lock()) {
         return false; // when other thread is loading or cleaning, return false
     }
-    if (status_ != BufferStatus::kUnPinned) {
+    if (status_ != BufferStatus::kUnloaded) {
         UnrecoverableError(fmt::format("attempt to free {} buffer object", BufferStatusToString(status_)));
     }
     switch (type_) {
@@ -186,11 +186,11 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
             case BufferStatus::kNew: {
                 file_worker_->AllocateInMemory();
                 buffer_mgr_->PushGCQueue(this);
-                status_ = BufferStatus::kUnPinned;
+                status_ = BufferStatus::kUnloaded;
             }
-            case BufferStatus::kPinned:
+            case BufferStatus::kLoaded:
                 [[fallthrough]];
-            case BufferStatus::kUnPinned: {
+            case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
                 bool all_save = file_worker_->WriteToFile(false, ctx);
                 if (all_save) {
@@ -227,12 +227,12 @@ bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_sna
 
     if (type_ == BufferType::kEphemeral) {
         switch (status_) {
-            case BufferStatus::kPinned: {
+            case BufferStatus::kLoaded: {
                 std::unique_lock<std::mutex> locker(w_locker_);
                 file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
                 break;
             }
-            case BufferStatus::kUnPinned: {
+            case BufferStatus::kUnloaded: {
                 this->Load();
                 std::unique_lock<std::mutex> locker(w_locker_);
                 file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
@@ -288,7 +288,7 @@ void BufferObj::PickForCleanup() {
             buffer_mgr_->AddToCleanList(this, false /*do_free*/);
             break;
         }
-        case BufferStatus::kUnPinned: {
+        case BufferStatus::kUnloaded: {
             file_worker_->FreeInMemory();
             buffer_mgr_->AddToCleanList(this, true /*do_free*/);
             break;
@@ -334,11 +334,11 @@ void BufferObj::ToMmap() {
         UnrecoverableError(fmt::format("Invalid buffer type: {}", BufferTypeToString(type_)));
     }
     switch (status_) {
-        case BufferStatus::kPinned: {
+        case BufferStatus::kLoaded: {
             type_ = BufferType::kToMmap;
             break;
         }
-        case BufferStatus::kUnPinned: {
+        case BufferStatus::kUnloaded: {
             buffer_mgr_->RemoveFromGCQueue(this);
             file_worker_->FreeInMemory();
             buffer_mgr_->FreeUnloadBuffer(this);
@@ -358,7 +358,7 @@ void BufferObj::ToMmap() {
 
 void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (status_ != BufferStatus::kPinned) {
+    if (status_ != BufferStatus::kLoaded) {
         UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     }
     ++rc_;
@@ -381,7 +381,7 @@ void *BufferObj::GetMutPointer() {
 
 void BufferObj::UnloadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (status_ != BufferStatus::kPinned) {
+    if (status_ != BufferStatus::kLoaded) {
         UnrecoverableError(fmt::format("Invalid status: {}", BufferStatusToString(status_)));
     }
     --rc_;
@@ -393,10 +393,10 @@ void BufferObj::UnloadInner() {
             type_ = BufferType::kMmap;
         } else if (type_ == BufferType::kMmap) {
             file_worker_->MmapNotNeed();
-            status_ = BufferStatus::kUnPinned;
+            status_ = BufferStatus::kUnloaded;
         } else {
             buffer_mgr_->PushGCQueue(this);
-            status_ = BufferStatus::kUnPinned;
+            status_ = BufferStatus::kUnloaded;
         }
     }
 }
@@ -433,13 +433,13 @@ void BufferObj::SubObjRc() {
 void BufferObj::CheckState() const {
     std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
-        case BufferStatus::kPinned: {
+        case BufferStatus::kLoaded: {
             if (rc_ == 0) {
                 UnrecoverableError("Invalid status");
             }
             break;
         }
-        case BufferStatus::kUnPinned: {
+        case BufferStatus::kUnloaded: {
             if (rc_ > 0) {
                 UnrecoverableError("Invalid status");
             }
@@ -472,7 +472,7 @@ void BufferObj::SetData(void *data) {
     }
     file_worker_->SetData(data);
 
-    status_ = BufferStatus::kPinned;
+    status_ = BufferStatus::kLoaded;
     type_ = BufferType::kEphemeral;
 }
 
