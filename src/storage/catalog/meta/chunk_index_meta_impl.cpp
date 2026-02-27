@@ -29,6 +29,7 @@ import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :secondary_index_file_worker;
+import :plaid_index_file_worker;
 import :fileworker_manager;
 
 import std;
@@ -171,6 +172,14 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 LOG_WARN("Not implemented");
                 break;
             }
+            case IndexType::kPLAID: {
+                auto index_file_name = IndexFileName(chunk_id_);
+                auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
+                const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
+                auto index_file_worker = std::make_unique<PlaidIndexFileWorker>(rel_file_path, index_base, column_def, segment_start_offset);
+                index_file_worker_ = fileworker_mgr->plaid_map_.EmplaceFileWorker(std::move(index_file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -254,6 +263,14 @@ Status ChunkIndexMeta::LoadSet() {
             index_file_worker_ = fileworker_mgr->emvb_map_.EmplaceFileWorker(std::move(index_file_worker));
             break;
         }
+        case IndexType::kPLAID: {
+            auto index_file_name = IndexFileName(chunk_id_);
+            auto rel_file_path = std::make_shared<std::string>(fmt::format("{}/{}", *index_dir, std::move(index_file_name)));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            auto index_file_worker = std::make_unique<PlaidIndexFileWorker>(rel_file_path, index_base, column_def, segment_start_offset);
+            index_file_worker_ = fileworker_mgr->plaid_map_.EmplaceFileWorker(std::move(index_file_worker));
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -313,6 +330,11 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
         case IndexType::kEMVB: {
             InfinityContext::instance().storage()->fileworker_manager()->emvb_map_.MoveToCleans(
                 static_cast<EMVBIndexFileWorker *>(index_file_worker_));
+            break;
+        }
+        case IndexType::kPLAID: {
+            InfinityContext::instance().storage()->fileworker_manager()->plaid_map_.MoveToCleans(
+                static_cast<PlaidIndexFileWorker *>(index_file_worker_));
             break;
         }
         case IndexType::kHnsw: {
@@ -440,7 +462,9 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
             [[fallthrough]];
         case IndexType::kSecondaryFunctional:
             [[fallthrough]];
-        case IndexType::kBMP: {
+        case IndexType::kBMP:
+            [[fallthrough]];
+        case IndexType::kPLAID: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
             paths.push_back(file_path);
@@ -519,6 +543,15 @@ Status ChunkIndexMeta::LoadIndexFileWorker() {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_file_worker_ = fileworker_mgr->emvb_map_.GetFileWorker(index_filepath);
+            if (index_file_worker_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kPLAID: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_file_worker_ = fileworker_mgr->plaid_map_.GetFileWorker(index_filepath);
             if (index_file_worker_ == nullptr) {
                 return Status::BufferManagerError(fmt::format("GetFileWorker failed: {}", index_filepath));
             }

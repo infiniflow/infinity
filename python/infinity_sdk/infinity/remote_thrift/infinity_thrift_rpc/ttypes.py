@@ -398,6 +398,7 @@ class IndexType(object):
     SecondaryFunctional = 5
     EMVB = 6
     DiskAnn = 7
+    PLAID = 8
 
     _VALUES_TO_NAMES = {
         0: "IVF",
@@ -408,6 +409,7 @@ class IndexType(object):
         5: "SecondaryFunctional",
         6: "EMVB",
         7: "DiskAnn",
+        8: "PLAID",
     }
 
     _NAMES_TO_VALUES = {
@@ -419,6 +421,7 @@ class IndexType(object):
         "SecondaryFunctional": 5,
         "EMVB": 6,
         "DiskAnn": 7,
+        "PLAID": 8,
     }
 
 

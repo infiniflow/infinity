@@ -1,0 +1,132 @@
+# name: test/sql/dql/knn/tensor/test_plaid_query.slt
+# description: Test PLAID index for tensor MATCH TENSOR queries
+# group: [dql, knn, tensor, plaid]
+
+statement ok
+DROP TABLE IF EXISTS test_plaid_tensor;
+
+# Create table with tensor column
+statement ok
+CREATE TABLE test_plaid_tensor (title VARCHAR, num INT, t TENSOR(FLOAT, 4), body VARCHAR);
+
+# Insert test data (use COPY from CSV file instead)
+statement ok
+COPY test_plaid_tensor FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+# Verify data insertion
+query I
+SELECT * FROM test_plaid_tensor;
+----
+test00 2 [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]] this
+test11 4 [[0.2,0.1,0.3,0.4]] tree
+test22 6 [[0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]] tell off
+test33 8 [[0.4,0.3,0.2,0.1]] that
+test44 12 [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]] time off
+test55 14 [[0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3]] where
+test66 16 [[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]] on
+test77 18 [[0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1]] off
+
+# Query without index (baseline)
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+test66 11.910000
+test33 3.620000
+test77 2.260000
+test44 -5.190000
+test11 -9.660000
+
+# Create PLAID index
+statement ok
+CREATE INDEX idx_plaid ON test_plaid_tensor (t) USING PLAID WITH (nbits = 4, n_centroids = 8);
+
+# Verify index creation (just check it doesn't fail)
+statement ok
+SHOW TABLE test_plaid_tensor INDEXES;
+
+
+# Query with PLAID index - should use index and return same results
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+test66 11.910000
+test33 3.620000
+test77 2.260000
+test44 -5.190000
+test11 -9.660000
+
+# Test with topn option
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+
+# Test with threshold option
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'threshold=20') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+
+# Test different query embeddings
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [0.3, 0.2, 0.1, 0.4], 'float', 'maxsim', '');
+----
+test22 1.010000
+test66 1.010000
+test11 0.270000
+test55 0.270000
+test33 0.240000
+test00 0.190000
+test44 0.190000
+test77 0.120000
+
+# Test query with filter only
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.1, 0.2, 0.3, 0.4]], 'float', 'maxsim', '') WHERE num < 10;
+----
+test22 2.870000
+test11 0.290000
+test33 0.200000
+test00 0.170000
+
+# Drop index and test again
+statement ok
+DROP INDEX idx_plaid ON test_plaid_tensor;
+
+# Query after dropping index (should still work without index)
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+test66 11.910000
+test33 3.620000
+test77 2.260000
+test44 -5.190000
+test11 -9.660000
+
+# Create PLAID index with 2-bit quantization
+statement ok
+CREATE INDEX idx_plaid_2bit ON test_plaid_tensor (t) USING PLAID WITH (nbits = 2, n_centroids = 16);
+
+# Query with 2-bit index
+query TR
+SELECT title, ROUND(SCORE(), 4) FROM test_plaid_tensor SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', '') WHERE num > 2;
+----
+test22 636.870100
+test55 27.370000
+test66 11.910000
+test33 3.620000
+test77 2.260000
+test44 -5.190000
+test11 -9.660000
+
+# Cleanup
+statement ok
+DROP TABLE test_plaid_tensor;

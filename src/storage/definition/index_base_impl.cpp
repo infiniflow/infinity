@@ -23,6 +23,7 @@ import :index_secondary;
 import :index_secondary_functional;
 import :index_emvb;
 import :index_bmp;
+import :index_plaid;
 import :bmp_util;
 import :infinity_exception;
 import :index_defines;
@@ -198,6 +199,12 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
             res = std::make_shared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
             break;
         }
+        case IndexType::kPLAID: {
+            u32 nbits = ReadBufAdv<u32>(ptr);
+            u32 n_centroids = ReadBufAdv<u32>(ptr);
+            res = std::make_shared<IndexPLAID>(index_name, index_comment, file_name, std::move(column_names), nbits, n_centroids);
+            break;
+        }
         case IndexType::kInvalid: {
             UnrecoverableError("Error index method while reading");
         }
@@ -357,6 +364,12 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
             size_t block_size = doc["block_size"].get<size_t>();
             auto compress_type = (BMPCompressType)(i8)doc["compress_type"].get<i8>();
             res = std::make_shared<IndexBMP>(index_name, index_comment, file_name, std::move(column_names), block_size, compress_type);
+            break;
+        }
+        case IndexType::kPLAID: {
+            u32 nbits = doc["nbits"].get<u32>();
+            u32 n_centroids = doc["n_centroids"].get<u32>();
+            res = std::make_shared<IndexPLAID>(index_name, index_comment, file_name, std::move(column_names), nbits, n_centroids);
             break;
         }
         case IndexType::kInvalid: {
