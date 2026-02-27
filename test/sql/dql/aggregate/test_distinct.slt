@@ -56,14 +56,21 @@ SELECT COUNT(DISTINCT c1, c3) FROM test_distinct
 ----
 3
 
-query I
-SELECT SUM(DISTINCT c1) FROM test_distinct
+query II
+SELECT SUM(DISTINCT c1), SUM(DISTINCT c1) FROM test_distinct
 ----
-6
+6 6
+
+query II
+SELECT AVG(DISTINCT c1), MIN(DISTINCT c1) FROM test_distinct
+----
+2.000000 1
 
 statement error
 SELECT SUM(DISTINCT c1, c3) FROM test_distinct
 
+statement error
+SELECT COUNT(DISTINCT c1, c3), SUM(DISTINCT c1) FROM test_distinct
 
 query I rowsort
 SELECT DISTINCT CAST(c3 AS INTEGER) FROM test_distinct

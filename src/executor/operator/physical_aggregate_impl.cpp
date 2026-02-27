@@ -285,6 +285,16 @@ void PhysicalAggregate::GenerateGroupByResult(const std::shared_ptr<DataTable> &
 
     std::shared_ptr<DataBlock> output_datablock = nullptr;
     const std::vector<std::shared_ptr<DataBlock>> &input_datablocks = input_table->data_blocks_;
+
+    if (hash_table.empty()) {
+        // Empty input table - create one row with NULL values for group by columns
+        output_datablock = DataBlock::Make();
+        output_datablock->Init(types, 1);
+        output_datablock->Finalize();
+        output_table->Append(output_datablock);
+        return;
+    }
+
     for (const auto &item : hash_table) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
@@ -333,8 +343,9 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
     std::vector<std::shared_ptr<DataType>> output_types;
     output_types.reserve(aggregates_count);
 
-    AggregateFlag flag = output_blocks.empty() ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
-                                               : (!task_completed ? AggregateFlag::kRunning : AggregateFlag::kFinish);
+    bool was_output_empty = output_blocks.empty();
+    AggregateFlag flag = was_output_empty ? (!task_completed ? AggregateFlag::kUninitialized : AggregateFlag::kRunAndFinish)
+                                          : (!task_completed ? AggregateFlag::kRunning : AggregateFlag::kFinish);
 
     for (i64 idx = 0; auto &expr : aggregates_) {
         // expression state
@@ -353,31 +364,45 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
     }
 
     if (output_blocks.empty()) {
-        for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
-            output_blocks.emplace_back(DataBlock::MakeUniquePtr());
-            auto out_put_block = output_blocks.back().get();
-            out_put_block->Init(*GetOutputTypes());
-        }
+        // For simple aggregate (no GROUP BY), we need ONE output block
+        // All input blocks will be processed into this single output block
+        // The aggregate state accumulates across all input blocks
+        output_blocks.emplace_back(DataBlock::MakeUniquePtr());
+        output_blocks[0]->Init(*GetOutputTypes());
     }
 
+    DataBlock *output_data_block = output_blocks[0].get();
     for (size_t block_idx = 0; block_idx < input_block_count; ++block_idx) {
         DataBlock *input_data_block = input_blocks[block_idx].get();
-
-        DataBlock *output_data_block = output_blocks[block_idx].get();
+        bool is_last_block = (block_idx == input_block_count - 1);
 
         ExpressionEvaluator evaluator;
         evaluator.Init(input_data_block);
 
         size_t expression_count = aggregates_count;
-        // calculate every columns value
+
+        // We need to set the correct aggregate flag based on which block we're
+        // processing to ensure we only append the result once.
+        // - First Execute call (was_output_empty): Use kUninitialized to initialize the state
+        // - Subsequent Execute calls: Use kRunning to update the state without appending
+        // - Last block (is_last_block && task_completed): Use kFinish to finalize and append
+        AggregateFlag block_flag;
+        if (was_output_empty && block_idx == 0) {
+            block_flag = is_last_block && task_completed ? AggregateFlag::kRunAndFinish : AggregateFlag::kUninitialized;
+        } else {
+            block_flag = is_last_block && task_completed ? AggregateFlag::kFinish : AggregateFlag::kRunning;
+        }
+
         for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-            LOG_TRACE("Physical aggregate Execute");
+            expr_states[expr_idx]->agg_flag_ = block_flag;
+        }
+
+        for (size_t expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors_[expr_idx]);
         }
-        if (task_completed) {
-            // Finalize the output block (e.g. calculate the average value
-            output_data_block->Finalize();
-        }
+    }
+    if (task_completed) {
+        output_data_block->Finalize();
     }
     return true;
 }

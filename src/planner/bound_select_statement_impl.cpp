@@ -58,6 +58,9 @@ import :infinity_exception;
 import :expression_transformer;
 import :expression_type;
 import :base_table_ref;
+import :aggregate_expression;
+import :aggregate_function;
+import :aggregate_function_set;
 import :subquery_table_ref;
 import :cross_product_table_ref;
 import :join_table_ref;
@@ -375,14 +378,220 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
     if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
         // Build logical aggregate
         auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-        auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
-                                                            base_table_ref,
-                                                            group_by_expressions_,
-                                                            groupby_index_,
-                                                            aggregate_expressions_,
-                                                            aggregate_index_);
-        aggregate->set_left_node(root);
-        root = aggregate;
+
+        // Check for aggregates with DISTINCT
+        bool has_distinct_agg = false;
+        bool has_non_distinct_agg = false;
+        for (const auto &agg_expr : aggregate_expressions_) {
+            auto *ae = static_cast<AggregateExpression *>(agg_expr.get());
+            if (ae->distinct()) {
+                has_distinct_agg = true;
+            } else {
+                has_non_distinct_agg = true;
+            }
+
+            if (has_distinct_agg && has_non_distinct_agg) {
+                Status status = Status::NotSupport("Mixing DISTINCT and non-DISTINCT aggregates is not yet supported");
+                RecoverableError(status);
+            }
+        }
+
+        // Transform aggregates with DISTINCT to two-level aggregation
+        if (has_distinct_agg) {
+            std::set<std::vector<std::string>> distinct_arg_sets;
+
+            for (const auto &agg_expr : aggregate_expressions_) {
+                auto *ae = static_cast<AggregateExpression *>(agg_expr.get());
+                const auto &args = ae->arguments();
+                std::vector<std::string> arg_strs;
+                for (const auto &arg : args) {
+                    arg_strs.push_back(arg->ToString());
+                }
+                distinct_arg_sets.insert(arg_strs);
+
+                if (args.size() > 1) {
+                    std::string func_name = ae->aggregate_function_.name();
+                    // Only COUNT(DISTINCT) supports multiple arguments.
+                    if (func_name != "COUNT") {
+                        Status status = Status::NotSupport(fmt::format("{}(DISTINCT) with multiple arguments is not supported.", func_name));
+                        RecoverableError(status);
+                    }
+                }
+            }
+
+            // Reject multiple distinct aggregates on different columns (e.g. sum(DISTINCT c1), sum(DISTINCT c2))
+            // as it requires separate aggregation paths
+            if (distinct_arg_sets.size() > 1) {
+                Status status = Status::NotSupport("Multiple DISTINCT aggregates on different columns are not supported.");
+                RecoverableError(status);
+            }
+
+            // Step 1: Collect DISTINCT arguments and original GROUP BY columns as GROUP BY keys
+            std::vector<std::shared_ptr<BaseExpression>> first_level_groups;
+            std::vector<AggregateExpression *> distinct_aggs_to_process;
+
+            auto *first_distinct_agg = static_cast<AggregateExpression *>(aggregate_expressions_[0].get());
+            std::set<BaseExpression *> distinct_arg_ptrs;
+            for (const auto &arg : first_distinct_agg->arguments()) {
+                first_level_groups.push_back(arg);
+                distinct_arg_ptrs.insert(arg.get());
+            }
+            for (const auto &agg_expr : aggregate_expressions_) {
+                distinct_aggs_to_process.push_back(static_cast<AggregateExpression *>(agg_expr.get()));
+            }
+
+            for (const auto &group_by_expr : group_by_expressions_) {
+                bool already_in_distinct = false;
+                for (const auto *arg_ptr : distinct_arg_ptrs) {
+                    if (arg_ptr->ToString() == group_by_expr->ToString()) {
+                        already_in_distinct = true;
+                        break;
+                    }
+                }
+                if (!already_in_distinct) {
+                    first_level_groups.push_back(group_by_expr);
+                }
+            }
+
+            std::vector<std::vector<size_t>> agg_to_groupby_indices;
+            for (const auto *ae : distinct_aggs_to_process) {
+                const auto &args = ae->arguments();
+                std::vector<size_t> groupby_col_indices;
+
+                for (const auto &arg : args) {
+                    for (size_t i = 0; i < first_level_groups.size(); ++i) {
+                        if (first_level_groups[i]->ToString() == arg->ToString()) {
+                            groupby_col_indices.push_back(i);
+                            break;
+                        }
+                    }
+                }
+                agg_to_groupby_indices.push_back(groupby_col_indices);
+            }
+
+            // Step 2: Build first aggregate (GROUP BY distinct columns, no aggregates)
+            // First aggregate removes duplicates across tasklets, returns one row per distinct value
+            u64 first_agg_output_index = bind_context->GenerateTableIndex();
+            auto first_agg = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                base_table_ref,
+                                                                first_level_groups,
+                                                                groupby_index_,
+                                                                std::vector<std::shared_ptr<BaseExpression>>{},
+                                                                first_agg_output_index); // UNIQUE index for first aggregate output
+            first_agg->set_left_node(root);
+            root = first_agg;
+
+            auto first_agg_output_types = first_agg->GetOutputTypes();
+            auto first_agg_output_names = first_agg->GetOutputNames();
+            std::string first_agg_table_name = "__distinct_agg_result_" + std::to_string(first_agg_output_index);
+            bind_context->AddSubqueryBinding(first_agg_table_name, first_agg_output_index, first_agg_output_types, first_agg_output_names);
+
+            // Step 3: Build aggregates on grouped results
+            // For COUNT(DISTINCT): Use COUNT(*) to count rows after GROUP BY
+            // For other aggregates (SUM, AVG, etc.): Use the only DISTINCT argument
+            std::vector<std::shared_ptr<BaseExpression>> second_level_aggregates;
+            NewCatalog *catalog = query_context->storage()->new_catalog();
+
+            for (size_t agg_idx = 0; auto *orig_agg : distinct_aggs_to_process) {
+                std::vector<std::shared_ptr<BaseExpression>> agg_column_exprs;
+                const std::vector<size_t> &groupby_col_indices = agg_to_groupby_indices[agg_idx];
+                size_t col_idx = groupby_col_indices[0];
+                auto group_by_col_expr = ColumnExpression::Make(*(*first_agg_output_types)[col_idx],
+                                                                first_agg_table_name,
+                                                                groupby_index_,
+                                                                (*first_agg_output_names)[col_idx],
+                                                                col_idx,
+                                                                0);
+                group_by_col_expr->source_position_ = SourcePosition(bind_context->binding_context_id_, ExprSourceType::kBinding);
+                group_by_col_expr->source_position_.binding_name_ = first_agg_table_name;
+
+                std::string func_name = orig_agg->aggregate_function_.name();
+                std::shared_ptr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, func_name);
+                auto aggregate_function_set_ptr = static_pointer_cast<AggregateFunctionSet>(function_set_ptr);
+                AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(group_by_col_expr);
+
+                std::vector<std::shared_ptr<BaseExpression>> final_agg_args;
+                final_agg_args.push_back(group_by_col_expr);
+
+                auto final_agg = std::make_shared<AggregateExpression>(aggregate_function, final_agg_args);
+                final_agg->SetCountStar(func_name == "COUNT");
+
+                second_level_aggregates.push_back(final_agg);
+                ++agg_idx;
+            }
+
+            u64 second_agg_output_index = bind_context->GenerateTableIndex();
+            u64 second_agg_groupby_index = bind_context->GenerateTableIndex();
+            std::vector<std::shared_ptr<BaseExpression>> second_level_groups;
+            if (!group_by_expressions_.empty()) {
+                for (const auto &group_by_expr : group_by_expressions_) {
+                    size_t col_idx = 0;
+                    for (size_t i = 0; i < first_level_groups.size(); ++i) {
+                        if (first_level_groups[i]->ToString() == group_by_expr->ToString()) {
+                            col_idx = i;
+                            break;
+                        }
+                    }
+                    auto group_by_col_expr = ColumnExpression::Make(*(*first_agg_output_types)[col_idx],
+                                                                    first_agg_table_name,
+                                                                    groupby_index_,
+                                                                    (*first_agg_output_names)[col_idx],
+                                                                    col_idx,
+                                                                    0);
+                    group_by_col_expr->source_position_ = SourcePosition(bind_context->binding_context_id_, ExprSourceType::kBinding);
+                    group_by_col_expr->source_position_.binding_name_ = first_agg_table_name;
+                    second_level_groups.push_back(group_by_col_expr);
+                }
+            }
+
+            auto second_agg = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                 base_table_ref,
+                                                                 second_level_groups,
+                                                                 second_agg_groupby_index,
+                                                                 second_level_aggregates,
+                                                                 second_agg_output_index);
+
+            auto second_agg_output_types = second_agg->GetOutputTypes();
+            auto second_agg_output_names = second_agg->GetOutputNames();
+            std::string second_agg_table_name = "__final_agg_result_" + std::to_string(second_agg_output_index);
+
+            auto second_agg_bindings = second_agg->GetColumnBindings();
+            bind_context->AddSubqueryBinding(second_agg_table_name, second_agg_output_index, second_agg_output_types, second_agg_output_names);
+
+            second_agg->set_left_node(root);
+            root = second_agg;
+            bind_context->aggregate_table_index_ = second_agg_output_index;
+            bind_context->aggregate_table_name_ = second_agg_table_name;
+
+            for (size_t i = 0; i < projection_expressions_.size(); ++i) {
+                auto &proj_expr = projection_expressions_[i];
+                if (auto *col_expr = dynamic_cast<ColumnExpression *>(proj_expr.get())) {
+                    if (col_expr->source_position_.source_type_ == ExprSourceType::kAggregate) {
+                        size_t output_col_idx = col_expr->binding().column_idx;
+                        auto new_col_expr = ColumnExpression::Make(col_expr->Type(),
+                                                                   second_agg_table_name,
+                                                                   second_agg_output_index,
+                                                                   col_expr->column_name(),
+                                                                   output_col_idx,
+                                                                   col_expr->depth());
+                        new_col_expr->source_position_ = col_expr->source_position_;
+                        new_col_expr->alias_ = col_expr->alias_;
+                        projection_expressions_[i] = new_col_expr;
+                    }
+                }
+            }
+            types_ptr_ = second_agg_output_types;
+            names_ptr_ = second_agg_output_names;
+        } else {
+            auto aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                base_table_ref,
+                                                                group_by_expressions_,
+                                                                groupby_index_,
+                                                                aggregate_expressions_,
+                                                                aggregate_index_);
+            aggregate->set_left_node(root);
+            root = aggregate;
+        }
     }
 
     if (!having_expressions_.empty()) {

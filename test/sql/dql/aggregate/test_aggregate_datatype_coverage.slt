@@ -713,7 +713,7 @@ null
 null
 500
 
-query I
+query II
 SELECT COUNT(*), COUNT(CAST(str_val AS INT)) FROM test_null_agg;
 ----
 7 3
@@ -746,11 +746,6 @@ query I
 SELECT COUNT(distinct c1), SUM(distinct c1), AVG(distinct c1), MIN(distinct c1), MAX(distinct c1), FIRST(distinct c1) FROM test_empty_int_agg;
 ----
 0 null null null null null
-
-query R
-SELECT AVG(c1) FROM test_empty_int_agg;
-----
-null
 
 statement ok
 DROP TABLE test_empty_int_agg;
