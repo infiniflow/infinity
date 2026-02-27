@@ -26,8 +26,8 @@ class KVInstance;
 class Status;
 
 export enum class BufferStatus {
-    kLoaded,
-    kUnloaded,
+    kPinned,
+    kUnPinned,
     kFreed,
     kClean,
     kNew,
@@ -51,9 +51,9 @@ export struct BufferObjectInfo {
 
 export std::string BufferStatusToString(BufferStatus status) {
     switch (status) {
-        case BufferStatus::kLoaded:
+        case BufferStatus::kPinned:
             return "Loaded";
-        case BufferStatus::kUnloaded:
+        case BufferStatus::kUnPinned:
             return "Unloaded";
         case BufferStatus::kFreed:
             return "Freed";
