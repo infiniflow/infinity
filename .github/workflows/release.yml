@@ -81,7 +81,7 @@ jobs:
         BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu22_clang20
 
     - name: Build release version
       run: |

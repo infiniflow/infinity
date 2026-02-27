@@ -45,8 +45,8 @@ fi
 GITHUB_SHA=$(git rev-parse HEAD)
 REMOTE_NAME=$(git remote -v | awk '/github\.com[/:]infiniflow\/infinity/ && $3 == "(fetch)" {print $1; exit}')
 RELEASE_DATETIME=$(date --rfc-3339=seconds)
-BUILDER_CONTAINER=infinity_build_ubuntu20_clang20
-BUILDER_IMAGE=infiniflow/infinity_builder:ubuntu20_clang20
+BUILDER_CONTAINER=infinity_build_ubuntu22_clang20
+BUILDER_IMAGE=infiniflow/infinity_builder:ubuntu22_clang20
 WORKSPACE="$(git rev-parse --show-toplevel)"
 
 function git_retag() {
