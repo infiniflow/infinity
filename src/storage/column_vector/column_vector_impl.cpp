@@ -2724,7 +2724,7 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, size_t offset, s
 }
 
 bool ColumnVector::AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset) {
-    const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_.get())[row_id];
+    const auto &json_info = reinterpret_cast<const JsonT *>(other.data_ptr_)[row_id];
     auto data = other.buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
     auto parsed_json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(data), json_info.length_);
     auto [total_elements, element_strings] = JsonManager::json_unnest(*parsed_json);
