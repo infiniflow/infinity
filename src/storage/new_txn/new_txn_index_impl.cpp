@@ -415,7 +415,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             // Check cardinality to determine which execution path to use
             auto cardinality = secondary_index->GetSecondaryIndexCardinality();
             if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-                auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
+                auto *data_ptr = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(buffer_handle.GetDataMut());
                 data_ptr->InsertMergeData(old_buffers);
             } else {
                 auto *data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(buffer_handle.GetDataMut());
