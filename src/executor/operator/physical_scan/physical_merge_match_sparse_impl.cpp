@@ -133,8 +133,8 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
         UnrecoverableError(fmt::format("Invalid column count, {}", column_n));
     }
     auto *merge_knn = static_cast<MergeHeap *>(match_sparse_data.merge_knn_base_.get());
-    auto &dist_column = *input_data.column_vectors[column_n];
-    auto &row_id_column = *input_data.column_vectors[column_n + 1];
+    auto &dist_column = *input_data.column_vectors_[column_n];
+    auto &row_id_column = *input_data.column_vectors_[column_n + 1];
     auto dists = reinterpret_cast<ResultType *>(dist_column.data());
     auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
     size_t row_n = input_data.row_count();

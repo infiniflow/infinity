@@ -237,7 +237,7 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
         output_types.push_back(std::make_shared<DataType>(query_expr->Type()));
         query_data->Init(output_types);
         std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(query_expr);
-        evaluator.Execute(query_expr, expr_state, query_data->column_vectors[0]);
+        evaluator.Execute(query_expr, expr_state, query_data->column_vectors_[0]);
 
         function_data.evaluated_ = true;
     }
@@ -414,7 +414,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     auto &block_ids_idx = function_data.current_block_ids_idx_;
     auto &segment_ids_idx = function_data.current_segment_ids_idx_;
 
-    const ColumnVector &query_vector = *function_data.query_data_->column_vectors[0];
+    const ColumnVector &query_vector = *function_data.query_data_->column_vectors_[0];
 
     auto get_ele = [](const ColumnVector &column_vector, size_t idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
         const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data()) + idx;

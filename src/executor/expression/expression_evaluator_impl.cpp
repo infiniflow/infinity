@@ -193,7 +193,7 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<ReferenceExpression> &ex
         UnrecoverableError(fmt::format("Invalid column index: {}, column count: {}", column_index, input_data_block_->column_count()));
     }
 
-    output_column_vector = input_data_block_->column_vectors[column_index];
+    output_column_vector = input_data_block_->column_vectors_[column_index];
 }
 
 void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
@@ -233,10 +233,10 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
 void ExpressionEvaluator::Execute(const std::shared_ptr<FilterFulltextExpression> &expr,
                                   std::shared_ptr<ExpressionState> &,
                                   std::shared_ptr<ColumnVector> &output_column_vector) {
-    if (input_data_block_->column_vectors.empty()) {
+    if (input_data_block_->column_vectors_.empty()) {
         UnrecoverableError("Input data block is empty");
     }
-    const auto *expect_rowid_col = input_data_block_->column_vectors.back().get();
+    const auto *expect_rowid_col = input_data_block_->column_vectors_.back().get();
     if (expect_rowid_col->data_type()->type() != LogicalType::kRowID) {
         UnrecoverableError("Input data type last column is not rowid");
     }

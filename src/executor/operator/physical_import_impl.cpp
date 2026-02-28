@@ -103,10 +103,10 @@ public:
 
     ColumnVector &GetColumnVector(size_t column_idx) {
         assert(column_idx < column_defs_.size());
-        return *cur_block_->column_vectors[column_idx];
+        return *cur_block_->column_vectors_[column_idx];
     }
 
-    std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
+    std::vector<std::shared_ptr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors_; }
 
     std::string GetDBName() const { return db_name_; }
     std::string GetTableName() const { return table_name_; }

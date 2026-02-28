@@ -68,7 +68,7 @@ void ReadDataBlock(DataBlock *output,
     for (size_t i = 0; i < column_ids.size(); ++i) {
         if (const size_t column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
             const u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-            output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
+            output->column_vectors_[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else if (column_should_load[i]) {
             ColumnMeta column_meta(column_id, block_meta);
             ColumnVector column_vector;
@@ -77,10 +77,10 @@ void ReadDataBlock(DataBlock *output,
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
+            output->column_vectors_[i]->AppendWith(column_vector, 0, row_count);
         } else {
             // no need to load this column
-            output->column_vectors[i]->Finalize(row_count);
+            output->column_vectors_[i]->Finalize(row_count);
         }
     }
     output->Finalize();

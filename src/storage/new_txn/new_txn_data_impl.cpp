@@ -502,9 +502,9 @@ Status NewTxn::AppendInner(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back((*column_defs)[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to insert different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -904,7 +904,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 
         // append in column file
         for (size_t column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
-            const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
+            const ColumnVector &column_vector = *input_block->column_vectors_[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
             status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
@@ -2208,9 +2208,9 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < table_column_count; ++col_id) {
         column_types.emplace_back(table_info->column_defs_[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to import different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -2220,7 +2220,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
 
     for (size_t i = 0; i < input_block->column_count(); ++i) {
-        std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
+        std::shared_ptr<ColumnVector> col = input_block->column_vectors_[i];
         auto col_def = table_info->column_defs_[i];
 
         BufferObj *buffer_obj = nullptr;
