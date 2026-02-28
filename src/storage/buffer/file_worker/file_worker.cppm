@@ -50,8 +50,7 @@ public:
     bool WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
                            bool use_memory,
                            const FileWorkerSaveCtx &ctx = {},
-                           size_t row_cnt = 0,
-                           size_t data_size = 0);
+                           bool from_spill = false);
     // bool WriteSnapshotFile1(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
     //                         bool use_memory,
     //                         const FileWorkerSaveCtx &ctx = {},
@@ -86,11 +85,11 @@ public:
 protected:
     virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual bool WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx = {});
+    virtual bool WriteSnapshotFileImpl(std::unique_ptr<LocalFileHandle> file_handle, const FileWorkerSaveCtx &ctx);
 
     virtual void ReadFromFileImpl(size_t file_size, bool from_spill) = 0;
 
-    std::string ChooseFileDir(bool spill) const;
+    [[nodiscard]] std::string ChooseFileDir(bool spill) const;
 
     std::pair<std::optional<DeferFn<std::function<void()>>>, std::string> GetFilePathInner(bool spill);
 

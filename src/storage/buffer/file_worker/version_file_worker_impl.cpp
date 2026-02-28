@@ -85,8 +85,19 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     return false;
 }
 
-bool VersionFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    return WriteToFileImpl(false, prepare_success, ctx);
+bool VersionFileWorker::WriteSnapshotFileImpl(std::unique_ptr<LocalFileHandle> file_handle, const FileWorkerSaveCtx &ctx) {
+    if (data_ == nullptr) {
+        UnrecoverableError("Data is not allocated.");
+    }
+    auto *version_data = static_cast<BlockVersion *>(data_);
+
+    const auto &version_ctx = static_cast<const VersionFileWorkerSaveCtx &>(ctx);
+    bool is_full = version_data->SaveToFile(version_ctx.checkpoint_ts_, *file_handle);
+    if (is_full) {
+        LOG_TRACE(fmt::format("Version file is full: {}", GetFilePath()));
+        return true;
+    }
+    return false;
 }
 
 void VersionFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {

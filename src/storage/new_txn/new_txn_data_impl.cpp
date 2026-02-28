@@ -1464,24 +1464,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 continue;
             }
 
-            NewTxnGetVisibleRangeState state;
-            status = NewCatalog::GetBlockVisibleRange(block_meta, txn_context_ptr_->begin_ts_, txn_context_ptr_->commit_ts_, state);
-            if (!status.ok()) {
-                return status;
-            }
-
-            std::pair<BlockOffset, BlockOffset> range;
-            BlockOffset row_cnt = 0;
-            while (state.Next(row_cnt, range)) {
-                row_cnt = range.second;
-            }
-
-            bool use_memory = false;
             std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
-            if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
-                use_memory = true;
-            }
-            LOG_TRACE(fmt::format("block: {}, use_memory: {}", block_id, use_memory ? "true" : "false"));
 
             {
                 std::shared_ptr<std::string> block_dir_ptr = block_meta.GetBlockDir();
@@ -1494,7 +1477,7 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 }
 
                 VersionFileWorkerSaveCtx ctx(option.checkpoint_ts_);
-                version_buffer->SaveSnapshot(table_snapshot_info, use_memory, ctx);
+                version_buffer->SaveSnapshot(table_snapshot_info, ctx);
             }
 
             {
@@ -1506,23 +1489,19 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 for (size_t column_idx = 0; column_idx < column_defs->size(); ++column_idx) {
                     ColumnMeta column_meta(column_idx, block_meta);
+
                     BufferObj *buffer_obj = nullptr;
                     BufferObj *outline_buffer_obj = nullptr;
-
                     status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
                     if (!status.ok()) {
                         return status;
                     }
 
-                    size_t data_size = 0;
-                    std::tie(data_size, status) = column_meta.GetColumnSize(row_cnt, (*column_defs)[column_idx]);
-
                     if (buffer_obj) {
-                        buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
+                        buffer_obj->SaveSnapshot(table_snapshot_info);
                     }
-
                     if (outline_buffer_obj) {
-                        outline_buffer_obj->SaveSnapshot(table_snapshot_info, use_memory, {}, row_cnt, data_size);
+                        outline_buffer_obj->SaveSnapshot(table_snapshot_info);
                     }
                 }
             }
@@ -1534,21 +1513,21 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
     LOG_TRACE(fmt::format("Saving data and version files took {} ms", data_duration.count()));
 
     {
+        // If something wrong, skip it, and the index file will be recovered in RestoreSnapshot.
         auto CreateSnapshotFile = [&](const std::string &file) -> Status {
             if (pm != nullptr) {
                 PersistResultHandler pm_handler(pm);
                 PersistReadResult result = pm->GetObjCache(file);
-
-                DeferFn defer_fn([&]() {
-                    auto res = pm->PutObjCache(file);
-                    pm_handler.HandleWriteResult(res);
-                });
-
                 const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
                 if (!obj_addr.Valid()) {
                     LOG_INFO(fmt::format("Failed to find object for local path {}", file));
                     return Status::OK();
                 }
+
+                DeferFn defer_fn([&]() {
+                    auto res = pm->PutObjCache(file);
+                    pm_handler.HandleWriteResult(res);
+                });
 
                 std::string read_path = pm->GetObjPath(obj_addr.obj_key_);
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
@@ -1561,26 +1540,34 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
 
                 auto [read_handle, read_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
                 if (!read_open_status.ok()) {
-                    UnrecoverableError(read_open_status.message());
+                    LOG_INFO(read_open_status.message());
+                    return Status::OK();
                 }
 
                 auto seek_status = read_handle->Seek(obj_addr.part_offset_);
                 if (!seek_status.ok()) {
-                    UnrecoverableError(seek_status.message());
+                    LOG_INFO(seek_status.message());
+                    return Status::OK();
                 }
 
                 auto file_size = obj_addr.part_size_;
                 auto buffer = std::make_unique<char[]>(file_size);
                 auto [nread, read_status] = read_handle->Read(buffer.get(), file_size);
+                if (!read_status.ok()) {
+                    LOG_INFO(fmt::format("Failed to read from {}: {}", read_path, read_status.message()));
+                    return Status::OK();
+                }
 
                 auto [write_handle, write_open_status] = VirtualStore::Open(write_path, FileAccessMode::kWrite);
                 if (!write_open_status.ok()) {
-                    UnrecoverableError(write_open_status.message());
+                    LOG_INFO(write_open_status.message());
+                    return Status::OK();
                 }
 
                 Status write_status = write_handle->Append(buffer.get(), file_size);
                 if (!write_status.ok()) {
-                    UnrecoverableError(write_status.message());
+                    LOG_INFO(write_status.message());
+                    return Status::OK();
                 }
                 write_handle->Sync();
             } else {
@@ -1588,9 +1575,10 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
                 std::string write_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
                 LOG_TRACE(fmt::format("CreateSnapshotFile, Read path: {}, Write path: {}", read_path, write_path));
 
-                Status status = VirtualStore::Copy(write_path, read_path);
+                status = VirtualStore::Copy(write_path, read_path);
                 if (!status.ok()) {
-                    UnrecoverableError(status.message());
+                    LOG_INFO(status.message());
+                    return Status::OK();
                 }
             }
 
@@ -1611,35 +1599,6 @@ Status NewTxn::CreateTableSnapshotFile(std::shared_ptr<TableSnapshotInfo> table_
         auto index_duration = std::chrono::duration_cast<std::chrono::milliseconds>(index_end_time - index_start_time);
         LOG_TRACE(fmt::format("Saving index files took {} ms", index_duration.count()));
     }
-
-    // {
-    //     auto json_start_time = std::chrono::high_resolution_clock::now();
-    //
-    //     nlohmann::json json_res = table_snapshot_info->CreateSnapshotMetadataJSON();
-    //     std::string json_string = json_res.dump();
-    //
-    //     std::string meta_path = fmt::format("{}/{}/{}.json", snapshot_dir, table_snapshot_info->snapshot_name_,
-    //     table_snapshot_info->snapshot_name_); std::string meta_path_dir = VirtualStore::GetParentPath(meta_path); if
-    //     (!VirtualStore::Exists(meta_path_dir)) {
-    //         VirtualStore::MakeDirectory(meta_path_dir);
-    //     }
-    //
-    //     auto [snapshot_file_handle, meta_status] = VirtualStore::Open(meta_path, FileAccessMode::kWrite);
-    //     if (!meta_status.ok()) {
-    //         UnrecoverableError(status.message());
-    //     }
-    //
-    //     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
-    //     if (!status.ok()) {
-    //         UnrecoverableError(status.message());
-    //     }
-    //     snapshot_file_handle->Sync();
-    //
-    //     auto json_end_time = std::chrono::high_resolution_clock::now();
-    //     auto json_duration = std::chrono::duration_cast<std::chrono::milliseconds>(json_end_time - json_start_time);
-    //     LOG_TRACE(fmt::format("Saving json files took {} ms", json_duration.count()));
-    // }
-
     return Status::OK();
 }
 
