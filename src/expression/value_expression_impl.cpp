@@ -25,6 +25,16 @@ namespace infinity {
 
 std::string ValueExpression::ToString() const { return value_.ToString(); }
 
+nlohmann::json ValueExpression::Serialize() const {
+    nlohmann::json j;
+    j["type"] = "Value";
+
+    j["value_str"] = value_.ToString();
+    j["value_type"] = value_.type().Serialize().dump();
+
+    return j;
+}
+
 u64 ValueExpression::Hash() const { return 0; }
 
 bool ValueExpression::Eq(const BaseExpression &other_base) const {

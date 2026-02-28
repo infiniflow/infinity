@@ -64,6 +64,7 @@ import :index_ivf;
 import :index_hnsw;
 import :index_diskann;
 import :index_secondary;
+import :index_secondary_functional;
 import :index_emvb;
 import :index_bmp;
 import :index_full_text;
@@ -81,6 +82,7 @@ import :table_meta;
 import :new_catalog;
 import :kv_store;
 import :query_context;
+import :column_remapper;
 
 import std;
 import third_party;
@@ -830,6 +832,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         RecoverableError(status);
     }
 
+    std::shared_ptr<FunctionExpression> function_expression_ptr{};
     IndexInfo *index_info = create_index_info->index_info_;
     std::shared_ptr<IndexBase> base_index_ptr{nullptr};
     std::string index_filename = fmt::format("{}_{}", create_index_info->table_name_, *index_name);
@@ -863,6 +866,52 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
                 IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_}, index_info->secondary_index_cardinality_);
             break;
         }
+        case IndexType::kSecondaryFunctional: {
+            FunctionExpr *function_expr = static_cast<FunctionExpr *>(index_info->function_expr_);
+
+            std::vector<std::string> column_names;
+            for (auto &func_arg : *(function_expr->arguments_)) {
+                if (func_arg->type_ == ParsedExprType::kColumn) {
+                    column_names.emplace_back(func_arg->ToString());
+                } else if (func_arg->type_ == ParsedExprType::kFunction) {
+                    RecoverableError(Status::NotSupport("Not support nested function"));
+                    break;
+                }
+            }
+            if (column_names.empty()) {
+                RecoverableError(Status::NotSupport("Only support column expression in argument list for secondary functional index"));
+                break;
+            }
+            if (column_names.size() > 1) {
+                RecoverableError(Status::NotSupport("Only support single column expression in argument list for secondary functional index"));
+                break;
+            }
+            index_info->column_name_ = column_names[0];
+
+            auto expression_binder = std::make_shared<ExpressionBinder>(query_context_ptr_);
+            auto base_expression = expression_binder->BuildFuncExpr(*function_expr, bind_context_ptr.get(), 0, true);
+            function_expression_ptr = std::dynamic_pointer_cast<FunctionExpression>(base_expression);
+            if (!function_expression_ptr) {
+                RecoverableError(Status::NotSupport("Invalid function expression for secondary functional index"));
+                break;
+            }
+
+            DataType return_type = function_expression_ptr->Type();
+            IndexSecondaryFunctional::ValidateColumnAndReturnDataType(base_table_ref,
+                                                                      index_info->column_name_,
+                                                                      return_type,
+                                                                      index_info->secondary_index_cardinality_);
+
+            base_index_ptr = IndexSecondaryFunctional::Make(index_name,
+                                                            index_comment,
+                                                            index_filename,
+                                                            {index_info->column_name_},
+                                                            std::make_shared<std::string>(function_expression_ptr->ExtractFunctionInfo()),
+                                                            function_expression_ptr->Type(),
+                                                            index_info->secondary_index_cardinality_);
+
+            break;
+        }
         case IndexType::kEMVB: {
             assert(index_info->index_param_list_ != nullptr);
             IndexEMVB::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
@@ -892,7 +941,21 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
     auto logical_create_index_operator = std::make_shared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                               base_table_ref,
                                                                               base_index_ptr,
-                                                                              create_index_info->conflict_type_);
+                                                                              create_index_info->conflict_type_,
+                                                                              function_expression_ptr);
+
+    // Apply Column Remapper for function expression in secondary functional index and store the serialized function expression string to index base
+    if (index_info->index_type_ == IndexType::kSecondaryFunctional) {
+        std::unique_ptr<ColumnRemapper> column_remapper = std::make_unique<ColumnRemapper>();
+        std::shared_ptr<LogicalNode> logical_node = logical_create_index_operator;
+        column_remapper->ApplyToPlan(query_context_ptr_, logical_node);
+
+        std::shared_ptr<IndexSecondaryFunctional> index_secondary_functional = std::dynamic_pointer_cast<IndexSecondaryFunctional>(base_index_ptr);
+        if (index_secondary_functional) {
+            index_secondary_functional->SetFunctionExpressionJsonStr(
+                std::make_shared<std::string>(logical_create_index_operator->function_expression_->Serialize().dump()));
+        }
+    }
 
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");

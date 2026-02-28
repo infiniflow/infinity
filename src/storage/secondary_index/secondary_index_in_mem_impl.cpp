@@ -150,14 +150,10 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }
 
 std::shared_ptr<SecondaryIndexInMem>
-SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id, SecondaryIndexCardinality cardinality) {
-    if (!column_def->type()->CanBuildSecondaryIndex()) {
-        UnrecoverableError("Column type can't build secondary index");
-    }
-
+SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, RowID begin_row_id, SecondaryIndexCardinality cardinality) {
     // Select template specialization based on cardinality
     if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-        switch (column_def->type()->type()) {
+        switch (index_data_type.type()) {
             case LogicalType::kTinyInt: {
                 return std::make_shared<SecondaryIndexInMemT<TinyIntT, HighCardinalityTag>>(begin_row_id, cardinality);
             }
@@ -196,7 +192,7 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const std::shared_ptr<ColumnDef> &co
             }
         }
     } else if (cardinality == SecondaryIndexCardinality::kLowCardinality) {
-        switch (column_def->type()->type()) {
+        switch (index_data_type.type()) {
             case LogicalType::kBoolean: {
                 return std::make_shared<SecondaryIndexInMemT<BooleanT, LowCardinalityTag>>(begin_row_id, cardinality);
             }

@@ -419,7 +419,7 @@ else ()
 endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development)
 #find_package(Python 3.8
 #        REQUIRED COMPONENTS Interpreter Development.Module
 #        OPTIONAL_COMPONENTS Development.SABIModule)

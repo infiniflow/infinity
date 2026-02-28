@@ -190,7 +190,7 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<ReferenceExpression> &ex
         UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        UnrecoverableError("Invalid column index");
+        UnrecoverableError(fmt::format("Invalid column index: {}, column count: {}", column_index, input_data_block_->column_count()));
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];

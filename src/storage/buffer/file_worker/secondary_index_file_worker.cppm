@@ -17,6 +17,7 @@ export module infinity_core:secondary_index_file_worker;
 import :index_file_worker;
 import :file_worker;
 import :index_base;
+import :index_secondary_functional;
 import :infinity_exception;
 import :default_values;
 import :file_worker_type;
@@ -44,7 +45,15 @@ public:
                           std::move(index_base),
                           std::move(column_def),
                           persistence_manager),
-          row_count_(row_count) {}
+          row_count_(row_count) {
+
+        if (index_base_->index_type_ == IndexType::kSecondary) {
+            index_data_type_ = *column_def_->type();
+        } else {
+            auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
+            index_data_type_ = functional_index->GetFuncReturnType();
+        }
+    }
 
     ~SecondaryIndexFileWorker() override;
 
@@ -60,6 +69,9 @@ protected:
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
     const u32 row_count_{};
+
+private:
+    DataType index_data_type_{LogicalType::kInvalid};
 };
 
 } // namespace infinity

@@ -51,6 +51,7 @@ import :bmp_handler;
 import :index_hnsw;
 import :index_bmp;
 import :index_secondary;
+import :index_secondary_functional;
 import :emvb_index_in_mem;
 import :emvb_index;
 import :meta_key;
@@ -68,6 +69,8 @@ import :kv_utility;
 import :dump_index_process;
 import :persistence_manager;
 import :persist_result_handler;
+import :function_expression;
+import :expression_evaluator;
 
 import std;
 import third_party;
@@ -148,14 +151,12 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
                             const std::string &index_name,
                             SegmentID segment_id,
                             RowID begin_row_id) {
-    Status status;
-
     std::shared_ptr<DBMeta> db_meta;
     std::shared_ptr<TableMeta> table_meta;
     std::shared_ptr<TableIndexMeta> table_index_meta;
     std::string table_key;
     std::string index_key;
-    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -177,7 +178,7 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     }
 
     // Put the data into local txn store
-    DumpMemIndexTxnStore *txn_store;
+    DumpMemIndexTxnStore *txn_store{};
     if (base_txn_store_ == nullptr) {
         base_txn_store_ = std::make_shared<DumpMemIndexTxnStore>();
         txn_store = static_cast<DumpMemIndexTxnStore *>(base_txn_store_.get());
@@ -240,7 +241,7 @@ Status NewTxn::OptimizeAllIndexes() {
             // const std::string &table_id_str = (*table_id_strs_ptr)[idx];
             const std::string &table_name = (*table_names_ptr)[idx];
 
-            status = this->OptimizeTableIndexes(db_name, table_name);
+            status = OptimizeTableIndexes(db_name, table_name);
             if (!status.ok()) {
                 return status;
             }
@@ -281,7 +282,7 @@ Status NewTxn::OptimizeTableIndexes(const std::string &db_name, const std::strin
         }
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
-            status = this->OptimizeIndexInner(segment_index_meta, index_name, table_name, db_name, table_key);
+            status = OptimizeIndexInner(segment_index_meta, index_name, table_name, db_name, table_key);
             if (!status.ok()) {
                 return status;
             }
@@ -337,7 +338,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         return index_status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, term_cnt, base_name);
+        status = OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, term_cnt, base_name);
         if (!status.ok()) {
             return status;
         }
@@ -390,7 +391,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
 
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
             std::vector<std::pair<u32, BufferObj *>> old_buffers;
             for (size_t i = 0; i < deprecate_ids.size(); ++i) {
@@ -688,7 +690,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
         }
         {
             BlockID block_id = block_meta->block_id();
-            Status status = this->AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
+            Status status = AppendMemIndex(*segment_index_meta, block_id, col, cur_offset, cur_row_cnt);
             if (!status.ok()) {
                 return status;
             }
@@ -725,8 +727,9 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
 
 Status
 NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+    Status status;
     SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-    RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+    auto base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
 
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
@@ -738,21 +741,42 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateBegin mem_index {:p}, is_null {}", static_cast<void *>(mem_index.get()), is_null));
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
+            auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+            if (!status.ok()) {
+                return status;
+            }
             std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
-            if (is_null) {
-                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
-                if (!status.ok()) {
-                    return status;
-                }
-                const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
-                auto cardinality = secondary_index->GetSecondaryIndexCardinality();
-                memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
-
-                mem_index->SetSecondaryIndex(memory_secondary_index);
-            } else {
-                memory_secondary_index = mem_index->GetSecondaryIndex();
+            const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+            auto cardinality = secondary_index->GetSecondaryIndexCardinality();
+            std::tie(memory_secondary_index, status) =
+                GetSecondaryIndexInMem(segment_index_meta, *column_def->type(), base_row_id, mem_index, cardinality);
+            if (!status.ok()) {
+                return status;
             }
             memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
+            break;
+        }
+        case IndexType::kSecondaryFunctional: {
+            std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
+            const IndexSecondaryFunctional *secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+            auto index_data_type = secondary_functional_index->GetFuncReturnType();
+            auto cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+            std::tie(memory_secondary_index, status) =
+                GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
+            if (!status.ok()) {
+                return status;
+            }
+
+            auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+            if (!status.ok()) {
+                return status;
+            }
+
+            auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_def->id());
+            if (output_column == nullptr) {
+                return Status::InvalidExpression(*secondary_functional_index->GetFunctionExpressionJsonStr());
+            }
+            memory_secondary_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
             break;
         }
         case IndexType::kFullText: {
@@ -766,8 +790,8 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 }
 
                 std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
-                std::string base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-                std::string full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
+                auto base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+                auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                 memory_indexer = std::make_unique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
                 need_to_update_ft_segment_ts = true;
                 mem_index->SetFulltextIndex(memory_indexer);
@@ -790,10 +814,10 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             auto col_ptr = std::make_shared<ColumnVector>(std::move(col));
             if (index_fulltext->IsRealtime()) {
                 std::unique_ptr<std::binary_semaphore> sema = memory_indexer->AsyncInsert(col_ptr, offset, row_cnt);
-                this->AddSemaphore(std::move(sema));
+                AddSemaphore(std::move(sema));
             } else {
                 // mem_index->GetFulltextIndex()->Insert(col_ptr, offset, row_cnt, false);
-                std::shared_ptr<AppendMemIndexTask> append_mem_index_task = std::make_shared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
+                auto append_mem_index_task = std::make_shared<AppendMemIndexTask>(mem_index, col_ptr, offset, row_cnt);
                 memory_indexer->AsyncInsertTop(append_mem_index_task.get());
                 auto *mem_index_appender = InfinityContext::instance().storage()->mem_index_appender();
                 mem_index_appender->Submit(append_mem_index_task);
@@ -854,7 +878,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         }
         case IndexType::kEMVB: {
             std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
-            TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+            auto &table_meta = segment_index_meta.table_index_meta().table_meta();
             if (is_null) {
                 auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                 if (!status.ok()) {
@@ -878,7 +902,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd mem_index {:p}", static_cast<void *>(mem_index.get())));
 
     // // Trigger dump if necessary
-    if (!this->IsReplay()) {
+    if (!IsReplay()) {
         size_t row_count = mem_index->GetRowCount();
         size_t row_quota = InfinityContext::instance().config()->MemIndexCapacity();
         if (row_count >= row_quota) {
@@ -964,6 +988,19 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
         case IndexType::kSecondary: {
             auto status =
                 PopulateSecondaryIndexInner(index_base, *segment_index_meta, segment_meta, segment_row_cnt, column_id, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kSecondaryFunctional: {
+            auto status = PopulateSecondaryFunctionalIndexInner(index_base,
+                                                                *segment_index_meta,
+                                                                segment_meta,
+                                                                segment_row_cnt,
+                                                                column_id,
+                                                                column_def,
+                                                                new_chunk_ids);
             if (!status.ok()) {
                 return status;
             }
@@ -1077,8 +1114,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
     SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
     std::vector<ChunkID> chunk_ids_to_delete;
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
     {
+        std::vector<ChunkID> *chunk_ids_ptr{};
         std::unordered_set<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
         std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
         if (!status.ok()) {
@@ -1108,12 +1145,12 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndexV2 *dump_index_cmd) {
         status = NewCatalog::LoadFlushedChunkIndex1(segment_index_meta, chunk_info, this);
         if (!status.ok()) {
             std::pair<RowID, u64> append_range = {chunk_info.base_rowid_, chunk_info.row_count_};
-            status = this->AppendIndex(*table_index_meta, append_range);
+            status = AppendIndex(*table_index_meta, append_range);
             if (!status.ok()) {
                 return status;
             }
             // Dump Mem Index
-            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_info.chunk_id_);
+            status = DumpSegmentMemIndex(segment_index_meta, chunk_info.chunk_id_);
             if (!status.ok()) {
                 return status;
             }
@@ -1145,23 +1182,23 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
     if (index_base->index_type_ != IndexType::kFullText) {
         UnrecoverableError("Invalid index type");
     }
-    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
+    const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
     Status status;
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-    std::vector<BlockID> *block_ids_ptr = nullptr;
+    auto mem_index = segment_index_meta.GetMemIndex();
+    std::vector<BlockID> *block_ids_ptr{};
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
     }
     size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
     i64 mem_index_capacity = InfinityContext::instance().storage()->config()->MemIndexCapacity();
-    std::shared_ptr<std::string> index_dir = segment_index_meta.GetSegmentIndexDir();
-    std::shared_ptr<MemoryIndexer> memory_indexer = nullptr;
-    for (BlockID block_id : *block_ids_ptr) {
+    auto index_dir = segment_index_meta.GetSegmentIndexDir();
+    std::shared_ptr<MemoryIndexer> memory_indexer;
+    for (auto block_id : *block_ids_ptr) {
         if (memory_indexer == nullptr) {
             RowID base_row_id(segment_index_meta.segment_id(), block_id * block_capacity);
-            std::string base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-            std::string full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
+            auto base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+            auto full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
             memory_indexer = std::make_shared<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
             LOG_INFO(fmt::format("PopulateFtIndexInner created memory_indexer, base_name: {}", base_name));
         }
@@ -1204,7 +1241,7 @@ Status NewTxn::PopulateFtIndexInner(std::shared_ptr<IndexBase> index_base,
             new_chunk_ids.push_back(new_chunk_id);
 
             std::optional<ChunkIndexMeta> chunk_index_meta;
-            ChunkIndexMetaInfo chunk_index_meta_info = memory_indexer->GetChunkIndexMetaInfo();
+            auto chunk_index_meta_info = memory_indexer->GetChunkIndexMetaInfo();
             status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
                                                    this,
                                                    new_chunk_id,
@@ -1420,10 +1457,7 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
                                            std::shared_ptr<ColumnDef> column_def,
                                            std::vector<ChunkID> &new_chunk_ids) {
     auto mem_index = std::make_shared<MemIndex>();
-    bool is_null = true;
     std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
-    // if (is_null)
-    // InitSegmentIndex(*segment_index_meta, segment_meta);
 
     auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
@@ -1450,14 +1484,12 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
 
         SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
         RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
-        if (is_null) {
-            const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
-            auto cardinality = secondary_index->GetSecondaryIndexCardinality();
-            memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id, cardinality);
-            mem_index->SetSecondaryIndex(memory_secondary_index);
-            is_null = false;
-        } else {
-            memory_secondary_index = mem_index->GetSecondaryIndex();
+        const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+        auto cardinality = secondary_index->GetSecondaryIndexCardinality();
+        std::tie(memory_secondary_index, status) =
+            GetSecondaryIndexInMem(segment_index_meta, *column_def->type(), base_row_id, mem_index, cardinality);
+        if (!status.ok()) {
+            return status;
         }
 
         memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
@@ -1504,6 +1536,158 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
     memory_secondary_index->Dump(buffer_obj);
     buffer_obj->Save();
     return Status::OK();
+}
+
+Status NewTxn::PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> index_base,
+                                                     SegmentIndexMeta &segment_index_meta,
+                                                     SegmentMeta &segment_meta,
+                                                     size_t segment_row_cnt,
+                                                     ColumnID column_id,
+                                                     std::shared_ptr<ColumnDef> column_def,
+                                                     std::vector<ChunkID> &new_chunk_ids) {
+    auto mem_index = std::make_shared<MemIndex>();
+    std::shared_ptr<SecondaryIndexInMem> memory_functional_index;
+
+    auto [block_ids, status] = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+    for (BlockID block_id : *block_ids) {
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
+
+        size_t row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+        u32 offset = 0;
+
+        auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+        if (!status.ok()) {
+            return status;
+        }
+
+        SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+        RowID base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
+        const IndexSecondaryFunctional *secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+        auto index_data_type = secondary_functional_index->GetFuncReturnType();
+        auto cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+        std::tie(memory_functional_index, status) = GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
+        if (!status.ok()) {
+            return status;
+        }
+
+        auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_id);
+        if (output_column == nullptr) {
+            return Status::InvalidExpression(*secondary_functional_index->GetFunctionExpressionJsonStr());
+        }
+
+        memory_functional_index->InsertBlockData(block_offset, *output_column, offset, row_cnt);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    std::optional<ChunkIndexMeta> chunk_index_meta;
+
+    ChunkID new_chunk_id = 0;
+    std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        return status;
+    }
+
+    new_chunk_ids.push_back(new_chunk_id);
+
+    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
+    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
+                                                   table_index_meta.table_meta().table_id_str(),
+                                                   segment_index_meta.segment_id(),
+                                                   new_chunk_id});
+
+    ChunkIndexMetaInfo chunk_index_meta_info;
+    chunk_index_meta_info = memory_functional_index->GetChunkIndexMetaInfo();
+
+    status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                           this,
+                                           new_chunk_id,
+                                           chunk_index_meta_info.base_row_id_,
+                                           chunk_index_meta_info.row_cnt_,
+                                           chunk_index_meta_info.term_cnt_,
+                                           chunk_index_meta_info.base_name_,
+                                           chunk_index_meta_info.index_size_,
+                                           chunk_index_meta);
+
+    if (!status.ok()) {
+        return status;
+    }
+
+    BufferObj *buffer_obj{};
+
+    status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+    memory_functional_index->Dump(buffer_obj);
+    buffer_obj->Save();
+
+    return Status::OK();
+}
+
+std::shared_ptr<ColumnVector>
+NewTxn::ExecuteFunctionExpression(const IndexSecondaryFunctional *secondary_functional_index, const ColumnVector &col, const ColumnID column_id) {
+    auto function_expression_json_str = secondary_functional_index->GetFunctionExpressionJsonStr();
+    if (function_expression_json_str->empty()) {
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Function expression is empty: {}", *function_expression_json_str));
+        return nullptr;
+    }
+
+    std::shared_ptr<BaseExpression> base_expr = BaseExpression::Deserialize(*function_expression_json_str);
+    if (base_expr == nullptr) {
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to deserialize function expression: {}", *function_expression_json_str));
+        return nullptr;
+    }
+
+    std::shared_ptr<FunctionExpression> function_expression = std::dynamic_pointer_cast<FunctionExpression>(base_expr);
+    if (!function_expression) {
+        LOG_ERROR(fmt::format("NewTxn::ExecuteFunctionExpression: Failed to cast to FunctionExpression: {}", *function_expression_json_str));
+        return nullptr;
+    }
+
+    auto data_block = DataBlock::Make();
+    std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+
+    // We only use the column with index as column_id in data block to execute function expression.
+    // The data block need to contain at least column_id + 1 columns.
+    for (size_t i = 0; i <= column_id; i++) {
+        column_vectors.push_back(std::make_shared<ColumnVector>(col));
+    }
+    data_block->Init(column_vectors);
+
+    std::shared_ptr<ExpressionState> expr_state = ExpressionState::CreateState(function_expression);
+    std::shared_ptr<ColumnVector> output_column = ColumnVector::Make(std::make_shared<DataType>(function_expression->Type()));
+
+    ExpressionEvaluator evaluator;
+    evaluator.Init(data_block.get());
+    output_column->Initialize();
+    evaluator.Execute(function_expression, expr_state, output_column);
+
+    return output_column;
+}
+
+std::tuple<std::shared_ptr<SecondaryIndexInMem>, Status> NewTxn::GetSecondaryIndexInMem(SegmentIndexMeta &segment_index_meta,
+                                                                                        DataType index_data_type,
+                                                                                        RowID base_row_id,
+                                                                                        std::shared_ptr<MemIndex> mem_index,
+                                                                                        SecondaryIndexCardinality cardinality) {
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
+    if (mem_index->IsNull()) {
+        memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(index_data_type, base_row_id, cardinality);
+        mem_index->SetSecondaryIndex(memory_secondary_index);
+    } else {
+        memory_secondary_index = mem_index->GetSecondaryIndex();
+    }
+    return {memory_secondary_index, Status::OK()};
 }
 
 Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
@@ -1626,7 +1810,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
     for (auto iter = chunk_ids.begin(); iter != chunk_ids.end(); ++iter) {
         ChunkID chunk_id = *iter;
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+        ChunkIndexMetaInfo *chunk_info_ptr{};
         {
             Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
             if (!status.ok()) {
@@ -1758,7 +1942,7 @@ Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, c
     if (!status.ok()) {
         return status;
     }
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+    std::vector<ChunkID> *chunk_ids_ptr{};
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
@@ -1847,7 +2031,7 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    std::shared_ptr<MemIndex> mem_index = segment_index_meta.PopMemIndex();
+    auto mem_index = segment_index_meta.PopMemIndex();
     if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
@@ -1859,15 +2043,16 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         return index_status;
     }
 
-    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index = nullptr;
-    std::shared_ptr<IVFIndexInMem> memory_ivf_index = nullptr;
-    std::shared_ptr<HnswIndexInMem> memory_hnsw_index = nullptr;
-    std::shared_ptr<BMPIndexInMem> memory_bmp_index = nullptr;
-    std::shared_ptr<EMVBIndexInMem> memory_emvb_index = nullptr;
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index;
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index;
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index;
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             memory_secondary_index = mem_index->GetSecondaryIndex();
             if (memory_secondary_index == nullptr) {
                 return Status::EmptyMemIndex();
@@ -1875,7 +2060,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             break;
         }
         case IndexType::kFullText: {
-            std::shared_ptr<MemoryIndexer> memory_indexer = mem_index->GetFulltextIndex();
+            auto memory_indexer = mem_index->GetFulltextIndex();
             if (memory_indexer == nullptr) {
                 return Status::EmptyMemIndex();
             }
@@ -1963,7 +2148,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             memory_secondary_index->Dump(buffer_obj);
             buffer_obj->Save();
             break;
@@ -2017,7 +2203,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
                                          SegmentMeta &segment_meta,
                                          std::vector<std::pair<RowID, u64>> &append_ranges) {
     Status status;
-    std::vector<ChunkID> *chunk_ids_ptr = nullptr;
+    std::vector<ChunkID> *chunk_ids_ptr{};
     std::tie(chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
@@ -2025,16 +2211,15 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
     std::vector<ChunkIndexMetaInfo> chunk_index_meta_infos;
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        ChunkIndexMetaInfo *chunk_index_meta_info_ptr = nullptr;
+        ChunkIndexMetaInfo *chunk_index_meta_info_ptr{};
         status = chunk_index_meta.GetChunkInfo(chunk_index_meta_info_ptr);
         if (!status.ok()) {
             return status;
         }
         chunk_index_meta_infos.push_back(*chunk_index_meta_info_ptr);
     }
-    std::sort(chunk_index_meta_infos.begin(), chunk_index_meta_infos.end(), [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
-        return lhs.base_row_id_ < rhs.base_row_id_;
-    });
+    std::ranges::sort(chunk_index_meta_infos,
+                      [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) { return lhs.base_row_id_ < rhs.base_row_id_; });
     SegmentID segment_id = segment_meta.segment_id();
 
     RowID start_row_id(segment_id, 0);
@@ -2086,7 +2271,7 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta,
 
 Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     Status status;
-    TableMeta &table_meta = table_index_meta.table_meta();
+    auto &table_meta = table_index_meta.table_meta();
 
     std::vector<SegmentID> *segment_ids_ptr = nullptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
@@ -2125,8 +2310,8 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     }
     std::ostringstream oss;
     oss << "[";
-    for (const auto &range : append_ranges) {
-        oss << fmt::format("({}, {}), ", range.first.ToUint64(), range.second);
+    for (const auto &[first, second] : append_ranges) {
+        oss << fmt::format("({}, {}), ", first.ToUint64(), second);
     }
     oss << "]";
     LOG_INFO(fmt::format("NewTxn::RecoverMemIndex db {} table {} index {} append_ranges {}: {}",
@@ -2136,7 +2321,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
                          append_ranges.size(),
                          oss.str()));
     for (const auto &range : append_ranges) {
-        status = this->AppendIndex(table_index_meta, range);
+        status = AppendIndex(table_index_meta, range);
         if (!status.ok()) {
             return status;
         }
@@ -2163,13 +2348,13 @@ Status NewTxn::GetFullTextIndexReader(const std::string &db_name, const std::str
 
 Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
     const TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-    const std::string &db_name = create_index_cmd->db_name_;
-    const std::string &table_name = create_index_cmd->table_name_;
-    const std::string &index_name = *create_index_cmd->index_base_->index_name_;
-    const std::string &db_id_str = create_index_cmd->db_id_;
-    const std::string &table_id_str = create_index_cmd->table_id_;
-    const std::string &table_key = create_index_cmd->table_key_;
-    const std::string &index_id_str = create_index_cmd->index_id_;
+    const auto &db_name = create_index_cmd->db_name_;
+    const auto &table_name = create_index_cmd->table_name_;
+    const auto &index_name = *create_index_cmd->index_base_->index_name_;
+    const auto &db_id_str = create_index_cmd->db_id_;
+    const auto &table_id_str = create_index_cmd->table_id_;
+    const auto &table_key = create_index_cmd->table_key_;
+    const auto &index_id_str = create_index_cmd->index_id_;
     std::shared_ptr<IndexBase> &index_base = create_index_cmd->index_base_;
 
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
@@ -2179,20 +2364,20 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
         return status;
     }
 
-    std::vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::vector<SegmentID> *segment_ids_ptr{};
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;
     }
 
-    if (this->IsReplay()) {
+    if (IsReplay()) {
         WalCmdDumpIndexV2 dump_index_cmd(db_name, db_id_str, table_name, table_id_str, index_name, index_id_str, 0, table_key);
         dump_index_cmd.dump_cause_ = DumpIndexCause::kReplayCreateIndex;
         for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
             dump_index_cmd.segment_id_ = segment_index_info.segment_id_;
             dump_index_cmd.chunk_infos_ = segment_index_info.chunk_infos_;
 
-            status = this->ReplayDumpIndex(&dump_index_cmd);
+            status = ReplayDumpIndex(&dump_index_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -2205,15 +2390,15 @@ Status NewTxn::PrepareCommitCreateIndex(WalCmdCreateIndexV2 *create_index_cmd) {
             if (!status.ok()) {
                 return status;
             }
-            status = this->PopulateIndex(db_name,
-                                         table_name,
-                                         index_name,
-                                         table_key,
-                                         *table_index_meta_ptr,
-                                         segment_meta,
-                                         segment_row_cnt,
-                                         DumpIndexCause::kCreateIndex,
-                                         create_index_cmd);
+            status = PopulateIndex(db_name,
+                                   table_name,
+                                   index_name,
+                                   table_key,
+                                   *table_index_meta_ptr,
+                                   segment_meta,
+                                   segment_row_cnt,
+                                   DumpIndexCause::kCreateIndex,
+                                   create_index_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -2444,7 +2629,7 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
             }
 
             // 7. Actually dump the memory index to disk
-            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+            status = DumpSegmentMemIndex(segment_index_meta, chunk_id);
             if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
                 return status;
             }
@@ -2455,7 +2640,7 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
         // 9. Update fulltext segment timestamp if needed
         // auto [index_base, index_status] = table_index_meta.GetIndexBase();
         // if (index_status.ok() && index_base->index_type_ == IndexType::kFullText) {
-        //     TxnTimeStamp commit_ts = this->txn_context_ptr_->commit_ts_;
+        //     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
         //     status = table_index_meta.UpdateFulltextSegmentTS(commit_ts);
         //     if (!status.ok()) {
         //         return status;

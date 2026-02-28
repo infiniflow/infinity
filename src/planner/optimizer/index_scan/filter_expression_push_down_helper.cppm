@@ -27,7 +27,7 @@ export class FilterExpressionPushDownHelper {
 public:
     static Value CalcValueResult(const std::shared_ptr<BaseExpression> &expression);
 
-    static std::tuple<ColumnID, Value, FilterCompareType>
+    static std::tuple<ColumnID, Value, std::shared_ptr<BaseExpression>, FilterCompareType>
     UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type);
 };
 
