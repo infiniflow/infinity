@@ -1769,10 +1769,11 @@ void swap(Field &a, Field &b);
 std::ostream &operator<<(std::ostream &out, const Field &obj);
 
 typedef struct _ColumnField__isset {
-    _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false) {}
+    _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false), bitmasks(true) {}
     bool column_type : 1;
     bool column_vectors : 1;
     bool column_name : 1;
+    bool bitmasks : 1;
 } _ColumnField__isset;
 
 class ColumnField : public virtual ::apache::thrift::TBase {
@@ -1789,6 +1790,7 @@ public:
     ColumnType::type column_type;
     std::vector<std::string> column_vectors;
     std::string column_name;
+    std::vector<bool> bitmasks;
 
     _ColumnField__isset __isset;
 
@@ -1797,6 +1799,8 @@ public:
     void __set_column_vectors(const std::vector<std::string> &val);
 
     void __set_column_name(const std::string &val);
+
+    void __set_bitmasks(const std::vector<bool> &val);
 
     bool operator==(const ColumnField &rhs) const;
     bool operator!=(const ColumnField &rhs) const { return !(*this == rhs); }

@@ -36,6 +36,7 @@ import :and_func;
 import :divide;
 import :equals;
 import :extract;
+import :extract_json;
 import :greater;
 import :greater_equals;
 import :inequals;
@@ -153,6 +154,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // extract function
     RegisterExtractFunction(catalog_ptr_);
+
+    // json function
+    RegisterJsonFunction(catalog_ptr_);
 
     // string functions
     RegisterSubstringFunction(catalog_ptr_);

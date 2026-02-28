@@ -25,7 +25,10 @@ namespace infinity {
 FunctionExpr::~FunctionExpr() {
     if (arguments_ != nullptr) {
         for (auto &expr_ptr : *arguments_) {
-            delete expr_ptr;
+            if (expr_ptr != nullptr) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
         }
         delete arguments_;
         arguments_ = nullptr;
@@ -66,6 +69,39 @@ std::string FunctionExpr::ToString() const {
     }
     ss << ')';
     return ss.str();
+}
+
+bool JsonExtraInfo::Init() {
+    if (initialized_) {
+        return true;
+    }
+
+    std::string_view entire_path_view(json_extra_info_);
+    if (entire_path_view.empty() || entire_path_view[0] != '$') {
+        return false;
+    }
+
+    std::string_view remaining = entire_path_view.substr(1);
+    json_tokens_.clear();
+
+    size_t start = 0;
+    size_t end = remaining.find('.');
+    while (start < remaining.length()) {
+        auto token_end = (end == std::string_view::npos) ? remaining.length() : end;
+
+        if (start < token_end) {
+            json_tokens_.emplace_back(remaining.substr(start, token_end - start));
+        }
+
+        if (end == std::string_view::npos)
+            break;
+
+        start = end + 1;
+        end = remaining.find('.', start);
+    }
+
+    initialized_ = true;
+    return true;
 }
 
 } // namespace infinity

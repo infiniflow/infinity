@@ -2,7 +2,6 @@ import numpy as np
 import time
 import pandas as pd
 import pytest
-from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
@@ -85,7 +84,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32', 'c3': 'Int32'}))
 
         res = table_obj.delete()
         assert res.error_code == ErrorCode.OK
@@ -93,7 +92,7 @@ class TestInfinity:
 
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32', 'c3': 'Int32'}))
 
         res = db_obj.drop_table("test_delete" + suffix)
         assert res.error_code == ErrorCode.OK

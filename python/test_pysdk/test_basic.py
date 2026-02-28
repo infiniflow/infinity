@@ -165,7 +165,7 @@ class TestInfinity:
             ["*"]).filter("c1 > 1").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
-            {'c1': dtype('int32'), 'c2': dtype('float32')}))
+            {'c1': 'Int32', 'c2': dtype('float32')}))
 
         res = db_obj.drop_table("my_table3"+suffix)
         assert res.error_code == ErrorCode.OK

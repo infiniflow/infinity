@@ -269,6 +269,7 @@ void VirtualStore::RecursiveCleanupAllEmptyDir(const std::string &path) {
     }
 
     if (std::filesystem::is_empty(path)) {
+        // std::error_code ec;
         std::filesystem::remove(path);
     }
 }
