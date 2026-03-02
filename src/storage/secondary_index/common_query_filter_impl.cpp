@@ -68,7 +68,7 @@ void ReadDataBlock(DataBlock *output,
     for (size_t i = 0; i < column_ids.size(); ++i) {
         if (const size_t column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
             const u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-            output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
+            output->column_vectors_[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else if (column_should_load[i]) {
             ColumnMeta column_meta(column_id, block_meta);
             ColumnVector column_vector;
@@ -77,10 +77,10 @@ void ReadDataBlock(DataBlock *output,
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
+            output->column_vectors_[i]->AppendWith(column_vector, 0, row_count);
         } else {
             // no need to load this column
-            output->column_vectors[i]->Finalize(row_count);
+            output->column_vectors_[i]->Finalize(row_count);
         }
     }
     output->Finalize();
@@ -248,16 +248,17 @@ void CommonQueryFilter::TryApplyFastRoughFilterOptimizer() {
         return;
     }
     finish_build_fast_rough_filter_ = true;
-    fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_);
+    TableMeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+    fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(original_filter_, table_meta);
 }
 
-void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context) {
+void CommonQueryFilter::TryApplyIndexFilterOptimizer(QueryContext *query_context, const FilterExpressionPushDown::MatchQueryCache *match_cache) {
     if (finish_build_index_filter_) {
         return;
     }
     finish_build_index_filter_ = true;
     IndexScanFilterExpressionPushDownResult index_scan_solve_result =
-        FilterExpressionPushDown::PushDownToIndexScan(query_context, base_table_ref_.get(), original_filter_);
+        FilterExpressionPushDown::PushDownToIndexScan(query_context, base_table_ref_.get(), original_filter_, match_cache);
     index_filter_ = std::move(index_scan_solve_result.index_filter_);
     leftover_filter_ = std::move(index_scan_solve_result.leftover_filter_);
     index_filter_evaluator_ = std::move(index_scan_solve_result.index_filter_evaluator_);

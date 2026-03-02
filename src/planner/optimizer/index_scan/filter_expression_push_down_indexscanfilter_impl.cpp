@@ -30,6 +30,7 @@ import :base_table_ref;
 import :scalar_function;
 import :scalar_function_set;
 import :index_base;
+import :index_secondary_functional;
 import :new_catalog;
 import :value;
 import :meta_info;
@@ -49,6 +50,7 @@ import :table_meta;
 import :db_meta;
 import :kv_store;
 import :utility;
+import :logical_match;
 
 import std;
 import third_party;
@@ -77,6 +79,14 @@ struct ExpressionIndexScanInfo {
         kSecondaryIndexValueCompareExpr,
         kValueSecondaryIndexCompareExpr,
 
+        // secondary functional index function
+        kSecondaryIndexFunctionExprOrAfterCast,
+        kVarcharSecondaryIndexFunctionExprOrAfterCast,
+
+        // secondary functional index filter
+        kSecondaryFunctionalIndexValueCompareExpr,
+        kValueSecondaryFunctionalIndexCompareExpr,
+
         // fulltext filter
         kFilterFulltextExpr,
 
@@ -88,6 +98,7 @@ struct ExpressionIndexScanInfo {
     // for index scan
     TableMeta *table_meta_ = nullptr;
     std::unordered_map<ColumnID, std::shared_ptr<TableIndexMeta>> new_candidate_column_index_map_;
+    std::unordered_map<std::string, std::shared_ptr<TableIndexMeta>> new_candidate_functional_index_map_;
 
     inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
         Status status;
@@ -121,19 +132,28 @@ struct ExpressionIndexScanInfo {
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            if (index_base->index_type_ != IndexType::kSecondary) {
-                continue;
-            }
-            auto column_name = index_base->column_name();
-            ColumnID column_id = 0;
-            std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(column_name);
-            if (!status.ok()) {
-                RecoverableError(status);
-            }
-            if (new_candidate_column_index_map_.contains(column_id)) {
-                LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
-            } else {
-                new_candidate_column_index_map_.emplace(column_id, it);
+            if (index_base->index_type_ == IndexType::kSecondary) {
+                auto column_name = index_base->column_name();
+                ColumnID column_id = 0;
+                std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(column_name);
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                if (new_candidate_column_index_map_.contains(column_id)) {
+                    LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
+                } else {
+                    new_candidate_column_index_map_.emplace(column_id, it);
+                }
+
+            } else if (index_base->index_type_ == IndexType::kSecondaryFunctional) {
+                IndexSecondaryFunctional *functional_index = reinterpret_cast<IndexSecondaryFunctional *>(index_base.get());
+                auto func_col_params = functional_index->GetFuncColParams();
+                if (new_candidate_functional_index_map_.contains(*func_col_params)) {
+                    LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Function {} has multiple secondary functional indexes. Skipping one.",
+                                          *func_col_params));
+                } else {
+                    new_candidate_functional_index_map_.emplace(*func_col_params, it);
+                }
             }
         }
     }
@@ -148,8 +168,10 @@ struct ExpressionIndexScanInfo {
             }
             case ExpressionType::kColumn: {
                 auto *column_expression = static_cast<const ColumnExpression *>(expression.get());
-                const ColumnID column_id = column_expression->binding().column_idx;
-                if (new_candidate_column_index_map_.contains(column_id)) {
+                // Get the actual column ID by column name (not the column index, which changes after DROP COLUMN)
+                const auto &column_name = column_expression->column_name();
+                auto [column_id, status] = table_meta_->GetColumnIDByColumnName(column_name);
+                if (status.ok() && new_candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
@@ -181,20 +203,22 @@ struct ExpressionIndexScanInfo {
                     }
                 }
                 { // 2. 3. now not all value
-                    auto *function_expression = static_cast<const FunctionExpression *>(expression.get());
+                    std::shared_ptr<FunctionExpression> function_expression = std::dynamic_pointer_cast<FunctionExpression>(expression);
                     if (const auto &f_name = function_expression->ScalarFunctionName();
                         std::find(LogicalFunctionNames.begin(), LogicalFunctionNames.end(), f_name) != LogicalFunctionNames.end()) {
                         if (tree.children.size() != 2) {
                             UnrecoverableError("Function argument num != 2");
                         }
-                        // 1. all column / unknown children: unknown
+                        // 1. all column / index function / unknown children: unknown
                         // 2. other: and / or
-                        bool all_column_or_unknown = true;
+                        bool all_column_function_or_unknown = true;
                         for (const auto &child : tree.children) {
                             switch (child.info) {
                                 case Enum::kUnknownExpr:
                                 case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
-                                case Enum::kSecondaryIndexColumnExprOrAfterCast: {
+                                case Enum::kSecondaryIndexColumnExprOrAfterCast:
+                                case Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast:
+                                case Enum::kSecondaryIndexFunctionExprOrAfterCast: {
                                     break;
                                 }
                                 case Enum::kAndExpr:
@@ -202,13 +226,15 @@ struct ExpressionIndexScanInfo {
                                 case Enum::kValueExpr:
                                 case Enum::kFilterFulltextExpr:
                                 case Enum::kSecondaryIndexValueCompareExpr:
-                                case Enum::kValueSecondaryIndexCompareExpr: {
-                                    all_column_or_unknown = false;
+                                case Enum::kValueSecondaryIndexCompareExpr:
+                                case Enum::kSecondaryFunctionalIndexValueCompareExpr:
+                                case Enum::kValueSecondaryFunctionalIndexCompareExpr: {
+                                    all_column_function_or_unknown = false;
                                     break;
                                 }
                             }
                         }
-                        if (!all_column_or_unknown) {
+                        if (!all_column_function_or_unknown) {
                             tree.info = f_name == "AND" ? Enum::kAndExpr : Enum::kOrExpr;
                         }
                     } else if (std::find(CompareFunctionNames.begin(), CompareFunctionNames.end(), f_name) != CompareFunctionNames.end()) {
@@ -231,11 +257,42 @@ struct ExpressionIndexScanInfo {
                                 }
                             }
                         };
-                        if (const bool is_equal_func = (f_name == "=");
-                            check_column_value(tree.children[0].info, tree.children[1].info, is_equal_func)) {
+                        auto check_func_value = [](const Enum func, const Enum val, const bool is_equal_func) -> bool {
+                            if (val != Enum::kValueExpr) {
+                                return false;
+                            }
+                            switch (func) {
+                                case Enum::kSecondaryIndexFunctionExprOrAfterCast: {
+                                    return true;
+                                }
+                                case Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast: {
+                                    return is_equal_func;
+                                }
+                                default: {
+                                    return false;
+                                }
+                            }
+                        };
+
+                        const bool is_equal_func = (f_name == "=");
+                        if (check_column_value(tree.children[0].info, tree.children[1].info, is_equal_func)) {
                             tree.info = Enum::kSecondaryIndexValueCompareExpr;
                         } else if (check_column_value(tree.children[1].info, tree.children[0].info, is_equal_func)) {
                             tree.info = Enum::kValueSecondaryIndexCompareExpr;
+                        } else if (check_func_value(tree.children[0].info, tree.children[1].info, is_equal_func)) {
+                            tree.info = Enum::kSecondaryFunctionalIndexValueCompareExpr;
+                        } else if (check_func_value(tree.children[1].info, tree.children[0].info, is_equal_func)) {
+                            tree.info = Enum::kValueSecondaryFunctionalIndexCompareExpr;
+                        }
+                    }
+                    // Identify the function expression in secondary functional index, ignore the negative function and not equal operator
+                    else if (!(f_name == "NOT" || f_name == "<>" || f_name == "!=" ||
+                               (f_name == "-" && function_expression->arguments().size() == 1))) {
+                        std::string func_col_params = function_expression->ExtractFunctionInfo();
+                        if (new_candidate_functional_index_map_.contains(func_col_params)) {
+                            tree.info = function_expression->Type().type() == LogicalType::kVarchar
+                                            ? Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast
+                                            : Enum::kSecondaryIndexFunctionExprOrAfterCast;
                         }
                     }
                 }
@@ -263,9 +320,13 @@ class IndexScanFilterExpressionPushDownMethod {
     ScalarFunctionSet *and_scalar_function_set_ptr_ = nullptr;
     ExpressionIndexScanInfo tree_info_;
 
+    const FilterExpressionPushDown::MatchQueryCache *match_cache_{nullptr};
+
 public:
     explicit IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr)
         : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {}
+
+    void SetMatchCache(const FilterExpressionPushDown::MatchQueryCache *match_cache) { match_cache_ = match_cache; }
 
     void Init() {
         const auto and_function_set_ptr = NewCatalog::GetFunctionSetByName(query_context_->storage()->new_catalog(), "AND");
@@ -337,6 +398,8 @@ private:
         switch (tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
+            case Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast:
+            case Enum::kSecondaryIndexFunctionExprOrAfterCast:
             case Enum::kUnknownExpr: {
                 result.second = *tree_node.src_ptr;
                 break;
@@ -344,6 +407,8 @@ private:
             case Enum::kValueExpr:
             case Enum::kValueSecondaryIndexCompareExpr:
             case Enum::kSecondaryIndexValueCompareExpr:
+            case Enum::kValueSecondaryFunctionalIndexCompareExpr:
+            case Enum::kSecondaryFunctionalIndexValueCompareExpr:
             case Enum::kFilterFulltextExpr: {
                 result.first = *tree_node.src_ptr;
                 break;
@@ -407,6 +472,8 @@ private:
         switch (index_filter_tree_node.info) {
             case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
             case Enum::kSecondaryIndexColumnExprOrAfterCast:
+            case Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast:
+            case Enum::kSecondaryIndexFunctionExprOrAfterCast:
             case Enum::kUnknownExpr: {
                 UnrecoverableError("Wrong status!");
                 return {};
@@ -424,7 +491,9 @@ private:
                 return std::make_unique<IndexFilterEvaluatorAllFalse>();
             }
             case Enum::kValueSecondaryIndexCompareExpr:
-            case Enum::kSecondaryIndexValueCompareExpr: {
+            case Enum::kSecondaryIndexValueCompareExpr:
+            case Enum::kValueSecondaryFunctionalIndexCompareExpr:
+            case Enum::kSecondaryFunctionalIndexValueCompareExpr: {
                 auto *function_expression = static_cast<FunctionExpression *>(index_filter_tree_node.src_ptr->get());
                 auto const &f_name = function_expression->ScalarFunctionName();
                 static constexpr std::array<std::string, 5> PossibleFunctionNames{"<", ">", "<=", ">=", "="};
@@ -442,45 +511,91 @@ private:
                 if (it == PossibleFunctionNames.end()) {
                     UnrecoverableError("Function name not found");
                 }
-                auto SolveForColVal = [&](std::shared_ptr<BaseExpression> &col_expr,
-                                          std::shared_ptr<BaseExpression> &val_expr,
-                                          FilterCompareType initial_compare_type) -> std::unique_ptr<IndexFilterEvaluator> {
+
+                auto SolveForColVal =
+                    [&](std::shared_ptr<BaseExpression> &col_expr,
+                        std::shared_ptr<BaseExpression> &val_expr,
+                        FilterCompareType initial_compare_type) -> std::tuple<ColumnID, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
                     auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
-                    auto [column_id, value, compare_type] =
-                        FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type);
-                    switch (compare_type) {
-                        case FilterCompareType::kEqual:
-                        case FilterCompareType::kLessEqual:
-                        case FilterCompareType::kGreaterEqual: {
-                            std::shared_ptr<TableIndexMeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
-                        }
-                        case FilterCompareType::kAlwaysTrue: {
-                            return std::make_unique<IndexFilterEvaluatorAllTrue>();
-                        }
-                        case FilterCompareType::kAlwaysFalse: {
-                            return std::make_unique<IndexFilterEvaluatorAllFalse>();
-                        }
-                        default: {
-                            // error
-                            UnrecoverableError("Wrong compare type!");
-                            return {};
-                        }
-                    }
+                    auto [column_id, value, _, compare_type] =
+                        FilterExpressionPushDownHelper::UnwindCast(col_expr, std::move(val_right), initial_compare_type, tree_info_.table_meta_);
+                    std::shared_ptr<TableIndexMeta> secondary_index_meta = tree_info_.new_candidate_column_index_map_.at(column_id);
+                    return std::make_tuple(column_id, value, compare_type, secondary_index_meta);
                 };
+
+                auto SolveForFuncVal =
+                    [&](std::shared_ptr<BaseExpression> &func_expr, std::shared_ptr<BaseExpression> &val_expr, FilterCompareType initial_compare_type)
+                    -> std::tuple<ColumnID, FunctionExpression *, Value, FilterCompareType, std::shared_ptr<TableIndexMeta>> {
+                    auto val_right = FilterExpressionPushDownHelper::CalcValueResult(val_expr);
+                    auto [column_id, value, base_expression, compare_type] =
+                        FilterExpressionPushDownHelper::UnwindCast(func_expr, std::move(val_right), initial_compare_type, tree_info_.table_meta_);
+
+                    auto *scalar_func_expression = static_cast<FunctionExpression *>(base_expression.get());
+                    std::string func_col_params = scalar_func_expression->ExtractFunctionInfo();
+                    std::shared_ptr<TableIndexMeta> secondary_functional_index_meta =
+                        tree_info_.new_candidate_functional_index_map_.at(func_col_params);
+                    return std::make_tuple(column_id, scalar_func_expression, value, compare_type, secondary_functional_index_meta);
+                };
+
+                ColumnID column_id;
+                FunctionExpression *scalar_func_expression{nullptr};
+                Value value = Value::MakeNull();
+                FilterCompareType compare_type;
+                std::shared_ptr<TableIndexMeta> table_index_meta;
                 switch (index_filter_tree_node.info) {
                     case Enum::kSecondaryIndexValueCompareExpr: {
-                        return SolveForColVal(function_expression->arguments()[0],
-                                              function_expression->arguments()[1],
-                                              PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        std::tie(column_id, value, compare_type, table_index_meta) =
+                            SolveForColVal(function_expression->arguments()[0],
+                                           function_expression->arguments()[1],
+                                           PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        break;
                     }
                     case Enum::kValueSecondaryIndexCompareExpr: {
-                        return SolveForColVal(function_expression->arguments()[1],
-                                              function_expression->arguments()[0],
-                                              PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        std::tie(column_id, value, compare_type, table_index_meta) =
+                            SolveForColVal(function_expression->arguments()[1],
+                                           function_expression->arguments()[0],
+                                           PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        break;
+                    }
+                    case Enum::kSecondaryFunctionalIndexValueCompareExpr: {
+                        std::tie(column_id, scalar_func_expression, value, compare_type, table_index_meta) =
+                            SolveForFuncVal(function_expression->arguments()[0],
+                                            function_expression->arguments()[1],
+                                            PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        break;
+                    }
+                    case Enum::kValueSecondaryFunctionalIndexCompareExpr: {
+                        std::tie(column_id, scalar_func_expression, value, compare_type, table_index_meta) =
+                            SolveForFuncVal(function_expression->arguments()[1],
+                                            function_expression->arguments()[0],
+                                            PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
+                        break;
                     }
                     default: {
                         UnrecoverableError("Wrong expression type!");
+                        return {};
+                    }
+                }
+
+                switch (compare_type) {
+                    case FilterCompareType::kEqual:
+                    case FilterCompareType::kLessEqual:
+                    case FilterCompareType::kGreaterEqual: {
+                        return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                   column_id,
+                                                                   scalar_func_expression,
+                                                                   table_index_meta,
+                                                                   compare_type,
+                                                                   value);
+                    }
+                    case FilterCompareType::kAlwaysTrue: {
+                        return std::make_unique<IndexFilterEvaluatorAllTrue>();
+                    }
+                    case FilterCompareType::kAlwaysFalse: {
+                        return std::make_unique<IndexFilterEvaluatorAllFalse>();
+                    }
+                    default: {
+                        UnrecoverableError("Wrong compare type!");
                         return {};
                     }
                 }
@@ -604,11 +719,41 @@ private:
                         bm25_params.delta_phrase = delta_phrase_v;
                     }
 
-                    std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
-                    SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
-                    query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
-                    if (!query_tree) {
-                        RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
+                    // Try to reuse cached query tree from LogicalMatch.
+                    MatchCacheKey key(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_, default_field, query_operator_option);
+                    bool found_cached = false;
+
+                    if (match_cache_) {
+                        if (auto it = match_cache_->find(key); it != match_cache_->end()) {
+                            auto *match_node = static_cast<LogicalMatch *>(it->second.get());
+                            query_tree = match_node->query_tree_->Clone();
+                            if (query_tree) {
+                                found_cached = true;
+                                LOG_DEBUG(fmt::format("Optimizer: Reusing query tree from LogicalMatch for fields: '{}', text: '{}', default_field: "
+                                                      "'{}', operator: {:d}",
+                                                      filter_fulltext_expr->fields_,
+                                                      filter_fulltext_expr->matching_text_,
+                                                      default_field,
+                                                      static_cast<int>(query_operator_option)));
+                            } else {
+                                LOG_INFO("Empty query tree");
+                            }
+                        }
+                    }
+
+                    if (!found_cached) {
+                        std::map<std::string, std::map<std::string, std::string>> column2analyzer = index_reader->GetColumn2Analyzer();
+                        SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
+                        LOG_DEBUG(fmt::format(
+                            "Optimizer: SearchDriver.ParseSingleWithFields input - fields: '{}', text: '{}', default_field: '{}', operator: {:d}",
+                            filter_fulltext_expr->fields_,
+                            filter_fulltext_expr->matching_text_,
+                            default_field,
+                            static_cast<int>(query_operator_option)));
+                        query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
+                        if (!query_tree) {
+                            RecoverableError(Status::ParseMatchExprFailed(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_));
+                        }
                     }
                 }
                 return std::make_unique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
@@ -734,16 +879,24 @@ private:
 
 IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToIndexScan(QueryContext *query_context,
                                                                                       const BaseTableRef *base_table_ref_ptr,
-                                                                                      const std::shared_ptr<BaseExpression> &expression) {
+                                                                                      const std::shared_ptr<BaseExpression> &expression,
+                                                                                      const MatchQueryCache *match_cache) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    if (match_cache) {
+        filter_expression_push_down_method.SetMatchCache(match_cache);
+    }
     filter_expression_push_down_method.Init();
     return filter_expression_push_down_method.SolveForIndexScan(expression);
 }
 
 void FilterExpressionPushDown::BuildFilterFulltextExpression(QueryContext *query_context,
                                                              const BaseTableRef *base_table_ref_ptr,
-                                                             const std::vector<std::shared_ptr<BaseExpression>> &expressions) {
+                                                             const std::vector<std::shared_ptr<BaseExpression>> &expressions,
+                                                             const MatchQueryCache *match_cache) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    if (match_cache) {
+        filter_expression_push_down_method.SetMatchCache(match_cache);
+    }
     filter_expression_push_down_method.Init();
     for (const auto &expr : expressions) {
         filter_expression_push_down_method.BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(expr);

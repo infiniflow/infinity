@@ -136,6 +136,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kTimestamp:
                 case LogicalType::kInterval:
                 case LogicalType::kVarchar:
+                case LogicalType::kJson:
                     return true;
                 default:
                     return false;
@@ -166,6 +167,14 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         }
+        case LogicalType::kJson: {
+            switch (target.type()) {
+                case LogicalType::kVarchar:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         default: {
             UnrecoverableError(fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString()));
         }
@@ -174,6 +183,21 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
 }
 
 std::string CastExpression::ToString() const { return fmt::format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
+
+nlohmann::json CastExpression::Serialize() const {
+    nlohmann::json j;
+    j["type"] = "Cast";
+
+    nlohmann::json args_json = nlohmann::json::array();
+    for (const auto &arg_expr : this->arguments_) {
+        args_json.push_back(arg_expr->Serialize());
+    }
+    j["arguments"] = args_json;
+
+    j["target_type"] = target_type_.Serialize();
+
+    return j;
+}
 
 u64 CastExpression::Hash() const {
     u64 h = 0;

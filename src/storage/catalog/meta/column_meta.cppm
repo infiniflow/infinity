@@ -54,7 +54,7 @@ public:
 
     std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
-    Status RestoreFromSnapshot(ColumnID column_id);
+    Status RestoreFromSnapshot();
 
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);

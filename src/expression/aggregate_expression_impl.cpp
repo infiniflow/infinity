@@ -36,6 +36,9 @@ bool AggregateExpression::IsCountStar() const { return count_star_; }
 std::string AggregateExpression::ToString() const {
     std::stringstream ss;
     ss << aggregate_function_.name() << "(";
+    if (distinct_) {
+        ss << "DISTINCT ";
+    }
     if (arguments_.empty()) {
         ss << ")";
     } else {

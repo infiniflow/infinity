@@ -25,7 +25,10 @@ namespace infinity {
 FunctionExpr::~FunctionExpr() {
     if (arguments_ != nullptr) {
         for (auto &expr_ptr : *arguments_) {
-            delete expr_ptr;
+            if (expr_ptr != nullptr) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
         }
         delete arguments_;
         arguments_ = nullptr;
@@ -48,24 +51,71 @@ std::string FunctionExpr::ToString() const {
             ss << func_name_ << "(star)";
             return ss.str();
         } else {
-            ss << func_name_ << '(' << arguments_->at(0)->ToString() << ")";
+            ss << func_name_ << '(';
+            if (distinct_) {
+                ss << "DISTINCT ";
+            }
+            ss << arguments_->at(0)->ToString() << ")";
             return ss.str();
         }
     }
     if (arguments_->size() == 2) {
-        // Binary argument function
-        ss << '(' << arguments_->at(0)->ToString() << " " << func_name_ << " " << arguments_->at(1)->ToString() << ")";
-        return ss.str();
+        // Check if it's actually a binary operator
+        static const std::set<std::string> infix_operators = {"+", "-", "*", "/", "%", "^", "&&", "||", "=", "!=", "<", ">", "<=", ">="};
+        if (infix_operators.contains(func_name_)) {
+            // Binary operator - use infix notation
+            ss << '(' << arguments_->at(0)->ToString() << " " << func_name_ << " " << arguments_->at(1)->ToString() << ")";
+            return ss.str();
+        }
     }
 
     ss << func_name_ << '(';
+    if (distinct_) {
+        ss << "DISTINCT ";
+    }
     if (arguments_ != nullptr) {
-        for (ParsedExpr *expr_ptr : *arguments_) {
-            ss << expr_ptr->ToString();
+        for (size_t i = 0; i < arguments_->size(); ++i) {
+            if (i > 0) {
+                ss << ", ";
+            }
+            ss << arguments_->at(i)->ToString();
         }
     }
     ss << ')';
     return ss.str();
+}
+
+bool JsonExtraInfo::Init() {
+    if (initialized_) {
+        return true;
+    }
+
+    std::string_view entire_path_view(json_extra_info_);
+    if (entire_path_view.empty() || entire_path_view[0] != '$') {
+        return false;
+    }
+
+    std::string_view remaining = entire_path_view.substr(1);
+    json_tokens_.clear();
+
+    size_t start = 0;
+    size_t end = remaining.find('.');
+    while (start < remaining.length()) {
+        auto token_end = (end == std::string_view::npos) ? remaining.length() : end;
+
+        if (start < token_end) {
+            json_tokens_.emplace_back(remaining.substr(start, token_end - start));
+        }
+
+        if (end == std::string_view::npos)
+            break;
+
+        start = end + 1;
+        end = remaining.find('.', start);
+    }
+
+    initialized_ = true;
+    return true;
 }
 
 } // namespace infinity

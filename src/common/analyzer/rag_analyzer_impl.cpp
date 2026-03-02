@@ -320,10 +320,46 @@ public:
     std::vector<std::string> CONTRACTIONS4 = {R"((?i)\b(whad)(dd)(ya)\b)", R"((?i)\b(wha)(t)(cha)\b)"};
 };
 
+// Structure to hold precompiled regex patterns
+struct CompiledRegex {
+    pcre2_code *re{nullptr};
+    std::string substitution;
+
+    CompiledRegex(pcre2_code *r, std::string sub) : re(r), substitution(std::move(sub)) {}
+    CompiledRegex(const CompiledRegex &) = delete;
+    CompiledRegex &operator=(const CompiledRegex &) = delete;
+    CompiledRegex(CompiledRegex &&other) noexcept : re(other.re), substitution(std::move(other.substitution)) { other.re = nullptr; }
+    CompiledRegex &operator=(CompiledRegex &&other) noexcept {
+        if (this != &other) {
+            if (re)
+                pcre2_code_free(re);
+            re = other.re;
+            substitution = std::move(other.substitution);
+            other.re = nullptr;
+        }
+        return *this;
+    }
+    ~CompiledRegex() {
+        if (re) {
+            pcre2_code_free(re);
+        }
+    }
+};
+
 class NLTKWordTokenizer {
     MacIntyreContractions contractions_;
 
+    // Static singleton instance
+    static std::unique_ptr<NLTKWordTokenizer> instance_;
+    static std::once_flag init_flag_;
+
 public:
+    // Static method to get the singleton instance
+    static NLTKWordTokenizer &GetInstance() {
+        std::call_once(init_flag_, []() { instance_ = std::make_unique<NLTKWordTokenizer>(); });
+        return *instance_;
+    }
+
     // Starting quotes.
     std::vector<std::pair<std::string, std::string>> STARTING_QUOTES = {
         {std::string(R"(([«“‘„]|[`]+))"), std::string(R"( $1 )")},
@@ -365,42 +401,55 @@ public:
 
     std::pair<std::string, std::string> DOUBLE_DASHES = {std::string(R"(--)"), std::string(R"( -- )")};
 
+    // Cache for compiled regex patterns
+    std::vector<CompiledRegex> compiled_starting_quotes_;
+    std::vector<CompiledRegex> compiled_ending_quotes_;
+    std::vector<CompiledRegex> compiled_punctuation_;
+    CompiledRegex compiled_parens_brackets_;
+    std::vector<CompiledRegex> compiled_convert_parentheses_;
+    CompiledRegex compiled_double_dashes_;
+    std::vector<CompiledRegex> compiled_contractions2_;
+    std::vector<CompiledRegex> compiled_contractions3_;
+
+    // Constructor that precompiles all regex patterns
+    NLTKWordTokenizer() : compiled_parens_brackets_(nullptr, ""), compiled_double_dashes_(nullptr, "") { CompileRegexPatterns(); }
+
     void Tokenize(const std::string &text, std::vector<std::string> &tokens, bool convert_parentheses = false) {
         std::string result = text;
 
-        for (const auto &[pattern, substitution] : STARTING_QUOTES) {
-            result = ApplyRegex(result, pattern, substitution);
+        for (const auto &compiled : compiled_starting_quotes_) {
+            result = ApplyRegex(result, compiled);
         }
-        for (const auto &[pattern, substitution] : PUNCTUATION) {
-            result = ApplyRegex(result, pattern, substitution);
+        for (const auto &compiled : compiled_punctuation_) {
+            result = ApplyRegex(result, compiled);
         }
 
         // Handles parentheses.
-        result = ApplyRegex(result, PARENS_BRACKETS.first, PARENS_BRACKETS.second);
+        result = ApplyRegex(result, compiled_parens_brackets_);
 
         // Optionally convert parentheses
         if (convert_parentheses) {
-            for (const auto &[pattern, substitution] : CONVERT_PARENTHESES) {
-                result = ApplyRegex(result, pattern, substitution);
+            for (const auto &compiled : compiled_convert_parentheses_) {
+                result = ApplyRegex(result, compiled);
             }
         }
 
         // Handles double dash.
-        result = ApplyRegex(result, DOUBLE_DASHES.first, DOUBLE_DASHES.second);
+        result = ApplyRegex(result, compiled_double_dashes_);
 
         // Add extra space to make things easier
         result = " " + result + " ";
 
-        for (const auto &[pattern, substitution] : ENDING_QUOTES) {
-            result = ApplyRegex(result, pattern, substitution);
+        for (const auto &compiled : compiled_ending_quotes_) {
+            result = ApplyRegex(result, compiled);
         }
 
-        for (const auto &pattern : contractions_.CONTRACTIONS2) {
-            result = ApplyRegex(result, pattern, R"( $1 $2 )");
+        for (const auto &compiled : compiled_contractions2_) {
+            result = ApplyRegex(result, compiled);
         }
 
-        for (const auto &pattern : contractions_.CONTRACTIONS3) {
-            result = ApplyRegex(result, pattern, R"( $1 $2 )");
+        for (const auto &compiled : compiled_contractions3_) {
+            result = ApplyRegex(result, compiled);
         }
 
         // Split the result into tokens
@@ -469,45 +518,94 @@ public:
     }
 
 private:
-    std::string ApplyRegex(const std::string &text, const std::string &pattern, const std::string &substitution) {
-        pcre2_code *re;
-        PCRE2_SPTR pcre2_pattern = reinterpret_cast<PCRE2_SPTR>(pattern.c_str());
-        PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
-        PCRE2_SPTR pcre2_replacement = reinterpret_cast<PCRE2_SPTR>(substitution.c_str());
-        int errorcode;
-        PCRE2_SIZE erroroffset;
-        re = pcre2_compile(pcre2_pattern, PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &errorcode, &erroroffset, nullptr);
+    void CompileRegexPatterns() {
+        compiled_starting_quotes_.reserve(STARTING_QUOTES.size());
+        for (const auto &[pattern, substitution] : STARTING_QUOTES) {
+            compiled_starting_quotes_.emplace_back(CompilePattern(pattern), substitution);
+        }
+
+        compiled_ending_quotes_.reserve(ENDING_QUOTES.size());
+        for (const auto &[pattern, substitution] : ENDING_QUOTES) {
+            compiled_ending_quotes_.emplace_back(CompilePattern(pattern), substitution);
+        }
+
+        compiled_punctuation_.reserve(PUNCTUATION.size());
+        for (const auto &[pattern, substitution] : PUNCTUATION) {
+            compiled_punctuation_.emplace_back(CompilePattern(pattern), substitution);
+        }
+
+        compiled_parens_brackets_ = CompiledRegex(CompilePattern(PARENS_BRACKETS.first), PARENS_BRACKETS.second);
+
+        compiled_convert_parentheses_.reserve(CONVERT_PARENTHESES.size());
+        for (const auto &[pattern, substitution] : CONVERT_PARENTHESES) {
+            compiled_convert_parentheses_.emplace_back(CompilePattern(pattern), substitution);
+        }
+
+        compiled_double_dashes_ = CompiledRegex(CompilePattern(DOUBLE_DASHES.first), DOUBLE_DASHES.second);
+
+        compiled_contractions2_.reserve(contractions_.CONTRACTIONS2.size());
+        for (const auto &pattern : contractions_.CONTRACTIONS2) {
+            compiled_contractions2_.emplace_back(CompilePattern(pattern), R"( $1 $2 )");
+        }
+
+        compiled_contractions3_.reserve(contractions_.CONTRACTIONS3.size());
+        for (const auto &pattern : contractions_.CONTRACTIONS3) {
+            compiled_contractions3_.emplace_back(CompilePattern(pattern), R"( $1 $2 )");
+        }
+    }
+
+    pcre2_code *CompilePattern(const std::string &pattern) {
+        int errorcode = 0;
+        PCRE2_SIZE erroffset = 0;
+        pcre2_code *re = pcre2_compile(reinterpret_cast<PCRE2_SPTR>(pattern.c_str()),
+                                       PCRE2_ZERO_TERMINATED,
+                                       PCRE2_MULTILINE | PCRE2_UTF,
+                                       &errorcode,
+                                       &erroffset,
+                                       nullptr);
+
         if (re == nullptr) {
+            PCRE2_UCHAR buffer[256];
+            pcre2_get_error_message(errorcode, buffer, sizeof(buffer));
+            std::cerr << "PCRE2 compilation failed at offset " << erroffset << ": " << buffer << std::endl;
+            return nullptr;
+        }
+        return re;
+    }
+
+    std::string ApplyRegex(const std::string &text, const CompiledRegex &compiled) {
+        if (compiled.re == nullptr) {
             return text;
         }
 
-        pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, nullptr);
-        int rc = pcre2_match(re, pcre2_subject, text.length(), 0, 0, match_data, nullptr);
-        if (rc < 0) {
-            pcre2_match_data_free(match_data);
-            pcre2_code_free(re);
-            return text;
-        }
+        PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
+        PCRE2_SPTR pcre2_replacement = reinterpret_cast<PCRE2_SPTR>(compiled.substitution.c_str());
 
         size_t outlength = text.length() * 2 < 1024 ? 1024 : text.length() * 2;
         auto buffer = std::make_unique<PCRE2_UCHAR[]>(outlength);
-        pcre2_substitute(re,
-                         pcre2_subject,
-                         text.length(),
-                         0,
-                         PCRE2_SUBSTITUTE_GLOBAL,
-                         match_data,
-                         nullptr,
-                         pcre2_replacement,
-                         PCRE2_ZERO_TERMINATED,
-                         buffer.get(),
-                         &outlength);
-        pcre2_match_data_free(match_data);
-        pcre2_code_free(re);
+        int rc = pcre2_substitute(compiled.re,
+                                  pcre2_subject,
+                                  text.length(),
+                                  0,
+                                  PCRE2_SUBSTITUTE_GLOBAL,
+                                  nullptr,
+                                  nullptr,
+                                  pcre2_replacement,
+                                  PCRE2_ZERO_TERMINATED,
+                                  buffer.get(),
+                                  &outlength);
+
+        if (rc < 0) {
+            return text;
+        }
 
         return std::string(reinterpret_cast<char *>(buffer.get()), outlength);
     }
 };
+
+// Static member definitions for NLTKWordTokenizer singleton
+std::unique_ptr<NLTKWordTokenizer> NLTKWordTokenizer::instance_ = nullptr;
+std::once_flag NLTKWordTokenizer::init_flag_;
 
 void SentenceSplitter(const std::string &text, std::vector<std::string> &result) {
     int error_code;
@@ -550,15 +648,13 @@ void SentenceSplitter(const std::string &text, std::vector<std::string> &result)
 }
 
 RAGAnalyzer::RAGAnalyzer(const std::string &path)
-    : dict_path_(path), stemmer_(std::make_unique<Stemmer>()), lowercase_string_buffer_(term_string_buffer_limit_),
-      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
+    : dict_path_(path), stemmer_(std::make_unique<Stemmer>()), lowercase_string_buffer_(term_string_buffer_limit_) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
     : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), wordnet_lemma_(other.wordnet_lemma_), stemmer_(std::make_unique<Stemmer>()),
-      opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
-      nltk_tokenizer_(std::make_unique<NLTKWordTokenizer>()) {
+      opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -1576,7 +1672,7 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             std::vector<std::string> sentences;
             SentenceSplitter(L, sentences);
             for (auto &sentence : sentences) {
-                nltk_tokenizer_->Tokenize(sentence, term_list);
+                NLTKWordTokenizer::GetInstance().Tokenize(sentence, term_list);
             }
             for (unsigned i = 0; i < term_list.size(); ++i) {
                 std::string t = wordnet_lemma_->Lemmatize(term_list[i]);
@@ -1687,7 +1783,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             unsigned sentence_start_pos = original_start;
             for (auto &sentence : sentences) {
                 std::vector<std::string> sentence_terms;
-                nltk_tokenizer_->Tokenize(sentence, sentence_terms);
+                NLTKWordTokenizer::GetInstance().Tokenize(sentence, sentence_terms);
 
                 unsigned current_search_pos = 0;
                 for (auto &term : sentence_terms) {

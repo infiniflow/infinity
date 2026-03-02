@@ -65,6 +65,10 @@ ConstantExpr::~ConstantExpr() {
             free(date_value_);
             break;
         }
+        case LiteralType::kJson: {
+            free(json_value_);
+            break;
+        }
         default:
             break;
     }
@@ -157,6 +161,9 @@ std::string ConstantExpr::ToString() const {
             oss << '}';
             return std::move(oss).str();
         }
+        case LiteralType::kJson: {
+            return fmt::format("{}", json_value_);
+        }
     }
 }
 
@@ -227,6 +234,10 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             for (const auto &val : curly_brackets_array_) {
                 size += val->GetSizeInBytes();
             }
+            break;
+        }
+        case LiteralType::kJson: {
+            size += sizeof(int32_t) + (std::string(json_value_)).length();
             break;
         }
     }
@@ -316,6 +327,10 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             for (const auto &val : curly_brackets_array_) {
                 val->WriteAdv(ptr);
             }
+            break;
+        }
+        case LiteralType::kJson: {
+            WriteBufAdv<std::string>(ptr, std::string(json_value_));
             break;
         }
     }
@@ -423,6 +438,11 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(const char *&ptr, int32_t maxb
             }
             break;
         }
+        case LiteralType::kJson: {
+            std::string json_value = ReadBufAdv<std::string>(ptr);
+            const_expr->json_value_ = strdup(json_value.c_str());
+            break;
+        }
     }
     maxbytes = ptr_end - ptr;
     ParserAssert(maxbytes >= 0, "ptr goes out of range when reading constant expression");
@@ -501,6 +521,10 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = std::move(sub_array_j);
             break;
         }
+        case LiteralType::kJson: {
+            j["value"] = json_value_;
+            break;
+        }
     }
     return j;
 }
@@ -572,6 +596,10 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
                 auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val.raw_json()));
                 const_expr->curly_brackets_array_.push_back(std::move(sub_arr));
             }
+            break;
+        }
+        case LiteralType::kJson: {
+            const_expr->json_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
             break;
         }
     }

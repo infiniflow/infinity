@@ -46,6 +46,8 @@ public:
 
     std::string ToString() const override;
 
+    nlohmann::json Serialize() const override;
+
     u64 Hash() const override;
 
     bool Eq(const BaseExpression &other) const override;

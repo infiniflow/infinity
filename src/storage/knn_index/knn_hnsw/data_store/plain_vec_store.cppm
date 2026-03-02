@@ -16,11 +16,7 @@ module;
 
 #include <cassert>
 
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
+#include <common/simd/simd_functions.h>
 
 export module infinity_core:plain_vec_store;
 
@@ -120,7 +116,7 @@ public:
 
     const OtherDataType *GetVecToQuery(size_t idx, const Meta &meta) const { return GetVec(idx, meta); }
 
-    void Prefetch(VertexType vec_i, const Meta &meta) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i, meta)), _MM_HINT_T0); }
+    void Prefetch(VertexType vec_i, const Meta &meta) const { SIMDPrefetch(reinterpret_cast<const void *>(GetVec(vec_i, meta))); }
 
 protected:
     ArrayPtr<OtherDataType, OwnMem> ptr_;

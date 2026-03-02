@@ -36,22 +36,22 @@ export struct TryCastBoolean {
     }
 };
 
-// Cast BooleanT to other VarcharT type
-// template <>
-// inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
-//    if (source) {
-//        constexpr u16 TRUE_LEN = 4;
-//        std::memcpy(target.prefix, "true", TRUE_LEN);
-//        std::memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
-//        target.length = TRUE_LEN;
-//    } else {
-//        constexpr u16 FALSE_LEN = 5;
-//        std::memcpy(target.prefix, "false", FALSE_LEN);
-//        std::memset(target.prefix + FALSE_LEN, 0, VarcharT::INLINE_LENGTH - FALSE_LEN);
-//        target.length = FALSE_LEN;
-//    }
-//    return true;
-//}
+//  // Cast BooleanT to other VarcharT type
+//  template <>
+//  inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
+//     if (source) {
+//         constexpr u16 TRUE_LEN = 4;
+//         std::memcpy(target.short_.data_, "true", TRUE_LEN);
+//         std::memset(target.short_.data_ + TRUE_LEN, 0, VARCHAR_INLINE_LEN - TRUE_LEN);
+//         target.length_ = TRUE_LEN;
+//     } else {
+//         constexpr u16 FALSE_LEN = 5;
+//         std::memcpy(target.short_.data_, "false", FALSE_LEN);
+//         std::memset(target.short_.data_ + FALSE_LEN, 0, VARCHAR_INLINE_LEN - FALSE_LEN);
+//         target.length_ = FALSE_LEN;
+//     }
+//     return true;
+// }
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {

@@ -92,7 +92,7 @@ public:
     }
 
     void TryApplyFastRoughFilterOptimizer();
-    void TryApplyIndexFilterOptimizer(QueryContext *query_context);
+    void TryApplyIndexFilterOptimizer(QueryContext *query_context, const FilterExpressionPushDown::MatchQueryCache *match_cache = nullptr);
 
     // result will not be populated if always_true_ be true
     bool AlwaysTrue() const { return always_true_; }

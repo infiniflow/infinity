@@ -1,7 +1,6 @@
 import time
 import pandas as pd
 import pytest
-from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
@@ -86,7 +85,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32', 'c3': 'Int32'}))
 
         with pytest.raises(InfinityException) as e:
             table_obj.update(None, {"c2": 90, "c3": 900})
@@ -96,7 +95,7 @@ class TestInfinity:
         res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32', 'c3': 'Int32'}))
 
         res = db_obj.drop_table("test_update" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

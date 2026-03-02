@@ -22,6 +22,7 @@ import :cast_function;
 import :column_vector;
 import :default_values;
 import :status;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -652,6 +653,20 @@ Value Value::MakeArray(std::vector<Value> array_elements, std::shared_ptr<TypeIn
     return value;
 }
 
+Value Value::MakeJson(std::vector<uint8_t> &bson, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(bson));
+    return value;
+}
+
+Value Value::MakeJson(std::string &json_str, std::shared_ptr<TypeInfo> type_info_ptr) {
+    Value value(LogicalType::kJson, std::move(type_info_ptr));
+    auto value_json = infinity::JsonManager::parse(json_str);
+    auto value_bson = infinity::JsonManager::to_bson(std::move(value_json));
+    value.value_info_ = std::make_shared<JsonValueInfo>(std::move(value_bson));
+    return value;
+}
+
 Value Value::MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, size_t nnz, const std::shared_ptr<TypeInfo> type_info) {
     const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
 
@@ -1006,6 +1021,11 @@ bool Value::operator==(const Value &other) const {
             const std::string &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
+        case LogicalType::kJson: {
+            const auto &bson1 = this->GetBson();
+            const auto &bson2 = other.GetBson();
+            return bson1 == bson2;
+        }
         case LogicalType::kEmbedding:
             [[fallthrough]];
         case LogicalType::kMultiVector:
@@ -1155,6 +1175,8 @@ void Value::CopyUnionValue(const Value &other) {
             [[fallthrough]];
         case LogicalType::kVarchar:
             [[fallthrough]];
+        case LogicalType::kJson:
+            [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];
         case LogicalType::kTensorArray:
@@ -1284,6 +1306,8 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case LogicalType::kArray:
             [[fallthrough]];
         case LogicalType::kVarchar:
+            [[fallthrough]];
+        case LogicalType::kJson:
             [[fallthrough]];
         case LogicalType::kTensor:
             [[fallthrough]];
@@ -1430,6 +1454,11 @@ std::string Value::ToString() const {
         case LogicalType::kVarchar: {
             return value_info_->Get<StringValueInfo>().GetString();
         }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            return json->dump();
+        }
         case LogicalType::kEmbedding: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             std::span<char> data_span = this->GetEmbedding();
@@ -1534,6 +1563,152 @@ std::string Value::ToString() const {
     return {};
 }
 
+uint64_t Value::Hash() const {
+    // Only hash types that are used in aggregate functions
+    switch (type_.type()) {
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kHugeInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
+        case LogicalType::kDecimal:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp: {
+            // Hash raw bytes for fixed-size types
+            size_t size = type_.Size();
+            return std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(&value_), size));
+        }
+        case LogicalType::kVarchar: {
+            const auto &str = value_info_->Get<StringValueInfo>().GetString();
+            return std::hash<std::string_view>{}(std::string_view(str));
+        }
+        default: {
+            UnrecoverableError(fmt::format("Value::Hash() not supported for data type: {}", type_.ToString()));
+            return 0;
+        }
+    }
+    return 0;
+}
+Value Value::StringToValue(const std::string &str, const DataType &data_type) {
+    Value value(data_type);
+    value.type_ = data_type;
+
+    switch (data_type.type()) {
+        case LogicalType::kBoolean: {
+            if (str == "true") {
+                value.value_.boolean = true;
+            } else if (str == "false") {
+                value.value_.boolean = false;
+            } else {
+                UnrecoverableError(fmt::format("Invalid boolean string: {}", str));
+            }
+            break;
+        }
+        case LogicalType::kTinyInt: {
+            TinyIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid TinyInt string: {}", str));
+            }
+            value.value_.tiny_int = val;
+            break;
+        }
+        case LogicalType::kSmallInt: {
+            SmallIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid SmallInt string: {}", str));
+            }
+            value.value_.small_int = val;
+            break;
+        }
+        case LogicalType::kInteger: {
+            IntegerT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Integer string: {}", str));
+            }
+            value.value_.integer = val;
+            break;
+        }
+        case LogicalType::kBigInt: {
+            BigIntT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid BigInt string: {}", str));
+            }
+            value.value_.big_int = val;
+            break;
+        }
+        case LogicalType::kFloat: {
+            FloatT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Float string: {}", str));
+            }
+            value.value_.float32 = val;
+            break;
+        }
+        case LogicalType::kDouble: {
+            DoubleT val;
+            auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), val);
+            if (ec != std::errc() || ptr != str.data() + str.size()) {
+                UnrecoverableError(fmt::format("Invalid Double string: {}", str));
+            }
+            value.value_.float64 = val;
+            break;
+        }
+        case LogicalType::kDate: {
+            DateT date;
+            date.FromString(str);
+            value.value_.date = date;
+            break;
+        }
+        case LogicalType::kTime: {
+            TimeT time;
+            time.FromString(str);
+            value.value_.time = time;
+            break;
+        }
+        case LogicalType::kDateTime: {
+            DateTimeT datetime;
+            datetime.FromString(str);
+            value.value_.datetime = datetime;
+            break;
+        }
+        case LogicalType::kTimestamp: {
+            TimestampT timestamp;
+            timestamp.FromString(str);
+            value.value_.timestamp = timestamp;
+            break;
+        }
+        case LogicalType::kVarchar: {
+            value.value_info_ = std::make_shared<StringValueInfo>(str);
+            break;
+        }
+        case LogicalType::kJson: {
+            auto json = nlohmann::json::parse(str);
+            auto bson = JsonManager::to_bson(std::move(json));
+            value.value_info_ = std::make_shared<JsonValueInfo>(bson);
+            break;
+        }
+        default: {
+            RecoverableError(
+                Status::NotSupport(fmt::format("StringToValue() is not implemented for data type: {}, str: {}", data_type.ToString(), str)));
+            break;
+        }
+    }
+
+    return value;
+}
+
 void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
@@ -1598,6 +1773,12 @@ void Value::AppendToJson(const std::string &name, nlohmann::json &json) const {
         }
         case LogicalType::kVarchar: {
             json[name] = value_info_->Get<StringValueInfo>().GetString();
+            return;
+        }
+        case LogicalType::kJson: {
+            const auto &bson = this->GetBson();
+            auto data = JsonManager::from_bson(bson);
+            json[name] = data->dump();
             return;
         }
         case LogicalType::kEmbedding: {
@@ -1751,6 +1932,13 @@ void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *a
         case LogicalType::kVarchar: {
             auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
             auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
+            break;
+        }
+        case LogicalType::kJson: {
+            auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
+            const auto &bson = this->GetBson();
+            auto json = JsonManager::from_bson(bson);
+            auto status = builder->Append(json->dump());
             break;
         }
         case LogicalType::kEmbedding: {

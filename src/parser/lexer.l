@@ -43,6 +43,7 @@ BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
+JSON            { return JSON; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
 BLOCK           { return BLOCK; }
@@ -91,6 +92,7 @@ DROP            { return DROP; }
 ELSE            { return ELSE; }
 EMBEDDING       { return EMBEDDING; }
 END             { return END; }
+ESCAPE          { return ESCAPE; }
 EXCEPT          { return EXCEPT; }
 EXTRACT         { return EXTRACT; }
 EXECUTE         { return EXECUTE; }
@@ -229,6 +231,7 @@ WHERE           { return WHERE; }
 WITH            { return WITH; }
 YEAR            { return YEAR; }
 YEARS           { return YEARS; }
+PARSE_JSON      { return PARSE_JSON; }
 
 "=="            { return EQUAL; }
 "!="            { return NOT_EQ; }

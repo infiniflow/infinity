@@ -180,3 +180,44 @@ struct float16_t {
 };
 
 } // namespace infinity
+
+namespace std {
+template <>
+struct numeric_limits<infinity::float16_t> {
+    using T = infinity::float16_t;
+
+    static constexpr bool is_specialized = true;
+    static constexpr bool is_signed = true;
+    static constexpr bool is_integer = false;
+    static constexpr bool is_exact = false;
+    static constexpr bool has_infinity = true;
+    static constexpr bool has_quiet_NaN = true;
+    static constexpr bool has_signaling_NaN = true;
+    static constexpr std::float_denorm_style has_denorm = std::denorm_present;
+    static constexpr bool has_denorm_loss = false;
+    static constexpr std::float_round_style round_style = std::round_to_nearest;
+    static constexpr bool is_iec559 = false;
+    static constexpr bool is_bounded = true;
+    static constexpr bool is_modulo = false;
+    static constexpr int digits = 11;  // mantissa bits (including implicit leading bit)
+    static constexpr int digits10 = 3; // decimal digits of precision
+    static constexpr int max_digits10 = 5;
+    static constexpr int radix = 2;
+    static constexpr int min_exponent = -14;
+    static constexpr int min_exponent10 = -4;
+    static constexpr int max_exponent = 16;
+    static constexpr int max_exponent10 = 4;
+    static constexpr bool traps = false;
+    static constexpr bool tinyness_before = false;
+
+    static constexpr T min() { return T(static_cast<uint16_t>(0x0400u)); }         // smallest positive normalized value (approx 6.10351563e-05)
+    static constexpr T max() { return T(static_cast<uint16_t>(0x7BFFu)); }         // largest finite value (approx 65504.0)
+    static constexpr T lowest() { return T(static_cast<uint16_t>(0xFBFFu)); }      // most negative finite value (approx -65504.0)
+    static constexpr T epsilon() { return T(static_cast<uint16_t>(0x1400u)); }     // difference between 1.0 and next representable value
+    static constexpr T round_error() { return T(static_cast<uint16_t>(0x3800u)); } // 0.5
+    static constexpr T infinity() { return T(static_cast<uint16_t>(0x7C00u)); }
+    static constexpr T quiet_NaN() { return T(static_cast<uint16_t>(0x7E00u)); }
+    static constexpr T signaling_NaN() { return T(static_cast<uint16_t>(0x7D00u)); }
+    static constexpr T denorm_min() { return T(static_cast<uint16_t>(0x0001u)); } // smallest positive denormalized value
+};
+} // namespace std

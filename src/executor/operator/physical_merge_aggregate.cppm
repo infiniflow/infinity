@@ -143,9 +143,9 @@ public:
 private:
     std::shared_ptr<std::vector<std::string>> output_names_{};
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_{};
-
-public:
     std::shared_ptr<BaseTableRef> table_ref_{};
+    std::vector<std::shared_ptr<DataType>> groupby_types_{};
+    size_t hash_key_size_{0};
 };
 
 } // namespace infinity

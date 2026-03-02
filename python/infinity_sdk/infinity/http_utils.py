@@ -1,7 +1,6 @@
 import ast
 import re
 from enum import Enum
-from numpy import dtype
 from infinity.common import ConflictType
 from infinity.table import ExplainType
 
@@ -49,6 +48,23 @@ functions = [
     "avg",
     "trunc",
     "datepart",
+    # JSON functions
+    "json_extract",
+    "json_extract_string",
+    "json_extract_int",
+    "json_extract_double",
+    "json_extract_bool",
+    "json_extract_isnull",
+    "json_exists_path",
+    "json_contains",
+    # String functions
+    "substring",
+    "upper",
+    "lower",
+    "trim",
+    "ltrim",
+    "rtrim",
+    "reverse",
 ]
 
 bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
@@ -56,49 +72,45 @@ bool_functions = ["filter_text", "filter_fulltext", "or", "and", "not"]
 
 def function_return_type(function_name, param_type):
     if function_name == "sqrt":
-        return dtype("float64")
-    elif (
-        function_name == "round" or function_name == "ceil" or function_name == "floor"
-    ):
-        if (
-            param_type == dtype("int8")
-            or param_type == dtype("int16")
-            or param_type == dtype("int32")
-            or param_type == dtype("int64")
-        ):
+        return 'Float64'
+    elif function_name in ["round", "ceil", "floor"]:
+        if param_type in ['Int8', 'Int16', 'Int32', 'Int64']:
             return param_type
         else:
-            return dtype("float64")
-    elif (
-        function_name == "filter_text"
-        or function_name == "filter_fulltext"
-        or function_name == "or"
-        or function_name == "and"
-        or function_name == "not"
-    ):
-        return dtype("bool")
+            return 'Float64'
+    elif function_name in ["filter_text", "filter_fulltext", "or", "and", "not"]:
+        return 'boolean'
     elif function_name == "trunc":
-        return dtype("str_")
+        return 'string'
     elif function_name == "datepart":
-        return dtype("int64")
+        return 'Int64'
     elif function_name == "char_length":
-        return dtype("int32")
+        return 'Int32'
     elif function_name == "sum":
-        if (
-            param_type == dtype("int8")
-            or param_type == dtype("int16")
-            or param_type == dtype("int32")
-            or param_type == dtype("int64")
-        ):
-            return dtype("int64")
+        if param_type in ['Int8', 'Int16', 'Int32', 'Int64']:
+            return 'Int64'
         else:
-            return dtype("float64")
-    elif function_name == "min" or function_name == "max":
+            return 'Float64'
+    elif function_name in ["min", "max"]:
         return param_type
     elif function_name == "count":
-        return dtype("int64")
+        return 'Int64'
     elif function_name == "avg":
-        return dtype("float64")
+        return 'Float64'
+    # JSON function return types
+    elif function_name in ["json_extract", "json_extract_string"]:
+        return 'string'
+    elif function_name == "json_extract_int":
+        return 'Int64'
+    elif function_name == "json_extract_double":
+        return 'Float64'
+    elif function_name in ["json_extract_bool", "json_extract_isnull",
+                          "json_exists_path", "json_contains"]:
+        return 'boolean'
+    # String function return types
+    elif function_name in ["substring", "upper", "lower", "trim",
+                           "ltrim", "rtrim", "reverse"]:
+        return 'string'
     else:
         return param_type
 
@@ -129,35 +141,37 @@ type_transfrom = {
 def type_to_dtype(type):
     match type.lower():
         case "bool":
-            return dtype("bool")
+            return 'boolean'
         case "boolean":
-            return dtype("bool")
+            return 'boolean'
         case "tinyint":
-            return dtype("int8")
+            return 'Int8'
         case "smallint":
-            return dtype("int16")
+            return 'Int16'
         case "integer":
-            return dtype("int32")
+            return 'Int32'
         case "int":
-            return dtype("int32")
+            return 'Int32'
         case "int32":
-            return dtype("int32")
+            return 'Int32'
         case "bigint":
-            return dtype("int64")
+            return 'Int64'
         case "float":
-            return dtype("float32")
+            return 'Float32'
         case "float32":
-            return dtype("float32")
+            return 'Float32'
         case "float64":
-            return dtype("float64")
+            return 'Float64'
         case "float16":
-            return dtype("float32")
+            return 'Float32'
         case "bfloat16":
-            return dtype("float32")
+            return 'Float32'
         case "double":
-            return dtype("float64")
+            return 'Float64'
         case "varchar":
-            return dtype("str")
+            return 'string'
+        case "json":
+            return 'string'
         case _:
             return object
 
@@ -254,8 +268,9 @@ index_type_transfrom = {
     2: "HNSW",
     3: "FULLTEXT",
     4: "SECONDARY",
-    5: "EMVB",
-    6: "BMP",
+    5: "SECONDARYFUNCTIONAL",
+    6: "EMVB",
+    7: "BMP",
 }
 
 baseResponse = {

@@ -82,6 +82,9 @@ public:
 
     std::string ToString() const final;
 
+public:
+    SourcePosition source_position_{};
+
 private:
     DataType data_type_;
 

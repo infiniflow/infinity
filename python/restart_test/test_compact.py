@@ -34,7 +34,7 @@ class TestCompact:
             infinity_obj.flush_data()
             table_obj.compact()
             for index_info in indexes:
-                table_obj.create_index(f"idx_{index_info.column_name}", index_info)
+                table_obj.create_index(f"idx_{index_info.target_name}", index_info)
 
             infinity_obj.cleanup()
 

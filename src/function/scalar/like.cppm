@@ -16,6 +16,8 @@ module;
 
 export module infinity_core:like;
 
+import std;
+
 namespace infinity {
 
 class NewCatalog;
@@ -23,5 +25,8 @@ class NewCatalog;
 export void RegisterLikeFunction(NewCatalog *catalog_ptr);
 
 export void RegisterNotLikeFunction(NewCatalog *catalog_ptr);
+
+// Convert LIKE pattern to RE2 regex pattern (exported for testing)
+export std::string LikeToRegexPattern(const std::string &like_pattern, char escape_char);
 
 } // namespace infinity

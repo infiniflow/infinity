@@ -23,7 +23,7 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
-project(infinity VERSION 0.6.15)
+project(infinity VERSION 0.7.0)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -84,6 +84,7 @@ set(GCC_SEARCH_ROOTS
 set(GCC15_SUFFIXES
         #        lib
         lib/gcc/15
+	lib/gcc/aarch64-linux-gnu/15
         lib/gcc/x86_64-linux-gnu/15
         lib/gcc/x86_64-pc-linux-gnu/15.1.0
         lib64/gcc/x86_64-linux-gnu/15
@@ -119,7 +120,7 @@ find_package(CLI11 CONFIG REQUIRED)
 #find_package(CURL REQUIRED) # wait for s3
 #darts-clone # wait for fix
 #eigen3 fuck this package
-#find_package(fmt REQUIRED) # wait for fmt:11.2.0
+find_package(fmt CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
@@ -139,12 +140,22 @@ find_package(re2 CONFIG REQUIRED)
 find_package(roaring CONFIG REQUIRED)
 find_package(RocksDB CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
-#find_package(spdlog REQUIRED) # wait for fmt:11.2.0
+find_package(spdlog CONFIG REQUIRED)
 if (ARM64)
     add_library(sse2neon INTERFACE)
-    # need this after highway and before simdcomp
-    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
-    target_include_directories(sse2neon SYSTEM ${SSE2NEON_INCLUDE_DIRS})
+    if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
+	    set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
+	    message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
+	    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+    else()
+	    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
+	    if (SSE2NEON_INCLUDE_DIRS)
+		    message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
+		    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
+	    else()
+		    message(WARNING "sse2neon not found, proceeding without it.")
+	    endif()
+    endif()
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
@@ -408,7 +419,7 @@ else ()
 endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development)
 #find_package(Python 3.8
 #        REQUIRED COMPONENTS Interpreter Development.Module
 #        OPTIONAL_COMPONENTS Development.SABIModule)

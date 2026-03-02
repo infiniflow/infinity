@@ -26,6 +26,7 @@ import data_type;
 
 namespace infinity {
 
+struct QueryNode;
 struct BlockIndex;
 
 export class FilterFulltextExpression final : public BaseExpression {

@@ -99,8 +99,11 @@ protected:
 
     const char *GetResourceDir() { return "/usr/share/infinity/resource"; }
 
+    const char *GetSnapshotDir() { return "/var/infinity/snapshot"; }
+
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
+        const char *infinity_db_dirs[] =
+            {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir(), GetSnapshotDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
@@ -109,7 +112,8 @@ protected:
     void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
+        const char *infinity_db_dirs[] =
+            {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir(), GetSnapshotDir()};
         for (auto &dir : infinity_db_dirs) {
             RemoveDirectory(dir);
         }

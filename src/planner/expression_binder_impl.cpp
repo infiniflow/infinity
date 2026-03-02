@@ -54,6 +54,8 @@ import :expression_type;
 import :meta_info;
 import :column_vector;
 import :new_catalog;
+import :json_manager;
+import :extract_json;
 
 import std;
 import third_party;
@@ -81,6 +83,7 @@ import data_type;
 import embedding_info;
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -415,9 +418,18 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantE
             Value value = Value::MakeArray(std::move(element_values), ArrayInfo::Make(std::move(common_element_type)));
             return std::make_shared<ValueExpression>(value);
         }
+        case LiteralType::kJson: {
+            std::string json_value(expr.json_value_);
+            if (!JsonManager::valid_json(json_value)) {
+                RecoverableError(Status::SyntaxError("JSON validation failed."));
+            }
+            Value value = Value::MakeJson(json_value, nullptr);
+            return std::make_shared<ValueExpression>(std::move(value));
+        }
     }
 
     UnrecoverableError("Unreachable");
+    return nullptr;
 }
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -509,6 +521,20 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
 
             std::shared_ptr<FunctionExpression> function_expr_ptr = std::make_shared<FunctionExpression>(scalar_function, arguments);
 
+            if (std::strncmp(scalar_function.name().c_str(), "json_extract", strlen("json_extract")) == 0) {
+                if (arguments.size() != 2) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression size."));
+                }
+                if (arguments[0]->type() != ExpressionType::kColumn || arguments[1]->type() != ExpressionType::kValue) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid expression type."));
+                }
+                auto value_expr = std::static_pointer_cast<ValueExpression>(arguments[1]);
+                std::string_view value_view(value_expr->GetValue().GetVarchar());
+                if (!JsonManager::check_json_path(value_view)) {
+                    RecoverableError(Status::SyntaxError("JsonExtract: Invalid json path."));
+                }
+            }
+
             // Special handling for FDE function - adjust return type based on target dimension parameter
             if (scalar_function.name() == "FDE" && arguments.size() >= 2) {
                 // Extract target dimension from the second argument if it's a constant
@@ -534,6 +560,7 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
             AggregateFunction aggregate_function = aggregate_function_set_ptr->GetMostMatchFunction(arguments[0]);
             auto aggregate_function_ptr = std::make_shared<AggregateExpression>(aggregate_function, arguments);
             aggregate_function_ptr->SetCountStar(is_count_star);
+            aggregate_function_ptr->SetDistinct(expr.distinct_);
             return aggregate_function_ptr;
         }
         case FunctionType::kTable: {
@@ -548,7 +575,15 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionEx
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     std::shared_ptr<BaseExpression> source_expr_ptr = BuildExpression(*expr.expr_, bind_context_ptr, depth, false);
-    return CastExpression::AddCastToType(source_expr_ptr, expr.data_type_);
+    if (!source_expr_ptr) {
+        return nullptr;
+    }
+    auto result = CastExpression::AddCastToType(source_expr_ptr, expr.data_type_);
+    if (!result) {
+        LOG_ERROR(fmt::format("Cannot cast {} to {}", source_expr_ptr->Type().ToString(), expr.data_type_.ToString()));
+        return nullptr;
+    }
+    return result;
 }
 
 std::shared_ptr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -1151,6 +1186,10 @@ std::shared_ptr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const Function
         case LogicalType::kArray: {
             auto *array_info = static_cast<ArrayInfo *>(child_expr->Type().type_info().get());
             return_type = DataType(array_info->ElemType().type());
+            break;
+        }
+        case LogicalType::kJson: {
+            return_type = DataType(LogicalType::kVarchar);
             break;
         }
         default: {

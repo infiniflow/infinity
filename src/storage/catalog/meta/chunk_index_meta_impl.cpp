@@ -37,6 +37,7 @@ import :persistence_manager;
 import :persist_result_handler;
 import :virtual_store;
 import :logger;
+import :secondary_index_file_worker;
 import :file_worker;
 
 import std;
@@ -101,7 +102,7 @@ Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
 Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     chunk_info_ = chunk_info;
     {
-        std::string chunk_info_key = GetChunkIndexTag("chunk_info");
+        auto chunk_info_key = GetChunkIndexTag("chunk_info");
         nlohmann::json chunk_info_json;
         chunk_info_->ToJson(chunk_info_json);
         auto status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
@@ -110,7 +111,7 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
         }
     }
 
-    TableIndexMeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto &table_index_meta = segment_index_meta_.table_index_meta();
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
@@ -130,7 +131,8 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         switch (index_base->index_type_) {
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kSecondaryFunctional: {
                 auto secondary_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
                 auto index_file_worker =
                     std::make_unique<SecondaryIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
@@ -368,7 +370,8 @@ Status ChunkIndexMeta::RestoreSet() {
     std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
     std::unique_ptr<FileWorker> index_file_worker;
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional: {
             auto secondary_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
             index_file_worker =
                 std::make_unique<SecondaryIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
@@ -584,6 +587,7 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         case IndexType::kEMVB:
         case IndexType::kIVF:
         case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional:
         case IndexType::kBMP: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
@@ -621,6 +625,7 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
     }
     switch (index_def->index_type_) {
         case IndexType::kSecondary:
+        case IndexType::kSecondaryFunctional:
         case IndexType::kIVF:
         case IndexType::kHnsw:
         case IndexType::kBMP:

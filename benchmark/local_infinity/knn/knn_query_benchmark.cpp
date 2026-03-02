@@ -219,7 +219,7 @@ int main(int argc, char *argv[]) {
                 infinity
                     ->Search(db_name, table_name, search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr, false);
             {
-                auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
+                auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors_;
                 auto &column = *cv[0];
                 auto data = reinterpret_cast<const RowID *>(column.data());
                 auto cnt = column.Size();
@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     QueryResult cache_result = infinity->ShowCache();
 
-    auto &vectors = cache_result.result_table_->GetDataBlockById(0)->column_vectors;
+    auto &vectors = cache_result.result_table_->GetDataBlockById(0)->column_vectors_;
     std::cout << "columns: " << vectors.size() << std::endl;
     auto column1 = reinterpret_cast<const u64 *>(vectors[1]->data());
     auto column2 = reinterpret_cast<const u64 *>(vectors[2]->data());

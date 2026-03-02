@@ -19,12 +19,12 @@ import :operator_state;
 import :physical_operator;
 import :physical_operator_type;
 import :data_table;
-import :hash_table;
 import :base_expression;
 import :load_meta;
 import :infinity_exception;
 import :data_block;
 import :logger;
+import :aggregate_utils;
 
 import internal_types;
 import data_type;
@@ -56,9 +56,9 @@ public:
 
     void GroupByInputTable(const std::vector<std::unique_ptr<DataBlock>> &input_blocks,
                            std::vector<std::unique_ptr<DataBlock>> &output_blocks,
-                           HashTable &hash_table);
+                           GroupByHashTable &hash_table);
 
-    void GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, HashTable &hash_table);
+    void GenerateGroupByResult(const std::shared_ptr<DataTable> &input_table, std::shared_ptr<DataTable> &output_table, GroupByHashTable &hash_table);
 
     std::vector<std::shared_ptr<BaseExpression>> groups_{};
     std::vector<std::shared_ptr<BaseExpression>> aggregates_{};
@@ -83,6 +83,9 @@ public:
 private:
     u64 groupby_index_{};
     u64 aggregate_index_{};
+    std::vector<std::shared_ptr<DataType>> groupby_types_{};
+    std::vector<std::shared_ptr<ColumnDef>> groupby_columns_{};
+    size_t hash_key_size_{0};
 };
 
 } // namespace infinity

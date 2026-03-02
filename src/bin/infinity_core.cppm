@@ -377,7 +377,6 @@ export import :physical_filter_scan_base;
 export import :physical_table_scan;
 export import :physical_match_tensor_scan;
 export import :physical_dummy_scan;
-export import :hash_table;
 export import :physical_operator_type;
 export import :admin_executor;
 export import :fragment_context;

@@ -545,44 +545,41 @@ std::string UpdateTxnStore::ToString() const {
                        db_id_,
                        table_name_,
                        table_id_,
-                       row_ranges_.size(),
+                       append_count_,
                        row_ids_.size());
 }
 
 std::shared_ptr<WalEntry> UpdateTxnStore::ToWalEntry(TxnTimeStamp commit_ts) const {
     std::shared_ptr<WalEntry> wal_entry = std::make_shared<WalEntry>();
     wal_entry->commit_ts_ = commit_ts;
-    std::shared_ptr<WalCmd> wal_command1 = std::make_shared<WalCmdDeleteV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ids_);
-    wal_entry->cmds_.push_back(wal_command1);
-    if (!input_blocks_.empty()) {
-        std::shared_ptr<DataBlock> input_block = nullptr;
-        if (input_blocks_.size() == 1) {
-            input_block = input_blocks_[0];
-        } else {
-            size_t total_row_count = 0;
-            for (size_t i = 0; i < row_ranges_.size(); ++i) {
-                total_row_count += row_ranges_[i].second;
-            }
-            input_block = std::make_shared<DataBlock>();
-            input_block->Init(input_blocks_[0]->types(), total_row_count);
-            for (size_t i = 0; i < input_blocks_.size(); ++i) {
-                input_block->AppendWith(input_blocks_[i]);
-            }
-            input_block->Finalize();
-        }
-        std::shared_ptr<WalCmd> wal_command2 =
-            std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ranges_, input_block);
-        wal_entry->cmds_.push_back(wal_command2);
+    std::size_t row_id_count = 0;
+    if (!row_ids_.empty()) {
+        std::shared_ptr<WalCmd> wal_delete_command = std::make_shared<WalCmdDeleteV2>(db_name_, db_id_str_, table_name_, table_id_str_, row_ids_);
+        wal_entry->cmds_.push_back(wal_delete_command);
+        row_id_count += row_ids_.size();
     }
+
+    std::size_t append_row_count = 0;
+    for (const auto &input_block : append_blocks_) {
+        std::shared_ptr<WalCmd> wal_append_command =
+            std::make_shared<WalCmdAppendV2>(db_name_, db_id_str_, table_name_, table_id_str_, input_block.row_ranges_, input_block.block_);
+        wal_entry->cmds_.push_back(wal_append_command);
+        append_row_count += input_block.block_->row_count();
+    }
+
+    if (row_id_count != append_row_count) {
+        LOG_WARN(fmt::format("Update WAL: delete row count: {} isn't matched with append row count: {}", row_id_count, append_row_count));
+    }
+
     return wal_entry;
 }
 
-void UpdateTxnStore::ClearData() { input_blocks_.clear(); }
+void UpdateTxnStore::ClearData() { append_blocks_.clear(); }
 
 size_t UpdateTxnStore::RowCount() const {
     size_t row_count = 0;
-    for (const auto &input_block : input_blocks_) {
-        row_count += input_block->row_count();
+    for (const auto &input_block : append_blocks_) {
+        row_count += input_block.block_->row_count();
     }
     return row_count;
 }

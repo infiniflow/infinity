@@ -40,6 +40,7 @@ import third_party;
 
 import logical_type;
 import internal_types;
+import function_expr;
 
 namespace infinity {
 
@@ -82,13 +83,51 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &ex
         RecoverableError(status);
     }
     in_aggregate_ = true;
-    std::shared_ptr<ExpressionState> &child_state = state->Children()[0];
-    std::shared_ptr<BaseExpression> &child_expr = expr->arguments()[0];
-    // Create output chunk.
-    // TODO: Now output chunk is pre-allocate memory in expression state
-    // TODO: In the future, it can be implemented as on-demand allocation.
-    std::shared_ptr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
-    this->Execute(child_expr, child_state, child_output_col);
+
+    // Execute all child arguments and get their output columns
+    std::vector<std::shared_ptr<ColumnVector>> child_output_cols;
+    std::vector<std::shared_ptr<ExpressionState>> &child_states = state->Children();
+    std::vector<std::shared_ptr<BaseExpression>> &arguments = expr->arguments();
+
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        std::shared_ptr<ColumnVector> &child_output_col = child_states[i]->OutputColumnVector();
+        this->Execute(arguments[i], child_states[i], child_output_col);
+        child_output_cols.push_back(child_output_col);
+    }
+    // Handle DISTINCT using hash-based deduplication for all cases
+    std::shared_ptr<ColumnVector> aggregate_input_col = child_output_cols[0];
+    if (expr->distinct()) {
+        // Use hash-based deduplication for both single and multiple columns
+        FlatHashSet<uint64_t> unique_tuples;
+        size_t row_count = child_output_cols[0]->Size();
+        std::vector<size_t> distinct_row_indices;
+
+        // Pre-allocate to avoid rehashing
+        unique_tuples.reserve(row_count);
+
+        for (size_t row = 0; row < row_count; ++row) {
+            // Compute combined hash without string allocation
+            uint64_t tuple_hash = 0;
+            for (const auto &col : child_output_cols) {
+                Value val = col->GetValueByIndex(row);
+                // HashCombine: similar to Boost's hash_combine
+                tuple_hash ^= val.Hash() + 0x9e3779b9 + (tuple_hash << 6) + (tuple_hash >> 2);
+            }
+
+            auto [it, inserted] = unique_tuples.emplace(tuple_hash);
+            if (inserted) {
+                distinct_row_indices.push_back(row);
+            }
+        }
+
+        // Create a column with distinct values so aggregate functions will process them correctly
+        aggregate_input_col = std::make_shared<ColumnVector>(child_output_cols[0]->data_type());
+        aggregate_input_col->Initialize(ColumnVectorType::kFlat, distinct_row_indices.size());
+
+        for (size_t idx : distinct_row_indices) {
+            aggregate_input_col->AppendWith(*child_output_cols[0], idx, 1);
+        }
+    }
 
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
         Status status = Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString());
@@ -103,20 +142,20 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &ex
             state->agg_flag_ = AggregateFlag::kRunning;
         }
         case AggregateFlag::kRunning: {
-            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            expr->aggregate_function_.update_func_(data_state, aggregate_input_col);
             break;
         }
         case AggregateFlag::kFinish: {
-            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            expr->aggregate_function_.update_func_(data_state, aggregate_input_col);
             const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-            output_column_vector->AppendByPtr(result_ptr);
+            AppendAggregateResult(expr->aggregate_function_, result_ptr, aggregate_input_col, output_column_vector);
             break;
         }
         case AggregateFlag::kRunAndFinish: {
             expr->aggregate_function_.init_func_(data_state);
-            expr->aggregate_function_.update_func_(data_state, child_output_col);
+            expr->aggregate_function_.update_func_(data_state, aggregate_input_col);
             const char *result_ptr = expr->aggregate_function_.finalize_func_(data_state);
-            output_column_vector->AppendByPtr(result_ptr);
+            AppendAggregateResult(expr->aggregate_function_, result_ptr, aggregate_input_col, output_column_vector);
             break;
         }
     }
@@ -190,10 +229,10 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<ReferenceExpression> &ex
         UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        UnrecoverableError("Invalid column index");
+        UnrecoverableError(fmt::format("Invalid column index: {}, column count: {}", column_index, input_data_block_->column_count()));
     }
 
-    output_column_vector = input_data_block_->column_vectors[column_index];
+    output_column_vector = input_data_block_->column_vectors_[column_index];
 }
 
 void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
@@ -233,10 +272,10 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<InExpression> &expr,
 void ExpressionEvaluator::Execute(const std::shared_ptr<FilterFulltextExpression> &expr,
                                   std::shared_ptr<ExpressionState> &,
                                   std::shared_ptr<ColumnVector> &output_column_vector) {
-    if (input_data_block_->column_vectors.empty()) {
+    if (input_data_block_->column_vectors_.empty()) {
         UnrecoverableError("Input data block is empty");
     }
-    const auto *expect_rowid_col = input_data_block_->column_vectors.back().get();
+    const auto *expect_rowid_col = input_data_block_->column_vectors_.back().get();
     if (expect_rowid_col->data_type()->type() != LogicalType::kRowID) {
         UnrecoverableError("Input data type last column is not rowid");
     }
@@ -267,6 +306,31 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<FilterFulltextExpression
         output_column_vector->buffer_->SetCompactBit(idx, row_result);
     }
     output_column_vector->Finalize(input_data_block_->row_count());
+}
+
+void ExpressionEvaluator::AppendAggregateResult(const AggregateFunction &aggregate_func,
+                                                const char *result_ptr,
+                                                const std::shared_ptr<ColumnVector> &child_output_col,
+                                                std::shared_ptr<ColumnVector> &output_column_vector) {
+
+    size_t row_index = output_column_vector->Size();
+    LogicalType logical_type = aggregate_func.return_type_.type();
+
+    // Handle aggregate functions on empty input - should return NULL (except COUNT)
+    if (child_output_col->Size() == 0) {
+        const std::string &func_name = aggregate_func.GetFuncName();
+        if (func_name != "COUNT") {
+            output_column_vector->nulls_ptr_->SetFalse(row_index);
+        }
+    }
+
+    if (logical_type == LogicalType::kVarchar) {
+        const VarcharT *varchar_ptr = reinterpret_cast<const VarcharT *>(result_ptr);
+        std::span<const char> varchar_data = child_output_col->GetVarcharInner(*varchar_ptr);
+        output_column_vector->AppendVarchar(varchar_data);
+    } else {
+        output_column_vector->AppendByPtr(result_ptr);
+    }
 }
 
 } // namespace infinity

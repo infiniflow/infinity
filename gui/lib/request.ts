@@ -22,10 +22,15 @@ export const request = async (
 
   try {
     const res = await fetch(nextUrl, options);
+    if (!res.ok) {
+      console.error(`HTTP ${res.status}: ${res.statusText} for ${nextUrl}`);
+      return { error_code: -1, message: `HTTP ${res.status}` };
+    }
     const ret = await res.json();
     return ret;
   } catch (error) {
-    console.warn('request error:', error);
+    console.error('request error:', error);
+    return { error_code: -1, message: error instanceof Error ? error.message : String(error) };
   }
 };
 

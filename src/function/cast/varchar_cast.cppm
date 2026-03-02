@@ -20,6 +20,7 @@ import :infinity_exception;
 import :column_vector;
 import :vector_buffer;
 import :status;
+import :json_manager;
 
 import data_type;
 import internal_types;
@@ -29,6 +30,7 @@ namespace infinity {
 
 export struct TryCastVarchar;
 export struct TryCastVarcharVector;
+export struct TryCastVarcharVectorToJson;
 export struct TryCastVarcharToChar;
 export struct TryCastVarcharToVarchar;
 
@@ -37,6 +39,9 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         UnrecoverableError(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
     }
     switch (target.type()) {
+        case LogicalType::kJson: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorVarlenWithType<VarcharT, JsonT, TryCastVarcharVectorToJson>);
+        }
         case LogicalType::kBoolean: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BooleanT, TryCastVarchar>);
         }
@@ -399,6 +404,40 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector *sour
     //     return false;
     // }
     return true;
+}
+
+struct TryCastVarcharVectorToJson {
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(const SourceType &input,
+                           DataType source_type,
+                           ColumnVector *source_vector,
+                           TargetType &result,
+                           DataType target_type,
+                           ColumnVector *target_vector) {
+        UnrecoverableError(
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
+    }
+};
+
+template <>
+inline bool TryCastVarcharVectorToJson::Run(const VarcharT &input,
+                                            DataType source_type,
+                                            ColumnVector *source_vector,
+                                            JsonT &result,
+                                            DataType target_type,
+                                            ColumnVector *target_vector) {
+    std::span<const char> data = source_vector->GetVarcharInner(input);
+    auto len = data.size();
+    std::string substr(data.data(), len);
+
+    if (JsonManager::valid_json(substr)) {
+        Value value = Value::MakeJson(substr, nullptr);
+        target_vector->AppendValue(value);
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace infinity

@@ -75,7 +75,6 @@ class Array:
     def __repr__(self):
         return str(self)
 
-
 @dataclass
 class FDE:
     """Fixed Dimensional Encoding function call for insert operations."""

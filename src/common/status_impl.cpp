@@ -83,9 +83,8 @@ Status Status::EmptyConfigParameter() {
 }
 
 Status Status::MismatchVersion(const std::string &current_version, const std::string &expected_version) {
-    return Status(
-        ErrorCode::kMismatchVersion,
-        std::make_unique<std::string>(fmt::format("Current infinity version: {}, expected version: {}", current_version, expected_version)));
+    return Status(ErrorCode::kMismatchVersion,
+                  std::make_unique<std::string>(fmt::format("Current config version: {}, expected version: {}", current_version, expected_version)));
 }
 
 Status Status::InvalidTimezone(const std::string &timezone) {
@@ -185,6 +184,7 @@ Status Status::InvalidIndexDefinition(const std::string &detailed_info) {
 Status Status::DataTypeMismatch(const std::string &type1, const std::string &type2) {
     return Status(ErrorCode::kDataTypeMismatch, std::make_unique<std::string>(fmt::format("Expected: {}, but {} is given.", type2, type1)));
 }
+
 Status Status::NameTooLong(const std::string &name, const std::string &object_type) {
     return Status(ErrorCode::kNameTooLong, std::make_unique<std::string>(fmt::format("{} is too long for a {} name", name, object_type)));
 }
@@ -647,6 +647,7 @@ Status Status::CantConnectServer(const std::string &ip, i64 port, const std::str
 Status Status::NotExistNode(const std::string &node_info) {
     return Status(ErrorCode::kNotExistNode, std::make_unique<std::string>(fmt::format("Node doesn't exist: {}", node_info)));
 }
+
 Status Status::DuplicateNode(const std::string &node_info) {
     return Status(ErrorCode::kDuplicateNode, std::make_unique<std::string>(fmt::format("Duplicate node: {}", node_info)));
 }
