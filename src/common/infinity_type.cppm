@@ -31,6 +31,7 @@ export {
     using ColumnID = uint64_t;
 
     // Related to entry
-    using BlockOffset = uint16_t;
+    // using BlockOffset = uint16_t;
+    using BlockOffset = uint64_t;
     using SegmentOffset = uint32_t;
 }
