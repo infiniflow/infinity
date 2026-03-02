@@ -43,7 +43,7 @@ lru_num                 = 8
 temp_dir                = "/var/infinity/tmp"
 memindex_memory_quota   = "2GB"
 
-result_cache            = "on"
+result_cache            = "off"
 cache_result_capacity   = 100
 
 [wal]
