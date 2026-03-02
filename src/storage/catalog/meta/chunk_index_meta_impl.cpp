@@ -270,6 +270,20 @@ Status ChunkIndexMeta::LoadSet() {
             index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
             break;
         }
+        case IndexType::kSecondaryFunctional: {
+            auto secondary_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            auto index_file_worker =
+                std::make_unique<SecondaryIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                           std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                           index_dir,
+                                                           std::move(secondary_index_file_name),
+                                                           index_base,
+                                                           column_def,
+                                                           row_count,
+                                                           buffer_mgr->persistence_manager());
+            index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
+            break;
+        }
         case IndexType::kFullText: {
             auto column_length_file_name = std::make_shared<std::string>(base_name + LENGTH_SUFFIX);
             auto index_file_worker = std::make_unique<RawFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
