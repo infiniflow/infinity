@@ -126,7 +126,7 @@ bool FileWorker::WriteSnapshotFile(const std::shared_ptr<TableSnapshotInfo> &tab
             if (!write_status.ok()) {
                 UnrecoverableError(fmt::format("Failed to write to {}: {}", write_path, write_status.message()));
             }
-            writ\e_handle->Sync();
+            write_handle->Sync();
         } else {
             Status status = VirtualStore::Copy(write_path, src_path);
             if (!status.ok()) {
