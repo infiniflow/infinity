@@ -659,6 +659,126 @@ class TestIndexParallel(TestSdk):
             connection_pool.release_conn(infinity_obj)
             print(f"thread {thread_id} (Hnsw MV): read {local_count} times")
 
+        def read_worker_fusion_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for fusion (RRF) combining fulltext and vector search"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    # Fusion: combine match_text + match_dense with RRF
+                    res, _ = (table_obj
+                             .output(["id", "text"])
+                             .match_text("text", "test", 5)
+                             .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
+                             .fusion(method='rrf', topn=5)
+                             .to_pl())
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            with written_data["lock"]:
+                                for row_id in ids:
+                                    # Just check id exists in written data
+                                    assert row_id in written_data, \
+                                        f"Fusion RRF validation failed: id={row_id} not found"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Fusion RRF): read {local_count} times")
+
+        def read_worker_fusion_mv_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for fusion (RRF) combining vector and multivector search"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    # Fusion: combine vector search + multivector search with RRF
+                    query_vec = [0.5] * 4
+                    query_mv = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
+                    res, _ = (table_obj
+                             .output(["id"])
+                             .match_dense("vector_col", query_vec, "float", "l2", 5)
+                             .match_dense("tensor_col", query_mv, "float", "l2", 5)
+                             .fusion(method='rrf', topn=5)
+                             .to_pl())
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            with written_data["lock"]:
+                                for row_id in ids:
+                                    # Just check id exists in written data
+                                    assert row_id in written_data, \
+                                        f"Fusion MV RRF validation failed: id={row_id} not found"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Fusion MV RRF): read {local_count} times")
+
+        def read_worker_fusion_weighted_sum(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for fusion (weighted_sum) combining fulltext and vector search"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    # Fusion: combine match_text + match_dense with weighted_sum
+                    # weights: 0.6 for fulltext, 0.4 for vector
+                    res, _ = (table_obj
+                             .output(["id", "text"])
+                             .match_text("text", "test", 5)
+                             .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
+                             .fusion(method='weighted_sum', topn=5, fusion_params={"weights": "0.6,0.4"})
+                             .to_pl())
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            with written_data["lock"]:
+                                for row_id in ids:
+                                    # Just check id exists in written data
+                                    assert row_id in written_data, \
+                                        f"Fusion weighted_sum validation failed: id={row_id} not found"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Fusion weighted_sum): read {local_count} times")
+
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
@@ -709,6 +829,7 @@ class TestIndexParallel(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         print(f"Created all 5 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv")
+        print(f"Running with 8 read threads: FullText, Hnsw, HnswMV, SecondaryHigh, SecondaryLow, FusionRRF, FusionMVRRF, FusionWeightedSum")
 
         # Insert initial data
         initial_data = []
@@ -752,6 +873,9 @@ class TestIndexParallel(TestSdk):
         read_count_hnsw_mv = Value('i', 0)
         read_count_secondary_high = Value('i', 0)
         read_count_secondary_low = Value('i', 0)
+        read_count_fusion_rrf = Value('i', 0)
+        read_count_fusion_mv_rrf = Value('i', 0)
+        read_count_fusion_weighted_sum = Value('i', 0)
 
         validation_errors = []
 
@@ -764,7 +888,7 @@ class TestIndexParallel(TestSdk):
                 connection_pool, table_name, end_time, i, write_count, written_data])
             threads.append(t)
 
-        # Start 5 read threads (one for each index type)
+        # Start read threads (one for each index type + fusion)
         t = Thread(target=read_worker_fulltext, args=[
             connection_pool, table_name, end_time, 0, read_count_fulltext, written_data, validation_errors])
         threads.append(t)
@@ -785,6 +909,19 @@ class TestIndexParallel(TestSdk):
             connection_pool, table_name, end_time, 4, read_count_secondary_low, written_data, validation_errors])
         threads.append(t)
 
+        # Start fusion threads
+        t = Thread(target=read_worker_fusion_rrf, args=[
+            connection_pool, table_name, end_time, 5, read_count_fusion_rrf, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_fusion_mv_rrf, args=[
+            connection_pool, table_name, end_time, 6, read_count_fusion_mv_rrf, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_fusion_weighted_sum, args=[
+            connection_pool, table_name, end_time, 7, read_count_fusion_weighted_sum, written_data, validation_errors])
+        threads.append(t)
+
         # Start all threads
         for t in threads:
             t.start()
@@ -797,7 +934,9 @@ class TestIndexParallel(TestSdk):
         print(f"Total write operations: {write_count.value}")
         print(f"Total read operations - FullText: {read_count_fulltext.value}, "
               f"Hnsw: {read_count_hnsw.value}, HnswMV: {read_count_hnsw_mv.value}, "
-              f"SecondaryHigh: {read_count_secondary_high.value}, SecondaryLow: {read_count_secondary_low.value}")
+              f"SecondaryHigh: {read_count_secondary_high.value}, SecondaryLow: {read_count_secondary_low.value}, "
+              f"FusionRRF: {read_count_fusion_rrf.value}, FusionMVRRF: {read_count_fusion_mv_rrf.value}, "
+              f"FusionWeightedSum: {read_count_fusion_weighted_sum.value}")
 
         # Verify indexes exist
         res = table_obj.list_indexes()
@@ -815,6 +954,9 @@ class TestIndexParallel(TestSdk):
         assert read_count_hnsw_mv.value > 0, "Hnsw MV read failed"
         assert read_count_secondary_high.value > 0, "Secondary High read failed"
         assert read_count_secondary_low.value > 0, "Secondary Low read failed"
+        assert read_count_fusion_rrf.value > 0, "Fusion RRF read failed"
+        assert read_count_fusion_mv_rrf.value > 0, "Fusion MV RRF read failed"
+        assert read_count_fusion_weighted_sum.value > 0, "Fusion weighted_sum read failed"
 
         print(f"Verify: all indexes exist and read operations succeeded")
 
