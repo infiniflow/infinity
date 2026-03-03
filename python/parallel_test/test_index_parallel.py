@@ -443,18 +443,25 @@ class TestIndexParallel(TestSdk):
                 try:
                     # Generate deterministic data for validation
                     vec = generate_deterministic_vector(thread_id, local_count)
+                    # Multi-vector: each doc has 10 vectors, each vector has 3 dimensions
+                    multivec = [[float(thread_id + local_count + i + j) / 100.0 for j in range(3)] for i in range(10)]
                     row_id = thread_id * 10000 + local_count
                     text_val = f"test_{thread_id}_{local_count}"
+                    # Category has limited unique values for low cardinality index
+                    categories = ["A", "B", "C", "D"]
+                    category = categories[local_count % len(categories)]
                     value = [{
                         "id": row_id,
                         "text": text_val,
-                        "vector_col": vec
+                        "category": category,
+                        "vector_col": vec,
+                        "tensor_col": multivec
                     }]
                     table_obj.insert(value)
 
                     # Record written data for validation
                     with written_data["lock"]:
-                        written_data[row_id] = {"text": text_val, "vector": vec}
+                        written_data[row_id] = {"text": text_val, "category": category, "vector": vec, "multivec": multivec}
 
                     local_count += 1
                     with write_count.get_lock():
@@ -541,8 +548,8 @@ class TestIndexParallel(TestSdk):
             connection_pool.release_conn(infinity_obj)
             print(f"thread {thread_id} (Hnsw): read {local_count} times")
 
-        def read_worker_secondary(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for Secondary index with validation"""
+        def read_worker_secondary_high(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for Secondary high cardinality index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -562,7 +569,7 @@ class TestIndexParallel(TestSdk):
                                 for row_id in ids:
                                     # Verify the id exists in written data
                                     assert row_id in written_data, \
-                                        f"Secondary validation failed: id={row_id} not found in written data"
+                                        f"Secondary High validation failed: id={row_id} not found in written data"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -572,7 +579,85 @@ class TestIndexParallel(TestSdk):
                 read_count.value += local_count
 
             connection_pool.release_conn(infinity_obj)
-            print(f"thread {thread_id} (Secondary): read {local_count} times")
+            print(f"thread {thread_id} (Secondary High): read {local_count} times")
+
+        def read_worker_secondary_low(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for Secondary low cardinality index with validation"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+            categories = ["A", "B", "C", "D"]
+
+            while time.time() < end_time:
+                try:
+                    # Query by category (low cardinality column)
+                    cat = categories[local_count % len(categories)]
+                    res, _ = table_obj.output(["id", "category"]).filter(f"category = '{cat}'").to_pl()
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            cats = list(res["category"])
+                            with written_data["lock"]:
+                                for row_id, cat_val in zip(ids, cats):
+                                    # Verify the category matches the written data
+                                    if row_id in written_data:
+                                        expected_cat = written_data[row_id]["category"]
+                                        assert cat_val == expected_cat, \
+                                            f"Secondary Low validation failed: id={row_id}, expected category='{expected_cat}', got='{cat_val}'"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Secondary Low): read {local_count} times")
+
+        def read_worker_hnsw_mv(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for Hnsw multi-vector index with validation"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    # Query multivector column using match_dense (flatten the query vectors)
+                    # 2 query vectors, each 3 dims -> flatten to 6 dims
+                    query_vec = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
+                    res, _ = table_obj.output(["id", "tensor_col"]).match_dense("tensor_col", query_vec, "float", "l2", 5).to_pl()
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            multivecs = list(res["tensor_col"])
+                            with written_data["lock"]:
+                                for row_id, multivec in zip(ids, multivecs):
+                                    if row_id in written_data:
+                                        # multivec is a flat list from multiple vectors
+                                        # Just check it has data
+                                        assert len(multivec) > 0, \
+                                            f"Hnsw MV validation failed: id={row_id}, empty result"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Hnsw MV): read {local_count} times")
 
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
@@ -586,18 +671,27 @@ class TestIndexParallel(TestSdk):
         table_obj = db_obj.create_table(table_name, {
             "id": {"type": "int"},
             "text": {"type": "varchar"},
-            "vector_col": {"type": "vector,4,float"}
+            "category": {"type": "varchar"},  # For low cardinality secondary index
+            "vector_col": {"type": "vector,4,float"},
+            "tensor_col": {"type": "multivector,3,float"}  # Multi-vector: each doc has multiple 3-dim vectors
         }, ConflictType.Error)
         assert table_obj is not None
 
-        # Create 3 types of indexes (no EMVB - causes server crash)
+        # Create indexes: FullText, Secondary (high + low cardinality), Hnsw, Hnsw MV
         res = table_obj.create_index("idx_fulltext",
                                      index.IndexInfo("text", index.IndexType.FullText),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.create_index("idx_secondary",
-                                     index.IndexInfo("id", index.IndexType.Secondary),
+        # High cardinality secondary index on id column
+        res = table_obj.create_index("idx_secondary_high",
+                                     index.IndexInfo("id", index.IndexType.Secondary, {"cardinality": "high"}),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        # Low cardinality secondary index on category column
+        res = table_obj.create_index("idx_secondary_low",
+                                     index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -607,21 +701,33 @@ class TestIndexParallel(TestSdk):
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        print(f"Created all 3 indexes: fulltext, secondary, hnsw")
+        # Hnsw index on multi-vector column (using vector type for fixed-dimension vectors)
+        res = table_obj.create_index("idx_hnsw_mv",
+                                     index.IndexInfo("tensor_col", index.IndexType.Hnsw,
+                                                     {"M": "16", "ef_construction": "50", "metric": "l2"}),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        print(f"Created all 5 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv")
 
         # Insert initial data
         initial_data = []
+        categories = ["A", "B", "C", "D"]
         for i in range(10):
+            # Multi-vector: 10 vectors per doc, each 3 dimensions
+            multivec = [[random.random() for _ in range(3)] for _ in range(10)]
             initial_data.append({
                 "id": i,
                 "text": f"test_{i}",
-                "vector_col": [random.random() for _ in range(4)]
+                "category": categories[i % len(categories)],
+                "vector_col": [random.random() for _ in range(4)],
+                "tensor_col": multivec
             })
         table_obj.insert(initial_data)
         print(f"Inserted initial {len(initial_data)} rows")
 
         # Start parallel test
-        kRuningTime = 15
+        kRuningTime = 20
         kWriteThreadNum = 4
 
         # Shared counters and data
@@ -630,12 +736,22 @@ class TestIndexParallel(TestSdk):
         written_data["lock"] = Lock()
 
         # Add initial data to written_data
+        categories = ["A", "B", "C", "D"]
         for i in range(10):
-            written_data[i] = {"text": f"test_{i}", "vector": [random.random() for _ in range(4)]}
+            # Multi-vector: 10 vectors per doc, each 3 dimensions
+            multivec = [[random.random() for _ in range(3)] for _ in range(10)]
+            written_data[i] = {
+                "text": f"test_{i}",
+                "category": categories[i % len(categories)],
+                "vector": [random.random() for _ in range(4)],
+                "multivec": multivec
+            }
 
         read_count_fulltext = Value('i', 0)
         read_count_hnsw = Value('i', 0)
-        read_count_secondary = Value('i', 0)
+        read_count_hnsw_mv = Value('i', 0)
+        read_count_secondary_high = Value('i', 0)
+        read_count_secondary_low = Value('i', 0)
 
         validation_errors = []
 
@@ -648,7 +764,7 @@ class TestIndexParallel(TestSdk):
                 connection_pool, table_name, end_time, i, write_count, written_data])
             threads.append(t)
 
-        # Start 3 read threads (one for each index type)
+        # Start 5 read threads (one for each index type)
         t = Thread(target=read_worker_fulltext, args=[
             connection_pool, table_name, end_time, 0, read_count_fulltext, written_data, validation_errors])
         threads.append(t)
@@ -657,8 +773,16 @@ class TestIndexParallel(TestSdk):
             connection_pool, table_name, end_time, 1, read_count_hnsw, written_data, validation_errors])
         threads.append(t)
 
-        t = Thread(target=read_worker_secondary, args=[
-            connection_pool, table_name, end_time, 2, read_count_secondary, written_data, validation_errors])
+        t = Thread(target=read_worker_hnsw_mv, args=[
+            connection_pool, table_name, end_time, 2, read_count_hnsw_mv, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_secondary_high, args=[
+            connection_pool, table_name, end_time, 3, read_count_secondary_high, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_secondary_low, args=[
+            connection_pool, table_name, end_time, 4, read_count_secondary_low, written_data, validation_errors])
         threads.append(t)
 
         # Start all threads
@@ -672,20 +796,25 @@ class TestIndexParallel(TestSdk):
         print(f"\n=== Test Summary ===")
         print(f"Total write operations: {write_count.value}")
         print(f"Total read operations - FullText: {read_count_fulltext.value}, "
-              f"Hnsw: {read_count_hnsw.value}, Secondary: {read_count_secondary.value}")
+              f"Hnsw: {read_count_hnsw.value}, HnswMV: {read_count_hnsw_mv.value}, "
+              f"SecondaryHigh: {read_count_secondary_high.value}, SecondaryLow: {read_count_secondary_low.value}")
 
         # Verify indexes exist
         res = table_obj.list_indexes()
         index_names = res.index_names
         print(f"Indexes in table: {index_names}")
         assert "idx_fulltext" in index_names, "FullText index not found"
-        assert "idx_secondary" in index_names, "Secondary index not found"
+        assert "idx_secondary_high" in index_names, "Secondary High index not found"
+        assert "idx_secondary_low" in index_names, "Secondary Low index not found"
         assert "idx_hnsw" in index_names, "Hnsw index not found"
+        assert "idx_hnsw_mv" in index_names, "Hnsw MV index not found"
 
         # Verify read operations succeeded
         assert read_count_fulltext.value > 0, "FullText read failed"
         assert read_count_hnsw.value > 0, "Hnsw read failed"
-        assert read_count_secondary.value > 0, "Secondary read failed"
+        assert read_count_hnsw_mv.value > 0, "Hnsw MV read failed"
+        assert read_count_secondary_high.value > 0, "Secondary High read failed"
+        assert read_count_secondary_low.value > 0, "Secondary Low read failed"
 
         print(f"Verify: all indexes exist and read operations succeeded")
 
