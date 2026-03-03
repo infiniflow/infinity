@@ -797,8 +797,8 @@ class TestIndexParallel(TestSdk):
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        print(f"Created all 5 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv")
-        print(f"Running with 8 read threads: FullText, Hnsw, HnswMV, SecondaryHigh, SecondaryLow, FusionRRF, FusionMVRRF, FusionWeightedSum")
+        print("Created all 5 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv")
+        print("Running with 8 read threads: FullText, Hnsw, HnswMV, SecondaryHigh, SecondaryLow, FusionRRF, FusionMVRRF, FusionWeightedSum")
 
         # Insert initial data
         initial_data = []
