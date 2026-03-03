@@ -421,7 +421,6 @@ class TestIndexParallel(TestSdk):
 
     def test_multiple_index_types_parallel(self, get_infinity_connection_pool):
         """Test parallel read/write with multiple index types"""
-        import random
 
         def generate_deterministic_vector(thread_id, local_count):
             return [
