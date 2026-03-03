@@ -20,14 +20,15 @@ import "fmt"
 type IndexType int
 
 const (
-	IndexTypeIVF                IndexType = 1
-	IndexTypeHnsw               IndexType = 2
-	IndexTypeFullText           IndexType = 3
-	IndexTypeSecondary          IndexType = 4
+	IndexTypeIVF                 IndexType = 1
+	IndexTypeHnsw                IndexType = 2
+	IndexTypeFullText            IndexType = 3
+	IndexTypeSecondary           IndexType = 4
 	IndexTypeSecondaryFunctional IndexType = 5
-	IndexTypeEMVB               IndexType = 6
-	IndexTypeBMP                IndexType = 7
-	IndexTypeDiskAnn            IndexType = 8
+	IndexTypeEMVB                IndexType = 6
+	IndexTypeBMP                 IndexType = 7
+	IndexTypeDiskAnn             IndexType = 8
+	IndexTypePLAID               IndexType = 9
 )
 
 func (it IndexType) String() string {
@@ -48,6 +49,8 @@ func (it IndexType) String() string {
 		return "BMP"
 	case IndexTypeDiskAnn:
 		return "DiskAnn"
+	case IndexTypePLAID:
+		return "PLAID"
 	default:
 		return "Unknown"
 	}
@@ -135,6 +138,6 @@ func NewExportOption() *ExportOption {
 
 // AlterIndexOptions represents options for altering an index
 type AlterIndexOptions struct {
-	IndexName  string
-	OptParams  []*InitParameter
+	IndexName string
+	OptParams []*InitParameter
 }
