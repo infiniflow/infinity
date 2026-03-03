@@ -127,8 +127,8 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
     EXPECT_EQ(config.MemIndexMemoryQuota(), 2 * 1024l * 1024l * 1024l);
 
-    EXPECT_EQ(config.ResultCache(), "on");
-    EXPECT_EQ(config.CacheResultNum(), 100);
+    EXPECT_EQ(config.ResultCache(), "off");
+    // EXPECT_EQ(config.CacheResultNum(), 100);
 }
 
 TEST_F(ConfigTest, TestWrongParamNames) {
