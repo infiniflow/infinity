@@ -420,12 +420,10 @@ class TestIndexParallel(TestSdk):
         connection_pool.release_conn(infinity_obj)
 
     def test_multiple_index_types_parallel(self, get_infinity_connection_pool):
-        """Test parallel read/write with multiple index types (Hnsw, Secondary, FullText) on same table"""
-        import threading
+        """Test parallel read/write with multiple index types"""
         import random
 
         def generate_deterministic_vector(thread_id, local_count):
-            """Generate deterministic vector for validation"""
             return [
                 float(thread_id + 1) / 10.0,
                 float(local_count + 1) / 10.0,
@@ -438,28 +436,18 @@ class TestIndexParallel(TestSdk):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
             local_count = 0
+            categories = ["A", "B", "C", "D"]
 
             while time.time() < end_time:
                 try:
-                    # Generate deterministic data for validation
                     vec = generate_deterministic_vector(thread_id, local_count)
-                    # Multi-vector: each doc has 10 vectors, each vector has 3 dimensions
                     multivec = [[float(thread_id + local_count + i + j) / 100.0 for j in range(3)] for i in range(10)]
                     row_id = thread_id * 10000 + local_count
                     text_val = f"test_{thread_id}_{local_count}"
-                    # Category has limited unique values for low cardinality index
-                    categories = ["A", "B", "C", "D"]
                     category = categories[local_count % len(categories)]
-                    value = [{
-                        "id": row_id,
-                        "text": text_val,
-                        "category": category,
-                        "vector_col": vec,
-                        "tensor_col": multivec
-                    }]
+                    value = [{"id": row_id, "text": text_val, "category": category, "vector_col": vec, "tensor_col": multivec}]
                     table_obj.insert(value)
 
-                    # Record written data for validation
                     with written_data["lock"]:
                         written_data[row_id] = {"text": text_val, "category": category, "vector": vec, "multivec": multivec}
 
@@ -474,7 +462,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id}: write worker done, inserted {local_count} rows")
 
         def read_worker_fulltext(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for FullText index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -486,18 +473,15 @@ class TestIndexParallel(TestSdk):
                     res, _ = table_obj.output(["id", "text"]).match_text("text", "test", 5).to_pl()
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
                             texts = list(res["text"])
                             with written_data["lock"]:
                                 for row_id, text_val in zip(ids, texts):
-                                    # Verify text matches the written data
                                     if row_id in written_data:
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, \
-                                            f"FullText validation failed: id={row_id}, expected='{expected_text}', got='{text_val}'"
+                                        assert text_val == expected_text, f"FullText validation failed"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -510,7 +494,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (FullText): read {local_count} times")
 
         def read_worker_hnsw(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for Hnsw index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -522,7 +505,6 @@ class TestIndexParallel(TestSdk):
                     res, _ = table_obj.output(["id", "vector_col"]).match_dense("vector_col", [0.5] * 4, "float", "l2", 5).to_pl()
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
@@ -530,13 +512,10 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, vec in zip(ids, vectors):
                                     if row_id in written_data:
-                                        # Verify vector matches the written data
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), \
-                                            f"Hnsw validation failed: id={row_id}, dimension mismatch"
+                                        assert len(vec) == len(expected_vec), f"Hnsw validation failed"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, \
-                                                f"Hnsw validation failed: id={row_id}, element[{i}]={v}, expected={e}"
+                                            assert abs(v - e) < 0.001, f"Hnsw validation failed"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -549,7 +528,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Hnsw): read {local_count} times")
 
         def read_worker_secondary_high(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for Secondary high cardinality index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -561,15 +539,12 @@ class TestIndexParallel(TestSdk):
                     res, _ = table_obj.output(["id"]).filter("id > 0").to_pl()
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
                             with written_data["lock"]:
                                 for row_id in ids:
-                                    # Verify the id exists in written data
-                                    assert row_id in written_data, \
-                                        f"Secondary High validation failed: id={row_id} not found in written data"
+                                    assert row_id in written_data, f"Secondary High validation failed"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -582,7 +557,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Secondary High): read {local_count} times")
 
         def read_worker_secondary_low(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for Secondary low cardinality index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -592,23 +566,19 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Query by category (low cardinality column)
                     cat = categories[local_count % len(categories)]
                     res, _ = table_obj.output(["id", "category"]).filter(f"category = '{cat}'").to_pl()
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
                             cats = list(res["category"])
                             with written_data["lock"]:
                                 for row_id, cat_val in zip(ids, cats):
-                                    # Verify the category matches the written data
                                     if row_id in written_data:
                                         expected_cat = written_data[row_id]["category"]
-                                        assert cat_val == expected_cat, \
-                                            f"Secondary Low validation failed: id={row_id}, expected category='{expected_cat}', got='{cat_val}'"
+                                        assert cat_val == expected_cat, f"Secondary Low validation failed"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -621,7 +591,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Secondary Low): read {local_count} times")
 
         def read_worker_hnsw_mv(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for Hnsw multi-vector index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -630,13 +599,10 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Query multivector column using match_dense (flatten the query vectors)
-                    # 2 query vectors, each 3 dims -> flatten to 6 dims
                     query_vec = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
                     res, _ = table_obj.output(["id", "tensor_col"]).match_dense("tensor_col", query_vec, "float", "l2", 5).to_pl()
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
@@ -644,10 +610,7 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, multivec in zip(ids, multivecs):
                                     if row_id in written_data:
-                                        # multivec is a flat list from multiple vectors
-                                        # Just check it has data
-                                        assert len(multivec) > 0, \
-                                            f"Hnsw MV validation failed: id={row_id}, empty result"
+                                        assert len(multivec) > 0, f"Hnsw MV validation failed"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -660,7 +623,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Hnsw MV): read {local_count} times")
 
         def read_worker_fusion_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for fusion (RRF) combining fulltext and vector search"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -669,7 +631,6 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Fusion: combine match_text + match_dense with RRF
                     res, _ = (table_obj
                              .output(["id", "text", "vector_col"])
                              .match_text("text", "test", 5)
@@ -678,7 +639,6 @@ class TestIndexParallel(TestSdk):
                              .to_pl())
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
@@ -687,17 +647,12 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, text_val, vec in zip(ids, texts, vectors):
                                     if row_id in written_data:
-                                        # Verify text matches
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, \
-                                            f"Fusion RRF validation failed: id={row_id}, text mismatch"
-                                        # Verify vector matches
+                                        assert text_val == expected_text, f"Fusion RRF text mismatch"
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), \
-                                            f"Fusion RRF validation failed: id={row_id}, vector dimension mismatch"
+                                        assert len(vec) == len(expected_vec), f"Fusion RRF vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, \
-                                                f"Fusion RRF validation failed: id={row_id}, element[{i}]={v}, expected={e}"
+                                            assert abs(v - e) < 0.001, f"Fusion RRF vector mismatch"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -710,7 +665,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Fusion RRF): read {local_count} times")
 
         def read_worker_fusion_mv_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for fusion (RRF) combining vector and multivector search"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -719,7 +673,6 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Fusion: combine vector search + multivector search with RRF
                     query_vec = [0.5] * 4
                     query_mv = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
                     res, _ = (table_obj
@@ -730,7 +683,6 @@ class TestIndexParallel(TestSdk):
                              .to_pl())
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
@@ -739,16 +691,11 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, vec, multivec in zip(ids, vectors, multivecs):
                                     if row_id in written_data:
-                                        # Verify vector matches
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), \
-                                            f"Fusion MV RRF validation failed: id={row_id}, vector dimension mismatch"
+                                        assert len(vec) == len(expected_vec), f"Fusion MV RRF vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, \
-                                                f"Fusion MV RRF validation failed: id={row_id}, element[{i}]={v}, expected={e}"
-                                        # Verify multivector has data
-                                        assert len(multivec) > 0, \
-                                            f"Fusion MV RRF validation failed: id={row_id}, empty multivector"
+                                            assert abs(v - e) < 0.001, f"Fusion MV RRF vector mismatch"
+                                        assert len(multivec) > 0, f"Fusion MV RRF empty multivector"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -761,7 +708,6 @@ class TestIndexParallel(TestSdk):
             print(f"thread {thread_id} (Fusion MV RRF): read {local_count} times")
 
         def read_worker_fusion_weighted_sum(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
-            """Read worker for fusion (weighted_sum) combining fulltext and vector search"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -770,8 +716,6 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Fusion: combine match_text + match_dense with weighted_sum
-                    # weights: 0.6 for fulltext, 0.4 for vector
                     res, _ = (table_obj
                              .output(["id", "text", "vector_col"])
                              .match_text("text", "test", 5)
@@ -780,7 +724,6 @@ class TestIndexParallel(TestSdk):
                              .to_pl())
                     local_count += 1
 
-                    # Validate every 3 seconds
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
@@ -789,17 +732,12 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, text_val, vec in zip(ids, texts, vectors):
                                     if row_id in written_data:
-                                        # Verify text matches
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, \
-                                            f"Fusion weighted_sum validation failed: id={row_id}, text mismatch"
-                                        # Verify vector matches
+                                        assert text_val == expected_text, f"Fusion weighted_sum text mismatch"
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), \
-                                            f"Fusion weighted_sum validation failed: id={row_id}, vector dimension mismatch"
+                                        assert len(vec) == len(expected_vec), f"Fusion weighted_sum vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, \
-                                                f"Fusion weighted_sum validation failed: id={row_id}, element[{i}]={v}, expected={e}"
+                                            assert abs(v - e) < 0.001, f"Fusion weighted_sum vector mismatch"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -867,13 +805,13 @@ class TestIndexParallel(TestSdk):
         initial_data = []
         categories = ["A", "B", "C", "D"]
         for i in range(10):
-            # Multi-vector: 10 vectors per doc, each 3 dimensions
             multivec = [[random.random() for _ in range(3)] for _ in range(10)]
+            vec = [random.random() for _ in range(4)]
             initial_data.append({
                 "id": i,
                 "text": f"test_{i}",
                 "category": categories[i % len(categories)],
-                "vector_col": [random.random() for _ in range(4)],
+                "vector_col": vec,
                 "tensor_col": multivec
             })
         table_obj.insert(initial_data)
@@ -889,15 +827,12 @@ class TestIndexParallel(TestSdk):
         written_data["lock"] = Lock()
 
         # Add initial data to written_data
-        categories = ["A", "B", "C", "D"]
         for i in range(10):
-            # Multi-vector: 10 vectors per doc, each 3 dimensions
-            multivec = [[random.random() for _ in range(3)] for _ in range(10)]
             written_data[i] = {
                 "text": f"test_{i}",
                 "category": categories[i % len(categories)],
-                "vector": [random.random() for _ in range(4)],
-                "multivec": multivec
+                "vector": initial_data[i]["vector_col"],
+                "multivec": initial_data[i]["tensor_col"]
             }
 
         read_count_fulltext = Value('i', 0)
@@ -962,7 +897,7 @@ class TestIndexParallel(TestSdk):
         for t in threads:
             t.join()
 
-        print(f"\n=== Test Summary ===")
+        print("\n=== Test Summary ===")
         print(f"Total write operations: {write_count.value}")
         print(f"Total read operations - FullText: {read_count_fulltext.value}, "
               f"Hnsw: {read_count_hnsw.value}, HnswMV: {read_count_hnsw_mv.value}, "
@@ -990,7 +925,7 @@ class TestIndexParallel(TestSdk):
         assert read_count_fusion_mv_rrf.value > 0, "Fusion MV RRF read failed"
         assert read_count_fusion_weighted_sum.value > 0, "Fusion weighted_sum read failed"
 
-        print(f"Verify: all indexes exist and read operations succeeded")
+        print("Verify: all indexes exist and read operations succeeded")
 
         # Clean up
         res = db_obj.drop_table(table_name, ConflictType.Error)
