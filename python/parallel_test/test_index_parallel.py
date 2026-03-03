@@ -671,7 +671,7 @@ class TestIndexParallel(TestSdk):
                 try:
                     # Fusion: combine match_text + match_dense with RRF
                     res, _ = (table_obj
-                             .output(["id", "text"])
+                             .output(["id", "text", "vector_col"])
                              .match_text("text", "test", 5)
                              .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
                              .fusion(method='rrf', topn=5)
@@ -682,11 +682,22 @@ class TestIndexParallel(TestSdk):
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
+                            texts = list(res["text"])
+                            vectors = list(res["vector_col"])
                             with written_data["lock"]:
-                                for row_id in ids:
-                                    # Just check id exists in written data
-                                    assert row_id in written_data, \
-                                        f"Fusion RRF validation failed: id={row_id} not found"
+                                for row_id, text_val, vec in zip(ids, texts, vectors):
+                                    if row_id in written_data:
+                                        # Verify text matches
+                                        expected_text = written_data[row_id]["text"]
+                                        assert text_val == expected_text, \
+                                            f"Fusion RRF validation failed: id={row_id}, text mismatch"
+                                        # Verify vector matches
+                                        expected_vec = written_data[row_id]["vector"]
+                                        assert len(vec) == len(expected_vec), \
+                                            f"Fusion RRF validation failed: id={row_id}, vector dimension mismatch"
+                                        for i, (v, e) in enumerate(zip(vec, expected_vec)):
+                                            assert abs(v - e) < 0.001, \
+                                                f"Fusion RRF validation failed: id={row_id}, element[{i}]={v}, expected={e}"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -712,7 +723,7 @@ class TestIndexParallel(TestSdk):
                     query_vec = [0.5] * 4
                     query_mv = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
                     res, _ = (table_obj
-                             .output(["id"])
+                             .output(["id", "vector_col", "tensor_col"])
                              .match_dense("vector_col", query_vec, "float", "l2", 5)
                              .match_dense("tensor_col", query_mv, "float", "l2", 5)
                              .fusion(method='rrf', topn=5)
@@ -723,11 +734,21 @@ class TestIndexParallel(TestSdk):
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
+                            vectors = list(res["vector_col"])
+                            multivecs = list(res["tensor_col"])
                             with written_data["lock"]:
-                                for row_id in ids:
-                                    # Just check id exists in written data
-                                    assert row_id in written_data, \
-                                        f"Fusion MV RRF validation failed: id={row_id} not found"
+                                for row_id, vec, multivec in zip(ids, vectors, multivecs):
+                                    if row_id in written_data:
+                                        # Verify vector matches
+                                        expected_vec = written_data[row_id]["vector"]
+                                        assert len(vec) == len(expected_vec), \
+                                            f"Fusion MV RRF validation failed: id={row_id}, vector dimension mismatch"
+                                        for i, (v, e) in enumerate(zip(vec, expected_vec)):
+                                            assert abs(v - e) < 0.001, \
+                                                f"Fusion MV RRF validation failed: id={row_id}, element[{i}]={v}, expected={e}"
+                                        # Verify multivector has data
+                                        assert len(multivec) > 0, \
+                                            f"Fusion MV RRF validation failed: id={row_id}, empty multivector"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -752,7 +773,7 @@ class TestIndexParallel(TestSdk):
                     # Fusion: combine match_text + match_dense with weighted_sum
                     # weights: 0.6 for fulltext, 0.4 for vector
                     res, _ = (table_obj
-                             .output(["id", "text"])
+                             .output(["id", "text", "vector_col"])
                              .match_text("text", "test", 5)
                              .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
                              .fusion(method='weighted_sum', topn=5, fusion_params={"weights": "0.6,0.4"})
@@ -763,11 +784,22 @@ class TestIndexParallel(TestSdk):
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
+                            texts = list(res["text"])
+                            vectors = list(res["vector_col"])
                             with written_data["lock"]:
-                                for row_id in ids:
-                                    # Just check id exists in written data
-                                    assert row_id in written_data, \
-                                        f"Fusion weighted_sum validation failed: id={row_id} not found"
+                                for row_id, text_val, vec in zip(ids, texts, vectors):
+                                    if row_id in written_data:
+                                        # Verify text matches
+                                        expected_text = written_data[row_id]["text"]
+                                        assert text_val == expected_text, \
+                                            f"Fusion weighted_sum validation failed: id={row_id}, text mismatch"
+                                        # Verify vector matches
+                                        expected_vec = written_data[row_id]["vector"]
+                                        assert len(vec) == len(expected_vec), \
+                                            f"Fusion weighted_sum validation failed: id={row_id}, vector dimension mismatch"
+                                        for i, (v, e) in enumerate(zip(vec, expected_vec)):
+                                            assert abs(v - e) < 0.001, \
+                                                f"Fusion weighted_sum validation failed: id={row_id}, element[{i}]={v}, expected={e}"
                         last_validation_time = time.time()
                 except Exception as e:
                     pass
@@ -848,7 +880,7 @@ class TestIndexParallel(TestSdk):
         print(f"Inserted initial {len(initial_data)} rows")
 
         # Start parallel test
-        kRuningTime = 20
+        kRuningTime = 30
         kWriteThreadNum = 4
 
         # Shared counters and data
