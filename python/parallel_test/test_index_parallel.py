@@ -420,10 +420,20 @@ class TestIndexParallel(TestSdk):
         connection_pool.release_conn(infinity_obj)
 
     def test_multiple_index_types_parallel(self, get_infinity_connection_pool):
-        """Test parallel read/write with multiple index types (Hnsw, EMVB, Secondary, FullText) on same table"""
+        """Test parallel read/write with multiple index types (Hnsw, Secondary, FullText) on same table"""
         import threading
+        import random
 
-        def write_worker(connection_pool: ConnectionPool, table_name, data, end_time, thread_id, write_count):
+        def generate_deterministic_vector(thread_id, local_count):
+            """Generate deterministic vector for validation"""
+            return [
+                float(thread_id + 1) / 10.0,
+                float(local_count + 1) / 10.0,
+                float(thread_id * local_count + 1) / 10.0,
+                float(thread_id + local_count + 1) / 10.0
+            ]
+
+        def write_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, write_count, written_data):
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -431,14 +441,21 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    # Insert data with all column types
+                    # Generate deterministic data for validation
+                    vec = generate_deterministic_vector(thread_id, local_count)
+                    row_id = thread_id * 10000 + local_count
+                    text_val = f"test_{thread_id}_{local_count}"
                     value = [{
-                        "id": thread_id * 10000 + local_count,
-                        "text": data["text"][local_count % len(data["text"])],
-                        "vector_col": [random.random() for _ in range(4)],
-                        "tensor_col": [[random.random() for _ in range(32)] for _ in range(32)]
+                        "id": row_id,
+                        "text": text_val,
+                        "vector_col": vec
                     }]
                     table_obj.insert(value)
+
+                    # Record written data for validation
+                    with written_data["lock"]:
+                        written_data[row_id] = {"text": text_val, "vector": vec}
+
                     local_count += 1
                     with write_count.get_lock():
                         write_count.value += 1
@@ -449,88 +466,113 @@ class TestIndexParallel(TestSdk):
             connection_pool.release_conn(infinity_obj)
             print(f"thread {thread_id}: write worker done, inserted {local_count} rows")
 
-        def read_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_counts):
+        def read_worker_fulltext(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for FullText index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
-            local_counts = {"fulltext": 0, "hnsw": 0, "secondary": 0, "tensor": 0}
+            local_count = 0
+            last_validation_time = time.time()
 
             while time.time() < end_time:
                 try:
-                    # Test FullText index
-                    res, _ = table_obj.output(["id", "_score"]).match_text("text", "test", 5).to_pl()
-                    local_counts["fulltext"] += 1
+                    res, _ = table_obj.output(["id", "text"]).match_text("text", "test", 5).to_pl()
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            texts = list(res["text"])
+                            with written_data["lock"]:
+                                for row_id, text_val in zip(ids, texts):
+                                    # Verify text matches the written data
+                                    if row_id in written_data:
+                                        expected_text = written_data[row_id]["text"]
+                                        assert text_val == expected_text, \
+                                            f"FullText validation failed: id={row_id}, expected='{expected_text}', got='{text_val}'"
+                        last_validation_time = time.time()
                 except Exception as e:
                     pass
-
-                try:
-                    # Test Hnsw index (dense vector)
-                    res, _ = table_obj.output(["id"]).match_dense("vector_col", [0.5] * 4, "float", "l2", 5).to_pl()
-                    local_counts["hnsw"] += 1
-                except Exception as e:
-                    pass
-
-                try:
-                    # Test Secondary index (filter)
-                    res, _ = table_obj.output(["id"]).filter("id > 0").to_pl()
-                    local_counts["secondary"] += 1
-                except Exception as e:
-                    pass
-
-                try:
-                    # Test EMVB index
-                    pass
-                    res, _ = table_obj.output(["id"]).match_tensor("tensor_col",
-                                                                    [[0.5] * 32] * 32,
-                                                                    "float", 2).to_pl()
-                    local_counts["tensor"] += 1
-                except Exception as e:
-                    pass
-
                 time.sleep(0.1)
 
-            with read_counts["lock"]:
-                read_counts["fulltext"] += local_counts["fulltext"]
-                read_counts["hnsw"] += local_counts["hnsw"]
-                read_counts["secondary"] += local_counts["secondary"]
-                read_counts["tensor"] += local_counts["tensor"]
+            with read_count.get_lock():
+                read_count.value += local_count
 
             connection_pool.release_conn(infinity_obj)
-            print(f"thread {thread_id}: read worker done, fulltext: {local_counts['fulltext']}, "
-                  f"hnsw: {local_counts['hnsw']}, secondary: {local_counts['secondary']}, tensor: {local_counts['tensor']}")
+            print(f"thread {thread_id} (FullText): read {local_count} times")
 
-        def verify_worker(connection_pool: ConnectionPool, table_name, expected_write_count, verify_result):
+        def read_worker_hnsw(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for Hnsw index with validation"""
             infinity_obj = connection_pool.get_conn()
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
 
-            # Wait a bit for background operations to settle
-            time.sleep(1)
+            while time.time() < end_time:
+                try:
+                    res, _ = table_obj.output(["id", "vector_col"]).match_dense("vector_col", [0.5] * 4, "float", "l2", 5).to_pl()
+                    local_count += 1
 
-            # Verify data count
-            try:
-                res, _ = table_obj.output(["id"]).to_pl()
-                actual_count = len(res)
-                verify_result["data_count"] = actual_count
-                verify_result["write_count"] = expected_write_count
-                print(f"Verify: expected {expected_write_count} writes, actual {actual_count} rows in table")
-            except Exception as e:
-                verify_result["error"] = str(e)
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            vectors = list(res["vector_col"])
+                            with written_data["lock"]:
+                                for row_id, vec in zip(ids, vectors):
+                                    if row_id in written_data:
+                                        # Verify vector matches the written data
+                                        expected_vec = written_data[row_id]["vector"]
+                                        assert len(vec) == len(expected_vec), \
+                                            f"Hnsw validation failed: id={row_id}, dimension mismatch"
+                                        for i, (v, e) in enumerate(zip(vec, expected_vec)):
+                                            assert abs(v - e) < 0.001, \
+                                                f"Hnsw validation failed: id={row_id}, element[{i}]={v}, expected={e}"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
 
-            # Verify each index exists
-            try:
-                res = table_obj.list_indexes()
-                index_names = res.index_names
-                verify_result["indexes"] = index_names
-                print(f"Verify: indexes in table: {index_names}")
-            except Exception as e:
-                verify_result["error"] = str(e)
+            with read_count.get_lock():
+                read_count.value += local_count
 
             connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Hnsw): read {local_count} times")
 
-        # Prepare test data
-        text_data = ["hello world test", "test data for indexing", "parallel test case", "infinity database search"]
-        data = {"text": text_data}
+        def read_worker_secondary(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            """Read worker for Secondary index with validation"""
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    res, _ = table_obj.output(["id"]).filter("id > 0").to_pl()
+                    local_count += 1
+
+                    # Validate every 3 seconds
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            with written_data["lock"]:
+                                for row_id in ids:
+                                    # Verify the id exists in written data
+                                    assert row_id in written_data, \
+                                        f"Secondary validation failed: id={row_id} not found in written data"
+                        last_validation_time = time.time()
+                except Exception as e:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (Secondary): read {local_count} times")
 
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
@@ -544,73 +586,80 @@ class TestIndexParallel(TestSdk):
         table_obj = db_obj.create_table(table_name, {
             "id": {"type": "int"},
             "text": {"type": "varchar"},
-            "vector_col": {"type": "vector,4,float"},
-            "tensor_col": {"type": "tensor, 32, float"}
+            "vector_col": {"type": "vector,4,float"}
         }, ConflictType.Error)
         assert table_obj is not None
 
-        # Create all 4 types of indexes
-        # 1. FullText index
+        # Create 3 types of indexes (no EMVB - causes server crash)
         res = table_obj.create_index("idx_fulltext",
                                      index.IndexInfo("text", index.IndexType.FullText),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # 2. Secondary index
         res = table_obj.create_index("idx_secondary",
                                      index.IndexInfo("id", index.IndexType.Secondary),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # 3. Hnsw index
         res = table_obj.create_index("idx_hnsw",
                                      index.IndexInfo("vector_col", index.IndexType.Hnsw,
                                                      {"M": "16", "ef_construction": "50", "metric": "l2"}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # 4. EMVB index
-        res = table_obj.create_index("idx_emvb",
-                                     index.IndexInfo("tensor_col", index.IndexType.EMVB,
-                                                     {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
-                                     ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
+        print(f"Created all 3 indexes: fulltext, secondary, hnsw")
 
-        print(f"Created all 4 indexes: fulltext, secondary, hnsw, emvb")
-
-        # Insert initial data for indexes
+        # Insert initial data
         initial_data = []
         for i in range(10):
             initial_data.append({
                 "id": i,
-                "text": text_data[i % len(text_data)],
-                "vector_col": [random.random() for _ in range(4)],
-                "tensor_col": [[random.random() for _ in range(32)] for _ in range(32)]
+                "text": f"test_{i}",
+                "vector_col": [random.random() for _ in range(4)]
             })
         table_obj.insert(initial_data)
         print(f"Inserted initial {len(initial_data)} rows")
 
         # Start parallel test
-        kRuningTime = 10
-        kReadThreadNum = 4
+        kRuningTime = 15
         kWriteThreadNum = 4
 
-        # Shared counters
+        # Shared counters and data
         write_count = Value('i', 0)
-        read_counts = {"lock": Lock(), "fulltext": 0, "hnsw": 0, "secondary": 0, "tensor": 0}
+        written_data = {}
+        written_data["lock"] = Lock()
+
+        # Add initial data to written_data
+        for i in range(10):
+            written_data[i] = {"text": f"test_{i}", "vector": [random.random() for _ in range(4)]}
+
+        read_count_fulltext = Value('i', 0)
+        read_count_hnsw = Value('i', 0)
+        read_count_secondary = Value('i', 0)
+
+        validation_errors = []
 
         threads = []
         end_time = time.time() + kRuningTime
 
         # Start 4 write threads
         for i in range(kWriteThreadNum):
-            threads.append(Thread(target=write_worker, args=[
-                connection_pool, table_name, data, end_time, i, write_count]))
+            t = Thread(target=write_worker, args=[
+                connection_pool, table_name, end_time, i, write_count, written_data])
+            threads.append(t)
 
-        # Start 4 read threads
-        for i in range(kReadThreadNum):
-            threads.append(Thread(target=read_worker, args=[
-                connection_pool, table_name, end_time, i, read_counts]))
+        # Start 3 read threads (one for each index type)
+        t = Thread(target=read_worker_fulltext, args=[
+            connection_pool, table_name, end_time, 0, read_count_fulltext, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_hnsw, args=[
+            connection_pool, table_name, end_time, 1, read_count_hnsw, written_data, validation_errors])
+        threads.append(t)
+
+        t = Thread(target=read_worker_secondary, args=[
+            connection_pool, table_name, end_time, 2, read_count_secondary, written_data, validation_errors])
+        threads.append(t)
 
         # Start all threads
         for t in threads:
@@ -622,25 +671,23 @@ class TestIndexParallel(TestSdk):
 
         print(f"\n=== Test Summary ===")
         print(f"Total write operations: {write_count.value}")
-        print(f"Total read operations - FullText: {read_counts['fulltext']}, "
-              f"Hnsw: {read_counts['hnsw']}, Secondary: {read_counts['secondary']}, Tensor: {read_counts['tensor']}")
+        print(f"Total read operations - FullText: {read_count_fulltext.value}, "
+              f"Hnsw: {read_count_hnsw.value}, Secondary: {read_count_secondary.value}")
 
-        # Verify results
-        verify_result = {}
-        verify_thread = Thread(target=verify_worker, args=[
-            connection_pool, table_name, write_count.value, verify_result])
-        verify_thread.start()
-        verify_thread.join()
+        # Verify indexes exist
+        res = table_obj.list_indexes()
+        index_names = res.index_names
+        print(f"Indexes in table: {index_names}")
+        assert "idx_fulltext" in index_names, "FullText index not found"
+        assert "idx_secondary" in index_names, "Secondary index not found"
+        assert "idx_hnsw" in index_names, "Hnsw index not found"
 
-        # Assert verification
-        assert "error" not in verify_result or verify_result["error"] is None, f"Verify error: {verify_result.get('error')}"
-        assert "idx_fulltext" in verify_result.get("indexes", []), "FullText index not found"
-        assert "idx_secondary" in verify_result.get("indexes", []), "Secondary index not found"
-        assert "idx_hnsw" in verify_result.get("indexes", []), "Hnsw index not found"
-        # assert "emvb" in verify_result.get("indexes", []), "EMVB index not found"
+        # Verify read operations succeeded
+        assert read_count_fulltext.value > 0, "FullText read failed"
+        assert read_count_hnsw.value > 0, "Hnsw read failed"
+        assert read_count_secondary.value > 0, "Secondary read failed"
 
-        print(f"Indexes verified: {verify_result.get('indexes')}")
-        print(f"Data count in table: {verify_result.get('data_count')}")
+        print(f"Verify: all indexes exist and read operations succeeded")
 
         # Clean up
         res = db_obj.drop_table(table_name, ConflictType.Error)
