@@ -478,12 +478,12 @@ class TestIndexParallel(TestSdk):
                     pass
 
                 try:
-                    # Test EMVB index (tensor) - skip for now due to backend bug
+                    # Test EMVB index
                     pass
-                    # res, _ = table_obj.output(["id"]).match_tensor("tensor_col",
-                    #                                                 [[0.5] * 32] * 32,
-                    #                                                 "float", 2).to_pl()
-                    # local_counts["tensor"] += 1
+                    res, _ = table_obj.output(["id"]).match_tensor("tensor_col",
+                                                                    [[0.5] * 32] * 32,
+                                                                    "float", 2).to_pl()
+                    local_counts["tensor"] += 1
                 except Exception as e:
                     pass
 
@@ -569,14 +569,14 @@ class TestIndexParallel(TestSdk):
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # 4. EMVB index (for tensor) - skip for now due to backend bug
-        # res = table_obj.create_index("idx_emvb",
-        #                              index.IndexInfo("tensor_col", index.IndexType.EMVB,
-        #                                              {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
-        #                              ConflictType.Error)
-        # assert res.error_code == ErrorCode.OK
+        # 4. EMVB index
+        res = table_obj.create_index("idx_emvb",
+                                     index.IndexInfo("tensor_col", index.IndexType.EMVB,
+                                                     {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
-        print(f"Created 3 indexes: fulltext, secondary, hnsw (EMVB skipped due to backend bug)")
+        print(f"Created all 4 indexes: fulltext, secondary, hnsw, emvb")
 
         # Insert initial data for indexes
         initial_data = []
