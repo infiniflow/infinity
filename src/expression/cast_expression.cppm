@@ -36,6 +36,8 @@ public:
 
     std::string ToString() const override;
 
+    nlohmann::json Serialize() const override;
+
     static bool CanCast(const DataType &source, const DataType &target);
 
     static std::shared_ptr<BaseExpression> AddCastToType(const std::shared_ptr<BaseExpression> &expr, const DataType &target_type);

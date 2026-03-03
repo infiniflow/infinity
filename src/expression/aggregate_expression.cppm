@@ -35,9 +35,14 @@ public:
 
     void SetCountStar(bool count_star) { count_star_ = count_star; }
 
+    [[nodiscard]] bool distinct() const { return distinct_; }
+
+    void SetDistinct(bool distinct) { distinct_ = distinct; }
+
 public:
     AggregateFunction aggregate_function_;
     bool count_star_{false};
+    bool distinct_{false};
 };
 
 } // namespace infinity

@@ -31,6 +31,9 @@ CastTable::CastTable() {
     matrix_[to_underlying_val(LogicalType::kBoolean)][to_underlying_val(LogicalType::kBoolean)] = 0;
     matrix_[to_underlying_val(LogicalType::kBoolean)][to_underlying_val(LogicalType::kVarchar)] = 100;
 
+    // From json to other type
+    matrix_[to_underlying_val(LogicalType::kJson)][to_underlying_val(LogicalType::kVarchar)] = 110;
+
     // From tinyint to other type
     matrix_[to_underlying_val(LogicalType::kTinyInt)][to_underlying_val(LogicalType::kTinyInt)] = 0;
     matrix_[to_underlying_val(LogicalType::kTinyInt)][to_underlying_val(LogicalType::kSmallInt)] = 1;
@@ -254,6 +257,8 @@ CastTable::CastTable() {
     //    matrix_[kVarchar][kBlob] = 2;
     matrix_[to_underlying_val(LogicalType::kVarchar)][to_underlying_val(LogicalType::kEmbedding)] = 2;
     matrix_[to_underlying_val(LogicalType::kVarchar)][to_underlying_val(LogicalType::kRowID)] = 2;
+
+    matrix_[to_underlying_val(LogicalType::kJson)][to_underlying_val(LogicalType::kJson)] = 0;
 }
 
 i64 CastTable::GetCastCost(LogicalType from, LogicalType to) const { return matrix_[to_underlying_val(from)][to_underlying_val(to)]; }

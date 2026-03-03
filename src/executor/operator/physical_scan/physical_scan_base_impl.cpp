@@ -135,7 +135,7 @@ void PhysicalScanBase::SetOutput(const std::vector<char *> &raw_result_dists_lis
             for (size_t i = 0; i < column_n; ++i) {
                 size_t column_id = base_table_ref_->column_ids_[i];
                 output_to_data_block_helper.AddOutputJobInfo(segment_id, block_id, column_id, block_offset, output_block_idx, i, output_block_row_id);
-                output_block_ptr->column_vectors[i]->Finalize(output_block_ptr->column_vectors[i]->Size() + 1);
+                output_block_ptr->column_vectors_[i]->Finalize(output_block_ptr->column_vectors_[i]->Size() + 1);
             }
             output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + top_idx * result_size);
             output_block_ptr->AppendValueByPtr(column_n + 1, (char *)&row_ids[top_idx]);

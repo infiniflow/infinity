@@ -400,17 +400,18 @@ struct SQL_LTYPE {
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX TASKS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK CHUNKS SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
-%token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
+%token BOOLEAN JSON INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP
 %token ARRAY TUPLE EMBEDDING VECTOR MULTIVECTOR TENSOR SPARSE TENSORARRAY BIT TEXT
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT IGNORE
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
-%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
+%token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE ESCAPE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE CACHES CACHE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY CHECK CLEAN CHECKPOINT IMPORT
+%token PARSE_JSON
 
 %token NUMBER
 
@@ -508,6 +509,8 @@ struct SQL_LTYPE {
 %precedence   IS
 %left       '+' '-'
 %left       '*' '/' '%'
+
+%precedence ESCAPE
 
 
 %%
@@ -917,6 +920,7 @@ column_type_array : column_type {
 
 column_type :
 BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| JSON { $$ = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | TINYINT { $$ = new infinity::ColumnType{infinity::LogicalType::kTinyInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | SMALLINT { $$ = new infinity::ColumnType{infinity::LogicalType::kSmallInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 | INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
@@ -3536,6 +3540,28 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($3);
+    // Add default escape character ('\')
+    infinity::ConstantExpr* escape_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
+    escape_expr->str_value_ = strdup("\\");
+    func_expr->arguments_->emplace_back(escape_expr);
+    $$ = func_expr;
+}
+| operand LIKE operand ESCAPE operand {
+    // Validate that escape character is a constant string of exactly one character
+    infinity::ConstantExpr* escape_expr = (infinity::ConstantExpr*)$5;
+    if (   $5->type_ != infinity::ParsedExprType::kConstant
+        || escape_expr->literal_type_ != infinity::LiteralType::kString
+        || strlen(escape_expr->str_value_) != 1) {
+        yyerror(&@$, scanner, result, "ESCAPE clause must be exactly one character");
+        YYERROR;
+    }
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "like";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($3);
+    // Use the provided escape character
+    func_expr->arguments_->emplace_back($5);
     $$ = func_expr;
 }
 | operand NOT LIKE operand {
@@ -3544,6 +3570,28 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     func_expr->arguments_->emplace_back($1);
     func_expr->arguments_->emplace_back($4);
+    // Add default escape character ('\')
+    infinity::ConstantExpr* escape_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
+    escape_expr->str_value_ = strdup("\\");
+    func_expr->arguments_->emplace_back(escape_expr);
+    $$ = func_expr;
+}
+| operand NOT LIKE operand ESCAPE operand {
+    // Validate that escape character is a constant string of exactly one character
+    infinity::ConstantExpr* escape_expr = (infinity::ConstantExpr*)$6;
+    if (   $6->type_ != infinity::ParsedExprType::kConstant
+        || escape_expr->literal_type_ != infinity::LiteralType::kString
+        || strlen(escape_expr->str_value_) != 1) {
+        yyerror(&@$, scanner, result, "ESCAPE clause must be exactly one character");
+        YYERROR;
+    }
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "not_like";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($1);
+    func_expr->arguments_->emplace_back($4);
+    // Use the provided escape character
+    func_expr->arguments_->emplace_back($6);
     $$ = func_expr;
 };
 
@@ -3636,6 +3684,19 @@ cast_expr: CAST '(' expr AS column_type ')' {
     infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
     cast_expr->expr_ = $3;
     $$ = cast_expr;
+}
+| PARSE_JSON '(' expr ')' {
+    auto column_type_ptr = new infinity::ColumnType{infinity::LogicalType::kJson, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid};
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*column_type_ptr, std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete column_type_ptr;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
+    }
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
+    cast_expr->expr_ = $3;
+    $$ = cast_expr;
 };
 
 subquery_expr: EXISTS '(' select_without_paren ')' {
@@ -3717,6 +3778,11 @@ constant_expr: STRING {
 | LONG_VALUE {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInteger);
     const_expr->integer_value_ = $1;
+    $$ = const_expr;
+}
+| JSON STRING {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kJson);
+    const_expr->json_value_ = $2;
     $$ = const_expr;
 }
 | DATE STRING {
@@ -3981,15 +4047,17 @@ copy_option_list : copy_option {
     $$ = $1;
 };
 
-copy_option : FORMAT IDENTIFIER {
+copy_option : FORMAT JSON {
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kFormat;
+    $$->file_type_ = infinity::CopyFileType::kJSON;
+}
+| FORMAT IDENTIFIER {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kFormat;
     ParserHelper::ToLower($2);
     if (strcasecmp($2, "csv") == 0) {
         $$->file_type_ = infinity::CopyFileType::kCSV;
-        free($2);
-    } else if (strcasecmp($2, "json") == 0) {
-        $$->file_type_ = infinity::CopyFileType::kJSON;
         free($2);
     } else if (strcasecmp($2, "jsonl") == 0) {
         $$->file_type_ = infinity::CopyFileType::kJSONL;
@@ -4206,6 +4274,49 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
     ParserHelper::ToLower($2);
     $$->column_name_ = $2;
     free($2);
+}
+| '(' function_expr ')' {
+    $$ = new infinity::IndexInfo();
+    $$->index_type_ = infinity::IndexType::kSecondaryFunctional;
+    $$->function_expr_ = $2;
+}
+
+| '(' function_expr ')' USING IDENTIFIER with_index_param_list {
+ParserHelper::ToLower($5);
+    infinity::IndexType index_type = infinity::IndexType::kInvalid;
+    if(strcmp($5, "secondary") == 0){
+        index_type = infinity::IndexType::kSecondary;
+        free($5);
+    } else {
+        free($5);
+        free($2);
+        delete $6;
+        yyerror(&yyloc, scanner, result, "functional index must be secondary index");
+        YYERROR;
+    }
+
+    $$ = new infinity::IndexInfo();
+    $$->index_type_ = infinity::IndexType::kSecondaryFunctional;
+    $$->function_expr_ = $2;
+    $$->index_param_list_ = $6;
+
+    // Handle secondary index cardinality parameter
+    if (index_type == infinity::IndexType::kSecondary && $$->index_param_list_ != nullptr) {
+        for (auto *param : *($$->index_param_list_)) {
+            if (strcasecmp(param->param_name_.c_str(), "cardinality") == 0) {
+                if (strcasecmp(param->param_value_.c_str(), "high") == 0) {
+                    $$->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kHighCardinality;
+                } else if (strcasecmp(param->param_value_.c_str(), "low") == 0) {
+                    $$->secondary_index_cardinality_ = infinity::SecondaryIndexCardinality::kLowCardinality;
+                } else {
+                    delete $6;
+                    free($2);
+                    yyerror(&yyloc, scanner, result, "Invalid cardinality value. Must be 'high' or 'low'");
+                    YYERROR;
+                }
+            }
+        }
+    }
 }
 
 

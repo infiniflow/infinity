@@ -102,7 +102,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
         u16 row_count = input_data_block->row_count();
         std::vector<size_t> array_lengths;
         {
-            const auto &unnest_col = input_data_block->column_vectors[unnest_idx];
+            const auto &unnest_col = input_data_block->column_vectors_[unnest_idx];
             auto &output_cols = output_datas[unnest_idx];
             if (output_cols.empty()) {
                 auto col = ColumnVector::Make(output_types[unnest_idx]);
@@ -114,7 +114,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
             for (u16 row_idx = 0; row_idx < row_count; ++row_idx) {
                 size_t written = 0;
                 while (true) {
-                    bool complete = cur_col->AppendUnnestArray(*unnest_col, row_idx, written);
+                    bool complete = cur_col->AppendUnnest(*unnest_col, row_idx, written);
                     if (complete) {
                         array_lengths.push_back(written);
                         break;
@@ -133,7 +133,7 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
             if (col_idx == unnest_idx) {
                 continue;
             }
-            const auto &input_col = input_data_block->column_vectors[col_idx];
+            const auto &input_col = input_data_block->column_vectors_[col_idx];
             auto &output_cols = output_datas[col_idx];
             if (output_cols.empty()) {
                 auto col = ColumnVector::Make(output_types[col_idx]);
@@ -184,7 +184,19 @@ std::shared_ptr<std::vector<std::string>> PhysicalUnnest::GetOutputNames() const
 std::shared_ptr<std::vector<std::shared_ptr<DataType>>> PhysicalUnnest::GetOutputTypes() const {
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> result = PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
     size_t unnest_idx = GetUnnestIdx();
-    (*result)[unnest_idx] = std::make_shared<DataType>(static_cast<ArrayInfo *>((*result)[unnest_idx]->type_info().get())->ElemType());
+    switch ((*result)[unnest_idx]->type()) {
+        case LogicalType::kArray: {
+            (*result)[unnest_idx] = std::make_shared<DataType>(static_cast<ArrayInfo *>((*result)[unnest_idx]->type_info().get())->ElemType());
+            break;
+        }
+        case LogicalType::kJson: {
+            (*result)[unnest_idx] = std::make_shared<DataType>(LogicalType::kVarchar);
+            break;
+        }
+        default: {
+            UnrecoverableError("UNNEST type must be array or json.");
+        }
+    }
     return result;
 }
 

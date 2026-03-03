@@ -35,6 +35,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import in_expr;
+import cast_expr;
 import knn_expr;
 import match_sparse_expr;
 import match_tensor_expr;
@@ -62,7 +63,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{35}; // 0.6.15
+    static constexpr i64 current_version_index_{36}; // 0.7.0.dev3
 
     static std::mutex infinity_session_map_mutex_;
     static std::unordered_map<u64, std::shared_ptr<Infinity>> infinity_session_map_;
@@ -226,6 +227,8 @@ private:
 
     static InExpr *GetInExprFromProto(Status &status, const infinity_thrift_rpc::InExpr &in_expr);
 
+    static CastExpr *GetCastExprFromProto(Status &status, const infinity_thrift_rpc::CastExpr &cast_expr);
+
     static ParsedExpr *GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr);
 
     static OrderByExpr *GetOrderByExprFromProto(Status &status, const infinity_thrift_rpc::OrderByExpr &expr);
@@ -272,6 +275,9 @@ private:
 
     static void
     HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
+
+    static void
+    HandleJsonType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);
 
     static void
     HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, size_t row_count, const std::shared_ptr<ColumnVector> &column_vector);

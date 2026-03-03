@@ -26,6 +26,8 @@ import :function_expression;
 import :infinity_exception;
 import :value;
 import :secondary_index_data;
+import :table_meta;
+import :status;
 
 import std.compat;
 import third_party;
@@ -344,17 +346,27 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
     }
 }
 
-std::tuple<ColumnID, Value, FilterCompareType>
-FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type) {
+std::tuple<ColumnID, Value, std::shared_ptr<BaseExpression>, FilterCompareType>
+FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr,
+                                           Value &&right_val,
+                                           FilterCompareType compare_type,
+                                           TableMeta *table_meta) {
     SimplifyCompareTypeAndValue(right_val, compare_type);
     if (compare_type == FilterCompareType::kAlwaysFalse or compare_type == FilterCompareType::kAlwaysTrue) {
-        return {0, Value::MakeNull(), compare_type};
+        return {0, Value::MakeNull(), nullptr, compare_type};
     }
     // now compare_type is one of {kLessEqual, kGreaterEqual, kEqual}
     if (cast_expr->type() == ExpressionType::kColumn) {
         auto *column_expression = static_cast<const ColumnExpression *>(cast_expr.get());
-        ColumnID column_id = column_expression->binding().column_idx;
-        return std::make_tuple(column_id, std::move(right_val), compare_type);
+        // Get the actual column ID by column name (not the column index, which changes after DROP COLUMN)
+        const auto &column_name = column_expression->column_name();
+        ColumnID column_id;
+        Status status;
+        std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("GetColumnIDByColumnName failed: column_name:{}", column_name));
+        }
+        return std::make_tuple(column_id, std::move(right_val), nullptr, compare_type);
     } else if (cast_expr->type() == ExpressionType::kCast) {
         auto &source_expr = cast_expr->arguments()[0];
         auto source_type = source_expr->Type();
@@ -363,11 +375,11 @@ FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression>
         auto target_logical_type = target_type.type();
         if (target_logical_type != right_val.type().type()) {
             UnrecoverableError(fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString()));
-            return {0, Value::MakeNull(), FilterCompareType::kInvalid};
+            return {0, Value::MakeNull(), nullptr, FilterCompareType::kInvalid};
         }
         // case 0. keep the original type?
         if (source_logical_type == target_logical_type) {
-            return UnwindCast(source_expr, std::move(right_val), compare_type);
+            return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
         }
         // case 1. cast "smaller ints" to BigIntT
         if (target_logical_type == LogicalType::kBigInt) {
@@ -376,31 +388,31 @@ FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression>
                 case LogicalType::kTinyInt: {
                     if (IntegralContinueUnwind<TinyIntT>(right_val_bigint, compare_type)) {
                         right_val = Value::MakeTinyInt(static_cast<TinyIntT>(right_val_bigint));
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kSmallInt: {
                     if (IntegralContinueUnwind<SmallIntT>(right_val_bigint, compare_type)) {
                         right_val = Value::MakeSmallInt(static_cast<SmallIntT>(right_val_bigint));
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kInteger: {
                     if (IntegralContinueUnwind<IntegerT>(right_val_bigint, compare_type)) {
                         right_val = Value::MakeInt(static_cast<IntegerT>(right_val_bigint));
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 default: {
                     // possible case: cast varchar column to bigint and compare with bigint value
                     // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
-                    return {0, Value::MakeNull(), FilterCompareType::kInvalid};
+                    return {0, Value::MakeNull(), nullptr, FilterCompareType::kInvalid};
                 }
             }
         }
@@ -412,56 +424,72 @@ FilterExpressionPushDownHelper::UnwindCast(const std::shared_ptr<BaseExpression>
                     TinyIntT prev;
                     if (IntegralContinueUnwind<TinyIntT>(right_val_double, compare_type, prev)) {
                         right_val = Value::MakeTinyInt(prev);
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kSmallInt: {
                     SmallIntT prev;
                     if (IntegralContinueUnwind<SmallIntT>(right_val_double, compare_type, prev)) {
                         right_val = Value::MakeSmallInt(prev);
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kInteger: {
                     IntegerT prev;
                     if (IntegralContinueUnwind<IntegerT>(right_val_double, compare_type, prev)) {
                         right_val = Value::MakeInt(prev);
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kBigInt: {
                     BigIntT prev;
                     if (IntegralContinueUnwind<BigIntT>(right_val_double, compare_type, prev)) {
                         right_val = Value::MakeBigInt(prev);
-                        return UnwindCast(source_expr, std::move(right_val), compare_type);
+                        return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                     } else {
-                        return {0, Value::MakeNull(), compare_type};
+                        return {0, Value::MakeNull(), nullptr, compare_type};
                     }
                 }
                 case LogicalType::kFloat: {
                     // TODO: cast double to float? check if this is correct
                     right_val = Value::MakeFloat(static_cast<FloatT>(right_val_double));
-                    return UnwindCast(source_expr, std::move(right_val), compare_type);
+                    return UnwindCast(source_expr, std::move(right_val), compare_type, table_meta);
                 }
                 default: {
                     // possible case: cast varchar column to double and compare with double value
                     // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
-                    return {0, Value::MakeNull(), FilterCompareType::kInvalid};
+                    return {0, Value::MakeNull(), nullptr, FilterCompareType::kInvalid};
                 }
             }
         }
         // possible case: cast column to varchar and compare with varchar value
         // UnrecoverableError(fmt::format("UnwindCast(): error in: {}.", cast_expr->Name()));
-        return {0, Value::MakeNull(), FilterCompareType::kInvalid};
+        return {0, Value::MakeNull(), nullptr, FilterCompareType::kInvalid};
+    } else if (cast_expr->type() == ExpressionType::kFunction) {
+        auto *scalar_func_expression = static_cast<FunctionExpression *>(cast_expr.get());
+        ColumnID column_id = std::numeric_limits<ColumnID>::max();
+        for (auto arg : scalar_func_expression->arguments()) {
+            if (arg->type() == ExpressionType::kColumn) {
+                auto *column_expression = static_cast<const ColumnExpression *>(arg.get());
+                // Get the actual column ID by column name (not the column index, which changes after DROP COLUMN)
+                const auto &column_name = column_expression->column_name();
+                Status status;
+                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("GetColumnIDByColumnName failed: column_name:{}", column_name));
+                }
+            }
+        }
+        return {column_id, std::move(right_val), cast_expr, compare_type};
     } else {
         UnrecoverableError(fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name()));
-        return {0, Value::MakeNull(), FilterCompareType::kInvalid};
+        return {0, Value::MakeNull(), nullptr, FilterCompareType::kInvalid};
     }
 }
 

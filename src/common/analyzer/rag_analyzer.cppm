@@ -141,23 +141,22 @@ public:
 
     bool enable_position_{false};
 
-    std::unique_ptr<NLTKWordTokenizer> nltk_tokenizer_;
+    static inline re2::RE2 pattern1_{"[a-zA-Z_-]+$"};
 
-    re2::RE2 pattern1_{"[a-zA-Z_-]+$"};
+    static inline re2::RE2 pattern2_{"[a-zA-Z\\.-]+$"};
 
-    re2::RE2 pattern2_{"[a-zA-Z\\.-]+$"};
+    static inline re2::RE2 pattern3_{"[0-9\\.-]+$"};
 
-    re2::RE2 pattern3_{"[0-9\\.-]+$"};
+    static inline re2::RE2 pattern4_{"[0-9,\\.-]+$"};
 
-    re2::RE2 pattern4_{"[0-9,\\.-]+$"};
+    static inline re2::RE2 pattern5_{"[a-zA-Z\\.-]+"};
 
-    re2::RE2 pattern5_{"[a-zA-Z\\.-]+"};
+    static inline re2::RE2 regex_split_pattern_{
+        R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+))#"};
 
-    re2::RE2 regex_split_pattern_{R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+))#"};
+    static inline re2::RE2 blank_pattern_{"( )"};
 
-    re2::RE2 blank_pattern_{"( )"};
-
-    re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
+    static inline re2::RE2 replace_space_pattern_{R"#(([ ]+))#"};
 };
 
 export void SentenceSplitter(const std::string &text, std::vector<std::string> &result);

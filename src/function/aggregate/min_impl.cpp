@@ -205,6 +205,116 @@ public:
     inline static size_t Size(const DataType &) { return sizeof(DoubleT); }
 };
 
+template <>
+struct MinState<VarcharT, VarcharT> {
+public:
+    static constexpr bool need_column_vector_ = true;
+    VarcharT value_{};
+    bool is_set_{false};
+
+    void Initialize() {
+        is_set_ = false;
+        value_ = VarcharT{};
+    }
+
+    void Update(const VarcharT *__restrict input, size_t idx, const ColumnVector *column_vector) {
+        const VarcharT &new_val = input[idx];
+        if (!is_set_) {
+            value_ = new_val;
+            is_set_ = true;
+        } else {
+            std::span<const char> current_span = column_vector->GetVarcharInner(value_);
+            std::span<const char> new_span = column_vector->GetVarchar(idx);
+
+            uint32_t min_len = std::min(current_span.size(), new_span.size());
+            int cmp = strncmp(current_span.data(), new_span.data(), min_len);
+            bool new_is_less = (cmp > 0) || (cmp == 0 && current_span.size() > new_span.size());
+
+            if (new_is_less) {
+                value_ = new_val;
+            }
+        }
+    }
+
+    inline char *Finalize() { return (char *)&value_; }
+
+    inline static size_t Size(const DataType &) { return sizeof(MinState<VarcharT, VarcharT>); }
+};
+
+template <>
+struct MinState<DateT, DateT> {
+public:
+    DateT value_;
+
+    void Initialize() { this->value_.value = std::numeric_limits<int32_t>::max(); }
+
+    void Update(const DateT *__restrict input, size_t idx) { value_.value = input[idx].value < value_.value ? input[idx].value : value_.value; }
+
+    inline char *Finalize() { return (char *)&value_; }
+
+    inline static size_t Size(const DataType &) { return sizeof(DateT); }
+};
+
+template <>
+struct MinState<TimeT, TimeT> {
+public:
+    TimeT value_;
+
+    void Initialize() { this->value_.value = std::numeric_limits<int32_t>::max(); }
+
+    void Update(const TimeT *__restrict input, size_t idx) { value_.value = input[idx].value < value_.value ? input[idx].value : value_.value; }
+
+    inline char *Finalize() { return (char *)&value_; }
+
+    inline static size_t Size(const DataType &) { return sizeof(TimeT); }
+};
+
+template <>
+struct MinState<DateTimeT, DateTimeT> {
+public:
+    DateTimeT value_;
+
+    void Initialize() {
+        value_.date.value = std::numeric_limits<int32_t>::max();
+        value_.time.value = 0;
+    }
+
+    void Update(const DateTimeT *__restrict input, size_t idx) {
+        bool is_less =
+            (input[idx].date.value < value_.date.value) || (input[idx].date.value == value_.date.value && input[idx].time.value < value_.time.value);
+        if (is_less) {
+            value_ = input[idx];
+        }
+    }
+
+    inline char *Finalize() { return (char *)&value_; }
+
+    inline static size_t Size(const DataType &) { return sizeof(DateTimeT); }
+};
+
+template <>
+struct MinState<TimestampT, TimestampT> {
+public:
+    TimestampT value_;
+
+    void Initialize() {
+        value_.date.value = std::numeric_limits<int32_t>::max();
+        value_.time.value = 0;
+    }
+
+    void Update(const TimestampT *__restrict input, size_t idx) {
+        bool is_less =
+            (input[idx].date.value < value_.date.value) || (input[idx].date.value == value_.date.value && input[idx].time.value < value_.time.value);
+        if (is_less) {
+            value_ = input[idx];
+        }
+    }
+
+    inline char *Finalize() { return (char *)&value_; }
+
+    inline static size_t Size(const DataType &) { return sizeof(TimestampT); }
+};
+
 void RegisterMinFunction(NewCatalog *catalog_ptr) {
     std::string func_name = "MIN";
 
@@ -267,22 +377,34 @@ void RegisterMinFunction(NewCatalog *catalog_ptr) {
                                                                                                               DataType(LogicalType::kBFloat16));
         function_set_ptr->AddFunction(max_function);
     }
-#if 0
     {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<DecimalT, DecimalT>, DecimalT, DecimalT>(func_name,
-                                                                                   DataType(LogicalType::kDecimal),
-                                                                                   DataType(LogicalType::kDecimal));
-        function_set_ptr->AddFunction(max_function);
+        AggregateFunction min_function =
+            UnaryAggregate<MinState<DateT, DateT>, DateT, DateT>(func_name, DataType(LogicalType::kDate), DataType(LogicalType::kDate));
+        function_set_ptr->AddFunction(min_function);
     }
     {
-        AggregateFunction max_function
-                = UnaryAggregate<MinState<VarcharT, VarcharT>, VarcharT, VarcharT>(func_name,
-                                                                                   DataType(LogicalType::kVarchar),
-                                                                                   DataType(LogicalType::kVarchar));
-        function_set_ptr->AddFunction(max_function);
+        AggregateFunction min_function =
+            UnaryAggregate<MinState<TimeT, TimeT>, TimeT, TimeT>(func_name, DataType(LogicalType::kTime), DataType(LogicalType::kTime));
+        function_set_ptr->AddFunction(min_function);
     }
-#endif
+    {
+        AggregateFunction min_function = UnaryAggregate<MinState<DateTimeT, DateTimeT>, DateTimeT, DateTimeT>(func_name,
+                                                                                                              DataType(LogicalType::kDateTime),
+                                                                                                              DataType(LogicalType::kDateTime));
+        function_set_ptr->AddFunction(min_function);
+    }
+    {
+        AggregateFunction min_function = UnaryAggregate<MinState<TimestampT, TimestampT>, TimestampT, TimestampT>(func_name,
+                                                                                                                  DataType(LogicalType::kTimestamp),
+                                                                                                                  DataType(LogicalType::kTimestamp));
+        function_set_ptr->AddFunction(min_function);
+    }
+    {
+        AggregateFunction min_function = UnaryAggregate<MinState<VarcharT, VarcharT>, VarcharT, VarcharT>(func_name,
+                                                                                                          DataType(LogicalType::kVarchar),
+                                                                                                          DataType(LogicalType::kVarchar));
+        function_set_ptr->AddFunction(min_function);
+    }
     NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
 }
 

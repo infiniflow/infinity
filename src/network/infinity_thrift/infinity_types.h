@@ -45,7 +45,8 @@ struct LogicType {
         Timestamp = 20,
         Interval = 21,
         Array = 22,
-        Invalid = 23
+        Json = 23,
+        Invalid = 24
     };
 };
 
@@ -180,7 +181,8 @@ struct ColumnType {
         ColumnTimestamp = 19,
         ColumnInterval = 20,
         ColumnArray = 21,
-        ColumnInvalid = 22
+        ColumnJson = 22,
+        ColumnInvalid = 23
     };
 };
 
@@ -191,7 +193,7 @@ std::ostream &operator<<(std::ostream &out, const ColumnType::type &val);
 std::string to_string(const ColumnType::type &val);
 
 struct IndexType {
-    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, EMVB = 5, DiskAnn = 6 };
+    enum type { IVF = 0, Hnsw = 1, FullText = 2, BMP = 3, Secondary = 4, SecondaryFunctional = 5, EMVB = 6, DiskAnn = 7 };
 };
 
 extern const std::map<int, const char *> _IndexType_VALUES_TO_NAMES;
@@ -265,6 +267,8 @@ class UpdateExpr;
 class OrderByExpr;
 
 class InExpr;
+
+class CastExpr;
 
 class ColumnDef;
 
@@ -436,11 +440,6 @@ public:
 
     void __set_value(const std::string &val);
 
-    bool operator==(const Property &rhs) const;
-    bool operator!=(const Property &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const Property &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -477,11 +476,6 @@ public:
 
     void __set_properties(const std::vector<Property> &val);
 
-    bool operator==(const CreateOption &rhs) const;
-    bool operator!=(const CreateOption &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateOption &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -514,11 +508,6 @@ public:
 
     void __set_conflict_type(const DropConflict::type val);
 
-    bool operator==(const DropOption &rhs) const;
-    bool operator!=(const DropOption &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropOption &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -537,11 +526,6 @@ public:
 
     virtual ~NumberType() noexcept;
 
-    bool operator==(const NumberType & /* rhs */) const;
-    bool operator!=(const NumberType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const NumberType &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -559,11 +543,6 @@ public:
     VarcharType() noexcept;
 
     virtual ~VarcharType() noexcept;
-
-    bool operator==(const VarcharType & /* rhs */) const;
-    bool operator!=(const VarcharType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const VarcharType &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -600,11 +579,6 @@ public:
     void __set_dimension(const int32_t val);
 
     void __set_element_type(const ElementType::type val);
-
-    bool operator==(const EmbeddingType &rhs) const;
-    bool operator!=(const EmbeddingType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const EmbeddingType &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -650,11 +624,6 @@ public:
 
     void __set_index_type(const ElementType::type val);
 
-    bool operator==(const SparseType &rhs) const;
-    bool operator!=(const SparseType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SparseType &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -682,11 +651,6 @@ public:
     _ArrayType__isset __isset;
 
     void __set_element_data_type(::std::shared_ptr<DataType> val);
-
-    bool operator==(const ArrayType &rhs) const;
-    bool operator!=(const ArrayType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ArrayType &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -732,11 +696,6 @@ public:
 
     void __set_array_type(const ArrayType &val);
 
-    bool operator==(const PhysicalType &rhs) const;
-    bool operator!=(const PhysicalType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const PhysicalType &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -773,11 +732,6 @@ public:
 
     void __set_physical_type(const PhysicalType &val);
 
-    bool operator==(const DataType &rhs) const;
-    bool operator!=(const DataType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DataType &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -791,7 +745,7 @@ std::ostream &operator<<(std::ostream &out, const DataType &obj);
 typedef struct _ParsedExprType__isset {
     _ParsedExprType__isset()
         : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_sparse_expr(false),
-          match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false) {}
+          match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false), in_expr(false), cast_expr(false) {}
     bool constant_expr : 1;
     bool column_expr : 1;
     bool function_expr : 1;
@@ -803,6 +757,7 @@ typedef struct _ParsedExprType__isset {
     bool fusion_expr : 1;
     bool search_expr : 1;
     bool in_expr : 1;
+    bool cast_expr : 1;
 } _ParsedExprType__isset;
 
 class ParsedExprType : public virtual ::apache::thrift::TBase {
@@ -823,6 +778,7 @@ public:
     ::std::shared_ptr<FusionExpr> fusion_expr;
     ::std::shared_ptr<SearchExpr> search_expr;
     ::std::shared_ptr<InExpr> in_expr;
+    ::std::shared_ptr<CastExpr> cast_expr;
 
     _ParsedExprType__isset __isset;
 
@@ -848,10 +804,7 @@ public:
 
     void __set_in_expr(::std::shared_ptr<InExpr> val);
 
-    bool operator==(const ParsedExprType &rhs) const;
-    bool operator!=(const ParsedExprType &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ParsedExprType &) const;
+    void __set_cast_expr(::std::shared_ptr<CastExpr> val);
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -885,11 +838,6 @@ public:
 
     void __set_alias_name(const std::string &val);
 
-    bool operator==(const ParsedExpr &rhs) const;
-    bool operator!=(const ParsedExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ParsedExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -921,11 +869,6 @@ public:
     void __set_column_name(const std::vector<std::string> &val);
 
     void __set_star(const bool val);
-
-    bool operator==(const ColumnExpr &rhs) const;
-    bool operator!=(const ColumnExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ColumnExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -993,11 +936,6 @@ public:
 
     void __set_bf16_array_value(const std::vector<double> &val);
 
-    bool operator==(const EmbeddingData &rhs) const;
-    bool operator!=(const EmbeddingData &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const EmbeddingData &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1029,11 +967,6 @@ public:
     void __set_param_name(const std::string &val);
 
     void __set_param_value(const std::string &val);
-
-    bool operator==(const InitParameter &rhs) const;
-    bool operator!=(const InitParameter &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const InitParameter &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1118,11 +1051,6 @@ public:
 
     void __set_curly_brackets_array(const std::vector<ConstantExpr> &val);
 
-    bool operator==(const ConstantExpr &rhs) const;
-    bool operator!=(const ConstantExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ConstantExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1154,11 +1082,6 @@ public:
     void __set_function_name(const std::string &val);
 
     void __set_arguments(const std::vector<ParsedExpr> &val);
-
-    bool operator==(const FunctionExpr &rhs) const;
-    bool operator!=(const FunctionExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const FunctionExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1226,11 +1149,6 @@ public:
 
     void __set_query_embedding_expr(const FunctionExpr &val);
 
-    bool operator==(const KnnExpr &rhs) const;
-    bool operator!=(const KnnExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const KnnExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1278,11 +1196,6 @@ public:
     void __set_opt_params(const std::vector<InitParameter> &val);
 
     void __set_filter_expr(const ParsedExpr &val);
-
-    bool operator==(const MatchSparseExpr &rhs) const;
-    bool operator!=(const MatchSparseExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const MatchSparseExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1337,11 +1250,6 @@ public:
 
     void __set_filter_expr(const ParsedExpr &val);
 
-    bool operator==(const MatchTensorExpr &rhs) const;
-    bool operator!=(const MatchTensorExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const MatchTensorExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1381,11 +1289,6 @@ public:
     void __set_options_text(const std::string &val);
 
     void __set_filter_expr(const ParsedExpr &val);
-
-    bool operator==(const MatchExpr &rhs) const;
-    bool operator!=(const MatchExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const MatchExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1427,11 +1330,6 @@ public:
 
     void __set_match_text_expr(::std::shared_ptr<MatchExpr> val);
 
-    bool operator==(const GenericMatchExpr &rhs) const;
-    bool operator!=(const GenericMatchExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const GenericMatchExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1468,11 +1366,6 @@ public:
 
     void __set_optional_match_tensor_expr(const MatchTensorExpr &val);
 
-    bool operator==(const FusionExpr &rhs) const;
-    bool operator!=(const FusionExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const FusionExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1504,11 +1397,6 @@ public:
     void __set_match_exprs(const std::vector<GenericMatchExpr> &val);
 
     void __set_fusion_exprs(const std::vector<FusionExpr> &val);
-
-    bool operator==(const SearchExpr &rhs) const;
-    bool operator!=(const SearchExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SearchExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1546,11 +1434,6 @@ public:
 
     void __set_lower_bound(const ParsedExpr &val);
 
-    bool operator==(const BetweenExpr &rhs) const;
-    bool operator!=(const BetweenExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const BetweenExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1583,11 +1466,6 @@ public:
 
     void __set_value(const ParsedExpr &val);
 
-    bool operator==(const UpdateExpr &rhs) const;
-    bool operator!=(const UpdateExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const UpdateExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1619,11 +1497,6 @@ public:
     void __set_expr(const ParsedExpr &val);
 
     void __set_asc(const bool val);
-
-    bool operator==(const OrderByExpr &rhs) const;
-    bool operator!=(const OrderByExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const OrderByExpr &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1661,11 +1534,6 @@ public:
 
     void __set_in_type(const bool val);
 
-    bool operator==(const InExpr &rhs) const;
-    bool operator!=(const InExpr &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const InExpr &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1675,6 +1543,38 @@ public:
 void swap(InExpr &a, InExpr &b);
 
 std::ostream &operator<<(std::ostream &out, const InExpr &obj);
+
+typedef struct _CastExpr__isset {
+    _CastExpr__isset() : expr(false), data_type(false) {}
+    bool expr : 1;
+    bool data_type : 1;
+} _CastExpr__isset;
+
+class CastExpr : public virtual ::apache::thrift::TBase {
+public:
+    CastExpr(const CastExpr &);
+    CastExpr &operator=(const CastExpr &);
+    CastExpr() noexcept;
+
+    virtual ~CastExpr() noexcept;
+    ParsedExpr expr;
+    DataType data_type;
+
+    _CastExpr__isset __isset;
+
+    void __set_expr(const ParsedExpr &val);
+
+    void __set_data_type(const DataType &val);
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(CastExpr &a, CastExpr &b);
+
+std::ostream &operator<<(std::ostream &out, const CastExpr &obj);
 
 typedef struct _ColumnDef__isset {
     _ColumnDef__isset() : id(false), name(false), data_type(false), constraints(true), constant_expr(false), comment(false) {}
@@ -1714,11 +1614,6 @@ public:
 
     void __set_comment(const std::string &val);
 
-    bool operator==(const ColumnDef &rhs) const;
-    bool operator!=(const ColumnDef &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ColumnDef &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1751,11 +1646,6 @@ public:
 
     void __set_parse_exprs(const std::vector<ParsedExpr> &val);
 
-    bool operator==(const Field &rhs) const;
-    bool operator!=(const Field &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const Field &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1767,10 +1657,11 @@ void swap(Field &a, Field &b);
 std::ostream &operator<<(std::ostream &out, const Field &obj);
 
 typedef struct _ColumnField__isset {
-    _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false) {}
+    _ColumnField__isset() : column_type(false), column_vectors(true), column_name(false), bitmasks(true) {}
     bool column_type : 1;
     bool column_vectors : 1;
     bool column_name : 1;
+    bool bitmasks : 1;
 } _ColumnField__isset;
 
 class ColumnField : public virtual ::apache::thrift::TBase {
@@ -1787,6 +1678,7 @@ public:
     ColumnType::type column_type;
     std::vector<std::string> column_vectors;
     std::string column_name;
+    std::vector<bool> bitmasks;
 
     _ColumnField__isset __isset;
 
@@ -1796,10 +1688,7 @@ public:
 
     void __set_column_name(const std::string &val);
 
-    bool operator==(const ColumnField &rhs) const;
-    bool operator!=(const ColumnField &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ColumnField &) const;
+    void __set_bitmasks(const std::vector<bool> &val);
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1840,11 +1729,6 @@ public:
     void __set_has_header(const bool val);
 
     void __set_copy_file_type(const CopyFileType::type val);
-
-    bool operator==(const ImportOption &rhs) const;
-    bool operator!=(const ImportOption &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ImportOption &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -1898,11 +1782,6 @@ public:
 
     void __set_row_limit(const int64_t val);
 
-    bool operator==(const ExportOption &rhs) const;
-    bool operator!=(const ExportOption &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ExportOption &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1935,11 +1814,6 @@ public:
 
     void __set_opt_params(const std::vector<InitParameter> &val);
 
-    bool operator==(const AlterIndexOptions &rhs) const;
-    bool operator!=(const AlterIndexOptions &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const AlterIndexOptions &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -1968,11 +1842,6 @@ public:
 
     void __set_client_version(const int64_t val);
 
-    bool operator==(const ConnectRequest &rhs) const;
-    bool operator!=(const ConnectRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ConnectRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2000,11 +1869,6 @@ public:
     _CommonRequest__isset __isset;
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const CommonRequest &rhs) const;
-    bool operator!=(const CommonRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CommonRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2042,11 +1906,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const CommonResponse &rhs) const;
-    bool operator!=(const CommonResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CommonResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2074,11 +1933,6 @@ public:
     _ListDatabaseRequest__isset __isset;
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ListDatabaseRequest &rhs) const;
-    bool operator!=(const ListDatabaseRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListDatabaseRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2124,11 +1978,6 @@ public:
 
     void __set_db_comments(const std::vector<std::string> &val);
 
-    bool operator==(const ListDatabaseResponse &rhs) const;
-    bool operator!=(const ListDatabaseResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListDatabaseResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2160,11 +2009,6 @@ public:
     void __set_db_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ListTableRequest &rhs) const;
-    bool operator!=(const ListTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListTableRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2202,11 +2046,6 @@ public:
 
     void __set_table_names(const std::vector<std::string> &val);
 
-    bool operator==(const ListTableResponse &rhs) const;
-    bool operator!=(const ListTableResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListTableResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2242,11 +2081,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ListIndexRequest &rhs) const;
-    bool operator!=(const ListIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListIndexRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2284,11 +2118,6 @@ public:
 
     void __set_index_names(const std::vector<std::string> &val);
 
-    bool operator==(const ListIndexResponse &rhs) const;
-    bool operator!=(const ListIndexResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListIndexResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2320,11 +2149,6 @@ public:
     void __set_db_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ShowDatabaseRequest &rhs) const;
-    bool operator!=(const ShowDatabaseRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowDatabaseRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2375,11 +2199,6 @@ public:
 
     void __set_comment(const std::string &val);
 
-    bool operator==(const ShowDatabaseResponse &rhs) const;
-    bool operator!=(const ShowDatabaseResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowDatabaseResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2415,11 +2234,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ShowTableRequest &rhs) const;
-    bool operator!=(const ShowTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowTableRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2479,11 +2293,6 @@ public:
 
     void __set_row_count(const int64_t val);
 
-    bool operator==(const ShowTableResponse &rhs) const;
-    bool operator!=(const ShowTableResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowTableResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2519,11 +2328,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ShowColumnsRequest &rhs) const;
-    bool operator!=(const ShowColumnsRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowColumnsRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2561,11 +2365,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const GetTableRequest &rhs) const;
-    bool operator!=(const GetTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const GetTableRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2577,10 +2376,11 @@ void swap(GetTableRequest &a, GetTableRequest &b);
 std::ostream &operator<<(std::ostream &out, const GetTableRequest &obj);
 
 typedef struct _IndexInfo__isset {
-    _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true) {}
+    _IndexInfo__isset() : column_name(false), index_type(false), index_param_list(true), function_expr(false) {}
     bool column_name : 1;
     bool index_type : 1;
     bool index_param_list : 1;
+    bool function_expr : 1;
 } _IndexInfo__isset;
 
 class IndexInfo : public virtual ::apache::thrift::TBase {
@@ -2597,6 +2397,7 @@ public:
      */
     IndexType::type index_type;
     std::vector<InitParameter> index_param_list;
+    FunctionExpr function_expr;
 
     _IndexInfo__isset __isset;
 
@@ -2606,10 +2407,7 @@ public:
 
     void __set_index_param_list(const std::vector<InitParameter> &val);
 
-    bool operator==(const IndexInfo &rhs) const;
-    bool operator!=(const IndexInfo &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const IndexInfo &) const;
+    void __set_function_expr(const FunctionExpr &val);
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2664,11 +2462,6 @@ public:
 
     void __set_create_option(const CreateOption &val);
 
-    bool operator==(const CreateIndexRequest &rhs) const;
-    bool operator!=(const CreateIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateIndexRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2713,11 +2506,6 @@ public:
 
     void __set_drop_option(const DropOption &val);
 
-    bool operator==(const DropIndexRequest &rhs) const;
-    bool operator!=(const DropIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropIndexRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2758,11 +2546,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const ShowIndexRequest &rhs) const;
-    bool operator!=(const ShowIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowIndexRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2776,7 +2559,8 @@ std::ostream &operator<<(std::ostream &out, const ShowIndexRequest &obj);
 typedef struct _ShowIndexResponse__isset {
     _ShowIndexResponse__isset()
         : error_code(false), error_msg(false), db_name(false), table_name(false), index_name(false), index_comment(false), index_type(false),
-          index_column_names(false), index_column_ids(false), other_parameters(false), store_dir(false), segment_index_count(false) {}
+          index_column_names(false), index_column_ids(false), index_function_info(false), other_parameters(false), store_dir(false),
+          segment_index_count(false) {}
     bool error_code : 1;
     bool error_msg : 1;
     bool db_name : 1;
@@ -2786,6 +2570,7 @@ typedef struct _ShowIndexResponse__isset {
     bool index_type : 1;
     bool index_column_names : 1;
     bool index_column_ids : 1;
+    bool index_function_info : 1;
     bool other_parameters : 1;
     bool store_dir : 1;
     bool segment_index_count : 1;
@@ -2807,6 +2592,7 @@ public:
     std::string index_type;
     std::string index_column_names;
     std::string index_column_ids;
+    std::string index_function_info;
     std::string other_parameters;
     std::string store_dir;
     std::string segment_index_count;
@@ -2831,16 +2617,13 @@ public:
 
     void __set_index_column_ids(const std::string &val);
 
+    void __set_index_function_info(const std::string &val);
+
     void __set_other_parameters(const std::string &val);
 
     void __set_store_dir(const std::string &val);
 
     void __set_segment_index_count(const std::string &val);
-
-    bool operator==(const ShowIndexResponse &rhs) const;
-    bool operator!=(const ShowIndexResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowIndexResponse &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2877,11 +2660,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const OptimizeRequest &rhs) const;
-    bool operator!=(const OptimizeRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const OptimizeRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -2923,11 +2701,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const AlterIndexRequest &rhs) const;
-    bool operator!=(const AlterIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const AlterIndexRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -2959,11 +2732,6 @@ public:
     void __set_db_name(const std::string &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const GetDatabaseRequest &rhs) const;
-    bool operator!=(const GetDatabaseRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const GetDatabaseRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3005,11 +2773,6 @@ public:
 
     void __set_db_comment(const std::string &val);
 
-    bool operator==(const CreateDatabaseRequest &rhs) const;
-    bool operator!=(const CreateDatabaseRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateDatabaseRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3045,11 +2808,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_drop_option(const DropOption &val);
-
-    bool operator==(const DropDatabaseRequest &rhs) const;
-    bool operator!=(const DropDatabaseRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropDatabaseRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3095,11 +2853,6 @@ public:
 
     void __set_create_option(const CreateOption &val);
 
-    bool operator==(const CreateTableRequest &rhs) const;
-    bool operator!=(const CreateTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateTableRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3139,11 +2892,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_drop_option(const DropOption &val);
-
-    bool operator==(const DropTableRequest &rhs) const;
-    bool operator!=(const DropTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropTableRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3185,11 +2933,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const RenameTableRequest &rhs) const;
-    bool operator!=(const RenameTableRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const RenameTableRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3229,11 +2972,6 @@ public:
     void __set_fields(const std::vector<Field> &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const InsertRequest &rhs) const;
-    bool operator!=(const InsertRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const InsertRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3278,11 +3016,6 @@ public:
     void __set_import_option(const ImportOption &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ImportRequest &rhs) const;
-    bool operator!=(const ImportRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ImportRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3331,11 +3064,6 @@ public:
     void __set_export_option(const ExportOption &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ExportRequest &rhs) const;
-    bool operator!=(const ExportRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ExportRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3419,11 +3147,6 @@ public:
 
     void __set_explain_type(const ExplainType::type val);
 
-    bool operator==(const ExplainRequest &rhs) const;
-    bool operator!=(const ExplainRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ExplainRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3463,11 +3186,6 @@ public:
     void __set_column_defs(const std::vector<ColumnDef> &val);
 
     void __set_column_fields(const std::vector<ColumnField> &val);
-
-    bool operator==(const ExplainResponse &rhs) const;
-    bool operator!=(const ExplainResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ExplainResponse &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3547,11 +3265,6 @@ public:
 
     void __set_total_hits_count(const bool val);
 
-    bool operator==(const SelectRequest &rhs) const;
-    bool operator!=(const SelectRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SelectRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3596,11 +3309,6 @@ public:
 
     void __set_extra_result(const std::string &val);
 
-    bool operator==(const SelectResponse &rhs) const;
-    bool operator!=(const SelectResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SelectResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3641,11 +3349,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const DeleteRequest &rhs) const;
-    bool operator!=(const DeleteRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DeleteRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3681,11 +3384,6 @@ public:
     void __set_error_msg(const std::string &val);
 
     void __set_deleted_rows(const int64_t val);
-
-    bool operator==(const DeleteResponse &rhs) const;
-    bool operator!=(const DeleteResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DeleteResponse &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3731,11 +3429,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const UpdateRequest &rhs) const;
-    bool operator!=(const UpdateRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const UpdateRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3775,11 +3468,6 @@ public:
     void __set_column_defs(const std::vector<ColumnDef> &val);
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const AddColumnsRequest &rhs) const;
-    bool operator!=(const AddColumnsRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const AddColumnsRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3821,11 +3509,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const DropColumnsRequest &rhs) const;
-    bool operator!=(const DropColumnsRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropColumnsRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3866,11 +3549,6 @@ public:
 
     void __set_session_id(const int64_t val);
 
-    bool operator==(const DumpIndexRequest &rhs) const;
-    bool operator!=(const DumpIndexRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DumpIndexRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -3906,11 +3584,6 @@ public:
     void __set_db_name(const std::string &val);
 
     void __set_table_name(const std::string &val);
-
-    bool operator==(const ShowSegmentsRequest &rhs) const;
-    bool operator!=(const ShowSegmentsRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowSegmentsRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -3951,11 +3624,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_segment_id(const int64_t val);
-
-    bool operator==(const ShowSegmentRequest &rhs) const;
-    bool operator!=(const ShowSegmentRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowSegmentRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4027,11 +3695,6 @@ public:
 
     void __set_column_count(const int64_t val);
 
-    bool operator==(const ShowSegmentResponse &rhs) const;
-    bool operator!=(const ShowSegmentResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowSegmentResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4071,11 +3734,6 @@ public:
     void __set_table_name(const std::string &val);
 
     void __set_segment_id(const int64_t val);
-
-    bool operator==(const ShowBlocksRequest &rhs) const;
-    bool operator!=(const ShowBlocksRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowBlocksRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4120,11 +3778,6 @@ public:
     void __set_segment_id(const int64_t val);
 
     void __set_block_id(const int64_t val);
-
-    bool operator==(const ShowBlockRequest &rhs) const;
-    bool operator!=(const ShowBlockRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowBlockRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4184,11 +3837,6 @@ public:
 
     void __set_column_count(const int64_t val);
 
-    bool operator==(const ShowBlockResponse &rhs) const;
-    bool operator!=(const ShowBlockResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowBlockResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4236,11 +3884,6 @@ public:
     void __set_block_id(const int64_t val);
 
     void __set_column_id(const int64_t val);
-
-    bool operator==(const ShowBlockColumnRequest &rhs) const;
-    bool operator!=(const ShowBlockColumnRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowBlockColumnRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4300,11 +3943,6 @@ public:
 
     void __set_extra_file_names(const std::string &val);
 
-    bool operator==(const ShowBlockColumnResponse &rhs) const;
-    bool operator!=(const ShowBlockColumnResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowBlockColumnResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4332,11 +3970,6 @@ public:
     _ShowCurrentNodeRequest__isset __isset;
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ShowCurrentNodeRequest &rhs) const;
-    bool operator!=(const ShowCurrentNodeRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowCurrentNodeRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4378,11 +4011,6 @@ public:
 
     void __set_server_status(const std::string &val);
 
-    bool operator==(const ShowCurrentNodeResponse &rhs) const;
-    bool operator!=(const ShowCurrentNodeResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowCurrentNodeResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4419,11 +4047,6 @@ public:
 
     void __set_test_command_content(const std::string &val);
 
-    bool operator==(const CommandRequest &rhs) const;
-    bool operator!=(const CommandRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CommandRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4455,11 +4078,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_flush_type(const std::string &val);
-
-    bool operator==(const FlushRequest &rhs) const;
-    bool operator!=(const FlushRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const FlushRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4496,11 +4114,6 @@ public:
     void __set_db_name(const std::string &val);
 
     void __set_table_name(const std::string &val);
-
-    bool operator==(const CompactRequest &rhs) const;
-    bool operator!=(const CompactRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CompactRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4542,11 +4155,6 @@ public:
 
     void __set_snapshot_name(const std::string &val);
 
-    bool operator==(const CreateTableSnapshotRequest &rhs) const;
-    bool operator!=(const CreateTableSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateTableSnapshotRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4583,11 +4191,6 @@ public:
 
     void __set_snapshot_name(const std::string &val);
 
-    bool operator==(const CreateDatabaseSnapshotRequest &rhs) const;
-    bool operator!=(const CreateDatabaseSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateDatabaseSnapshotRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4619,11 +4222,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_snapshot_name(const std::string &val);
-
-    bool operator==(const CreateSystemSnapshotRequest &rhs) const;
-    bool operator!=(const CreateSystemSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const CreateSystemSnapshotRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4660,11 +4258,6 @@ public:
     void __set_snapshot_name(const std::string &val);
 
     void __set_scope(const std::string &val);
-
-    bool operator==(const RestoreSnapshotRequest &rhs) const;
-    bool operator!=(const RestoreSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const RestoreSnapshotRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4710,11 +4303,6 @@ public:
 
     void __set_size(const std::string &val);
 
-    bool operator==(const SnapshotInfo &rhs) const;
-    bool operator!=(const SnapshotInfo &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SnapshotInfo &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4746,11 +4334,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_snapshot_name(const std::string &val);
-
-    bool operator==(const ShowSnapshotRequest &rhs) const;
-    bool operator!=(const ShowSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowSnapshotRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4788,11 +4371,6 @@ public:
 
     void __set_snapshot(const SnapshotInfo &val);
 
-    bool operator==(const ShowSnapshotResponse &rhs) const;
-    bool operator!=(const ShowSnapshotResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowSnapshotResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4820,11 +4398,6 @@ public:
     _ListSnapshotsRequest__isset __isset;
 
     void __set_session_id(const int64_t val);
-
-    bool operator==(const ListSnapshotsRequest &rhs) const;
-    bool operator!=(const ListSnapshotsRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListSnapshotsRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4862,11 +4435,6 @@ public:
 
     void __set_snapshots(const std::vector<SnapshotInfo> &val);
 
-    bool operator==(const ListSnapshotsResponse &rhs) const;
-    bool operator!=(const ListSnapshotsResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ListSnapshotsResponse &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4898,11 +4466,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_snapshot_name(const std::string &val);
-
-    bool operator==(const DropSnapshotRequest &rhs) const;
-    bool operator!=(const DropSnapshotRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const DropSnapshotRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -4944,11 +4507,6 @@ public:
 
     void __set_double_value(const double val);
 
-    bool operator==(const ConfigValue &rhs) const;
-    bool operator!=(const ConfigValue &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ConfigValue &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -4985,11 +4543,6 @@ public:
 
     void __set_config_value(const ConfigValue &val);
 
-    bool operator==(const SetConfigRequest &rhs) const;
-    bool operator!=(const SetConfigRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const SetConfigRequest &) const;
-
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
 
@@ -5021,11 +4574,6 @@ public:
     void __set_session_id(const int64_t val);
 
     void __set_config_name(const std::string &val);
-
-    bool operator==(const ShowConfigRequest &rhs) const;
-    bool operator!=(const ShowConfigRequest &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowConfigRequest &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
@@ -5066,11 +4614,6 @@ public:
     void __set_config_name(const std::string &val);
 
     void __set_config_value(const ConfigValue &val);
-
-    bool operator==(const ShowConfigResponse &rhs) const;
-    bool operator!=(const ShowConfigResponse &rhs) const { return !(*this == rhs); }
-
-    bool operator<(const ShowConfigResponse &) const;
 
     uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
     uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;

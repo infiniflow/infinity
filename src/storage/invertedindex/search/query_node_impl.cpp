@@ -878,4 +878,89 @@ uint32_t MultiQueryNode::LeafCount() const {
     }
 }
 
+// Clone implementations for QueryNode hierarchy
+std::unique_ptr<QueryNode> TermQueryNode::Clone() const {
+    auto cloned = std::make_unique<TermQueryNode>();
+    cloned->term_ = term_;
+    cloned->column_ = column_;
+    cloned->index_ = index_;
+    cloned->position_ = position_;
+    cloned->weight_ = weight_;
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> RankFeatureQueryNode::Clone() const {
+    auto cloned = std::make_unique<RankFeatureQueryNode>();
+    cloned->term_ = term_;
+    cloned->column_ = column_;
+    cloned->index_ = index_;
+    cloned->boost_ = boost_;
+    cloned->weight_ = weight_;
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> PhraseQueryNode::Clone() const {
+    auto cloned = std::make_unique<PhraseQueryNode>();
+    cloned->terms_ = terms_;
+    cloned->column_ = column_;
+    cloned->index_ = index_;
+    cloned->slop_ = slop_;
+    cloned->weight_ = weight_;
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> NotQueryNode::Clone() const {
+    auto cloned = std::make_unique<NotQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> AndQueryNode::Clone() const {
+    auto cloned = std::make_unique<AndQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> AndNotQueryNode::Clone() const {
+    auto cloned = std::make_unique<AndNotQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> OrQueryNode::Clone() const {
+    auto cloned = std::make_unique<OrQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> RankFeaturesQueryNode::Clone() const {
+    auto cloned = std::make_unique<RankFeaturesQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
+std::unique_ptr<QueryNode> KeywordQueryNode::Clone() const {
+    auto cloned = std::make_unique<KeywordQueryNode>();
+    cloned->weight_ = weight_;
+    for (const auto &child : children_) {
+        cloned->children_.emplace_back(child->Clone());
+    }
+    return cloned;
+}
+
 } // namespace infinity

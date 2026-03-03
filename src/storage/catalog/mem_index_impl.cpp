@@ -182,6 +182,14 @@ void MemIndex::SetIsDumping(bool is_dumping) {
     std::unique_lock<std::mutex> lock(mtx_);
     is_dumping_ = is_dumping;
 }
+bool MemIndex::TrySetIsDumping() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    if (is_dumping_) {
+        return false;
+    }
+    is_dumping_ = true;
+    return true;
+}
 
 void MemIndex::UpdateBegin() {
     std::unique_lock<std::mutex> lock(mtx_);

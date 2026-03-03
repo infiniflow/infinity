@@ -22,3 +22,21 @@ SHOW TABLE test_secondary_index INDEX idx_c1;
 
 statement ok
 DROP TABLE test_secondary_index;
+
+statement ok
+CREATE TABLE test_secondary_index (c1 integer, c2 varchar);
+
+statement ok
+CREATE INDEX idx_c2 ON test_secondary_index (c2) using secondary with (cardinality='low');
+
+statement ok
+INSERT INTO test_secondary_index (c1, c2) VALUES (1, 'hello'), (2, 'hi'), (3, 'you'), (4, 'me'), (5, 'hello');
+
+query I
+SELECT * FROM test_secondary_index WHERE c1 <10 and c2 = 'hello';
+----
+1 hello
+5 hello
+
+statement ok
+DROP TABLE test_secondary_index;

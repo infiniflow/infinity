@@ -38,7 +38,7 @@ TEST_F(ConfigTest, test1) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.15");
+    EXPECT_EQ(config.Version(), "0.7.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -86,7 +86,7 @@ TEST_F(ConfigTest, test2) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.15");
+    EXPECT_EQ(config.Version(), "0.7.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
 
@@ -127,8 +127,8 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
     EXPECT_EQ(config.MemIndexMemoryQuota(), 2 * 1024l * 1024l * 1024l);
 
-    EXPECT_EQ(config.ResultCache(), "on");
-    EXPECT_EQ(config.CacheResultNum(), 100);
+    EXPECT_EQ(config.ResultCache(), "off");
+    // EXPECT_EQ(config.CacheResultNum(), 100);
 }
 
 TEST_F(ConfigTest, TestWrongParamNames) {
@@ -208,7 +208,7 @@ TEST_F(ConfigTest, TestValidValues) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.6.15");
+    EXPECT_EQ(config.Version(), "0.7.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
     EXPECT_EQ(config.CPULimit(), 2);

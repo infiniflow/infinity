@@ -1963,8 +1963,6 @@ public:
             }
         });
         {
-            index_info->column_name_ = doc["fields"].get_array().at(0).get<std::string>();
-            ToLower(index_info->column_name_);
             auto index_param_list = new std::vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
                 if (index_param_list != nullptr) {
@@ -1999,6 +1997,28 @@ public:
                 } else {
                     index_param_list->push_back(new InitParameter(name, value));
                 }
+            }
+
+            if (index_info->index_type_ == IndexType::kSecondaryFunctional) {
+                std::string func_str = doc["fields"].get_array().at(0).get<std::string>();
+                nlohmann::json func_str_json_wrapper = func_str;
+                std::string func_json_str = func_str_json_wrapper.dump();
+                std::string_view func_sv(func_json_str);
+
+                std::vector<ParsedExpr *> *func_expr = HTTPSearch::ParseOutput(func_sv, http_status, json_response);
+                if (func_expr == nullptr) {
+                    UnrecoverableError("Parse function expression in index definition failed");
+                } else if (func_expr->size() > 0) {
+                    index_info->function_expr_ = (*func_expr)[0];
+                } else {
+                    json_response["error_code"] = ErrorCode::kInvalidIndexDefinition;
+                    json_response["error_msg"] = fmt::format("Invalid function expression {} in index definition", func_str);
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+            } else {
+                index_info->column_name_ = doc["fields"].get_array().at(0).get<std::string>();
+                ToLower(index_info->column_name_);
             }
 
             index_info->index_param_list_ = index_param_list;
@@ -3571,35 +3591,35 @@ public:
                         nlohmann::json snapshot_obj;
 
                         // Extract snapshot name (column 0)
-                        auto &name_column = data_block->column_vectors[0];
+                        auto &name_column = data_block->column_vectors_[0];
                         if (name_column->data_type()->type() == LogicalType::kVarchar) {
                             auto varchar_value = name_column->GetValueByIndex(row_idx);
                             snapshot_obj["name"] = varchar_value.GetVarchar();
                         }
 
                         // Extract scope (column 1)
-                        auto &scope_column = data_block->column_vectors[1];
+                        auto &scope_column = data_block->column_vectors_[1];
                         if (scope_column->data_type()->type() == LogicalType::kVarchar) {
                             auto scope_value = scope_column->GetValueByIndex(row_idx);
                             snapshot_obj["scope"] = scope_value.GetVarchar();
                         }
 
                         // Extract create time (column 2)
-                        auto &time_column = data_block->column_vectors[2];
+                        auto &time_column = data_block->column_vectors_[2];
                         if (time_column->data_type()->type() == LogicalType::kVarchar) {
                             auto time_value = time_column->GetValueByIndex(row_idx);
                             snapshot_obj["time"] = time_value.GetVarchar();
                         }
 
                         // Extract commit timestamp (column 3)
-                        auto &commit_column = data_block->column_vectors[3];
+                        auto &commit_column = data_block->column_vectors_[3];
                         if (commit_column->data_type()->type() == LogicalType::kBigInt) {
                             auto commit_value = commit_column->GetValueByIndex(row_idx);
                             snapshot_obj["commit"] = commit_value.GetValue<BigIntT>();
                         }
 
                         // Extract size (column 4)
-                        auto &size_column = data_block->column_vectors[4];
+                        auto &size_column = data_block->column_vectors_[4];
                         if (size_column->data_type()->type() == LogicalType::kVarchar) {
                             auto size_value = size_column->GetValueByIndex(row_idx);
                             snapshot_obj["size"] = size_value.GetVarchar();
@@ -3667,8 +3687,8 @@ public:
                     for (size_t row_idx = 0; row_idx < row_count; row_idx += 2) {
                         // Each pair consists of a key row and a value row
                         if (row_idx + 1 < row_count) {
-                            auto &key_column = data_block->column_vectors[0];
-                            auto &value_column = data_block->column_vectors[1];
+                            auto &key_column = data_block->column_vectors_[0];
+                            auto &value_column = data_block->column_vectors_[1];
 
                             if (key_column->data_type()->type() == LogicalType::kVarchar &&
                                 value_column->data_type()->type() == LogicalType::kVarchar) {

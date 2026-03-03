@@ -262,10 +262,27 @@ class TestInfinity:
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("types", ["vector, 3, int",
-                                       "vector, 128, int",
                                        "vector, 3, float",
-                                       "vector, 128, float",
                                        "vector, 3, double"])
+    def test_import_embedding_with_compatible_definition(self, check_data, types, suffix):
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_import_embedding_with_compatible_definition"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_import_embedding_with_compatible_definition"+suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": types}})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
+        res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
+        assert res.error_code == ErrorCode.OK
+
+        res, extra_result = table_obj.output(["*"]).to_df()
+        print(res)
+        db_obj.drop_table("test_import_embedding_with_compatible_definition"+suffix, ConflictType.Error)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("types", ["vector, 128, int"])
     def test_import_embedding_with_not_match_definition(self, check_data, types, suffix):
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -275,11 +292,13 @@ class TestInfinity:
                                         {"c1": {"type": "int"}, "c2": {"type": types}})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
-        res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
-        assert res.error_code == ErrorCode.OK
 
-        res, extra_result = table_obj.output(["*"]).to_df()
-        print(res)
+        with pytest.raises(InfinityException) as e:
+            table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
+
         db_obj.drop_table("test_import_embedding_with_not_match_definition"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",

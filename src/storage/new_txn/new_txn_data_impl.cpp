@@ -502,9 +502,9 @@ Status NewTxn::AppendInner(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back((*column_defs)[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to insert different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -596,15 +596,21 @@ Status NewTxn::Update(const std::string &db_name,
         update_txn_store->table_name_ = table_name;
         update_txn_store->table_id_str_ = table_meta->table_id_str();
         update_txn_store->table_id_ = std::stoull(table_meta->table_id_str());
-        update_txn_store->input_blocks_.emplace_back(input_block);
-        // update_txn_store->row_ranges_ will be populated after conflict check
+        UpdateAppendBlock update_append_block;
+        update_append_block.block_ = input_block;
+        update_txn_store->append_blocks_.emplace_back(update_append_block);
+        // update_txn_store->append_blocks_.row_ranges_ will be populated after conflict check
         update_txn_store->row_ids_ = row_ids;
+        update_txn_store->append_count_ = input_block->row_count();
     } else {
         UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(base_txn_store_.get());
-        update_txn_store->input_blocks_.emplace_back(input_block);
-        // append_txn_store->row_ranges_ will be populated after conflict check
+        UpdateAppendBlock update_append_block;
+        update_append_block.block_ = input_block;
+        update_txn_store->append_blocks_.emplace_back(update_append_block);
+        // update_txn_store->append_blocks_.row_ranges_ will be populated after conflict check
         update_txn_store->row_ids_.reserve(update_txn_store->row_ids_.size() + row_ids.size());
         update_txn_store->row_ids_.insert(update_txn_store->row_ids_.end(), row_ids.begin(), row_ids.end());
+        update_txn_store->append_count_ += input_block->row_count();
     }
 
     std::string operation_msg =
@@ -904,7 +910,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, size_t block_offset, size_t 
 
         // append in column file
         for (size_t column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
-            const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
+            const ColumnVector &column_vector = *input_block->column_vectors_[column_idx];
             ColumnMeta column_meta(column_idx, block_meta);
             status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
@@ -2208,9 +2214,9 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     std::vector<std::shared_ptr<DataType>> column_types;
     for (size_t col_id = 0; col_id < table_column_count; ++col_id) {
         column_types.emplace_back(table_info->column_defs_[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+        if (*column_types.back() != *input_block->column_vectors_[col_id]->data_type()) {
             LOG_ERROR(fmt::format("Attempt to import different type data into transaction table store"));
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors_[col_id]->data_type()->ToString());
         }
     }
 
@@ -2220,7 +2226,7 @@ Status NewTxn::WriteDataBlockToFile(const std::string &db_name,
     size_t block_idx = input_block_idx % DEFAULT_BLOCK_PER_SEGMENT;
 
     for (size_t i = 0; i < input_block->column_count(); ++i) {
-        std::shared_ptr<ColumnVector> col = input_block->column_vectors[i];
+        std::shared_ptr<ColumnVector> col = input_block->column_vectors_[i];
         auto col_def = table_info->column_defs_[i];
 
         BufferObj *buffer_obj = nullptr;

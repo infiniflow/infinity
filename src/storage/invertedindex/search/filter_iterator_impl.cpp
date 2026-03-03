@@ -72,4 +72,9 @@ void FilterQueryNode::PrintTree(std::ostream &os, const std::string &prefix, con
     os << filter_str << ") (filter_result_count: " << filter_result_count_ << ")\n";
 }
 
+std::unique_ptr<QueryNode> FilterQueryNode::Clone() const {
+    UnrecoverableError("FilterQueryNode cannot be cloned");
+    return nullptr;
+}
+
 } // namespace infinity

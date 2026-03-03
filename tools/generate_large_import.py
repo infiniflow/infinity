@@ -5,7 +5,7 @@ import os
 import argparse
 
 
-def generate(generate_if_exists: bool, copy_dir: str):
+def generate1(generate_if_exists: bool, copy_dir: str):
     row_n = 8192 * 1024 + 1
     table_name = "test_slt_import_more_than_one_segment"
 
@@ -70,6 +70,33 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     pass
 
+def generate_big_columns_csv(num, filename):
+    with open(os.getcwd() + "/test/data/csv/" + filename, "w") as f:
+        data = "".join(str(i) + "," for i in range(num - 1))
+        data += str(num - 1)
+        f.write(data)
+    f.close()
+
+def generate_big_int_csv(num, filename):
+    with open(os.getcwd() + "/test/data/csv/" + filename, "w") as f:
+        for i in range(num):
+            f.write(str(i) + "," + str(i) + "\n")
+    f.close()
+
+def generate_big_rows_csv(num, filename):
+    with open(os.getcwd() + "/test/data/csv/" + filename, "w") as f:
+        for i in range(num):
+            f.write(str(i) + ",asdasdlk中fjio@!#!@asd #$%$23\n")
+    f.close()
+
+def generate(generate_if_exists: bool, copy_dir: str):
+    generate1(generate_if_exists, copy_dir)
+    generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
+    generate_big_int_csv(10000, "pysdk_test_big_int.csv")
+    for data_size in [1, 8191, 8192, 8193, 16 * 819]:
+        generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
+    generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
+    generate_big_rows_csv(1024 * 8192 + 1, "test_sdk_import_more_than_one_segment.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate more than 8192 * 1024 rows for testing import")

@@ -95,8 +95,8 @@ public:
         std::vector<std::shared_ptr<DataType>> types;
 
         types.reserve(column_count());
-        for (size_t colum_idx = 0; colum_idx < column_vectors.size(); ++colum_idx) {
-            types.push_back(column_vectors[colum_idx]->data_type());
+        for (size_t colum_idx = 0; colum_idx < column_vectors_.size(); ++colum_idx) {
+            types.push_back(column_vectors_[colum_idx]->data_type());
         }
         return types;
     }
@@ -114,7 +114,7 @@ public:
     // Read from a serialized version
     static std::shared_ptr<DataBlock> ReadAdv(const char *&ptr, i32 maxbytes);
 
-    std::vector<std::shared_ptr<ColumnVector>> column_vectors;
+    std::vector<std::shared_ptr<ColumnVector>> column_vectors_;
 
 private:
     u16 row_count_{0};

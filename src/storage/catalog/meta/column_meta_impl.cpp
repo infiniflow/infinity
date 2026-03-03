@@ -316,14 +316,14 @@ std::tuple<std::shared_ptr<BlockColumnSnapshotInfo>, Status> ColumnMeta::MapMeta
     return {block_column_snapshot_info, Status::OK()};
 }
 
-Status ColumnMeta::RestoreFromSnapshot(ColumnID column_id) {
+Status ColumnMeta::RestoreFromSnapshot() {
     Status status;
     std::shared_ptr<std::vector<std::shared_ptr<ColumnDef>>> column_defs;
     std::tie(column_defs, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    const ColumnDef *col_def = (*column_defs)[column_id].get();
+    const ColumnDef *col_def = (*column_defs)[column_idx_].get();
     status = RestoreSet(col_def);
     if (!status.ok()) {
         return status;

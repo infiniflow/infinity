@@ -1,0 +1,181 @@
+# NOTICE: This Dockerfile depends on BuildKit
+# NOTICE: You must run download_deps_infinity_builder_ubuntu20.py script BEFORE building this image
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+# Configure APT to use aliyun mirrors and install basic packages
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    apt-get update  \
+    && apt-get install -y software-properties-common  \
+    && add-apt-repository ppa:deadsnakes/ppa  \
+    && apt-get update \
+    && apt-get install -y \
+        git make wget curl vim file gettext \
+        libssl-dev unzip bzip2 libtool m4 tree \
+        autoconf automake pkg-config autoconf-archive libtool \
+        software-properties-common gnupg2 lsb-release \
+        build-essential zlib1g-dev libncurses5-dev libgdbm-dev \
+        libnss3-dev libreadline-dev libffi-dev libsqlite3-dev \
+        libbz2-dev libexpat1-dev liblzma-dev tk-dev uuid-dev \
+        postgresql graphviz sudo bridge-utils iptables \
+        libpcap-dev libpcre3-dev \
+        perl flex bison binutils gdb zip rpm iproute2 \
+        python3.11-dev \
+    && echo '/usr/local/lib' >> /etc/ld.so.conf.d/local.conf \
+    && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311
+
+# Add LLVM APT repository and install clang 20
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    && echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main" >> /etc/apt/sources.list.d/llvm.list \
+    && echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main" >> /etc/apt/sources.list.d/llvm.list \
+    && apt-get update \
+    && apt-get install -y \
+        clang-20 clang++-20 clang-format-20 clang-tidy-20 clang-tools-20 \
+        libc++-20-dev libc++abi-20-dev \
+        lld-20 lldb-20 \
+    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100 \
+    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100 \
+    && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-20 100
+
+# Install GCC 15 build dependencies
+RUN --mount=type=cache,id=inf_apt,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=inf_lib,target=/var/lib/apt,sharing=locked \
+    apt install -y libgmp-dev libmpfr-dev libmpc-dev libisl-dev
+
+# Install GCC 15 from source with complete libstdc++ support
+RUN --mount=type=bind,source=gcc-15.2.0.tar.gz,target=/root/gcc-15.2.0.tar.gz \
+    cd /root && tar xf gcc-15.2.0.tar.gz \
+    && cd gcc-releases-gcc-15.2.0 && mkdir build && cd build \
+    && ../configure --prefix=/usr \
+        --enable-languages=c,c++ \
+        --enable-shared \
+        --enable-static \
+        --disable-multilib \
+        --program-suffix=-15 \
+    && make -j$(nproc) \
+    && make install \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 150 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 150 \
+    && update-alternatives --install /usr/bin/cpp cpp /usr/bin/cpp-15 150 \
+    && cd /root && rm -rf gcc-releases-gcc-15.2.0
+
+# Configure GCC 15 library paths and symlinks for infinity build system
+RUN mkdir -p /usr/lib64/gcc/15 \
+    && mkdir -p /usr/lib64/gcc/x86_64-linux-gnu/15 \
+    # Copy static libraries to expected locations
+    && cp /usr/lib64/libstdc++.a /usr/lib64/gcc/15/ \
+    && cp /usr/lib64/libstdc++exp.a /usr/lib64/gcc/15/ \
+    && cp /usr/lib64/libstdc++.a /usr/lib64/gcc/x86_64-linux-gnu/15/ \
+    && cp /usr/lib64/libstdc++exp.a /usr/lib64/gcc/x86_64-linux-gnu/15/ \
+    # Update library paths and ensure new libstdc++ is used
+    && echo "/usr/lib64" >> /etc/ld.so.conf.d/gcc-15.conf \
+    && echo "/usr/lib/x86_64-linux-gnu" >> /etc/ld.so.conf.d/gcc-15.conf \
+    && ldconfig \
+    # Create symlinks for dynamic libraries
+    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /lib/x86_64-linux-gnu/libstdc++.so.6 \
+    && ln -sf /usr/lib64/libstdc++.so.6.0.34 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
+    # Verify the symlink points to the correct version
+    && ls -la /lib/x86_64-linux-gnu/libstdc++.so.6
+
+# Install Python 3.11 from source
+RUN --mount=type=bind,source=Python-3.11.14.tar.xz,target=/root/Python-3.11.14.tar.xz \
+    cd /root && tar xJf Python-3.11.14.tar.xz \
+    && cd Python-3.11.14 && ./configure --enable-shared \
+    && make -j$(nproc) && make altinstall \
+    && ldconfig && cd /root && rm -rf Python-3.11.14 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.11 50 \
+    && update-alternatives --install /usr/bin/pip3 pip3 /usr/local/bin/pip3.11 50
+
+# Install cmake-4.2.3
+RUN --mount=type=bind,source=cmake-4.2.3-linux-x86_64.tar.gz,target=/root/cmake-4.2.3-linux-x86_64.tar.gz \
+    cd /root && tar xf cmake-4.2.3-linux-x86_64.tar.gz \
+    && cp -rf cmake-4.2.3-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-4.2.3-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-4.2.3-linux-x86_64
+
+# Install ninja-1.13.2
+RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
+    cd /root && unzip ninja-linux.zip \
+    && cp ninja /usr/local/bin
+
+# Install jemalloc-5.3.0
+# Known issue: Composition of `-fsanitize=address`, staticly linked jemalloc and `mallctl` cause crash at initialization.
+# Refers to https://github.com/jemalloc/jemalloc/issues/2454
+RUN --mount=type=bind,source=jemalloc-5.3.0.tar.bz2,target=/root/jemalloc-5.3.0.tar.bz2  \
+    cd /root && tar xjf jemalloc-5.3.0.tar.bz2 \
+    && cd jemalloc-5.3.0 && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --enable-static --disable-libdl --enable-prof --enable-prof-libunwind --disable-initial-exec-tls && make -j install \
+    && ldconfig && cd /root && rm -rf jemalloc-5.3.0
+
+# Install gperftools-2.17.2
+RUN --mount=type=bind,source=gperftools-2.17.2.tar.gz,target=/root/gperftools-2.17.2.tar.gz  \
+    cd /root && tar xzf gperftools-2.17.2.tar.gz \
+    && cd gperftools-2.17.2 && ./configure && make -j && make install \
+    && ldconfig && cd /root && rm -rf gperftools-2.17.2
+
+# Install sqllogictest
+RUN --mount=type=bind,source=sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz \
+    cd /tmp && tar xzf /root/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
+
+# Install mold-2.40.4
+RUN --mount=type=bind,source=mold-2.40.4-x86_64-linux.tar.gz,target=/root/mold-2.40.4-x86_64-linux.tar.gz \
+    cd /root && tar xf mold-2.40.4-x86_64-linux.tar.gz \
+    && cp -rf mold-2.40.4-x86_64-linux/bin/* /usr/local/bin \
+    && cp -rf mold-2.40.4-x86_64-linux/lib/* /usr/local/lib \
+    && cp -rf mold-2.40.4-x86_64-linux/libexec/* /usr/local/libexec \
+    && rm -rf mold-2.40.4-x86_64-linux
+
+# Install Docker
+RUN --mount=type=bind,source=docker-29.1.2.tgz,target=/root/docker-29.1.2.tgz \
+    cd /root \
+    && tar zxf docker-29.1.2.tgz \
+    && cp docker/* /usr/bin
+
+# Set environment variables for vcpkg and infinity build
+ENV CC=clang CXX=clang++
+
+# Setup vcpkg and pre-build dependencies
+# This populates the binary cache at /root/.cache/vcpkg for later use by infinity builds
+RUN --mount=type=bind,source=vcpkg.json,target=/tmp/vcpkg.json \
+    git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && ./vcpkg install --clean-after-build
+
+# Set vcpkg toolchain path for CMake
+# Set Python paths for CMake to find the correct Python installation
+ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
+    Python3_EXECUTABLE=/usr/bin/python3.11 \
+    Python3_INCLUDE_DIR=/usr/include/python3.11 \
+    Python3_LIBRARY=/usr/lib/libpython3.11.so
+
+# Add thrift compiler to PATH
+RUN ln -s /opt/vcpkg/vcpkg_installed/x64-linux/tools/thrift/thrift /usr/local/bin/thrift \
+    && chmod 1777 /tmp
+
+# Install uv
+RUN --mount=type=bind,source=uv-x86_64-unknown-linux-gnu.tar.gz,target=/root/uv-x86_64-unknown-linux-gnu.tar.gz \
+    mkdir -p /etc/uv \
+    && echo "[[index]]" > /etc/uv/uv.toml \
+    && echo 'url = "https://pypi.tuna.tsinghua.edu.cn/simple"' >> /etc/uv/uv.toml \
+    && echo "default = true" >> /etc/uv/uv.toml \
+    && tar xzf /root/uv-x86_64-unknown-linux-gnu.tar.gz \
+    && cp uv-x86_64-unknown-linux-gnu/* /usr/local/bin/ \
+    && rm -rf uv-x86_64-unknown-linux-gnu \
+    && uv python install 3.10 3.11 3.12
+
+
+#RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+
+
+COPY nltk_data /root/nltk_data
+
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

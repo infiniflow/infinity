@@ -15,6 +15,7 @@ target_link_libraries(infinity_benchmark
         jma
         opencc
         dl
+        Boost::asio
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -39,7 +40,10 @@ target_link_libraries(infinity_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -68,6 +72,7 @@ target_link_libraries(knn_import_benchmark
         jma
         opencc
         dl
+        Boost::asio
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -92,7 +97,10 @@ target_link_libraries(knn_import_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -119,6 +127,7 @@ target_link_libraries(knn_query_benchmark
         jma
         opencc
         dl
+        Boost::asio
         Parquet::parquet_static
         Arrow::arrow_static
         thrift::thrift
@@ -143,7 +152,10 @@ target_link_libraries(knn_query_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -171,6 +183,7 @@ target_link_libraries(fulltext_benchmark
         jma
         opencc
         dl
+        Boost::asio
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -195,7 +208,10 @@ target_link_libraries(fulltext_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -221,6 +237,7 @@ target_link_libraries(sparse_benchmark
         jma
         opencc
         dl
+        Boost::asio
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
@@ -241,7 +258,10 @@ target_link_libraries(sparse_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -266,6 +286,7 @@ target_link_libraries(bmp_benchmark
         jma
         opencc
         dl
+        Boost::asio
         thrift::thrift
         # thriftnb::thriftnb
         libevent::core
@@ -290,7 +311,10 @@ target_link_libraries(bmp_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -315,6 +339,7 @@ target_link_libraries(hnsw_benchmark
         jma
         opencc
         dl
+        Boost::asio
         Parquet::parquet_static
         Arrow::arrow_static
         thrift::thrift
@@ -339,7 +364,10 @@ target_link_libraries(hnsw_benchmark
         CLI11::CLI11
         magic_enum::magic_enum
         roaring::roaring
-        ${STDCXX15EXP_STATIC}
+        spdlog::spdlog
+        fmt::fmt
+#        ${STDCXX15EXP_STATIC}
+        libstdc++exp.a
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")

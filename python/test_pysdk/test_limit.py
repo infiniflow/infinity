@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 from common import common_values
 import infinity
-from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, SortType
 
@@ -53,24 +52,24 @@ class TestInfinity:
         res, extra_res = table_obj.output(["c1", "c2"]).limit(2).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2),
                                                          'c2': (3, 2)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_res = table_obj.output(["c1", "c2"]).limit(2).offset(2).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 0),
                                                          'c2': (1, 0)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_res = table_obj.output(["c1", "c2"]).limit(2).offset(2).option({"total_hits_count": True}).to_df()
         assert extra_res['total_hits_count'] == 13
 
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 0),
                                                          'c2': (1, 0)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
 
         res, extra_res = table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).limit(3).option({"total_hits_count": True}).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, -1),
                                                          'c2': (0, 1, 1)})
-                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
+                                      .astype({'c1': 'Int32', 'c2': 'Int32'}))
         assert extra_res['total_hits_count'] == 13
 
         res = db_obj.drop_table("test_limit" + suffix, ConflictType.Error)
@@ -127,7 +126,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         res, extra_result = (
@@ -149,7 +148,7 @@ class TestInfinity:
         )
         gt = pd.DataFrame(
             {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-        ).astype({"doc_id": dtype("object")})
+        ).astype({"doc_id": "string"})
         pd.testing.assert_frame_equal(res, gt)
 
         db_obj.drop_table(table_name)

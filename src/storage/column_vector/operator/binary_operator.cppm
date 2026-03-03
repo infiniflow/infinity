@@ -100,8 +100,16 @@ public:
                 result_null->SetAllTrue();
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
-                for (size_t i = 0; i < count; ++i) {
-                    Operator::Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+
+                // Check if Operator supports batch processing
+                if constexpr (requires { Operator::ExecuteBatch(left_ptr, right_c, result_ptr, count); }) {
+                    // Use batch processing for better performance
+                    Operator::ExecuteBatch(left_ptr, right_c, result_ptr, count);
+                } else {
+                    // Fall back to row-by-row processing
+                    for (size_t i = 0; i < count; ++i) {
+                        Operator::Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
+                    }
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right_c, result, count, state_ptr);

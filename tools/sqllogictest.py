@@ -106,6 +106,7 @@ def copy_all(data_dir, copy_dir):
                 continue
             dest_path = os.path.join(copy_dir, filename)
             copyfile(src_path, dest_path)
+            print(f"Copied file from {src_path} to {dest_path}")
     print("Finished copying all files.")
 
 

@@ -86,6 +86,11 @@ i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const
         RecoverableError(status);
     }
 
+    // Aggregate functions are not supported for JSON type
+    if (argument->Type().type() == LogicalType::kJson) {
+        return -1;
+    }
+
     i64 cost = CastTable::instance().GetCastCost(argument->Type().type(), func.argument_type_.type());
 
     return cost;

@@ -27,7 +27,15 @@ import data_type;
 
 namespace infinity {
 
-std::vector<ColumnBinding> LogicalCreateIndex::GetColumnBindings() const { return {}; };
+std::vector<ColumnBinding> LogicalCreateIndex::GetColumnBindings() const {
+    std::vector<ColumnBinding> result;
+    auto &column_ids = base_table_ref_->column_ids_;
+    result.reserve(column_ids.size());
+    for (size_t col_id : column_ids) {
+        result.emplace_back(base_table_ref_->table_index_, col_id);
+    }
+    return result;
+};
 
 std::shared_ptr<std::vector<std::string>> LogicalCreateIndex::GetOutputNames() const {
     std::shared_ptr<std::vector<std::string>> result = std::make_shared<std::vector<std::string>>();

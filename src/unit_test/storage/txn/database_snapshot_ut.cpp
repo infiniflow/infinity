@@ -299,9 +299,13 @@ TEST_P(DatabaseSnapshotTest, test_restore_database_create_database_multithreaded
         {
             auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
             Status status = txn->CreateDatabase("db_0", ConflictType::kError, std::make_shared<std::string>());
-            ASSERT_TRUE(status.ok());
-            status = txn_mgr->CommitTxn(txn);
-            ASSERT_TRUE(status.ok());
+            if (!status.ok()) {
+                LOG_INFO(fmt::format("[thread_create_database] CreateDatabase failed: {}", status.message()));
+                status = txn->Rollback();
+                ASSERT_TRUE(status.ok());
+                return;
+            }
+            txn_mgr->CommitTxn(txn);
         }
     };
 

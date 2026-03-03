@@ -23,6 +23,9 @@ import :ut.base_test;
 import third_party;
 import :secondary_index_data;
 import :roaring_bitmap;
+import :secondary_index_file_worker;
+import :index_secondary;
+import :virtual_store;
 
 import data_type;
 import logical_type;

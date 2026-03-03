@@ -4,8 +4,7 @@ import os
 import argparse
 from generate_util.format_data import format_float1
 
-
-def generate(generate_if_exists: bool, copy_dir: str):
+def generate1(generate_if_exists: bool, copy_dir: str):
     row_n = 1000
     dim = 128
     fvecs_dir = "./test/data/fvecs"
@@ -59,6 +58,18 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("DROP TABLE {};\n".format(table_name))
     random.random()
 
+def generate_fvecs(num, dim, filename):
+    with open(
+            os.getcwd() + "/test/data/fvecs/" + filename, "wb"
+    ) as fvecs_file:
+        for _ in range(num):
+            fvecs_file.write((dim).to_bytes(4, byteorder="little"))
+            fvec = np.random.random(dim).astype(np.float32)
+            fvec.tofile(fvecs_file)
+    fvecs_file.close()
+def generate(generate_if_exists: bool, copy_dir: str):
+    generate1(generate_if_exists, copy_dir)
+    generate_fvecs(100, 128, "pysdk_test.fvecs")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate fvecs data for test")

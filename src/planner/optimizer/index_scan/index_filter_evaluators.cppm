@@ -20,6 +20,7 @@ import :filter_expression_push_down;
 import :filter_expression_push_down_helper;
 import :filter_fulltext_expression;
 import :base_expression;
+import :function_expression;
 import :meta_info;
 import :query_node;
 import :column_index_reader;
@@ -66,6 +67,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     virtual void Merge(IndexFilterEvaluatorSecondary &other, Type op) = 0;
     static std::unique_ptr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                                ColumnID column_id,
+                                                               FunctionExpression *scalar_func_expression,
                                                                std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                FilterCompareType compare_type,
                                                                const Value &val);

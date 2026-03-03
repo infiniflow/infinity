@@ -1,5 +1,5 @@
 [general]
-version                  = "0.6.15"
+version                  = "0.7.0"
 time_zone                = "utc-8"
 server_mode              = "admin" # "standalone"
 
@@ -50,7 +50,7 @@ enable_https             = false
 buffer_manager_size      = "8GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/leader/tmp"
-result_cache       = "on"
+result_cache       = "off"
 
 memindex_memory_quota   = "1GB"
 

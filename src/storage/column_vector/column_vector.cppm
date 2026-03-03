@@ -216,9 +216,12 @@ public:
 
     void SetArrayValue(ArrayT &target, const Value &value);
 
-    bool AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset);
+    bool AppendUnnest(const ColumnVector &other, size_t offset, size_t &array_offset);
 
 private:
+    bool AppendUnnestArray(const ColumnVector &other, size_t offset, size_t &array_offset);
+    bool AppendUnnestJson(const ColumnVector &other, size_t row_id, size_t &element_offset);
+
     Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
 
     void SetArrayValueRecursively(const Value &value, char *dst_ptr);
@@ -518,6 +521,8 @@ void ColumnVector::AppendSparseInner(size_t nnz, const DataT *data, const IdxT *
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer);
 
+void CopyJson(JsonT &dst_ref, VectorBuffer *dst_vec_buffer, const JsonT &src_ref, const VectorBuffer *src_vec_buffer);
+
 void CopyMultiVector(MultiVectorT &dst_ref,
                      VectorBuffer *dst_vec_buffer,
                      const MultiVectorT &src_ref,
@@ -599,6 +604,19 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
         CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
+    }
+}
+
+template <>
+inline void
+ColumnVector::CopyFrom<JsonT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, size_t count, const Selection &input_select) {
+    const char *src = src_buf->GetData();
+    const char *dst = dst_buf->GetData();
+    for (size_t idx = 0; idx < count; ++idx) {
+        size_t row_id = input_select[idx];
+        JsonT *dst_ptr = &(((JsonT *)dst)[idx]);
+        const JsonT *src_ptr = &(((const JsonT *)src)[row_id]);
+        CopyJson(*dst_ptr, dst_buf, *src_ptr, src_buf);
     }
 }
 

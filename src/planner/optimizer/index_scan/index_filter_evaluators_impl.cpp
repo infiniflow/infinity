@@ -37,6 +37,7 @@ import :segment_index_meta;
 import :chunk_index_meta;
 import :mem_index;
 import :index_secondary;
+import :index_secondary_functional;
 
 import std;
 import third_party;
@@ -413,19 +414,27 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 
 std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                                    ColumnID column_id,
+                                                                                   FunctionExpression *scalar_function_expr,
                                                                                    std::shared_ptr<TableIndexMeta> new_secondary_index,
                                                                                    FilterCompareType compare_type,
                                                                                    const Value &val) {
-    ColumnDef *column_def;
-    auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    LogicalType index_data_type;
+    auto [index_base, index_status] = new_secondary_index->GetIndexBase();
+    if (index_base->index_type_ == IndexType::kSecondary) {
+        ColumnDef *column_def;
+        auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        column_def = column_def_ptr.get();
+        if (column_def->id() != static_cast<i64>(column_id)) {
+            UnrecoverableError("Invalid column id");
+        }
+        index_data_type = column_def->type()->type();
+    } else {
+        index_data_type = scalar_function_expr->Type().type();
     }
-    column_def = column_def_ptr.get();
-    if (column_def->id() != static_cast<i64>(column_id)) {
-        UnrecoverableError("Invalid column id");
-    }
-    switch (column_def->type()->type()) {
+    switch (index_data_type) {
         case LogicalType::kTinyInt: {
             return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
@@ -464,7 +473,7 @@ std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Ma
             return {};
         }
         default: {
-            UnrecoverableError(fmt::format("Unexpected type for secondary index: {}", column_def->type()->ToString()));
+            UnrecoverableError(fmt::format("Unexpected type for secondary index: {}", LogicalType2Str(index_data_type)));
             return {};
         }
     }
@@ -894,9 +903,19 @@ ExecuteSingleRangeLowCardinalityT(const std::pair<ConvertToOrderedType<ColumnVal
     Bitmask part_result(segment_row_count);
     part_result.SetAllFalse();
     for (auto &trunk_reader : trunk_readers) {
-        // Set the range for LowCardinality processing
-        auto *typed_reader = static_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get());
-        typed_reader->SetRange(interval_range);
+        // Set the range for TrunkReaderT
+        if (auto *typed_reader_t = dynamic_cast<TrunkReaderT<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get())) {
+            typed_reader_t->SetRange(interval_range);
+        }
+        // Initialize result_cache_ for TrunkReaderM before calling OutPut
+        if (auto *typed_reader_m = dynamic_cast<TrunkReaderM<ColumnValueType, LowCardinalityTag> *>(trunk_reader.get())) {
+            const auto [begin_val, end_val] = interval_range;
+            std::tuple<u32,
+                       typename TrunkReader<ColumnValueType, LowCardinalityTag>::SecondaryIndexOrderedT,
+                       typename TrunkReader<ColumnValueType, LowCardinalityTag>::SecondaryIndexOrderedT>
+                arg_tuple = {typed_reader_m->segment_row_count_, begin_val, end_val};
+            typed_reader_m->result_cache_ = typed_reader_m->memory_secondary_index_->RangeQuery(&arg_tuple);
+        }
         // directly output without GetResultCnt optimization
         trunk_reader->OutPut(part_result);
     }
@@ -909,12 +928,19 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
     std::optional<SegmentIndexMeta> index_meta;
     index_meta.emplace(segment_id, *new_secondary_index_);
     auto [index_base, index_status] = new_secondary_index_->GetIndexBase();
-    if (!index_status.ok() || index_base->index_type_ != IndexType::kSecondary) {
+    if (!index_status.ok() || (index_base->index_type_ != IndexType::kSecondary && index_base->index_type_ != IndexType::kSecondaryFunctional)) {
         UnrecoverableError("Fail to get index definition");
     }
-    const IndexSecondary *secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+
     // Check cardinality to determine which execution path to use
-    auto cardinality = secondary_index->GetSecondaryIndexCardinality();
+    SecondaryIndexCardinality cardinality;
+    if (index_base->index_type_ == IndexType::kSecondary) {
+        const auto secondary_index = reinterpret_cast<const IndexSecondary *>(index_base.get());
+        cardinality = secondary_index->GetSecondaryIndexCardinality();
+    } else {
+        const auto secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
+        cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+    }
 
     Bitmask result(segment_row_count);
     result.SetAllFalse();

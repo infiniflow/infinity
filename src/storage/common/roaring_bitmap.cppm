@@ -97,6 +97,24 @@ struct RoaringBitmap {
         return roaring_.contains(row_index);
     }
 
+    [[nodiscard]] inline bool NextSetBit(u32 &pos) const {
+        if (pos >= count_) {
+            return false;
+        }
+        if constexpr (init_all_true) {
+            if (all_true_flag_.value) {
+                return true; // all bits are true, pos remains unchanged
+            }
+        }
+        auto it = roaring_.begin();
+        it.equalorlarger(pos);
+        if (it == roaring_.end()) {
+            return false;
+        }
+        pos = *it;
+        return true;
+    }
+
     inline void SetTrue(const u32 row_index) {
         if (row_index >= count_) {
             UnrecoverableError(fmt::format("RoaringBitmap::SetTrue: row_index >= count_, row_index: {}, count_: {}", row_index, count_));
@@ -311,11 +329,12 @@ struct RoaringBitmap {
         if (size > maxbytes) {
             UnrecoverableError("RoaringBitmap::ReadAdv: size > maxbytes");
         }
+        auto roaring_bitmap = roaring::Roaring::readSafe(ptr, size);
         auto bitmap = std::make_shared<RoaringBitmap>(count);
         if constexpr (init_all_true) {
             bitmap->all_true_flag_.value = false;
         }
-        bitmap->roaring_.read(ptr);
+        bitmap->roaring_ = std::move(roaring_bitmap);
         ptr += size;
         // no need to reduce maxbytes
         return bitmap;

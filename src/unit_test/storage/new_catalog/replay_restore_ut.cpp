@@ -242,12 +242,6 @@ protected:
         }
     }
 
-    ~TestTxnReplayRestore() override {
-        std::string cmd = fmt::format("rm -rf {}", *snapshot_dir);
-        LOG_INFO(fmt::format("Exec cmd: {}", cmd));
-        system(cmd.c_str());
-    }
-
 protected:
     std::shared_ptr<std::string> db_name{};
     std::shared_ptr<ColumnDef> column_def1{};
