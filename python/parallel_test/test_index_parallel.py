@@ -3,7 +3,6 @@ import os
 import random
 import time
 from threading import Thread
-import threading
 from multiprocessing import Value, Lock
 
 import infinity.index as index
@@ -486,9 +485,9 @@ class TestIndexParallel(TestSdk):
                                 for row_id, text_val in zip(ids, texts):
                                     if row_id in written_data:
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, f"FullText validation failed"
+                                        assert text_val == expected_text, "FullText validation failed"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -518,11 +517,11 @@ class TestIndexParallel(TestSdk):
                                 for row_id, vec in zip(ids, vectors):
                                     if row_id in written_data:
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), f"Hnsw validation failed"
+                                        assert len(vec) == len(expected_vec), "Hnsw validation failed"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, f"Hnsw validation failed"
+                                            assert abs(v - e) < 0.001, "Hnsw validation failed"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -549,9 +548,9 @@ class TestIndexParallel(TestSdk):
                             ids = list(res["id"])
                             with written_data["lock"]:
                                 for row_id in ids:
-                                    assert row_id in written_data, f"Secondary High validation failed"
+                                    assert row_id in written_data, "Secondary High validation failed"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -583,9 +582,9 @@ class TestIndexParallel(TestSdk):
                                 for row_id, cat_val in zip(ids, cats):
                                     if row_id in written_data:
                                         expected_cat = written_data[row_id]["category"]
-                                        assert cat_val == expected_cat, f"Secondary Low validation failed"
+                                        assert cat_val == expected_cat, "Secondary Low validation failed"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -615,9 +614,9 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, multivec in zip(ids, multivecs):
                                     if row_id in written_data:
-                                        assert len(multivec) > 0, f"Hnsw MV validation failed"
+                                        assert len(multivec) > 0, "Hnsw MV validation failed"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -648,10 +647,9 @@ class TestIndexParallel(TestSdk):
                             with written_data["lock"]:
                                 for row_id, sparse_col in zip(ids, sparse_cols):
                                     if row_id in written_data and "sparse" in written_data[row_id]:
-                                        # Just verify we got a valid sparse result (non-empty)
-                                        assert len(sparse_col) > 0, f"Sparse validation failed: empty sparse_col"
+                                        assert len(sparse_col) > 0, "Sparse validation failed: empty sparse_col"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -687,13 +685,13 @@ class TestIndexParallel(TestSdk):
                                 for row_id, text_val, vec in zip(ids, texts, vectors):
                                     if row_id in written_data:
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, f"Fusion RRF text mismatch"
+                                        assert text_val == expected_text, "Fusion RRF text mismatch"
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), f"Fusion RRF vector dim mismatch"
+                                        assert len(vec) == len(expected_vec), "Fusion RRF vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, f"Fusion RRF vector mismatch"
+                                            assert abs(v - e) < 0.001, "Fusion RRF vector mismatch"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -731,12 +729,12 @@ class TestIndexParallel(TestSdk):
                                 for row_id, vec, multivec in zip(ids, vectors, multivecs):
                                     if row_id in written_data:
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), f"Fusion MV RRF vector dim mismatch"
+                                        assert len(vec) == len(expected_vec), "Fusion MV RRF vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, f"Fusion MV RRF vector mismatch"
-                                        assert len(multivec) > 0, f"Fusion MV RRF empty multivector"
+                                            assert abs(v - e) < 0.001, "Fusion MV RRF vector mismatch"
+                                        assert len(multivec) > 0, "Fusion MV RRF empty multivector"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
@@ -772,13 +770,13 @@ class TestIndexParallel(TestSdk):
                                 for row_id, text_val, vec in zip(ids, texts, vectors):
                                     if row_id in written_data:
                                         expected_text = written_data[row_id]["text"]
-                                        assert text_val == expected_text, f"Fusion weighted_sum text mismatch"
+                                        assert text_val == expected_text, "Fusion weighted_sum text mismatch"
                                         expected_vec = written_data[row_id]["vector"]
-                                        assert len(vec) == len(expected_vec), f"Fusion weighted_sum vector dim mismatch"
+                                        assert len(vec) == len(expected_vec), "Fusion weighted_sum vector dim mismatch"
                                         for i, (v, e) in enumerate(zip(vec, expected_vec)):
-                                            assert abs(v - e) < 0.001, f"Fusion weighted_sum vector mismatch"
+                                            assert abs(v - e) < 0.001, "Fusion weighted_sum vector mismatch"
                         last_validation_time = time.time()
-                except Exception as e:
+                except Exception:
                     pass
                 time.sleep(0.1)
 
