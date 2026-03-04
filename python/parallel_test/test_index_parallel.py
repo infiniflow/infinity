@@ -931,9 +931,9 @@ class TestIndexParallel(TestSdk):
         threads.append(t)
 
         # Skip sparse read thread temporarily due to crash issue
-        # t = Thread(target=read_worker_sparse, args=[
-        #     connection_pool, table_name, end_time, 5, read_count_sparse, written_data, validation_errors])
-        # threads.append(t)
+        t = Thread(target=read_worker_sparse, args=[
+            connection_pool, table_name, end_time, 5, read_count_sparse, written_data, validation_errors])
+        threads.append(t)
 
         # Start fusion threads
         t = Thread(target=read_worker_fusion_rrf, args=[
@@ -974,7 +974,7 @@ class TestIndexParallel(TestSdk):
         assert "idx_secondary_low" in index_names, "Secondary Low index not found"
         assert "idx_hnsw" in index_names, "Hnsw index not found"
         assert "idx_hnsw_mv" in index_names, "Hnsw MV index not found"
-        # assert "idx_bmp" in index_names, "BMP (sparse) index not found"
+        assert "idx_bmp" in index_names, "BMP (sparse) index not found"
 
         # Verify read operations succeeded
         assert read_count_fulltext.value > 0, "FullText read failed"
@@ -982,7 +982,7 @@ class TestIndexParallel(TestSdk):
         assert read_count_hnsw_mv.value > 0, "Hnsw MV read failed"
         assert read_count_secondary_high.value > 0, "Secondary High read failed"
         assert read_count_secondary_low.value > 0, "Secondary Low read failed"
-        # assert read_count_sparse.value > 0, "Sparse BMP read failed"  # Temporarily disabled
+        assert read_count_sparse.value > 0, "Sparse BMP read failed"  # Temporarily disabled
         assert read_count_fusion_rrf.value > 0, "Fusion RRF read failed"
         assert read_count_fusion_mv_rrf.value > 0, "Fusion MV RRF read failed"
         assert read_count_fusion_weighted_sum.value > 0, "Fusion weighted_sum read failed"
