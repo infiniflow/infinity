@@ -70,9 +70,8 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
     }
 }
 
-BufferHandle BufferObj::Load() {
+void *BufferObj::LoadNoLock() {
     buffer_mgr_->AddRequestCount();
-    std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kMmap) {
         switch (status_) {
             case BufferStatus::kUnloaded:
@@ -91,7 +90,7 @@ BufferHandle BufferObj::Load() {
         status_ = BufferStatus::kLoaded;
         ++rc_;
         void *data = file_worker_->GetMmapData();
-        return BufferHandle(this, data);
+        return data;
     }
     switch (status_) {
         case BufferStatus::kLoaded: {
@@ -141,6 +140,12 @@ BufferHandle BufferObj::Load() {
     status_ = BufferStatus::kLoaded;
     ++rc_;
     void *data = file_worker_->GetData();
+    return data;
+}
+
+BufferHandle BufferObj::Load() {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    void *data = LoadNoLock();
     return BufferHandle(this, data);
 }
 
@@ -218,44 +223,61 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     return write;
 }
 
-bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info,
-                             bool use_memory,
-                             const FileWorkerSaveCtx &ctx,
-                             size_t row_cnt,
-                             size_t data_size) {
-    LOG_TRACE(fmt::format("BufferObj::SaveSnapshot, type_: {}, status_: {}, file: {}", int(type_), int(status_), GetFilename()));
+bool BufferObj::SaveSnapshot(const std::shared_ptr<TableSnapshotInfo> &table_snapshot_info, const FileWorkerSaveCtx &ctx) {
+    LOG_TRACE(fmt::format("BufferObj::SaveSnapshot, type_: {}, status_: {}, file: {}",
+                          BufferTypeToString(type_),
+                          BufferStatusToString(status_),
+                          GetFilename()));
 
-    if (type_ == BufferType::kEphemeral) {
+    bool res = false;
+    bool use_memory = false;
+    bool from_spill = false;
+    std::unique_ptr<BufferHandle> handle = nullptr;
+
+    {
+        std::unique_lock<std::mutex> locker(w_locker_);
         switch (status_) {
-            case BufferStatus::kLoaded: {
-                std::unique_lock<std::mutex> locker(w_locker_);
-                file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
-                break;
-            }
+            case BufferStatus::kLoaded:
+                [[fallthrough]];
             case BufferStatus::kUnloaded: {
-                this->Load();
-                std::unique_lock<std::mutex> locker(w_locker_);
-                file_worker_->WriteSnapshotFile(table_snapshot_info, true, ctx, row_cnt, data_size);
+                if (type_ == BufferType::kMmap) {
+                    use_memory = false;
+                    from_spill = false;
+                } else {
+                    use_memory = true;
+                    from_spill = false;
+                    handle = std::make_unique<BufferHandle>(this, LoadNoLock());
+                }
                 break;
             }
             case BufferStatus::kFreed: {
-                std::unique_lock<std::mutex> locker(w_locker_);
-                file_worker_->WriteSnapshotFile(table_snapshot_info, false, ctx, row_cnt, data_size);
+                switch (type_) {
+                    case BufferType::kTemp: {
+                        use_memory = false;
+                        from_spill = true;
+                        break;
+                    }
+                    case BufferType::kMmap:
+                        [[fallthrough]];
+                    case BufferType::kPersistent: {
+                        use_memory = false;
+                        from_spill = false;
+                        break;
+                    }
+                    default: {
+                        UnrecoverableError(fmt::format("Invalid buffer type for snapshot: {}", BufferTypeToString(type_)));
+                    }
+                }
                 break;
             }
             default: {
-                UnrecoverableError(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
+                UnrecoverableError(fmt::format("Invalid buffer status: {}", BufferStatusToString(status_)));
             }
         }
-    } else {
-        if (use_memory) {
-            this->Load();
-        }
-        std::unique_lock<std::mutex> locker(w_locker_);
-        file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, row_cnt, data_size);
+        res = file_worker_->WriteSnapshotFile(table_snapshot_info, use_memory, ctx, from_spill);
     }
 
-    return true;
+    return res;
 }
 
 void BufferObj::PickForCleanup() {
