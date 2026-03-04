@@ -93,28 +93,20 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     return true;
 }
 
-bool VarFileWorker::WriteSnapshotFileImpl(size_t row_cnt, size_t data_size, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
+bool VarFileWorker::WriteSnapshotFileImpl(std::unique_ptr<LocalFileHandle> file_handle, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         UnrecoverableError("Data is not allocated.");
     }
-
     const auto *buffer = static_cast<const VarBuffer *>(data_);
-    auto total_size = buffer->TotalSize();
-    if (total_size == 0) {
-        return false;
-    }
-
-    auto buffer_data = std::make_unique<char[]>(total_size);
+    size_t data_size = buffer->TotalSize();
+    auto buffer_data = std::make_unique<char[]>(data_size);
     char *ptr = buffer_data.get();
-    buffer->Write(ptr, total_size);
+    buffer->Write(ptr, data_size);
 
-    // auto rel_size = buffer->GetSize(row_cnt);
-    Status status = file_handle_->Append(buffer_data.get(), total_size);
+    Status status = file_handle->Append(buffer_data.get(), data_size);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-
-    prepare_success = true;
     return true;
 }
 
