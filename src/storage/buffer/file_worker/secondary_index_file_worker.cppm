@@ -75,6 +75,10 @@ protected:
     const u32 row_count_{};
 
 private:
+    SecondaryIndexCardinality GetCardinalityType();
+
+    // void GetDataType();
+
     DataType index_data_type_{LogicalType::kInvalid};
 };
 
