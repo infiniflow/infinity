@@ -168,4 +168,20 @@ void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spil
     }
 }
 
+bool SecondaryIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
+    if (mmap_data_ != nullptr) {
+        UnrecoverableError("Mmap data is already allocated.");
+    }
+
+    return true;
+}
+
+void SecondaryIndexFileWorker::FreeFromMmapImpl() {
+    if (mmap_data_ == nullptr) {
+        UnrecoverableError("Mmap data is not allocated.");
+    }
+
+    mmap_data_ = nullptr;
+}
+
 } // namespace infinity
