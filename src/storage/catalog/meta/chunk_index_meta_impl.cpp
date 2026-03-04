@@ -222,15 +222,15 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
             case IndexType::kPLAID: {
                 auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
                 const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
-                auto file_worker = std::make_unique<PlaidIndexFileWorker>(
-                    std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                    std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                    index_dir,
-                    std::move(index_file_name),
-                    index_base,
-                    column_def,
-                    segment_start_offset,
-                    buffer_mgr->persistence_manager());
+                auto file_worker =
+                    std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                           std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                           index_dir,
+                                                           std::move(index_file_name),
+                                                           index_base,
+                                                           column_def,
+                                                           segment_start_offset,
+                                                           buffer_mgr->persistence_manager());
                 index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
                 break;
             }
@@ -364,6 +364,20 @@ Status ChunkIndexMeta::LoadSet() {
             index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
+        case IndexType::kPLAID: {
+            auto plaid_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            auto file_worker = std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                      std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                      index_dir,
+                                                                      std::move(plaid_index_file_name),
+                                                                      index_base,
+                                                                      column_def,
+                                                                      segment_start_offset,
+                                                                      buffer_mgr->persistence_manager());
+            index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -476,22 +490,28 @@ Status ChunkIndexMeta::RestoreSet() {
         case IndexType::kPLAID: {
             auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
             const auto segment_start_offset = base_row_id.segment_offset_;
-            auto file_worker = std::make_unique<PlaidIndexFileWorker>(
-                std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
-                std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
-                index_dir,
-                std::move(index_file_name),
-                index_base,
-                column_def,
-                segment_start_offset,
-                buffer_mgr->persistence_manager());
-            index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
-            index_buffer_->AddObjRc();
+            index_file_worker = std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                       std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                       index_dir,
+                                                                       std::move(index_file_name),
+                                                                       index_base,
+                                                                       column_def,
+                                                                       segment_start_offset,
+                                                                       buffer_mgr->persistence_manager());
             break;
         }
-    default: {
+        default: {
             UnrecoverableError("Not implemented yet");
         }
+    }
+
+    auto *buffer_obj = buffer_mgr->GetBufferObject(index_file_worker->GetFilePath());
+    if (buffer_obj == nullptr) {
+        index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
+        index_buffer_->AddObjRc();
+    }
+    if (index_buffer_ == nullptr) {
+        return Status::BufferManagerError("GetBufferObject failed");
     }
 
     return Status::OK();
