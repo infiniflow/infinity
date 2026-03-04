@@ -505,7 +505,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                         UnrecoverableError(status.message());
                     }
                     BufferHandle index_handle = index_buffer->Load();
-                    auto *emvb_index = *static_cast<EMVBIndex **>(index_handle.GetDataMut());
+                    auto *emvb_index = static_cast<EMVBIndex *>(index_handle.GetDataMut());
 
                     const auto [result_num, score_ptr, row_id_ptr] =
                         emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
