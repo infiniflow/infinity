@@ -930,7 +930,6 @@ class TestIndexParallel(TestSdk):
             connection_pool, table_name, end_time, 4, read_count_secondary_low, written_data, validation_errors])
         threads.append(t)
 
-        # Skip sparse read thread temporarily due to crash issue
         t = Thread(target=read_worker_sparse, args=[
             connection_pool, table_name, end_time, 5, read_count_sparse, written_data, validation_errors])
         threads.append(t)
