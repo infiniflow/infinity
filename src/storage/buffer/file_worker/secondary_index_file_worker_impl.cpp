@@ -181,27 +181,15 @@ void SecondaryIndexFileWorker::FreeFromMmapImpl() {
         UnrecoverableError("Mmap data is not allocated.");
     }
 
-    // SecondaryIndexCardinality cardinality = GetCardinalityType();
-    //
-    // if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
-    //     auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
-    //     index->ReadIndexInner(*file_handle_);
-    //     mmap_data_ = reinterpret_cast<u8 *>(index);
-    //
-    //     GetSecondaryIndexDataWithCardinality<LowCardinalityTag>
-    //
-    //     auto *index = reinterpret_cast<SecondaryIndexData<HighCardinalityTag>>(mmap_data_);
-    //     delete *index;
-    //     delete index;
-    // } else {
-    //     auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
-    //     index->ReadIndexInner(*file_handle_);
-    //     mmap_data_ = reinterpret_cast<u8 *>(index);
-    // }
-    //
-    // auto *index = reinterpret_cast<HnswHandlerPtr *>(mmap_data_);
-    // delete *index;
-    // delete index;
+    SecondaryIndexCardinality cardinality = GetCardinalityType();
+
+    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+        auto index = reinterpret_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(mmap_data_);
+        delete index;
+    } else {
+        auto index = reinterpret_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(mmap_data_);
+        delete index;
+    }
     mmap_data_ = nullptr;
 }
 
