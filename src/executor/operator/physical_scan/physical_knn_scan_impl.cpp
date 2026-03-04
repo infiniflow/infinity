@@ -957,6 +957,9 @@ void ExecuteHnswSearch(QueryContext *query_context,
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
+
+        index_buffer->ToMmap();
+
         auto index_handle = index_buffer->Load();
         const auto *hnsw_handler = reinterpret_cast<const HnswHandlerPtr *>(index_handle.GetData());
         hnsw_search(*hnsw_handler, false);
