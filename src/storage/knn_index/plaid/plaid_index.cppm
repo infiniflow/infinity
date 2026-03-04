@@ -254,6 +254,9 @@ public:
     // Add one document's embeddings
     void AddOneDocEmbeddings(const f32 *embedding_data, u32 embedding_num);
 
+    // Add multiple documents' embeddings in batch (much faster than repeated AddOneDocEmbeddings)
+    void AddMultipleDocsEmbeddings(const f32 *embedding_data, const std::vector<u32> &doc_lens);
+
     // Incrementally update index with new embeddings
     // Supports centroid expansion when outliers are detected
     // Returns number of new centroids added (0 if no expansion)

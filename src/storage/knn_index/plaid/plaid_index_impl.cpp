@@ -135,10 +135,9 @@ u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_
         UnrecoverableError(error_msg);
     }
 
-    // Smart sampling similar to next-plaid
-    // Sample size formula: min(16 * sqrt(120 * N), N)
-    // This balances training quality and speed for large datasets
-    const u64 max_sample_size = static_cast<u64>(16.0 * std::sqrt(120.0 * static_cast<f64>(embedding_num)));
+    // Use fastkmeans-rs sampling strategy: max k * 256 samples
+    // This is more aggressive than the old formula and ensures fast training
+    const u64 max_sample_size = static_cast<u64>(n_centroids_) * 256;
     const u64 actual_sample_size = std::min(max_sample_size, embedding_num);
 
     const f32 *training_data = embedding_data;
@@ -329,6 +328,102 @@ void PlaidIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embedd
 
     n_total_embeddings_ += embedding_num;
     ++n_docs_;
+}
+
+void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std::vector<u32> &doc_lens) {
+    if (doc_lens.empty())
+        return;
+
+    std::unique_lock lock(rw_mutex_);
+
+    const u32 old_doc_num = n_docs_;
+    const u32 old_total_embeddings = n_total_embeddings_;
+
+    // Calculate total embeddings
+    u64 total_embedding_num = 0;
+    for (u32 len : doc_lens)
+        total_embedding_num += len;
+
+    // Assign to centroids and compute residuals for all embeddings at once
+    std::vector<u32> centroid_id_assignments(total_embedding_num);
+    const auto residuals = std::make_unique_for_overwrite<f32[]>(total_embedding_num * embedding_dimension_);
+
+    {
+        // Single matrix multiplication for all embeddings
+        const auto dist_table = std::make_unique_for_overwrite<f32[]>(total_embedding_num * n_centroids_);
+        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
+                                                       centroids_data_.data(),
+                                                       static_cast<u32>(total_embedding_num),
+                                                       n_centroids_,
+                                                       embedding_dimension_,
+                                                       dist_table.get());
+
+        // Process all embeddings to find nearest centroids and compute residuals
+        for (u64 i = 0; i < total_embedding_num; ++i) {
+            const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
+            f32 *output_ptr = residuals.get() + i * embedding_dimension_;
+            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+            u32 max_id = 0;
+            const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
+
+            for (u32 k = 0; k < n_centroids_; ++k) {
+                if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                    max_neg_distance = neg_distance;
+                    max_id = k;
+                }
+            }
+
+            centroid_id_assignments[i] = max_id;
+            const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
+            for (u32 j = 0; j < embedding_dimension_; ++j) {
+                output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+            }
+        }
+    }
+
+    // Store centroid assignments
+    centroid_ids_.insert(centroid_ids_.end(), centroid_id_assignments.begin(), centroid_id_assignments.end());
+
+    // Update IVF lists
+    u64 offset = 0;
+    for (u32 doc_idx = 0; doc_idx < doc_lens.size(); ++doc_idx) {
+        u32 doc_id = old_doc_num + doc_idx;
+        u32 len = doc_lens[doc_idx];
+        for (u32 i = 0; i < len; ++i) {
+            const u32 centroid_id = centroid_id_assignments[offset + i];
+            if (ivf_lists_[centroid_id].empty() || ivf_lists_[centroid_id].back() != doc_id) {
+                ivf_lists_[centroid_id].push_back(doc_id);
+            }
+        }
+        offset += len;
+    }
+
+    // Quantize and store residuals for all embeddings at once
+    u32 packed_dim = 0;
+    auto packed_residuals = quantizer_->Quantize(residuals.get(), static_cast<u32>(total_embedding_num), packed_dim);
+
+    if (!packed_residuals_) {
+        packed_residuals_size_ = 0;
+    }
+
+    const size_t old_size = packed_residuals_size_;
+    packed_residuals_size_ += total_embedding_num * packed_dim;
+    auto new_packed = std::make_unique<u8[]>(packed_residuals_size_);
+    if (old_size > 0) {
+        std::copy_n(packed_residuals_.get(), old_size, new_packed.get());
+    }
+    std::copy_n(packed_residuals.get(), total_embedding_num * packed_dim, new_packed.get() + old_size);
+    packed_residuals_ = std::move(new_packed);
+
+    // Update metadata
+    u32 current_offset = old_total_embeddings;
+    for (u32 len : doc_lens) {
+        doc_lens_.push_back(len);
+        doc_offsets_.push_back(current_offset);
+        current_offset += len;
+    }
+    n_total_embeddings_ += total_embedding_num;
+    n_docs_ += doc_lens.size();
 }
 
 PlaidQueryResultType PlaidIndex::SearchWithBitmask(const f32 *query_ptr,
@@ -967,7 +1062,6 @@ void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32
     // Save current document metadata for reconstruction
     const auto old_doc_lens = doc_lens_;
     const auto old_doc_offsets = doc_offsets_;
-    const u32 old_n_docs = n_docs_.load();
 
     // Clear current index state (but keep raw embeddings)
     n_centroids_ = 0;
@@ -1004,13 +1098,8 @@ void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32
     // Re-acquire lock
     lock.lock();
 
-    // Re-add all documents
-    u64 offset = 0;
-    for (u32 i = 0; i < old_n_docs; ++i) {
-        u32 doc_len = old_doc_lens[i];
-        AddOneDocEmbeddings(raw_embeddings_.data() + offset, doc_len);
-        offset += doc_len * embedding_dimension_;
-    }
+    // Re-add all documents using batch processing (much faster)
+    AddMultipleDocsEmbeddings(raw_embeddings_.data(), old_doc_lens);
 
     LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuild complete with {} centroids, {} docs", n_centroids_, n_docs_.load()));
 }

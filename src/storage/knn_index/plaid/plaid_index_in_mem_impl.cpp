@@ -20,6 +20,7 @@ import :plaid_quantizer;
 import :plaid_index_file_worker;
 import :index_plaid;
 import :column_vector;
+import :mlas_matrix_multiply;
 import :new_catalog;
 import :segment_meta;
 import :block_meta;
@@ -100,12 +101,8 @@ bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
             doc_lens.push_back(embedding_num);
         }
 
-        // Add to existing index with centroid expansion support
-        offset = 0;
-        for (u32 doc_len : doc_lens) {
-            plaid_index_->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
-            offset += doc_len * embedding_dimension_;
-        }
+        // Add to existing index with centroid expansion support (batch processing)
+        plaid_index_->AddMultipleDocsEmbeddings(all_embeddings.get(), doc_lens);
 
         // Try to update index with centroid expansion if needed
         plaid_index_->UpdateWithNewEmbeddings(all_embeddings.get(), total_embeddings, true);
@@ -221,13 +218,8 @@ bool PlaidIndexInMem::BuildIndex() {
         LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Stored {} raw embeddings for start_from_scratch mode", local_embedding_count));
     }
 
-    // Add documents to the trained index
-    offset = 0;
-    for (size_t i = 0; i < doc_count; ++i) {
-        u32 doc_len = local_doc_lens[i];
-        temp_index->AddOneDocEmbeddings(all_embeddings.get() + offset, doc_len);
-        offset += doc_len * local_embedding_dim;
-    }
+    // Add documents to the trained index using batch method (much faster)
+    temp_index->AddMultipleDocsEmbeddings(all_embeddings.get(), local_doc_lens);
 
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto add_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
@@ -577,33 +569,61 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
     // Create a temporary quantizer for residual quantization
     auto quantizer = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
 
-    // Compute residuals for training the quantizer
+    // Compute residuals for training the quantizer using optimized matrix operations
     std::vector<f32> residuals(total_embeddings * embedding_dimension_);
     std::vector<u32> centroid_ids(total_embeddings);
 
-    // Find nearest centroid for each embedding and compute residuals
+    // Optimized: Use matrix multiplication to find nearest centroids
+    // Compute dot products: all_embeddings * centroids^T
+    auto dist_table = std::make_unique_for_overwrite<f32[]>(total_embeddings * actual_n_centroids);
+    
+    matrixA_multiply_transpose_matrixB_output_to_C(
+        all_embeddings.data(),
+        centroids_data.data(),
+        static_cast<u32>(total_embeddings),
+        actual_n_centroids,
+        embedding_dimension_,
+        dist_table.get()
+    );
+    
+    // Pre-compute centroid norms: ||c||^2
+    std::vector<f32> centroid_norms(actual_n_centroids);
+    for (u32 c = 0; c < actual_n_centroids; ++c) {
+        const f32 *centroid = centroids_data.data() + c * embedding_dimension_;
+        f32 norm = 0.0f;
+        for (u32 d = 0; d < embedding_dimension_; ++d) {
+            norm += centroid[d] * centroid[d];
+        }
+        centroid_norms[c] = norm;
+    }
+    
+    // Find nearest centroid for each embedding using the distance table
+    // ||x - c||^2 = ||x||^2 + ||c||^2 - 2 * x.c
     for (u64 i = 0; i < total_embeddings; ++i) {
         const f32 *emb = all_embeddings.data() + i * embedding_dimension_;
-
+        
+        // Compute ||x||^2
+        f32 emb_norm = 0.0f;
+        for (u32 d = 0; d < embedding_dimension_; ++d) {
+            emb_norm += emb[d] * emb[d];
+        }
+        
         // Find nearest centroid
         f32 min_dist = std::numeric_limits<f32>::max();
         u32 best_centroid = 0;
-
+        f32 *dot_products = dist_table.get() + i * actual_n_centroids;
+        
         for (u32 c = 0; c < actual_n_centroids; ++c) {
-            const f32 *centroid = centroids_data.data() + c * embedding_dimension_;
-            f32 dist = 0.0f;
-            for (u32 d = 0; d < embedding_dimension_; ++d) {
-                f32 diff = emb[d] - centroid[d];
-                dist += diff * diff;
-            }
+            // ||x - c||^2 = ||x||^2 + ||c||^2 - 2 * dot(x, c)
+            f32 dist = emb_norm + centroid_norms[c] - 2.0f * dot_products[c];
             if (dist < min_dist) {
                 min_dist = dist;
                 best_centroid = c;
             }
         }
-
+        
         centroid_ids[i] = best_centroid;
-
+        
         // Compute residual
         const f32 *best_centroid_data = centroids_data.data() + best_centroid * embedding_dimension_;
         for (u32 d = 0; d < embedding_dimension_; ++d) {
