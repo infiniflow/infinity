@@ -107,7 +107,6 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
             index->SaveIndexInner(*file_handle_);
-            std::println("OK");
         } else {
             auto index = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(data_);
             index->SaveIndexInner(*file_handle_);
@@ -166,11 +165,11 @@ bool SecondaryIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
 
     if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
         auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
-        index->ReadIndexInner(*file_handle_);
+        index->ReadIndexInner(static_cast<const char *>(ptr), size);
         mmap_data_ = reinterpret_cast<u8 *>(index);
     } else {
         auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
-        index->ReadIndexInner(*file_handle_);
+        index->ReadIndexInner(static_cast<const char *>(ptr), size);
         mmap_data_ = reinterpret_cast<u8 *>(index);
     }
 

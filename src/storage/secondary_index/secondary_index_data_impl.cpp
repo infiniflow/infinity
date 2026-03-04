@@ -242,6 +242,16 @@ public:
         pgm_index_->LoadIndex(file_handle);
     }
 
+    void ReadIndexInner(const char *ptr, size_t size) override {
+        key_ptr_ = (void *)ptr;
+        ptr += chunk_row_count_ * sizeof(OrderedKeyType);
+
+        offset_ptr_ = (SegmentOffset *)ptr;
+        ptr += chunk_row_count_ * sizeof(SegmentOffset);
+
+        pgm_index_->LoadIndex(ptr);
+    }
+
     void InsertData(const void *ptr) override {
         auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
@@ -345,6 +355,8 @@ public:
             SetupCompatibilityPointers();
         }
     }
+
+    void ReadIndexInner(const char *ptr, size_t size) override {}
 
     void InsertData(const void *ptr) override {
         auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
@@ -521,6 +533,8 @@ public:
             SetupCompatibilityPointers();
         }
     }
+
+    void ReadIndexInner(const char *ptr, size_t size) override {}
 
     void InsertData(const void *ptr) override {
         // For BooleanT, we need to convert from bool to uint8_t
