@@ -576,16 +576,14 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
     // Optimized: Use matrix multiplication to find nearest centroids
     // Compute dot products: all_embeddings * centroids^T
     auto dist_table = std::make_unique_for_overwrite<f32[]>(total_embeddings * actual_n_centroids);
-    
-    matrixA_multiply_transpose_matrixB_output_to_C(
-        all_embeddings.data(),
-        centroids_data.data(),
-        static_cast<u32>(total_embeddings),
-        actual_n_centroids,
-        embedding_dimension_,
-        dist_table.get()
-    );
-    
+
+    matrixA_multiply_transpose_matrixB_output_to_C(all_embeddings.data(),
+                                                   centroids_data.data(),
+                                                   static_cast<u32>(total_embeddings),
+                                                   actual_n_centroids,
+                                                   embedding_dimension_,
+                                                   dist_table.get());
+
     // Pre-compute centroid norms: ||c||^2
     std::vector<f32> centroid_norms(actual_n_centroids);
     for (u32 c = 0; c < actual_n_centroids; ++c) {
@@ -596,23 +594,23 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
         }
         centroid_norms[c] = norm;
     }
-    
+
     // Find nearest centroid for each embedding using the distance table
     // ||x - c||^2 = ||x||^2 + ||c||^2 - 2 * x.c
     for (u64 i = 0; i < total_embeddings; ++i) {
         const f32 *emb = all_embeddings.data() + i * embedding_dimension_;
-        
+
         // Compute ||x||^2
         f32 emb_norm = 0.0f;
         for (u32 d = 0; d < embedding_dimension_; ++d) {
             emb_norm += emb[d] * emb[d];
         }
-        
+
         // Find nearest centroid
         f32 min_dist = std::numeric_limits<f32>::max();
         u32 best_centroid = 0;
         f32 *dot_products = dist_table.get() + i * actual_n_centroids;
-        
+
         for (u32 c = 0; c < actual_n_centroids; ++c) {
             // ||x - c||^2 = ||x||^2 + ||c||^2 - 2 * dot(x, c)
             f32 dist = emb_norm + centroid_norms[c] - 2.0f * dot_products[c];
@@ -621,9 +619,9 @@ Status PlaidIndexInMem::DumpStartFromScratch(PlaidSegmentIndex *segment_index, C
                 best_centroid = c;
             }
         }
-        
+
         centroid_ids[i] = best_centroid;
-        
+
         // Compute residual
         const f32 *best_centroid_data = centroids_data.data() + best_centroid * embedding_dimension_;
         for (u32 d = 0; d < embedding_dimension_; ++d) {

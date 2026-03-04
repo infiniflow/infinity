@@ -31,8 +31,7 @@ import infinity.index
 import numpy as np
 import time
 import argparse
-import sys
-from typing import List, Tuple
+from typing import Tuple
 
 
 class PlaidBenchmark:
@@ -125,7 +124,7 @@ class PlaidBenchmark:
         print()  # New line after progress
         
         final_throughput = n_docs / total_elapsed if total_elapsed > 0 else 0
-        print(f"\nInsertion complete:")
+        print("\nInsertion complete:")
         print(f"  Total time: {total_elapsed:.3f}s")
         print(f"  Average throughput: {final_throughput:.1f} docs/sec")
         print(f"  Total embeddings: {n_docs * n_tokens_per_doc}")
@@ -144,7 +143,7 @@ class PlaidBenchmark:
             Index creation time in seconds
         """
         print(f"\n{'='*60}")
-        print(f"Creating PLAID index")
+        print("Creating PLAID index")
         print(f"  - nbits: {nbits}")
         print(f"  - n_centroids: {n_centroids if n_centroids > 0 else 'auto (sqrt(N))'}")
         print(f"{'='*60}")
@@ -183,7 +182,7 @@ class PlaidBenchmark:
             (total_time, avg_latency) in seconds
         """
         print(f"\n{'='*60}")
-        print(f"Benchmarking queries")
+        print("Benchmarking queries")
         print(f"  - Number of queries: {n_queries}")
         print(f"  - Tokens per query: {n_tokens_per_query}")
         print(f"  - TopN: {topn}")
@@ -223,7 +222,7 @@ class PlaidBenchmark:
         print()  # New line
         
         # Calculate statistics
-        latencies_ms = [l * 1000 for l in latencies]  # Convert to ms
+        latencies_ms = [latency * 1000 for latency in latencies]  # Convert to ms
         avg_latency = np.mean(latencies_ms)
         p50_latency = np.percentile(latencies_ms, 50)
         p95_latency = np.percentile(latencies_ms, 95)
@@ -232,10 +231,10 @@ class PlaidBenchmark:
         max_latency = np.max(latencies_ms)
         throughput = n_queries / total_elapsed if total_elapsed > 0 else 0
         
-        print(f"\nQuery performance:")
+        print("\nQuery performance:")
         print(f"  Total time: {total_elapsed:.3f}s")
         print(f"  Throughput: {throughput:.1f} queries/sec")
-        print(f"  Latency (ms):")
+        print("  Latency (ms):")
         print(f"    Min:   {min_latency:.3f}")
         print(f"    Avg:   {avg_latency:.3f}")
         print(f"    P50:   {p50_latency:.3f}")
@@ -282,12 +281,12 @@ class PlaidBenchmark:
             print(f"\n{'='*60}")
             print("BENCHMARK SUMMARY")
             print(f"{'='*60}")
-            print(f"Configuration:")
+            print("Configuration:")
             print(f"  Documents: {n_docs}")
             print(f"  Tokens per document: {n_tokens_per_doc}")
             print(f"  Embedding dimension: {self.embedding_dim}")
             print(f"  Total embeddings: {n_docs * n_tokens_per_doc}")
-            print(f"\nResults:")
+            print("\nResults:")
             print(f"  Insertion time:     {insert_time:.3f}s")
             print(f"  Index creation:     {index_time:.3f}s")
             print(f"  Query time ({n_queries} queries): {query_time:.3f}s")
@@ -326,7 +325,7 @@ def main():
         return
     
     print(f"\n{'#'*70}")
-    print(f"# PLAID Index Benchmark")
+    print("# PLAID Index Benchmark")
     print(f"{'#'*70}")
     
     benchmark.run_full_benchmark(
@@ -341,7 +340,7 @@ def main():
     )
     
     print(f"\n{'#'*70}")
-    print(f"# Benchmark Complete!")
+    print("# Benchmark Complete!")
     print(f"{'#'*70}\n")
 
 
