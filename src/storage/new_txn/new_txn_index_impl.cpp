@@ -130,18 +130,31 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
             continue;
         }
 
-        ChunkID chunk_id = 0;
-        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-        if (!status.ok()) {
-            mem_index->SetIsDumping(false);
-            return status;
-        }
+        // For PLAID index, we may need to dump multiple chunks in one go
+        // Keep dumping while there's data available
+        bool is_plaid = (mem_index->GetPlaidIndex() != nullptr);
+        do {
+            ChunkID chunk_id = 0;
+            std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+            if (!status.ok()) {
+                mem_index->SetIsDumping(false);
+                return status;
+            }
 
-        // Dump Mem Index
-        status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-        if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-            return status;
-        }
+            // Dump Mem Index
+            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+            if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+                mem_index->SetIsDumping(false);
+                return status;
+            }
+
+            // For PLAID, check if there's more data to dump
+            // We need to check if there's buffered data or if index is built again
+            if (!is_plaid) {
+                break; // Non-PLAID indexes only dump once
+            }
+            // For PLAID, continue loop to dump next chunk if there's more data
+        } while (is_plaid && mem_index->GetPlaidIndex() != nullptr && mem_index->GetPlaidIndex()->HasBufferedData());
     }
 
     if (txn_store->chunk_infos_in_segments_.empty()) {
@@ -209,18 +222,31 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
         txn_store->segment_ids_.emplace_back(segment_id);
     }
 
-    ChunkID chunk_id = 0;
-    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-    if (!status.ok()) {
-        mem_index->SetIsDumping(false);
-        return status;
-    }
+    // For PLAID index, we may need to dump multiple chunks in one go
+    // Keep dumping while there's data available
+    bool is_plaid = (mem_index->GetPlaidIndex() != nullptr);
+    do {
+        ChunkID chunk_id = 0;
+        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+        if (!status.ok()) {
+            mem_index->SetIsDumping(false);
+            return status;
+        }
 
-    // Dump Mem Index
-    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-        return status;
-    }
+        // Dump Mem Index
+        status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+        if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+            mem_index->SetIsDumping(false);
+            return status;
+        }
+
+        // For PLAID, check if there's more data to dump
+        // We need to check if there's buffered data or if index is built again
+        if (!is_plaid) {
+            break; // Non-PLAID indexes only dump once
+        }
+        // For PLAID, continue loop to dump next chunk if there's more data
+    } while (is_plaid && mem_index->GetPlaidIndex() != nullptr && mem_index->GetPlaidIndex()->HasBufferedData());
 
     if (txn_store->chunk_infos_in_segments_.empty()) {
         base_txn_store_ = nullptr; // No mem index to dump.
@@ -743,6 +769,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
 
 Status
 NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+    LOG_INFO(fmt::format("AppendMemIndex ENTER: block_id={}, offset={}, row_cnt={}", block_id, offset, row_cnt));
     Status status;
     SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
     auto base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
@@ -750,10 +777,14 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
     if (!index_status.ok()) {
+        LOG_INFO("AppendMemIndex: GetIndexBase failed");
         return index_status;
     }
+    LOG_INFO("AppendMemIndex: before GetMemIndex");
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex(true);
+    LOG_INFO(fmt::format("AppendMemIndex: after GetMemIndex, ptr={}", static_cast<void *>(mem_index.get())));
     bool is_null = mem_index->IsNull();
+    LOG_INFO(fmt::format("AppendMemIndex: is_null={}", is_null));
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateBegin mem_index {:p}, is_null {}", static_cast<void *>(mem_index.get()), is_null));
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -913,6 +944,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
         case IndexType::kPLAID: {
             std::shared_ptr<PlaidIndexInMem> memory_plaid_index;
             auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+            LOG_INFO(fmt::format("AppendMemIndex PLAID: is_null={}, base_row_id={}", is_null, base_row_id.ToUint64()));
             if (is_null) {
                 auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
                 if (!status.ok()) {
@@ -921,8 +953,10 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
                 memory_plaid_index->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
                 mem_index->SetPlaidIndex(memory_plaid_index);
+                LOG_INFO("AppendMemIndex PLAID: created new PlaidIndexInMem");
             } else {
                 memory_plaid_index = mem_index->GetPlaidIndex();
+                LOG_INFO(fmt::format("AppendMemIndex PLAID: using existing PlaidIndexInMem, ptr={}", static_cast<void *>(memory_plaid_index.get())));
             }
             MetaCache *meta_cache = table_meta.meta_cache();
             // Insert will auto-trigger BuildIndex when threshold is reached
@@ -933,8 +967,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             UnrecoverableError("Not implemented yet");
         }
     }
+    LOG_INFO("AppendMemIndex: before UpdateEnd");
     mem_index->UpdateEnd();
-    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd mem_index {:p}", static_cast<void *>(mem_index.get())));
+    LOG_INFO(fmt::format("AppendMemIndex EXIT: mem_index {:p}", static_cast<void *>(mem_index.get())));
 
     // // Trigger dump if necessary
     if (!IsReplay()) {
@@ -2355,6 +2390,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kPLAID: {
             memory_plaid_index->Dump(buffer_obj);
             buffer_obj->Save();
+            // For PLAID, BuildIndex now only builds a batch of data (up to threshold)
+            // If there's more buffered data, we need to create new chunks and dump them
+            // This is handled by the caller checking HasBufferedData() after Dump
             break;
         }
         default: {

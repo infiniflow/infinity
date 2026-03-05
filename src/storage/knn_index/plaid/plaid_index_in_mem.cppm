@@ -41,17 +41,18 @@ export class PlaidIndexInMem : public BaseMemIndex {
     const u32 nbits_ = 4;
     const u32 requested_n_centroids_ = 0;
     const u32 embedding_dimension_ = 0;
-    const RowID begin_row_id_ = {};  // Original begin row id, never changes
+    const RowID begin_row_id_ = {}; // Original begin row id, never changes
     const std::shared_ptr<ColumnDef> column_def_;
 
+    // row_count_ tracks total rows in current chunk (including before and after BuildIndex)
     u32 row_count_ = 0;
     PlaidIndex *plaid_index_ = nullptr;
     std::atomic_flag is_built_;
     bool own_memory_ = true;
     mutable std::shared_mutex rw_mutex_;
-    BufferHandle chunk_handle_;  // Like HNSW: holds reference after dump
+    BufferHandle chunk_handle_; // Like HNSW: holds reference after dump
     u32 build_index_threshold_ = 0;
-    
+
     // Current begin row id for the next chunk of data
     // Updated after each dump to point to the next new row
     RowID current_begin_row_id_ = {};
@@ -104,6 +105,9 @@ public:
 
     // Get pointer to internal index (for disk chunk search)
     PlaidIndex *GetIndex() const { return plaid_index_; }
+
+    // Check if there's buffered data waiting to be built (for incremental dump)
+    bool HasBufferedData() const;
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 

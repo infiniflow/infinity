@@ -328,7 +328,7 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     // IMPORTANT: First release old packed_residuals_ to temporary, then allocate new memory
     // This minimizes peak memory: at any point we only have old OR new, not both
     auto old_packed = std::move(packed_residuals_);
-    packed_residuals_size_ = 0;  // Reset size since we're moving ownership
+    packed_residuals_size_ = 0; // Reset size since we're moving ownership
 
     // Now allocate new buffer (old memory is in 'old_packed', will be freed after copy)
     auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
@@ -336,7 +336,7 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     // Copy old data first (if any), then immediately release old memory
     if (old_packed_size > 0 && old_packed) {
         std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
-        old_packed.reset();  // IMMEDIATELY release old memory
+        old_packed.reset(); // IMMEDIATELY release old memory
     }
 
     // Process in chunks and write new data directly to the buffer
@@ -388,8 +388,7 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
             auto chunk_packed = quantizer_->Quantize(chunk_residuals.get(), chunk_count, chunk_packed_dim);
 
             // Write new data after the old data
-            std::copy_n(chunk_packed.get(), chunk_count * chunk_packed_dim,
-                        new_packed.get() + old_packed_size + chunk_start * packed_dim);
+            std::copy_n(chunk_packed.get(), chunk_count * chunk_packed_dim, new_packed.get() + old_packed_size + chunk_start * packed_dim);
         }
     }
 
@@ -431,7 +430,6 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     // This vector can be large (4MB per 1M embeddings) and is no longer needed
     centroid_id_assignments.clear();
     centroid_id_assignments.shrink_to_fit();
-
 }
 
 PlaidQueryResultType PlaidIndex::SearchWithBitmask(const f32 *query_ptr,

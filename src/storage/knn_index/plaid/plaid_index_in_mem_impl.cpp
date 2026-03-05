@@ -62,15 +62,15 @@ size_t PlaidIndexInMem::GetRowCount() const {
     return row_count_;
 }
 
+bool PlaidIndexInMem::HasBufferedData() const {
+    std::shared_lock lock(rw_mutex_);
+    return buffered_embedding_count_ > 0;
+}
+
 void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
     std::unique_lock lock(rw_mutex_);
 
-    // If index is already built, silently ignore new insertions
-    // This happens when auto-build is triggered and then more inserts come in
-    if (is_built_.test()) {
-        return;
-    }
-
+    // Buffer the new embeddings
     for (u32 i = 0; i < row_count; ++i) {
         auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
         const auto *tensor_data = reinterpret_cast<const f32 *>(raw_data.data());
@@ -85,8 +85,8 @@ void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
         row_count_++;
     }
 
-    // Auto-trigger training if threshold reached
-    if (!is_built_.test() && buffered_embedding_count_ >= build_index_threshold_) {
+    // Auto-trigger training/add if threshold reached
+    if (buffered_embedding_count_ >= build_index_threshold_) {
         // Release lock before building to prevent deadlock
         lock.unlock();
         BuildIndex();
@@ -96,10 +96,7 @@ void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
 bool PlaidIndexInMem::BuildIndex() {
     std::unique_lock lock(rw_mutex_);
 
-    if (is_built_.test()) {
-        return true; // Already built
-    }
-
+    // If not enough data, return false
     if (buffered_embedding_count_ < build_index_threshold_) {
         LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Not enough data to build index. "
                              "Have {} embeddings, need {}.",
@@ -108,19 +105,63 @@ bool PlaidIndexInMem::BuildIndex() {
         return false;
     }
 
-    // Copy all necessary data to local variables
+    // If index is already built, add buffered data to existing index
+    if (is_built_.test() && plaid_index_ != nullptr) {
+        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Adding {} buffered embeddings to existing index", buffered_embedding_count_));
+
+        // Prepare embeddings data
+        const size_t doc_count = buffered_embeddings_.size();
+        const u64 local_embedding_count = buffered_embedding_count_;
+        const u32 local_embedding_dim = embedding_dimension_;
+
+        // Copy document lengths first
+        std::vector<u32> local_doc_lens = buffered_doc_lens_;
+
+        // Copy embeddings data
+        auto all_embeddings = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
+        u64 offset = 0;
+        for (size_t i = 0; i < doc_count; ++i) {
+            u32 doc_len = local_doc_lens[i];
+            std::copy_n(buffered_embeddings_[i].get(), doc_len * local_embedding_dim, all_embeddings.get() + offset);
+            offset += doc_len * local_embedding_dim;
+        }
+
+        // Clear buffers
+        buffered_embeddings_.clear();
+        buffered_doc_lens_.clear();
+        buffered_embedding_count_ = 0;
+
+        // Release lock before adding to index
+        lock.unlock();
+
+        // Add to existing index
+        plaid_index_->AddMultipleDocsEmbeddings(all_embeddings.get(), local_doc_lens);
+
+        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Added {} docs ({} embeddings) to existing index. Total docs now: {}",
+                             doc_count,
+                             local_embedding_count,
+                             plaid_index_->GetDocNum()));
+        return true;
+    }
+
+    // Build new index from scratch
+    const size_t doc_count = buffered_embeddings_.size();
     const u64 local_embedding_count = buffered_embedding_count_;
     const u32 local_embedding_dim = embedding_dimension_;
     const u32 local_nbits = nbits_;
     const u32 local_requested_n_centroids = requested_n_centroids_;
     // Use current_begin_row_id_ which accounts for previous dumps
     const u32 local_start_segment_offset = current_begin_row_id_.segment_offset_;
-    const size_t doc_count = buffered_embeddings_.size();
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Building index with {} docs ({} embeddings) starting at offset {}",
+                         doc_count,
+                         local_embedding_count,
+                         local_start_segment_offset));
 
     // Copy document lengths
-    std::vector<u32> local_doc_lens(buffered_doc_lens_.begin(), buffered_doc_lens_.end());
+    std::vector<u32> local_doc_lens = std::move(buffered_doc_lens_);
 
-    // Copy embeddings data (non-const so we can reset() it later to free memory)
+    // Copy embeddings data
     auto all_embeddings = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
     u64 offset = 0;
     for (size_t i = 0; i < doc_count; ++i) {
@@ -129,14 +170,10 @@ bool PlaidIndexInMem::BuildIndex() {
         offset += doc_len * local_embedding_dim;
     }
 
-    // IMPORTANT: Clear buffered embeddings immediately to free memory
-    // The data is now in all_embeddings, so we don't need buffered_embeddings_ anymore
+    // Clear buffers - all data will be in the index
     buffered_embeddings_.clear();
-    buffered_embeddings_.shrink_to_fit();
     buffered_doc_lens_.clear();
     buffered_embedding_count_ = 0;
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Cleared buffered embeddings, freed ~{} MB",
-                         local_embedding_count * local_embedding_dim * sizeof(f32) / (1024 * 1024)));
 
     // Determine number of centroids
     u32 n_centroids = local_requested_n_centroids;
@@ -148,7 +185,6 @@ bool PlaidIndexInMem::BuildIndex() {
     }
 
     // Release lock before training to prevent deadlock
-    // Other threads can still search using buffered data (is_built_ is still false)
     lock.unlock();
 
     const auto time_0 = std::chrono::high_resolution_clock::now();
@@ -166,12 +202,6 @@ bool PlaidIndexInMem::BuildIndex() {
     // Add documents to the trained index using batch method (much faster)
     temp_index->AddMultipleDocsEmbeddings(all_embeddings.get(), local_doc_lens);
 
-    // IMPORTANT: Free all_embeddings immediately after AddMultipleDocsEmbeddings
-    // This is the key to reducing memory usage
-    all_embeddings.reset();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Freed all_embeddings after AddMultipleDocsEmbeddings, saved ~{} MB",
-                         local_embedding_count * local_embedding_dim * sizeof(f32) / (1024 * 1024)));
-
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto add_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Adding documents took {} ms", add_ms));
@@ -186,40 +216,49 @@ bool PlaidIndexInMem::BuildIndex() {
 
     // Transfer ownership to member
     plaid_index_ = temp_index.release();
+    own_memory_ = true; // We own this new index
 
     // Memory barrier to ensure plaid_index_ is visible before is_built_ is set
     std::atomic_thread_fence(std::memory_order_release);
     is_built_.test_and_set();
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms, doc_count={}", total_ms, doc_count));
     return true;
 }
 
 void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     std::unique_lock lock(rw_mutex_);
 
-    // Try to build index if we have buffered data but index is not built yet
+    // If we have buffered data but index is not built yet, build it first
     if (!is_built_.test() && buffered_embedding_count_ > 0) {
-        LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Building index before dump with {} buffered embeddings",
-                             buffered_embedding_count_));
+        // For dump, we need to build even if we have less data than threshold
+        // Set a lower threshold temporarily for this build
+        u32 saved_threshold = build_index_threshold_;
+        build_index_threshold_ = std::min(build_index_threshold_, buffered_embedding_count_);
+        LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Building index before dump with {} buffered embeddings (threshold adjusted from {})",
+                             buffered_embedding_count_,
+                             saved_threshold));
         lock.unlock();
         BuildIndex();
         lock.lock();
+        build_index_threshold_ = saved_threshold; // Restore original threshold
     }
 
+    // Check if we have anything to dump
     if (!is_built_.test() || !plaid_index_) {
-        // Either no data or not enough data to build index
-        // Return error to let caller know data is not dumped
-        UnrecoverableError(fmt::format("PlaidIndexInMem::Dump: Cannot dump - index not built. "
-                                       "Have {} buffered embeddings, need {}.",
-                                       buffered_embedding_count_,
-                                       build_index_threshold_));
+        // No data to dump - this is an error
+        UnrecoverableError(fmt::format("PlaidIndexInMem::Dump: Cannot dump - no index data. "
+                                       "Have {} buffered embeddings.",
+                                       buffered_embedding_count_));
     }
 
     if (!own_memory_) {
         UnrecoverableError("PlaidIndexInMem::Dump() called with own_memory_ = false.");
     }
+
+    // Get the total row count to dump
+    u32 rows_to_dump = row_count_;
 
     // Like HNSW: load buffer and move index data
     BufferHandle handle = buffer_obj->Load();
@@ -232,18 +271,20 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     own_memory_ = false;
     chunk_handle_ = std::move(handle);
 
-    // IMPORTANT: Reset state to allow continuing insert after dump (like HNSW/BMP)
     // Update current_begin_row_id_ to point to the next new row
-    current_begin_row_id_ = RowID(begin_row_id_.segment_id_, begin_row_id_.segment_offset_ + row_count_);
+    u32 next_segment_offset = current_begin_row_id_.segment_offset_ + rows_to_dump;
+    current_begin_row_id_ = RowID(begin_row_id_.segment_id_, next_segment_offset);
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Dumped {} rows, next chunk starts at segment_offset={}", rows_to_dump, next_segment_offset));
+
     // Clear the built flag so new data can be buffered and built into a new index
     is_built_.clear();
-    row_count_ = 0;
-    // buffered_embeddings_ and buffered_doc_lens_ should already be empty after BuildIndex
-    buffered_embedding_count_ = 0;
 
-    LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Index dumped successfully, reset state for new insertions. "
-                         "Next chunk will start at segment_offset={}",
-                         current_begin_row_id_.segment_offset_));
+    // Reset row_count_ to 0 since all data has been dumped
+    row_count_ = 0;
+
+    // Note: buffered_embeddings_ and buffered_doc_lens_ should be empty at this point
+    // since we either built from them or added directly to the index
 }
 
 PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_ptr,
@@ -292,7 +333,9 @@ const ChunkIndexMetaInfo PlaidIndexInMem::GetChunkIndexMetaInfo() const {
         embedding_count = plaid_index_->GetTotalEmbeddingNum();
     }
 
-    return ChunkIndexMetaInfo{"", begin_row_id_, row_count_, embedding_count, 0};
+    // Use current_begin_row_id_ which is updated after each dump
+    // This correctly reflects the starting position of buffered data in the segment
+    return ChunkIndexMetaInfo{"", current_begin_row_id_, row_count_, embedding_count, 0};
 }
 
 MemIndexTracerInfo PlaidIndexInMem::GetInfo() const {
