@@ -16,12 +16,9 @@ module infinity_core:plaid_index_in_mem.impl;
 
 import :plaid_index_in_mem;
 import :plaid_index;
-import :plaid_index_file_worker;
 import :index_plaid;
 import :column_vector;
-import :new_catalog;
 import :chunk_index_meta;
-import :status;
 import :logger;
 import :infinity_exception;
 import :buffer_obj;
@@ -65,44 +62,13 @@ size_t PlaidIndexInMem::GetRowCount() const {
     return row_count_;
 }
 
-bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
+void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
     std::unique_lock lock(rw_mutex_);
 
-    // Check if index is already built - handle incremental insertion
-    if (is_built_.test() && plaid_index_) {
-        // Index already built, handle incremental update
-        lock.unlock();
-
-        // Collect all embeddings from this batch
-        u64 total_embeddings = 0;
-        for (u32 i = 0; i < row_count; ++i) {
-            auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
-            total_embeddings += embedding_num;
-        }
-
-        // Copy to contiguous buffer
-        auto all_embeddings = std::make_unique_for_overwrite<f32[]>(total_embeddings * embedding_dimension_);
-        u64 offset = 0;
-        std::vector<u32> doc_lens;
-        doc_lens.reserve(row_count);
-
-        for (u32 i = 0; i < row_count; ++i) {
-            auto [raw_data, embedding_num] = col.GetTensorRaw(row_offset + i);
-            const auto *tensor_data = reinterpret_cast<const f32 *>(raw_data.data());
-            std::copy_n(tensor_data, embedding_num * embedding_dimension_, all_embeddings.get() + offset);
-            offset += embedding_num * embedding_dimension_;
-            doc_lens.push_back(embedding_num);
-        }
-
-        // Add to existing index with centroid expansion support (batch processing)
-        plaid_index_->AddMultipleDocsEmbeddings(all_embeddings.get(), doc_lens);
-
-        // Try to update index with centroid expansion if needed
-        plaid_index_->UpdateWithNewEmbeddings(all_embeddings.get(), total_embeddings, true);
-
-        std::unique_lock relock(rw_mutex_);
-        row_count_ += row_count;
-        return true;
+    // Like HNSW/EMVB: once index is built, we don't accept new insertions
+    // MemIndex will handle creating a new MemIndex for new data
+    if (is_built_.test()) {
+        UnrecoverableError("PlaidIndexInMem::Insert: Cannot insert into built index. MemIndex should create a new MemIndex instance.");
     }
 
     for (u32 i = 0; i < row_count; ++i) {
@@ -119,17 +85,14 @@ bool PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
         row_count_++;
     }
 
-    // Auto-trigger training if not built and threshold reached
+    // Auto-trigger training if threshold reached
     if (!is_built_.test() && buffered_embedding_count_ >= build_index_threshold_) {
-        lock.unlock(); // Release lock before BuildIndex which takes its own lock
-        return BuildIndex();
+        lock.unlock();
+        BuildIndex();
     }
-
-    return false;
 }
 
 bool PlaidIndexInMem::BuildIndex() {
-    // First, check if already built and copy data while holding lock
     std::unique_lock lock(rw_mutex_);
 
     if (is_built_.test()) {
@@ -216,23 +179,18 @@ bool PlaidIndexInMem::BuildIndex() {
 
     // Double-check that index wasn't built by another thread while we were training
     if (is_built_.test()) {
-        lock.unlock(); // Must unlock before returning
-        return true;   // Another thread already built it
+        return true; // Another thread already built it
     }
 
-    // Safely transfer ownership to raw pointer
-    // This ensures search threads see a consistent state
+    // Transfer ownership to member
     plaid_index_ = temp_index.release();
 
-    // Memory barrier to ensure plaid_index_ is visible to other threads before is_built_ is set
+    // Memory barrier to ensure plaid_index_ is visible before is_built_ is set
     std::atomic_thread_fence(std::memory_order_release);
-
-    // Set is_built_ AFTER plaid_index_ is fully constructed and visible
     is_built_.test_and_set();
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms", total_ms));
-    // Lock will be automatically released when function returns
     return true;
 }
 
@@ -240,7 +198,6 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     std::unique_lock lock(rw_mutex_);
 
     if (!is_built_.test() || !plaid_index_) {
-        // Index not built (e.g., not enough data), skip dumping
         LOG_INFO("PlaidIndexInMem::Dump: Index not built, skipping dump.");
         return;
     }
@@ -249,19 +206,18 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
         UnrecoverableError("PlaidIndexInMem::Dump() called with own_memory_ = false.");
     }
 
-    // Load the buffer object to get the file worker (like EMVB)
-    BufferHandle buffer_handle = buffer_obj->Load();
+    // Like HNSW: load buffer and move index data
+    BufferHandle handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<PlaidIndex *>(handle.GetDataMut());
+    *data_ptr = std::move(*plaid_index_);
 
-    // Get the PlaidIndex pointer from buffer data
-    auto *index_ptr = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
-
-    // Move data to the buffer (like EMVB)
-    *index_ptr = std::move(*plaid_index_);
-
-    // Clean up the source index
+    // Release ownership (like HNSW)
     delete plaid_index_;
     plaid_index_ = nullptr;
     own_memory_ = false;
+    chunk_handle_ = std::move(handle);
+
+    LOG_INFO("PlaidIndexInMem::Dump: Index dumped successfully");
 }
 
 PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_ptr,
