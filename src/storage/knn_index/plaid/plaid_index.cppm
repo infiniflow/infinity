@@ -262,10 +262,6 @@ public:
     // Returns number of new centroids added (0 if no expansion)
     u32 UpdateWithNewEmbeddings(const f32 *embedding_data, u64 embedding_num, bool allow_centroid_expansion = true);
 
-    // Rebuild index from stored raw embeddings (start_from_scratch mode)
-    // Used when index quality degrades or for recovery
-    void RebuildFromRawEmbeddings(u32 new_centroids_num = 0, u32 iter_cnt = 4);
-
     // Search with bitmask filtering
     PlaidQueryResultType SearchWithBitmask(const f32 *query_ptr,
                                            u32 query_embedding_num,
@@ -325,13 +321,6 @@ public:
 
     // Internal version of ExpandCentroids - assumes caller holds the lock
     void ExpandCentroidsInternal(const f32 *new_embeddings, u64 new_embedding_count, u32 expand_iter);
-
-    // Store raw embeddings for potential rebuild (start_from_scratch mode)
-    void StoreRawEmbeddings(const f32 *embedding_data, u64 embedding_num);
-    void ClearRawEmbeddings();
-    bool HasRawEmbeddings() const { return !raw_embeddings_.empty(); }
-    u64 GetRawEmbeddingCount() const { return raw_embeddings_count_; }
-
     // Get internal data for dump operations (used by PlaidIndexInMem::PrepareDumpData)
     // Returns pointers to internal data - caller must not modify
     const std::vector<u32> &GetCentroidIds() const { return centroid_ids_; }
@@ -385,11 +374,6 @@ private:
     size_t mmap_size_ = 0;
     bool is_mmap_ = false;
     bool owns_data_ = true;
-
-    // Raw embeddings storage for start_from_scratch rebuild mode
-    // Stored as flattened array: [n_embeddings, embedding_dimension]
-    std::vector<f32> raw_embeddings_;
-    u64 raw_embeddings_count_ = 0;
 
     // Thread safety
     mutable std::shared_mutex rw_mutex_;

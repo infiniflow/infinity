@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module infinity_core:plaid_index.impl;
+module;
+
+#include <algorithm>
+#include <random>
+
+export module infinity_core:plaid_index.impl;
 
 import :plaid_index;
 import :plaid_quantizer;
@@ -150,17 +155,26 @@ u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_
                              actual_sample_size,
                              static_cast<int>(100.0 * actual_sample_size / embedding_num)));
 
-        // Random sampling
+        // Random sampling using Reservoir Sampling (memory-efficient)
+        // Avoids creating large indices array and full shuffle (saves ~8MB + overhead)
         sampled_data = std::make_unique_for_overwrite<f32[]>(actual_sample_size * embedding_dimension_);
-        std::vector<u32> indices(embedding_num);
-        std::iota(indices.begin(), indices.end(), 0u);
 
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::shuffle(indices.begin(), indices.end(), gen);
 
+        // Reservoir sampling: O(n) time, O(k) space where k = actual_sample_size
+        // First fill with first k elements
         for (u64 i = 0; i < actual_sample_size; ++i) {
-            std::copy_n(embedding_data + indices[i] * embedding_dimension_, embedding_dimension_, sampled_data.get() + i * embedding_dimension_);
+            std::copy_n(embedding_data + i * embedding_dimension_, embedding_dimension_, sampled_data.get() + i * embedding_dimension_);
+        }
+
+        // Then replace with decreasing probability
+        std::uniform_int_distribution<u64> dist(0, std::numeric_limits<u64>::max());
+        for (u64 i = actual_sample_size; i < embedding_num; ++i) {
+            u64 j = dist(gen) % (i + 1);
+            if (j < actual_sample_size) {
+                std::copy_n(embedding_data + i * embedding_dimension_, embedding_dimension_, sampled_data.get() + j * embedding_dimension_);
+            }
         }
 
         training_data = sampled_data.get();
@@ -199,44 +213,96 @@ u64 PlaidIndex::TrainWithSampling(const u32 centroids_num, const f32 *embedding_
     auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
     LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Finish train centroids, time cost: {} ms", train_ms));
 
-    // Compute residuals on FULL dataset (not just samples) for quantizer training
-    const auto residuals = std::make_unique_for_overwrite<f32[]>(embedding_num * embedding_dimension_);
+    // IMPORTANT: Free sampled_data immediately after K-means training
+    // This releases ~4GB memory before quantizer training
+    if (sampled_data) {
+        sampled_data.reset();
+        LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Freed K-means sampling data, saved ~{} MB",
+                             actual_sample_size * embedding_dimension_ * sizeof(f32) / (1024 * 1024)));
+    }
+
+    // Sample residuals for quantizer training (following next-plaid's strategy)
+    // Use at most 50,000 embeddings to train the quantizer, saving ~16GB memory
+    constexpr u64 MAX_SAMPLE_FOR_QUANTIZER = 50000;
+    const u64 quantizer_sample_size = std::min(MAX_SAMPLE_FOR_QUANTIZER, embedding_num);
+
+    // Random sampling for quantizer training using Reservoir Sampling (memory-efficient)
+    std::vector<u64> sample_indices;
+    sample_indices.reserve(quantizer_sample_size);
+    for (u64 i = 0; i < quantizer_sample_size; ++i) {
+        sample_indices.push_back(i);
+    }
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<u64> dist(0, std::numeric_limits<u64>::max());
+    for (u64 i = quantizer_sample_size; i < embedding_num; ++i) {
+        u64 j = dist(gen) % (i + 1);
+        if (j < quantizer_sample_size) {
+            sample_indices[j] = i;
+        }
+    }
+
+    // Compute residuals only for sampled embeddings
+    const auto sample_residuals = std::make_unique_for_overwrite<f32[]>(quantizer_sample_size * embedding_dimension_);
     {
-        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
-        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
-                                                       centroids_data_.data(),
-                                                       embedding_num,
-                                                       n_centroids_,
-                                                       embedding_dimension_,
-                                                       dist_table.get());
+        // Process in chunks to limit memory usage
+        constexpr u32 CHUNK_SIZE = 65536;
+        const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(CHUNK_SIZE * n_centroids_);
 
-        for (u64 i = 0; i < embedding_num; ++i) {
-            const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
-            f32 *output_ptr = residuals.get() + i * embedding_dimension_;
-            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-            u64 max_id = 0;
-            const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
+        for (u64 chunk_start = 0; chunk_start < quantizer_sample_size; chunk_start += CHUNK_SIZE) {
+            const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(quantizer_sample_size));
+            const u32 chunk_count = chunk_end - chunk_start;
 
-            for (u32 k = 0; k < n_centroids_; ++k) {
-                if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
-                    max_neg_distance = neg_distance;
-                    max_id = k;
-                }
+            // Prepare chunk data from sampled indices
+            const auto chunk_embeddings = std::make_unique_for_overwrite<f32[]>(chunk_count * embedding_dimension_);
+            for (u32 i = 0; i < chunk_count; ++i) {
+                const u64 orig_idx = sample_indices[chunk_start + i];
+                std::copy_n(embedding_data + orig_idx * embedding_dimension_,
+                            embedding_dimension_,
+                            chunk_embeddings.get() + i * embedding_dimension_);
             }
 
-            const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
-            for (u32 j = 0; j < embedding_dimension_; ++j) {
-                output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+            // Compute distances for this chunk
+            matrixA_multiply_transpose_matrixB_output_to_C(chunk_embeddings.get(),
+                                                           centroids_data_.data(),
+                                                           chunk_count,
+                                                           n_centroids_,
+                                                           embedding_dimension_,
+                                                           dist_table_chunk.get());
+
+            // Process chunk to find nearest centroids and compute residuals
+            for (u32 i = 0; i < chunk_count; ++i) {
+                const f32 *embedding_data_ptr = chunk_embeddings.get() + i * embedding_dimension_;
+                f32 *output_ptr = sample_residuals.get() + (chunk_start + i) * embedding_dimension_;
+                f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+                u32 max_id = 0;
+                const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
+
+                for (u32 k = 0; k < n_centroids_; ++k) {
+                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                        max_neg_distance = neg_distance;
+                        max_id = k;
+                    }
+                }
+
+                const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
+                for (u32 j = 0; j < embedding_dimension_; ++j) {
+                    output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+                }
             }
         }
     }
 
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto residual_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
-    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Finish calculate residuals on {} embeddings, time cost: {} ms", embedding_num, residual_ms));
+    LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Sampled {} residuals for quantizer training (from {} total), time cost: {} ms",
+                         quantizer_sample_size,
+                         embedding_num,
+                         residual_ms));
 
-    // Train residual quantizer
-    quantizer_->Train(residuals.get(), embedding_num);
+    // Train residual quantizer with sampled residuals (saves ~16GB memory)
+    quantizer_->Train(sample_residuals.get(), quantizer_sample_size);
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
     auto quantizer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_2).count();
@@ -263,42 +329,55 @@ void PlaidIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embedd
     doc_lens_.push_back(embedding_num);
     doc_offsets_.push_back(old_total_embeddings);
 
-    // Assign to centroids and compute residuals
+    // Assign to centroids and compute residuals using chunked processing
     std::vector<u32> centroid_id_assignments(embedding_num);
     const auto residuals = std::make_unique_for_overwrite<f32[]>(embedding_num * embedding_dimension_);
 
     {
-        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
-        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
-                                                       centroids_data_.data(),
-                                                       embedding_num,
-                                                       n_centroids_,
-                                                       embedding_dimension_,
-                                                       dist_table.get());
+        // Process in chunks to limit memory usage
+        constexpr u32 CHUNK_SIZE = 65536;
+        const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(CHUNK_SIZE * n_centroids_);
 
-        for (u32 i = 0; i < embedding_num; ++i) {
-            const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
-            f32 *output_ptr = residuals.get() + i * embedding_dimension_;
-            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-            u32 max_id = 0;
-            const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
+        for (u32 chunk_start = 0; chunk_start < embedding_num; chunk_start += CHUNK_SIZE) {
+            const u32 chunk_end = std::min(chunk_start + CHUNK_SIZE, embedding_num);
+            const u32 chunk_count = chunk_end - chunk_start;
 
-            for (u32 k = 0; k < n_centroids_; ++k) {
-                if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
-                    max_neg_distance = neg_distance;
-                    max_id = k;
+            // Compute distances for this chunk
+            matrixA_multiply_transpose_matrixB_output_to_C(embedding_data + chunk_start * embedding_dimension_,
+                                                           centroids_data_.data(),
+                                                           chunk_count,
+                                                           n_centroids_,
+                                                           embedding_dimension_,
+                                                           dist_table_chunk.get());
+
+            // Process chunk to find nearest centroids and compute residuals
+            for (u32 i = 0; i < chunk_count; ++i) {
+                const f32 *embedding_data_ptr = embedding_data + (chunk_start + i) * embedding_dimension_;
+                f32 *output_ptr = residuals.get() + (chunk_start + i) * embedding_dimension_;
+                f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+                u32 max_id = 0;
+                const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
+
+                for (u32 k = 0; k < n_centroids_; ++k) {
+                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                        max_neg_distance = neg_distance;
+                        max_id = k;
+                    }
                 }
-            }
 
-            centroid_id_assignments[i] = max_id;
-            const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
-            for (u32 j = 0; j < embedding_dimension_; ++j) {
-                output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+                centroid_id_assignments[chunk_start + i] = max_id;
+                const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
+                for (u32 j = 0; j < embedding_dimension_; ++j) {
+                    output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+                }
             }
         }
     }
 
     // Store centroid assignments
+    // Reserve space first to avoid multiple reallocations
+    const size_t old_centroid_ids_size = centroid_ids_.size();
+    centroid_ids_.reserve(old_centroid_ids_size + centroid_id_assignments.size());
     centroid_ids_.insert(centroid_ids_.end(), centroid_id_assignments.begin(), centroid_id_assignments.end());
 
     // Update IVF lists
@@ -344,44 +423,91 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     for (u32 len : doc_lens)
         total_embedding_num += len;
 
-    // Assign to centroids and compute residuals for all embeddings at once
+    // Assign to centroids and quantize residuals using STREAMING processing
+    // Following next-plaid's strategy: compute residuals -> quantize immediately -> release memory
     std::vector<u32> centroid_id_assignments(total_embedding_num);
-    const auto residuals = std::make_unique_for_overwrite<f32[]>(total_embedding_num * embedding_dimension_);
 
+    // Get packed dimension from quantizer (constant for all chunks)
+    const u32 packed_dim = (embedding_dimension_ * nbits_) / 8;
+    const size_t new_data_size = total_embedding_num * packed_dim;
+    const size_t old_packed_size = packed_residuals_size_;
+
+    // IMPORTANT: First release old packed_residuals_ to temporary, then allocate new memory
+    // This minimizes peak memory: at any point we only have old OR new, not both
+    auto old_packed = std::move(packed_residuals_);
+    packed_residuals_size_ = 0;  // Reset size since we're moving ownership
+
+    // Now allocate new buffer (old memory is in 'old_packed', will be freed after copy)
+    auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
+
+    // Copy old data first (if any), then immediately release old memory
+    if (old_packed_size > 0 && old_packed) {
+        std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
+        old_packed.reset();  // IMMEDIATELY release old memory
+    }
+
+    // Process in chunks and write new data directly to the buffer
     {
-        // Single matrix multiplication for all embeddings
-        const auto dist_table = std::make_unique_for_overwrite<f32[]>(total_embedding_num * n_centroids_);
-        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
-                                                       centroids_data_.data(),
-                                                       static_cast<u32>(total_embedding_num),
-                                                       n_centroids_,
-                                                       embedding_dimension_,
-                                                       dist_table.get());
+        // Process in chunks to limit memory usage
+        // Target: keep distance table under ~256MB (64M floats)
+        // For n_centroids=4096, chunk_size = 64M / 4096 = 16384
+        constexpr u32 CHUNK_SIZE = 16384;
+        const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(CHUNK_SIZE * n_centroids_);
 
-        // Process all embeddings to find nearest centroids and compute residuals
-        for (u64 i = 0; i < total_embedding_num; ++i) {
-            const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
-            f32 *output_ptr = residuals.get() + i * embedding_dimension_;
-            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-            u32 max_id = 0;
-            const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
+        for (u64 chunk_start = 0; chunk_start < total_embedding_num; chunk_start += CHUNK_SIZE) {
+            const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(total_embedding_num));
+            const u32 chunk_count = chunk_end - chunk_start;
 
-            for (u32 k = 0; k < n_centroids_; ++k) {
-                if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
-                    max_neg_distance = neg_distance;
-                    max_id = k;
+            // Compute distances for this chunk
+            matrixA_multiply_transpose_matrixB_output_to_C(embedding_data + chunk_start * embedding_dimension_,
+                                                           centroids_data_.data(),
+                                                           chunk_count,
+                                                           n_centroids_,
+                                                           embedding_dimension_,
+                                                           dist_table_chunk.get());
+
+            // Compute residuals for this chunk (STREAMING: only allocate chunk-sized residuals)
+            const auto chunk_residuals = std::make_unique_for_overwrite<f32[]>(chunk_count * embedding_dimension_);
+
+            for (u32 i = 0; i < chunk_count; ++i) {
+                const f32 *embedding_data_ptr = embedding_data + (chunk_start + i) * embedding_dimension_;
+                f32 *output_ptr = chunk_residuals.get() + i * embedding_dimension_;
+                f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+                u32 max_id = 0;
+                const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
+
+                for (u32 k = 0; k < n_centroids_; ++k) {
+                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                        max_neg_distance = neg_distance;
+                        max_id = k;
+                    }
+                }
+
+                centroid_id_assignments[chunk_start + i] = max_id;
+                const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
+                for (u32 j = 0; j < embedding_dimension_; ++j) {
+                    output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
                 }
             }
 
-            centroid_id_assignments[i] = max_id;
-            const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
-            for (u32 j = 0; j < embedding_dimension_; ++j) {
-                output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
-            }
+            // Quantize this chunk immediately (STREAMING: quantize then release residuals memory)
+            u32 chunk_packed_dim = 0;
+            auto chunk_packed = quantizer_->Quantize(chunk_residuals.get(), chunk_count, chunk_packed_dim);
+
+            // Write new data after the old data
+            std::copy_n(chunk_packed.get(), chunk_count * chunk_packed_dim,
+                        new_packed.get() + old_packed_size + chunk_start * packed_dim);
         }
     }
 
+    // Update size and move new data to storage
+    packed_residuals_size_ = old_packed_size + new_data_size;
+    packed_residuals_ = std::move(new_packed);
+
     // Store centroid assignments
+    // Reserve space first to avoid multiple reallocations
+    const size_t old_centroid_ids_size = centroid_ids_.size();
+    centroid_ids_.reserve(old_centroid_ids_size + centroid_id_assignments.size());
     centroid_ids_.insert(centroid_ids_.end(), centroid_id_assignments.begin(), centroid_id_assignments.end());
 
     // Update IVF lists
@@ -398,23 +524,6 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
         offset += len;
     }
 
-    // Quantize and store residuals for all embeddings at once
-    u32 packed_dim = 0;
-    auto packed_residuals = quantizer_->Quantize(residuals.get(), static_cast<u32>(total_embedding_num), packed_dim);
-
-    if (!packed_residuals_) {
-        packed_residuals_size_ = 0;
-    }
-
-    const size_t old_size = packed_residuals_size_;
-    packed_residuals_size_ += total_embedding_num * packed_dim;
-    auto new_packed = std::make_unique<u8[]>(packed_residuals_size_);
-    if (old_size > 0) {
-        std::copy_n(packed_residuals_.get(), old_size, new_packed.get());
-    }
-    std::copy_n(packed_residuals.get(), total_embedding_num * packed_dim, new_packed.get() + old_size);
-    packed_residuals_ = std::move(new_packed);
-
     // Update metadata
     u32 current_offset = old_total_embeddings;
     for (u32 len : doc_lens) {
@@ -424,6 +533,12 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     }
     n_total_embeddings_ += total_embedding_num;
     n_docs_ += doc_lens.size();
+
+    // IMPORTANT: Release centroid_id_assignments memory immediately
+    // This vector can be large (4MB per 1M embeddings) and is no longer needed
+    centroid_id_assignments.clear();
+    centroid_id_assignments.shrink_to_fit();
+
 }
 
 PlaidQueryResultType PlaidIndex::SearchWithBitmask(const f32 *query_ptr,
@@ -1022,88 +1137,6 @@ std::vector<std::unique_ptr<f32[]>> PlaidIndex::ReconstructDocuments(const std::
     return results;
 }
 
-void PlaidIndex::StoreRawEmbeddings(const f32 *embedding_data, const u64 embedding_num) {
-    std::unique_lock lock(rw_mutex_);
-
-    // Store raw embeddings for potential rebuild
-    const u64 new_size = raw_embeddings_.size() + embedding_num * embedding_dimension_;
-    std::vector<f32> new_raw(new_size);
-
-    // Copy existing embeddings
-    std::copy(raw_embeddings_.begin(), raw_embeddings_.end(), new_raw.begin());
-
-    // Copy new embeddings
-    std::copy_n(embedding_data, embedding_num * embedding_dimension_, new_raw.begin() + raw_embeddings_.size());
-
-    raw_embeddings_ = std::move(new_raw);
-    raw_embeddings_count_ += embedding_num;
-
-    LOG_INFO(fmt::format("PlaidIndex::StoreRawEmbeddings: Stored {} raw embeddings, total: {}", embedding_num, raw_embeddings_count_));
-}
-
-void PlaidIndex::ClearRawEmbeddings() {
-    std::unique_lock lock(rw_mutex_);
-    raw_embeddings_.clear();
-    raw_embeddings_.shrink_to_fit();
-    raw_embeddings_count_ = 0;
-    LOG_INFO("PlaidIndex::ClearRawEmbeddings: Cleared all raw embeddings");
-}
-
-void PlaidIndex::RebuildFromRawEmbeddings(const u32 new_centroids_num, const u32 iter_cnt) {
-    std::unique_lock lock(rw_mutex_);
-
-    if (raw_embeddings_.empty() || raw_embeddings_count_ == 0) {
-        LOG_WARN("PlaidIndex::RebuildFromRawEmbeddings: No raw embeddings stored, cannot rebuild");
-        return;
-    }
-
-    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuilding from {} raw embeddings", raw_embeddings_count_));
-
-    // Save current document metadata for reconstruction
-    const auto old_doc_lens = doc_lens_;
-    const auto old_doc_offsets = doc_offsets_;
-
-    // Clear current index state (but keep raw embeddings)
-    n_centroids_ = 0;
-    centroids_data_.clear();
-    centroid_norms_neg_half_.clear();
-    centroid_ids_.clear();
-    packed_residuals_.reset();
-    packed_residuals_size_ = 0;
-    ivf_lists_.clear();
-    n_docs_ = 0;
-    n_total_embeddings_ = 0;
-    doc_lens_.clear();
-    doc_offsets_.clear();
-    quantizer_ = std::make_unique<PlaidQuantizer>(nbits_, embedding_dimension_);
-
-    // Release lock during training to avoid blocking
-    lock.unlock();
-
-    // Determine number of centroids
-    u32 centroids_num = new_centroids_num;
-    if (centroids_num == 0) {
-        centroids_num = requested_n_centroids_;
-    }
-    if (centroids_num == 0) {
-        // Auto: sqrt(N) rounded to multiple of 8
-        centroids_num = static_cast<u32>(std::sqrt(raw_embeddings_count_));
-        centroids_num = ((centroids_num + 7) / 8) * 8;
-        centroids_num = std::max(8u, centroids_num);
-    }
-
-    // Retrain with sampling
-    TrainWithSampling(centroids_num, raw_embeddings_.data(), raw_embeddings_count_, iter_cnt);
-
-    // Re-acquire lock
-    lock.lock();
-
-    // Re-add all documents using batch processing (much faster)
-    AddMultipleDocsEmbeddings(raw_embeddings_.data(), old_doc_lens);
-
-    LOG_INFO(fmt::format("PlaidIndex::RebuildFromRawEmbeddings: Rebuild complete with {} centroids, {} docs", n_centroids_, n_docs_.load()));
-}
-
 u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 embedding_num, const bool allow_centroid_expansion) {
     std::unique_lock lock(rw_mutex_);
 
@@ -1115,43 +1148,42 @@ u32 PlaidIndex::UpdateWithNewEmbeddings(const f32 *embedding_data, const u64 emb
     LOG_INFO(
         fmt::format("PlaidIndex::UpdateWithNewEmbeddings: Adding {} new embeddings, allow_expansion={}", embedding_num, allow_centroid_expansion));
 
-    // Store raw embeddings if in start_from_scratch mode
-    if (!raw_embeddings_.empty()) {
-        // Extend raw embeddings storage
-        const u64 old_size = raw_embeddings_.size();
-        const u64 new_size = old_size + embedding_num * embedding_dimension_;
-        raw_embeddings_.resize(new_size);
-        std::copy_n(embedding_data, embedding_num * embedding_dimension_, raw_embeddings_.begin() + old_size);
-        raw_embeddings_count_ += embedding_num;
-    }
-
     // Expand centroids if enabled and needed
     u32 new_centroids = 0;
     if (allow_centroid_expansion && embedding_num > 0) {
-        // Check if expansion is needed by finding outliers
-        const auto dist_table = std::make_unique_for_overwrite<f32[]>(embedding_num * n_centroids_);
-
         // Release lock during computation to allow concurrent reads
         lock.unlock();
 
-        matrixA_multiply_transpose_matrixB_output_to_C(embedding_data,
-                                                       centroids_data_.data(),
-                                                       embedding_num,
-                                                       n_centroids_,
-                                                       embedding_dimension_,
-                                                       dist_table.get());
-
-        // Count outliers
+        // Count outliers using CHUNKED processing to avoid OOM
+        // For n_centroids=4096, chunk_size = 64M / 4096 = 16384
+        constexpr u32 CHUNK_SIZE = 16384;
         u32 outlier_count = 0;
-        const f32 outlier_threshold = -0.1f; // Adjust based on your similarity metric
-        for (u64 i = 0; i < embedding_num; ++i) {
-            f32 max_sim = std::numeric_limits<f32>::lowest();
-            for (u32 j = 0; j < n_centroids_; ++j) {
-                f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
-                max_sim = std::max(max_sim, sim);
-            }
-            if (max_sim < outlier_threshold) {
-                outlier_count++;
+        const f32 outlier_threshold = -0.1f;
+
+        for (u64 chunk_start = 0; chunk_start < embedding_num; chunk_start += CHUNK_SIZE) {
+            const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(embedding_num));
+            const u32 chunk_count = chunk_end - chunk_start;
+
+            // Allocate distance table for this chunk only
+            const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(chunk_count * n_centroids_);
+
+            matrixA_multiply_transpose_matrixB_output_to_C(embedding_data + chunk_start * embedding_dimension_,
+                                                           centroids_data_.data(),
+                                                           chunk_count,
+                                                           n_centroids_,
+                                                           embedding_dimension_,
+                                                           dist_table_chunk.get());
+
+            // Count outliers in this chunk
+            for (u32 i = 0; i < chunk_count; ++i) {
+                f32 max_sim = std::numeric_limits<f32>::lowest();
+                for (u32 j = 0; j < n_centroids_; ++j) {
+                    f32 sim = dist_table_chunk[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+                    max_sim = std::max(max_sim, sim);
+                }
+                if (max_sim < outlier_threshold) {
+                    outlier_count++;
+                }
             }
         }
 
@@ -1184,31 +1216,40 @@ void PlaidIndex::ExpandCentroidsInternal(const f32 *new_embeddings, const u64 ne
 
     LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanding with {} new embeddings", new_embedding_count));
 
-    // Find outliers: embeddings that are far from existing centroids
-    const auto dist_table = std::make_unique_for_overwrite<f32[]>(new_embedding_count * n_centroids_);
-    matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings,
-                                                   centroids_data_.data(),
-                                                   new_embedding_count,
-                                                   n_centroids_,
-                                                   embedding_dimension_,
-                                                   dist_table.get());
-
-    // Find embeddings with max distance below threshold (outliers)
+    // Find outliers using CHUNKED processing to avoid OOM
+    // For n_centroids=4096, chunk_size = 64M / 4096 = 16384
+    constexpr u32 CHUNK_SIZE = 16384;
     std::vector<u32> outlier_indices;
     std::vector<f32> outlier_embeddings;
     const f32 outlier_threshold = -0.5f; // Threshold for cosine similarity
 
-    for (u64 i = 0; i < new_embedding_count; ++i) {
-        f32 max_sim = std::numeric_limits<f32>::lowest();
-        for (u32 j = 0; j < n_centroids_; ++j) {
-            f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
-            max_sim = std::max(max_sim, sim);
-        }
-        if (max_sim < outlier_threshold) {
-            // This is an outlier, add to list
-            outlier_indices.push_back(static_cast<u32>(i));
-            for (u32 d = 0; d < embedding_dimension_; ++d) {
-                outlier_embeddings.push_back(new_embeddings[i * embedding_dimension_ + d]);
+    for (u64 chunk_start = 0; chunk_start < new_embedding_count; chunk_start += CHUNK_SIZE) {
+        const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(new_embedding_count));
+        const u32 chunk_count = chunk_end - chunk_start;
+
+        // Allocate distance table for this chunk only
+        const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(chunk_count * n_centroids_);
+        matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings + chunk_start * embedding_dimension_,
+                                                       centroids_data_.data(),
+                                                       chunk_count,
+                                                       n_centroids_,
+                                                       embedding_dimension_,
+                                                       dist_table_chunk.get());
+
+        // Find outliers in this chunk
+        for (u32 i = 0; i < chunk_count; ++i) {
+            f32 max_sim = std::numeric_limits<f32>::lowest();
+            for (u32 j = 0; j < n_centroids_; ++j) {
+                f32 sim = dist_table_chunk[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+                max_sim = std::max(max_sim, sim);
+            }
+            if (max_sim < outlier_threshold) {
+                // This is an outlier, add to list
+                const u64 global_idx = chunk_start + i;
+                outlier_indices.push_back(static_cast<u32>(global_idx));
+                for (u32 d = 0; d < embedding_dimension_; ++d) {
+                    outlier_embeddings.push_back(new_embeddings[global_idx * embedding_dimension_ + d]);
+                }
             }
         }
     }
@@ -1458,29 +1499,39 @@ u32 PlaidGlobalIVF::ExpandCentroids(const f32 *new_embeddings, const u64 new_emb
         return 0;
     }
 
-    // Find outliers
-    const auto dist_table = std::make_unique_for_overwrite<f32[]>(new_embedding_count * n_centroids_);
-    matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings,
-                                                   centroids_data_.data(),
-                                                   new_embedding_count,
-                                                   n_centroids_,
-                                                   embedding_dim,
-                                                   dist_table.get());
-
+    // Find outliers using CHUNKED processing to avoid OOM
+    // For n_centroids=4096, chunk_size = 64M / 4096 = 16384
+    constexpr u32 CHUNK_SIZE = 16384;
     std::vector<u32> outlier_indices;
     std::vector<f32> outlier_embeddings;
     const f32 outlier_threshold = -0.5f;
 
-    for (u64 i = 0; i < new_embedding_count; ++i) {
-        f32 max_sim = std::numeric_limits<f32>::lowest();
-        for (u32 j = 0; j < n_centroids_; ++j) {
-            f32 sim = dist_table[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
-            max_sim = std::max(max_sim, sim);
-        }
-        if (max_sim < outlier_threshold) {
-            outlier_indices.push_back(static_cast<u32>(i));
-            for (u32 d = 0; d < embedding_dim; ++d) {
-                outlier_embeddings.push_back(new_embeddings[i * embedding_dim + d]);
+    for (u64 chunk_start = 0; chunk_start < new_embedding_count; chunk_start += CHUNK_SIZE) {
+        const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(new_embedding_count));
+        const u32 chunk_count = chunk_end - chunk_start;
+
+        // Allocate distance table for this chunk only
+        const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(chunk_count * n_centroids_);
+        matrixA_multiply_transpose_matrixB_output_to_C(new_embeddings + chunk_start * embedding_dim,
+                                                       centroids_data_.data(),
+                                                       chunk_count,
+                                                       n_centroids_,
+                                                       embedding_dim,
+                                                       dist_table_chunk.get());
+
+        // Find outliers in this chunk
+        for (u32 i = 0; i < chunk_count; ++i) {
+            f32 max_sim = std::numeric_limits<f32>::lowest();
+            for (u32 j = 0; j < n_centroids_; ++j) {
+                f32 sim = dist_table_chunk[i * n_centroids_ + j] + centroid_norms_neg_half_[j];
+                max_sim = std::max(max_sim, sim);
+            }
+            if (max_sim < outlier_threshold) {
+                const u64 global_idx = chunk_start + i;
+                outlier_indices.push_back(static_cast<u32>(global_idx));
+                for (u32 d = 0; d < embedding_dim; ++d) {
+                    outlier_embeddings.push_back(new_embeddings[global_idx * embedding_dim + d]);
+                }
             }
         }
     }

@@ -49,10 +49,6 @@ RowID MemIndex::GetBeginRowID() {
     if (emvb_index != nullptr) {
         return emvb_index->GetBeginRowID();
     }
-    std::shared_ptr<PlaidIndexInMem> plaid_index = GetPlaidIndex();
-    if (plaid_index != nullptr) {
-        return plaid_index->GetBeginRowID();
-    }
     return RowID();
 }
 
@@ -64,10 +60,6 @@ size_t MemIndex::GetRowCount() {
     std::shared_ptr<EMVBIndexInMem> emvb_index = GetEMVBIndex();
     if (emvb_index != nullptr) {
         return emvb_index->GetRowCount();
-    }
-    std::shared_ptr<PlaidIndexInMem> plaid_index = GetPlaidIndex();
-    if (plaid_index != nullptr) {
-        return plaid_index->GetRowCount();
     }
     return 0;
 }
@@ -105,6 +97,8 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_plaid_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_plaid_index_.get());
     } else if (memory_dummy_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
