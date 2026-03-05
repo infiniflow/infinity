@@ -925,6 +925,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 memory_plaid_index = mem_index->GetPlaidIndex();
             }
             MetaCache *meta_cache = table_meta.meta_cache();
+            // Insert will auto-trigger BuildIndex when threshold is reached
             memory_plaid_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
             break;
         }
@@ -1421,7 +1422,7 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         row_count = rc;
     }
 
-    // Create in-memory PLAID index and check if we have enough data
+    // Create in-memory PLAID index
     auto mem_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
     mem_index->SetSegmentID("", "", segment_index_meta.segment_id());
 
@@ -2173,7 +2174,22 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    auto mem_index = segment_index_meta.PopMemIndex();
+    // For PLAID index, we don't PopMemIndex because PlaidIndexInMem continues to handle insertions after dump.
+    // It maintains state (like updated begin_row_id) across dump operations.
+    // For other index types, we PopMemIndex and ClearMemIndex as usual.
+    std::shared_ptr<MemIndex> mem_index;
+    bool keep_mem_index_after_dump = false;
+    {
+        auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
+        if (index_status.ok()) {
+            keep_mem_index_after_dump = (index_base->index_type_ == IndexType::kPLAID);
+        }
+    }
+    if (keep_mem_index_after_dump) {
+        mem_index = segment_index_meta.GetMemIndex();
+    } else {
+        mem_index = segment_index_meta.PopMemIndex();
+    }
     if (mem_index == nullptr ||
         (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
         return Status::EmptyMemIndex();
@@ -2346,7 +2362,11 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    mem_index->ClearMemIndex();
+    // For PLAID index, don't ClearMemIndex because PlaidIndexInMem continues to handle insertions after dump.
+    // The PlaidIndexInMem object is preserved with its updated state (current_begin_row_id_, etc.).
+    if (!keep_mem_index_after_dump) {
+        mem_index->ClearMemIndex();
+    }
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
         auto *memindex_tracer = storage->memindex_tracer();

@@ -45,7 +45,7 @@ PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
                                  const RowID begin_row_id,
                                  std::shared_ptr<ColumnDef> column_def)
     : nbits_(nbits), requested_n_centroids_(n_centroids), embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id),
-      column_def_(std::move(column_def)) {
+      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id) {
     // Threshold for building index: at least enough for k-means
     build_index_threshold_ = std::max(256u, n_centroids * 32);
 }
@@ -65,10 +65,10 @@ size_t PlaidIndexInMem::GetRowCount() const {
 void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, const u32 row_count, KVInstance &, const TxnTimeStamp, MetaCache *) {
     std::unique_lock lock(rw_mutex_);
 
-    // Like HNSW/EMVB: once index is built, we don't accept new insertions
-    // MemIndex will handle creating a new MemIndex for new data
+    // If index is already built, silently ignore new insertions
+    // This happens when auto-build is triggered and then more inserts come in
     if (is_built_.test()) {
-        UnrecoverableError("PlaidIndexInMem::Insert: Cannot insert into built index. MemIndex should create a new MemIndex instance.");
+        return;
     }
 
     for (u32 i = 0; i < row_count; ++i) {
@@ -87,6 +87,7 @@ void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
 
     // Auto-trigger training if threshold reached
     if (!is_built_.test() && buffered_embedding_count_ >= build_index_threshold_) {
+        // Release lock before building to prevent deadlock
         lock.unlock();
         BuildIndex();
     }
@@ -112,7 +113,8 @@ bool PlaidIndexInMem::BuildIndex() {
     const u32 local_embedding_dim = embedding_dimension_;
     const u32 local_nbits = nbits_;
     const u32 local_requested_n_centroids = requested_n_centroids_;
-    const u32 local_start_segment_offset = begin_row_id_.segment_offset_;
+    // Use current_begin_row_id_ which accounts for previous dumps
+    const u32 local_start_segment_offset = current_begin_row_id_.segment_offset_;
     const size_t doc_count = buffered_embeddings_.size();
 
     // Copy document lengths
@@ -197,9 +199,22 @@ bool PlaidIndexInMem::BuildIndex() {
 void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     std::unique_lock lock(rw_mutex_);
 
+    // Try to build index if we have buffered data but index is not built yet
+    if (!is_built_.test() && buffered_embedding_count_ > 0) {
+        LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Building index before dump with {} buffered embeddings",
+                             buffered_embedding_count_));
+        lock.unlock();
+        BuildIndex();
+        lock.lock();
+    }
+
     if (!is_built_.test() || !plaid_index_) {
-        LOG_INFO("PlaidIndexInMem::Dump: Index not built, skipping dump.");
-        return;
+        // Either no data or not enough data to build index
+        // Return error to let caller know data is not dumped
+        UnrecoverableError(fmt::format("PlaidIndexInMem::Dump: Cannot dump - index not built. "
+                                       "Have {} buffered embeddings, need {}.",
+                                       buffered_embedding_count_,
+                                       build_index_threshold_));
     }
 
     if (!own_memory_) {
@@ -217,7 +232,18 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     own_memory_ = false;
     chunk_handle_ = std::move(handle);
 
-    LOG_INFO("PlaidIndexInMem::Dump: Index dumped successfully");
+    // IMPORTANT: Reset state to allow continuing insert after dump (like HNSW/BMP)
+    // Update current_begin_row_id_ to point to the next new row
+    current_begin_row_id_ = RowID(begin_row_id_.segment_id_, begin_row_id_.segment_offset_ + row_count_);
+    // Clear the built flag so new data can be buffered and built into a new index
+    is_built_.clear();
+    row_count_ = 0;
+    // buffered_embeddings_ and buffered_doc_lens_ should already be empty after BuildIndex
+    buffered_embedding_count_ = 0;
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Index dumped successfully, reset state for new insertions. "
+                         "Next chunk will start at segment_offset={}",
+                         current_begin_row_id_.segment_offset_));
 }
 
 PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_ptr,
@@ -234,15 +260,16 @@ PlaidInMemQueryResultType PlaidIndexInMem::SearchWithBitmask(const f32 *query_pt
     std::atomic_thread_fence(std::memory_order_acquire);
 
     // If index is not built, return data range for exhaustive search
+    // Use current_begin_row_id_ which is updated after each dump
     if (!is_built_.test()) {
-        return std::make_pair(begin_row_id_.segment_offset_, row_count_);
+        return std::make_pair(current_begin_row_id_.segment_offset_, row_count_);
     }
 
     std::shared_lock lock(rw_mutex_);
 
     // Second check after acquiring lock
     if (!is_built_.test() || !plaid_index_) {
-        return std::make_pair(begin_row_id_.segment_offset_, row_count_);
+        return std::make_pair(current_begin_row_id_.segment_offset_, row_count_);
     }
 
     return plaid_index_->SearchWithBitmask(query_ptr,
