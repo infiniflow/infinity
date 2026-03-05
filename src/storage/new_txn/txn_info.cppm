@@ -14,8 +14,9 @@
 
 export module infinity_core:txn_info;
 
-import std;
 import :infinity_type;
+
+import std;
 
 namespace infinity {
 
