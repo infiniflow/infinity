@@ -80,11 +80,10 @@ public:
     NewPlaidIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 
     // Constructor with global centroids (for incremental updates)
-    static std::shared_ptr<PlaidIndexInMem>
-    NewPlaidIndexInMemWithCentroids(const std::shared_ptr<IndexBase> &index_base,
-                                    const std::shared_ptr<ColumnDef> &column_def,
-                                    RowID begin_row_id,
-                                    std::shared_ptr<PlaidGlobalCentroids> global_centroids);
+    static std::shared_ptr<PlaidIndexInMem> NewPlaidIndexInMemWithCentroids(const std::shared_ptr<IndexBase> &index_base,
+                                                                            const std::shared_ptr<ColumnDef> &column_def,
+                                                                            RowID begin_row_id,
+                                                                            std::shared_ptr<PlaidGlobalCentroids> global_centroids);
 
     PlaidIndexInMem(u32 nbits, u32 n_centroids, u32 embedding_dimension, RowID begin_row_id, std::shared_ptr<ColumnDef> column_def);
 

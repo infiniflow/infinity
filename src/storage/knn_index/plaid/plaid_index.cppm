@@ -109,9 +109,7 @@ public:
     bool IsMmap() const { return is_mmap_; }
 
     // Access centroids (for global centroids sharing)
-    const std::vector<f32> &centroids_data() const {
-        return global_centroids_ref_ ? global_centroids_ref_->centroids_data() : centroids_data_;
-    }
+    const std::vector<f32> &centroids_data() const { return global_centroids_ref_ ? global_centroids_ref_->centroids_data() : centroids_data_; }
     const std::vector<f32> &centroid_norms_neg_half() const {
         return global_centroids_ref_ ? global_centroids_ref_->centroid_norms_neg_half() : centroid_norms_neg_half_;
     }
