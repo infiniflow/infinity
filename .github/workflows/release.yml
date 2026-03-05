@@ -26,7 +26,7 @@ jobs:
     # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
     # https://github.com/actions/runner-images/discussions/5734
     # It's not possible to disable avx512 CPU hardware instruction of ubuntu-latest.
-    runs-on: [ "self-hosted", "infinity-test" ]
+    runs-on: [ "self-hosted", "infinity-release" ]
     steps:
     - name: Ensure workspace ownership
       run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
