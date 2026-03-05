@@ -136,14 +136,14 @@ TEST_F(PlaidIndexTest, test_train_and_add) {
     std::vector<f32> all_embeddings;
     all_embeddings.reserve(n_docs * embeddings_per_doc * embedding_dim);
     doc_lens.reserve(n_docs);
-    
+
     for (u32 doc = 0; doc < n_docs; ++doc) {
         for (u32 i = 0; i < embeddings_per_doc * embedding_dim; ++i) {
             all_embeddings.push_back(dis(gen));
         }
         doc_lens.push_back(embeddings_per_doc);
     }
-    
+
     index.AddMultipleDocsEmbeddings(all_embeddings.data(), doc_lens);
 
     EXPECT_EQ(index.GetDocNum(), n_docs);
@@ -181,22 +181,20 @@ TEST_F(PlaidIndexTest, test_search) {
     std::vector<f32> all_embeddings;
     all_embeddings.reserve(n_docs * embeddings_per_doc * embedding_dim);
     doc_lens.reserve(n_docs);
-    
+
     for (u32 doc = 0; doc < n_docs; ++doc) {
         for (u32 i = 0; i < embeddings_per_doc * embedding_dim; ++i) {
             all_embeddings.push_back(dis(gen));
         }
         doc_lens.push_back(embeddings_per_doc);
     }
-    
+
     index.AddMultipleDocsEmbeddings(all_embeddings.data(), doc_lens);
 
     // Just verify index was built correctly
     EXPECT_EQ(index.GetDocNum(), n_docs);
     EXPECT_EQ(index.GetTotalEmbeddingNum(), n_docs * embeddings_per_doc);
 }
-
-
 
 TEST_F(PlaidIndexTest, test_save_load) {
     constexpr u32 embedding_dim = 32;
@@ -222,14 +220,14 @@ TEST_F(PlaidIndexTest, test_save_load) {
     std::vector<f32> all_embeddings;
     all_embeddings.reserve(n_docs * embeddings_per_doc * embedding_dim);
     doc_lens.reserve(n_docs);
-    
+
     for (u32 doc = 0; doc < n_docs; ++doc) {
         for (u32 i = 0; i < embeddings_per_doc * embedding_dim; ++i) {
             all_embeddings.push_back(dis(gen));
         }
         doc_lens.push_back(embeddings_per_doc);
     }
-    
+
     index1.AddMultipleDocsEmbeddings(all_embeddings.data(), doc_lens);
 
     // Get initial size
@@ -268,7 +266,7 @@ TEST_F(PlaidIndexTest, test_move_semantics) {
     }
 
     index1.Train(n_centroids, train_data.data(), n_train_embeddings);
-    
+
     std::vector<u32> doc_lens = {8};
     index1.AddMultipleDocsEmbeddings(train_data.data(), doc_lens);
 
@@ -300,7 +298,7 @@ TEST_F(PlaidIndexTest, test_mem_usage) {
     }
 
     index.Train(n_centroids, train_data.data(), n_train_embeddings);
-    
+
     std::vector<u32> doc_lens = {8};
     index.AddMultipleDocsEmbeddings(train_data.data(), doc_lens);
 
