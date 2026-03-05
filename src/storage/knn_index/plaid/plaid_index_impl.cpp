@@ -21,6 +21,7 @@ export module infinity_core:plaid_index.impl;
 
 import :plaid_index;
 import :plaid_quantizer;
+import :plaid_global_centroids;
 import :mlas_matrix_multiply;
 import :vector_distance;
 import :kmeans_partition;
@@ -70,11 +71,12 @@ PlaidIndex::~PlaidIndex() = default;
 PlaidIndex::PlaidIndex(PlaidIndex &&other)
     : start_segment_offset_(other.start_segment_offset_), embedding_dimension_(other.embedding_dimension_), nbits_(other.nbits_),
       requested_n_centroids_(other.requested_n_centroids_), n_centroids_(other.n_centroids_), centroids_data_(std::move(other.centroids_data_)),
-      centroid_norms_neg_half_(std::move(other.centroid_norms_neg_half_)), n_docs_(other.n_docs_.load()),
-      n_total_embeddings_(other.n_total_embeddings_), doc_lens_(std::move(other.doc_lens_)), doc_offsets_(std::move(other.doc_offsets_)),
-      centroid_ids_(std::move(other.centroid_ids_)), packed_residuals_(std::move(other.packed_residuals_)),
-      packed_residuals_size_(other.packed_residuals_size_), ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)),
-      mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_), is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
+      centroid_norms_neg_half_(std::move(other.centroid_norms_neg_half_)), global_centroids_ref_(std::move(other.global_centroids_ref_)),
+      n_docs_(other.n_docs_.load()), n_total_embeddings_(other.n_total_embeddings_), doc_lens_(std::move(other.doc_lens_)),
+      doc_offsets_(std::move(other.doc_offsets_)), centroid_ids_(std::move(other.centroid_ids_)),
+      packed_residuals_(std::move(other.packed_residuals_)), packed_residuals_size_(other.packed_residuals_size_),
+      ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_),
+      is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
     other.mmap_addr_ = nullptr;
     other.mmap_size_ = 0;
     other.n_docs_ = 0;
@@ -90,6 +92,7 @@ PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
         n_centroids_ = other.n_centroids_;
         centroids_data_ = std::move(other.centroids_data_);
         centroid_norms_neg_half_ = std::move(other.centroid_norms_neg_half_);
+        global_centroids_ref_ = std::move(other.global_centroids_ref_);
         n_docs_ = other.n_docs_.load();
         n_total_embeddings_ = other.n_total_embeddings_;
         doc_lens_ = std::move(other.doc_lens_);
@@ -432,6 +435,142 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     centroid_id_assignments.shrink_to_fit();
 }
 
+void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_data,
+                                                        const std::vector<u32> &doc_lens,
+                                                        const u32 *centroid_ids,
+                                                        const u8 *packed_residuals,
+                                                        const u32 packed_dim) {
+    if (doc_lens.empty())
+        return;
+
+    std::unique_lock lock(rw_mutex_);
+
+    const u32 old_doc_num = n_docs_;
+    const u32 old_total_embeddings = n_total_embeddings_;
+
+    // Calculate total embeddings
+    u64 total_embedding_num = 0;
+    for (u32 len : doc_lens)
+        total_embedding_num += len;
+
+    // Get expected packed dimension from quantizer
+    const u32 expected_packed_dim = (embedding_dimension_ * nbits_) / 8;
+    if (packed_dim != expected_packed_dim) {
+        UnrecoverableError(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: packed_dim mismatch. Expected {}, got {}",
+                                       expected_packed_dim,
+                                       packed_dim));
+    }
+
+    // Copy centroid IDs
+    const size_t old_centroid_ids_size = centroid_ids_.size();
+    centroid_ids_.reserve(old_centroid_ids_size + total_embedding_num);
+    for (u64 i = 0; i < total_embedding_num; ++i) {
+        centroid_ids_.push_back(centroid_ids[i]);
+    }
+
+    // Copy packed residuals
+    const size_t new_data_size = total_embedding_num * packed_dim;
+    const size_t old_packed_size = packed_residuals_size_;
+
+    auto old_packed = std::move(packed_residuals_);
+    packed_residuals_size_ = 0;
+
+    auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
+
+    if (old_packed_size > 0 && old_packed) {
+        std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
+        old_packed.reset();
+    }
+
+    std::copy_n(packed_residuals, new_data_size, new_packed.get() + old_packed_size);
+
+    packed_residuals_size_ = old_packed_size + new_data_size;
+    packed_residuals_ = std::move(new_packed);
+
+    // Update IVF lists
+    u64 offset = 0;
+    for (u32 doc_idx = 0; doc_idx < doc_lens.size(); ++doc_idx) {
+        u32 doc_id = old_doc_num + doc_idx;
+        u32 len = doc_lens[doc_idx];
+        for (u32 i = 0; i < len; ++i) {
+            const u32 centroid_id = centroid_ids[offset + i];
+            if (ivf_lists_.empty() || centroid_id >= ivf_lists_.size()) {
+                UnrecoverableError(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: Invalid centroid_id {} (n_centroids={})",
+                                               centroid_id,
+                                               ivf_lists_.size()));
+            }
+            if (ivf_lists_[centroid_id].empty() || ivf_lists_[centroid_id].back() != doc_id) {
+                ivf_lists_[centroid_id].push_back(doc_id);
+            }
+        }
+        offset += len;
+    }
+
+    // Update metadata
+    u32 current_offset = old_total_embeddings;
+    for (u32 len : doc_lens) {
+        doc_lens_.push_back(len);
+        doc_offsets_.push_back(current_offset);
+        current_offset += len;
+    }
+    n_total_embeddings_ += total_embedding_num;
+    n_docs_ += doc_lens.size();
+
+    LOG_INFO(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: Added {} docs ({} embeddings). Total docs: {}",
+                         doc_lens.size(),
+                         total_embedding_num,
+                         n_docs_.load()));
+}
+
+void PlaidIndex::CopyCentroidsFrom(const std::vector<f32> &centroids_data,
+                                   const std::vector<f32> &centroid_norms_neg_half,
+                                   const u32 n_centroids,
+                                   const PlaidQuantizer *quantizer) {
+    std::unique_lock lock(rw_mutex_);
+
+    n_centroids_ = n_centroids;
+
+    centroids_data_ = centroids_data;
+    centroid_norms_neg_half_ = centroid_norms_neg_half;
+
+    // Copy quantizer if provided
+    if (quantizer != nullptr) {
+        quantizer_->CopyFrom(*quantizer);
+    }
+
+    // Resize IVF lists
+    ivf_lists_.clear();
+    ivf_lists_.resize(n_centroids_);
+
+    LOG_INFO(fmt::format("PlaidIndex::CopyCentroidsFrom: Copied {} centroids", n_centroids));
+}
+
+void PlaidIndex::ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> global_centroids) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (!global_centroids || !global_centroids->IsTrained()) {
+        UnrecoverableError("PlaidIndex::ShareGlobalCentroids: Global centroids not trained");
+    }
+
+    global_centroids_ref_ = std::move(global_centroids);
+    n_centroids_ = global_centroids_ref_->n_centroids();
+
+    // Copy quantizer from global centroids (still needed for dequantization)
+    quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+
+    // Resize IVF lists
+    ivf_lists_.clear();
+    ivf_lists_.resize(n_centroids_);
+
+    // Clear local copies to save memory
+    centroids_data_.clear();
+    centroids_data_.shrink_to_fit();
+    centroid_norms_neg_half_.clear();
+    centroid_norms_neg_half_.shrink_to_fit();
+
+    LOG_INFO(fmt::format("PlaidIndex::ShareGlobalCentroids: Shared {} centroids (no copy)", n_centroids_));
+}
+
 PlaidQueryResultType PlaidIndex::SearchWithBitmask(const f32 *query_ptr,
                                                    const u32 query_embedding_num,
                                                    const u32 top_n,
@@ -753,8 +892,9 @@ size_t PlaidIndex::CalcSize() const {
     size += sizeof(u32); // n_docs_
     size += sizeof(n_total_embeddings_);
 
-    size += centroids_data_.size() * sizeof(f32);
-    size += centroid_norms_neg_half_.size() * sizeof(f32);
+    // Use accessors to get centroids data (handles shared global centroids)
+    size += centroids_data().size() * sizeof(f32);
+    size += centroid_norms_neg_half().size() * sizeof(f32);
 
     size += sizeof(u32) + doc_lens_.size() * sizeof(u32);
     size += sizeof(u32) + doc_offsets_.size() * sizeof(u32);
@@ -793,8 +933,11 @@ void PlaidIndex::SaveToPtr(void *ptr, size_t &offset) const {
     append(&n_docs, sizeof(n_docs));
     append(&n_total_embeddings_, sizeof(n_total_embeddings_));
 
-    append(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
-    append(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
+    // Use accessors to get centroids data (handles shared global centroids)
+    const auto &centroids = centroids_data();
+    const auto &centroid_norms = centroid_norms_neg_half();
+    append(centroids.data(), centroids.size() * sizeof(f32));
+    append(centroid_norms.data(), centroid_norms.size() * sizeof(f32));
 
     u32 doc_lens_size = doc_lens_.size();
     append(&doc_lens_size, sizeof(doc_lens_size));

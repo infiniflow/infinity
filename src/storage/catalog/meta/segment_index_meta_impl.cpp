@@ -33,6 +33,9 @@ import :infinity_exception;
 import :utility;
 import :memory_indexer;
 import :logger;
+import :plaid_global_centroids;
+import :virtual_store;
+import :index_plaid;
 
 import std;
 import third_party;
@@ -333,6 +336,111 @@ std::tuple<std::shared_ptr<SegmentIndexSnapshotInfo>, Status> SegmentIndexMeta::
         segment_index_snapshot_info->chunk_index_snapshots_.push_back(chunk_index_snapshot);
     }
     return {segment_index_snapshot_info, Status::OK()};
+}
+
+// PLAID global centroids management
+Status SegmentIndexMeta::SetPlaidGlobalCentroids(const std::shared_ptr<PlaidGlobalCentroids> &centroids) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    plaid_global_centroids_ = centroids;
+    return Status::OK();
+}
+
+std::shared_ptr<PlaidGlobalCentroids> SegmentIndexMeta::GetPlaidGlobalCentroids() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (!plaid_global_centroids_) {
+        // Try to load from disk
+        Status status = LoadPlaidGlobalCentroids();
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
+    return plaid_global_centroids_;
+}
+
+Status SegmentIndexMeta::SavePlaidGlobalCentroids() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (!plaid_global_centroids_) {
+        return Status::OK(); // Nothing to save
+    }
+
+    // Save to file in segment index directory
+    auto segment_dir = GetSegmentIndexDir();
+    if (!segment_dir) {
+        return Status::UnexpectedError("Failed to get segment index directory");
+    }
+
+    std::string centroids_file = fmt::format("{}/plaid_centroids.bin", *segment_dir);
+
+    // Use VirtualStore to create file handle
+    auto [file_handle, status] = VirtualStore::Open(centroids_file, FileAccessMode::kWrite);
+    if (!status.ok()) {
+        return status;
+    }
+
+    plaid_global_centroids_->Save(*file_handle);
+    file_handle->Sync();
+
+    LOG_INFO(fmt::format("Saved PLAID global centroids to {}", centroids_file));
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::LoadPlaidGlobalCentroids() {
+    // Note: This method is called with mtx_ already held from GetPlaidGlobalCentroids
+    // or called without lock from UninitSet1
+
+    auto segment_dir = GetSegmentIndexDir();
+    if (!segment_dir) {
+        return Status::UnexpectedError("Failed to get segment index directory");
+    }
+
+    std::string centroids_file = fmt::format("{}/plaid_centroids.bin", *segment_dir);
+
+    // Check if file exists
+    if (!VirtualStore::Exists(centroids_file)) {
+        return Status::NotFound("PLAID global centroids file not found");
+    }
+
+    // Get index info for dimension and nbits
+    auto [index_base, index_status] = table_index_meta_.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    if (index_base->index_type_ != IndexType::kPLAID) {
+        return Status::UnexpectedError("Not a PLAID index");
+    }
+
+    // Get embedding dimension from column def
+    auto [column_def, col_status] = table_index_meta_.GetColumnDef();
+    if (!col_status.ok()) {
+        return col_status;
+    }
+
+    const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
+    const u32 embedding_dimension = embedding_info->Dimension();
+
+    // Get nbits from index base
+    const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
+    const u32 nbits = index_plaid->nbits_;
+
+    // Create and load centroids
+    plaid_global_centroids_ = std::make_shared<PlaidGlobalCentroids>(embedding_dimension, nbits);
+
+    auto [file_handle, status] = VirtualStore::Open(centroids_file, FileAccessMode::kRead);
+    if (!status.ok()) {
+        plaid_global_centroids_.reset();
+        return status;
+    }
+
+    plaid_global_centroids_->Load(*file_handle);
+
+    LOG_INFO(fmt::format("Loaded PLAID global centroids from {} (n_centroids={})", centroids_file, plaid_global_centroids_->n_centroids()));
+    return Status::OK();
+}
+
+bool SegmentIndexMeta::HasPlaidGlobalCentroids() {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return plaid_global_centroids_ != nullptr && plaid_global_centroids_->IsTrained();
 }
 
 } // namespace infinity

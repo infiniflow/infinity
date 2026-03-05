@@ -416,4 +416,41 @@ void PlaidQuantizer::LoadFromPtr(void *ptr, size_t &offset) {
     BuildLookupTables();
 }
 
+size_t PlaidQuantizer::MemUsage() const {
+    std::shared_lock lock(rw_mutex_);
+
+    size_t size = sizeof(PlaidQuantizer);
+    size += (n_buckets_ - 1) * sizeof(f32); // bucket_cutoffs_
+    size += n_buckets_ * sizeof(f32);       // bucket_weights_
+    size += 256 * sizeof(u8);               // byte_reversed_bits_map_
+    size += 256 * sizeof(u8);               // bucket_weight_indices_lookup_
+
+    return size;
+}
+
+void PlaidQuantizer::CopyFrom(const PlaidQuantizer &other) {
+    std::unique_lock lock(rw_mutex_);
+    std::shared_lock other_lock(other.rw_mutex_);
+
+    if (other.nbits_ != nbits_ || other.embedding_dim_ != embedding_dim_) {
+        UnrecoverableError("PlaidQuantizer::CopyFrom: dimension mismatch");
+    }
+
+    avg_residual_ = other.avg_residual_;
+
+    // Copy bucket cutoffs
+    if (other.bucket_cutoffs_) {
+        bucket_cutoffs_ = std::make_unique<f32[]>(n_buckets_ - 1);
+        std::copy_n(other.bucket_cutoffs_.get(), n_buckets_ - 1, bucket_cutoffs_.get());
+    }
+
+    // Copy bucket weights
+    if (other.bucket_weights_) {
+        bucket_weights_ = std::make_unique<f32[]>(n_buckets_);
+        std::copy_n(other.bucket_weights_.get(), n_buckets_, bucket_weights_.get());
+    }
+
+    // Note: lookup tables are already built in constructor
+}
+
 } // namespace infinity

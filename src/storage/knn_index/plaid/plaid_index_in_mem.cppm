@@ -20,6 +20,7 @@ import :buffer_handle;
 import :base_memindex;
 import :memindex_tracer;
 import :chunk_index_meta;
+import :plaid_global_centroids;
 
 import column_def;
 import internal_types;
@@ -32,11 +33,15 @@ struct BlockIndex;
 struct ColumnVector;
 class KVInstance;
 class MetaCache;
+class SegmentIndexMeta;
 
 using PlaidInMemQueryResultType = std::variant<std::pair<u32, u32>, std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>;
 
-// In-memory PLAID index
-// Follows HNSW/EMVB design: holds complete index in memory, dumps as a whole chunk
+// In-memory PLAID index with global centroids support
+// Key design:
+// 1. Global centroids are trained once and shared across all chunks
+// 2. Incremental updates use existing centroids (no re-training)
+// 3. Multiple chunks can be efficiently merged (same centroids = direct data merge)
 export class PlaidIndexInMem : public BaseMemIndex {
     const u32 nbits_ = 4;
     const u32 requested_n_centroids_ = 0;
@@ -57,6 +62,14 @@ export class PlaidIndexInMem : public BaseMemIndex {
     // Updated after each dump to point to the next new row
     RowID current_begin_row_id_ = {};
 
+    // Global centroids shared across all chunks in the segment
+    // If null, will train new centroids on first build
+    std::shared_ptr<PlaidGlobalCentroids> global_centroids_;
+
+    // Incremental update threshold
+    // When buffered data reaches this and global centroids exist, do incremental update
+    u32 incremental_threshold_ = 100;
+
 public:
     std::string db_name_;
     std::string table_name_;
@@ -66,7 +79,22 @@ public:
     static std::shared_ptr<PlaidIndexInMem>
     NewPlaidIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 
+    // Constructor with global centroids (for incremental updates)
+    static std::shared_ptr<PlaidIndexInMem>
+    NewPlaidIndexInMemWithCentroids(const std::shared_ptr<IndexBase> &index_base,
+                                    const std::shared_ptr<ColumnDef> &column_def,
+                                    RowID begin_row_id,
+                                    std::shared_ptr<PlaidGlobalCentroids> global_centroids);
+
     PlaidIndexInMem(u32 nbits, u32 n_centroids, u32 embedding_dimension, RowID begin_row_id, std::shared_ptr<ColumnDef> column_def);
+
+    // Constructor with global centroids
+    PlaidIndexInMem(u32 nbits,
+                    u32 n_centroids,
+                    u32 embedding_dimension,
+                    RowID begin_row_id,
+                    std::shared_ptr<ColumnDef> column_def,
+                    std::shared_ptr<PlaidGlobalCentroids> global_centroids);
 
     ~PlaidIndexInMem() override;
 
@@ -109,6 +137,12 @@ public:
     // Check if there's buffered data waiting to be built (for incremental dump)
     bool HasBufferedData() const;
 
+    // Get global centroids (may be null if not yet trained)
+    std::shared_ptr<PlaidGlobalCentroids> GetGlobalCentroids() const { return global_centroids_; }
+
+    // Check if using global centroids (incremental mode)
+    bool IsIncrementalMode() const { return global_centroids_ != nullptr && global_centroids_->IsTrained(); }
+
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
 protected:
@@ -119,6 +153,12 @@ private:
     std::vector<std::unique_ptr<f32[]>> buffered_embeddings_;
     std::vector<u32> buffered_doc_lens_;
     u32 buffered_embedding_count_ = 0;
+
+    // Build index with existing global centroids (incremental update)
+    bool BuildIndexWithGlobalCentroids();
+
+    // Build index from scratch (train new centroids)
+    bool BuildIndexFromScratch();
 };
 
 } // namespace infinity

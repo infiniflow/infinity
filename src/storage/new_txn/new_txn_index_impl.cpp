@@ -515,7 +515,20 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             break;
         }
         case IndexType::kPLAID: {
-            // PLAID index is fully built during PopulatePlaidIndexInner, no additional optimization needed
+            // PLAID index merge: read from column store, rebuild with global centroids
+            SegmentMeta segment_meta(segment_id, table_meta);
+            std::shared_ptr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         default: {
@@ -950,7 +963,15 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 if (!status.ok()) {
                     return status;
                 }
-                memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+                // Try to load existing global centroids for incremental updates
+                auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+                if (global_centroids && global_centroids->IsTrained()) {
+                    LOG_INFO(fmt::format("AppendMemIndex PLAID: Using existing global centroids (n_centroids={})", global_centroids->n_centroids()));
+                    memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_row_id, global_centroids);
+                } else {
+                    LOG_INFO("AppendMemIndex PLAID: No existing global centroids, will train new ones");
+                    memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+                }
                 memory_plaid_index->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
                 mem_index->SetPlaidIndex(memory_plaid_index);
                 LOG_INFO("AppendMemIndex PLAID: created new PlaidIndexInMem");
@@ -2112,6 +2133,74 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
     return Status::OK();
 }
 
+Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
+                                  SegmentIndexMeta &segment_index_meta,
+                                  SegmentMeta &segment_meta,
+                                  std::shared_ptr<ColumnDef> column_def,
+                                  RowID base_rowid,
+                                  u32 total_row_cnt,
+                                  BufferObj *buffer_obj) {
+    Status status;
+
+    // Get or load global centroids
+    auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+    if (!global_centroids || !global_centroids->IsTrained()) {
+        LOG_WARN("OptimizePlaidIndex: No trained global centroids, cannot optimize");
+        return Status::UnexpectedError("No trained global centroids for PLAID index optimization");
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging chunks with {} centroids, {} rows starting at {}",
+                         global_centroids->n_centroids(),
+                         total_row_cnt,
+                         base_rowid.ToUint64()));
+
+    // Create a new PlaidIndexInMem with the existing global centroids
+    auto memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_rowid, global_centroids);
+
+    // Read data from column store and insert into the new index
+    auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+    if (!block_status.ok()) {
+        return block_status;
+    }
+
+    u32 remaining_rows = total_row_cnt;
+    for (BlockID block_id : *block_ids) {
+        if (remaining_rows == 0) {
+            break;
+        }
+
+        BlockMeta block_meta(block_id, segment_meta);
+        size_t block_row_cnt = 0;
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+        if (!status.ok()) {
+            return status;
+        }
+
+        ColumnMeta column_meta(column_def->id(), block_meta);
+        size_t row_cnt = std::min(block_row_cnt, static_cast<size_t>(remaining_rows));
+        remaining_rows -= row_cnt;
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
+        }
+
+        // Insert into the memory index (will auto-build with global centroids)
+        u32 offset = 0;
+        memory_plaid_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), 0, nullptr);
+    }
+
+    // Build the index (using existing global centroids)
+    memory_plaid_index->BuildIndex();
+
+    // Dump to the new buffer
+    memory_plaid_index->Dump(buffer_obj);
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} rows into new chunk", total_row_cnt));
+    return Status::OK();
+}
+
 Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &raw_params) {
     Status status;
     std::shared_ptr<IndexBase> index_base;
@@ -2390,6 +2479,23 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kPLAID: {
             memory_plaid_index->Dump(buffer_obj);
             buffer_obj->Save();
+
+            // Save global centroids after dump (if trained)
+            auto global_centroids = memory_plaid_index->GetGlobalCentroids();
+            if (global_centroids && global_centroids->IsTrained()) {
+                // Update the segment index meta with the global centroids
+                Status centroids_status = segment_index_meta.SetPlaidGlobalCentroids(global_centroids);
+                if (!centroids_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to set global centroids: {}", centroids_status.message()));
+                } else {
+                    centroids_status = segment_index_meta.SavePlaidGlobalCentroids();
+                    if (!centroids_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to save global centroids: {}", centroids_status.message()));
+                    } else {
+                        LOG_INFO("Saved PLAID global centroids after dump");
+                    }
+                }
+            }
             // For PLAID, BuildIndex now only builds a batch of data (up to threshold)
             // If there's more buffered data, we need to create new chunks and dump them
             // This is handled by the caller checking HasBufferedData() after Dump

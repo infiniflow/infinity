@@ -77,6 +77,9 @@ public:
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
 
+    // Copy from another quantizer
+    void CopyFrom(const PlaidQuantizer &other);
+
     // Mmap support
     void SaveToPtr(void *ptr, size_t &offset) const;
     void LoadFromPtr(void *ptr, size_t &offset);
@@ -89,6 +92,9 @@ public:
 
     const f32 *bucket_weights() const { return bucket_weights_.get(); }
     const f32 *bucket_cutoffs() const { return bucket_cutoffs_.get(); }
+
+    // Memory usage
+    size_t MemUsage() const;
 
 private:
     const u32 nbits_;

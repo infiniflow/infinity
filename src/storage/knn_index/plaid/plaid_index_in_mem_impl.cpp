@@ -16,6 +16,7 @@ module infinity_core:plaid_index_in_mem.impl;
 
 import :plaid_index_in_mem;
 import :plaid_index;
+import :plaid_global_centroids;
 import :index_plaid;
 import :column_vector;
 import :chunk_index_meta;
@@ -23,6 +24,7 @@ import :logger;
 import :infinity_exception;
 import :buffer_obj;
 import :buffer_handle;
+import :mlas_matrix_multiply;
 
 import column_def;
 import internal_types;
@@ -39,6 +41,24 @@ std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMem(const std::
     return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_, index_plaid->n_centroids_, embedding_dimension, begin_row_id, column_def);
 }
 
+std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(const std::shared_ptr<IndexBase> &index_base,
+                                                                                  const std::shared_ptr<ColumnDef> &column_def,
+                                                                                  const RowID begin_row_id,
+                                                                                  std::shared_ptr<PlaidGlobalCentroids> global_centroids) {
+    const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
+    const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
+    const u32 embedding_dimension = embedding_info->Dimension();
+    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMemWithCentroids: embedding_dimension={}, has_centroids={}",
+                         embedding_dimension,
+                         global_centroids != nullptr));
+    return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_,
+                                             index_plaid->n_centroids_,
+                                             embedding_dimension,
+                                             begin_row_id,
+                                             column_def,
+                                             std::move(global_centroids));
+}
+
 PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
                                  const u32 n_centroids,
                                  const u32 embedding_dimension,
@@ -48,6 +68,26 @@ PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
       column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id) {
     // Threshold for building index: at least enough for k-means
     build_index_threshold_ = std::max(256u, n_centroids * 32);
+    // Incremental threshold: smaller batch for frequent updates
+    incremental_threshold_ = std::max(100u, n_centroids * 4);
+}
+
+PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
+                                 const u32 n_centroids,
+                                 const u32 embedding_dimension,
+                                 const RowID begin_row_id,
+                                 std::shared_ptr<ColumnDef> column_def,
+                                 std::shared_ptr<PlaidGlobalCentroids> global_centroids)
+    : nbits_(nbits), requested_n_centroids_(n_centroids), embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id),
+      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id), global_centroids_(std::move(global_centroids)) {
+    // Threshold for building index: at least enough for k-means
+    build_index_threshold_ = std::max(256u, n_centroids * 32);
+    // Incremental threshold: smaller batch for frequent updates
+    incremental_threshold_ = std::max(100u, n_centroids * 4);
+
+    if (global_centroids_ && global_centroids_->IsTrained()) {
+        LOG_INFO(fmt::format("PlaidIndexInMem: Using existing global centroids (n_centroids={})", global_centroids_->n_centroids()));
+    }
 }
 
 PlaidIndexInMem::~PlaidIndexInMem() {
@@ -85,75 +125,50 @@ void PlaidIndexInMem::Insert(const ColumnVector &col, const u32 row_offset, cons
         row_count_++;
     }
 
-    // Auto-trigger training/add if threshold reached
-    if (buffered_embedding_count_ >= build_index_threshold_) {
-        // Release lock before building to prevent deadlock
-        lock.unlock();
-        BuildIndex();
+    // Auto-trigger based on mode
+    if (IsIncrementalMode()) {
+        // Incremental mode: trigger on smaller threshold
+        if (buffered_embedding_count_ >= incremental_threshold_) {
+            lock.unlock();
+            BuildIndexWithGlobalCentroids();
+        }
+    } else {
+        // Initial training mode: wait for enough data
+        if (buffered_embedding_count_ >= build_index_threshold_) {
+            lock.unlock();
+            BuildIndex();
+        }
     }
 }
 
 bool PlaidIndexInMem::BuildIndex() {
+    // Check if we can use incremental mode
+    if (IsIncrementalMode()) {
+        return BuildIndexWithGlobalCentroids();
+    }
+    return BuildIndexFromScratch();
+}
+
+bool PlaidIndexInMem::BuildIndexFromScratch() {
     std::unique_lock lock(rw_mutex_);
 
     // If not enough data, return false
     if (buffered_embedding_count_ < build_index_threshold_) {
-        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Not enough data to build index. "
+        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Not enough data to build index. "
                              "Have {} embeddings, need {}.",
                              buffered_embedding_count_,
                              build_index_threshold_));
         return false;
     }
 
-    // If index is already built, add buffered data to existing index
-    if (is_built_.test() && plaid_index_ != nullptr) {
-        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Adding {} buffered embeddings to existing index", buffered_embedding_count_));
-
-        // Prepare embeddings data
-        const size_t doc_count = buffered_embeddings_.size();
-        const u64 local_embedding_count = buffered_embedding_count_;
-        const u32 local_embedding_dim = embedding_dimension_;
-
-        // Copy document lengths first
-        std::vector<u32> local_doc_lens = buffered_doc_lens_;
-
-        // Copy embeddings data
-        auto all_embeddings = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
-        u64 offset = 0;
-        for (size_t i = 0; i < doc_count; ++i) {
-            u32 doc_len = local_doc_lens[i];
-            std::copy_n(buffered_embeddings_[i].get(), doc_len * local_embedding_dim, all_embeddings.get() + offset);
-            offset += doc_len * local_embedding_dim;
-        }
-
-        // Clear buffers
-        buffered_embeddings_.clear();
-        buffered_doc_lens_.clear();
-        buffered_embedding_count_ = 0;
-
-        // Release lock before adding to index
-        lock.unlock();
-
-        // Add to existing index
-        plaid_index_->AddMultipleDocsEmbeddings(all_embeddings.get(), local_doc_lens);
-
-        LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Added {} docs ({} embeddings) to existing index. Total docs now: {}",
-                             doc_count,
-                             local_embedding_count,
-                             plaid_index_->GetDocNum()));
-        return true;
-    }
-
-    // Build new index from scratch
     const size_t doc_count = buffered_embeddings_.size();
     const u64 local_embedding_count = buffered_embedding_count_;
     const u32 local_embedding_dim = embedding_dimension_;
     const u32 local_nbits = nbits_;
     const u32 local_requested_n_centroids = requested_n_centroids_;
-    // Use current_begin_row_id_ which accounts for previous dumps
     const u32 local_start_segment_offset = current_begin_row_id_.segment_offset_;
 
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Building index with {} docs ({} embeddings) starting at offset {}",
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Building index with {} docs ({} embeddings) starting at offset {}",
                          doc_count,
                          local_embedding_count,
                          local_start_segment_offset));
@@ -189,22 +204,29 @@ bool PlaidIndexInMem::BuildIndex() {
 
     const auto time_0 = std::chrono::high_resolution_clock::now();
 
-    // Create and train index without holding PlaidIndexInMem lock
-    auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, local_requested_n_centroids);
-
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training with {} centroids", n_centroids));
-    temp_index->Train(n_centroids, all_embeddings.get(), local_embedding_count, 4);
+    // Create and train global centroids first
+    global_centroids_ = std::make_shared<PlaidGlobalCentroids>(local_embedding_dim, local_nbits);
+    global_centroids_->Train(n_centroids, all_embeddings.get(), local_embedding_count, 4);
 
     const auto time_1 = std::chrono::high_resolution_clock::now();
     auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Training took {} ms", train_ms));
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Training took {} ms", train_ms));
 
-    // Add documents to the trained index using batch method (much faster)
+    // Create index with global centroids
+    auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids);
+
+    // Copy centroids and quantizer from global_centroids_ to the index
+    temp_index->CopyCentroidsFrom(global_centroids_->centroids_data(),
+                                  global_centroids_->centroid_norms_neg_half(),
+                                  global_centroids_->n_centroids(),
+                                  global_centroids_->quantizer());
+
+    // Add documents to the trained index
     temp_index->AddMultipleDocsEmbeddings(all_embeddings.get(), local_doc_lens);
 
     const auto time_2 = std::chrono::high_resolution_clock::now();
     auto add_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_1).count();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Adding documents took {} ms", add_ms));
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Adding documents took {} ms", add_ms));
 
     // Re-acquire lock to update member variables
     lock.lock();
@@ -223,7 +245,110 @@ bool PlaidIndexInMem::BuildIndex() {
     is_built_.test_and_set();
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_2 - time_0).count();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndex: Index built successfully. Total time: {} ms, doc_count={}", total_ms, doc_count));
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Index built successfully. Total time: {} ms, doc_count={}", total_ms, doc_count));
+    return true;
+}
+
+bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
+    std::unique_lock lock(rw_mutex_);
+
+    if (!global_centroids_ || !global_centroids_->IsTrained()) {
+        LOG_WARN("PlaidIndexInMem::BuildIndexWithGlobalCentroids: Global centroids not trained, falling back to scratch build");
+        lock.unlock();
+        return BuildIndexFromScratch();
+    }
+
+    if (buffered_embedding_count_ == 0) {
+        return false;
+    }
+
+    const size_t doc_count = buffered_embeddings_.size();
+    const u64 local_embedding_count = buffered_embedding_count_;
+    const u32 local_embedding_dim = embedding_dimension_;
+    const u32 local_nbits = nbits_;
+    const u32 local_start_segment_offset = current_begin_row_id_.segment_offset_;
+    const u32 n_centroids = global_centroids_->n_centroids();
+
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexWithGlobalCentroids: Incremental build with {} docs ({} embeddings) using {} centroids",
+                         doc_count,
+                         local_embedding_count,
+                         n_centroids));
+
+    // Copy document lengths
+    std::vector<u32> local_doc_lens = buffered_doc_lens_;
+
+    // Copy embeddings data
+    auto all_embeddings = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
+    u64 offset = 0;
+    for (size_t i = 0; i < doc_count; ++i) {
+        u32 doc_len = local_doc_lens[i];
+        std::copy_n(buffered_embeddings_[i].get(), doc_len * local_embedding_dim, all_embeddings.get() + offset);
+        offset += doc_len * local_embedding_dim;
+    }
+
+    // Clear buffers
+    buffered_embeddings_.clear();
+    buffered_doc_lens_.clear();
+    buffered_embedding_count_ = 0;
+
+    // Release lock before processing
+    lock.unlock();
+
+    const auto time_0 = std::chrono::high_resolution_clock::now();
+
+    // Find nearest centroids for all embeddings
+    auto centroid_ids = std::make_unique<u32[]>(local_embedding_count);
+    global_centroids_->FindNearestCentroids(all_embeddings.get(), local_embedding_count, centroid_ids.get());
+
+    // Compute residuals
+    auto residuals = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
+    global_centroids_->ComputeResiduals(all_embeddings.get(), local_embedding_count, centroid_ids.get(), residuals.get());
+
+    // Quantize residuals using global quantizer
+    u32 packed_dim = 0;
+    auto packed_residuals = global_centroids_->quantizer()->Quantize(residuals.get(), local_embedding_count, packed_dim);
+
+    const auto time_3 = std::chrono::high_resolution_clock::now();
+
+    // Create or update PlaidIndex
+    if (!is_built_.test() || plaid_index_ == nullptr) {
+        // Create new index
+        auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids);
+
+        // Share global centroids (avoids copying, saves memory)
+        temp_index->ShareGlobalCentroids(global_centroids_);
+
+        // Add documents with pre-computed centroid IDs and packed residuals
+        temp_index->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
+                                                           local_doc_lens,
+                                                           centroid_ids.get(),
+                                                           packed_residuals.get(),
+                                                           packed_dim);
+
+        // Re-acquire lock
+        lock.lock();
+
+        if (is_built_.test()) {
+            return true; // Another thread built it
+        }
+
+        plaid_index_ = temp_index.release();
+        own_memory_ = true;
+        std::atomic_thread_fence(std::memory_order_release);
+        is_built_.test_and_set();
+    } else {
+        // Add to existing index
+        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
+                                                             local_doc_lens,
+                                                             centroid_ids.get(),
+                                                             packed_residuals.get(),
+                                                             packed_dim);
+    }
+
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_0).count();
+    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexWithGlobalCentroids: Incremental build complete. Total time: {} ms, total docs={}",
+                         total_ms,
+                         plaid_index_->GetDocNum()));
     return true;
 }
 
@@ -233,7 +358,6 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     // If we have buffered data but index is not built yet, build it first
     if (!is_built_.test() && buffered_embedding_count_ > 0) {
         // For dump, we need to build even if we have less data than threshold
-        // Set a lower threshold temporarily for this build
         u32 saved_threshold = build_index_threshold_;
         build_index_threshold_ = std::min(build_index_threshold_, buffered_embedding_count_);
         LOG_INFO(fmt::format("PlaidIndexInMem::Dump: Building index before dump with {} buffered embeddings (threshold adjusted from {})",
@@ -351,6 +475,11 @@ MemIndexTracerInfo PlaidIndexInMem::GetInfo() const {
     // Index memory
     if (plaid_index_) {
         mem_used += plaid_index_->MemUsage();
+    }
+
+    // Global centroids memory (shared, but count it for visibility)
+    if (global_centroids_) {
+        mem_used += global_centroids_->MemUsage();
     }
 
     return MemIndexTracerInfo(std::make_shared<std::string>(index_name_),

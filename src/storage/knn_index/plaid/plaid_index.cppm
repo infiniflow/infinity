@@ -16,6 +16,7 @@ export module infinity_core:plaid_index;
 
 import :infinity_type;
 import :new_catalog;
+import :plaid_global_centroids;
 
 import std;
 import column_def;
@@ -32,6 +33,7 @@ using PlaidQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique
 
 // PLAID Index for multi-vector (tensor) retrieval
 // Follows HNSW/EMVB design: complete index that can be dumped/loaded as a whole chunk
+// Supports global centroids for efficient incremental updates and merging
 export class PlaidIndex {
 public:
     // Constructor for memory-based index
@@ -56,8 +58,24 @@ public:
     // Train the index with embedding data
     void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 4);
 
-    // Add multiple documents' embeddings in batch
+    // Add multiple documents' embeddings in batch (computes centroid assignments internally)
     void AddMultipleDocsEmbeddings(const f32 *embedding_data, const std::vector<u32> &doc_lens);
+
+    // Add multiple documents' embeddings with pre-computed centroid IDs (for incremental updates)
+    void AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_data,
+                                                const std::vector<u32> &doc_lens,
+                                                const u32 *centroid_ids,
+                                                const u8 *packed_residuals,
+                                                u32 packed_dim);
+
+    // Copy centroids from external source (for global centroids support)
+    void CopyCentroidsFrom(const std::vector<f32> &centroids_data,
+                           const std::vector<f32> &centroid_norms_neg_half,
+                           u32 n_centroids,
+                           const PlaidQuantizer *quantizer = nullptr);
+
+    // Share global centroids (avoids copying, preferred for incremental updates)
+    void ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> global_centroids);
 
     // Search with bitmask filtering
     PlaidQueryResultType SearchWithBitmask(const f32 *query_ptr,
@@ -90,6 +108,14 @@ public:
     u32 GetEmbeddingDimension() const { return embedding_dimension_; }
     bool IsMmap() const { return is_mmap_; }
 
+    // Access centroids (for global centroids sharing)
+    const std::vector<f32> &centroids_data() const {
+        return global_centroids_ref_ ? global_centroids_ref_->centroids_data() : centroids_data_;
+    }
+    const std::vector<f32> &centroid_norms_neg_half() const {
+        return global_centroids_ref_ ? global_centroids_ref_->centroid_norms_neg_half() : centroid_norms_neg_half_;
+    }
+
     // Get document length (number of tokens)
     u32 GetDocLen(u32 doc_id) const;
 
@@ -104,6 +130,9 @@ private:
     u32 n_centroids_ = 0;
     std::vector<f32> centroids_data_;          // [n_centroids_, embedding_dimension_]
     std::vector<f32> centroid_norms_neg_half_; // [n_centroids_] for fast L2 computation
+
+    // Optional: shared global centroids reference (avoids copying for incremental updates)
+    std::shared_ptr<PlaidGlobalCentroids> global_centroids_ref_;
 
     // Document metadata
     std::atomic_uint32_t n_docs_ = 0;
