@@ -449,11 +449,12 @@ class TestIndexParallel(TestSdk):
                     row_id = thread_id * 10000 + local_count
                     text_val = f"test_{thread_id}_{local_count}"
                     category = categories[local_count % len(categories)]
-                    value = [{"id": row_id, "text": text_val, "category": category, "vector_col": vec, "tensor_col": multivec, "sparse_col": sparse_vec}]
+                    tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
+                    value = [{"id": row_id, "text": text_val, "category": category, "vector_col": vec, "multi_vector_col": multivec, "tensor_col": tensor_data, "sparse_col": sparse_vec}]
                     table_obj.insert(value)
 
                     with written_data["lock"]:
-                        written_data[row_id] = {"text": text_val, "category": category, "vector": vec, "multivec": multivec, "sparse": sparse_vec}
+                        written_data[row_id] = {"text": text_val, "category": category, "vector": vec, "multivec": multivec, "tensor": tensor_data, "sparse": sparse_vec}
 
                     local_count += 1
                     with write_count.get_lock():
@@ -604,13 +605,13 @@ class TestIndexParallel(TestSdk):
             while time.time() < end_time:
                 try:
                     query_vec = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
-                    res, _ = table_obj.output(["id", "tensor_col"]).match_dense("tensor_col", query_vec, "float", "l2", 5).to_pl()
+                    res, _ = table_obj.output(["id", "multi_vector_col"]).match_dense("multi_vector_col", query_vec, "float", "l2", 5).to_pl()
                     local_count += 1
 
                     if time.time() - last_validation_time >= 3:
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
-                            multivecs = list(res["tensor_col"])
+                            multivecs = list(res["multi_vector_col"])
                             with written_data["lock"]:
                                 for row_id, multivec in zip(ids, multivecs):
                                     if row_id in written_data:
@@ -658,6 +659,40 @@ class TestIndexParallel(TestSdk):
 
             connection_pool.release_conn(infinity_obj)
             print(f"thread {thread_id} (Sparse BMP): read {local_count} times")
+
+
+        def read_worker_emvb(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
+            infinity_obj = connection_pool.get_conn()
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            local_count = 0
+            last_validation_time = time.time()
+
+            while time.time() < end_time:
+                try:
+                    # Query tensor column using EMVB index
+                    query_mv = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
+                    res, _ = table_obj.output(["id", "tensor_col"]).match_tensor("tensor_col", query_mv, "float", 5).to_pl()
+                    local_count += 1
+
+                    if time.time() - last_validation_time >= 3:
+                        if res is not None and len(res) > 0:
+                            ids = list(res["id"])
+                            tensor_cols = list(res["tensor_col"])
+                            with written_data["lock"]:
+                                for row_id, tensor_col in zip(ids, tensor_cols):
+                                    if row_id in written_data:
+                                        assert len(tensor_col) > 0, "EMVB validation failed: empty tensor_col"
+                        last_validation_time = time.time()
+                except Exception:
+                    pass
+                time.sleep(0.1)
+
+            with read_count.get_lock():
+                read_count.value += local_count
+
+            connection_pool.release_conn(infinity_obj)
+            print(f"thread {thread_id} (EMVB): read {local_count} times")
 
         def read_worker_fusion_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, written_data, validation_errors):
             infinity_obj = connection_pool.get_conn()
@@ -713,9 +748,9 @@ class TestIndexParallel(TestSdk):
                     query_vec = [0.5] * 4
                     query_mv = [0.5, 0.5, 0.5, 0.6, 0.6, 0.6]
                     res, _ = (table_obj
-                             .output(["id", "vector_col", "tensor_col"])
+                             .output(["id", "vector_col", "multi_vector_col"])
                              .match_dense("vector_col", query_vec, "float", "l2", 5)
-                             .match_dense("tensor_col", query_mv, "float", "l2", 5)
+                             .match_dense("multi_vector_col", query_mv, "float", "l2", 5)
                              .fusion(method='rrf', topn=5)
                              .to_pl())
                     local_count += 1
@@ -724,7 +759,7 @@ class TestIndexParallel(TestSdk):
                         if res is not None and len(res) > 0:
                             ids = list(res["id"])
                             vectors = list(res["vector_col"])
-                            multivecs = list(res["tensor_col"])
+                            multivecs = list(res["multi_vector_col"])
                             with written_data["lock"]:
                                 for row_id, vec, multivec in zip(ids, vectors, multivecs):
                                     if row_id in written_data:
@@ -800,7 +835,8 @@ class TestIndexParallel(TestSdk):
             "text": {"type": "varchar"},
             "category": {"type": "varchar"},  # For low cardinality secondary index
             "vector_col": {"type": "vector,4,float"},
-            "tensor_col": {"type": "multivector,3,float"},  # Multi-vector: each doc has multiple 3-dim vectors
+            "multi_vector_col": {"type": "multivector,3,float"},  # Multi-vector: each doc has multiple 3-dim vectors
+            "tensor_col": {"type": "tensor,4,float"},  # Tensor column for EMVB index
             "sparse_col": {"type": "sparse,100,float,int8"}  # Sparse vector column for BMP index
         }, ConflictType.Error)
         assert table_obj is not None
@@ -831,7 +867,7 @@ class TestIndexParallel(TestSdk):
 
         # Hnsw index on multi-vector column (using vector type for fixed-dimension vectors)
         res = table_obj.create_index("idx_hnsw_mv",
-                                     index.IndexInfo("tensor_col", index.IndexType.Hnsw,
+                                     index.IndexInfo("multi_vector_col", index.IndexType.Hnsw,
                                                      {"M": "16", "ef_construction": "50", "metric": "l2"}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -843,8 +879,15 @@ class TestIndexParallel(TestSdk):
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        print("Created all 6 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv, bmp")
-        print("Running with 9 read threads: FullText, Hnsw, HnswMV, SecondaryHigh, SecondaryLow, Sparse, FusionRRF, FusionMVRRF, FusionWeightedSum")
+        # EMVB index on tensor column
+        res = table_obj.create_index("idx_emvb",
+                                     index.IndexInfo("tensor_col", index.IndexType.EMVB,
+                                                     {"pq_subspace_num": "8", "pq_subspace_bits": "8"}),
+                                     ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        print("Created all 7 indexes: fulltext, secondary_high, secondary_low, hnsw, hnsw_mv, bmp, emvb")
+        print("Running with 10 read threads: FullText, Hnsw, HnswMV, SecondaryHigh, SecondaryLow, Sparse, EMVB, FusionRRF, FusionMVRRF, FusionWeightedSum")
 
         # Insert initial data
         initial_data = []
@@ -858,12 +901,14 @@ class TestIndexParallel(TestSdk):
                 sparse_indices = [0, 1, 2]
             sparse_values = [random.random() for _ in range(len(sparse_indices))]
             sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+            tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
             initial_data.append({
                 "id": i,
                 "text": f"test_{i}",
                 "category": categories[i % len(categories)],
                 "vector_col": vec,
-                "tensor_col": multivec,
+                "multi_vector_col": multivec,
+                "tensor_col": tensor_data,
                 "sparse_col": sparse_vec
             })
         table_obj.insert(initial_data)
@@ -884,7 +929,8 @@ class TestIndexParallel(TestSdk):
                 "text": f"test_{i}",
                 "category": categories[i % len(categories)],
                 "vector": initial_data[i]["vector_col"],
-                "multivec": initial_data[i]["tensor_col"],
+                "multivec": initial_data[i]["multi_vector_col"],
+                "tensor": initial_data[i]["tensor_col"],
                 "sparse": initial_data[i]["sparse_col"]
             }
 
@@ -894,6 +940,7 @@ class TestIndexParallel(TestSdk):
         read_count_secondary_high = Value('i', 0)
         read_count_secondary_low = Value('i', 0)
         read_count_sparse = Value('i', 0)
+        read_count_emvb = Value('i', 0)
         read_count_fusion_rrf = Value('i', 0)
         read_count_fusion_mv_rrf = Value('i', 0)
         read_count_fusion_weighted_sum = Value('i', 0)
@@ -934,17 +981,21 @@ class TestIndexParallel(TestSdk):
             connection_pool, table_name, end_time, 5, read_count_sparse, written_data, validation_errors])
         threads.append(t)
 
+        t = Thread(target=read_worker_emvb, args=[
+            connection_pool, table_name, end_time, 6, read_count_emvb, written_data, validation_errors])
+        threads.append(t)
+
         # Start fusion threads
         t = Thread(target=read_worker_fusion_rrf, args=[
-            connection_pool, table_name, end_time, 6, read_count_fusion_rrf, written_data, validation_errors])
+            connection_pool, table_name, end_time, 7, read_count_fusion_rrf, written_data, validation_errors])
         threads.append(t)
 
         t = Thread(target=read_worker_fusion_mv_rrf, args=[
-            connection_pool, table_name, end_time, 7, read_count_fusion_mv_rrf, written_data, validation_errors])
+            connection_pool, table_name, end_time, 8, read_count_fusion_mv_rrf, written_data, validation_errors])
         threads.append(t)
 
         t = Thread(target=read_worker_fusion_weighted_sum, args=[
-            connection_pool, table_name, end_time, 8, read_count_fusion_weighted_sum, written_data, validation_errors])
+            connection_pool, table_name, end_time, 9, read_count_fusion_weighted_sum, written_data, validation_errors])
         threads.append(t)
 
         # Start all threads
@@ -961,6 +1012,7 @@ class TestIndexParallel(TestSdk):
               f"Hnsw: {read_count_hnsw.value}, HnswMV: {read_count_hnsw_mv.value}, "
               f"SecondaryHigh: {read_count_secondary_high.value}, SecondaryLow: {read_count_secondary_low.value}, "
               f"Sparse: {read_count_sparse.value}, "
+              f"EMVB: {read_count_emvb.value}, "
               f"FusionRRF: {read_count_fusion_rrf.value}, FusionMVRRF: {read_count_fusion_mv_rrf.value}, "
               f"FusionWeightedSum: {read_count_fusion_weighted_sum.value}")
 
@@ -974,6 +1026,7 @@ class TestIndexParallel(TestSdk):
         assert "idx_hnsw" in index_names, "Hnsw index not found"
         assert "idx_hnsw_mv" in index_names, "Hnsw MV index not found"
         assert "idx_bmp" in index_names, "BMP (sparse) index not found"
+        assert "idx_emvb" in index_names, "EMVB index not found"
 
         # Verify read operations succeeded
         assert read_count_fulltext.value > 0, "FullText read failed"
