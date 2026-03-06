@@ -162,8 +162,8 @@ std::variant<std::pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::Sear
                                               out_second_stage,
                                               threshold_final);
     }
-    // execute exhaustive search
-    return std::make_pair(begin_row_id_.segment_offset_, row_count_);
+    // execute exhaustive search - use bitmask.count() which is the segment_row_count at begin_ts
+    return std::make_pair(begin_row_id_.segment_offset_, bitmask.count());
 }
 
 const ChunkIndexMetaInfo EMVBIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, GetRowCount(), 0, 0}; }

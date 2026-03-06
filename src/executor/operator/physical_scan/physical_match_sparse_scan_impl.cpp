@@ -486,18 +486,20 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         }
         SegmentIndexMeta *segment_index_meta = iter->second.get();
 
+        auto segment_it = block_index->new_segment_block_index_.find(segment_id);
+        if (segment_it == block_index->new_segment_block_index_.end()) {
+            UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+        }
+        size_t segment_row_count = segment_it->second.segment_offset();
+
         bool has_some_result = false;
         Bitmask bitmask;
         bool use_bitmask = false;
+
         if (common_query_filter_->AlwaysTrue()) {
             has_some_result = true;
         } else {
             if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
-                auto segment_it = block_index->new_segment_block_index_.find(segment_id);
-                if (segment_it == block_index->new_segment_block_index_.end()) {
-                    UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
-                }
-                size_t segment_row_count = segment_it->second.segment_offset();
                 bitmask = it->second;
                 if (bitmask.count() != segment_row_count) {
                     UnrecoverableError(fmt::format("Invalid segment row count: {} vs {}", bitmask.count(), segment_row_count));
@@ -542,7 +544,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             BitmaskFilter<SegmentOffset> filter(bitmask);
             bmp_scan(filter);
         } else {
-            bmp_scan(nullptr);
+            AppendFilter filter(segment_row_count);
+            bmp_scan(filter);
         }
 
         break;
