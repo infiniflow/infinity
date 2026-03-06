@@ -68,9 +68,17 @@ protected:
 
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
 
+    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
+
+    void FreeFromMmapImpl() override;
+
     const u32 row_count_{};
 
 private:
+    SecondaryIndexCardinality GetCardinalityType();
+
+    // void GetDataType();
+
     DataType index_data_type_{LogicalType::kInvalid};
 };
 

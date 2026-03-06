@@ -19,6 +19,8 @@ import :infinity_exception;
 
 import third_party;
 
+import serialize;
+
 namespace infinity {
 
 struct SecondaryIndexApproxPos {
@@ -95,6 +97,35 @@ public:
         }
     }
 
+    inline void Load(const char *&ptr) {
+        {
+            u32 save_n = ReadBufAdv<u32>(ptr);
+            this->n = save_n;
+        }
+        {
+            // load first_key
+            IndexValueType save_first_key = ReadBufAdv<IndexValueType>(ptr);
+            this->first_key = save_first_key;
+        }
+
+        // Fix these in 3rd-party
+        {
+            u32 save_size = ReadBufAdv<u32>(ptr);
+            this->segments.resize(save_size);
+            // Unless modify 3rd-party class
+            std::memcpy(this->segments.data(), ptr, save_size * sizeof(typename decltype(this->segments)::value_type));
+            // this->segments.data() = ptr;
+            ptr += save_size * sizeof(typename decltype(this->segments)::value_type);
+        }
+        {
+            u32 save_levels_offsets_size = ReadBufAdv<u32>(ptr);
+            this->levels_offsets.resize(save_levels_offsets_size);
+
+            std::memcpy(this->levels_offsets.data(), ptr, save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type));
+            ptr += save_levels_offsets_size * sizeof(typename decltype(this->levels_offsets)::value_type);
+        }
+    }
+
     inline void Save(LocalFileHandle &file_handle) const {
         {
             // save n
@@ -129,6 +160,8 @@ public:
 
     virtual void LoadIndex(LocalFileHandle &file_handle) = 0;
 
+    virtual void LoadIndex(const char *&ptr) = 0;
+
     virtual void BuildIndex(size_t data_cnt, const void *data_ptr) = 0;
 
     virtual SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const = 0;
@@ -157,6 +190,15 @@ public:
         }
         pgm_index_ = std::make_unique<PGMWithExtraFunction<IndexValueType>>();
         pgm_index_->Load(file_handle);
+        initialized_ = true;
+    }
+
+    void LoadIndex(const char *&ptr) override {
+        if (initialized_) {
+            UnrecoverableError("Already initialized.");
+        }
+        pgm_index_ = std::make_unique<PGMWithExtraFunction<IndexValueType>>();
+        pgm_index_->Load(ptr);
         initialized_ = true;
     }
 
