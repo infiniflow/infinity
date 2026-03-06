@@ -300,13 +300,16 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     auto centroid_ids = std::make_unique<u32[]>(local_embedding_count);
     global_centroids_->FindNearestCentroids(all_embeddings.get(), local_embedding_count, centroid_ids.get());
 
-    // Compute residuals
-    auto residuals = std::make_unique_for_overwrite<f32[]>(local_embedding_count * local_embedding_dim);
-    global_centroids_->ComputeResiduals(all_embeddings.get(), local_embedding_count, centroid_ids.get(), residuals.get());
+    // Compute residuals and quantize in-place to save memory
+    // Instead of allocating a separate residuals array, we reuse all_embeddings
+    global_centroids_->ComputeResiduals(all_embeddings.get(), local_embedding_count, centroid_ids.get(), all_embeddings.get());
 
-    // Quantize residuals using global quantizer
+    // Quantize residuals (now stored in all_embeddings) using global quantizer
     u32 packed_dim = 0;
-    auto packed_residuals = global_centroids_->quantizer()->Quantize(residuals.get(), local_embedding_count, packed_dim);
+    auto packed_residuals = global_centroids_->quantizer()->Quantize(all_embeddings.get(), local_embedding_count, packed_dim);
+
+    // Release all_embeddings early to free memory
+    all_embeddings.reset();
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
 
