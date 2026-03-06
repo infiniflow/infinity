@@ -32,6 +32,8 @@ public:
 
     const std::string &db_id_str() const;
 
+    const std::string &db_name() const { return db_name_; }
+
     KVInstance *kv_instance() const { return kv_instance_; }
 
     Status InitSet(const std::string *comment = nullptr);

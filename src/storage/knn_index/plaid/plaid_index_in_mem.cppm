@@ -71,10 +71,6 @@ export class PlaidIndexInMem : public BaseMemIndex {
     u32 incremental_threshold_ = 100;
 
 public:
-    std::string db_name_;
-    std::string table_name_;
-    std::string index_name_;
-    SegmentID segment_id_ = -1;
 
     static std::shared_ptr<PlaidIndexInMem>
     NewPlaidIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
@@ -102,9 +98,9 @@ public:
     RowID GetBeginRowID() const override { return current_begin_row_id_; }
     size_t GetRowCount() const;
 
-    void SetSegmentID(std::string db_id_str, std::string table_id_str, SegmentID segment_id) {
-        db_name_ = std::move(db_id_str);
-        table_name_ = std::move(table_id_str);
+    void SetSegmentID(std::string db_name, std::string table_name, SegmentID segment_id) {
+        db_name_ = std::move(db_name);
+        table_name_ = std::move(table_name);
         segment_id_ = segment_id;
     }
 
@@ -135,6 +131,9 @@ public:
 
     // Check if there's buffered data waiting to be built (for incremental dump)
     bool HasBufferedData() const;
+
+    // Check if index has been built (has valid plaid_index_)
+    bool IsBuilt() const { return is_built_.test() && plaid_index_ != nullptr; }
 
     // Get global centroids (may be null if not yet trained)
     std::shared_ptr<PlaidGlobalCentroids> GetGlobalCentroids() const { return global_centroids_; }

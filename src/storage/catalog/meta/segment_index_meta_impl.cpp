@@ -369,6 +369,14 @@ Status SegmentIndexMeta::SavePlaidGlobalCentroids() {
         return Status::UnexpectedError("Failed to get segment index directory");
     }
 
+    // Ensure directory exists
+    if (!VirtualStore::Exists(*segment_dir)) {
+        Status mkdir_status = VirtualStore::MakeDirectory(*segment_dir);
+        if (!mkdir_status.ok()) {
+            return mkdir_status;
+        }
+    }
+
     std::string centroids_file = fmt::format("{}/plaid_centroids.bin", *segment_dir);
 
     // Use VirtualStore to create file handle
