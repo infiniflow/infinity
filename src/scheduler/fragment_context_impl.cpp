@@ -28,6 +28,7 @@ import :physical_table_scan;
 import :physical_index_scan;
 import :physical_knn_scan;
 import :physical_aggregate;
+import :physical_hash_aggregate;
 import :physical_explain;
 import :physical_create_index_prepare;
 import :physical_sort;
@@ -258,6 +259,12 @@ MakeTaskState(size_t operator_id, const std::vector<PhysicalOperator *> &physica
         case PhysicalOperatorType::kAggregate: {
             auto *physical_aggregate = static_cast<PhysicalAggregate *>(physical_ops[operator_id]);
             return MakeAggregateState(physical_aggregate, task);
+        }
+        case PhysicalOperatorType::kHashAggregate: {
+            return MakeTaskStateTemplate<HashAggregateOperatorState>(physical_ops[operator_id]);
+        }
+        case PhysicalOperatorType::kMergeHashAggregate: {
+            return MakeTaskStateTemplate<MergeHashAggregateOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeAggregate: {
             return MakeTaskStateTemplate<MergeAggregateOperatorState>(physical_ops[operator_id]);
@@ -735,6 +742,23 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kHashAggregate: {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+                UnrecoverableError(
+                    fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
+            }
+
+            if ((i64)tasks_.size() != parallel_count) {
+                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+            }
+
+            auto *hash_agg_operator = static_cast<PhysicalHashAggregate *>(first_operator);
+            std::vector<HashRange> hash_range = hash_agg_operator->GetHashRanges(parallel_count);
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->source_state_ = std::make_unique<AggregateSourceState>(hash_range[task_id].start_, hash_range[task_id].end_);
+            }
+            break;
+        }
         case PhysicalOperatorType::kProjection: {
             if (this->GetOperators().size() == 1) {
                 // Only one operator and it's project
@@ -773,6 +797,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kMergeAggregate:
+        case PhysicalOperatorType::kMergeHashAggregate:
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
@@ -937,7 +962,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kInvalid: {
             UnrecoverableError("Unexpected operator type");
         }
-        case PhysicalOperatorType::kAggregate: {
+        case PhysicalOperatorType::kAggregate:
+        case PhysicalOperatorType::kHashAggregate: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
                 UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
@@ -992,6 +1018,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeParallelAggregate:
         case PhysicalOperatorType::kMergeAggregate:
         case PhysicalOperatorType::kMergeHash:
+        case PhysicalOperatorType::kMergeHashAggregate:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:

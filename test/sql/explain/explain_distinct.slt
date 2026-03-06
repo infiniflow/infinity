@@ -1,0 +1,185 @@
+# name: test/sql/explain/explain_distinct.slt
+# description: Test explain on DISTINCT queries
+# group: [explain]
+
+# Create test table
+statement ok
+DROP TABLE IF EXISTS explain_distinct;
+
+statement ok
+CREATE TABLE explain_distinct (c1 INTEGER, c2 INTEGER, c3 VARCHAR);
+
+statement ok
+INSERT INTO explain_distinct VALUES (1, 100, 'apple'), (2, 200, 'banana'), (1, 100, 'apple'), (3, 300, 'cherry');
+
+# Test EXPLAIN SELECT DISTINCT
+query I
+explain SELECT DISTINCT c1 FROM explain_distinct;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [c1 (#0)]
+ -> AGGREGATE (3)
+    - aggregate table index: #5
+    - aggregate: []
+    - group by table index: #5
+    - group by: [c1 (#0)]
+   -> TABLE SCAN (2)
+      - table name: explain_distinct(default_db.explain_distinct)
+      - table index: #1
+      - output_columns: [c1, __rowid]
+
+
+# Test EXPLAIN SELECT DISTINCT on multiple columns
+query I
+explain SELECT DISTINCT c1, c2 FROM explain_distinct;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [c1 (#0), c2 (#1)]
+ -> AGGREGATE (3)
+    - aggregate table index: #5
+    - aggregate: []
+    - group by table index: #5
+    - group by: [c1 (#0), c2 (#1)]
+   -> TABLE SCAN (2)
+      - table name: explain_distinct(default_db.explain_distinct)
+      - table index: #1
+      - output_columns: [c1, c2, __rowid]
+
+# Test EXPLAIN SELECT COUNT(DISTINCT c1)
+query I
+explain SELECT COUNT(DISTINCT c1) FROM explain_distinct;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#0)]
+ -> AGGREGATE (4)
+    - aggregate table index: #6
+    - aggregate: [COUNT(c1 (#0))]
+   -> AGGREGATE (3)
+      - aggregate table index: #5
+      - aggregate: []
+      - group by table index: #5
+      - group by: [c1 (#0)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c1, __rowid]
+
+query I
+explain SELECT c1, COUNT(DISTINCT c2) FROM explain_distinct GROUP BY c1;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [c1 (#0), count(DISTINCT c2) (#1)]
+ -> AGGREGATE (4)
+    - aggregate table index: #6
+    - aggregate: [COUNT(c2 (#1))]
+    - group by table index: #7
+    - group by: [c1 (#0)]
+   -> AGGREGATE (3)
+      - aggregate table index: #5
+      - aggregate: []
+      - group by table index: #5
+      - group by: [c1 (#0), c2 (#1)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c1, c2, __rowid]
+
+query I
+explain SELECT c1, COUNT(DISTINCT c2) FROM explain_distinct GROUP BY c1 ORDER BY c1;
+----
+ PROJECT (6)
+  - table index: #8
+  - expressions: [c1 (#0), count(DISTINCT c2) (#1)]
+ -> SORT (5)
+    - expressions: [c1 (#0) ASC]
+    - output columns: [c1, COUNT(c2)]
+   -> AGGREGATE (4)
+      - aggregate table index: #6
+      - aggregate: [COUNT(c2 (#1))]
+      - group by table index: #7
+      - group by: [c1 (#0)]
+     -> AGGREGATE (3)
+        - aggregate table index: #5
+        - aggregate: []
+        - group by table index: #5
+        - group by: [c1 (#0), c2 (#1)]
+       -> TABLE SCAN (2)
+          - table name: explain_distinct(default_db.explain_distinct)
+          - table index: #1
+          - output_columns: [c1, c2, __rowid]
+
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(DISTINCT c2) FROM explain_distinct;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#0), sum(DISTINCT c2) (#1)]
+ -> MERGE HASH AGGREGATE (4)
+    - aggregates: [COUNT(DISTINCT c1 (#0)), SUM(DISTINCT c2 (#1))]
+   -> HASH AGGREGATE (3)
+      - distinct columns: [c1 (#0), c2 (#1)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c1, c2, __rowid]
+
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(DISTINCT c2) FROM explain_distinct GROUP BY c3;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#1), sum(DISTINCT c2) (#2)]
+ -> MERGE HASH AGGREGATE (4)
+    - group by: [c3 (#0)]
+    - aggregates: [COUNT(DISTINCT c1 (#1)), SUM(DISTINCT c2 (#2))]
+   -> HASH AGGREGATE (3)
+      - group by: [c3 (#0)]
+      - distinct columns: [c1 (#1), c2 (#2)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c3, c1, c2, __rowid]
+
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(DISTINCT c2) FROM explain_distinct GROUP BY c3 ORDER by c3;
+----
+ PROJECT (6)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#1), sum(DISTINCT c2) (#2)]
+ -> SORT (5)
+    - expressions: [c3 (#0) ASC]
+    - output columns: [c3, COUNT(DISTINCT c1), SUM(DISTINCT c2)]
+   -> MERGE HASH AGGREGATE (4)
+      - group by: [c3 (#0)]
+      - aggregates: [COUNT(DISTINCT c1 (#1)), SUM(DISTINCT c2 (#2))]
+     -> HASH AGGREGATE (3)
+        - group by: [c3 (#0)]
+        - distinct columns: [c1 (#1), c2 (#2)]
+       -> TABLE SCAN (2)
+          - table name: explain_distinct(default_db.explain_distinct)
+          - table index: #1
+          - output_columns: [c3, c1, c2, __rowid]
+
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(c2) FROM explain_distinct;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#0), sum(c2) (#1)]
+ -> MERGE HASH AGGREGATE (4)
+    - aggregates: [COUNT(DISTINCT c1 (#0)), SUM(c2 (#1))]
+   -> HASH AGGREGATE (3)
+      - distinct columns: [c1 (#0)]
+      - non-distinct columns: [c2 (#1)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c1, c2, __rowid]
+
+# Cleanup
+statement ok
+DROP TABLE explain_distinct;

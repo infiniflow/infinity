@@ -46,25 +46,6 @@ SELECT DISTINCT c1, c2, c3 FROM test_distinct order by c1,c2
 2 1 apple
 3 2 456
 
-query I
-SELECT COUNT(DISTINCT c1) FROM test_distinct
-----
-3
-
-query I
-SELECT COUNT(DISTINCT c1, c3) FROM test_distinct
-----
-3
-
-query I
-SELECT SUM(DISTINCT c1) FROM test_distinct
-----
-6
-
-statement error
-SELECT SUM(DISTINCT c1, c3) FROM test_distinct
-
-
 query I rowsort
 SELECT DISTINCT CAST(c3 AS INTEGER) FROM test_distinct
 ----
@@ -72,6 +53,23 @@ SELECT DISTINCT CAST(c3 AS INTEGER) FROM test_distinct
 456
 null
 
+query I
+SELECT COUNT(DISTINCT c1) FROM test_distinct
+----
+3
+
+query I
+SELECT AVG(DISTINCT c1) FROM test_distinct
+----
+2.000000
+
+query I
+SELECT COUNT(DISTINCT c1, c3) FROM test_distinct
+----
+3
+
+statement error
+SELECT SUM(DISTINCT c1, c3) FROM test_distinct
 
 query I
 SELECT COUNT(DISTINCT CAST(c3 AS INTEGER)) FROM test_distinct
@@ -82,3 +80,35 @@ query I
 SELECT SUM(DISTINCT CAST(c3 AS INTEGER)) FROM test_distinct
 ----
 579
+
+query II
+SELECT SUM(DISTINCT c1), SUM(DISTINCT c1) FROM test_distinct
+----
+6 6
+
+query II
+SELECT AVG(DISTINCT c1), MIN(DISTINCT c1), SUM(DISTINCT c2), AVG(DISTINCT c2) FROM test_distinct
+----
+2.000000 1 3 1.500000
+
+query II
+SELECT COUNT(DISTINCT c1, c2), SUM(DISTINCT c2) FROM test_distinct
+----
+4 3
+
+query TIII rowsort
+SELECT c3, AVG(DISTINCT c1), MIN(DISTINCT c1), SUM(DISTINCT c2), AVG(DISTINCT c2) FROM test_distinct group by c3;
+----
+123 1.000000 1 3 1.500000
+456 3.000000 3 2 2.000000
+apple 2.000000 2 1 1.000000
+
+query TIII
+SELECT c3, MAX(DISTINCT c1), MIN(DISTINCT c1), SUM(DISTINCT c2), AVG(DISTINCT c2) FROM test_distinct group by c3 order by c3;
+----
+123 1 1 3 1.500000
+456 3 3 2 2.000000
+apple 2 2 1 1.000000
+
+statement ok
+DROP TABLE test_distinct;

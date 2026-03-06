@@ -181,6 +181,22 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kHashAggregate: {
+            HashAggregateOperatorState *hash_agg_output_state = static_cast<HashAggregateOperatorState *>(task_op_state);
+            if (hash_agg_output_state->data_block_array_.empty()) {
+                if (materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    UnrecoverableError("Empty hash aggregate output");
+                }
+            } else {
+                for (auto &data_block : hash_agg_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                hash_agg_output_state->data_block_array_.clear();
+            }
+            break;
+        }
         case PhysicalOperatorType::kReadCache: {
             auto *read_cache_state = static_cast<ReadCacheState *>(task_op_state);
             if (read_cache_state->data_block_array_.empty()) {

@@ -24,6 +24,8 @@ namespace infinity {
 export enum class LogicalNodeType : u8 {
     kInvalid = 0,
     kAggregate,
+    kHashAggregate,
+    kMergeHashAggregate,
     kExcept,
     kUnion,
     kIntersect,

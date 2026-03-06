@@ -44,6 +44,7 @@ import :physical_filter;
 import :physical_table_scan;
 import :physical_knn_scan;
 import :physical_aggregate;
+import :physical_hash_aggregate;
 import :physical_sort;
 import :physical_limit;
 import :physical_cross_product;
@@ -69,6 +70,7 @@ import :physical_fusion;
 import :physical_match_sparse_scan;
 import :physical_merge_match_sparse;
 import :physical_merge_aggregate;
+import :physical_merge_hash_aggregate;
 import :status;
 import :physical_operator_type;
 import :physical_read_cache;
@@ -107,6 +109,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op,
     switch (op->operator_type()) {
         case PhysicalOperatorType::kAggregate: {
             Explain((PhysicalAggregate *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kHashAggregate: {
+            Explain((PhysicalHashAggregate *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMergeHashAggregate: {
+            Explain((PhysicalMergeHashAggregate *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kUnionAll: {
@@ -973,6 +983,116 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node,
         ExplainLogicalPlan::Explain(aggregate_node->groups_.back().get(), group_by_expression_str);
         group_by_expression_str += "]";
         result->emplace_back(std::make_shared<std::string>(group_by_expression_str));
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalHashAggregate *hash_agg_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
+    const auto &group_by_exprs = hash_agg_node->GroupByExpressions();
+    const auto &distinct_cols = hash_agg_node->DistinctColumns();
+    const auto &non_distinct_cols = hash_agg_node->NonDistinctColumns();
+    size_t groups_count = group_by_exprs.size();
+    size_t distinct_count = distinct_cols.size();
+    size_t output_count = non_distinct_cols.size();
+    if (groups_count == 0 && distinct_count == 0 && output_count == 0) {
+        UnrecoverableError("All column lists are empty.");
+    }
+
+    {
+        std::string agg_header;
+        if (intent_size != 0) {
+            agg_header = std::string(intent_size - 2, ' ') + "-> HASH AGGREGATE ";
+        } else {
+            agg_header = "HASH AGGREGATE ";
+        }
+
+        agg_header += "(" + std::to_string(hash_agg_node->node_id()) + ")";
+        result->emplace_back(std::make_shared<std::string>(agg_header));
+    }
+
+    // Group by expressions
+    if (groups_count != 0) {
+        std::string group_by_expression_str = std::string(intent_size, ' ') + " - group by: [";
+        for (size_t idx = 0; idx < groups_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(group_by_exprs[idx].get(), group_by_expression_str);
+            group_by_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(group_by_exprs.back().get(), group_by_expression_str);
+        group_by_expression_str += "]";
+        result->emplace_back(std::make_shared<std::string>(group_by_expression_str));
+    }
+
+    // Distinct column expressions
+    if (distinct_count != 0) {
+        std::string distinct_expression_str = std::string(intent_size, ' ') + " - distinct columns: [";
+        for (size_t idx = 0; idx < distinct_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(distinct_cols[idx].get(), distinct_expression_str);
+            distinct_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(distinct_cols.back().get(), distinct_expression_str);
+        distinct_expression_str += "]";
+        result->emplace_back(std::make_shared<std::string>(distinct_expression_str));
+    }
+
+    // Output column expressions (non-distinct)
+    if (output_count != 0) {
+        std::string output_expression_str = std::string(intent_size, ' ') + " - non-distinct columns: [";
+        for (size_t idx = 0; idx < output_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(non_distinct_cols[idx].get(), output_expression_str);
+            output_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(non_distinct_cols.back().get(), output_expression_str);
+        output_expression_str += "]";
+        result->emplace_back(std::make_shared<std::string>(output_expression_str));
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalMergeHashAggregate *merge_hash_agg_node,
+                                  std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                                  i64 intent_size) {
+    const auto &group_by_exprs = merge_hash_agg_node->GroupByExpressions();
+    const auto &aggregates = merge_hash_agg_node->Aggregates();
+    size_t groups_count = group_by_exprs.size();
+    size_t aggregates_count = aggregates.size();
+    if (groups_count == 0 && aggregates_count == 0) {
+        UnrecoverableError("Both group by and aggregates are empty.");
+    }
+
+    {
+        std::string agg_header;
+        if (intent_size != 0) {
+            agg_header = std::string(intent_size - 2, ' ') + "-> MERGE HASH AGGREGATE ";
+        } else {
+            agg_header = "MERGE HASH AGGREGATE ";
+        }
+
+        agg_header += "(" + std::to_string(merge_hash_agg_node->node_id()) + ")";
+        result->emplace_back(std::make_shared<std::string>(agg_header));
+    }
+
+    // Group by expressions
+    if (groups_count != 0) {
+        std::string group_by_expression_str = std::string(intent_size, ' ') + " - group by: [";
+        for (size_t idx = 0; idx < groups_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(group_by_exprs[idx].get(), group_by_expression_str);
+            group_by_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(group_by_exprs.back().get(), group_by_expression_str);
+        group_by_expression_str += "]";
+        result->emplace_back(std::make_shared<std::string>(group_by_expression_str));
+    }
+
+    // Aggregate expressions
+    if (aggregates_count != 0) {
+        std::string aggregate_expression_str = std::string(intent_size, ' ') + " - aggregates: [";
+        for (size_t idx = 0; idx < aggregates_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(aggregates[idx].get(), aggregate_expression_str);
+            aggregate_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(aggregates.back().get(), aggregate_expression_str);
+        aggregate_expression_str += "]";
+        result->emplace_back(std::make_shared<std::string>(aggregate_expression_str));
     }
 }
 

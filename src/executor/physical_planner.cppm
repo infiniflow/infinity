@@ -85,6 +85,10 @@ private:
     // Select operator
     [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildHashAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildMergeHashAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const;
+
     // Operator
     [[nodiscard]] std::unique_ptr<PhysicalOperator> BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const;
 
