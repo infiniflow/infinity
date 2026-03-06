@@ -171,6 +171,8 @@ public:
 
     virtual void ReadIndexInner(LocalFileHandle &file_handle) = 0;
 
+    virtual void ReadIndexInner(const char *ptr, size_t size) = 0;
+
     virtual void InsertData(const void *ptr) = 0;
 
     virtual void InsertMergeData(const std::vector<std::pair<u32, BufferObj *>> &old_chunks) = 0;
