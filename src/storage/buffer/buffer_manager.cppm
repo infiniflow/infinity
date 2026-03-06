@@ -102,6 +102,8 @@ public:
 
     bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
+    size_t TempSetSize();
+
 private:
     friend class BufferObj;
 

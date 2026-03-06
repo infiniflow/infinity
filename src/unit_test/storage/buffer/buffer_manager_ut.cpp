@@ -127,7 +127,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             buffer_obj->AddObjRc();
             buffer_objs.push_back(buffer_obj);
             {
-                auto buffer_handle = buffer_obj->Load();
+                auto buffer_handle = buffer_obj->Load(false);
                 auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
                 for (size_t j = 0; j < file_size; ++j) {
                     data[j] = 'a' + (i + j) % 26;
@@ -148,7 +148,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
         CheckFileNum(file_num, 0);
         for (size_t i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
-            auto buffer_handle = buffer_obj->Load();
+            auto buffer_handle = buffer_obj->Load(false);
             const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
             for (size_t j = 0; j < file_size; ++j) {
                 EXPECT_EQ(data[j], char('a' + (i + j) % 26));
@@ -157,7 +157,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
         CheckFileNum(file_num, 0);
         for (size_t i = 0; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
-            auto buffer_handle = buffer_obj->Load();
+            auto buffer_handle = buffer_obj->Load(false);
             auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
             for (size_t j = 0; j < file_size; ++j) {
                 data[j] = 'a' + (i + j) % 26;
@@ -181,7 +181,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
         for (size_t i = file_num1; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];
             {
-                auto buffer_handle = buffer_obj->Load();
+                auto buffer_handle = buffer_obj->Load(false);
                 auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
                 for (size_t j = 0; j < file_size; ++j) {
                     data[j] = 'A' + (i + j) % 26;
@@ -225,15 +225,15 @@ TEST_F(BufferManagerTest, varfile_test) {
         data[i] = 'a' + i % 26;
     }
     {
-        auto handle1 = buffer_objs[0]->Load();
+        auto handle1 = buffer_objs[0]->Load(false);
         auto *buffer1 = reinterpret_cast<VarBuffer *>(handle1.GetDataMut());
         buffer1->Append(data.get(), data_size);
 
-        auto handle2 = buffer_objs[1]->Load();
+        auto handle2 = buffer_objs[1]->Load(false);
         auto *buffer2 = reinterpret_cast<VarBuffer *>(handle2.GetDataMut());
         buffer2->Append(data.get(), data_size);
 
-        auto handle3 = buffer_objs[2]->Load();
+        auto handle3 = buffer_objs[2]->Load(false);
         auto *buffer3 = reinterpret_cast<VarBuffer *>(handle3.GetDataMut());
         bool free_success = true;
         buffer3->Append(data.get(), data_size, &free_success);
@@ -243,13 +243,13 @@ TEST_F(BufferManagerTest, varfile_test) {
         EXPECT_EQ(cur_mem, 3 * data_size);
     }
     {
-        auto handle1 = buffer_objs[0]->Load();
+        auto handle1 = buffer_objs[0]->Load(false);
         auto *buffer1 = reinterpret_cast<VarBuffer *>(handle1.GetDataMut());
         buffer1->Append(data.get(), data_size);
 
-        auto handle2 = buffer_objs[1]->Load();
+        auto handle2 = buffer_objs[1]->Load(false);
 
-        auto handle3 = buffer_objs[2]->Load();
+        auto handle3 = buffer_objs[2]->Load(false);
         auto *buffer3 = reinterpret_cast<VarBuffer *>(handle3.GetDataMut());
         bool free_success = true;
         buffer3->Append(data.get(), data_size, &free_success);
@@ -258,13 +258,13 @@ TEST_F(BufferManagerTest, varfile_test) {
         EXPECT_EQ(buffer_mgr.memory_usage(), 5 * data_size);
     }
     {
-        auto handle2 = buffer_objs[1]->Load();
+        auto handle2 = buffer_objs[1]->Load(false);
         auto *buffer2 = reinterpret_cast<VarBuffer *>(handle2.GetDataMut());
         buffer2->Append(data.get(), data_size);
     }
 
     for (int i = 0; i < 2; ++i) {
-        auto handle1 = buffer_objs[i]->Load();
+        auto handle1 = buffer_objs[i]->Load(false);
         const auto *buffer1 = reinterpret_cast<const VarBuffer *>(handle1.GetData());
         const char *res1 = buffer1->Get(0, data_size);
         EXPECT_EQ(std::string_view(res1, data_size), std::string_view(data.get(), data_size));
@@ -399,7 +399,7 @@ public:
 
     void Write(FileInfo &file_info) override {
         size_t visit_cnt = file_info.visit_cnt_;
-        auto buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load(false);
         auto *data = reinterpret_cast<char *>(buffer_handle.GetDataMut());
         for (size_t i = 0; i < file_info.file_size_; ++i) {
             data[i] = 'a' + (visit_cnt % 26);
@@ -409,7 +409,7 @@ public:
 
     void Check(const FileInfo &file_info) override {
         size_t visit_cnt = file_info.visit_cnt_;
-        auto buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load(false);
         const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
         for (size_t i = 0; i < file_info.file_size_; ++i) {
             EXPECT_EQ(data[i], char('a' + (visit_cnt - 1) % 26));
@@ -479,7 +479,7 @@ public:
     }
 
     void Write(FileInfo &file_info) override {
-        auto buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load(false);
         auto *buffer = reinterpret_cast<VarBuffer *>(buffer_handle.GetDataMut());
         auto data = std::make_unique<char[]>(var_file_step);
         for (size_t i = 0; i < var_file_step; ++i) {
@@ -493,7 +493,7 @@ public:
     }
 
     void Check(const FileInfo &file_info) override {
-        auto buffer_handle = file_info.buffer_obj_->Load();
+        auto buffer_handle = file_info.buffer_obj_->Load(false);
         const auto *buffer = reinterpret_cast<const VarBuffer *>(buffer_handle.GetData());
         for (size_t i = 0; i < file_info.file_size_; i += var_file_step) {
             const char *data = buffer->Get(i, var_file_step);

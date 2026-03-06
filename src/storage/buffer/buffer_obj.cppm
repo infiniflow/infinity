@@ -93,8 +93,8 @@ public:
 
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
-    void *LoadNoLock();
-    BufferHandle Load();
+    void *LoadNoLock(bool checkpoint_by_spill = true);
+    BufferHandle Load(bool checkpoint_by_spill = true);
 
     // called by BufferMgr in GC process.
     bool Free();

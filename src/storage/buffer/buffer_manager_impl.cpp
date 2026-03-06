@@ -280,6 +280,11 @@ bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
     return lru_caches_[idx].RemoveFromGCQueue(buffer_obj);
 }
 
+size_t BufferManager::TempSetSize() {
+    std::lock_guard l(temp_locker_);
+    return temp_set_.size();
+}
+
 void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
     {
         std::unique_lock lock(clean_locker_);
