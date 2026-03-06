@@ -74,7 +74,7 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
     }
 }
 
-void *BufferObj::LoadNoLock() {
+void *BufferObj::LoadNoLock(bool checkpoint_by_spill) {
     buffer_mgr_->AddRequestCount();
     if (type_ == BufferType::kMmap) {
         switch (status_) {
@@ -155,7 +155,7 @@ void *BufferObj::LoadNoLock() {
             if (!free_success) {
                 UnrecoverableError("Out of memory");
             }
-            if (buffer_mgr_->TempSetSize() > 0) {
+            if (checkpoint_by_spill && buffer_mgr_->TempSetSize() > 0) {
                 spill_checkpoint();
             }
 
@@ -173,9 +173,9 @@ void *BufferObj::LoadNoLock() {
     return data;
 }
 
-BufferHandle BufferObj::Load() {
+BufferHandle BufferObj::Load(bool checkpoint_by_spill) {
     std::unique_lock<std::mutex> locker(w_locker_);
-    void *data = LoadNoLock();
+    void *data = LoadNoLock(checkpoint_by_spill);
     return BufferHandle(this, data);
 }
 
