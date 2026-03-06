@@ -544,7 +544,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
 
     buffer_obj->Save();
-    if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
+    if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP ||
+        index_base->index_type_ == IndexType::kSecondary || index_base->index_type_ == IndexType::kSecondaryFunctional) {
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();
         }
@@ -2445,6 +2446,9 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kSecondaryFunctional: {
             memory_secondary_index->Dump(buffer_obj);
             buffer_obj->Save();
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
             break;
         }
         case IndexType::kFullText: {

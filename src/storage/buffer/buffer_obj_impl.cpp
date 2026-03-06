@@ -28,6 +28,10 @@ import :file_worker_type;
 import :var_file_worker;
 import :kv_store;
 import :status;
+import :infinity_context;
+import :background_process;
+import :bg_task;
+import :new_txn_manager;
 
 import third_party;
 
@@ -70,7 +74,7 @@ void BufferObj::UpdateFileWorkerInfo(std::unique_ptr<FileWorker> new_file_worker
     }
 }
 
-void *BufferObj::LoadNoLock() {
+void *BufferObj::LoadNoLock(bool checkpoint_by_spill) {
     buffer_mgr_->AddRequestCount();
     if (type_ == BufferType::kMmap) {
         switch (status_) {
@@ -125,10 +129,36 @@ void *BufferObj::LoadNoLock() {
 
             size_t buffer_size = GetBufferSize();
             LOG_TRACE(fmt::format("Request memory {}", buffer_size));
+
+            auto spill_checkpoint = [&] mutable {
+                auto *bg_processor = InfinityContext::instance().storage()->bg_processor();
+                auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+                auto *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+                auto last_ckp_ts = wal_manager->LastCheckpointTS();
+                auto cur_ckp_ts = new_txn_mgr->CurrentTS() + 1;
+                if (cur_ckp_ts <= last_ckp_ts) {
+                    LOG_DEBUG("No write txn after last checkpoint");
+                    return;
+                }
+                if (wal_manager->IsCheckpointing()) {
+                    LOG_INFO("There is a running checkpoint task, skip this checkpoint triggered by periodic timer");
+                    return;
+                }
+                TxnTimeStamp max_commit_ts{};
+                i64 wal_size{};
+                std::tie(max_commit_ts, wal_size) = wal_manager->GetCommitState();
+                auto checkpoint_task = std::make_shared<NewCheckpointTask>(wal_size);
+                bg_processor->Submit(std::move(checkpoint_task));
+            };
+
             bool free_success = buffer_mgr_->RequestSpace(buffer_size);
             if (!free_success) {
-                UnrecoverableError("Out of memory.");
+                UnrecoverableError("Out of memory");
             }
+            if (checkpoint_by_spill && buffer_mgr_->TempSetSize() > 0) {
+                spill_checkpoint();
+            }
+
             file_worker_->AllocateInMemory();
             LOG_TRACE(fmt::format("Allocated memory {}", buffer_size));
             break;
@@ -143,9 +173,9 @@ void *BufferObj::LoadNoLock() {
     return data;
 }
 
-BufferHandle BufferObj::Load() {
+BufferHandle BufferObj::Load(bool checkpoint_by_spill) {
     std::unique_lock<std::mutex> locker(w_locker_);
-    void *data = LoadNoLock();
+    void *data = LoadNoLock(checkpoint_by_spill);
     return BufferHandle(this, data);
 }
 

@@ -337,8 +337,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         bool has_some_result = false;
         Bitmask segment_bitmask(segment_row_count); // Initialize with correct row count
         if (common_query_filter_->AlwaysTrue()) {
-            has_some_result = true;
+            segment_bitmask = Bitmask(segment_row_count);
             segment_bitmask.SetAllTrue();
+            has_some_result = true;
         } else {
             if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
                 LOG_TRACE(

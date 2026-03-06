@@ -52,21 +52,13 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
             cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
         }
 
-        DataType index_data_type{LogicalType::kInvalid};
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            index_data_type = *column_def_->type();
-        } else {
-            auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
-            index_data_type = functional_index->GetFuncReturnType();
-        }
-
         // Use the correct factory function based on cardinality
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             data_ = static_cast<void *>(
-                GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, true));
+                GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, true));
         } else {
             data_ = static_cast<void *>(
-                GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, true));
+                GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, true));
         }
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
@@ -115,7 +107,6 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
             index->SaveIndexInner(*file_handle_);
-            std::println("OK");
         } else {
             auto index = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(data_);
             index->SaveIndexInner(*file_handle_);
@@ -128,35 +119,32 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
     return true;
 }
 
+SecondaryIndexCardinality SecondaryIndexFileWorker::GetCardinalityType() {
+    SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
+    if (index_base_->index_type_ == IndexType::kSecondary) {
+        auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
+        cardinality = secondary_index->GetSecondaryIndexCardinality();
+    } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
+        auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
+        cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+    }
+    return cardinality;
+}
+
 void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     if (!data_) [[likely]] {
         // Determine cardinality and use appropriate function
         // For secondary indexes, cast to IndexSecondary to get cardinality
-        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
-            cardinality = secondary_index->GetSecondaryIndexCardinality();
-        } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
-            auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
-            cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-        }
-
-        DataType index_data_type{LogicalType::kInvalid};
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            index_data_type = *column_def_->type();
-        } else {
-            auto functional_index = dynamic_cast<IndexSecondaryFunctional *>(index_base_.get());
-            index_data_type = functional_index->GetFuncReturnType();
-        }
+        SecondaryIndexCardinality cardinality = GetCardinalityType();
 
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             // auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(column_def_->type(), row_count_, false);
-            auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, false);
+            auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
             index->ReadIndexInner(*file_handle_);
             data_ = static_cast<void *>(index);
         } else {
             // auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(column_def_->type(), row_count_, false);
-            auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type), row_count_, false);
+            auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
             index->ReadIndexInner(*file_handle_);
             data_ = static_cast<void *>(index);
         }
@@ -166,6 +154,43 @@ void SecondaryIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spil
     } else {
         UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
     }
+}
+
+bool SecondaryIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
+    if (mmap_data_ != nullptr) {
+        UnrecoverableError("Mmap data is already allocated.");
+    }
+
+    SecondaryIndexCardinality cardinality = GetCardinalityType();
+
+    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+        auto index = GetSecondaryIndexDataWithCardinality<HighCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
+        index->ReadIndexInner(static_cast<const char *>(ptr), size);
+        mmap_data_ = reinterpret_cast<u8 *>(index);
+    } else {
+        auto index = GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(std::make_shared<DataType>(index_data_type_), row_count_, false);
+        index->ReadIndexInner(static_cast<const char *>(ptr), size);
+        mmap_data_ = reinterpret_cast<u8 *>(index);
+    }
+
+    return true;
+}
+
+void SecondaryIndexFileWorker::FreeFromMmapImpl() {
+    if (mmap_data_ == nullptr) {
+        UnrecoverableError("Mmap data is not allocated.");
+    }
+
+    SecondaryIndexCardinality cardinality = GetCardinalityType();
+
+    if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+        auto index = reinterpret_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(mmap_data_);
+        delete index;
+    } else {
+        auto index = reinterpret_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(mmap_data_);
+        delete index;
+    }
+    mmap_data_ = nullptr;
 }
 
 } // namespace infinity

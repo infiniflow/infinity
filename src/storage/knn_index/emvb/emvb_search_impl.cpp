@@ -402,8 +402,8 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
         BitmaskFilter<SegmentOffset> filter(bitmask);
         filter_doc(filter);
     } else {
-        // no delete
-        candidate_docs_filtered = std::move(candidate_docs);
+        AppendFilter filter(bitmask.count());
+        filter_doc(filter);
     }
     auto selected_cnt_and_docs = compute_hit_frequency(std::move(candidate_docs_filtered), n_doc_to_score, std::move(centroid_q_token_sim));
     auto selected_docs_centroid_scores =
