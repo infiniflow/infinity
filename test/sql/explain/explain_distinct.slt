@@ -2,7 +2,6 @@
 # description: Test explain on DISTINCT queries
 # group: [explain]
 
-# Create test table
 statement ok
 DROP TABLE IF EXISTS explain_distinct;
 
@@ -12,7 +11,6 @@ CREATE TABLE explain_distinct (c1 INTEGER, c2 INTEGER, c3 VARCHAR);
 statement ok
 INSERT INTO explain_distinct VALUES (1, 100, 'apple'), (2, 200, 'banana'), (1, 100, 'apple'), (3, 300, 'cherry');
 
-# Test EXPLAIN SELECT DISTINCT
 query I
 explain SELECT DISTINCT c1 FROM explain_distinct;
 ----
@@ -30,7 +28,6 @@ explain SELECT DISTINCT c1 FROM explain_distinct;
       - output_columns: [c1, __rowid]
 
 
-# Test EXPLAIN SELECT DISTINCT on multiple columns
 query I
 explain SELECT DISTINCT c1, c2 FROM explain_distinct;
 ----
@@ -180,6 +177,44 @@ explain SELECT COUNT(DISTINCT c1), SUM(c2) FROM explain_distinct;
         - table index: #1
         - output_columns: [c1, c2, __rowid]
 
-# Cleanup
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(c2) FROM explain_distinct GROUP BY c3;
+----
+ PROJECT (5)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#1), sum(c2) (#2)]
+ -> MERGE HASH AGGREGATE (4)
+    - group by: [c3 (#0)]
+    - aggregates: [COUNT(DISTINCT c1 (#1)), SUM(c2 (#2))]
+   -> HASH AGGREGATE (3)
+      - group by: [c3 (#0)]
+      - distinct columns: [c1 (#1)]
+      - non-distinct columns: [c2 (#2)]
+     -> TABLE SCAN (2)
+        - table name: explain_distinct(default_db.explain_distinct)
+        - table index: #1
+        - output_columns: [c3, c1, c2, __rowid]
+
+query I
+explain SELECT COUNT(DISTINCT c1), SUM(c2) FROM explain_distinct GROUP BY c3 ORDER BY c3;
+----
+ PROJECT (6)
+  - table index: #8
+  - expressions: [count(DISTINCT c1) (#1), sum(c2) (#2)]
+ -> SORT (5)
+    - expressions: [c3 (#0) ASC]
+    - output columns: [c3, COUNT(DISTINCT c1), SUM(c2)]
+   -> MERGE HASH AGGREGATE (4)
+      - group by: [c3 (#0)]
+      - aggregates: [COUNT(DISTINCT c1 (#1)), SUM(c2 (#2))]
+     -> HASH AGGREGATE (3)
+        - group by: [c3 (#0)]
+        - distinct columns: [c1 (#1)]
+        - non-distinct columns: [c2 (#2)]
+       -> TABLE SCAN (2)
+          - table name: explain_distinct(default_db.explain_distinct)
+          - table index: #1
+          - output_columns: [c3, c1, c2, __rowid]
+
 statement ok
 DROP TABLE explain_distinct;
