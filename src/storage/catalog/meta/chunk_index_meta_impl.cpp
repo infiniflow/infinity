@@ -595,6 +595,30 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 VirtualStore::DeleteFile(absolute_posting_file);
                 VirtualStore::DeleteFile(absolute_dict_file);
             }
+        } else if (index_def->index_type_ == IndexType::kPLAID) {
+            // Delete chunk index file for these index types
+            std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
+            std::string file_name = IndexFileName(chunk_id_);
+            std::string index_file = fmt::format("{}/{}", *index_dir, file_name);
+
+            // Debug: print the index_id from TableIndexMeta
+            LOG_INFO(fmt::format("UninitSet: Deleting chunk index file. index_id={}, chunk_id={}, index_dir={}, index_file={}",
+                                 segment_index_meta_.table_index_meta().index_id_str(),
+                                 chunk_id_,
+                                 *index_dir,
+                                 index_file));
+
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            if (pm != nullptr) {
+                LOG_INFO(fmt::format("Cleaned chunk index file: {}", index_file));
+                PersistResultHandler handler(pm);
+                PersistWriteResult result = pm->Cleanup(index_file);
+                handler.HandleWriteResult(result);
+            } else {
+                std::string absolute_index_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_file);
+                LOG_INFO(fmt::format("Clean chunk index file: {}", absolute_index_file));
+                VirtualStore::DeleteFile(absolute_index_file);
+            }
         }
     }
     {
