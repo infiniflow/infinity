@@ -22,6 +22,8 @@ import :expression_type;
 import :logical_node_type;
 import :logical_node;
 import :logical_aggregate;
+import :logical_hash_aggregate;
+import :logical_merge_hash_aggregate;
 import :logical_join;
 import :logical_limit;
 import :logical_filter;
@@ -74,6 +76,29 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
     switch (op.operator_type()) {
         case LogicalNodeType::kAggregate: {
             auto &node = (LogicalAggregate &)op;
+            for (auto &expression : node.groups_) {
+                VisitExpression(expression);
+            }
+            for (auto &expression : node.aggregates_) {
+                VisitExpression(expression);
+            }
+            break;
+        }
+        case LogicalNodeType::kHashAggregate: {
+            auto &node = (LogicalHashAggregate &)op;
+            for (auto &expression : node.groups_) {
+                VisitExpression(expression);
+            }
+            for (auto &expression : node.distinct_columns_) {
+                VisitExpression(expression);
+            }
+            for (auto &expression : node.non_distinct_columns_) {
+                VisitExpression(expression);
+            }
+            break;
+        }
+        case LogicalNodeType::kMergeHashAggregate: {
+            auto &node = (LogicalMergeHashAggregate &)op;
             for (auto &expression : node.groups_) {
                 VisitExpression(expression);
             }

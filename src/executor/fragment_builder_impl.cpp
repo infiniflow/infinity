@@ -146,10 +146,17 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
             return;
         }
+        case PhysicalOperatorType::kHashAggregate:
+            // HashAggregate performs local deduplication for DISTINCT aggregates.
+            // Each parallel fragment produces partially deduplicated results.
+            // Results are sent to a local queue for MergeHashAggregate to consume.
+            // Fragment structure:
+            // - Parent fragment (SerialMaterialize): Reads from local queue, computes final aggregates
+            // - Child fragment (ParallelMaterialize): HashAggregate writes to local queue
         case PhysicalOperatorType::kAggregate: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() == nullptr) {
-                UnrecoverableError("No input node of aggregate operator");
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
             } else {
                 BuildFragments(phys_op->left(), current_fragment_ptr);
                 if (current_fragment_ptr->GetFragmentType() != FragmentType::kSerialMaterialize) {
@@ -210,6 +217,9 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             [[fallthrough]];
         }
         case PhysicalOperatorType::kMergeAggregate:
+        case PhysicalOperatorType::kMergeHashAggregate:
+            // MergeHashAggregate performs global deduplication across all HashAggregate fragments
+            // and computes final aggregates on the deduplicated data.
         case PhysicalOperatorType::kMergeHash:
         case PhysicalOperatorType::kMergeLimit:
         case PhysicalOperatorType::kMergeTop:

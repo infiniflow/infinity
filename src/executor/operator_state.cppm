@@ -85,6 +85,35 @@ export struct MergeAggregateOperatorState : public OperatorState {
     bool input_complete_{false};
 };
 
+// Hash Aggregate
+export struct HashAggregateOperatorState : public OperatorState {
+    inline explicit HashAggregateOperatorState() : OperatorState(PhysicalOperatorType::kHashAggregate) {}
+
+    DistinctHashTable hash_table_;
+};
+
+// MergeHashAggregate
+export struct MergeHashAggregateOperatorState : public OperatorState {
+    inline explicit MergeHashAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeHashAggregate) {}
+
+    std::unique_ptr<DataBlock> input_data_block_;
+
+    // For incremental processing: group key -> per-aggregate distinct values and states
+    // This replaces accumulated_input_blocks_ to avoid holding all input data in memory
+    struct GroupAggregateData {
+        // Groupby column values (stored as column vectors for output)
+        std::vector<std::shared_ptr<ColumnVector>> groupby_columns;
+        // For each aggregate: set of distinct values seen so far
+        std::vector<std::set<std::string>> distinct_values;
+        // For each aggregate: aggregate state
+        std::vector<std::unique_ptr<char[]>> agg_states;
+    };
+    using GroupHashTable = FlatHashMap<std::string, GroupAggregateData>;
+    GroupHashTable hash_table_;
+
+    bool input_complete_{false};
+};
+
 // Merge Parallel Aggregate
 export struct MergeParallelAggregateOperatorState : public OperatorState {
     inline explicit MergeParallelAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeParallelAggregate) {}

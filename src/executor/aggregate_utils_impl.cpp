@@ -16,6 +16,8 @@ module infinity_core:aggregate_utils.impl;
 
 import :aggregate_utils;
 import :column_vector;
+import :aggregate_expression;
+import :data_block;
 import :infinity_exception;
 import :status;
 
@@ -101,6 +103,38 @@ size_t CalculateHashKeySize(const std::vector<std::shared_ptr<DataType>> &types)
         key_size += type_count;
     }
     return key_size;
+}
+
+void GenerateDefaultAggregateOutput(const std::vector<std::shared_ptr<BaseExpression>> &aggregates, std::unique_ptr<DataBlock> &output_block) {
+    size_t aggregates_count = aggregates.size();
+
+    // Build output types
+    std::vector<std::shared_ptr<DataType>> output_types;
+    output_types.reserve(aggregates_count);
+    for (const auto &expr : aggregates) {
+        output_types.emplace_back(std::make_shared<DataType>(expr->Type()));
+    }
+
+    output_block = DataBlock::MakeUniquePtr();
+    output_block->Init(output_types, 1);
+
+    for (size_t idx = 0; idx < aggregates_count; ++idx) {
+        auto agg_expr = std::static_pointer_cast<AggregateExpression>(aggregates[idx]);
+        const std::string &func_name = agg_expr->aggregate_function_.GetFuncName();
+
+        // Initialize and finalize to get default value
+        auto agg_state = agg_expr->aggregate_function_.InitState();
+        agg_expr->aggregate_function_.init_func_(agg_state.get());
+        const char *result_ptr = agg_expr->aggregate_function_.finalize_func_(agg_state.get());
+        output_block->column_vectors_[idx]->AppendByPtr(result_ptr);
+
+        // For non-COUNT aggregates, mark as NULL
+        if (func_name != "COUNT") {
+            output_block->column_vectors_[idx]->nulls_ptr_->SetFalse(0);
+        }
+    }
+
+    output_block->Finalize();
 }
 
 } // namespace infinity
