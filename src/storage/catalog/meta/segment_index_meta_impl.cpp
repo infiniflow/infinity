@@ -369,15 +369,18 @@ Status SegmentIndexMeta::SavePlaidGlobalCentroids() {
         return Status::UnexpectedError("Failed to get segment index directory");
     }
 
+    // Use absolute path with data_dir prefix
+    std::string abs_segment_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *segment_dir);
+
     // Ensure directory exists
-    if (!VirtualStore::Exists(*segment_dir)) {
-        Status mkdir_status = VirtualStore::MakeDirectory(*segment_dir);
+    if (!VirtualStore::Exists(abs_segment_dir)) {
+        Status mkdir_status = VirtualStore::MakeDirectory(abs_segment_dir);
         if (!mkdir_status.ok()) {
             return mkdir_status;
         }
     }
 
-    std::string centroids_file = fmt::format("{}/plaid_centroids.bin", *segment_dir);
+    std::string centroids_file = fmt::format("{}/plaid_centroids.bin", abs_segment_dir);
 
     // Use VirtualStore to create file handle
     auto [file_handle, status] = VirtualStore::Open(centroids_file, FileAccessMode::kWrite);
@@ -401,7 +404,8 @@ Status SegmentIndexMeta::LoadPlaidGlobalCentroids() {
         return Status::UnexpectedError("Failed to get segment index directory");
     }
 
-    std::string centroids_file = fmt::format("{}/plaid_centroids.bin", *segment_dir);
+    // Use absolute path with data_dir prefix
+    std::string centroids_file = fmt::format("{}/{}/plaid_centroids.bin", InfinityContext::instance().config()->DataDir(), *segment_dir);
 
     // Check if file exists
     if (!VirtualStore::Exists(centroids_file)) {
