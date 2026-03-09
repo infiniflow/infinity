@@ -140,6 +140,10 @@ std::string PhysicalOperatorToString(PhysicalOperatorType type) {
             return "Fusion";
         case PhysicalOperatorType::kMergeAggregate:
             return "MergeAggregate";
+        case PhysicalOperatorType::kHashAggregate:
+            return "HashAggregate";
+        case PhysicalOperatorType::kMergeHashAggregate:
+            return "MergeHashAggregate";
         case PhysicalOperatorType::kCreateIndexPrepare:
             return "CreateIndexPrepare";
         case PhysicalOperatorType::kReadCache:

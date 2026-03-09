@@ -15,6 +15,8 @@
 export module infinity_core:aggregate_utils;
 
 import :column_vector;
+import :aggregate_expression;
+import :data_block;
 
 import std;
 import internal_types;
@@ -33,10 +35,20 @@ export using GroupByHashTable = FlatHashMap<std::string, FlatHashMap<size_t, std
 //                               (serialized groupby column values)     (block_id, row_id)
 export using MergeGroupByHashTable = FlatHashMap<std::string, std::pair<size_t, size_t>>;
 
+// Type alias for hash tables used in deduplication
+//
+//                                           Outer key                      Value
+//                               (serialized distinct column values)     (block_id, row_id)
+export using DistinctHashTable = FlatHashMap<std::string, std::pair<size_t, size_t>>;
+
 export void BuildHashKey(const std::vector<std::shared_ptr<ColumnVector>> &columns,
                          size_t row_id,
                          const std::vector<std::shared_ptr<DataType>> &types,
                          std::string &hash_key);
 
 export size_t CalculateHashKeySize(const std::vector<std::shared_ptr<DataType>> &types);
+
+// Generate output block with default aggregate values for empty input
+// COUNT returns 0, other aggregates return NULL
+export void GenerateDefaultAggregateOutput(const std::vector<std::shared_ptr<BaseExpression>> &aggregates, std::unique_ptr<DataBlock> &output_block);
 } // namespace infinity

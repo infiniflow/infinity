@@ -26,6 +26,9 @@ export enum class PhysicalOperatorType : i8 {
     kAggregate,
     kMergeAggregate,
 
+    kHashAggregate,
+    kMergeHashAggregate,
+
     kParallelAggregate,
     kMergeParallelAggregate,
 

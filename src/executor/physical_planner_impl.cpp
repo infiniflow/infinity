@@ -50,7 +50,9 @@ import :physical_merge_hash;
 import :physical_merge_knn;
 import :physical_merge_limit;
 import :physical_aggregate;
+import :physical_hash_aggregate;
 import :physical_merge_aggregate;
+import :physical_merge_hash_aggregate;
 import :physical_merge_parallel_aggregate;
 import :physical_merge_sort;
 import :physical_merge_top;
@@ -105,6 +107,8 @@ import :logical_table_scan;
 import :logical_index_scan;
 import :logical_knn_scan;
 import :logical_aggregate;
+import :logical_hash_aggregate;
+import :logical_merge_hash_aggregate;
 import :logical_sort;
 import :logical_limit;
 import :logical_top;
@@ -258,6 +262,14 @@ std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const s
         // SELECT
         case LogicalNodeType::kAggregate: {
             result = BuildAggregate(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kHashAggregate: {
+            result = BuildHashAggregate(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kMergeHashAggregate: {
+            result = BuildMergeHashAggregate(logical_operator);
             break;
         }
         case LogicalNodeType::kJoin: {
@@ -643,6 +655,43 @@ std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const std::sha
                                                         logical_aggregate->GetOutputTypes(),
                                                         std::make_shared<std::vector<LoadMeta>>());
     }
+}
+
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildHashAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    auto input_logical_node = logical_operator->left_node();
+    if (input_logical_node.get() == nullptr) {
+        UnrecoverableError("HashAggregate node has no input node.");
+    }
+    if (logical_operator->right_node().get() != nullptr) {
+        UnrecoverableError("HashAggregate node shouldn't have right child.");
+    }
+    std::shared_ptr<LogicalHashAggregate> logical_hash_agg = static_pointer_cast<LogicalHashAggregate>(logical_operator);
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    return std::make_unique<PhysicalHashAggregate>(logical_hash_agg->node_id(),
+                                                   std::move(input_physical_operator),
+                                                   logical_hash_agg->groups_,
+                                                   logical_hash_agg->distinct_columns_,
+                                                   logical_hash_agg->non_distinct_columns_,
+                                                   logical_operator->load_metas());
+}
+
+std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildMergeHashAggregate(const std::shared_ptr<LogicalNode> &logical_operator) const {
+    auto input_logical_node = logical_operator->left_node();
+    if (input_logical_node.get() == nullptr) {
+        UnrecoverableError("MergeHashAggregate node has no input node.");
+    }
+    if (logical_operator->right_node().get() != nullptr) {
+        UnrecoverableError("MergeHashAggregate node shouldn't have right child.");
+    }
+    std::shared_ptr<LogicalMergeHashAggregate> logical_merge_hash_agg = static_pointer_cast<LogicalMergeHashAggregate>(logical_operator);
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    return std::make_unique<PhysicalMergeHashAggregate>(logical_merge_hash_agg->node_id(),
+                                                        std::move(input_physical_operator),
+                                                        logical_merge_hash_agg->groups_,
+                                                        logical_merge_hash_agg->aggregates_,
+                                                        logical_operator->load_metas());
 }
 
 std::unique_ptr<PhysicalOperator> PhysicalPlanner::BuildJoin(const std::shared_ptr<LogicalNode> &logical_operator) const {

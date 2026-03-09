@@ -42,6 +42,7 @@ import :physical_filter;
 import :physical_table_scan;
 import :physical_knn_scan;
 import :physical_aggregate;
+import :physical_hash_aggregate;
 import :physical_sort;
 import :physical_limit;
 import :physical_cross_product;
@@ -66,6 +67,7 @@ import :physical_match;
 import :physical_match_tensor_scan;
 import :physical_fusion;
 import :physical_merge_aggregate;
+import :physical_merge_hash_aggregate;
 import :physical_match_sparse_scan;
 import :physical_read_cache;
 import :physical_unnest;
@@ -147,6 +149,13 @@ public:
 
     static void
     Explain(const PhysicalAggregate *aggregate_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+
+    static void
+    Explain(const PhysicalHashAggregate *hash_agg_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
+
+    static void Explain(const PhysicalMergeHashAggregate *merge_hash_agg_node,
+                        std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result,
+                        i64 intent_size = 0);
 
     static void Explain(const PhysicalSort *sort_node, std::shared_ptr<std::vector<std::shared_ptr<std::string>>> &result, i64 intent_size = 0);
 
