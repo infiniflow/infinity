@@ -134,7 +134,7 @@ size_t BMPHandler::AddDocs(SegmentOffset block_offset, const ColumnVector &col, 
                     index->AddDocs(std::move(iter));
                     size_t mem_after = index->MemoryUsage();
                     mem_usage = mem_after - mem_before;
-                    LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
+                    LOG_TRACE(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
                 } else {
                     UnrecoverableError("BMPHandler::AddDocs: index does not own memory");
                 }
