@@ -965,35 +965,20 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             UnrecoverableError("Not implemented yet");
         }
     }
-    LOG_INFO("AppendMemIndex: before UpdateEnd");
     mem_index->UpdateEnd();
-    LOG_INFO(fmt::format("AppendMemIndex EXIT: mem_index {:p}", static_cast<void *>(mem_index.get())));
+    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd: mem_index {:p}", static_cast<void *>(mem_index.get())));
 
     // // Trigger dump if necessary
     if (!IsReplay()) {
         size_t row_count = mem_index->GetRowCount();
         size_t row_quota = InfinityContext::instance().config()->MemIndexCapacity();
-        LOG_INFO(fmt::format("AppendMemIndex: row_count={}, row_quota={}, will_dump={}", row_count, row_quota, row_count >= row_quota));
         if (row_count >= row_quota) {
-            // Get db_name, table_name, index_name from BaseMemIndex
-            std::string db_name, table_name, index_name;
+            TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+            auto [db_name, table_name] = table_meta.GetDBTableName();
+            auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
+            std::string index_name = *index_base->index_name_;
             SegmentID segment_id = segment_index_meta.segment_id();
             RowID begin_row_id = mem_index->GetBeginRowID();
-
-            const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
-            if (base_mem_index != nullptr && !base_mem_index->db_name_.empty()) {
-                // Use names from BaseMemIndex
-                db_name = base_mem_index->db_name_;
-                table_name = base_mem_index->table_name_;
-                index_name = base_mem_index->index_name_;
-            } else {
-                // Fallback to old method (for backward compatibility)
-                TableMeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-                std::tie(db_name, table_name) = table_meta.GetDBTableName();
-                auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
-                index_name = *index_base->index_name_;
-            }
-
             auto dump_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
             DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
             LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
