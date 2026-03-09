@@ -71,7 +71,6 @@ export class PlaidIndexInMem : public BaseMemIndex {
     u32 incremental_threshold_ = 100;
 
 public:
-
     static std::shared_ptr<PlaidIndexInMem>
     NewPlaidIndexInMem(const std::shared_ptr<IndexBase> &index_base, const std::shared_ptr<ColumnDef> &column_def, RowID begin_row_id);
 

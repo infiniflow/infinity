@@ -359,7 +359,10 @@ void PlaidIndexInMem::Dump(BufferObj *buffer_obj) {
     std::unique_lock lock(rw_mutex_);
 
     LOG_INFO(fmt::format("PlaidIndexInMem::Dump: START - is_built={}, row_count={}, buffered_embeddings={}, plaid_index={}",
-                         is_built_.test(), row_count_, buffered_embedding_count_, static_cast<void *>(plaid_index_)));
+                         is_built_.test(),
+                         row_count_,
+                         buffered_embedding_count_,
+                         static_cast<void *>(plaid_index_)));
 
     // If we have buffered data but index is not built yet, build it first
     if (!is_built_.test() && buffered_embedding_count_ > 0) {

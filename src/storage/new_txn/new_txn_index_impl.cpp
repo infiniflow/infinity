@@ -130,31 +130,18 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
             continue;
         }
 
-        // For PLAID index, we may need to dump multiple chunks in one go
-        // Keep dumping while there's data available
-        bool is_plaid = (mem_index->GetPlaidIndex() != nullptr);
-        do {
-            ChunkID chunk_id = 0;
-            std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-            if (!status.ok()) {
-                mem_index->SetIsDumping(false);
-                return status;
-            }
+        ChunkID chunk_id = 0;
+        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+        if (!status.ok()) {
+            mem_index->SetIsDumping(false);
+            return status;
+        }
 
-            // Dump Mem Index
-            status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-            if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-                mem_index->SetIsDumping(false);
-                return status;
-            }
-
-            // For PLAID, check if there's more data to dump
-            // We need to check if there's buffered data or if index is built again
-            if (!is_plaid) {
-                break; // Non-PLAID indexes only dump once
-            }
-            // For PLAID, continue loop to dump next chunk if there's more data
-        } while (is_plaid && mem_index->GetPlaidIndex() != nullptr && mem_index->GetPlaidIndex()->HasBufferedData());
+        // Dump Mem Index
+        status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+        if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+            return status;
+        }
     }
 
     if (txn_store->chunk_infos_in_segments_.empty()) {
@@ -222,31 +209,18 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
         txn_store->segment_ids_.emplace_back(segment_id);
     }
 
-    // For PLAID index, we may need to dump multiple chunks in one go
-    // Keep dumping while there's data available
-    bool is_plaid = (mem_index->GetPlaidIndex() != nullptr);
-    do {
-        ChunkID chunk_id = 0;
-        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
-        if (!status.ok()) {
-            mem_index->SetIsDumping(false);
-            return status;
-        }
+    ChunkID chunk_id = 0;
+    std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+    if (!status.ok()) {
+        mem_index->SetIsDumping(false);
+        return status;
+    }
 
-        // Dump Mem Index
-        status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
-        if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
-            mem_index->SetIsDumping(false);
-            return status;
-        }
-
-        // For PLAID, check if there's more data to dump
-        // We need to check if there's buffered data or if index is built again
-        if (!is_plaid) {
-            break; // Non-PLAID indexes only dump once
-        }
-        // For PLAID, continue loop to dump next chunk if there's more data
-    } while (is_plaid && mem_index->GetPlaidIndex() != nullptr && mem_index->GetPlaidIndex()->HasBufferedData());
+    // Dump Mem Index
+    status = this->DumpSegmentMemIndex(segment_index_meta, chunk_id);
+    if (!status.ok() && status.code() != ErrorCode::kEmptyMemIndex) {
+        return status;
+    }
 
     if (txn_store->chunk_infos_in_segments_.empty()) {
         base_txn_store_ = nullptr; // No mem index to dump.
@@ -999,15 +973,14 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     if (!IsReplay()) {
         size_t row_count = mem_index->GetRowCount();
         size_t row_quota = InfinityContext::instance().config()->MemIndexCapacity();
-        LOG_INFO(fmt::format("AppendMemIndex: row_count={}, row_quota={}, will_dump={}",
-                             row_count, row_quota, row_count >= row_quota));
+        LOG_INFO(fmt::format("AppendMemIndex: row_count={}, row_quota={}, will_dump={}", row_count, row_quota, row_count >= row_quota));
         if (row_count >= row_quota) {
             // Get db_name, table_name, index_name from BaseMemIndex
             std::string db_name, table_name, index_name;
             SegmentID segment_id = segment_index_meta.segment_id();
             RowID begin_row_id = mem_index->GetBeginRowID();
-            
-            const BaseMemIndex* base_mem_index = mem_index->GetBaseMemIndex();
+
+            const BaseMemIndex *base_mem_index = mem_index->GetBaseMemIndex();
             if (base_mem_index != nullptr && !base_mem_index->db_name_.empty()) {
                 // Use names from BaseMemIndex
                 db_name = base_mem_index->db_name_;
@@ -1020,7 +993,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 auto [index_base, _] = segment_index_meta.table_index_meta().GetIndexBase();
                 index_name = *index_base->index_name_;
             }
-            
+
             auto dump_task = std::make_shared<DumpMemIndexTask>(db_name, table_name, index_name, segment_id, begin_row_id);
             DumpIndexProcessor *dump_index_processor = InfinityContext::instance().storage()->dump_index_processor();
             LOG_INFO(fmt::format("MemIndex row count {} exceeds quota {}.  Submit dump task: {}", row_count, row_quota, dump_task->ToString()));
@@ -1555,8 +1528,7 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
     if (existing_mem_index && existing_mem_index->GetPlaidIndex()) {
         // Use existing PlaidIndexInMem from MemIndex
         plaid_index_in_mem = existing_mem_index->GetPlaidIndex();
-        LOG_INFO(fmt::format("PopulatePlaidIndexInner: Using existing PlaidIndexInMem with {} rows",
-                             plaid_index_in_mem->GetRowCount()));
+        LOG_INFO(fmt::format("PopulatePlaidIndexInner: Using existing PlaidIndexInMem with {} rows", plaid_index_in_mem->GetRowCount()));
     } else {
         // Create new in-memory PLAID index and read data from blocks
         plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
