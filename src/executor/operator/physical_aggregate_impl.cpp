@@ -130,6 +130,14 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
+    // If hash_table is empty, generate output with default aggregate values
+    if (hash_table.empty()) {
+        if (prev_op_state->Complete()) {
+            aggregate_operator_state->SetComplete();
+        }
+        return true;
+    }
+
     std::shared_ptr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
     GenerateGroupByResult(groupby_table, output_groupby_table, hash_table);
 
@@ -316,8 +324,10 @@ bool PhysicalAggregate::SimpleAggregateExecute(const std::vector<std::unique_ptr
     size_t input_block_count = input_blocks.size();
 
     if (input_block_count == 0) {
-        // No input data
-        LOG_TRACE("No input, no aggregate result");
+        // No input data - generate output with NULL for non-COUNT aggregates
+        std::unique_ptr<DataBlock> output_block;
+        GenerateDefaultAggregateOutput(aggregates_, output_block);
+        output_blocks.push_back(std::move(output_block));
         return true;
     }
 

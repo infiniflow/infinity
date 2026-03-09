@@ -94,40 +94,7 @@ void ExpressionEvaluator::Execute(const std::shared_ptr<AggregateExpression> &ex
         this->Execute(arguments[i], child_states[i], child_output_col);
         child_output_cols.push_back(child_output_col);
     }
-    // Handle DISTINCT using hash-based deduplication for all cases
     std::shared_ptr<ColumnVector> aggregate_input_col = child_output_cols[0];
-    if (expr->distinct()) {
-        // Use hash-based deduplication for both single and multiple columns
-        FlatHashSet<uint64_t> unique_tuples;
-        size_t row_count = child_output_cols[0]->Size();
-        std::vector<size_t> distinct_row_indices;
-
-        // Pre-allocate to avoid rehashing
-        unique_tuples.reserve(row_count);
-
-        for (size_t row = 0; row < row_count; ++row) {
-            // Compute combined hash without string allocation
-            uint64_t tuple_hash = 0;
-            for (const auto &col : child_output_cols) {
-                Value val = col->GetValueByIndex(row);
-                // HashCombine: similar to Boost's hash_combine
-                tuple_hash ^= val.Hash() + 0x9e3779b9 + (tuple_hash << 6) + (tuple_hash >> 2);
-            }
-
-            auto [it, inserted] = unique_tuples.emplace(tuple_hash);
-            if (inserted) {
-                distinct_row_indices.push_back(row);
-            }
-        }
-
-        // Create a column with distinct values so aggregate functions will process them correctly
-        aggregate_input_col = std::make_shared<ColumnVector>(child_output_cols[0]->data_type());
-        aggregate_input_col->Initialize(ColumnVectorType::kFlat, distinct_row_indices.size());
-
-        for (size_t idx : distinct_row_indices) {
-            aggregate_input_col->AppendWith(*child_output_cols[0], idx, 1);
-        }
-    }
 
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
         Status status = Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString());

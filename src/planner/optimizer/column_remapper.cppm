@@ -37,7 +37,7 @@ private:
 
 export class ColumnRemapper : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final { return remapper_.VisitNode(*logical_plan); }
+    inline void ApplyToPlan(QueryContext *, std::shared_ptr<LogicalNode> &logical_plan) final { remapper_.VisitNode(*logical_plan); }
 
     [[nodiscard]] inline std::string name() const final { return "Column Remapper"; }
 
