@@ -26,6 +26,7 @@ import :infinity_exception;
 import :file_worker_type;
 import :status;
 import :local_file_handle;
+import :logger;
 
 import third_party;
 
@@ -62,16 +63,32 @@ void PlaidIndexFileWorker::AllocateInMemory() {
 }
 
 void PlaidIndexFileWorker::FreeInMemory() {
-    if (!data_) {
+    // For mmap-loaded index, object is in mmap_data_
+    // For regular-loaded index, object is in data_
+    if (mmap_data_) {
+        auto *index = reinterpret_cast<PlaidIndex *>(mmap_data_);
+        delete index;
+        mmap_data_ = nullptr;
+    } else if (data_) {
+        auto *index = static_cast<PlaidIndex *>(data_);
+        delete index;
+        data_ = nullptr;
+    } else {
         UnrecoverableError("PlaidIndexFileWorker::FreeInMemory: Data is not allocated.");
     }
-    auto *index = static_cast<PlaidIndex *>(data_);
-    delete index;
-    data_ = nullptr;
 }
 
 bool PlaidIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    auto *index = static_cast<PlaidIndex *>(data_);
+    // For mmap-loaded index, object is in mmap_data_
+    // For regular-loaded index, object is in data_
+    PlaidIndex *index = nullptr;
+    if (mmap_data_) {
+        index = reinterpret_cast<PlaidIndex *>(mmap_data_);
+    } else if (data_) {
+        index = static_cast<PlaidIndex *>(data_);
+    } else {
+        UnrecoverableError("PlaidIndexFileWorker::WriteToFileImpl: No index data available.");
+    }
     index->SaveIndexInner(*file_handle_);
     prepare_success = true;
     return true;
@@ -91,5 +108,43 @@ void PlaidIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
 }
 
 const EmbeddingInfo *PlaidIndexFileWorker::GetEmbeddingInfo() const { return static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get()); }
+
+bool PlaidIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
+    LOG_INFO(fmt::format("PlaidIndexFileWorker::ReadFromMmapImpl: ptr={}, size={}, mmap_data_={}", ptr, size, static_cast<const void *>(mmap_data_)));
+    if (mmap_data_ != nullptr) {
+        UnrecoverableError("PlaidIndexFileWorker::ReadFromMmapImpl: Mmap data is already allocated.");
+    }
+    const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
+    const auto *index_plaid = static_cast<IndexPLAID *>(index_base_.get());
+    const auto nbits = index_plaid->nbits_;
+    const auto n_centroids = index_plaid->n_centroids_;
+
+    // Allocate PlaidIndex object
+    auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids);
+
+    // Load from mmap pointer - this will copy data into internal vectors
+    // Note: For true zero-copy mmap, PlaidIndex would need to use pointers into mmap region
+    // instead of owning vectors. This is a future optimization.
+    index->LoadFromPtr(const_cast<void *>(ptr), size, size);
+
+    // Store PlaidIndex object in mmap_data_ so GetMmapData() returns it
+    mmap_data_ = reinterpret_cast<u8 *>(index);
+
+    LOG_INFO(fmt::format("PlaidIndexFileWorker::ReadFromMmapImpl: Loaded index with {} docs, {} embeddings, {} bytes, mmap_data_={}",
+                         index->GetDocNum(),
+                         index->GetTotalEmbeddingNum(),
+                         size,
+                         static_cast<const void *>(mmap_data_)));
+    return true;
+}
+
+void PlaidIndexFileWorker::FreeFromMmapImpl() {
+    if (mmap_data_ == nullptr) {
+        return;
+    }
+    auto *index = reinterpret_cast<PlaidIndex *>(mmap_data_);
+    delete index;
+    mmap_data_ = nullptr;
+}
 
 } // namespace infinity

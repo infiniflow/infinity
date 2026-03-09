@@ -117,6 +117,25 @@ public:
     // Get document length (number of tokens)
     u32 GetDocLen(u32 doc_id) const;
 
+    // Merge multiple chunk indexes directly (without loading raw embeddings)
+    // This is the key optimization: merge quantized data (centroid_ids + packed_residuals)
+    // instead of reading from column store
+    void MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *>> &chunks_with_doc_offsets);
+
+    // Streaming merge: merge one chunk at a time (memory efficient for large indexes)
+    // InitializeMerge() -> MergeOneChunk() x N -> FinalizeMerge()
+    void InitializeMerge();
+    void MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset);
+    void FinalizeMerge();
+
+    // Accessors for merge operation (needed for direct data access)
+    const std::vector<u32> &centroid_ids() const { return centroid_ids_; }
+    const u8 *packed_residuals() const { return packed_residuals_.get(); }
+    size_t packed_residuals_size() const { return packed_residuals_size_; }
+    const std::vector<u32> &doc_lens() const { return doc_lens_; }
+    const std::vector<u32> &doc_offsets() const { return doc_offsets_; }
+    const std::vector<std::vector<u32>> &ivf_lists() const { return ivf_lists_; }
+
 private:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;

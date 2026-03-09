@@ -49,9 +49,10 @@ export struct PlaidIndexFileWorker : IndexFileWorker {
           start_segment_offset_(start_segment_offset), rel_file_path_(std::make_shared<std::string>(fmt::format("{}/{}", *file_dir_, *file_name_))) {}
 
     ~PlaidIndexFileWorker() override {
-        if (data_ != nullptr) {
+        if (data_ != nullptr || mmap_data_ != nullptr) {
             FreeInMemory();
             data_ = nullptr;
+            mmap_data_ = nullptr;
         }
     }
 
@@ -72,6 +73,11 @@ protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
     void ReadFromFileImpl(size_t file_size, bool from_spill) override;
+
+    // Mmap support for large index files
+    bool ReadFromMmapImpl(const void *ptr, size_t size) override;
+
+    void FreeFromMmapImpl() override;
 
 public:
     // Template wrappers for FileWorkerMap compatibility

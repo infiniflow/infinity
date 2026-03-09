@@ -391,8 +391,15 @@ void PlaidQuantizer::LoadFromPtr(void *ptr, size_t &offset) {
         offset += len;
     };
 
-    // Note: nbits_ and embedding_dim_ are already loaded by PlaidIndex::LoadFromPtr
-    // Only load quantizer-specific data
+    // Read and verify nbits and embedding_dim (must match what Save() wrote)
+    u32 nbits, embedding_dim;
+    read(&nbits, sizeof(nbits));
+    read(&embedding_dim, sizeof(embedding_dim));
+
+    if (nbits != nbits_ || embedding_dim != embedding_dim_) {
+        UnrecoverableError("PlaidQuantizer::LoadFromPtr: dimension mismatch");
+    }
+
     read(&avg_residual_, sizeof(avg_residual_));
 
     // Load bucket cutoffs

@@ -55,6 +55,8 @@ import :index_secondary_functional;
 import :emvb_index_in_mem;
 import :plaid_index_in_mem;
 import :plaid_index_file_worker;
+import :plaid_index;
+import :index_plaid;
 import :emvb_index;
 import :meta_key;
 import :data_access_state;
@@ -2171,55 +2173,88 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
         return Status::UnexpectedError("No trained global centroids for PLAID index optimization");
     }
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging chunks with {} centroids, {} rows starting at {}",
+    // Get old chunk IDs
+    std::vector<ChunkID> *old_chunk_ids_ptr = nullptr;
+    std::tie(old_chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (old_chunk_ids_ptr->empty()) {
+        LOG_WARN("OptimizePlaidIndex: No chunks to merge");
+        return Status::UnexpectedError("No chunks to merge");
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging {} chunks with {} centroids, {} total rows starting at {}",
+                         old_chunk_ids_ptr->size(),
                          global_centroids->n_centroids(),
                          total_row_cnt,
                          base_rowid.ToUint64()));
 
-    // Create a new PlaidIndexInMem with the existing global centroids
-    auto memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_rowid, global_centroids);
+    // OPTIMIZATION: Streaming merge - load one chunk at a time to control memory
+    // This is critical for large indexes that exceed available RAM
 
-    // Read data from column store and insert into the new index
-    auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
-    if (!block_status.ok()) {
-        return block_status;
-    }
+    // Step 1: Create new merged index with shared global centroids
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
+    const u32 embedding_dimension = embedding_info->Dimension();
+    const IndexPLAID *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
 
-    u32 remaining_rows = total_row_cnt;
-    for (BlockID block_id : *block_ids) {
-        if (remaining_rows == 0) {
-            break;
-        }
+    auto merged_index =
+        std::make_unique<PlaidIndex>(base_rowid.segment_offset_, embedding_dimension, index_plaid->nbits_, global_centroids->n_centroids());
 
-        BlockMeta block_meta(block_id, segment_meta);
-        size_t block_row_cnt = 0;
-        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+    // Share global centroids (no copy)
+    merged_index->ShareGlobalCentroids(global_centroids);
+
+    // Step 2: Initialize streaming merge
+    merged_index->InitializeMerge();
+
+    // Step 3: Load and merge chunks one at a time (streaming to control memory)
+    u32 current_doc_offset = 0;
+    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+        ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
+
+        BufferObj *chunk_buffer_obj = nullptr;
+        status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
         if (!status.ok()) {
             return status;
         }
 
-        ColumnMeta column_meta(column_def->id(), block_meta);
-        size_t row_cnt = std::min(block_row_cnt, static_cast<size_t>(remaining_rows));
-        remaining_rows -= row_cnt;
+        // Load chunk (uses mmap if buffer is kMmap type)
+        BufferHandle buffer_handle = chunk_buffer_obj->Load();
+        auto *plaid_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
 
-        ColumnVector col;
-        status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
-        if (!status.ok()) {
-            return status;
-        }
+        LOG_INFO(fmt::format("OptimizePlaidIndex: Loading chunk {} with {} docs, {} embeddings",
+                             old_chunk_id,
+                             plaid_index->GetDocNum(),
+                             plaid_index->GetTotalEmbeddingNum()));
 
-        // Insert into the memory index (will auto-build with global centroids)
-        u32 offset = 0;
-        memory_plaid_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), 0, nullptr);
+        // Merge this chunk
+        merged_index->MergeOneChunk(plaid_index, current_doc_offset);
+
+        current_doc_offset += plaid_index->GetDocNum();
+
+        // Release handle immediately to allow buffer manager to free memory
+        // This is crucial for streaming merge - we don't keep all chunks in memory
+        buffer_handle = BufferHandle();
     }
 
-    // Build the index (using existing global centroids)
-    memory_plaid_index->BuildIndex();
+    // Step 4: Finalize merge
+    merged_index->FinalizeMerge();
 
-    // Dump to the new buffer
-    memory_plaid_index->Dump(buffer_obj);
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} rows into new chunk", total_row_cnt));
+    // Step 5: Write to buffer and convert to mmap for large index support
+    BufferHandle buffer_handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
+    *data_ptr = std::move(*merged_index);
+
+    // Save and convert to mmap
+    buffer_obj->Save();
+    if (buffer_obj->type() != BufferType::kMmap) {
+        buffer_obj->ToMmap();
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", old_chunk_ids_ptr->size(), data_ptr->GetDocNum()));
     return Status::OK();
 }
 
@@ -2504,6 +2539,10 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kPLAID: {
             memory_plaid_index->Dump(buffer_obj);
             buffer_obj->Save();
+            // Convert to mmap for large index support - OS manages memory
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
 
             // Save global centroids after dump (if trained)
             auto global_centroids = memory_plaid_index->GetGlobalCentroids();
