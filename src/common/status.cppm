@@ -201,6 +201,7 @@ export enum class ErrorCode : long {
     kTooManyFollower = 7027,
     kTooManyLearner = 7028,
     kCheckpointing = 7029,
+    kOutOfBound = 7030,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -397,6 +398,7 @@ public:
     static Status TooManyFollower(u8 follower_limit);
     static Status TooManyLearner();
     static Status Checkpointing();
+    static Status OutofBound(const std::string &detail_message);
 
     // meta
     static Status InvalidEntry();

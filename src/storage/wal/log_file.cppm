@@ -29,6 +29,8 @@ export struct TempWalFileInfo {
 export struct WalFileInfo {
     std::string path_;
     TxnTimeStamp max_commit_ts_;
+
+    auto operator<=>(const WalFileInfo &other) const { return path_ <=> other.path_; }
 };
 
 export class WalFile {
