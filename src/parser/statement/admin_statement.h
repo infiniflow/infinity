@@ -90,6 +90,7 @@ public:
     std::optional<std::string> node_name_{};
     std::optional<std::string> snapshot_name_{};
     std::optional<std::string> export_path_{};
+    std::optional<std::string> schema_name_{};
 };
 
 } // namespace infinity
