@@ -197,6 +197,15 @@ bool QueueSourceState::GetData() {
             merge_aggregate_op_state->input_complete_ = completed;
             break;
         }
+        case PhysicalOperatorType::kMergeHashAggregate: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            MergeHashAggregateOperatorState *merge_hash_agg_op_state = (MergeHashAggregateOperatorState *)next_op_state;
+            if (fragment_data->data_block_) {
+                merge_hash_agg_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            }
+            merge_hash_agg_op_state->input_complete_ = completed;
+            break;
+        }
         default: {
             UnrecoverableError("Not support operator type");
             break;

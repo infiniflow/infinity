@@ -40,12 +40,13 @@ namespace {
 
 using namespace infinity;
 
-void ConvertAvgToSumDivideCount(FunctionExpr &func_expression, const std::vector<std::string> &column_names) {
+void ConvertAvgToSumDivideCount(FunctionExpr &func_expression, const std::vector<std::string> &column_names, bool distinct) {
     func_expression.func_name_ = "/";
     func_expression.arguments_->clear();
-    auto createFunctionWithColumnArg = [&column_names](const std::string &func_name) {
+    auto createFunctionWithColumnArg = [&column_names, distinct](const std::string &func_name) {
         auto function_expression = std::make_unique<FunctionExpr>();
         function_expression->func_name_ = func_name;
+        function_expression->distinct_ = distinct;
         function_expression->arguments_ = new std::vector<ParsedExpr *>();
         auto column_expr = std::make_unique<ColumnExpr>();
         column_expr->names_.push_back(column_names[0]);
@@ -80,7 +81,7 @@ std::shared_ptr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr 
             auto column_expr = (ColumnExpr *)(*function_expression.arguments_)[0];
             std::vector<std::string> column_names(std::move(column_expr->names_));
             delete column_expr;
-            ConvertAvgToSumDivideCount(function_expression, column_names);
+            ConvertAvgToSumDivideCount(function_expression, column_names, function_expression.distinct_);
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
         }
     }

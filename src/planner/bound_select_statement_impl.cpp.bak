@@ -430,101 +430,18 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 }
             }
 
-            // Helper functions for aggregate plan construction
-            // Update projection expressions to reference aggregate output
-            auto update_projection_for_aggregate = [&](std::vector<std::shared_ptr<BaseExpression>> &proj_exprs, u64 groupby_index, u64 agg_index) {
-                std::string groupby_table = fmt::format("groupby_{}", groupby_index);
-                std::string agg_table = "__agg";
-                std::set<std::string> group_by_names_set;
-                for (const auto &grp : group_by_expressions_) {
-                    group_by_names_set.insert(grp->Name());
-                }
-
-                std::function<void(std::shared_ptr<BaseExpression> &)> update_agg_column_exprs = [&](std::shared_ptr<BaseExpression> &expr) {
-                    if (!expr)
-                        return;
-                    if (auto *col = dynamic_cast<ColumnExpression *>(expr.get())) {
-                        if (group_by_names_set.count(col->column_name()) > 0) {
-                            size_t output_col_idx = 0;
-                            for (size_t j = 0; j < group_by_expressions_.size(); ++j) {
-                                if (group_by_expressions_[j]->Name() == col->column_name()) {
-                                    output_col_idx = j;
-                                    break;
-                                }
-                            }
-                            auto new_col =
-                                ColumnExpression::Make(col->Type(), groupby_table, groupby_index, col->column_name(), output_col_idx, col->depth());
-                            new_col->alias_ = col->alias_;
-                            new_col->source_position_ = col->source_position_;
-                            expr = new_col;
-                        } else {
-                            std::string col_name = col->column_name();
-                            size_t output_col_idx = col->binding().column_idx;
-                            auto new_col = ColumnExpression::Make(col->Type(), agg_table, agg_index, col_name, output_col_idx, col->depth());
-                            new_col->alias_ = col->alias_;
-                            new_col->source_position_ = col->source_position_;
-                            expr = new_col;
-                        }
-                    } else {
-                        for (auto &arg : expr->arguments()) {
-                            update_agg_column_exprs(arg);
-                        }
-                    }
-                };
-
-                for (size_t i = 0; i < proj_exprs.size(); ++i) {
-                    update_agg_column_exprs(proj_exprs[i]);
-                }
-            };
-
-            // Add ORDER BY sort node
-            auto add_order_by_node = [&](u64 table_index) {
-                std::string table_name = fmt::format("groupby_{}", table_index);
-                if (!order_by_expressions_.empty()) {
-                    std::vector<std::shared_ptr<BaseExpression>> sort_exprs;
-                    for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
-                        const auto &order_expr = order_by_expressions_[i];
-                        size_t col_idx = 0;
-                        for (size_t j = 0; j < names_ptr_->size(); ++j) {
-                            if ((*names_ptr_)[j] == order_expr->Name()) {
-                                col_idx = j;
-                                break;
-                            }
-                        }
-                        auto new_col = ColumnExpression::Make(*types_ptr_->at(col_idx), table_name, table_index, order_expr->Name(), col_idx, 0);
-                        sort_exprs.push_back(new_col);
-                    }
-                    auto sort = std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), sort_exprs, order_by_types_);
-                    sort->set_left_node(root);
-                    root = sort;
-                }
-            };
-
-            // Add final Project node for output formatting
-            auto add_final_project_node = [&](std::vector<std::shared_ptr<BaseExpression>> &proj_exprs) {
-                u64 final_project_index = bind_context->GenerateTableIndex();
-                auto final_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
-                                                                      proj_exprs,
-                                                                      final_project_index,
-                                                                      std::map<size_t, std::shared_ptr<HighlightInfo>>());
-                final_project->set_left_node(root);
-                root = final_project;
-            };
-
             // Use HashAggregate + MergeHashAggregate for:
             // - Mixed aggregates (some distinct, some non-distinct)
             // - Different distinct columns across aggregates
             //
             // Use 2-level aggregates for:
-            // - Single distinct column
+            // - Single distinc column
             // - Same distinct columns across aggregates
             if (has_non_distinct_agg || !distinct_columns_all_same) {
-                // LEVEL 1: HashAggregate (parallel)
-                // For mixed aggregates, HashAggregate does not deduplicate distinct columns, MergeHashAggregate will handle deduplication.
-                // For different distinct columns, do partial deduplication.
+                // LEVEL 1: HashAggregate (parallel) - partial deduplication
                 u64 level1_output_index = bind_context->GenerateTableIndex();
-                std::string level1_table_name = fmt::format("__level1_hash_agg_{}", level1_output_index);
                 auto level1_hash_agg = std::make_shared<LogicalHashAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                              base_table_ref,
                                                                               group_by_expressions_,
                                                                               distinct_agg_args,
                                                                               non_distinct_agg_args,
@@ -547,6 +464,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                     level1_column_index[non_distinct_agg_args[i]->Name()] = idx;
                 }
 
+                std::string level1_table_name = fmt::format("__level1_hash_agg_{}", level1_output_index);
+
                 // LEVEL 2: MergeHashAggregate (serial) - apply aggregates with global deduplication
                 std::vector<std::shared_ptr<BaseExpression>> level2_groups;
                 std::vector<std::shared_ptr<BaseExpression>> level2_aggregates;
@@ -563,6 +482,9 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                     level2_groups.push_back(new_col);
                 }
 
+                // Create the final aggregates
+                // For mixed aggregates: HashAggregate doesn't deduplicate distinct columns,
+                // MergeHashAggregate handles it.
                 for (const auto &agg_expr : aggregate_expressions_) {
                     auto *ae = static_cast<AggregateExpression *>(agg_expr.get());
                     std::vector<std::shared_ptr<BaseExpression>> new_args;
@@ -585,6 +507,7 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 u64 level2_groupby_index = bind_context->GenerateTableIndex();
                 u64 level2_aggregate_index = bind_context->GenerateTableIndex();
                 auto level2_merge_agg = std::make_shared<LogicalMergeHashAggregate>(bind_context->GetNewLogicalNodeId(),
+                                                                                    base_table_ref,
                                                                                     level2_groups,
                                                                                     level2_aggregates,
                                                                                     level2_groupby_index,
@@ -595,24 +518,120 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
 
                 auto out_types = level2_merge_agg->GetOutputTypes();
                 auto out_names = level2_merge_agg->GetOutputNames();
+                std::string groupby_table = fmt::format("groupby_{}", level2_groupby_index);
+                std::string agg_table = "__agg";
+                auto groupby_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+                auto groupby_names_ptr = std::make_shared<std::vector<std::string>>();
+                for (size_t i = 0; i < group_by_expressions_.size(); ++i) {
+                    groupby_types->push_back(out_types->at(i));
+                    groupby_names_ptr->push_back(out_names->at(i));
+                }
+                bind_context->AddSubqueryBinding(groupby_table, level2_groupby_index, groupby_types, groupby_names_ptr);
+
                 auto agg_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
                 auto agg_names_ptr = std::make_shared<std::vector<std::string>>();
                 for (size_t i = group_by_expressions_.size(); i < out_types->size(); ++i) {
                     agg_types->push_back(out_types->at(i));
                     agg_names_ptr->push_back(out_names->at(i));
                 }
+                bind_context->AddSubqueryBinding(agg_table, level2_aggregate_index, agg_types, agg_names_ptr);
+                bind_context->aggregate_table_index_ = level2_aggregate_index;
+                bind_context->aggregate_table_name_ = agg_table;
 
                 // Update projection expressions to reference level 2 output
-                update_projection_for_aggregate(projection_expressions_, level2_groupby_index, level2_aggregate_index);
+                std::set<std::string> group_by_names_set;
+                for (const auto &grp : group_by_expressions_) {
+                    group_by_names_set.insert(grp->Name());
+                }
 
-                // Add ORDER BY if present
-                add_order_by_node(level2_groupby_index);
+                std::map<std::string, size_t> agg_name_to_output_idx;
+                for (size_t i = 0; i < agg_names_ptr->size(); ++i) {
+                    agg_name_to_output_idx[agg_names_ptr->at(i)] = i;
+                }
+
+                std::function<void(std::shared_ptr<BaseExpression> &)> update_agg_column_exprs = [&](std::shared_ptr<BaseExpression> &expr) {
+                    if (!expr)
+                        return;
+                    if (auto *col = dynamic_cast<ColumnExpression *>(expr.get())) {
+                        if (group_by_names_set.count(col->column_name()) > 0) {
+                            size_t output_col_idx = 0;
+                            for (size_t j = 0; j < group_by_expressions_.size(); ++j) {
+                                if (group_by_expressions_[j]->Name() == col->column_name()) {
+                                    output_col_idx = j;
+                                    break;
+                                }
+                            }
+                            auto new_col = ColumnExpression::Make(col->Type(),
+                                                                  groupby_table,
+                                                                  level2_groupby_index,
+                                                                  col->column_name(),
+                                                                  output_col_idx,
+                                                                  col->depth());
+                            new_col->alias_ = col->alias_;
+                            new_col->source_position_ = col->source_position_;
+                            expr = new_col;
+                        } else {
+                            std::string col_name = col->column_name();
+
+                            size_t output_col_idx = col->binding().column_idx;
+
+                            auto new_col =
+                                ColumnExpression::Make(col->Type(), agg_table, level2_aggregate_index, col_name, output_col_idx, col->depth());
+                            new_col->alias_ = col->alias_;
+                            new_col->source_position_ = col->source_position_;
+                            expr = new_col;
+                        }
+                    } else {
+                        for (auto &arg : expr->arguments()) {
+                            update_agg_column_exprs(arg);
+                        }
+                    }
+                };
+
+                // Create NEW output expressions for the final Project, don't modify projection_expressions_
+                std::vector<std::shared_ptr<BaseExpression>> final_project_exprs;
+                for (size_t i = 0; i < projection_expressions_.size(); ++i) {
+                    // Clone the expression and update its column references
+                    auto cloned_expr = projection_expressions_[i];
+                    update_agg_column_exprs(cloned_expr);
+                    final_project_exprs.push_back(cloned_expr);
+                }
+
+                types_ptr_ = out_types;
+                names_ptr_ = out_names;
+
+                if (!order_by_expressions_.empty()) {
+                    // Create order by expressions that reference the aggregate output
+                    std::vector<std::shared_ptr<BaseExpression>> sort_exprs;
+                    for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
+                        const auto &order_expr = order_by_expressions_[i];
+                        // Find the output column index by name
+                        size_t col_idx = 0;
+                        for (size_t j = 0; j < names_ptr_->size(); ++j) {
+                            if ((*names_ptr_)[j] == order_expr->Name()) {
+                                col_idx = j;
+                                break;
+                            }
+                        }
+                        auto new_col =
+                            ColumnExpression::Make(*types_ptr_->at(col_idx), groupby_table, level2_groupby_index, order_expr->Name(), col_idx, 0);
+                        sort_exprs.push_back(new_col);
+                    }
+                    auto sort = std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), sort_exprs, order_by_types_);
+                    sort->set_left_node(root);
+                    root = sort;
+                }
 
                 // Add final Project node for output formatting
-                add_final_project_node(projection_expressions_);
+                u64 final_project_index = bind_context->GenerateTableIndex();
+                auto final_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                                      final_project_exprs,
+                                                                      final_project_index,
+                                                                      std::map<size_t, std::shared_ptr<HighlightInfo>>());
+                final_project->set_left_node(root);
+                root = final_project;
 
                 return root;
-
             } else {
                 // Use 2-level aggregation
                 // LEVEL 1: DISTINCT is converted to GROUP BY
@@ -626,7 +645,6 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
 
                 std::vector<std::shared_ptr<BaseExpression>> level1_aggregates; // Empty
                 u64 level1_output_index = bind_context->GenerateTableIndex();
-                std::string level1_table_name = fmt::format("__level1_{}", level1_output_index);
                 auto level1_aggregate = std::make_shared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
                                                                            base_table_ref,
                                                                            level1_groups,
@@ -636,6 +654,8 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 level1_aggregate->set_left_node(root);
                 root = level1_aggregate;
 
+                // Build column name to level1 output index mapping
+                // Level 1 output order: group_by + distinct_columns + non_distinct_agg_args
                 std::map<std::string, size_t> level1_column_index;
                 size_t idx = 0;
                 for (size_t i = 0; i < group_by_expressions_.size(); ++i, ++idx) {
@@ -645,6 +665,11 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 for (size_t i = 0; i < distinct_agg_args.size(); ++i, ++idx) {
                     level1_column_index[distinct_agg_args[i]->Name()] = idx;
                 }
+
+                std::string level1_table_name = fmt::format("__level1_{}", level1_output_index);
+                auto level1_types = level1_aggregate->GetOutputTypes();
+                auto level1_names = level1_aggregate->GetOutputNames();
+                bind_context->AddSubqueryBinding(level1_table_name, level1_output_index, level1_types, level1_names);
 
                 // LEVEL 2: Aggregate
                 std::vector<std::shared_ptr<BaseExpression>> level2_groupby_exprs;
@@ -663,8 +688,22 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 std::vector<std::shared_ptr<BaseExpression>> level2_aggregates;
                 for (const auto &agg_expr : aggregate_expressions_) {
                     auto *ae = static_cast<AggregateExpression *>(agg_expr.get());
-                    bool is_not_count = ae->aggregate_function_.name() != "COUNT";
-                    if (is_not_count || ae->arguments().size() <= 1) {
+                    bool is_count = ae->aggregate_function_.name() == "COUNT";
+
+                    if (is_count && ae->arguments().size() > 1) {
+                        // COUNT(DISTINCT c1, c2, ...) - count rows
+                        std::vector<std::shared_ptr<BaseExpression>> count_args;
+                        if (!level1_groups.empty()) {
+                            std::string first_col_name = level1_groups[0]->Name();
+                            auto count_star_col =
+                                ColumnExpression::Make(level1_groups[0]->Type(), level1_table_name, level1_output_index, first_col_name, 0, 0);
+                            count_args.push_back(count_star_col);
+                        }
+                        auto new_agg = std::make_shared<AggregateExpression>(ae->aggregate_function_, count_args);
+                        new_agg->SetDistinct(false);
+                        new_agg->SetCountStar(true);
+                        level2_aggregates.push_back(new_agg);
+                    } else {
                         // Normal aggregate
                         std::vector<std::shared_ptr<BaseExpression>> new_args;
                         for (const auto &arg : ae->arguments()) {
@@ -680,19 +719,6 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         auto new_agg = std::make_shared<AggregateExpression>(ae->aggregate_function_, new_args);
                         new_agg->SetDistinct(false);
                         level2_aggregates.push_back(new_agg);
-                    } else {
-                        // COUNT(DISTINCT c1, c2, ...) - count rows
-                        std::vector<std::shared_ptr<BaseExpression>> count_args;
-                        if (!level1_groups.empty()) {
-                            std::string first_col_name = level1_groups[0]->Name();
-                            auto count_star_col =
-                                ColumnExpression::Make(level1_groups[0]->Type(), level1_table_name, level1_output_index, first_col_name, 0, 0);
-                            count_args.push_back(count_star_col);
-                        }
-                        auto new_agg = std::make_shared<AggregateExpression>(ae->aggregate_function_, count_args);
-                        new_agg->SetDistinct(false);
-                        new_agg->SetCountStar(true);
-                        level2_aggregates.push_back(new_agg);
                     }
                 }
 
@@ -707,14 +733,118 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                 level2_aggregate->set_left_node(root);
                 root = level2_aggregate;
 
-                // Update projection expressions to reference level 2 output
-                update_projection_for_aggregate(projection_expressions_, level2_groupby_index, level2_output_index);
+                auto out_types = level2_aggregate->GetOutputTypes();
+                auto out_names = level2_aggregate->GetOutputNames();
 
-                // Add ORDER BY if present
-                add_order_by_node(level2_groupby_index);
+                // Register bindings
+                std::string groupby_table = fmt::format("groupby_{}", level2_groupby_index);
+                std::string agg_table = "__agg";
+
+                auto groupby_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+                auto groupby_names = std::make_shared<std::vector<std::string>>();
+                for (size_t i = 0; i < group_by_expressions_.size(); ++i) {
+                    groupby_types->push_back(out_types->at(i));
+                    groupby_names->push_back(out_names->at(i));
+                }
+                bind_context->AddSubqueryBinding(groupby_table, level2_groupby_index, groupby_types, groupby_names);
+
+                auto agg_types = std::make_shared<std::vector<std::shared_ptr<DataType>>>();
+                auto agg_names = std::make_shared<std::vector<std::string>>();
+                for (size_t i = group_by_expressions_.size(); i < out_types->size(); ++i) {
+                    agg_types->push_back(out_types->at(i));
+                    agg_names->push_back(out_names->at(i));
+                }
+                bind_context->AddSubqueryBinding(agg_table, level2_output_index, agg_types, agg_names);
+                bind_context->aggregate_table_index_ = level2_output_index;
+                bind_context->aggregate_table_name_ = agg_table;
+
+                // Update projection expressions
+                std::set<std::string> group_by_names_set;
+                for (const auto &grp : group_by_expressions_) {
+                    group_by_names_set.insert(grp->Name());
+                }
+
+                std::map<std::string, size_t> agg_name_to_output_idx;
+                for (size_t i = 0; i < agg_names->size(); ++i) {
+                    agg_name_to_output_idx[agg_names->at(i)] = i;
+                }
+
+                std::function<void(std::shared_ptr<BaseExpression> &)> update_agg_column_exprs = [&](std::shared_ptr<BaseExpression> &expr) {
+                    if (!expr)
+                        return;
+                    if (auto *col = dynamic_cast<ColumnExpression *>(expr.get())) {
+                        if (group_by_names_set.count(col->column_name()) > 0) {
+                            size_t output_col_idx = 0;
+                            for (size_t j = 0; j < group_by_expressions_.size(); ++j) {
+                                if (group_by_expressions_[j]->Name() == col->column_name()) {
+                                    output_col_idx = j;
+                                    break;
+                                }
+                            }
+                            auto new_col = ColumnExpression::Make(col->Type(),
+                                                                  groupby_table,
+                                                                  level2_groupby_index,
+                                                                  col->column_name(),
+                                                                  output_col_idx,
+                                                                  col->depth());
+                            new_col->alias_ = col->alias_;
+                            new_col->source_position_ = col->source_position_;
+                            expr = new_col;
+                        } else {
+                            std::string col_name = col->column_name();
+                            size_t output_col_idx = col->binding().column_idx;
+
+                            auto new_col =
+                                ColumnExpression::Make(col->Type(), agg_table, level2_output_index, col_name, output_col_idx, col->depth());
+                            new_col->alias_ = col->alias_;
+                            new_col->source_position_ = col->source_position_;
+                            expr = new_col;
+                        }
+                    } else {
+                        for (auto &arg : expr->arguments()) {
+                            update_agg_column_exprs(arg);
+                        }
+                    }
+                };
+
+                for (size_t i = 0; i < projection_expressions_.size(); ++i) {
+                    update_agg_column_exprs(projection_expressions_[i]);
+                }
+
+                types_ptr_ = out_types;
+                names_ptr_ = out_names;
+
+                // Handle ORDER BY if present - create Sort node below the Project
+                if (!order_by_expressions_.empty()) {
+                    // Create order by expressions that reference the aggregate output
+                    std::vector<std::shared_ptr<BaseExpression>> sort_exprs;
+                    for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
+                        const auto &order_expr = order_by_expressions_[i];
+                        // Find the output column index by name
+                        size_t col_idx = 0;
+                        for (size_t j = 0; j < names_ptr_->size(); ++j) {
+                            if ((*names_ptr_)[j] == order_expr->Name()) {
+                                col_idx = j;
+                                break;
+                            }
+                        }
+                        auto new_col =
+                            ColumnExpression::Make(*types_ptr_->at(col_idx), groupby_table, level2_groupby_index, order_expr->Name(), col_idx, 0);
+                        sort_exprs.push_back(new_col);
+                    }
+                    auto sort = std::make_shared<LogicalSort>(bind_context->GetNewLogicalNodeId(), sort_exprs, order_by_types_);
+                    sort->set_left_node(root);
+                    root = sort;
+                }
 
                 // Add final Project node for output formatting
-                add_final_project_node(projection_expressions_);
+                u64 final_project_index = bind_context->GenerateTableIndex();
+                auto final_project = std::make_shared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
+                                                                      projection_expressions_,
+                                                                      final_project_index,
+                                                                      std::map<size_t, std::shared_ptr<HighlightInfo>>());
+                final_project->set_left_node(root);
+                root = final_project;
 
                 return root;
             }
