@@ -115,12 +115,41 @@ bool PlaidIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
         UnrecoverableError("PlaidIndexFileWorker::ReadFromMmapImpl: Mmap data is already allocated.");
     }
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
-    const auto *index_plaid = static_cast<IndexPLAID *>(index_base_.get());
-    const auto nbits = index_plaid->nbits_;
-    const auto n_centroids = index_plaid->n_centroids_;
 
-    // Allocate PlaidIndex object
+    // Read header from the mmap data (first 4 fields: start_segment_offset, embedding_dimension, nbits, n_centroids)
+    const char *src = static_cast<const char *>(ptr);
+    u32 stored_start_segment_offset, stored_embedding_dimension, stored_nbits, stored_n_centroids;
+    size_t offset = 0;
+    std::memcpy(&stored_start_segment_offset, src + offset, sizeof(stored_start_segment_offset));
+    offset += sizeof(stored_start_segment_offset);
+    std::memcpy(&stored_embedding_dimension, src + offset, sizeof(stored_embedding_dimension));
+    offset += sizeof(stored_embedding_dimension);
+    std::memcpy(&stored_nbits, src + offset, sizeof(stored_nbits));
+    offset += sizeof(stored_nbits);
+    std::memcpy(&stored_n_centroids, src + offset, sizeof(stored_n_centroids));
+
+    // Verify embedding dimension matches
+    if (stored_embedding_dimension != column_embedding_dim) {
+        UnrecoverableError(fmt::format("PlaidIndexFileWorker::ReadFromMmapImpl: embedding dimension mismatch: stored={}, expected={}",
+                                       stored_embedding_dimension,
+                                       column_embedding_dim));
+    }
+
+    // Use nbits and n_centroids from file, not from index_base_
+    const auto nbits = stored_nbits;
+    const auto n_centroids = stored_n_centroids;
+
+    LOG_INFO(fmt::format(
+        "PlaidIndexFileWorker::ReadFromMmapImpl: stored_start_segment_offset={}, stored_embedding_dim={}, stored_nbits={}, stored_n_centroids={}",
+        stored_start_segment_offset,
+        stored_embedding_dimension,
+        stored_nbits,
+        stored_n_centroids));
+
+    // Allocate PlaidIndex object with correct nbits from file
     auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids);
+
+    LOG_INFO(fmt::format("PlaidIndexFileWorker::ReadFromMmapImpl: Created PlaidIndex with nbits={}, n_centroids={}", nbits, n_centroids));
 
     // Load from mmap pointer - this will copy data into internal vectors
     // Note: For true zero-copy mmap, PlaidIndex would need to use pointers into mmap region

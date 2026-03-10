@@ -909,7 +909,9 @@ size_t PlaidIndex::CalcSize() const {
 
     size += sizeof(u32) + packed_residuals_size_;
 
-    // Quantizer size (nbits_ and embedding_dimension_ are already counted in PlaidIndex header)
+    // Quantizer size (now includes nbits_ and embedding_dim_ to match SaveToPtr format)
+    size += sizeof(u32);                                               // nbits_
+    size += sizeof(u32);                                               // embedding_dim_
     size += sizeof(f32);                                               // avg_residual_
     size += sizeof(u32) + (quantizer_->n_buckets() - 1) * sizeof(f32); // bucket_cutoffs (n_buckets - 1)
     size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32);       // bucket_weights

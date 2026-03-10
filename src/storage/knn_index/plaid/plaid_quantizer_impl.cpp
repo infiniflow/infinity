@@ -17,6 +17,7 @@ module infinity_core:plaid_quantizer.impl;
 import :plaid_quantizer;
 import :local_file_handle;
 import :infinity_exception;
+import :logger;
 
 import std;
 
@@ -366,8 +367,9 @@ void PlaidQuantizer::SaveToPtr(void *ptr, size_t &offset) const {
         offset += len;
     };
 
-    // Note: nbits_ and embedding_dim_ are already saved by PlaidIndex::SaveToPtr
-    // Only save quantizer-specific data
+    // Save nbits_ and embedding_dim_ (consistent with Save() format)
+    append(&nbits_, sizeof(nbits_));
+    append(&embedding_dim_, sizeof(embedding_dim_));
     append(&avg_residual_, sizeof(avg_residual_));
 
     // Save bucket cutoffs
@@ -391,9 +393,19 @@ void PlaidQuantizer::LoadFromPtr(void *ptr, size_t &offset) {
         offset += len;
     };
 
-    // Note: nbits_ and embedding_dim_ are already saved by PlaidIndex::SaveToPtr
-    // and verified by PlaidIndex::LoadFromPtr before calling this method.
-    // Only load quantizer-specific data here.
+    // Read nbits_ and embedding_dim_ (consistent with Save() format)
+    u32 nbits, embedding_dim;
+    read(&nbits, sizeof(nbits));
+    read(&embedding_dim, sizeof(embedding_dim));
+
+    if (nbits != nbits_ || embedding_dim != embedding_dim_) {
+        UnrecoverableError(
+            fmt::format("PlaidQuantizer::LoadFromPtr: dimension mismatch: read nbits={}, embedding_dim={}, expected nbits={}, embedding_dim={}",
+                        nbits,
+                        embedding_dim,
+                        nbits_,
+                        embedding_dim_));
+    }
 
     read(&avg_residual_, sizeof(avg_residual_));
 
@@ -409,7 +421,7 @@ void PlaidQuantizer::LoadFromPtr(void *ptr, size_t &offset) {
     u32 n_buckets;
     read(&n_buckets, sizeof(n_buckets));
     if (n_buckets != n_buckets_) {
-        UnrecoverableError("PlaidQuantizer::LoadFromPtr: n_buckets mismatch");
+        UnrecoverableError(fmt::format("PlaidQuantizer::LoadFromPtr: n_buckets mismatch: read={}, expected={}", n_buckets, n_buckets_));
     }
     bucket_weights_ = std::make_unique<f32[]>(n_buckets_);
     read(bucket_weights_.get(), n_buckets_ * sizeof(f32));
