@@ -53,6 +53,10 @@ import :index_bmp;
 import :index_secondary;
 import :index_secondary_functional;
 import :emvb_index_in_mem;
+import :plaid_index_in_mem;
+import :plaid_index_file_worker;
+import :plaid_index;
+import :index_plaid;
 import :emvb_index;
 import :meta_key;
 import :data_access_state;
@@ -486,6 +490,23 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
             break;
         }
+        case IndexType::kPLAID: {
+            // PLAID index merge: read from column store, rebuild with global centroids
+            SegmentMeta segment_meta(segment_id, table_meta);
+            std::shared_ptr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -738,6 +759,7 @@ Status NewTxn::AppendIndex(TableIndexMeta &table_index_meta, const std::pair<Row
 
 Status
 NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+    LOG_INFO(fmt::format("AppendMemIndex ENTER: block_id={}, offset={}, row_cnt={}", block_id, offset, row_cnt));
     Status status;
     SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
     auto base_row_id = RowID(segment_index_meta.segment_id(), block_offset + offset);
@@ -745,10 +767,14 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
     if (!index_status.ok()) {
+        LOG_INFO("AppendMemIndex: GetIndexBase failed");
         return index_status;
     }
+    LOG_INFO("AppendMemIndex: before GetMemIndex");
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex(true);
+    LOG_INFO(fmt::format("AppendMemIndex: after GetMemIndex, ptr={}", static_cast<void *>(mem_index.get())));
     bool is_null = mem_index->IsNull();
+    LOG_INFO(fmt::format("AppendMemIndex: is_null={}", is_null));
     LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateBegin mem_index {:p}, is_null {}", static_cast<void *>(mem_index.get()), is_null));
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
@@ -905,12 +931,44 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
             break;
         }
+        case IndexType::kPLAID: {
+            std::shared_ptr<PlaidIndexInMem> memory_plaid_index;
+            auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+            LOG_INFO(fmt::format("AppendMemIndex PLAID: is_null={}, base_row_id={}", is_null, base_row_id.ToUint64()));
+            if (is_null) {
+                auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                // Try to load existing global centroids for incremental updates
+                auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+                if (global_centroids && global_centroids->IsTrained()) {
+                    LOG_INFO(fmt::format("AppendMemIndex PLAID: Using existing global centroids (n_centroids={})", global_centroids->n_centroids()));
+                    memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_row_id, global_centroids);
+                } else {
+                    LOG_INFO("AppendMemIndex PLAID: No existing global centroids, will train new ones");
+                    memory_plaid_index = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+                }
+                auto [db_name, table_name] = table_meta.GetDBTableName();
+                memory_plaid_index->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+                memory_plaid_index->index_name_ = *index_base->index_name_;
+                mem_index->SetPlaidIndex(memory_plaid_index);
+                LOG_INFO("AppendMemIndex PLAID: created new PlaidIndexInMem");
+            } else {
+                memory_plaid_index = mem_index->GetPlaidIndex();
+                LOG_INFO(fmt::format("AppendMemIndex PLAID: using existing PlaidIndexInMem, ptr={}", static_cast<void *>(memory_plaid_index.get())));
+            }
+            MetaCache *meta_cache = table_meta.meta_cache();
+            // Insert will auto-trigger BuildIndex when threshold is reached
+            memory_plaid_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance(), begin_ts, meta_cache);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
     }
     mem_index->UpdateEnd();
-    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd mem_index {:p}", static_cast<void *>(mem_index.get())));
+    LOG_TRACE(fmt::format("NewTxn::AppendMemIndex UpdateEnd: mem_index {:p}", static_cast<void *>(mem_index.get())));
 
     // // Trigger dump if necessary
     if (!IsReplay()) {
@@ -1048,6 +1106,19 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
         case IndexType::kDiskAnn: { // TODO
             LOG_WARN("Not implemented yet");
             return Status::OK();
+        }
+        case IndexType::kPLAID: {
+            auto status = PopulatePlaidIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            // If no chunk was created (not enough data), remove the segment from index
+            // so that queries will fall back to brute force search
+            if (new_chunk_ids.empty()) {
+                // Remove segment from index - it will be added later when more data is inserted
+                table_index_meta.RemoveSegmentIndexIDs({segment_meta.segment_id()});
+            }
+            break;
         }
         default: {
             UnrecoverableError("Invalid index type");
@@ -1370,6 +1441,143 @@ Status NewTxn::PopulateEmvbIndexInner(std::shared_ptr<IndexBase> index_base,
     return Status::OK();
 }
 
+Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
+                                       SegmentIndexMeta &segment_index_meta,
+                                       SegmentMeta &segment_meta,
+                                       std::shared_ptr<ColumnDef> column_def,
+                                       std::vector<ChunkID> &new_chunk_ids) {
+    RowID base_row_id(segment_index_meta.segment_id(), 0);
+
+    auto &table_meta = segment_index_meta.table_index_meta().table_meta();
+    auto [db_name, table_name] = table_meta.GetDBTableName();
+
+    // Get mem_index_capacity for incremental dump threshold
+    size_t mem_index_capacity = InfinityContext::instance().config()->MemIndexCapacity();
+
+    // Helper lambda to dump current index and create chunk
+    auto dump_current_index = [&](PlaidIndexInMem *plaid_index) -> Status {
+        if (!plaid_index->IsBuilt() || plaid_index->GetRowCount() == 0) {
+            return Status::OK();
+        }
+
+        auto chunk_info = plaid_index->GetChunkIndexMetaInfo();
+        ChunkID chunk_id = 0;
+        Status status;
+        std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
+        if (!status.ok()) {
+            return status;
+        }
+        new_chunk_ids.push_back(chunk_id);
+
+        std::optional<ChunkIndexMeta> chunk_index_meta;
+        BufferObj *buffer_obj = nullptr;
+        status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
+                                               this,
+                                               chunk_id,
+                                               chunk_info.base_row_id_,
+                                               chunk_info.row_cnt_,
+                                               chunk_info.term_cnt_,
+                                               chunk_info.base_name_,
+                                               chunk_info.index_size_,
+                                               chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+
+        LOG_INFO(fmt::format("PopulatePlaidIndexInner: Dumping chunk {} with {} rows", chunk_id, plaid_index->GetRowCount()));
+        plaid_index->Dump(buffer_obj);
+        buffer_obj->Save();
+
+        // Save global centroids after first dump
+        auto global_centroids = plaid_index->GetGlobalCentroids();
+        if (global_centroids && global_centroids->IsTrained()) {
+            Status centroids_status = segment_index_meta.SetPlaidGlobalCentroids(global_centroids);
+            if (centroids_status.ok()) {
+                centroids_status = segment_index_meta.SavePlaidGlobalCentroids();
+                if (centroids_status.ok()) {
+                    LOG_INFO("Saved PLAID global centroids");
+                }
+            }
+        }
+
+        return Status::OK();
+    };
+
+    // Check if there's already a MemIndex with PlaidIndexInMem
+    // This happens when data was inserted before create_index was called
+    std::shared_ptr<MemIndex> existing_mem_index = segment_index_meta.GetMemIndex();
+    std::shared_ptr<PlaidIndexInMem> plaid_index_in_mem;
+
+    if (existing_mem_index && existing_mem_index->GetPlaidIndex()) {
+        // Use existing PlaidIndexInMem from MemIndex
+        plaid_index_in_mem = existing_mem_index->GetPlaidIndex();
+        LOG_INFO(fmt::format("PopulatePlaidIndexInner: Using existing PlaidIndexInMem with {} rows", plaid_index_in_mem->GetRowCount()));
+    } else {
+        // Create new in-memory PLAID index and read data from blocks
+        plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+        plaid_index_in_mem->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+        plaid_index_in_mem->index_name_ = *index_base->index_name_;
+
+        // Read all blocks and insert data
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+        if (!block_status.ok()) {
+            return block_status;
+        }
+
+        ColumnID column_id = column_def->id();
+        for (BlockID block_id : *block_ids) {
+            BlockMeta block_meta(block_id, segment_meta);
+            ColumnMeta column_meta(column_id, block_meta);
+
+            size_t row_cnt = 0;
+            auto [block_row_cnt, row_status] = block_meta.GetRowCnt1();
+            if (!row_status.ok()) {
+                return row_status;
+            }
+            row_cnt = block_row_cnt;
+
+            ColumnVector col;
+            Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
+            }
+
+            plaid_index_in_mem->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+
+            // Check if we need to dump (incremental dump when exceeding capacity)
+            if (plaid_index_in_mem->IsBuilt() && plaid_index_in_mem->GetRowCount() >= mem_index_capacity) {
+                Status dump_status = dump_current_index(plaid_index_in_mem.get());
+                if (!dump_status.ok()) {
+                    return dump_status;
+                }
+                // After dump, PlaidIndexInMem resets and can accept more data
+            }
+        }
+    }
+
+    // Check if index was built (either during Insert auto-trigger or needs explicit build)
+    // The Insert method auto-triggers BuildIndex when threshold is reached,
+    // so we need to check if index is already built or if we have buffered data that needs building
+    if (!plaid_index_in_mem->IsBuilt()) {
+        // Try to build - may have buffered data that didn't reach auto-trigger threshold
+        if (!plaid_index_in_mem->BuildIndex()) {
+            LOG_INFO(fmt::format("PopulatePlaidIndexInner: Not enough data to build PLAID index for segment {}. "
+                                 "Index will be built incrementally as more data is added.",
+                                 segment_index_meta.segment_id()));
+            // Don't create chunk if index not built - return without error
+            // Index will be built later when more data is inserted
+            return Status::OK();
+        }
+    }
+
+    // Final dump for remaining data
+    return dump_current_index(plaid_index_in_mem.get());
+}
+
 Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
                                       SegmentIndexMeta &segment_index_meta,
                                       SegmentMeta &segment_meta,
@@ -1436,6 +1644,8 @@ Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex()) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex()) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -1767,6 +1977,8 @@ Status NewTxn::PopulateBMPIndexInner(std::shared_ptr<IndexBase> index_base,
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex()) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex()) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -1945,6 +2157,107 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
     return Status::OK();
 }
 
+Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
+                                  SegmentIndexMeta &segment_index_meta,
+                                  SegmentMeta &segment_meta,
+                                  std::shared_ptr<ColumnDef> column_def,
+                                  RowID base_rowid,
+                                  u32 total_row_cnt,
+                                  BufferObj *buffer_obj) {
+    Status status;
+
+    // Get or load global centroids
+    auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+    if (!global_centroids || !global_centroids->IsTrained()) {
+        LOG_WARN("OptimizePlaidIndex: No trained global centroids, cannot optimize");
+        return Status::UnexpectedError("No trained global centroids for PLAID index optimization");
+    }
+
+    // Get old chunk IDs
+    std::vector<ChunkID> *old_chunk_ids_ptr = nullptr;
+    std::tie(old_chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (old_chunk_ids_ptr->empty()) {
+        LOG_WARN("OptimizePlaidIndex: No chunks to merge");
+        return Status::UnexpectedError("No chunks to merge");
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging {} chunks with {} centroids, {} total rows starting at {}",
+                         old_chunk_ids_ptr->size(),
+                         global_centroids->n_centroids(),
+                         total_row_cnt,
+                         base_rowid.ToUint64()));
+
+    // OPTIMIZATION: Streaming merge - load one chunk at a time to control memory
+    // This is critical for large indexes that exceed available RAM
+
+    // Step 1: Create new merged index with shared global centroids
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
+    const u32 embedding_dimension = embedding_info->Dimension();
+    const IndexPLAID *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
+
+    auto merged_index =
+        std::make_unique<PlaidIndex>(base_rowid.segment_offset_, embedding_dimension, index_plaid->nbits_, global_centroids->n_centroids());
+
+    // Share global centroids (no copy)
+    merged_index->ShareGlobalCentroids(global_centroids);
+
+    // Step 2: Initialize streaming merge
+    merged_index->InitializeMerge();
+
+    // Step 3: Load and merge chunks one at a time (streaming to control memory)
+    u32 current_doc_offset = 0;
+    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+        ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
+
+        BufferObj *chunk_buffer_obj = nullptr;
+        status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+
+        // Load chunk (uses mmap if buffer is kMmap type)
+        BufferHandle buffer_handle = chunk_buffer_obj->Load();
+        auto *plaid_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
+
+        LOG_INFO(fmt::format("OptimizePlaidIndex: Loading chunk {} with {} docs, {} embeddings",
+                             old_chunk_id,
+                             plaid_index->GetDocNum(),
+                             plaid_index->GetTotalEmbeddingNum()));
+
+        // Merge this chunk
+        merged_index->MergeOneChunk(plaid_index, current_doc_offset);
+
+        current_doc_offset += plaid_index->GetDocNum();
+
+        // Release handle immediately to allow buffer manager to free memory
+        // This is crucial for streaming merge - we don't keep all chunks in memory
+        buffer_handle = BufferHandle();
+    }
+
+    // Step 4: Finalize merge
+    merged_index->FinalizeMerge();
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
+
+    // Step 5: Write to buffer and convert to mmap for large index support
+    BufferHandle buffer_handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
+    *data_ptr = std::move(*merged_index);
+
+    // Save and convert to mmap
+    buffer_obj->Save();
+    if (buffer_obj->type() != BufferType::kMmap) {
+        buffer_obj->ToMmap();
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", old_chunk_ids_ptr->size(), data_ptr->GetDocNum()));
+    return Status::OK();
+}
+
 Status NewTxn::AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &raw_params) {
     Status status;
     std::shared_ptr<IndexBase> index_base;
@@ -2042,8 +2355,24 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    auto mem_index = segment_index_meta.PopMemIndex();
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+    // For PLAID index, we don't PopMemIndex because PlaidIndexInMem continues to handle insertions after dump.
+    // It maintains state (like updated begin_row_id) across dump operations.
+    // For other index types, we PopMemIndex and ClearMemIndex as usual.
+    std::shared_ptr<MemIndex> mem_index;
+    bool keep_mem_index_after_dump = false;
+    {
+        auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
+        if (index_status.ok()) {
+            keep_mem_index_after_dump = (index_base->index_type_ == IndexType::kPLAID);
+        }
+    }
+    if (keep_mem_index_after_dump) {
+        mem_index = segment_index_meta.GetMemIndex();
+    } else {
+        mem_index = segment_index_meta.PopMemIndex();
+    }
+    if (mem_index == nullptr ||
+        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
@@ -2059,6 +2388,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
     std::shared_ptr<HnswIndexInMem> memory_hnsw_index;
     std::shared_ptr<BMPIndexInMem> memory_bmp_index;
     std::shared_ptr<EMVBIndexInMem> memory_emvb_index;
+    std::shared_ptr<PlaidIndexInMem> memory_plaid_index;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
@@ -2110,6 +2440,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             UnrecoverableError("Not implemented yet");
             break;
         }
+        case IndexType::kPLAID: {
+            memory_plaid_index = mem_index->GetPlaidIndex();
+            if (memory_plaid_index == nullptr) {
+                return Status::EmptyMemIndex();
+            }
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -2121,6 +2458,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         chunk_index_meta_info = mem_index->GetBaseMemIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetEMVBIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetPlaidIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -2197,12 +2536,45 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
             buffer_obj->Save();
             break;
         }
+        case IndexType::kPLAID: {
+            memory_plaid_index->Dump(buffer_obj);
+            buffer_obj->Save();
+            // Convert to mmap for large index support - OS manages memory
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
+
+            // Save global centroids after dump (if trained)
+            auto global_centroids = memory_plaid_index->GetGlobalCentroids();
+            if (global_centroids && global_centroids->IsTrained()) {
+                // Update the segment index meta with the global centroids
+                Status centroids_status = segment_index_meta.SetPlaidGlobalCentroids(global_centroids);
+                if (!centroids_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to set global centroids: {}", centroids_status.message()));
+                } else {
+                    centroids_status = segment_index_meta.SavePlaidGlobalCentroids();
+                    if (!centroids_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to save global centroids: {}", centroids_status.message()));
+                    } else {
+                        LOG_INFO("Saved PLAID global centroids after dump");
+                    }
+                }
+            }
+            // For PLAID, BuildIndex now only builds a batch of data (up to threshold)
+            // If there's more buffered data, we need to create new chunks and dump them
+            // This is handled by the caller checking HasBufferedData() after Dump
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
     }
 
-    mem_index->ClearMemIndex();
+    // For PLAID index, don't ClearMemIndex because PlaidIndexInMem continues to handle insertions after dump.
+    // The PlaidIndexInMem object is preserved with its updated state (current_begin_row_id_, etc.).
+    if (!keep_mem_index_after_dump) {
+        mem_index->ClearMemIndex();
+    }
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
         auto *memindex_tracer = storage->memindex_tracer();

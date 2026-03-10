@@ -939,7 +939,7 @@ static const yytype_int16 yyrline[] =
     4041,  4045,  4050,  4055,  4084,  4094,  4099,  4104,  4109,  4115,
     4119,  4120,  4122,  4123,  4125,  4126,  4138,  4146,  4150,  4153,
     4157,  4160,  4164,  4168,  4173,  4179,  4189,  4199,  4207,  4218,
-    4271,  4278,  4284
+    4273,  4280,  4286
 };
 #endif
 
@@ -9851,6 +9851,8 @@ Return4:
         index_type = infinity::IndexType::kDiskAnn;
     } else if(strcmp((yyvsp[-1].str_value), "secondary") == 0){
         index_type = infinity::IndexType::kSecondary;
+    } else if(strcmp((yyvsp[-1].str_value), "plaid") == 0){
+        index_type = infinity::IndexType::kPLAID;
     } else {
         free((yyvsp[-1].str_value));
         free((yyvsp[-4].str_value));
@@ -9887,11 +9889,11 @@ Return4:
     
     free((yyvsp[-4].str_value));
 }
-#line 9891 "parser.cpp"
+#line 9893 "parser.cpp"
     break;
 
   case 570: /* index_info: '(' IDENTIFIER ')'  */
-#line 4271 "parser.y"
+#line 4273 "parser.y"
                      {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
@@ -9899,21 +9901,21 @@ Return4:
     (yyval.index_info_t)->column_name_ = (yyvsp[-1].str_value);
     free((yyvsp[-1].str_value));
 }
-#line 9903 "parser.cpp"
+#line 9905 "parser.cpp"
     break;
 
   case 571: /* index_info: '(' function_expr ')'  */
-#line 4278 "parser.y"
+#line 4280 "parser.y"
                         {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondaryFunctional;
     (yyval.index_info_t)->function_expr_ = (yyvsp[-1].expr_t);
 }
-#line 9913 "parser.cpp"
+#line 9915 "parser.cpp"
     break;
 
   case 572: /* index_info: '(' function_expr ')' USING IDENTIFIER with_index_param_list  */
-#line 4284 "parser.y"
+#line 4286 "parser.y"
                                                                {
 ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -9951,11 +9953,11 @@ ParserHelper::ToLower((yyvsp[-1].str_value));
         }
     }
 }
-#line 9955 "parser.cpp"
+#line 9957 "parser.cpp"
     break;
 
 
-#line 9959 "parser.cpp"
+#line 9961 "parser.cpp"
 
       default: break;
     }
@@ -10184,7 +10186,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 4323 "parser.y"
+#line 4325 "parser.y"
 
 
 void
