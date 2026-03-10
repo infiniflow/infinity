@@ -101,22 +101,8 @@ void *BufferObj::LoadNoLock(bool checkpoint_by_spill) {
             break;
         }
         case BufferStatus::kUnloaded: {
-            // Try to remove from GC queue, but don't fail if not found
-            // (might have been cleaned up by PickForCleanup)
-            buffer_mgr_->RemoveFromGCQueue(this);
-            // Check if data is still in memory, if not, reload from file
-            if (file_worker_->GetData() == nullptr) {
-                buffer_mgr_->AddCacheMissCount();
-                // For kEphemeral type, data was never spilled to temp, read from regular file
-                bool from_spill = (type_ == BufferType::kTemp);
-                file_worker_->ReadFromFile(from_spill);
-
-                size_t buffer_size = GetBufferSize();
-                LOG_TRACE(fmt::format("Request memory {}", buffer_size));
-                bool free_success = buffer_mgr_->RequestSpace(buffer_size);
-                if (!free_success) {
-                    UnrecoverableError("Out of memory.");
-                }
+            if (!buffer_mgr_->RemoveFromGCQueue(this)) {
+                UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename()));
             }
             break;
         }
