@@ -2600,6 +2600,17 @@ admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
      $$->log_file_index_ = $4;
      $$->log_index_in_file_ = $6;
 }
+| ADMIN SHOW DATABASES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListDatabases;
+}
+| ADMIN SHOW DATABASE IDENTIFIER {
+    $$ = new infinity::AdminStatement();
+    $$->admin_type_ = infinity::AdminStmtType::kShowDatabase;
+    ParserHelper::ToLower($4);
+    $$->schema_name_ = $4;
+    free($4);
+}
 | ADMIN SHOW CONFIGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListConfigs;
