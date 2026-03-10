@@ -26,6 +26,7 @@ namespace infinity {
 class KVInstance;
 class TableIndexMeta;
 struct MemIndex;
+class PlaidGlobalCentroids;
 // struct SegmentIndexFtInfo;
 class NewTxn;
 
@@ -70,6 +71,15 @@ public:
 
     std::tuple<std::shared_ptr<SegmentIndexSnapshotInfo>, Status> MapMetaToSnapShotInfo();
 
+    // PLAID global centroids management
+    // The global centroids are shared across all chunks in this segment
+    // Once trained, they are persisted and loaded for subsequent operations
+    Status SetPlaidGlobalCentroids(const std::shared_ptr<PlaidGlobalCentroids> &centroids);
+    std::shared_ptr<PlaidGlobalCentroids> GetPlaidGlobalCentroids();
+    Status SavePlaidGlobalCentroids();
+    Status LoadPlaidGlobalCentroids();
+    bool HasPlaidGlobalCentroids();
+
 private:
     Status LoadChunkIDs1();
 
@@ -92,6 +102,10 @@ private:
     std::optional<ChunkID> next_chunk_id_{};
 
     std::shared_ptr<SegmentIndexFtInfo> ft_info_{};
+
+    // PLAID-specific: global centroids shared by all chunks
+    // Stored in KV store for persistence
+    std::shared_ptr<PlaidGlobalCentroids> plaid_global_centroids_{};
 };
 
 } // namespace infinity

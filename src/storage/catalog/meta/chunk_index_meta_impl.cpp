@@ -38,6 +38,7 @@ import :persist_result_handler;
 import :virtual_store;
 import :logger;
 import :secondary_index_file_worker;
+import :plaid_index_file_worker;
 import :file_worker;
 
 import std;
@@ -218,6 +219,21 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 LOG_WARN("Not implemented");
                 break;
             }
+            case IndexType::kPLAID: {
+                auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+                const auto segment_start_offset = chunk_info.base_row_id_.segment_offset_;
+                auto file_worker =
+                    std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                           std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                           index_dir,
+                                                           std::move(index_file_name),
+                                                           index_base,
+                                                           column_def,
+                                                           segment_start_offset,
+                                                           buffer_mgr->persistence_manager());
+                index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -348,6 +364,20 @@ Status ChunkIndexMeta::LoadSet() {
             index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
+        case IndexType::kPLAID: {
+            auto plaid_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            auto file_worker = std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                      std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                      index_dir,
+                                                                      std::move(plaid_index_file_name),
+                                                                      index_base,
+                                                                      column_def,
+                                                                      segment_start_offset,
+                                                                      buffer_mgr->persistence_manager());
+            index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -457,10 +487,24 @@ Status ChunkIndexMeta::RestoreSet() {
 
             break;
         }
+        case IndexType::kPLAID: {
+            auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            const auto segment_start_offset = base_row_id.segment_offset_;
+            index_file_worker = std::make_unique<PlaidIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                       std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                       index_dir,
+                                                                       std::move(index_file_name),
+                                                                       index_base,
+                                                                       column_def,
+                                                                       segment_start_offset,
+                                                                       buffer_mgr->persistence_manager());
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
     }
+
     auto *buffer_obj = buffer_mgr->GetBufferObject(index_file_worker->GetFilePath());
     if (buffer_obj == nullptr) {
         index_buffer_ = buffer_mgr->GetBufferObject(std::move(index_file_worker));
@@ -551,6 +595,30 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 VirtualStore::DeleteFile(absolute_posting_file);
                 VirtualStore::DeleteFile(absolute_dict_file);
             }
+        } else if (index_def->index_type_ == IndexType::kPLAID) {
+            // Delete chunk index file for these index types
+            std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
+            std::string file_name = IndexFileName(chunk_id_);
+            std::string index_file = fmt::format("{}/{}", *index_dir, file_name);
+
+            // Debug: print the index_id from TableIndexMeta
+            LOG_INFO(fmt::format("UninitSet: Deleting chunk index file. index_id={}, chunk_id={}, index_dir={}, index_file={}",
+                                 segment_index_meta_.table_index_meta().index_id_str(),
+                                 chunk_id_,
+                                 *index_dir,
+                                 index_file));
+
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            if (pm != nullptr) {
+                LOG_INFO(fmt::format("Cleaned chunk index file: {}", index_file));
+                PersistResultHandler handler(pm);
+                PersistWriteResult result = pm->Cleanup(index_file);
+                handler.HandleWriteResult(result);
+            } else {
+                std::string absolute_index_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_file);
+                LOG_INFO(fmt::format("Clean chunk index file: {}", absolute_index_file));
+                VirtualStore::DeleteFile(absolute_index_file);
+            }
         }
     }
     {
@@ -602,7 +670,10 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         case IndexType::kIVF:
         case IndexType::kSecondary:
         case IndexType::kSecondaryFunctional:
-        case IndexType::kBMP: {
+            [[fallthrough]];
+        case IndexType::kBMP:
+            [[fallthrough]];
+        case IndexType::kPLAID: {
             std::string file_name = IndexFileName(chunk_id_);
             std::string file_path = fmt::format("{}/{}", *index_dir, file_name);
             paths.push_back(file_path);
@@ -644,6 +715,15 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
         case IndexType::kHnsw:
         case IndexType::kBMP:
         case IndexType::kEMVB: {
+            std::string index_file_name = IndexFileName(chunk_id_);
+            std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
+            index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);
+            if (index_buffer_ == nullptr) {
+                return Status::BufferManagerError(fmt::format("GetBufferObject failed: {}", index_filepath));
+            }
+            break;
+        }
+        case IndexType::kPLAID: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);

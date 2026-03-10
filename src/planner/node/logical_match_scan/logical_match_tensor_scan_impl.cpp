@@ -40,7 +40,11 @@ void LogicalMatchTensorScan::InitExtraOptions() {
                                                         "emvb_threshold_first",
                                                         "emvb_n_doc_to_score",
                                                         "emvb_n_doc_out_second_stage",
-                                                        "emvb_threshold_final"};
+                                                        "emvb_threshold_final",
+                                                        "plaid_n_ivf_probe",
+                                                        "plaid_centroid_score_threshold",
+                                                        "plaid_n_doc_to_score",
+                                                        "plaid_n_full_scores"};
     auto match_tensor_expr = static_cast<MatchTensorExpression *>(query_expression_.get());
     SearchOptions options(match_tensor_expr->options_text_);
     for (const auto &[x, _] : options.options_) {
@@ -106,6 +110,48 @@ void LogicalMatchTensorScan::InitExtraOptions() {
     }
     if (const auto emvb_threshold_final_it = options.options_.find("emvb_threshold_final"); emvb_threshold_final_it != options.options_.end()) {
         index_options_->emvb_threshold_final_ = std::stof(emvb_threshold_final_it->second);
+    }
+
+    // PLAID index options
+    if (const auto plaid_n_ivf_probe_it = options.options_.find("plaid_n_ivf_probe"); plaid_n_ivf_probe_it != options.options_.end()) {
+        const auto plaid_n_ivf_probe_candidate = std::stoi(plaid_n_ivf_probe_it->second);
+        if (plaid_n_ivf_probe_candidate <= 0) {
+            Status status = Status::SyntaxError("plaid_n_ivf_probe must be a positive integer");
+            RecoverableError(std::move(status));
+        }
+        index_options_->plaid_n_ivf_probe_ = plaid_n_ivf_probe_candidate;
+    }
+    if (const auto plaid_centroid_score_threshold_it = options.options_.find("plaid_centroid_score_threshold");
+        plaid_centroid_score_threshold_it != options.options_.end()) {
+        index_options_->plaid_centroid_score_threshold_ = std::stof(plaid_centroid_score_threshold_it->second);
+    }
+    if (const auto plaid_n_doc_to_score_it = options.options_.find("plaid_n_doc_to_score"); plaid_n_doc_to_score_it != options.options_.end()) {
+        const auto plaid_n_doc_to_score_candidate = std::stoi(plaid_n_doc_to_score_it->second);
+        if (plaid_n_doc_to_score_candidate <= 0) {
+            Status status = Status::SyntaxError("plaid_n_doc_to_score must be a positive integer");
+            RecoverableError(std::move(status));
+        }
+        index_options_->plaid_n_doc_to_score_ = plaid_n_doc_to_score_candidate;
+    }
+    if (index_options_->plaid_n_doc_to_score_ < topn_) {
+        Status status = Status::SyntaxError("plaid_n_doc_to_score must be at least topn");
+        RecoverableError(std::move(status));
+    }
+    if (const auto plaid_n_full_scores_it = options.options_.find("plaid_n_full_scores"); plaid_n_full_scores_it != options.options_.end()) {
+        const auto plaid_n_full_scores_candidate = std::stoi(plaid_n_full_scores_it->second);
+        if (plaid_n_full_scores_candidate <= 0) {
+            Status status = Status::SyntaxError("plaid_n_full_scores must be a positive integer");
+            RecoverableError(std::move(status));
+        }
+        index_options_->plaid_n_full_scores_ = plaid_n_full_scores_candidate;
+    }
+    if (index_options_->plaid_n_full_scores_ > index_options_->plaid_n_doc_to_score_) {
+        Status status = Status::SyntaxError("plaid_n_full_scores must be no more than plaid_n_doc_to_score");
+        RecoverableError(std::move(status));
+    }
+    if (index_options_->plaid_n_full_scores_ < topn_) {
+        Status status = Status::SyntaxError("plaid_n_full_scores must be no less than topn");
+        RecoverableError(std::move(status));
     }
 }
 

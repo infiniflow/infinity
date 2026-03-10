@@ -4243,6 +4243,8 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
         index_type = infinity::IndexType::kDiskAnn;
     } else if(strcmp($5, "secondary") == 0){
         index_type = infinity::IndexType::kSecondary;
+    } else if(strcmp($5, "plaid") == 0){
+        index_type = infinity::IndexType::kPLAID;
     } else {
         free($5);
         free($2);

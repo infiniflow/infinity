@@ -22,6 +22,7 @@ import :emvb_index_in_mem;
 import :memory_indexer;
 import :hnsw_handler;
 import :bmp_handler;
+import :plaid_index_in_mem;
 
 import std;
 
@@ -66,7 +67,7 @@ size_t MemIndex::GetRowCount() {
 bool MemIndex::IsNull() const {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_hnsw_index_ == nullptr && memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
-           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_dummy_index_ == nullptr;
+           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_plaid_index_ == nullptr && memory_dummy_index_ == nullptr;
 }
 
 void MemIndex::ClearMemIndex() {
@@ -78,6 +79,7 @@ void MemIndex::ClearMemIndex() {
     memory_secondary_index_.reset();
     memory_emvb_index_.reset();
     memory_bmp_index_.reset();
+    memory_plaid_index_.reset();
 
     is_dumping_ = false;
 }
@@ -95,6 +97,8 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
         res = static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_bmp_index_.get());
+    } else if (memory_plaid_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_plaid_index_.get());
     } else if (memory_dummy_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
     } else {
@@ -162,6 +166,16 @@ std::shared_ptr<BMPIndexInMem> MemIndex::GetBMPIndex() {
 void MemIndex::SetBMPIndex(std::shared_ptr<BMPIndexInMem> bmp_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_bmp_index_ = bmp_index;
+}
+
+std::shared_ptr<PlaidIndexInMem> MemIndex::GetPlaidIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_plaid_index_;
+}
+
+void MemIndex::SetPlaidIndex(std::shared_ptr<PlaidIndexInMem> plaid_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_plaid_index_ = plaid_index;
 }
 
 std::shared_ptr<DummyIndexInMem> MemIndex::GetDummyIndex() {

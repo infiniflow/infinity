@@ -47,7 +47,9 @@ TableIndexMeta::TableIndexMeta(const std::string &index_id_str, const std::strin
     if (index_name_str_.empty()) {
         index_def_ =
             infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
-        index_name_str_ = *index_def_->index_name_;
+        if (index_def_ != nullptr) {
+            index_name_str_ = *index_def_->index_name_;
+        }
     }
 }
 
@@ -72,6 +74,10 @@ std::tuple<std::shared_ptr<IndexBase>, Status> TableIndexMeta::GetIndexBase() {
 
     index_def_ =
         infinity::GetTableIndexDef(&kv_instance_, table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, table_meta_.begin_ts());
+
+    if (index_def_ == nullptr) {
+        return {nullptr, Status::CatalogError(fmt::format("Index definition not found for index_id: {}", index_id_str_))};
+    }
 
     if (index_cache.get() != nullptr && table_meta_.txn() != nullptr) {
         table_meta_.txn()->AddCacheInfo(
