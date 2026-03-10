@@ -81,6 +81,8 @@ std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::Par
         // this happens when temp wal file is swapped and new wal is not created yet
         LOG_INFO(fmt::format("Current wal file not found in the wal directory: {}", wal_dir));
     }
+
+    std::ranges::sort(wal_infos, std::greater<decltype(wal_infos.back())>());
     return {cur_wal_info, wal_infos};
 }
 

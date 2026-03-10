@@ -190,6 +190,12 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const Admin
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     {
         // index
         Value value = Value::MakeBigInt(row_count);
@@ -280,11 +286,23 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            query_result.result_table_ = nullptr;
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
@@ -378,21 +396,33 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
 }
 
 QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
+    QueryResult query_result;
+
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
 
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
     std::unique_ptr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
     std::vector<std::shared_ptr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
 
-    QueryResult query_result;
     auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
@@ -511,11 +541,23 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            query_result.result_table_ = nullptr;
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
