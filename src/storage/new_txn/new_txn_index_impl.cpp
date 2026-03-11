@@ -521,7 +521,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     buffer_obj->Save();
     if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP ||
-        index_base->index_type_ == IndexType::kSecondary || index_base->index_type_ == IndexType::kSecondaryFunctional) {
+        index_base->index_type_ == IndexType::kSecondary || index_base->index_type_ == IndexType::kSecondaryFunctional ||
+        index_base->index_type_ == IndexType::kPLAID) {
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();
         }
@@ -2355,24 +2356,8 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    // For PLAID index, we don't PopMemIndex because PlaidIndexInMem continues to handle insertions after dump.
-    // It maintains state (like updated begin_row_id) across dump operations.
-    // For other index types, we PopMemIndex and ClearMemIndex as usual.
-    std::shared_ptr<MemIndex> mem_index;
-    bool keep_mem_index_after_dump = false;
-    {
-        auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
-        if (index_status.ok()) {
-            keep_mem_index_after_dump = (index_base->index_type_ == IndexType::kPLAID);
-        }
-    }
-    if (keep_mem_index_after_dump) {
-        mem_index = segment_index_meta.GetMemIndex();
-    } else {
-        mem_index = segment_index_meta.PopMemIndex();
-    }
-    if (mem_index == nullptr ||
-        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
+    auto mem_index = segment_index_meta.PopMemIndex();
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
@@ -2539,10 +2524,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kPLAID: {
             memory_plaid_index->Dump(buffer_obj);
             buffer_obj->Save();
-            // Convert to mmap for large index support - OS manages memory
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
             }
+            // Note: Like HNSW, we don't manually release chunk_handle_ here.
+            // The memory management is handled by BufferManager:
+            // - When there's no query, the buffer can be evicted by the buffer manager
+            // - When there's a query, the buffer will be loaded via chunk_handle_
 
             // Save global centroids after dump (if trained)
             auto global_centroids = memory_plaid_index->GetGlobalCentroids();
@@ -2570,11 +2558,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    // For PLAID index, don't ClearMemIndex because PlaidIndexInMem continues to handle insertions after dump.
-    // The PlaidIndexInMem object is preserved with its updated state (current_begin_row_id_, etc.).
-    if (!keep_mem_index_after_dump) {
-        mem_index->ClearMemIndex();
-    }
+    mem_index->ClearMemIndex();
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
         auto *memindex_tracer = storage->memindex_tracer();
