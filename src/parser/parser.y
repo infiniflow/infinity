@@ -2611,6 +2611,147 @@ admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
     $$->schema_name_ = $4;
     free($4);
 }
+| ADMIN SHOW TABLES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListTables;
+}
+| ADMIN SHOW TABLE table_name {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowTable;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+}
+| ADMIN SHOW TABLE table_name SEGMENTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListSegments;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+}
+| ADMIN SHOW TABLE table_name SEGMENT LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowSegment;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->segment_index_ = $6;
+}
+| ADMIN SHOW TABLE table_name SEGMENT LONG_VALUE BLOCKS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListBlocks;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->segment_index_ = $6;
+}
+| ADMIN SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowBlock;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->segment_index_ = $6;
+     $$->block_index_ = $8;
+}
+| ADMIN SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMNS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListColumns;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->segment_index_ = $6;
+     $$->block_index_ = $8;
+}
+| ADMIN SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMN LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowColumn;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->segment_index_ = $6;
+     $$->block_index_ = $8;
+     $$->column_index_ = $10;
+}
+| ADMIN SHOW TABLE table_name INDEXES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListIndexes;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+}
+| ADMIN SHOW TABLE table_name INDEX IDENTIFIER {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowIndex;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->index_name_ = $6;
+     free($6);
+}
+| ADMIN SHOW TABLE table_name INDEX IDENTIFIER SEGMENTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListIndexSegments;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->index_name_ = $6;
+     free($6);
+}
+| ADMIN SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
+     if($4->schema_name_ptr_ != nullptr) {
+         $$->schema_name_ = $4->schema_name_ptr_;
+         free($4->schema_name_ptr_);
+     }
+     $$->table_name_ = $4->table_name_ptr_;
+     free($4->table_name_ptr_);
+     delete $4;
+     $$->index_name_ = $6;
+     free($6);
+     $$->segment_index_ = $8;
+}
 | ADMIN SHOW CONFIGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListConfigs;

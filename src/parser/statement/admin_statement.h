@@ -91,6 +91,8 @@ public:
     std::optional<std::string> snapshot_name_{};
     std::optional<std::string> export_path_{};
     std::optional<std::string> schema_name_{};
+    std::optional<std::string> table_name_{};
+    std::optional<std::string> index_name_{};
 };
 
 } // namespace infinity
