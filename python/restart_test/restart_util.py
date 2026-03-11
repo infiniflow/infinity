@@ -203,18 +203,19 @@ class LChYDataGenerato:
 
 
 class MultiIndexTypesGenerator:
-    """Generator for multiple index types test data"""
 
-    DEFAULT_CSV_FILE = "test/data/csv/test_multi_index_types.csv"
-    DEFAULT_NUM_ROWS = 10000000
+    DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
+    DEFAULT_NUM_ROWS = 9999
 
     def columns():
         return {
-            "id": {"type": "int"},
-            "text": {"type": "varchar"},
+            "doctitle": {"type": "varchar"},
+            "docdate": {"type": "varchar"},
+            "body": {"type": "varchar"},
+            "num": {"type": "int"},
+            "vector_col": {"type": "vector,2048,float"},
+            "multi_vector_col": {"type": "multivector,2,float"},
             "category": {"type": "varchar"},
-            "vector_col": {"type": "vector,4,float"},
-            "multi_vector_col": {"type": "multivector,3,float"},
             "sparse_col": {"type": "sparse,100,float,int8"}
         }
 
@@ -224,20 +225,21 @@ class MultiIndexTypesGenerator:
         for i in range(dim):
             if random.random() < density:
                 indices.append(i)
-                values.append(round(random.random(), 6))
+                values.append(float(random.randint(1, 100)))
         if not indices:
             indices = [0]
             values = [round(random.random(), 6)]
         return indices, values
 
     def _generate_vector(self, dim):
-        return [round(random.random(), 6) for _ in range(dim)]
+        return [random.randint(0, 100) for _ in range(dim)]
 
     def _generate_multivector(self, sub_vec_dim, num_sub_vecs):
+        # Returns flattened list for multivector (matching original format)
         result = []
         for _ in range(num_sub_vecs):
             for _ in range(sub_vec_dim):
-                result.append(round(random.random(), 6))
+                result.append(random.randint(0, 100))
         return result
 
 
@@ -245,7 +247,7 @@ class MultiIndexTypesGenerator:
         return "[" + ", ".join(str(v) for v in vec) + "]"
 
     def _format_multivector(self, mv):
-        # multivector uses 1D flattened format like tensor: [e1, e2, ..., eN]
+        # multivector uses flat format like vector
         return "[" + ", ".join(str(v) for v in mv) + "]"
 
 
@@ -259,19 +261,24 @@ class MultiIndexTypesGenerator:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
         with open(output_file, 'w', newline='') as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, delimiter='\t')  # Use tab delimiter
             for i in range(num_rows):
-                row_id = i
-                text = f"test_text_{i}_{random.choice(text_words)}"
+                doctitle = f"title_{i}"
+                docdate = "01-JAN-2024 00:00:00.000"
+                body = f"test_text_{i}_{random.choice(text_words)}"
+                num = i
+                # vector_col: 2048 dimensions
+                vector = self._generate_vector(2048)
+                # multi_vector_col: 2 sub-vectors, each 1024 dimensions (multivector,2,float)
+                multivec = self._generate_multivector(1024, 2)
                 category = categories[i % len(categories)]
-                vector = self._generate_vector(4)
-                multivec = self._generate_multivector(3, 3)  # dimension 3, 3 sub-vectors
                 sparse_indices, sparse_values = self._generate_sparse_vector(100, density=0.3)
 
                 writer.writerow([
-                    row_id, text, category,
+                    doctitle, docdate, body, num,
                     self._format_vector(vector),
                     self._format_multivector(multivec),
+                    category,
                     self._format_sparse(sparse_indices, sparse_values)
                 ])
         print(f"Generated {num_rows} rows to {output_file}")
@@ -284,9 +291,9 @@ class MultiIndexTypesGenerator:
             i = 0
             while i < insert_n:
                 f = open(csv_path, "r")
-                reader = csv.reader(f)
+                reader = csv.reader(f, delimiter="\t")
                 for row in reader:
-                    yield [int(row[0]), row[1], row[2], row[3], row[4], row[5]]
+                    yield [row[0], row[1], row[2], int(row[3]), row[4], row[5], row[6], row[7]]
                     i += 1
                     if i >= insert_n:
                         break
@@ -294,10 +301,10 @@ class MultiIndexTypesGenerator:
 
     def index():
         return [
-            index.IndexInfo("text", index.IndexType.FullText),
-            index.IndexInfo("id", index.IndexType.Secondary, {"cardinality": "high"}),
+            index.IndexInfo("body", index.IndexType.FullText),
+            index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
             index.IndexInfo("vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
+            # index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
             index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "8", "compress_type": "compress"}),
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
@@ -306,8 +313,10 @@ class MultiIndexTypesGenerator:
         filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
         if os.path.exists(filepath):
             return filepath
-        gen = MultiIndexTypesGenerator()
-        gen._generate_csv_internal(filepath, MultiIndexTypesGenerator.DEFAULT_NUM_ROWS)
+        # If file doesn't exist, generate it using generate_plus()
+        print(f"CSV file not found: {filepath}. Generating...")
+        from tools.generate_wiki_embedding_plus import generate_plus
+        generate_plus()
         return filepath
 
     def import_size() -> int:
