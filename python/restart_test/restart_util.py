@@ -216,7 +216,7 @@ class MultiIndexTypesGenerator:
             "vector_col": {"type": "vector,2048,float"},
             "multi_vector_col": {"type": "multivector,2,float"},
             "category": {"type": "varchar"},
-            "sparse_col": {"type": "sparse,100,float,int8"}
+            "sparse_col": {"type": "sparse,1024,float,int16"}
         }
 
     def _generate_sparse_vector(self, dim, density=0.3):
@@ -228,7 +228,7 @@ class MultiIndexTypesGenerator:
                 values.append(float(random.randint(1, 100)))
         if not indices:
             indices = [0]
-            values = [round(random.random(), 6)]
+            values = [float(random.randint(1, 100))]
         return indices, values
 
     def _generate_vector(self, dim):
@@ -272,7 +272,7 @@ class MultiIndexTypesGenerator:
                 # multi_vector_col: 2 sub-vectors, each 1024 dimensions (multivector,2,float)
                 multivec = self._generate_multivector(1024, 2)
                 category = categories[i % len(categories)]
-                sparse_indices, sparse_values = self._generate_sparse_vector(100, density=0.3)
+                sparse_indices, sparse_values = self._generate_sparse_vector(1024, density=0.3)
 
                 writer.writerow([
                     doctitle, docdate, body, num,
@@ -304,7 +304,7 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("body", index.IndexType.FullText),
             index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
             index.IndexInfo("vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            # index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
+            index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
             index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "8", "compress_type": "compress"}),
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
@@ -313,10 +313,10 @@ class MultiIndexTypesGenerator:
         filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
         if os.path.exists(filepath):
             return filepath
-        # If file doesn't exist, generate it using generate_plus()
+        # If file doesn't exist, generate it using generate()
         print(f"CSV file not found: {filepath}. Generating...")
-        from tools.generate_wiki_embedding_plus import generate_plus
-        generate_plus()
+        from tools.generate_wiki_embedding_plus import generate
+        generate()
         return filepath
 
     def import_size() -> int:

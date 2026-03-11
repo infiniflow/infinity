@@ -69,10 +69,10 @@ class TestMultipleIndexTypesImport:
             table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
             assert table_obj is not None
 
-            for idx in indexes:
-                table_obj.create_index(f"idx_{idx.target_name}", idx)
-
-            logging.info(f"Created table and {len(indexes)} indexes")
+            # for idx in indexes:
+            #     table_obj.create_index(f"idx_{idx.target_name}", idx)
+            #
+            # logging.info(f"Created table and {len(indexes)} indexes")
 
         part1()
 
@@ -83,22 +83,31 @@ class TestMultipleIndexTypesImport:
             table_obj = db_obj.get_table(table_name)
 
             abs_import_file = os.path.abspath(import_file)
-            import_start = time.time()
-            logging.info(f"Importing data from {abs_import_file}...")
-            table_obj.import_data(abs_import_file, import_options)
-            import_duration = time.time() - import_start
-            logging.info(f"Import completed in {import_duration:.2f} seconds")
+            kImportRepeat = 2
 
-            # Verify row count
+            for import_round in range(kImportRepeat):
+                import_start = time.time()
+                logging.info(f"Importing data from {abs_import_file}... (round {import_round + 1}/{kImportRepeat})")
+                table_obj.import_data(abs_import_file, import_options)
+                import_duration = time.time() - import_start
+                logging.info(f"Import round {import_round + 1} completed in {import_duration:.2f} seconds")
+
+            # Verify row count after all imports
+            expected_count = total_n * kImportRepeat
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
-            logging.info(f"Total rows after import: {count}")
-            assert count == total_n, f"Expected {total_n} rows, got {count}"
+            logging.info(f"Total rows after {kImportRepeat} imports: {count}")
+            assert count == expected_count, f"Expected {expected_count} rows, got {count}"
 
-            # for idx in indexes:
-            #     table_obj.create_index(f"idx_{idx.target_name}", idx)
-            #
-            # logging.info(f"Created table and {len(indexes)} indexes")
+            for idx in indexes:
+                idx_name = f"idx_{idx.target_name}"
+                idx_start = time.time()
+                logging.info(f"Creating index {idx_name}...")
+                table_obj.create_index(idx_name, idx)
+                idx_duration = time.time() - idx_start
+                logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
+
+            logging.info(f"Created table and {len(indexes)} indexes")
 
         part2()
 
@@ -399,31 +408,31 @@ class TestMultipleIndexTypesImport:
                     threads.append(t)
 
                 # Start 10 read threads (one for each index type)
-                t = Thread(target=read_worker_fulltext, args=[infinity_pool, table_name, end_time, 0, read_count_fulltext])
+                t = Thread(target=read_worker_fulltext, args=[infinity_pool, table_name, end_time, 4, read_count_fulltext])
                 threads.append(t)
 
-                t = Thread(target=read_worker_hnsw, args=[infinity_pool, table_name, end_time, 1, read_count_hnsw])
+                t = Thread(target=read_worker_hnsw, args=[infinity_pool, table_name, end_time, 5, read_count_hnsw])
                 threads.append(t)
 
-                # t = Thread(target=read_worker_hnsw_mv, args=[infinity_pool, table_name, end_time, 2, read_count_hnsw_mv])
-                # threads.append(t)
-
-                t = Thread(target=read_worker_secondary_high, args=[infinity_pool, table_name, end_time, 3, read_count_secondary_high])
+                t = Thread(target=read_worker_hnsw_mv, args=[infinity_pool, table_name, end_time, 6, read_count_hnsw_mv])
                 threads.append(t)
 
-                t = Thread(target=read_worker_secondary_low, args=[infinity_pool, table_name, end_time, 4, read_count_secondary_low])
+                t = Thread(target=read_worker_secondary_high, args=[infinity_pool, table_name, end_time, 7, read_count_secondary_high])
                 threads.append(t)
 
-                t = Thread(target=read_worker_sparse, args=[infinity_pool, table_name, end_time, 5, read_count_sparse])
+                t = Thread(target=read_worker_secondary_low, args=[infinity_pool, table_name, end_time, 8, read_count_secondary_low])
                 threads.append(t)
 
-                t = Thread(target=read_worker_fusion_rrf, args=[infinity_pool, table_name, end_time, 7, read_count_fusion_rrf])
+                t = Thread(target=read_worker_sparse, args=[infinity_pool, table_name, end_time, 9, read_count_sparse])
                 threads.append(t)
 
-                t = Thread(target=read_worker_fusion_mv_rrf, args=[infinity_pool, table_name, end_time, 8, read_count_fusion_mv_rrf])
+                t = Thread(target=read_worker_fusion_rrf, args=[infinity_pool, table_name, end_time, 10, read_count_fusion_rrf])
                 threads.append(t)
 
-                t = Thread(target=read_worker_fusion_weighted_sum, args=[infinity_pool, table_name, end_time, 9, read_count_fusion_weighted_sum])
+                t = Thread(target=read_worker_fusion_mv_rrf, args=[infinity_pool, table_name, end_time, 11, read_count_fusion_mv_rrf])
+                threads.append(t)
+
+                t = Thread(target=read_worker_fusion_weighted_sum, args=[infinity_pool, table_name, end_time, 12, read_count_fusion_weighted_sum])
                 threads.append(t)
 
                 # Start all threads
