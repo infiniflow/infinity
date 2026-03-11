@@ -15,6 +15,7 @@
 export module infinity_core:log_file;
 
 import :infinity_type;
+import :utility;
 
 import std;
 
@@ -29,6 +30,13 @@ export struct TempWalFileInfo {
 export struct WalFileInfo {
     std::string path_;
     TxnTimeStamp max_commit_ts_;
+
+    auto operator<=>(const WalFileInfo &other) const {
+        size_t path_num = std::stoull(Partition(path_, '.').back());
+        size_t other_path_num = std::stoull(Partition(other.path_, '.').back());
+
+        return path_num <=> other_path_num;
+    }
 };
 
 export class WalFile {

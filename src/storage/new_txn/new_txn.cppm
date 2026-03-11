@@ -580,6 +580,12 @@ private:
                                   std::shared_ptr<ColumnDef> column_def,
                                   std::vector<ChunkID> &new_chunk_ids);
 
+    Status PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
+                                   SegmentIndexMeta &segment_index_meta,
+                                   SegmentMeta &segment_meta,
+                                   std::shared_ptr<ColumnDef> column_def,
+                                   std::vector<ChunkID> &new_chunk_ids);
+
     Status OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                            SegmentIndexMeta &segment_index_meta,
                            RowID &base_rowid,
@@ -593,6 +599,14 @@ private:
                             RowID base_rowid,
                             u32 row_cnt,
                             BufferObj *buffer_obj);
+
+    Status OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
+                              SegmentIndexMeta &segment_index_meta,
+                              SegmentMeta &segment_meta,
+                              std::shared_ptr<ColumnDef> column_def,
+                              RowID base_rowid,
+                              u32 row_cnt,
+                              BufferObj *buffer_obj);
 
     Status AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 

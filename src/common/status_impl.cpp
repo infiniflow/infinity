@@ -685,6 +685,8 @@ Status Status::TooManyLearner() { return Status(ErrorCode::kTooManyLearner, std:
 
 Status Status::Checkpointing() { return Status(ErrorCode::kCheckpointing, std::make_unique<std::string>("Checkpointing")); }
 
+Status Status::OutofBound(const std::string &detail_message) { return Status(ErrorCode::kOutOfBound, std::make_unique<std::string>(detail_message)); }
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, std::make_unique<std::string>("Invalid entry")); }
 

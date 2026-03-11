@@ -31,6 +31,7 @@ class MemoryIndexer;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
+class PlaidIndexInMem;
 class DummyIndexInMem;
 
 export struct MemIndexID {
@@ -70,6 +71,9 @@ public:
     std::shared_ptr<BMPIndexInMem> GetBMPIndex();
     void SetBMPIndex(std::shared_ptr<BMPIndexInMem> bmp_index);
 
+    std::shared_ptr<PlaidIndexInMem> GetPlaidIndex();
+    void SetPlaidIndex(std::shared_ptr<PlaidIndexInMem> plaid_index);
+
     std::shared_ptr<DummyIndexInMem> GetDummyIndex();
     void SetDummyIndex(std::shared_ptr<DummyIndexInMem> dummy_index);
 
@@ -86,13 +90,14 @@ private:
     bool is_dumping_{false};
     bool is_updating_{false};
 
-    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_{};
-    std::shared_ptr<IVFIndexInMem> memory_ivf_index_{};
-    std::shared_ptr<MemoryIndexer> memory_indexer_{};
-    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_{};
-    std::shared_ptr<EMVBIndexInMem> memory_emvb_index_{};
-    std::shared_ptr<BMPIndexInMem> memory_bmp_index_{};
-    std::shared_ptr<DummyIndexInMem> memory_dummy_index_{};
+    std::shared_ptr<HnswIndexInMem> memory_hnsw_index_;
+    std::shared_ptr<IVFIndexInMem> memory_ivf_index_;
+    std::shared_ptr<MemoryIndexer> memory_indexer_;
+    std::shared_ptr<SecondaryIndexInMem> memory_secondary_index_;
+    std::shared_ptr<EMVBIndexInMem> memory_emvb_index_;
+    std::shared_ptr<BMPIndexInMem> memory_bmp_index_;
+    std::shared_ptr<PlaidIndexInMem> memory_plaid_index_;
+    std::shared_ptr<DummyIndexInMem> memory_dummy_index_;
 };
 
 } // namespace infinity

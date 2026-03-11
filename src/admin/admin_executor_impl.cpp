@@ -42,8 +42,12 @@ import :peer_task;
 import :infinity_exception;
 import :node_info;
 import :persistence_manager;
+import :kv_store;
+import :kv_code;
+import :rocksdb_merge_operator;
 
 import std;
+import third_party;
 
 import data_type;
 import logical_type;
@@ -190,6 +194,12 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const Admin
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     {
         // index
         Value value = Value::MakeBigInt(row_count);
@@ -280,11 +290,23 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            query_result.result_table_ = nullptr;
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
@@ -378,21 +400,33 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminS
 }
 
 QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
+    QueryResult query_result;
+
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
 
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
     std::unique_ptr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
     std::vector<std::shared_ptr<WalEntry>> wal_entries = wal_iterator->GetAllEntries();
 
-    QueryResult query_result;
     auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
     auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
 
@@ -511,11 +545,23 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
     std::string wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
+    if (!temp_wal_info.has_value()) {
+        query_result.status_ = Status::NotFound("No active WAL");
+        query_result.result_table_ = nullptr;
+        return query_result;
+    }
+
     i64 file_index = admin_statement->log_file_index_.value();
     std::string file_path;
     if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
+        auto wal_array_size = wal_infos.size();
+        if (static_cast<size_t>(file_index) > wal_array_size) {
+            query_result.status_ = Status::OutofBound(fmt::format("The wal index is not valid. Max is {}", wal_array_size));
+            query_result.result_table_ = nullptr;
+            return query_result;
+        }
         file_path = wal_infos[file_index - 1].path_;
     }
 
@@ -569,76 +615,131 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const Admin
 }
 
 QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const AdminStatement *admin_statement) {
-    //
-    //    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
-    //    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
-    //    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
-    //
-    //    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
-    //        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
-    //        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
-    //        std::make_shared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
-    //    };
-    //
-    //    std::shared_ptr<TableDef> table_def = TableDef::Make(std::make_shared<std::string>("default_db"),
-    //    std::make_shared<std::string>("show_catalog"), nullptr, column_defs); query_result.result_table_ = std::make_shared<DataTable>(table_def,
-    //    TableType::kDataTable);
-    //
-    //    std::vector<std::shared_ptr<DataType>> column_types{
-    //        bigint_type,
-    //        varchar_type,
-    //    };
-    //
-    //    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    //    output_block_ptr->Init(column_types);
-    //
-    //    std::vector<std::shared_ptr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
-    //    if (checkpoint_entries.empty()) {
-    //        return query_result;
-    //    }
-    //
-    //    auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
-    //    if (!status.ok()) {
-    //        query_result.status_ = status;
-    //        return query_result;
-    //    }
-    //
-    //    size_t row_count = 0;
-    //    auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
-    //    for (auto &meta_ptr : meta_ptrs) {
-    //        DBMeta *db_meta = static_cast<DBMeta *>(meta_ptr);
-    //        if (output_block_ptr.get() == nullptr) {
-    //            output_block_ptr = DataBlock::MakeUniquePtr();
-    //            output_block_ptr->Init(column_types);
-    //        }
-    //
-    //        {
-    //            // index
-    //            Value value = Value::MakeBigInt(row_count);
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-    //        }
-    //
-    //        {
-    //            // database name
-    //            Value value = Value::MakeVarchar(*db_meta->db_name());
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-    //        }
-    //
-    //        ++row_count;
-    //        if (row_count % output_block_ptr->capacity() == 0) {
-    //            output_block_ptr->Finalize();
-    //            query_result.result_table_->Append(std::move(output_block_ptr));
-    //            output_block_ptr = nullptr;
-    //        }
-    //    }
-    //
-    //    output_block_ptr->Finalize();
-    //    query_result.result_table_->Append(std::move(output_block_ptr));
     QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+
+    auto bool_type = std::make_shared<DataType>(LogicalType::kBoolean);
+    auto varchar_type = std::make_shared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = std::make_shared<DataType>(LogicalType::kBigInt);
+
+    std::vector<std::shared_ptr<ColumnDef>> column_defs = {
+        std::make_shared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+        std::make_shared<ColumnDef>(3, bool_type, "dropped", std::set<ConstraintType>()),
+    };
+
+    auto table_def =
+        TableDef::Make(std::make_shared<std::string>("default_db"), std::make_shared<std::string>("show_databases"), nullptr, column_defs);
+    query_result.result_table_ = std::make_shared<DataTable>(table_def, TableType::kDataTable);
+
+    std::vector<std::shared_ptr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        bool_type,
+    };
+
+    std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    rocksdb::DB *db{};
+    rocksdb::Options options;
+    rocksdb::ReadOptions read_options;
+
+    auto catalog_dir = InfinityContext::instance().config()->CatalogDir();
+
+    rocksdb::TransactionDB::OpenForReadOnly(options, catalog_dir, &db);
+
+    struct db_output_obj {
+        std::string name_;
+        size_t id_;
+        bool dropped_;
+    };
+
+    std::vector<db_output_obj> db_output_objs;
+
+    std::map<std::string, std::vector<std::pair<std::string, std::string>>> db_kvs_map;
+
+    auto catalog_db_iter = db->NewIterator(read_options);
+    catalog_db_iter->Seek(KeyEncode::kCatalogDbHeader);
+
+    while (catalog_db_iter->Valid() && catalog_db_iter->key().starts_with(KeyEncode::kCatalogDbHeader)) {
+        std::string key_str = catalog_db_iter->key().ToString();
+        std::string db_id = catalog_db_iter->value().ToString();
+        size_t start = KeyEncode::kCatalogDbHeader.size();
+        size_t end = key_str.find('|', start);
+        std::string db_name = key_str.substr(start, end - start);
+        db_kvs_map[db_name].emplace_back(key_str, db_id);
+        catalog_db_iter->Next();
+    }
+
+    for (const auto &[db_name, db_kvs] : db_kvs_map) {
+        for (const auto &[db_key, db_value] : db_kvs) { // create -> drop -> create
+            TxnTimeStamp db_commit_ts = std::stoull(Partition(db_key, '|').back());
+            auto drop_iter = db->NewIterator(read_options);
+            auto drop_db_name_prefix = fmt::format("{}{}", KeyEncode::kDropDbHeader, db_name);
+            drop_iter->Seek(drop_db_name_prefix);
+            TxnTimeStamp drop_ts{};
+            bool dropped{};
+            while (drop_iter->Valid() && drop_iter->key().starts_with(drop_db_name_prefix)) {
+                auto key_str = drop_iter->key().ToString();
+                drop_ts = static_cast<TxnTimeStamp>(std::stoull(Partition(key_str, '/')[1]));
+                if (drop_ts >= db_commit_ts) {
+                    dropped = true;
+                    break;
+                }
+                drop_iter->Next();
+            }
+
+            db_output_objs.emplace_back(db_name, std::stoull(db_value), dropped);
+        }
+    }
+
+    // size_t row_count = 0;
+    auto all_db_cnt = db_output_objs.size();
+    for (size_t i = 0; i < all_db_cnt; ++i) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // index
+            Value value = Value::MakeBigInt(i);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[0]);
+        }
+
+        {
+            // database name
+            Value value = Value::MakeVarchar(db_output_objs[i].name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[1]);
+        }
+
+        {
+            // database dir
+            Value value = Value::MakeVarchar(fmt::format("db_{}", db_output_objs[i].id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[2]);
+        }
+
+        {
+            // dropped
+            Value value = Value::MakeBool(db_output_objs[i].dropped_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors_[3]);
+        }
+
+        if (i % output_block_ptr->capacity() == 0) {
+            output_block_ptr->Finalize();
+            query_result.result_table_->Append(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
     return query_result;
 }
 

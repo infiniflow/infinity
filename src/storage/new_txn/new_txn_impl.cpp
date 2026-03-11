@@ -2467,6 +2467,7 @@ Status NewTxn::GetTableMeta(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
+    table_meta->SetDBTableName(db_name, table_name);
     return Status::OK();
 }
 
@@ -2483,6 +2484,7 @@ Status NewTxn::GetTableMeta(const std::string &table_name,
     }
     LOG_DEBUG(fmt::format("GetTableMeta: txn_id: {} table_id: {}", TxnID(), table_id_str));
     table_meta = std::make_shared<TableMeta>(db_meta->db_id_str(), table_id_str, table_name, this);
+    table_meta->SetDBTableName(db_meta->db_name(), table_name);
     if (table_key_ptr) {
         *table_key_ptr = table_key;
     }
@@ -2507,6 +2509,7 @@ Status NewTxn::GetTableIndexMeta(const std::string &db_name,
     if (!status.ok()) {
         return status;
     }
+    table_meta->SetDBTableName(db_name, table_name);
     status = GetTableIndexMeta(index_name, *table_meta, table_index_meta, index_key_ptr);
     if (!status.ok()) {
         return status;
