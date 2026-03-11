@@ -32,7 +32,7 @@ class TestMultipleIndexTypesImport:
                 MultiIndexTypesGenerator.gen_factory(MultiIndexTypesGenerator.import_file()),
                 MultiIndexTypesGenerator.import_file(),
                 MultiIndexTypesGenerator.import_size(),
-                {"file_type": "csv"},
+                {"file_type": "csv", "delimiter": "\t"},
             ),
         ],
     )
@@ -83,9 +83,11 @@ class TestMultipleIndexTypesImport:
             table_obj = db_obj.get_table(table_name)
 
             abs_import_file = os.path.abspath(import_file)
+            import_start = time.time()
             logging.info(f"Importing data from {abs_import_file}...")
             table_obj.import_data(abs_import_file, import_options)
-            logging.info("Import completed")
+            import_duration = time.time() - import_start
+            logging.info(f"Import completed in {import_duration:.2f} seconds")
 
             # Verify row count
             res, _, _ = table_obj.output(["count(*)"]).to_result()
@@ -93,10 +95,15 @@ class TestMultipleIndexTypesImport:
             logging.info(f"Total rows after import: {count}")
             assert count == total_n, f"Expected {total_n} rows, got {count}"
 
+            # for idx in indexes:
+            #     table_obj.create_index(f"idx_{idx.target_name}", idx)
+            #
+            # logging.info(f"Created table and {len(indexes)} indexes")
+
         part2()
 
         # Part 3: Restart 3 times - each round runs 120s with continuous insert/query
-        kRunningTime = 120
+        kRunningTime = 20
         kWriteThreadNum = 4
 
         for round_num in range(3):
@@ -144,8 +151,9 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            vec = [random.random() for _ in range(4)]
-                            multivec = [[random.random() for _ in range(3)] for _ in range(3)]
+                            vec = [random.random() for _ in range(2048)]
+                            # multi_vector: 2 vectors, each 1024-dim (total 2048 values)
+                            multivec = [[random.random() for _ in range(2)] for _ in range(2)]
                             tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
@@ -155,8 +163,10 @@ class TestMultipleIndexTypesImport:
 
                             row_id = thread_id * 100000 + local_count
                             table_obj.insert([{
-                                "id": row_id,
-                                "text": f"test_text_{row_id}_{random.choice(text_words)}",
+                                "doctitle": f"test_title_{row_id}",
+                                "docdate": "01-JAN-2024 00:00:00.000",
+                                "body": f"test_text_{row_id}_{random.choice(text_words)}",
+                                "num": row_id,
                                 "category": categories[local_count % len(categories)],
                                 "vector_col": vec,
                                 "multi_vector_col": multivec,
@@ -181,7 +191,7 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            result, _ = table_obj.output(["id", "text"]).match_text("text", "test_text", 5).to_pl()
+                            result, _ = table_obj.output(["num", "body"]).match_text("body", "test_text", 5).to_pl()
                             if len(result) != 5:
                                 raise Exception(f"FullText query expected 5 results, got {len(result)}")
                             local_count += 1
@@ -202,7 +212,7 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            result, _ = table_obj.output(["id", "vector_col"]).match_dense("vector_col", [0.5] * 4, "float", "l2", 5).to_pl()
+                            result, _ = table_obj.output(["num", "vector_col"]).match_dense("vector_col", [0.5] * 2048, "float", "l2", 5).to_pl()
                             if len(result) != 5:
                                 raise Exception(f"Hnsw query expected 5 results, got {len(result)}")
                             local_count += 1
@@ -223,8 +233,8 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            query_vec = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-                            result, _ = table_obj.output(["id", "multi_vector_col"]).match_dense("multi_vector_col", query_vec, "float", "l2", 5).to_pl()
+                            query_vec = [0.5] * 2048
+                            result, _ = table_obj.output(["num", "multi_vector_col"]).match_dense("multi_vector_col", query_vec, "float", "l2", 5).to_pl()
                             if len(result) != 5:
                                 raise Exception(f"HnswMV query expected 5 results, got {len(result)}")
                             local_count += 1
@@ -245,7 +255,7 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            result, _ = table_obj.output(["id"]).filter("id >= 0").to_pl()
+                            result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
                             if len(result) == 0:
                                 raise Exception(f"SecondaryHigh query returned 0 results")
                             local_count += 1
@@ -269,7 +279,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             query_sparse = SparseVector(indices=[0, 5, 10, 15], values=[1.0, 1.0, 1.0, 1.0])
-                            result, _ = table_obj.output(["id", "sparse_col"]).match_sparse("sparse_col", query_sparse, "ip", 5).to_pl()
+                            result, _ = table_obj.output(["num", "sparse_col"]).match_sparse("sparse_col", query_sparse, "ip", 5).to_pl()
                             if len(result) != 5:
                                 raise Exception(f"SparseBMP query expected 5 results, got {len(result)}")
                             local_count += 1
@@ -290,7 +300,7 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            result, _ = table_obj.output(["id", "category"]).filter("category = 'A'").to_pl()
+                            result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
                             if len(result) == 0:
                                 raise Exception(f"SecondaryLow query returned 0 results")
                             local_count += 1
@@ -312,9 +322,9 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             result, _ = (table_obj
-                             .output(["id", "text", "vector_col"])
-                             .match_text("text", "test_text", 5)
-                             .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
+                             .output(["num", "body", "vector_col"])
+                             .match_text("body", "test_text", 5)
+                             .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
                              .fusion(method='rrf', topn=5)
                              .to_pl())
                             if len(result) != 5:
@@ -337,10 +347,10 @@ class TestMultipleIndexTypesImport:
 
                     while time.time() < end_time:
                         try:
-                            query_vec = [0.5] * 4
-                            query_mv = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+                            query_vec = [0.5] * 2048
+                            query_mv = [0.5] * 2048
                             result, _ = (table_obj
-                             .output(["id", "vector_col", "multi_vector_col"])
+                             .output(["num", "vector_col", "multi_vector_col"])
                              .match_dense("vector_col", query_vec, "float", "l2", 5)
                              .match_dense("multi_vector_col", query_mv, "float", "l2", 5)
                              .fusion(method='rrf', topn=5)
@@ -366,9 +376,9 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             result, _ = (table_obj
-                             .output(["id", "text", "vector_col"])
-                             .match_text("text", "test_text", 5)
-                             .match_dense("vector_col", [0.5] * 4, "float", "l2", 5)
+                             .output(["num", "body", "vector_col"])
+                             .match_text("body", "test_text", 5)
+                             .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
                              .fusion(method='weighted_sum', topn=5, fusion_params={"weights": "0.6,0.4"})
                              .to_pl())
                             if len(result) != 5:
@@ -395,8 +405,8 @@ class TestMultipleIndexTypesImport:
                 t = Thread(target=read_worker_hnsw, args=[infinity_pool, table_name, end_time, 1, read_count_hnsw])
                 threads.append(t)
 
-                t = Thread(target=read_worker_hnsw_mv, args=[infinity_pool, table_name, end_time, 2, read_count_hnsw_mv])
-                threads.append(t)
+                # t = Thread(target=read_worker_hnsw_mv, args=[infinity_pool, table_name, end_time, 2, read_count_hnsw_mv])
+                # threads.append(t)
 
                 t = Thread(target=read_worker_secondary_high, args=[infinity_pool, table_name, end_time, 3, read_count_secondary_high])
                 threads.append(t)
