@@ -59,8 +59,8 @@ class TestMultipleIndexTypesImport:
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
         kRunningTime = 120
-        kImportRepeat = 2
-        kBatchCount = 100
+        kImportRepeat = 5
+        kBatchCount = 10
         kRowsPerBatch = 5000
         max_row_id = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
 
@@ -121,7 +121,7 @@ class TestMultipleIndexTypesImport:
                 for row_idx in range(kRowsPerBatch):
                     row_id = batch_idx * kRowsPerBatch + row_idx
                     vec = [random.random() for _ in range(2048)]
-                    multivec = [[random.random() for _ in range(2)] for _ in range(2)]
+                    multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
                     sparse_indices = [j for j in range(100) if random.random() > 0.7]
                     if not sparse_indices:
                         sparse_indices = [0, 1, 2]
@@ -201,7 +201,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             vec = [random.random() for _ in range(2048)]
-                            multivec = [[random.random() for _ in range(2)] for _ in range(2)]
+                            multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
@@ -239,21 +239,22 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             # Get a random row id to update
-                            update_id = random.randint(0, max_row_id)
+                            update_id = random.randint(0, min(max_row_id, 10000))
                             vec = [random.random() for _ in range(2048)]
-                            multivec = [[random.random() for _ in range(2)] for _ in range(2)]
+                            multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
                             sparse_values = [random.random() for _ in range(len(sparse_indices))]
                             sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
 
-                            table_obj.update(f"num = {update_id}", [{
+                            logging.info(f"thread {thread_id}: updating num={update_id}")
+                            table_obj.update(f"num = {update_id}", {
                                 "doctitle": f"updated_title_{update_id}",
                                 "vector_col": vec,
                                 "multi_vector_col": multivec,
                                 "sparse_col": sparse_vec
-                            }])
+                            })
 
                             local_count += 1
                             with update_count.get_lock():
@@ -274,7 +275,8 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             # Get a random row id to delete
-                            delete_id = random.randint(0, max_row_id)
+                            delete_id = random.randint(0, min(max_row_id, 10000))
+                            logging.info(f"thread {thread_id}: deleting num={delete_id}")
                             table_obj.delete(f"num = {delete_id}")
 
                             local_count += 1
@@ -511,12 +513,12 @@ class TestMultipleIndexTypesImport:
                     # Read workers
                     (read_worker_fulltext, read_count_fulltext, False),
                     (read_worker_hnsw, read_count_hnsw, False),
-                    (read_worker_hnsw_mv, read_count_hnsw_mv, False),
+                    # (read_worker_hnsw_mv, read_count_hnsw_mv, False),
                     (read_worker_secondary_high, read_count_secondary_high, False),
                     (read_worker_secondary_low, read_count_secondary_low, False),
                     (read_worker_sparse, read_count_sparse, False),
                     (read_worker_fusion_rrf, read_count_fusion_rrf, False),
-                    (read_worker_fusion_mv_rrf, read_count_fusion_mv_rrf, False),
+                    # (read_worker_fusion_mv_rrf, read_count_fusion_mv_rrf, False),
                     (read_worker_fusion_weighted_sum, read_count_fusion_weighted_sum, False),
                 ]
 

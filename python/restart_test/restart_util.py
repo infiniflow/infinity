@@ -214,7 +214,7 @@ class MultiIndexTypesGenerator:
             "body": {"type": "varchar"},
             "num": {"type": "int"},
             "vector_col": {"type": "vector,2048,float"},
-            "multi_vector_col": {"type": "multivector,2,float"},
+            "multi_vector_col": {"type": "multivector,1024,float"},
             "category": {"type": "varchar"},
             "sparse_col": {"type": "sparse,1024,float,int16"}
         }
