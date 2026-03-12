@@ -154,7 +154,7 @@ class TestMultipleIndexTypesImport:
                             vec = [random.random() for _ in range(2048)]
                             # multi_vector: 2 vectors, each 1024-dim (total 2048 values)
                             multivec = [[random.random() for _ in range(2)] for _ in range(2)]
-                            tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
+                            # tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
@@ -263,7 +263,7 @@ class TestMultipleIndexTypesImport:
                         try:
                             result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
                             if len(result) == 0:
-                                raise Exception(f"SecondaryHigh query returned 0 results")
+                                raise Exception("SecondaryHigh query returned 0 results")
                             local_count += 1
                         except Exception as e:
                             raise e
@@ -310,7 +310,7 @@ class TestMultipleIndexTypesImport:
                         try:
                             result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
                             if len(result) == 0:
-                                raise Exception(f"SecondaryLow query returned 0 results")
+                                raise Exception("SecondaryLow query returned 0 results")
                             local_count += 1
                         except Exception as e:
                             raise e
