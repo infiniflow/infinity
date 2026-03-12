@@ -368,6 +368,9 @@ export struct ImportTxnStore final : public BaseTxnStore {
     std::vector<std::string> index_ids_str_{};
     std::vector<u64> index_ids_{};
     std::vector<SegmentID> segment_ids_{};
+
+    // When creating multiple index types simultaneously, the chunk_infos data of all indexes is shared, leading to different indexes in the WAL using
+    // the same metadata, causing some indexes' metadata to be overwritten by others. Therefore, each index needs its own storage area.
     std::map<SegmentID, std::map<std::string, std::vector<WalChunkIndexInfo>>> chunk_infos_in_segments_;
     std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_;
     size_t row_count_{};
