@@ -394,7 +394,7 @@ std::shared_ptr<WalEntry> ImportTxnStore::ToWalEntry(TxnTimeStamp commit_ts) con
                                                                index_names_[i],
                                                                index_ids_str_[i],
                                                                segment_id,
-                                                               chunk_infos_in_segments_.at(segment_id),
+                                                               chunk_infos_in_segments_.at(segment_id).at(index_ids_str_[i]),
                                                                deprecate_ids_in_segments_.at(segment_id),
                                                                table_key_);
             dump_command->dump_cause_ = DumpIndexCause::kImport;
@@ -509,7 +509,7 @@ std::shared_ptr<WalEntry> CompactTxnStore::ToWalEntry(TxnTimeStamp commit_ts) co
                                                                index_names_[i],
                                                                index_ids_str_[i],
                                                                segment_id,
-                                                               chunk_infos_in_segments_.at(segment_id),
+                                                               chunk_infos_in_segments_.at(segment_id).at(index_ids_str_[i]),
                                                                deprecate_ids_in_segments_.at(segment_id),
                                                                table_key_);
             dump_command->dump_cause_ = DumpIndexCause::kCompact;

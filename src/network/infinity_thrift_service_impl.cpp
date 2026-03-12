@@ -1478,6 +1478,20 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         }
     }
 
+    index_info_to_use->secondary_index_cardinality_ = SecondaryIndexCardinality::kHighCardinality;
+    if (index_info_to_use->index_type_ == IndexType::kSecondary || index_info_to_use->index_type_ == IndexType::kSecondaryFunctional) {
+        for (const auto &index_param : request.index_info.index_param_list) {
+            if (index_param.param_name == "cardinality") {
+                if (index_param.param_value == "high") {
+                    index_info_to_use->secondary_index_cardinality_ = SecondaryIndexCardinality::kHighCardinality;
+                } else if (index_param.param_value == "low") {
+                    index_info_to_use->secondary_index_cardinality_ = SecondaryIndexCardinality::kLowCardinality;
+                }
+                break;
+            }
+        }
+    }
+
     auto *index_param_list = new std::vector<InitParameter *>();
     for (auto &index_param : request.index_info.index_param_list) {
         auto init_parameter = new InitParameter();

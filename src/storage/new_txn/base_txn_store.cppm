@@ -353,23 +353,26 @@ export struct ImportTxnStore final : public BaseTxnStore {
     ImportTxnStore() : BaseTxnStore(TransactionType::kImport) {}
     ~ImportTxnStore() override = default;
 
-    std::string db_name_{};
-    std::string db_id_str_{};
-    std::string table_name_{};
-    std::string table_id_str_{};
+    std::string db_name_;
+    std::string db_id_str_;
+    std::string table_name_;
+    std::string table_id_str_;
     u64 db_id_{};
     u64 table_id_{};
-    std::string table_key_{};
-    std::string import_tmp_path_{};
-    std::vector<std::string> import_file_names_{}; // used during rollback
-    std::vector<WalSegmentInfo> segment_infos_{};
+    std::string table_key_;
+    std::string import_tmp_path_;
+    std::vector<std::string> import_file_names_; // used during rollback
+    std::vector<WalSegmentInfo> segment_infos_;
 
     std::vector<std::string> index_names_{};
     std::vector<std::string> index_ids_str_{};
     std::vector<u64> index_ids_{};
     std::vector<SegmentID> segment_ids_{};
-    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
-    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
+
+    // When creating multiple index types simultaneously, the chunk_infos data of all indexes is shared, leading to different indexes in the WAL using
+    // the same metadata, causing some indexes' metadata to be overwritten by others. Therefore, each index needs its own storage area.
+    std::map<SegmentID, std::map<std::string, std::vector<WalChunkIndexInfo>>> chunk_infos_in_segments_;
+    std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_;
     size_t row_count_{};
 
     std::string ToString() const final;
@@ -459,7 +462,7 @@ export struct CompactTxnStore final : public BaseTxnStore {
     std::vector<std::string> index_ids_str_{};
     std::vector<u64> index_ids_{};
     std::vector<SegmentID> segment_ids_{};
-    std::map<SegmentID, std::vector<WalChunkIndexInfo>> chunk_infos_in_segments_{};
+    std::map<SegmentID, std::map<std::string, std::vector<WalChunkIndexInfo>>> chunk_infos_in_segments_{};
     std::map<SegmentID, std::vector<ChunkID>> deprecate_ids_in_segments_{};
 
     std::string ToString() const final;
