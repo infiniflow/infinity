@@ -1530,7 +1530,26 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         }
 
         ColumnID column_id = column_def->id();
+        RowID current_base_row_id = base_row_id;
         for (BlockID block_id : *block_ids) {
+            // Check if we need to recreate PlaidIndexInMem (was destroyed after incremental dump)
+            if (!plaid_index_in_mem) {
+                // Recreate with existing global centroids for incremental build
+                // Use current_base_row_id which tracks the next row after dumps
+                auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+                if (global_centroids && global_centroids->IsTrained()) {
+                    plaid_index_in_mem =
+                        PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, current_base_row_id, global_centroids);
+                } else {
+                    plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, current_base_row_id);
+                }
+                plaid_index_in_mem->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+                plaid_index_in_mem->index_name_ = *index_base->index_name_;
+                if (existing_mem_index) {
+                    existing_mem_index->SetPlaidIndex(plaid_index_in_mem);
+                }
+            }
+
             BlockMeta block_meta(block_id, segment_meta);
             ColumnMeta column_meta(column_id, block_meta);
 
@@ -1541,13 +1560,33 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
             }
             row_cnt = block_row_cnt;
 
-            ColumnVector col;
-            Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
-            if (!status.ok()) {
-                return status;
-            }
+            {
+                // Use a scope to ensure ColumnVector is destroyed before we cleanup the buffer
+                ColumnVector col;
+                Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
+                if (!status.ok()) {
+                    return status;
+                }
 
-            plaid_index_in_mem->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+                plaid_index_in_mem->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+            } // ColumnVector destroyed here, BufferHandle released
+
+            // CRITICAL: Explicitly cleanup column buffer to release mmap memory
+            // This prevents RSS accumulation when creating index without restart
+            // After ColumnVector is destroyed, rc_ should be 0, call Munmap directly
+            // NOTE: Do NOT use PickForCleanup() as it will delete the file!
+            {
+                BufferObj *column_buffer = nullptr;
+                BufferObj *outline_buffer = nullptr;
+                Status cleanup_status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+                if (cleanup_status.ok() && column_buffer != nullptr) {
+                    // Directly call Munmap to release mmap memory without deleting file
+                    column_buffer->file_worker()->Munmap();
+                    if (outline_buffer != nullptr) {
+                        outline_buffer->file_worker()->Munmap();
+                    }
+                }
+            }
 
             // Check if we need to dump (incremental dump when exceeding capacity)
             if (plaid_index_in_mem->IsBuilt() && plaid_index_in_mem->GetRowCount() >= mem_index_capacity) {
@@ -1555,8 +1594,32 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
                 if (!dump_status.ok()) {
                     return dump_status;
                 }
-                // After dump, PlaidIndexInMem resets and can accept more data
+                // CRITICAL: After dump, destroy PlaidIndexInMem to release chunk_handle_ and free mmap memory
+                // Then recreate for next batch to avoid memory accumulation
+                // Get the updated begin_row_id before destroying (PlaidIndexInMem updates it in Dump)
+                current_base_row_id = plaid_index_in_mem->GetBeginRowID();
+                if (existing_mem_index) {
+                    existing_mem_index->SetPlaidIndex(nullptr);
+                }
+                plaid_index_in_mem.reset();
+                // Continue to next iteration - PlaidIndexInMem will be recreated at loop start
             }
+        }
+    }
+
+    // Check if we need to recreate PlaidIndexInMem (was destroyed after loop ended with incremental dump)
+    if (!plaid_index_in_mem) {
+        // Recreate with existing global centroids for incremental build
+        auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+        if (global_centroids && global_centroids->IsTrained()) {
+            plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_row_id, global_centroids);
+        } else {
+            plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+        }
+        plaid_index_in_mem->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+        plaid_index_in_mem->index_name_ = *index_base->index_name_;
+        if (existing_mem_index) {
+            existing_mem_index->SetPlaidIndex(plaid_index_in_mem);
         }
     }
 
@@ -1576,7 +1639,17 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
     }
 
     // Final dump for remaining data
-    return dump_current_index(plaid_index_in_mem.get());
+    Status final_dump_status = dump_current_index(plaid_index_in_mem.get());
+    if (!final_dump_status.ok()) {
+        return final_dump_status;
+    }
+    // CRITICAL: Destroy PlaidIndexInMem after final dump to release chunk_handle_ and free mmap memory
+    if (existing_mem_index) {
+        existing_mem_index->SetPlaidIndex(nullptr);
+    }
+    plaid_index_in_mem.reset();
+
+    return Status::OK();
 }
 
 Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
