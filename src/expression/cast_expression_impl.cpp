@@ -167,8 +167,18 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         }
+        case LogicalType::kTensor: {
+            switch (target.type()) {
+                case LogicalType::kTensor:
+                case LogicalType::kMultiVector:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         case LogicalType::kJson: {
             switch (target.type()) {
+                case LogicalType::kJson:
                 case LogicalType::kVarchar:
                     return true;
                 default:
