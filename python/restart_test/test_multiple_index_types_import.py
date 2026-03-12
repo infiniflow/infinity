@@ -3,6 +3,7 @@ import random
 import pytest
 import logging
 import time
+import numpy as np
 from threading import Thread
 from multiprocessing import Value
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory, infinity_runner_decorator_factory2
@@ -62,7 +63,6 @@ class TestMultipleIndexTypesImport:
         kImportRepeat = 5
         kBatchCount = 10
         kRowsPerBatch = 5000
-        max_row_id = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
 
         # Part 1: Create table and indexes
         @decorator
@@ -73,10 +73,15 @@ class TestMultipleIndexTypesImport:
             table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
             assert table_obj is not None
 
-            # for idx in indexes:
-            #     table_obj.create_index(f"idx_{idx.target_name}", idx)
-            #
-            # logging.info(f"Created table and {len(indexes)} indexes")
+            for idx in indexes:
+                idx_name = f"idx_{idx.target_name}"
+                idx_start = time.time()
+                logging.info(f"Creating index {idx_name}...")
+                table_obj.create_index(idx_name, idx)
+                idx_duration = time.time() - idx_start
+                logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
+
+            logging.info(f"Created table and {len(indexes)} indexes")
 
         part1()
 
@@ -102,17 +107,7 @@ class TestMultipleIndexTypesImport:
             logging.info(f"Total rows after {kImportRepeat} imports: {count}")
             assert count == expected_count, f"Expected {expected_count} rows, got {count}"
 
-            for idx in indexes:
-                idx_name = f"idx_{idx.target_name}"
-                idx_start = time.time()
-                logging.info(f"Creating index {idx_name}...")
-                table_obj.create_index(idx_name, idx)
-                idx_duration = time.time() - idx_start
-                logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
-
-            logging.info(f"Created table and {len(indexes)} indexes")
-
-            # Insert 100 batches, each with 9999 rows
+            # Insert 10 batches, each with 5000 rows
             categories = ["A", "B", "C", "D"]
             text_words = ["apple", "banana", "cherry", "date"]
 
@@ -190,6 +185,8 @@ class TestMultipleIndexTypesImport:
                 threads = []
                 end_time = time.time() + kRunningTime
 
+                max_row_id = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
+
                 def insert_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count):
                     infinity_obj = connection_pool.get_conn()
                     db_obj = infinity_obj.get_database("default_db")
@@ -201,7 +198,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             vec = [random.random() for _ in range(2048)]
-                            multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
+                            multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
@@ -241,7 +238,7 @@ class TestMultipleIndexTypesImport:
                             # Get a random row id to update
                             update_id = random.randint(0, min(max_row_id, 10000))
                             vec = [random.random() for _ in range(2048)]
-                            multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
+                            multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
