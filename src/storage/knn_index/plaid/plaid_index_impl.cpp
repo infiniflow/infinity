@@ -525,7 +525,8 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
 void PlaidIndex::CopyCentroidsFrom(const std::vector<f32> &centroids_data,
                                    const std::vector<f32> &centroid_norms_neg_half,
                                    const u32 n_centroids,
-                                   const PlaidQuantizer *quantizer) {
+                                   const PlaidQuantizer *quantizer,
+                                   bool preserve_ivf_lists) {
     std::unique_lock lock(rw_mutex_);
 
     n_centroids_ = n_centroids;
@@ -538,11 +539,16 @@ void PlaidIndex::CopyCentroidsFrom(const std::vector<f32> &centroids_data,
         quantizer_->CopyFrom(*quantizer);
     }
 
-    // Resize IVF lists
-    ivf_lists_.clear();
-    ivf_lists_.resize(n_centroids_);
-
-    LOG_INFO(fmt::format("PlaidIndex::CopyCentroidsFrom: Copied {} centroids", n_centroids));
+    // Handle IVF lists based on preserve_ivf_lists flag
+    if (preserve_ivf_lists) {
+        // Preserve existing IVF lists (used after MergeOneChunk/FinalizeMerge)
+        LOG_INFO(fmt::format("PlaidIndex::CopyCentroidsFrom: Copied {} centroids, preserved {} IVF lists", n_centroids, ivf_lists_.size()));
+    } else {
+        // Initialize/resize IVF lists (used when creating new index)
+        ivf_lists_.clear();
+        ivf_lists_.resize(n_centroids_);
+        LOG_INFO(fmt::format("PlaidIndex::CopyCentroidsFrom: Copied {} centroids, initialized {} IVF lists", n_centroids, n_centroids_));
+    }
 }
 
 void PlaidIndex::ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> global_centroids) {
@@ -1204,8 +1210,11 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
     }
 
     // Update IVF lists for this chunk
+    // doc_offset is the starting doc_id in the merged index for this chunk
+    u32 max_doc_id_added = 0;
     for (u32 i = 0; i < chunk_doc_num; ++i) {
-        u32 global_doc_id = current_docs + i;
+        u32 global_doc_id = doc_offset + i; // Use doc_offset to calculate correct segment-relative doc_id
+        max_doc_id_added = std::max(max_doc_id_added, global_doc_id);
         u32 doc_len = chunk_doc_lens[i];
         u32 local_doc_offset = chunk_doc_offsets[i];
         for (u32 j = 0; j < doc_len; ++j) {
@@ -1220,6 +1229,10 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
             }
         }
     }
+    LOG_INFO(fmt::format("PlaidIndex::MergeOneChunk: Added doc_ids from {} to {}, total docs in index: {}",
+                         doc_offset,
+                         max_doc_id_added,
+                         current_docs + chunk_doc_num));
 
     // Update counters
     n_docs_ = current_docs + chunk_doc_num;
@@ -1228,10 +1241,20 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
 
 void PlaidIndex::FinalizeMerge() {
     std::shared_lock lock(rw_mutex_);
-    LOG_INFO(fmt::format("PlaidIndex::FinalizeMerge: Completed. Total docs: {}, embeddings: {}, IVF entries: {}",
+
+    // Find max doc_id in IVF lists for debugging
+    u32 max_doc_id = 0;
+    for (const auto &list : ivf_lists_) {
+        for (u32 doc_id : list) {
+            max_doc_id = std::max(max_doc_id, doc_id);
+        }
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::FinalizeMerge: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, max_doc_id in IVF: {}",
                          n_docs_.load(),
                          n_total_embeddings_,
-                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); })));
+                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
+                         max_doc_id));
 }
 
 void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,

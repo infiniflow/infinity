@@ -2322,13 +2322,10 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
 
     // Copy centroids from global centroids to make index self-contained
     // This is necessary for mmap-based access
+    // IMPORTANT: preserve_ivf_lists = true because MergeOneChunk has already populated the IVF lists
     const auto &global_centroids_data = global_centroids->centroids_data();
     const auto &global_norms = global_centroids->centroid_norms_neg_half();
-
-    // Access internal members directly for initialization
-    // Note: This is a bit hacky but necessary for efficient merge
-    // We'll use the existing CopyCentroidsFrom method
-    merged_index->CopyCentroidsFrom(global_centroids_data, global_norms, global_centroids->n_centroids(), global_centroids->quantizer());
+    merged_index->CopyCentroidsFrom(global_centroids_data, global_norms, global_centroids->n_centroids(), global_centroids->quantizer(), true);
 
     LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
 

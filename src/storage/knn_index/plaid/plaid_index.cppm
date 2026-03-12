@@ -69,10 +69,13 @@ public:
                                                 u32 packed_dim);
 
     // Copy centroids from external source (for global centroids support)
+    // preserve_ivf_lists = true: for merge
+    // preserve_ivf_lists = false: build from scratch
     void CopyCentroidsFrom(const std::vector<f32> &centroids_data,
                            const std::vector<f32> &centroid_norms_neg_half,
                            u32 n_centroids,
-                           const PlaidQuantizer *quantizer = nullptr);
+                           const PlaidQuantizer *quantizer = nullptr,
+                           bool preserve_ivf_lists = false);
 
     // Share global centroids (avoids copying, preferred for incremental updates)
     void ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> global_centroids);
