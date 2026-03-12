@@ -123,8 +123,8 @@ public:
     void MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *>> &chunks_with_doc_offsets);
 
     // Streaming merge: merge one chunk at a time (memory efficient for large indexes)
-    // InitializeMerge() -> MergeOneChunk() x N -> FinalizeMerge()
-    void InitializeMerge();
+    // InitializeMerge(n_centroids) -> MergeOneChunk() x N -> FinalizeMerge()
+    void InitializeMerge(u32 n_centroids);
     void MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset);
     void FinalizeMerge();
 

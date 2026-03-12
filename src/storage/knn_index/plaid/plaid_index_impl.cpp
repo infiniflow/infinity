@@ -1137,7 +1137,7 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
 // Streaming merge support - allows merging one chunk at a time to control memory
 // This is crucial for large indexes that exceed available RAM
 
-void PlaidIndex::InitializeMerge() {
+void PlaidIndex::InitializeMerge(u32 n_centroids) {
     std::unique_lock lock(rw_mutex_);
     // Clear existing data for fresh merge
     doc_lens_.clear();
@@ -1145,12 +1145,15 @@ void PlaidIndex::InitializeMerge() {
     centroid_ids_.clear();
     packed_residuals_.reset();
     packed_residuals_size_ = 0;
-    for (auto &list : ivf_lists_) {
-        list.clear();
-    }
+
+    // CRITICAL: Set n_centroids_ and ensure IVF lists are sized correctly
+    n_centroids_ = n_centroids;
+    ivf_lists_.clear();
+    ivf_lists_.resize(n_centroids_);
+
     n_docs_ = 0;
     n_total_embeddings_ = 0;
-    LOG_INFO("PlaidIndex::InitializeMerge: Ready for streaming merge");
+    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: Ready for streaming merge with {} centroids", n_centroids_));
 }
 
 void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
@@ -1207,6 +1210,11 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
         u32 local_doc_offset = chunk_doc_offsets[i];
         for (u32 j = 0; j < doc_len; ++j) {
             u32 centroid_id = chunk_centroid_ids[local_doc_offset + j];
+            // Safety check: ensure centroid_id is within bounds
+            if (centroid_id >= n_centroids_) {
+                LOG_ERROR(fmt::format("PlaidIndex::MergeOneChunk: centroid_id {} out of bounds (n_centroids_={})", centroid_id, n_centroids_));
+                continue;
+            }
             if (ivf_lists_[centroid_id].empty() || ivf_lists_[centroid_id].back() != global_doc_id) {
                 ivf_lists_[centroid_id].push_back(global_doc_id);
             }
@@ -1236,6 +1244,42 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
                                   u64 total_embeddings) {
     std::unique_lock lock(rw_mutex_);
 
+    LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Starting. n_centroids={}, global_centroids_ref={}",
+                         n_centroids_,
+                         global_centroids_ref_ ? "set" : "null"));
+
+    // Validate IVF lists size matches n_centroids
+    if (ivf_lists.size() != n_centroids_) {
+        UnrecoverableError(
+            fmt::format("PlaidIndex::AcceptMergedData: IVF lists size {} doesn't match n_centroids {}", ivf_lists.size(), n_centroids_));
+    }
+
+    // Validate doc_lens size matches total_docs
+    if (doc_lens.size() != total_docs) {
+        UnrecoverableError(fmt::format("PlaidIndex::AcceptMergedData: doc_lens size {} doesn't match total_docs {}", doc_lens.size(), total_docs));
+    }
+
+    // Validate doc_offsets size matches total_docs
+    if (doc_offsets.size() != total_docs) {
+        UnrecoverableError(
+            fmt::format("PlaidIndex::AcceptMergedData: doc_offsets size {} doesn't match total_docs {}", doc_offsets.size(), total_docs));
+    }
+
+    // Validate centroid_ids size matches total_embeddings
+    if (centroid_ids.size() != total_embeddings) {
+        UnrecoverableError(fmt::format("PlaidIndex::AcceptMergedData: centroid_ids size {} doesn't match total_embeddings {}",
+                                       centroid_ids.size(),
+                                       total_embeddings));
+    }
+
+    // Validate packed_residuals_size matches expected size
+    size_t expected_packed_size = total_embeddings * ((embedding_dimension_ * nbits_ + 7) / 8);
+    if (packed_residuals_size != expected_packed_size) {
+        UnrecoverableError(fmt::format("PlaidIndex::AcceptMergedData: packed_residuals_size {} doesn't match expected {}",
+                                       packed_residuals_size,
+                                       expected_packed_size));
+    }
+
     // Move all data efficiently
     doc_lens_ = std::move(doc_lens);
     doc_offsets_ = std::move(doc_offsets);
@@ -1246,10 +1290,32 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     n_docs_ = total_docs;
     n_total_embeddings_ = total_embeddings;
 
-    LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Accepted merged data. Total docs: {}, embeddings: {}, IVF entries: {}",
+    // CRITICAL: Copy centroids and quantizer from global centroids to make index self-contained
+    // This is necessary for mmap-based indexes that don't have access to global centroids
+    if (global_centroids_ref_) {
+        LOG_INFO("PlaidIndex::AcceptMergedData: Copying centroids and quantizer from global centroids");
+
+        // Copy centroids data
+        const auto &global_centroids_data = global_centroids_ref_->centroids_data();
+        const auto &global_norms = global_centroids_ref_->centroid_norms_neg_half();
+        centroids_data_ = global_centroids_data;
+        centroid_norms_neg_half_ = global_norms;
+
+        // Copy quantizer
+        quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+
+        // Clear global centroids reference since we now have local copies
+        // This makes the index self-contained and safe for mmap
+        global_centroids_ref_.reset();
+
+        LOG_INFO("PlaidIndex::AcceptMergedData: Copied centroids and quantizer, index is now self-contained");
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, quantizer n_buckets: {}",
                          n_docs_.load(),
                          n_total_embeddings_,
-                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); })));
+                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
+                         quantizer_->n_buckets()));
 }
 
 } // namespace infinity

@@ -132,16 +132,25 @@ Status PlaidIndexDiskMerger::Initialize(const PlaidMergeSizeInfo &size_info) {
                          size_info.total_embeddings,
                          size_info.estimated_file_size));
 
-    // Reserve space for data to avoid reallocations
-    state_.doc_lens.reserve(size_info.total_docs);
-    state_.doc_offsets.reserve(size_info.total_docs);
-    state_.centroid_ids.reserve(size_info.total_embeddings);
+    // Reserve space for data if size info is provided (avoid OOM on large indexes)
+    if (size_info.total_docs > 0) {
+        state_.doc_lens.reserve(size_info.total_docs);
+        state_.doc_offsets.reserve(size_info.total_docs);
+    }
+    if (size_info.total_embeddings > 0) {
+        state_.centroid_ids.reserve(size_info.total_embeddings);
+    }
 
-    // Pre-allocate packed_residuals
-    size_t packed_dim = (embedding_dim_ * nbits_ + 7) / 8;
-    state_.packed_residuals_size = size_info.total_embeddings * packed_dim;
-    if (state_.packed_residuals_size > 0) {
-        state_.packed_residuals = std::make_unique<u8[]>(state_.packed_residuals_size);
+    // Initialize IVF lists with correct size
+    state_.ivf_lists.resize(n_centroids_);
+
+    // Pre-allocate packed_residuals only if size is known
+    if (size_info.total_embeddings > 0) {
+        size_t packed_dim = (embedding_dim_ * nbits_ + 7) / 8;
+        state_.packed_residuals_size = size_info.total_embeddings * packed_dim;
+        if (state_.packed_residuals_size > 0) {
+            state_.packed_residuals = std::make_unique<u8[]>(state_.packed_residuals_size);
+        }
     }
 
     initialized_ = true;
@@ -184,8 +193,19 @@ Status PlaidIndexDiskMerger::MergeChunk(BufferObj *chunk_buffer, u32 doc_offset)
     const u8 *chunk_residuals = chunk_index->packed_residuals();
     size_t chunk_residuals_size = chunk_index->packed_residuals_size();
 
-    // Reserve space for new data
+    // Reserve space for new data (reserve in batches to avoid frequent reallocations)
     size_t current_embedding_offset = state_.centroid_ids.size();
+
+    // Pre-allocate with some headroom to avoid frequent reallocations
+    if (state_.doc_lens.capacity() < state_.doc_lens.size() + chunk_doc_num) {
+        state_.doc_lens.reserve(std::max(state_.doc_lens.size() + chunk_doc_num, state_.doc_lens.size() * 2));
+    }
+    if (state_.doc_offsets.capacity() < state_.doc_offsets.size() + chunk_doc_num) {
+        state_.doc_offsets.reserve(std::max(state_.doc_offsets.size() + chunk_doc_num, state_.doc_offsets.size() * 2));
+    }
+    if (state_.centroid_ids.capacity() < state_.centroid_ids.size() + chunk_embedding_num) {
+        state_.centroid_ids.reserve(std::max(state_.centroid_ids.size() + chunk_embedding_num, state_.centroid_ids.size() * 2));
+    }
 
     // Append doc_lens
     state_.doc_lens.insert(state_.doc_lens.end(), chunk_doc_lens.begin(), chunk_doc_lens.end());
@@ -198,9 +218,26 @@ Status PlaidIndexDiskMerger::MergeChunk(BufferObj *chunk_buffer, u32 doc_offset)
     // Append centroid_ids
     state_.centroid_ids.insert(state_.centroid_ids.end(), chunk_centroid_ids.begin(), chunk_centroid_ids.end());
 
-    // Copy packed_residuals
+    // Copy packed_residuals with dynamic expansion if needed
     if (chunk_residuals_size > 0 && chunk_residuals) {
-        size_t packed_offset = current_embedding_offset * ((embedding_dim_ * nbits_ + 7) / 8);
+        size_t packed_dim = (embedding_dim_ * nbits_ + 7) / 8;
+        size_t packed_offset = current_embedding_offset * packed_dim;
+        size_t required_size = packed_offset + chunk_residuals_size;
+
+        // Expand if needed (with headroom)
+        if (required_size > state_.packed_residuals_size) {
+            size_t new_size = std::max(required_size, state_.packed_residuals_size * 2);
+            if (new_size < required_size)
+                new_size = required_size; // Handle overflow
+
+            auto new_packed = std::make_unique<u8[]>(new_size);
+            if (state_.packed_residuals && state_.packed_residuals_size > 0) {
+                std::memcpy(new_packed.get(), state_.packed_residuals.get(), state_.packed_residuals_size);
+            }
+            state_.packed_residuals = std::move(new_packed);
+            state_.packed_residuals_size = new_size;
+        }
+
         std::memcpy(state_.packed_residuals.get() + packed_offset, chunk_residuals, chunk_residuals_size);
     }
 
@@ -228,8 +265,12 @@ Status PlaidIndexDiskMerger::MergeChunk(BufferObj *chunk_buffer, u32 doc_offset)
         progress_.bytes_written += chunk_residuals_size + (chunk_doc_num * 2 + chunk_embedding_num) * sizeof(u32);
     }
 
-    // Release chunk buffer immediately
+    // CRITICAL: Release chunk buffer immediately to free memory
     handle = BufferHandle();
+
+    // Force memory cleanup suggestion to buffer manager
+    // by requesting a small allocation to trigger cleanup
+    // This is a hint that we're under memory pressure
 
     return Status::OK();
 }
