@@ -207,7 +207,7 @@ class MultiIndexTypesGenerator:
     DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
     DEFAULT_NUM_ROWS = 9999
 
-    def columns(self):
+    def columns():
         return {
             "doctitle": {"type": "varchar"},
             "docdate": {"type": "varchar"},
@@ -219,7 +219,7 @@ class MultiIndexTypesGenerator:
             "sparse_col": {"type": "sparse,1024,float,int16"}
         }
 
-    def index(self):
+    def index():
         return [
             index.IndexInfo("body", index.IndexType.FullText),
             index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
@@ -229,7 +229,7 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
 
-    def import_file(self) -> str:
+    def import_file() -> str:
         filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
         if os.path.exists(filepath):
             return filepath
@@ -238,7 +238,7 @@ class MultiIndexTypesGenerator:
         generate()
         return filepath
 
-    def import_size(self) -> int:
+    def import_size() -> int:
         return MultiIndexTypesGenerator.DEFAULT_NUM_ROWS
 
 
