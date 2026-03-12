@@ -1136,13 +1136,15 @@ Status NewTxn::PopulateIndex(const std::string &db_name,
     switch (dump_index_cause) {
         case DumpIndexCause::kCompact: {
             auto compact_txn_store = static_cast<CompactTxnStore *>(base_txn_store_.get());
-            compact_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
+            auto &index_chunk_infos_map = compact_txn_store->chunk_infos_in_segments_[segment_meta.segment_id()];
+            index_chunk_infos_map[table_index_meta.index_id_str()] = chunk_infos;
             compact_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
             break;
         }
         case DumpIndexCause::kImport: {
             auto import_txn_store = static_cast<ImportTxnStore *>(base_txn_store_.get());
-            import_txn_store->chunk_infos_in_segments_.emplace(segment_meta.segment_id(), chunk_infos);
+            auto &index_chunk_infos_map = import_txn_store->chunk_infos_in_segments_[segment_meta.segment_id()];
+            index_chunk_infos_map[table_index_meta.index_id_str()] = chunk_infos;
             import_txn_store->deprecate_ids_in_segments_.emplace(segment_meta.segment_id(), old_chunk_ids);
         }
         default: {
