@@ -19,16 +19,14 @@ def generate():
     # Categories: A, B, C, D
     categories = ['A', 'B', 'C', 'D']
 
-    # Generate sparse vector: 100 random indices out of 1024, with int values 0-100
+    # Generate sparse vector: 100 random indices out of 1024, with int values 1-100
     import random
     random.seed(42)
 
     def generate_sparse(row_id):
         random.seed(row_id + 42)
-        # Use sample to get 100 unique indices out of 1024
         indices = random.sample(range(1024), 100)
-        values = [float(random.randint(0, 100)) for _ in range(100)]
-        # Sort by index
+        values = [float(random.randint(1, 100)) for _ in range(100)]
         sorted_pairs = sorted(zip(indices, values))
         return sorted_pairs
 
@@ -53,7 +51,6 @@ def generate():
                 sparse_str = '[' + ', '.join(sparse_parts) + ']'
 
                 # Combine: original + num + vector + multi_vector + category + sparse
-                # Format: comma-separated CSV
                 new_line = f"{original}\t{i}\t[{vector_2048}]\t[{multi_vector}]\t{category}\t{sparse_str}\n"
                 dst.write(new_line)
 

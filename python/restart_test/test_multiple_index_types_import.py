@@ -109,13 +109,55 @@ class TestMultipleIndexTypesImport:
 
             logging.info(f"Created table and {len(indexes)} indexes")
 
+            # Insert 1000 batches, each with 1000 rows
+            kBatchCount = 1000
+            kRowsPerBatch = 1000
+            categories = ["A", "B", "C", "D"]
+            text_words = ["apple", "banana", "cherry", "date"]
+
+            for batch_idx in range(kBatchCount):
+                batch_data = []
+                for row_idx in range(kRowsPerBatch):
+                    row_id = batch_idx * kRowsPerBatch + row_idx
+                    vec = [random.random() for _ in range(2048)]
+                    multivec = [[random.random() for _ in range(2)] for _ in range(2)]
+                    sparse_indices = [j for j in range(100) if random.random() > 0.7]
+                    if not sparse_indices:
+                        sparse_indices = [0, 1, 2]
+                    sparse_values = [random.random() for _ in range(len(sparse_indices))]
+                    sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+
+                    batch_data.append({
+                        "doctitle": f"test_title_{row_id}",
+                        "docdate": "01-JAN-2024 00:00:00.000",
+                        "body": f"test_text_{row_id}_{random.choice(text_words)}",
+                        "num": row_id,
+                        "category": categories[row_idx % len(categories)],
+                        "vector_col": vec,
+                        "multi_vector_col": multivec,
+                        "sparse_col": sparse_vec
+                    })
+
+                insert_start = time.time()
+                table_obj.insert(batch_data)
+                insert_duration = time.time() - insert_start
+                logging.info(f"Inserted batch {batch_idx + 1}/{kBatchCount} ({kRowsPerBatch} rows) in {insert_duration:.2f} seconds")
+
+            # Verify row count after insert
+            res, _, _ = table_obj.output(["count(*)"]).to_result()
+            count = res["count(star)"][0]
+            # Previous import added total_n * kImportRepeat rows, now add kBatchCount * kRowsPerBatch rows
+            expected_count = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
+            logging.info(f"Total rows after batch insert: {count}, expected: {expected_count}")
+            assert count == expected_count, f"Expected {expected_count} rows after batch insert, got {count}"
+
         part2()
 
-        # Part 3: Restart 3 times - each round runs 120s with continuous insert/query
-        kRunningTime = 20
+        # Part 3: Restart 5 times - each round runs 120s with continuous insert/query
+        kRunningTime = 120
         kWriteThreadNum = 4
 
-        for round_num in range(3):
+        for round_num in range(5):
             # Track insert and query counts
             write_count = Value('i', 0)
             read_count_fulltext = Value('i', 0)
@@ -161,9 +203,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             vec = [random.random() for _ in range(2048)]
-                            # multi_vector: 2 vectors, each 1024-dim (total 2048 values)
                             multivec = [[random.random() for _ in range(2)] for _ in range(2)]
-                            tensor_data = [[random.random() for _ in range(4)] for _ in range(3)]
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
@@ -407,7 +447,7 @@ class TestMultipleIndexTypesImport:
                     t = Thread(target=write_worker, args=[infinity_pool, table_name, end_time, i, write_count])
                     threads.append(t)
 
-                # Start 10 read threads (one for each index type)
+                # Start 9 read threads (one for each index type)
                 t = Thread(target=read_worker_fulltext, args=[infinity_pool, table_name, end_time, 4, read_count_fulltext])
                 threads.append(t)
 
@@ -435,15 +475,12 @@ class TestMultipleIndexTypesImport:
                 t = Thread(target=read_worker_fusion_weighted_sum, args=[infinity_pool, table_name, end_time, 12, read_count_fusion_weighted_sum])
                 threads.append(t)
 
-                # Start all threads
                 for t in threads:
                     t.start()
 
-                # Wait for all threads
                 for t in threads:
                     t.join()
 
-                # Verify final count increased
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
                 end_count = res["count(star)"][0]
                 logging.info(f"Round {round_num + 1}: End count: {end_count}, inserted {write_count.value} rows")
@@ -455,7 +492,6 @@ class TestMultipleIndexTypesImport:
                             f"FusionRRF: {read_count_fusion_rrf.value}, "
                             f"FusionMVRRF: {read_count_fusion_mv_rrf.value}, FusionWeighted: {read_count_fusion_weighted_sum.value}")
 
-                # Verify at least some inserts happened
                 assert end_count > start_count, f"Expected count to increase, got {start_count} -> {end_count}"
 
             part3_round(round_num)
