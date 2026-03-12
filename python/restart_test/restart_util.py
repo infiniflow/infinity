@@ -15,6 +15,7 @@ class SimpleEmbeddingGenerator:
         def gen(insert: int):
             for i in range(insert):
                 yield [i, [0.1, 0.2, 0.3, 0.4]]
+
         return gen
 
     def index():
@@ -38,6 +39,7 @@ class SimpleVarcharGenerator:
                     yield [i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"]
                 else:
                     yield [i, "test"]
+
         return gen
 
     def index():
@@ -55,6 +57,7 @@ class SimpleTensorGenerator:
                     yield [i, [0.1, 0.2, 0.3, 0.4]]
                 else:
                     yield [i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]]
+
         return gen
 
 
@@ -83,6 +86,7 @@ class EnwikiGenerator:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -162,6 +166,7 @@ class LChYDataGenerato:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -203,7 +208,6 @@ class LChYDataGenerato:
 
 
 class MultiIndexTypesGenerator:
-
     DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
     DEFAULT_NUM_ROWS = 9999
 
@@ -242,14 +246,12 @@ class MultiIndexTypesGenerator:
                 result.append(random.randint(0, 100))
         return result
 
-
     def _format_vector(self, vec):
         return "[" + ", ".join(str(v) for v in vec) + "]"
 
     def _format_multivector(self, mv):
         # multivector uses flat format like vector
         return "[" + ", ".join(str(v) for v in mv) + "]"
-
 
     def _format_sparse(self, indices, values):
         return "[" + ", ".join(f"{idx}:{val}" for idx, val in zip(indices, values)) + "]"
@@ -297,6 +299,7 @@ class MultiIndexTypesGenerator:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
