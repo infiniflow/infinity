@@ -1226,4 +1226,30 @@ void PlaidIndex::FinalizeMerge() {
                          std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); })));
 }
 
+void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
+                                  std::vector<u32> &&doc_offsets,
+                                  std::vector<u32> &&centroid_ids,
+                                  std::unique_ptr<u8[]> &&packed_residuals,
+                                  size_t packed_residuals_size,
+                                  std::vector<std::vector<u32>> &&ivf_lists,
+                                  u32 total_docs,
+                                  u64 total_embeddings) {
+    std::unique_lock lock(rw_mutex_);
+
+    // Move all data efficiently
+    doc_lens_ = std::move(doc_lens);
+    doc_offsets_ = std::move(doc_offsets);
+    centroid_ids_ = std::move(centroid_ids);
+    packed_residuals_ = std::move(packed_residuals);
+    packed_residuals_size_ = packed_residuals_size;
+    ivf_lists_ = std::move(ivf_lists);
+    n_docs_ = total_docs;
+    n_total_embeddings_ = total_embeddings;
+
+    LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Accepted merged data. Total docs: {}, embeddings: {}, IVF entries: {}",
+                         n_docs_.load(),
+                         n_total_embeddings_,
+                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); })));
+}
+
 } // namespace infinity

@@ -136,6 +136,16 @@ public:
     const std::vector<u32> &doc_offsets() const { return doc_offsets_; }
     const std::vector<std::vector<u32>> &ivf_lists() const { return ivf_lists_; }
 
+    // Accept merged data from disk merger - efficient move semantics
+    void AcceptMergedData(std::vector<u32> &&doc_lens,
+                          std::vector<u32> &&doc_offsets,
+                          std::vector<u32> &&centroid_ids,
+                          std::unique_ptr<u8[]> &&packed_residuals,
+                          size_t packed_residuals_size,
+                          std::vector<std::vector<u32>> &&ivf_lists,
+                          u32 total_docs,
+                          u64 total_embeddings);
+
 private:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;

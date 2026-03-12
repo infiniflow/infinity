@@ -56,6 +56,7 @@ import :emvb_index_in_mem;
 import :plaid_index_in_mem;
 import :plaid_index_file_worker;
 import :plaid_index;
+import :plaid_index_disk_merger;
 import :index_plaid;
 import :emvb_index;
 import :meta_key;
@@ -2265,59 +2266,118 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
                          total_row_cnt,
                          base_rowid.ToUint64()));
 
-    // OPTIMIZATION: Streaming merge - load one chunk at a time to control memory
+    // OPTIMIZATION: Use PlaidIndexDiskMerger for streaming merge with controlled memory
     // This is critical for large indexes that exceed available RAM
+    // P0: Basic streaming merge, P1: Parallel loading, P2: Incremental merge
 
-    // Step 1: Create new merged index with shared global centroids
+    // Step 1: Prepare index parameters
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
     const u32 embedding_dimension = embedding_info->Dimension();
     const IndexPLAID *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
 
+    // Step 2: Collect chunk buffers and calculate merge size
+    std::vector<BufferObj *> chunk_buffers;
+    chunk_buffers.reserve(old_chunk_ids_ptr->size());
+
+    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+        ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
+        BufferObj *chunk_buffer_obj = nullptr;
+        status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+        chunk_buffers.push_back(chunk_buffer_obj);
+    }
+
+    // Step 3: Calculate merge size for pre-allocation
+    PlaidMergeSizeInfo size_info;
+    status = PlaidIndexDiskMerger::CalculateMergeSize(chunk_buffers, embedding_dimension, index_plaid->nbits_, size_info);
+    if (!status.ok()) {
+        return status;
+    }
+
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Pre-calculated merge size: {} docs, {} embeddings, {} bytes",
+                         size_info.total_docs,
+                         size_info.total_embeddings,
+                         size_info.estimated_file_size));
+
+    // Step 4: Create disk merger and initialize
+    std::string temp_dir = fmt::format("{}/plaid_merge", InfinityContext::instance().config()->TempDir());
+    std::string output_path = fmt::format("{}/plaid_merged_{}.idx", temp_dir, base_rowid.segment_offset_);
+
+    PlaidIndexDiskMerger merger(temp_dir, output_path, global_centroids->n_centroids(), embedding_dimension, index_plaid->nbits_);
+
+    status = merger.Initialize(size_info);
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("OptimizePlaidIndex: Failed to initialize merger: {}", status.message()));
+        return status;
+    }
+
+    // Step 5: Merge chunks using parallel loading (P1)
+    // For small number of chunks, use sequential merge; for large, use parallel
+    const u32 PARALLEL_THRESHOLD = 4;
+    if (chunk_buffers.size() >= PARALLEL_THRESHOLD) {
+        // P1: Parallel merge
+        std::vector<std::pair<BufferObj *, u32>> chunks_with_offsets;
+        chunks_with_offsets.reserve(chunk_buffers.size());
+
+        u32 current_doc_offset = 0;
+        for (size_t i = 0; i < chunk_buffers.size(); ++i) {
+            chunks_with_offsets.emplace_back(chunk_buffers[i], current_doc_offset);
+
+            // Get doc count for offset calculation
+            BufferHandle handle = chunk_buffers[i]->Load();
+            auto *plaid_index = static_cast<PlaidIndex *>(handle.GetDataMut());
+            if (plaid_index) {
+                current_doc_offset += plaid_index->GetDocNum();
+            }
+            handle = BufferHandle();
+        }
+
+        status = merger.MergeChunksParallel(chunks_with_offsets);
+        if (!status.ok()) {
+            LOG_ERROR(fmt::format("OptimizePlaidIndex: Parallel merge failed: {}", status.message()));
+            merger.Cancel();
+            return status;
+        }
+    } else {
+        // P0: Sequential merge
+        u32 current_doc_offset = 0;
+        for (size_t i = 0; i < chunk_buffers.size(); ++i) {
+            status = merger.MergeChunk(chunk_buffers[i], current_doc_offset);
+            if (!status.ok()) {
+                LOG_ERROR(fmt::format("OptimizePlaidIndex: Merge chunk {} failed: {}", i, status.message()));
+                merger.Cancel();
+                return status;
+            }
+
+            // Get doc count for next offset
+            BufferHandle handle = chunk_buffers[i]->Load();
+            auto *plaid_index = static_cast<PlaidIndex *>(handle.GetDataMut());
+            if (plaid_index) {
+                current_doc_offset += plaid_index->GetDocNum();
+            }
+            handle = BufferHandle();
+        }
+    }
+
+    // Step 6: Create output index and finalize merge
     auto merged_index =
         std::make_unique<PlaidIndex>(base_rowid.segment_offset_, embedding_dimension, index_plaid->nbits_, global_centroids->n_centroids());
 
     // Share global centroids (no copy)
     merged_index->ShareGlobalCentroids(global_centroids);
 
-    // Step 2: Initialize streaming merge
-    merged_index->InitializeMerge();
-
-    // Step 3: Load and merge chunks one at a time (streaming to control memory)
-    u32 current_doc_offset = 0;
-    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
-        ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
-
-        BufferObj *chunk_buffer_obj = nullptr;
-        status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
-        if (!status.ok()) {
-            return status;
-        }
-
-        // Load chunk (uses mmap if buffer is kMmap type)
-        BufferHandle buffer_handle = chunk_buffer_obj->Load();
-        auto *plaid_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
-
-        LOG_INFO(fmt::format("OptimizePlaidIndex: Loading chunk {} with {} docs, {} embeddings",
-                             old_chunk_id,
-                             plaid_index->GetDocNum(),
-                             plaid_index->GetTotalEmbeddingNum()));
-
-        // Merge this chunk
-        merged_index->MergeOneChunk(plaid_index, current_doc_offset);
-
-        current_doc_offset += plaid_index->GetDocNum();
-
-        // Release handle immediately to allow buffer manager to free memory
-        // This is crucial for streaming merge - we don't keep all chunks in memory
-        buffer_handle = BufferHandle();
+    // Finalize merger and populate output index
+    status = merger.Finalize(merged_index.get());
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("OptimizePlaidIndex: Finalize failed: {}", status.message()));
+        return status;
     }
-
-    // Step 4: Finalize merge
-    merged_index->FinalizeMerge();
 
     LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
 
-    // Step 5: Write to buffer and convert to mmap for large index support
+    // Step 7: Write to output buffer and convert to mmap
     BufferHandle buffer_handle = buffer_obj->Load();
     auto *data_ptr = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
     *data_ptr = std::move(*merged_index);
