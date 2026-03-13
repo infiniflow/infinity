@@ -40,7 +40,6 @@ class TestMultipleIndexTypesImport:
         uri = common_values.TEST_LOCAL_HOST
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-
         # Part 1: Create table and indexes
         @decorator
         def part1(infinity_obj):
@@ -55,7 +54,7 @@ class TestMultipleIndexTypesImport:
                 logging.info(f"Creating index {idx_name}...")
                 table_obj.create_index(idx_name, idx)
 
-            logging.info(f"Created table and {len(indexes)} indexes")
+            logging.info(f" Created table and {len(indexes)} indexes")
 
         part1()
 
@@ -173,9 +172,6 @@ class TestMultipleIndexTypesImport:
 
                 for t in threads:
                     t.join()
-
-                res, _, _ = table_obj.output(["count(*)"]).to_result()
-                logging.info(f"Round {round_num + 1}: End count: {res["count(star)"][0]}")
 
             part3_round(round_num)
 
