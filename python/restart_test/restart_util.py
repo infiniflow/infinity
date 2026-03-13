@@ -225,17 +225,19 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
 
+    K_NUM_ROWS = 9999
     def generate_import_file() -> str:
-        filepath = "test/data/csv/enwiki_embedding_plus_9999.csv"
+        filepath = f"test/data/csv/enwiki_embedding_plus_{MultiIndexTypesGenerator.K_NUM_ROWS}.csv"
         if os.path.exists(filepath):
             return filepath
         print(f"CSV file not found: {filepath}. Generating...")
         from tools.generate_wiki_embedding_plus import generate
-        generate()
+        generate(MultiIndexTypesGenerator.K_NUM_ROWS)
         return filepath
 
     def import_size() -> int:
-        return 9999
+        return MultiIndexTypesGenerator.K_NUM_ROWS
+
     def import_options():
         return {"file_type": "csv", "delimiter": "\t"}
 
