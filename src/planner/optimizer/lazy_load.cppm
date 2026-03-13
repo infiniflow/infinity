@@ -43,6 +43,7 @@ private:
 
     std::unordered_set<ColumnBinding> unloaded_bindings_;
     std::vector<LoadMeta> load_metas_;
+    u32 depth_{0};
 };
 
 class CleanScan : public LogicalNodeVisitor {
@@ -55,6 +56,7 @@ private:
     std::shared_ptr<std::vector<LoadMeta>> last_op_load_metas_{};
     u64 last_op_node_id_{};
     std::vector<size_t> scan_table_indexes_{};
+    u32 depth_{0};
 };
 
 export class LazyLoad : public OptimizerRule {

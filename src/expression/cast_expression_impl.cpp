@@ -146,6 +146,34 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
             switch (target.type()) {
                 case LogicalType::kVarchar:
                 case LogicalType::kEmbedding:
+                case LogicalType::kTensor:
+                case LogicalType::kMultiVector:
+                case LogicalType::kSparse:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        case LogicalType::kTensor: {
+            switch (target.type()) {
+                case LogicalType::kTensor:
+                case LogicalType::kMultiVector:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        case LogicalType::kMultiVector: {
+            switch (target.type()) {
+                case LogicalType::kMultiVector:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        case LogicalType::kTensorArray: {
+            switch (target.type()) {
+                case LogicalType::kTensorArray:
                     return true;
                 default:
                     return false;
