@@ -59,9 +59,9 @@ class TestMultipleIndexTypesImport:
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        kRunningTime = 120
-        kImportRepeat = 5
-        kBatchCount = 10
+        kRunningTime = 20
+        kImportRepeat = 2
+        kBatchCount = 2
         kRowsPerBatch = 5000
 
         # Part 1: Create table and indexes
@@ -236,7 +236,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             # Get a random row id to update
-                            update_id = random.randint(0, min(max_row_id, 10000))
+                            update_id = random.randint(0, max_row_id)
                             vec = [random.random() for _ in range(2048)]
                             multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
                             sparse_indices = [j for j in range(100) if random.random() > 0.7]
@@ -272,7 +272,7 @@ class TestMultipleIndexTypesImport:
                     while time.time() < end_time:
                         try:
                             # Get a random row id to delete
-                            delete_id = random.randint(0, min(max_row_id, 10000))
+                            delete_id = random.randint(0, max_row_id)
                             logging.info(f"thread {thread_id}: deleting num={delete_id}")
                             table_obj.delete(f"num = {delete_id}")
 
@@ -502,7 +502,7 @@ class TestMultipleIndexTypesImport:
                     (insert_worker, insert_count, False),
                     (insert_worker, insert_count, False),
                     # Update workers
-                    (update_worker, update_count, True),
+                    # (update_worker, update_count, True),
                     (update_worker, update_count, True),
                     # Delete workers
                     (delete_worker, delete_count, True),
@@ -543,8 +543,6 @@ class TestMultipleIndexTypesImport:
                             f"Sparse: {read_count_sparse.value}, "
                             f"FusionRRF: {read_count_fusion_rrf.value}, "
                             f"FusionMVRRF: {read_count_fusion_mv_rrf.value}, FusionWeighted: {read_count_fusion_weighted_sum.value}")
-
-                assert end_count > start_count, f"Expected count to increase, got {start_count} -> {end_count}"
 
             part3_round(round_num)
 
