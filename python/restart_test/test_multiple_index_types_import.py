@@ -5,62 +5,55 @@ import logging
 import time
 import numpy as np
 from threading import Thread
-from multiprocessing import Value
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory, infinity_runner_decorator_factory2
 from restart_util import MultiIndexTypesGenerator
 from common import common_values
 from infinity.common import ConflictType, SparseVector
-from infinity import index
 from infinity.connection_pool import ConnectionPool
 
 # Test configuration constants
 K_RUNNING_TIME_SECONDS = 20
 
+class Counter:
+    """Simple thread-safe counter"""
+    def __init__(self):
+        self.value = 0
+        self._lock = __import__('threading').Lock()
+
+    def increment(self):
+        with self._lock:
+            self.value += 1
+
+    def add(self, n):
+        with self._lock:
+            self.value += n
+
 
 class TestMultipleIndexTypesImport:
-    """Test multiple index types with import and restart scenarios"""
-
     @pytest.mark.slow
     @pytest.mark.parametrize(
-        "total_n, config",
+        "config, generator",
         [
-            (MultiIndexTypesGenerator.import_size(), "test/data/config/restart_test/test_insert/5.toml"),
-        ],
-    )
-    @pytest.mark.parametrize(
-        "columns, indexes, import_file, import_size, import_options",
-        [
-            (
-                MultiIndexTypesGenerator.columns(),
-                MultiIndexTypesGenerator.index(),
-                MultiIndexTypesGenerator.import_file(),
-                MultiIndexTypesGenerator.import_size(),
-                {"file_type": "csv", "delimiter": "\t"},
-            ),
+            ("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator),
         ],
     )
     def test_multiple_index_types_import_restart(
         self,
         infinity_runner: InfinityRunner,
-        total_n: int,
         config: str,
-        columns: dict,
-        indexes: list[index.IndexInfo],
-        import_file: str,
-        import_size: int,
-        import_options: dict,
+        generator,
     ):
-        """Test import data with multiple indexes and verify after restart with continuous insert + query"""
-        uri = common_values.TEST_LOCAL_HOST
-        table_name = "test_multi_index_types"
-
+        # Initialize
         infinity_runner.clear()
-
-        # Ensure CSV file exists (auto-generated if not exists)
-        import_file = MultiIndexTypesGenerator.import_file()
-        logging.info(f"Using CSV file: {import_file}")
-
+        columns = generator.columns()
+        indexes = generator.index()
+        import_file = generator.import_file()
+        import_size = generator.import_size()
+        import_options = {"file_type": "csv", "delimiter": "\t"}
+        table_name = "test_multi_index_types"
+        uri = common_values.TEST_LOCAL_HOST
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
 
         # Part 1: Create table and indexes
         @decorator
@@ -100,7 +93,7 @@ class TestMultipleIndexTypesImport:
                 logging.info(f"Import round {import_round + 1} completed in {import_duration:.2f} seconds")
 
             # Verify row count after all imports
-            expected_count = total_n * kImportRepeat
+            expected_count = import_size * kImportRepeat
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
             logging.info(f"Total rows after {kImportRepeat} imports: {count}")
@@ -141,27 +134,15 @@ class TestMultipleIndexTypesImport:
             # Verify row count after insert
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
-            # Previous import added total_n * kImportRepeat rows, now add kBatchCount * kRowsPerBatch rows
-            expected_count = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
+            expected_count = import_size * kImportRepeat + kBatchCount * kRowsPerBatch
             logging.info(f"Total rows after batch insert: {count}, expected: {expected_count}")
             assert count == expected_count, f"Expected {expected_count} rows after batch insert, got {count}"
 
         part2()
 
         # Part 3: Restart 5 times - each round runs 120s with continuous write/read
-        for round_num in range(5):
-            insert_count = Value('i', 0)
-            read_count_fulltext = Value('i', 0)
-            read_count_hnsw = Value('i', 0)
-            read_count_hnsw_mv = Value('i', 0)
-            read_count_secondary_high = Value('i', 0)
-            read_count_secondary_low = Value('i', 0)
-            read_count_sparse = Value('i', 0)
-            read_count_fusion_rrf = Value('i', 0)
-            read_count_fusion_mv_rrf = Value('i', 0)
-            read_count_fusion_weighted_sum = Value('i', 0)
-            update_count = Value('i', 0)
-            delete_count = Value('i', 0)
+        def part3(round_num: int):
+            counts = {key: Counter() for key in ["insert", "update", "delete", "fulltext", "hnsw", "secondary_high", "secondary_low", "sparse", "fusion_rrf", "fusion_weighted"]}
 
             decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner)
 
@@ -185,22 +166,22 @@ class TestMultipleIndexTypesImport:
                 threads = []
 
                 workers = [
-                    (self.insert_worker, insert_count, 2),
-                    (self.update_worker, update_count, 1, max_row_id),
-                    (self.delete_worker, delete_count, 2, max_row_id),
-                    (self.read_worker_fulltext, read_count_fulltext, 1),
-                    (self.read_worker_hnsw, read_count_hnsw, 1),
-                    (self.read_worker_secondary_high, read_count_secondary_high, 1),
-                    (self.read_worker_secondary_low, read_count_secondary_low, 1),
-                    (self.read_worker_sparse, read_count_sparse, 1),
-                    (self.read_worker_fusion_rrf, read_count_fusion_rrf, 1),
-                    (self.read_worker_fusion_weighted_sum, read_count_fusion_weighted_sum, 1),
+                    (self.insert_worker, "insert", 2),
+                    (self.update_worker, "update", 2),
+                    (self.delete_worker, "delete", 2),
+                    (self.read_worker_fulltext, "fulltext", 1),
+                    (self.read_worker_hnsw, "hnsw", 1),
+                    (self.read_worker_secondary_high, "secondary_high", 1),
+                    (self.read_worker_secondary_low, "secondary_low", 1),
+                    (self.read_worker_sparse, "sparse", 1),
+                    (self.read_worker_fusion_rrf, "fusion_rrf", 1),
+                    (self.read_worker_fusion_weighted_sum, "fusion_weighted", 1),
                 ]
 
                 thread_id = 0
-                for worker_func, count, num_threads, *extra_args in workers:
+                for worker_func, count_key, num_threads in workers:
                     for _ in range(num_threads):
-                        t = Thread(target=worker_func, args=[infinity_pool, table_name, end_time, thread_id, count, round_num] + extra_args)
+                        t = Thread(target=worker_func, args=[infinity_pool, table_name, end_time, thread_id, counts[count_key], round_num, max_row_id])
                         threads.append(t)
                         thread_id += 1
 
@@ -211,17 +192,12 @@ class TestMultipleIndexTypesImport:
                     t.join()
 
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
-                end_count = res["count(star)"][0]
-                logging.info(f"Round {round_num + 1}: End count: {end_count}, inserted {insert_count.value}, updated {update_count.value}, deleted {delete_count.value} rows")
-                logging.info(f"  Read counts - FullText: {read_count_fulltext.value}, Hnsw: {read_count_hnsw.value}, "
-                            f"HnswMV: {read_count_hnsw_mv.value}, "
-                            f"SecondaryHigh: {read_count_secondary_high.value}, "
-                            f"SecondaryLow: {read_count_secondary_low.value}, "
-                            f"Sparse: {read_count_sparse.value}, "
-                            f"FusionRRF: {read_count_fusion_rrf.value}, "
-                            f"FusionMVRRF: {read_count_fusion_mv_rrf.value}, FusionWeighted: {read_count_fusion_weighted_sum.value}")
+                logging.info(f"Round {round_num + 1}: End count: {res["count(star)"][0]}, inserted {counts['insert'].value}, updated {counts['update'].value}, deleted {counts['delete'].value} rows")
 
             part3_round(round_num)
+
+        for i in range(5):
+            part3(i)
 
         # Part 4: Cleanup
         @decorator
@@ -235,7 +211,7 @@ class TestMultipleIndexTypesImport:
         logging.info("Test completed successfully!")
 
     # Worker functions (defined as instance methods)
-    def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count, round_num):
+    def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -267,7 +243,7 @@ class TestMultipleIndexTypesImport:
 
                 local_count += 1
                 with insert_count.get_lock():
-                    insert_count.value += 1
+                    insert_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: insert failed: {e}")
             time.sleep(0.1)
@@ -302,7 +278,7 @@ class TestMultipleIndexTypesImport:
 
                 local_count += 1
                 with update_count.get_lock():
-                    update_count.value += 1
+                    update_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: update failed: {e}")
             time.sleep(0.1)
@@ -324,7 +300,7 @@ class TestMultipleIndexTypesImport:
 
                 local_count += 1
                 with delete_count.get_lock():
-                    delete_count.value += 1
+                    delete_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: delete failed: {e}")
             time.sleep(0.1)
