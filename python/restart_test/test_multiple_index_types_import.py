@@ -14,20 +14,6 @@ from infinity.connection_pool import ConnectionPool
 # Test configuration constants
 K_RUNNING_TIME_SECONDS = 20
 
-class Counter:
-    """Simple thread-safe counter"""
-    def __init__(self):
-        self.value = 0
-        self._lock = __import__('threading').Lock()
-
-    def increment(self):
-        with self._lock:
-            self.value += 1
-
-    def add(self, n):
-        with self._lock:
-            self.value += n
-
 
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
@@ -141,8 +127,6 @@ class TestMultipleIndexTypesImport:
         part2()
 
         def part3(round_num: int):
-            counts = {key: Counter() for key in ["insert", "update", "delete", "fulltext", "hnsw", "secondary_high", "secondary_low", "sparse", "fusion_rrf", "fusion_weighted"]}
-
             decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner)
 
             @decorator_round
@@ -155,33 +139,32 @@ class TestMultipleIndexTypesImport:
                 index_names = res.index_names
                 logging.info(f"Round {round_num + 1}: Indexes after restart: {index_names}")
 
-                # Get current count before insert
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
                 max_row_id = res["count(star)"][0]
                 logging.info(f"Round {round_num + 1}: Start count: {max_row_id}")
 
-                # Start parallel write/read threads
-                end_time = time.time() + K_RUNNING_TIME_SECONDS
-                threads = []
-
                 workers = [
-                    (self.insert_worker, "insert", 2),
-                    (self.update_worker, "update", 2),
-                    (self.delete_worker, "delete", 2),
-                    (self.read_worker_fulltext, "fulltext", 1),
-                    (self.read_worker_hnsw, "hnsw", 1),
-                    (self.read_worker_secondary_high, "secondary_high", 1),
-                    (self.read_worker_secondary_low, "secondary_low", 1),
-                    (self.read_worker_sparse, "sparse", 1),
-                    (self.read_worker_fusion_rrf, "fusion_rrf", 1),
-                    (self.read_worker_fusion_weighted_sum, "fusion_weighted", 1),
-                    (self.read_worker_fusion_mv_rrf, "fusion_mv_rrf", 0),
+                    (self.insert_worker, 2),
+                    (self.update_worker, 2),
+                    (self.delete_worker, 2),
+                    (self.read_worker_fulltext, 1),
+                    (self.read_worker_hnsw, 1),
+                    (self.read_worker_hnsw_mv, 0),
+                    (self.read_worker_secondary_high, 1),
+                    (self.read_worker_secondary_low, 1),
+                    (self.read_worker_sparse, 1),
+                    (self.read_worker_fusion_rrf, 1),
+                    (self.read_worker_fusion_weighted_sum, 1),
+                    (self.read_worker_fusion_mv_rrf, 0),
                 ]
 
+                end_time = time.time() + K_RUNNING_TIME_SECONDS
                 thread_id = 0
-                for worker_func, count_key, num_threads in workers:
+                threads = []
+                for worker_func, num_threads in workers:
                     for _ in range(num_threads):
-                        t = Thread(target=worker_func, args=[infinity_pool, table_name, end_time, thread_id, counts[count_key], round_num, max_row_id])
+                        args = [infinity_pool, table_name, end_time, thread_id, round_num, max_row_id]
+                        t = Thread(target=worker_func, args=args)
                         threads.append(t)
                         thread_id += 1
 
@@ -192,7 +175,7 @@ class TestMultipleIndexTypesImport:
                     t.join()
 
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
-                logging.info(f"Round {round_num + 1}: End count: {res["count(star)"][0]}, inserted {counts['insert'].value}, updated {counts['update'].value}, deleted {counts['delete'].value} rows")
+                logging.info(f"Round {round_num + 1}: End count: {res["count(star)"][0]}")
 
             part3_round(round_num)
 
@@ -211,7 +194,7 @@ class TestMultipleIndexTypesImport:
         logging.info("Test completed successfully!")
 
     # Worker functions
-    def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count, round_num, max_row_id):
+    def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -242,16 +225,14 @@ class TestMultipleIndexTypesImport:
                 }])
 
                 local_count += 1
-                with insert_count.get_lock():
-                    insert_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: insert failed: {e}")
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, inserted {local_count} rows")
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, executed {local_count} times")
 
-    def update_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, update_count, max_row_id, round_num):
+    def update_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -277,16 +258,14 @@ class TestMultipleIndexTypesImport:
                 })
 
                 local_count += 1
-                with update_count.get_lock():
-                    update_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: update failed: {e}")
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: update done, updated {local_count} rows")
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: update done, executed {local_count} times")
 
-    def delete_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, delete_count, max_row_id, round_num):
+    def delete_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -299,16 +278,14 @@ class TestMultipleIndexTypesImport:
                 table_obj.delete(f"num = {delete_id}")
 
                 local_count += 1
-                with delete_count.get_lock():
-                    delete_count.increment()
             except Exception as e:
                 logging.warning(f"thread {thread_id}: delete failed: {e}")
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: delete done, deleted {local_count} rows")
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: delete done, executed {local_count} times")
 
-    def read_worker_fulltext(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_fulltext(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -325,10 +302,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (FullText): read done, {local_count} queries")
 
-    def read_worker_hnsw(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_hnsw(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -345,10 +321,28 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw): read done, {local_count} queries")
 
-    def read_worker_secondary_high(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_hnsw_mv(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = table_obj.output(["num", "multi_vector_col"]).match_dense("multi_vector_col", [[0.5] * 1024] * 2, "float", "l2", 5).to_pl()
+                if len(result) != 5:
+                    raise Exception(f"HnswMV query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw MV): read done, {local_count} queries")
+
+    def read_worker_secondary_high(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -365,10 +359,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary High): read done, {local_count} queries")
 
-    def read_worker_sparse(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_sparse(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -386,10 +379,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
 
-    def read_worker_secondary_low(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_secondary_low(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -406,10 +398,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
 
-    def read_worker_fusion_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_fusion_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -431,10 +422,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
 
-    def read_worker_fusion_weighted_sum(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+    def read_worker_fusion_weighted_sum(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -456,10 +446,9 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
 
-    def read_worker_fusion_mv_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num, max_row_id):
+    def read_worker_fusion_mv_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
@@ -482,5 +471,4 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion MV RRF): read done, {local_count} queries")
