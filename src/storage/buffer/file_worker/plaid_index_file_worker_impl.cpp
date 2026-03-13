@@ -176,4 +176,16 @@ void PlaidIndexFileWorker::FreeFromMmapImpl() {
     mmap_data_ = nullptr;
 }
 
+size_t PlaidIndexFileWorker::GetMemoryCost() const {
+    // Return the actual memory cost of the loaded PlaidIndex
+    if (data_) {
+        auto *index = static_cast<PlaidIndex *>(data_);
+        return index->MemUsage();
+    } else if (mmap_data_) {
+        auto *index = reinterpret_cast<PlaidIndex *>(mmap_data_);
+        return index->MemUsage();
+    }
+    return 0;
+}
+
 } // namespace infinity
