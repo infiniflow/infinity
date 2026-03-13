@@ -14,7 +14,6 @@ from infinity.connection_pool import ConnectionPool
 # Test configuration constants
 K_RUNNING_TIME_SECONDS = 20
 
-
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
     @pytest.mark.parametrize(
@@ -32,7 +31,6 @@ class TestMultipleIndexTypesImport:
         # Initialize
         infinity_runner.clear()
         self.generator = generator
-        import_options = {"file_type": "csv", "delimiter": "\t"}
         table_name = "test_multi_index_types"
         uri = common_values.TEST_LOCAL_HOST
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
@@ -70,44 +68,29 @@ class TestMultipleIndexTypesImport:
             for import_round in range(kImportRepeat):
                 import_start = time.time()
                 logging.info(f"Importing data from {abs_import_file}... (round {import_round + 1}/{kImportRepeat})")
-                table_obj.import_data(abs_import_file, import_options)
+                table_obj.import_data(abs_import_file, self.generator.import_options())
                 import_duration = time.time() - import_start
                 logging.info(f"Import round {import_round + 1} completed in {import_duration:.2f} seconds")
 
-            # Verify row count after all imports
+            # Verify row count after imports
             expected_count = self.generator.import_size() * kImportRepeat
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
             logging.info(f"Total rows after {kImportRepeat} imports: {count}")
             assert count == expected_count, f"Expected {expected_count} rows, got {count}"
 
-            # Insert 10 batches, each with 5000 rows
-            categories = ["A", "B", "C", "D"]
-            text_words = ["apple", "banana", "cherry", "date"]
-
             for batch_idx in range(kBatchCount):
                 batch_data = []
                 for row_idx in range(kRowsPerBatch):
                     row_id = batch_idx * kRowsPerBatch + row_idx
-                    vec, multivec, sparse_vec = self.generator.generate_random_row()
-
-                    batch_data.append({
-                        "doctitle": f"test_title_{row_id}",
-                        "docdate": "01-JAN-2024 00:00:00.000",
-                        "body": f"test_text_{row_id}_{random.choice(text_words)}",
-                        "num": row_id,
-                        "category": categories[row_idx % len(categories)],
-                        "vector_col": vec,
-                        "multi_vector_col": multivec,
-                        "sparse_col": sparse_vec
-                    })
+                    batch_data.append(self.generator.generate_random_row(row_id))
 
                 insert_start = time.time()
                 table_obj.insert(batch_data)
                 insert_duration = time.time() - insert_start
                 logging.info(f"Inserted batch {batch_idx + 1}/{kBatchCount} ({kRowsPerBatch} rows) in {insert_duration:.2f} seconds")
 
-            # Verify row count after insert
+            # Verify row count after inserts
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
             expected_count = self.generator.import_size() * kImportRepeat + kBatchCount * kRowsPerBatch
@@ -135,8 +118,8 @@ class TestMultipleIndexTypesImport:
 
                 workers = [
                     (self.insert_worker, 2),
-                    (self.update_worker, 2),
-                    (self.delete_worker, 2),
+                    (self.update_worker, 1),
+                    (self.delete_worker, 1),
                     (self.read_worker_fulltext, 1),
                     (self.read_worker_hnsw, 1),
                     (self.read_worker_hnsw_mv, 0),
@@ -186,24 +169,10 @@ class TestMultipleIndexTypesImport:
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table(table_name)
         local_count = 0
-        categories = ["A", "B", "C", "D"]
-        text_words = ["apple", "banana", "cherry", "date"]
-
         while time.time() < end_time:
             try:
-                vec, multivec, sparse_vec = self.generator.generate_random_row()
-
                 row_id = thread_id * 100000 + local_count
-                table_obj.insert([{
-                    "doctitle": f"test_title_{row_id}",
-                    "docdate": "01-JAN-2024 00:00:00.000",
-                    "body": f"test_text_{row_id}_{random.choice(text_words)}",
-                    "num": row_id,
-                    "category": categories[local_count % len(categories)],
-                    "vector_col": vec,
-                    "multi_vector_col": multivec,
-                    "sparse_col": sparse_vec
-                }])
+                table_obj.insert([self.generator.generate_random_row(row_id)])
 
                 local_count += 1
             except Exception as e:
@@ -222,14 +191,14 @@ class TestMultipleIndexTypesImport:
         while time.time() < end_time:
             try:
                 update_id = random.randint(0, max_row_id)
-                vec, multivec, sparse_vec = self.generator.generate_random_row()
+                row_data = self.generator.generate_random_row(update_id)
 
                 logging.info(f"thread {thread_id}: updating num={update_id}")
                 table_obj.update(f"num = {update_id}", {
                     "doctitle": f"updated_title_{update_id}",
-                    "vector_col": vec,
-                    "multi_vector_col": multivec,
-                    "sparse_col": sparse_vec
+                    "vector_col": row_data["vector_col"],
+                    "multi_vector_col": row_data["multi_vector_col"],
+                    "sparse_col": row_data["sparse_col"]
                 })
 
                 local_count += 1

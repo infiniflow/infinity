@@ -236,9 +236,14 @@ class MultiIndexTypesGenerator:
 
     def import_size() -> int:
         return 9999
+    def import_options():
+        return {"file_type": "csv", "delimiter": "\t"}
+
+    K_CATEGORIES = ["A", "B", "C", "D"]
+    K_TEXT_WORDS = ["apple", "banana", "cherry", "date"]
 
     @staticmethod
-    def generate_random_row():
+    def generate_random_row(num: int):
         vec = np.array([random.random() for _ in range(2048)], dtype=np.float32)
         multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
         sparse_indices = [j for j in range(1024) if random.random() > 0.9]
@@ -246,7 +251,17 @@ class MultiIndexTypesGenerator:
             sparse_indices = [0, 1, 2]
         sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
         sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
-        return vec, multivec, sparse_vec
+
+        return {
+            "doctitle": f"test_title_{num}",
+            "docdate": "01-JAN-2024 00:00:00.000",
+            "body": f"test_text_{num}_{random.choice(MultiIndexTypesGenerator.K_TEXT_WORDS)}",
+            "num": num,
+            "category": MultiIndexTypesGenerator.K_CATEGORIES[num % len(MultiIndexTypesGenerator.K_CATEGORIES)],
+            "vector_col": vec,
+            "multi_vector_col": multivec,
+            "sparse_col": sparse_vec
+        }
 
 
 if __name__ == "__main__":
