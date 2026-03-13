@@ -117,10 +117,10 @@ class TestMultipleIndexTypesImport:
                     row_id = batch_idx * kRowsPerBatch + row_idx
                     vec = [random.random() for _ in range(2048)]
                     multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
-                    sparse_indices = [j for j in range(100) if random.random() > 0.7]
+                    sparse_indices = [j for j in range(1024) if random.random() > 0.9]
                     if not sparse_indices:
                         sparse_indices = [0, 1, 2]
-                    sparse_values = [random.random() for _ in range(len(sparse_indices))]
+                    sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
                     sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
 
                     batch_data.append({
@@ -199,10 +199,10 @@ class TestMultipleIndexTypesImport:
                         try:
                             vec = [random.random() for _ in range(2048)]
                             multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                            sparse_indices = [j for j in range(100) if random.random() > 0.7]
+                            sparse_indices = [j for j in range(1024) if random.random() > 0.9]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
-                            sparse_values = [random.random() for _ in range(len(sparse_indices))]
+                            sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
                             sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
 
                             row_id = thread_id * 100000 + local_count
@@ -225,7 +225,7 @@ class TestMultipleIndexTypesImport:
                         time.sleep(0.1)
 
                     connection_pool.release_conn(infinity_obj)
-                    logging.info(f"Round {round_num + 1} - thread {thread_id}: write done, inserted {local_count} rows")
+                    logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, inserted {local_count} rows")
 
                 def update_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, update_count, max_row_id):
                     infinity_obj = connection_pool.get_conn()
@@ -239,10 +239,10 @@ class TestMultipleIndexTypesImport:
                             update_id = random.randint(0, max_row_id)
                             vec = [random.random() for _ in range(2048)]
                             multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                            sparse_indices = [j for j in range(100) if random.random() > 0.7]
+                            sparse_indices = [j for j in range(1024) if random.random() > 0.9]
                             if not sparse_indices:
                                 sparse_indices = [0, 1, 2]
-                            sparse_values = [random.random() for _ in range(len(sparse_indices))]
+                            sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
                             sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
 
                             logging.info(f"thread {thread_id}: updating num={update_id}")
@@ -503,10 +503,10 @@ class TestMultipleIndexTypesImport:
                     (insert_worker, insert_count, False),
                     # Update workers
                     # (update_worker, update_count, True),
-                    # (update_worker, update_count, True),
+                    (update_worker, update_count, True),
                     # Delete workers
-                    # (delete_worker, delete_count, True),
-                    # (delete_worker, delete_count, True),
+                    (delete_worker, delete_count, True),
+                    (delete_worker, delete_count, True),
                     # Read workers
                     (read_worker_fulltext, read_count_fulltext, False),
                     (read_worker_hnsw, read_count_hnsw, False),
