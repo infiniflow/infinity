@@ -28,7 +28,10 @@ class ConnectionPool(object):
             self._create_conn()
 
     def __del__(self):
-        self.destroy()
+        try:
+            self.destroy()
+        except Exception:
+            pass  # Ignore errors in destructor
 
     def _create_conn(self):
         infinity_coon = infinity.connect(self.uri_)
@@ -54,6 +57,11 @@ class ConnectionPool(object):
             logging.debug("release_conn")
 
     def destroy(self):
+        if not hasattr(self, 'free_pool_'):
+            return
         for conn in iter(self.free_pool_):
-            conn.disconnect()
+            try:
+                conn.disconnect()
+            except Exception:
+                pass  # Ignore errors when disconnecting
         self.free_pool_.clear()

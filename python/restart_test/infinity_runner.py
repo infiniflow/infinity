@@ -106,12 +106,14 @@ class InfinityRunner:
         return_code = self.process.wait()
         self.logger.info(f"return code: {return_code}")
         self.process = None
+        # Wait a moment for the port to be released
+        time.sleep(1)
 
     def connected(self):
         return self.process is not None
 
     def connect(self, uri: str):
-        try_n = 15
+        try_n = 30
         infinity_obj = None
         count = 0
         while True:
@@ -132,7 +134,7 @@ class InfinityRunner:
                     else:
                         raise e
                 else:
-                    self.logger.warn(str(e))
+                    self.logger.warning(str(e))
                 sleep_time = 1 * (count + 1)
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -149,7 +151,7 @@ class InfinityRunner:
         return infinity_obj
 
     def connect_pool(self, uri: str):
-        try_n = 15
+        try_n = 30
         infinity_pool = None
         for i in range(try_n):
             try:
@@ -169,7 +171,7 @@ class InfinityRunner:
                     else:
                         raise e
                 else:
-                    self.logger.warn(str(e))
+                    self.logger.warning(str(e))
                 sleep_time = 1 * (i + 1)
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -239,16 +241,26 @@ def infinity_runner_decorator_factory2(
             infinity_runner.init(config_path)
             infinity_pool = infinity_runner.connect_pool(uri)
             try:
-                return f(infinity_pool, *args, **kwargs)
+                result = f(infinity_pool, *args, **kwargs)
+                infinity_runner.logger.info(f"Decorated function {f.__name__} completed successfully")
+                return result
+            except Exception as e:
+                infinity_runner.logger.warning(f"Decorated function {f.__name__} raised exception: {e}")
+                raise
             finally:
+                infinity_runner.logger.info(f"Starting cleanup for {f.__name__}")
                 try:
                     infinity_pool.destroy()
-                except Exception:
+                    infinity_runner.logger.info(f"Pool destroyed for {f.__name__}")
+                except Exception as e:
+                    infinity_runner.logger.warning(f"Pool destroy exception (ignored): {e}")
                     if not shutdown_out:
                         raise
                 try:
                     infinity_runner.uninit(kill, terminate_timeout)
-                except Exception:
+                    infinity_runner.logger.info(f"Uninit completed for {f.__name__}")
+                except Exception as e:
+                    infinity_runner.logger.warning(f"Uninit exception (check_kill={check_kill}): {e}")
                     if check_kill:
                         raise
 
