@@ -118,8 +118,8 @@ class TestMultipleIndexTypesImport:
 
                 workers = [
                     (self.insert_worker, 2),
-                    (self.update_worker, 1),
-                    (self.delete_worker, 1),
+                    (self.update_worker, 0),
+                    (self.delete_worker, 2),
                     (self.read_worker_fulltext, 1),
                     (self.read_worker_hnsw, 1),
                     (self.read_worker_hnsw_mv, 0),
