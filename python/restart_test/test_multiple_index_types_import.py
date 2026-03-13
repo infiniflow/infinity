@@ -140,7 +140,6 @@ class TestMultipleIndexTypesImport:
 
         part2()
 
-        # Part 3: Restart 5 times - each round runs 120s with continuous write/read
         def part3(round_num: int):
             counts = {key: Counter() for key in ["insert", "update", "delete", "fulltext", "hnsw", "secondary_high", "secondary_low", "sparse", "fusion_rrf", "fusion_weighted"]}
 
@@ -176,6 +175,7 @@ class TestMultipleIndexTypesImport:
                     (self.read_worker_sparse, "sparse", 1),
                     (self.read_worker_fusion_rrf, "fusion_rrf", 1),
                     (self.read_worker_fusion_weighted_sum, "fusion_weighted", 1),
+                    (self.read_worker_fusion_mv_rrf, "fusion_mv_rrf", 0),
                 ]
 
                 thread_id = 0
@@ -210,7 +210,7 @@ class TestMultipleIndexTypesImport:
 
         logging.info("Test completed successfully!")
 
-    # Worker functions (defined as instance methods)
+    # Worker functions
     def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database("default_db")
@@ -325,8 +325,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (FullText): read done, {local_count} queries")
 
     def read_worker_hnsw(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -346,8 +345,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw): read done, {local_count} queries")
 
     def read_worker_secondary_high(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -367,8 +365,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary High): read done, {local_count} queries")
 
     def read_worker_sparse(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -389,8 +386,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
 
     def read_worker_secondary_low(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -410,8 +406,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
 
     def read_worker_fusion_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -436,8 +431,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
 
     def read_worker_fusion_weighted_sum(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
@@ -462,6 +456,31 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        with read_count.get_lock():
-            read_count.value += local_count
+        read_count.add(local_count)
         logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
+
+    def read_worker_fusion_mv_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num, max_row_id):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = (table_obj
+                 .output(["num", "body", "vector_col", "multi_vector_col"])
+                 .match_text("body", "test_text", 5)
+                 .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
+                 .match_dense("multi_vector_col", [[0.5] * 1024] * 2, "float", "l2", 5)
+                 .fusion(method='rrf', topn=5)
+                 .to_pl())
+                if len(result) != 5:
+                    raise Exception(f"FusionMVRRF query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        read_count.add(local_count)
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion MV RRF): read done, {local_count} queries")
