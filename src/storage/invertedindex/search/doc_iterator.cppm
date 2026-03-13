@@ -97,6 +97,11 @@ public:
     // for minimum_should_match parameter
     virtual u32 MatchCount() const = 0;
 
+    // Hint for minimum_should_match requirement (optional override)
+    // When set > 0, iterator should try to skip documents/children that cannot
+    // possibly satisfy the minimum_should_match constraint
+    virtual void SetMinimumShouldMatchHint(u32 minimum_should_match) { (void)minimum_should_match; }
+
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 
