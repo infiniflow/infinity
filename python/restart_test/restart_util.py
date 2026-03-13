@@ -3,7 +3,6 @@ from infinity import index
 import csv
 import json
 import numpy as np
-import random
 from infinity.common import SparseVector
 
 
@@ -15,6 +14,7 @@ class SimpleEmbeddingGenerator:
         def gen(insert: int):
             for i in range(insert):
                 yield [i, [0.1, 0.2, 0.3, 0.4]]
+
         return gen
 
     def index():
@@ -38,6 +38,7 @@ class SimpleVarcharGenerator:
                     yield [i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"]
                 else:
                     yield [i, "test"]
+
         return gen
 
     def index():
@@ -55,6 +56,7 @@ class SimpleTensorGenerator:
                     yield [i, [0.1, 0.2, 0.3, 0.4]]
                 else:
                     yield [i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]]
+
         return gen
 
 
@@ -83,6 +85,7 @@ class EnwikiGenerator:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -162,6 +165,7 @@ class LChYDataGenerato:
                     i += 1
                     if i >= insert_n:
                         break
+
         return gen
 
     def index():
@@ -203,7 +207,6 @@ class LChYDataGenerato:
 
 
 class MultiIndexTypesGenerator:
-
     DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
     DEFAULT_NUM_ROWS = 9999
 

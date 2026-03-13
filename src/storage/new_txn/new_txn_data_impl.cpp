@@ -983,6 +983,11 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const std::vector<BlockOffse
         for (BlockOffset block_offset : block_offsets) {
             status = block_version->Delete(block_offset, commit_ts);
             if (!status.ok()) {
+                // During WAL replay, ignore "delete twice" conflicts since concurrent
+                // transactions may have deleted the same row before crash
+                if (IsReplay() && status.code() == ErrorCode::kTxnWWConflict) {
+                    continue;
+                }
                 return status;
             }
             undo_block_offsets.push_back(block_offset);

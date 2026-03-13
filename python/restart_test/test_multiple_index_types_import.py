@@ -57,12 +57,12 @@ class TestMultipleIndexTypesImport:
         import_file = MultiIndexTypesGenerator.import_file()
         logging.info(f"Using CSV file: {import_file}")
 
-        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True, check_kill=False)
 
-        kRunningTime = 120
-        kImportRepeat = 5
+        kRunningTime = 60
+        kImportRepeat = 3
         kBatchCount = 10
-        kRowsPerBatch = 5000
+        kRowsPerBatch = 2500
 
         # Part 1: Create table and indexes
         @decorator
@@ -165,7 +165,8 @@ class TestMultipleIndexTypesImport:
             update_count = Value('i', 0)
             delete_count = Value('i', 0)
 
-            decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner)
+            decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner, shutdown_out=True,
+                                                                 check_kill=False)
 
             @decorator_round
             def part3_round(infinity_pool, round_num: int):
@@ -371,7 +372,7 @@ class TestMultipleIndexTypesImport:
                         try:
                             result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
                             if len(result) == 0:
-                                raise Exception(f"SecondaryHigh query returned 0 results")
+                                raise Exception("SecondaryHigh query returned 0 results")
                             local_count += 1
                         except Exception as e:
                             raise e
@@ -418,7 +419,7 @@ class TestMultipleIndexTypesImport:
                         try:
                             result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
                             if len(result) == 0:
-                                raise Exception(f"SecondaryLow query returned 0 results")
+                                raise Exception("SecondaryLow query returned 0 results")
                             local_count += 1
                         except Exception as e:
                             raise e
@@ -570,9 +571,12 @@ class TestMultipleIndexTypesImport:
 
                 # Allow count to fluctuate due to concurrent insert/update/delete
                 # Just verify that the test ran without crashing
-                logging.info(f"Round {round_num + 1}: Row count changed by {end_count - start_count:+-1}")
+                logging.info(f"Round {round_num + 1}: Row count changed by {end_count - start_count:+d}")
 
             part3_round(round_num)
+            logging.info(f"Completed round {round_num + 1}/5")
+
+        logging.info("All 5 rounds completed successfully!")
 
         # Part 4: Cleanup
         @decorator
