@@ -78,8 +78,8 @@ BlockMaxWandIterator::BlockMaxWandIterator(std::vector<std::unique_ptr<DocIterat
     }
     indices_valid_ = true;
 
-    // Initialize MSM optimization structures
-    block_min_match_counts_.resize(num_iterators, 0);
+    // TODO: Initialize block_min_match_counts_ when MSM-aware block pruning is implemented
+    // Currently reserved for future optimization to estimate match counts per block
 
     UpdateScoreUpperBoundPrefixSums();
 }

@@ -60,21 +60,18 @@ private:
 export template <std::derived_from<MultiDocIterator> T>
 class MinimumShouldMatchWrapper final : public T {
     u32 minimum_should_match_ = 0;
-    bool hint_set_ = false;
 
 public:
     MinimumShouldMatchWrapper(std::vector<std::unique_ptr<DocIterator>> &&iterators, const u32 minimum_should_match)
         : T(std::move(iterators)), minimum_should_match_(minimum_should_match) {
+        // Set MSM hint on the wrapper itself (T) to enable MSM-aware optimizations
+        this->SetMinimumShouldMatchHint(minimum_should_match_);
         // Propagate MSM hint to underlying iterators for potential optimization
         SetMSMHintToChildren();
     }
     ~MinimumShouldMatchWrapper() override = default;
 
     bool Next(RowID doc_id) override {
-        if (!hint_set_) {
-            SetMSMHintToChildren();
-            hint_set_ = true;
-        }
         for (; T::Next(doc_id); doc_id = this->doc_id_ + 1) {
             if (this->MatchCount() >= minimum_should_match_) {
                 return true;

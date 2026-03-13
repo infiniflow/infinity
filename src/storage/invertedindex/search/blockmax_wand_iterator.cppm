@@ -85,8 +85,9 @@ private:
     std::vector<std::tuple<u32, u64, float>> pivot_history_; // pivot, row_id, score
 
     // Minimum should match optimization
-    u32 minimum_should_match_hint_ = 0;       // Hint from wrapper (0 = no hint)
-    std::vector<u32> block_min_match_counts_; // For each iterator: min docs that could match in current block
+    u32 minimum_should_match_hint_ = 0; // Hint from wrapper (0 = no hint)
+    // TODO: block_min_match_counts_ is reserved for future MSM-aware block pruning optimization
+    // Currently not used but kept for potential future enhancement to estimate match counts per block
 
     // debug info
     u32 next_sort_cnt_ = 0;
