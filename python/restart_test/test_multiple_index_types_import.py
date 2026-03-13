@@ -56,9 +56,9 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 3
-            kBatchCount = 10
-            kRowsPerBatch = 2500
+            kImportRepeat = 20
+            kBatchCount = 20
+            kRowsPerBatch = 5000
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
@@ -118,7 +118,7 @@ class TestMultipleIndexTypesImport:
 
                 workers = [
                     (self.insert_worker, 2),
-                    (self.update_worker, 0),
+                    (self.update_worker, 2),
                     (self.delete_worker, 2),
                     (self.read_worker_fulltext, 1),
                     (self.read_worker_hnsw, 1),

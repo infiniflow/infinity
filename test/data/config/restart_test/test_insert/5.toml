@@ -13,7 +13,8 @@ cleanup_interval         = "3s"
 compact_interval         = "3s"
 
 [buffer]
-buffer_manager_size = "1024GB"
+mem_index_capacity = 8192
+buffer_manager_size = "4GB"
 
 [wal]
 checkpoint_interval = "3s"
