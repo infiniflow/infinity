@@ -11,9 +11,9 @@ log_level = "info"
 optimize_interval        = "3s"
 cleanup_interval         = "3s"
 compact_interval         = "3s"
+mem_index_capacity       = 8192
 
 [buffer]
-mem_index_capacity = 8192
 buffer_manager_size = "4GB"
 
 [wal]
