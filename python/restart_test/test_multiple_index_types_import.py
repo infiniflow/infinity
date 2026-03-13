@@ -13,6 +13,9 @@ from infinity.common import ConflictType, SparseVector
 from infinity import index
 from infinity.connection_pool import ConnectionPool
 
+# Test configuration constants
+K_RUNNING_TIME_SECONDS = 20
+
 
 class TestMultipleIndexTypesImport:
     """Test multiple index types with import and restart scenarios"""
@@ -59,11 +62,6 @@ class TestMultipleIndexTypesImport:
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        kRunningTime = 20
-        kImportRepeat = 10
-        kBatchCount = 10
-        kRowsPerBatch = 5000
-
         # Part 1: Create table and indexes
         @decorator
         def part1(infinity_obj):
@@ -75,11 +73,8 @@ class TestMultipleIndexTypesImport:
 
             for idx in indexes:
                 idx_name = f"idx_{idx.target_name}"
-                idx_start = time.time()
                 logging.info(f"Creating index {idx_name}...")
                 table_obj.create_index(idx_name, idx)
-                idx_duration = time.time() - idx_start
-                logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
 
             logging.info(f"Created table and {len(indexes)} indexes")
 
@@ -88,6 +83,10 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import data
         @decorator
         def part2(infinity_obj):
+            kImportRepeat = 10
+            kBatchCount = 20
+            kRowsPerBatch = 5000
+
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
 
@@ -178,354 +177,32 @@ class TestMultipleIndexTypesImport:
 
                 # Get current count before insert
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
-                start_count = res["count(star)"][0]
-                logging.info(f"Round {round_num + 1}: Start count: {start_count}")
+                max_row_id = res["count(star)"][0]
+                logging.info(f"Round {round_num + 1}: Start count: {max_row_id}")
 
                 # Start parallel write/read threads
+                end_time = time.time() + K_RUNNING_TIME_SECONDS
                 threads = []
-                end_time = time.time() + kRunningTime
 
-                max_row_id = total_n * kImportRepeat + kBatchCount * kRowsPerBatch
-
-                def insert_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-                    categories = ["A", "B", "C", "D"]
-                    text_words = ["apple", "banana", "cherry", "date"]
-
-                    while time.time() < end_time:
-                        try:
-                            vec = [random.random() for _ in range(2048)]
-                            multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                            sparse_indices = [j for j in range(1024) if random.random() > 0.9]
-                            if not sparse_indices:
-                                sparse_indices = [0, 1, 2]
-                            sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
-                            sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
-
-                            row_id = thread_id * 100000 + local_count
-                            table_obj.insert([{
-                                "doctitle": f"test_title_{row_id}",
-                                "docdate": "01-JAN-2024 00:00:00.000",
-                                "body": f"test_text_{row_id}_{random.choice(text_words)}",
-                                "num": row_id,
-                                "category": categories[local_count % len(categories)],
-                                "vector_col": vec,
-                                "multi_vector_col": multivec,
-                                "sparse_col": sparse_vec
-                            }])
-
-                            local_count += 1
-                            with insert_count.get_lock():
-                                insert_count.value += 1
-                        except Exception as e:
-                            logging.warning(f"thread {thread_id}: insert failed: {e}")
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, inserted {local_count} rows")
-
-                def update_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, update_count, max_row_id):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            # Get a random row id to update
-                            update_id = random.randint(0, max_row_id)
-                            vec = [random.random() for _ in range(2048)]
-                            multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                            sparse_indices = [j for j in range(1024) if random.random() > 0.9]
-                            if not sparse_indices:
-                                sparse_indices = [0, 1, 2]
-                            sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
-                            sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
-
-                            logging.info(f"thread {thread_id}: updating num={update_id}")
-                            table_obj.update(f"num = {update_id}", {
-                                "doctitle": f"updated_title_{update_id}",
-                                "vector_col": vec,
-                                "multi_vector_col": multivec,
-                                "sparse_col": sparse_vec
-                            })
-
-                            local_count += 1
-                            with update_count.get_lock():
-                                update_count.value += 1
-                        except Exception as e:
-                            logging.warning(f"thread {thread_id}: update failed: {e}")
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    logging.info(f"Round {round_num + 1} - thread {thread_id}: update done, updated {local_count} rows")
-
-                def delete_worker(connection_pool: ConnectionPool, table_name, end_time, thread_id, delete_count, max_row_id):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            # Get a random row id to delete
-                            delete_id = random.randint(0, max_row_id)
-                            logging.info(f"thread {thread_id}: deleting num={delete_id}")
-                            table_obj.delete(f"num = {delete_id}")
-
-                            local_count += 1
-                            with delete_count.get_lock():
-                                delete_count.value += 1
-                        except Exception as e:
-                            logging.warning(f"thread {thread_id}: delete failed: {e}")
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    logging.info(f"Round {round_num + 1} - thread {thread_id}: delete done, deleted {local_count} rows")
-
-                def read_worker_fulltext(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = table_obj.output(["num", "body"]).match_text("body", "test_text", 5).to_pl()
-                            if len(result) != 5:
-                                raise Exception(f"FullText query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (FullText): read done, {local_count} queries")
-
-                def read_worker_hnsw(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = table_obj.output(["num", "vector_col"]).match_dense("vector_col", [0.5] * 2048, "float", "l2", 5).to_pl()
-                            if len(result) != 5:
-                                raise Exception(f"Hnsw query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw): read done, {local_count} queries")
-
-                def read_worker_hnsw_mv(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            query_vec = [0.5] * 2048
-                            result, _ = table_obj.output(["num", "multi_vector_col"]).match_dense("multi_vector_col", query_vec, "float", "l2", 5).to_pl()
-                            if len(result) != 5:
-                                raise Exception(f"HnswMV query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw MV): read done, {local_count} queries")
-
-                def read_worker_secondary_high(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
-                            if len(result) == 0:
-                                raise Exception(f"SecondaryHigh query returned 0 results")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary High): read done, {local_count} queries")
-
-                def read_worker_sparse(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            query_sparse = SparseVector(indices=[0, 5, 10, 15], values=[1.0, 1.0, 1.0, 1.0])
-                            result, _ = table_obj.output(["num", "sparse_col"]).match_sparse("sparse_col", query_sparse, "ip", 5).to_pl()
-                            if len(result) != 5:
-                                raise Exception(f"SparseBMP query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
-
-                def read_worker_secondary_low(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
-                            if len(result) == 0:
-                                raise Exception(f"SecondaryLow query returned 0 results")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
-
-                def read_worker_fusion_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = (table_obj
-                             .output(["num", "body", "vector_col"])
-                             .match_text("body", "test_text", 5)
-                             .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
-                             .fusion(method='rrf', topn=5)
-                             .to_pl())
-                            if len(result) != 5:
-                                raise Exception(f"FusionRRF query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
-
-                def read_worker_fusion_mv_rrf(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            query_vec = [0.5] * 2048
-                            query_mv = [0.5] * 2048
-                            result, _ = (table_obj
-                             .output(["num", "vector_col", "multi_vector_col"])
-                             .match_dense("vector_col", query_vec, "float", "l2", 5)
-                             .match_dense("multi_vector_col", query_mv, "float", "l2", 5)
-                             .fusion(method='rrf', topn=5)
-                             .to_pl())
-                            if len(result) != 5:
-                                raise Exception(f"FusionMV query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion MV RRF): read done, {local_count} queries")
-
-                def read_worker_fusion_weighted_sum(connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count):
-                    infinity_obj = connection_pool.get_conn()
-                    db_obj = infinity_obj.get_database("default_db")
-                    table_obj = db_obj.get_table(table_name)
-                    local_count = 0
-
-                    while time.time() < end_time:
-                        try:
-                            result, _ = (table_obj
-                             .output(["num", "body", "vector_col"])
-                             .match_text("body", "test_text", 5)
-                             .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
-                             .fusion(method='weighted_sum', topn=5, fusion_params={"weights": "0.6,0.4"})
-                             .to_pl())
-                            if len(result) != 5:
-                                raise Exception(f"FusionWeighted query expected 5 results, got {len(result)}")
-                            local_count += 1
-                        except Exception as e:
-                            raise e
-                        time.sleep(0.1)
-
-                    connection_pool.release_conn(infinity_obj)
-                    with read_count.get_lock():
-                        read_count.value += local_count
-                    logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
-
-                thread_id = 0
-
-                # All workers: (worker_func, count, has_max_row_id)
                 workers = [
-                    # Insert workers
-                    (insert_worker, insert_count, False),
-                    (insert_worker, insert_count, False),
-                    # Update workers
-                    # (update_worker, update_count, True),
-                    (update_worker, update_count, True),
-                    # Delete workers
-                    (delete_worker, delete_count, True),
-                    (delete_worker, delete_count, True),
-                    # Read workers
-                    (read_worker_fulltext, read_count_fulltext, False),
-                    (read_worker_hnsw, read_count_hnsw, False),
-                    # (read_worker_hnsw_mv, read_count_hnsw_mv, False),
-                    (read_worker_secondary_high, read_count_secondary_high, False),
-                    (read_worker_secondary_low, read_count_secondary_low, False),
-                    (read_worker_sparse, read_count_sparse, False),
-                    (read_worker_fusion_rrf, read_count_fusion_rrf, False),
-                    # (read_worker_fusion_mv_rrf, read_count_fusion_mv_rrf, False),
-                    (read_worker_fusion_weighted_sum, read_count_fusion_weighted_sum, False),
+                    (self.insert_worker, insert_count, 2),
+                    (self.update_worker, update_count, 1, max_row_id),
+                    (self.delete_worker, delete_count, 2, max_row_id),
+                    (self.read_worker_fulltext, read_count_fulltext, 1),
+                    (self.read_worker_hnsw, read_count_hnsw, 1),
+                    (self.read_worker_secondary_high, read_count_secondary_high, 1),
+                    (self.read_worker_secondary_low, read_count_secondary_low, 1),
+                    (self.read_worker_sparse, read_count_sparse, 1),
+                    (self.read_worker_fusion_rrf, read_count_fusion_rrf, 1),
+                    (self.read_worker_fusion_weighted_sum, read_count_fusion_weighted_sum, 1),
                 ]
 
-                for worker, count, has_max_row_id in workers:
-                    if has_max_row_id:
-                        t = Thread(target=worker, args=[infinity_pool, table_name, end_time, thread_id, count, max_row_id])
-                    else:
-                        t = Thread(target=worker, args=[infinity_pool, table_name, end_time, thread_id, count])
-                    threads.append(t)
-                    thread_id += 1
+                thread_id = 0
+                for worker_func, count, num_threads, *extra_args in workers:
+                    for _ in range(num_threads):
+                        t = Thread(target=worker_func, args=[infinity_pool, table_name, end_time, thread_id, count, round_num] + extra_args)
+                        threads.append(t)
+                        thread_id += 1
 
                 for t in threads:
                     t.start()
@@ -556,3 +233,259 @@ class TestMultipleIndexTypesImport:
         part4()
 
         logging.info("Test completed successfully!")
+
+    # Worker functions (defined as instance methods)
+    def insert_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, insert_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+        categories = ["A", "B", "C", "D"]
+        text_words = ["apple", "banana", "cherry", "date"]
+
+        while time.time() < end_time:
+            try:
+                vec = [random.random() for _ in range(2048)]
+                multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
+                sparse_indices = [j for j in range(1024) if random.random() > 0.9]
+                if not sparse_indices:
+                    sparse_indices = [0, 1, 2]
+                sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
+                sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+
+                row_id = thread_id * 100000 + local_count
+                table_obj.insert([{
+                    "doctitle": f"test_title_{row_id}",
+                    "docdate": "01-JAN-2024 00:00:00.000",
+                    "body": f"test_text_{row_id}_{random.choice(text_words)}",
+                    "num": row_id,
+                    "category": categories[local_count % len(categories)],
+                    "vector_col": vec,
+                    "multi_vector_col": multivec,
+                    "sparse_col": sparse_vec
+                }])
+
+                local_count += 1
+                with insert_count.get_lock():
+                    insert_count.value += 1
+            except Exception as e:
+                logging.warning(f"thread {thread_id}: insert failed: {e}")
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, inserted {local_count} rows")
+
+    def update_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, update_count, max_row_id, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                update_id = random.randint(0, max_row_id)
+                vec = [random.random() for _ in range(2048)]
+                multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
+                sparse_indices = [j for j in range(1024) if random.random() > 0.9]
+                if not sparse_indices:
+                    sparse_indices = [0, 1, 2]
+                sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
+                sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+
+                logging.info(f"thread {thread_id}: updating num={update_id}")
+                table_obj.update(f"num = {update_id}", {
+                    "doctitle": f"updated_title_{update_id}",
+                    "vector_col": vec,
+                    "multi_vector_col": multivec,
+                    "sparse_col": sparse_vec
+                })
+
+                local_count += 1
+                with update_count.get_lock():
+                    update_count.value += 1
+            except Exception as e:
+                logging.warning(f"thread {thread_id}: update failed: {e}")
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: update done, updated {local_count} rows")
+
+    def delete_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, delete_count, max_row_id, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                delete_id = random.randint(0, max_row_id)
+                logging.info(f"thread {thread_id}: deleting num={delete_id}")
+                table_obj.delete(f"num = {delete_id}")
+
+                local_count += 1
+                with delete_count.get_lock():
+                    delete_count.value += 1
+            except Exception as e:
+                logging.warning(f"thread {thread_id}: delete failed: {e}")
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        logging.info(f"Round {round_num + 1} - thread {thread_id}: delete done, deleted {local_count} rows")
+
+    def read_worker_fulltext(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = table_obj.output(["num", "body"]).match_text("body", "test_text", 5).to_pl()
+                if len(result) != 5:
+                    raise Exception(f"FullText query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (FullText): read done, {local_count} queries")
+
+    def read_worker_hnsw(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = table_obj.output(["num", "vector_col"]).match_dense("vector_col", [0.5] * 2048, "float", "l2", 5).to_pl()
+                if len(result) != 5:
+                    raise Exception(f"Hnsw query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw): read done, {local_count} queries")
+
+    def read_worker_secondary_high(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
+                if len(result) == 0:
+                    raise Exception(f"SecondaryHigh query returned 0 results")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary High): read done, {local_count} queries")
+
+    def read_worker_sparse(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                query_sparse = SparseVector(indices=[0, 5, 10, 15], values=[1.0, 1.0, 1.0, 1.0])
+                result, _ = table_obj.output(["num", "sparse_col"]).match_sparse("sparse_col", query_sparse, "ip", 5).to_pl()
+                if len(result) != 5:
+                    raise Exception(f"SparseBMP query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
+
+    def read_worker_secondary_low(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
+                if len(result) == 0:
+                    raise Exception(f"SecondaryLow query returned 0 results")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
+
+    def read_worker_fusion_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = (table_obj
+                 .output(["num", "body", "vector_col"])
+                 .match_text("body", "test_text", 5)
+                 .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
+                 .fusion(method='rrf', topn=5)
+                 .to_pl())
+                if len(result) != 5:
+                    raise Exception(f"FusionRRF query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
+
+    def read_worker_fusion_weighted_sum(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, read_count, round_num):
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        table_obj = db_obj.get_table(table_name)
+        local_count = 0
+
+        while time.time() < end_time:
+            try:
+                result, _ = (table_obj
+                 .output(["num", "body", "vector_col"])
+                 .match_text("body", "test_text", 5)
+                 .match_dense("vector_col", [0.5] * 2048, "float", "l2", 5)
+                 .fusion(method='weighted_sum', topn=5, fusion_params={"weights": "0.6,0.4"})
+                 .to_pl())
+                if len(result) != 5:
+                    raise Exception(f"FusionWeighted query expected 5 results, got {len(result)}")
+                local_count += 1
+            except Exception as e:
+                raise e
+            time.sleep(0.1)
+
+        connection_pool.release_conn(infinity_obj)
+        with read_count.get_lock():
+            read_count.value += local_count
+        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
