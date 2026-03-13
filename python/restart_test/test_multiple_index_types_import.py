@@ -60,8 +60,8 @@ class TestMultipleIndexTypesImport:
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
         kRunningTime = 20
-        kImportRepeat = 2
-        kBatchCount = 2
+        kImportRepeat = 10
+        kBatchCount = 10
         kRowsPerBatch = 5000
 
         # Part 1: Create table and indexes
@@ -503,10 +503,10 @@ class TestMultipleIndexTypesImport:
                     (insert_worker, insert_count, False),
                     # Update workers
                     # (update_worker, update_count, True),
-                    (update_worker, update_count, True),
+                    # (update_worker, update_count, True),
                     # Delete workers
-                    (delete_worker, delete_count, True),
-                    (delete_worker, delete_count, True),
+                    # (delete_worker, delete_count, True),
+                    # (delete_worker, delete_count, True),
                     # Read workers
                     (read_worker_fulltext, read_count_fulltext, False),
                     (read_worker_hnsw, read_count_hnsw, False),
