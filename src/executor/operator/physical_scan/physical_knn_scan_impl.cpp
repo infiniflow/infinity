@@ -595,8 +595,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
         SegmentID segment_id = segment_index_meta->segment_id();
 
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
-        if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+        auto iter = segment_index_hashmap.find(segment_id);
+        if (iter == segment_index_hashmap.end()) {
+            // Segment was deleted during execution (concurrent delete/compact), skip this task
+            LOG_INFO(fmt::format("KnnScan: {} skip segment {} as it was deleted", knn_scan_function_data->task_id_, segment_id));
+            return;
         }
 
         bool has_some_result = false;

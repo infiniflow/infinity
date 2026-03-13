@@ -74,23 +74,32 @@ std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PhysicalIndexScan::Plan
 }
 
 std::vector<std::unique_ptr<std::vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 parallel_count) const {
-    const u32 total_segment_num = base_table_ref_->block_index_->SegmentCount();
+    const auto &segment_block_index = base_table_ref_->block_index_->new_segment_block_index_;
+    const u32 total_segment_num = segment_block_index.size();
     const u32 segment_num_per_tasklet = total_segment_num / parallel_count;
     const u32 segment_num_remainder = total_segment_num % parallel_count;
-    SegmentID next_segment_id = 0;
+
+    // Collect actual segment IDs from block_index (not assuming consecutive IDs)
+    std::vector<SegmentID> all_segment_ids;
+    all_segment_ids.reserve(total_segment_num);
+    for (const auto &[segment_id, _] : segment_block_index) {
+        all_segment_ids.push_back(segment_id);
+    }
+
     std::vector<std::unique_ptr<std::vector<SegmentID>>> result;
     result.reserve(parallel_count);
+
+    size_t idx = 0;
     for (u32 i = 0; i < parallel_count; ++i) {
         auto segment_ids = std::make_unique<std::vector<SegmentID>>();
         u32 segment_num = segment_num_per_tasklet + (i < segment_num_remainder ? 1 : 0);
         segment_ids->reserve(segment_num);
         for (u32 j = 0; j < segment_num; ++j) {
-            segment_ids->emplace_back(next_segment_id++);
+            if (idx < all_segment_ids.size()) {
+                segment_ids->emplace_back(all_segment_ids[idx++]);
+            }
         }
         result.emplace_back(std::move(segment_ids));
-    }
-    if (next_segment_id != total_segment_num) {
-        UnrecoverableError("PhysicalIndexScan::PlanSegments(): segment number error.");
     }
     return result;
 }
@@ -186,15 +195,30 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
         }
     };
 
-    SegmentMeta *segment_meta = nullptr;
-    SegmentOffset segment_row_count = 0;
     const auto &segment_block_index_ = base_table_ref_->block_index_->new_segment_block_index_;
-    if (auto iter = segment_block_index_.find(segment_id); iter == segment_block_index_.end()) {
-        UnrecoverableError(fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id));
-    } else {
-        segment_meta = iter->second.segment_meta_.get();
-        segment_row_count = iter->second.segment_offset();
+
+    // Skip segments that have been deleted during execution (concurrent delete/compact)
+    while (next_idx < segment_ids.size()) {
+        segment_id = segment_ids[next_idx];
+        auto iter = segment_block_index_.find(segment_id);
+        if (iter == segment_block_index_.end()) {
+            // Segment was deleted during execution, skip it
+            ++next_idx;
+        } else {
+            break;
+        }
     }
+
+    if (next_idx >= segment_ids.size()) {
+        // All segments have been processed or skipped
+        index_scan_operator_state->SetComplete();
+        return;
+    }
+
+    segment_id = segment_ids[next_idx];
+    auto iter = segment_block_index_.find(segment_id);
+    SegmentMeta *segment_meta = iter->second.segment_meta_.get();
+    SegmentOffset segment_row_count = iter->second.segment_offset();
 
     // check FastRoughFilter
     std::shared_ptr<FastRoughFilter> segment_filter;

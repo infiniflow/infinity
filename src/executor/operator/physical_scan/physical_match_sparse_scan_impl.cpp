@@ -482,13 +482,19 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         NewIndexSnapshot *index_snapshot = index_index->new_index_snapshots_vec_[0];
         auto iter = index_snapshot->segment_index_metas_.find(segment_id);
         if (iter == index_snapshot->segment_index_metas_.end()) {
-            UnrecoverableError(fmt::format("Cannot find segment index with id: {}", segment_id));
+            // Segment index was deleted during execution (concurrent delete/compact), skip this task
+            LOG_INFO(fmt::format("MatchSparseScan: skip segment {} as its index was deleted", segment_id));
+            task_id = segment_ids_idx;
+            continue;
         }
         SegmentIndexMeta *segment_index_meta = iter->second.get();
 
         auto segment_it = block_index->new_segment_block_index_.find(segment_id);
         if (segment_it == block_index->new_segment_block_index_.end()) {
-            UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+            // Segment was deleted during execution (concurrent delete/compact), skip this task
+            LOG_INFO(fmt::format("MatchSparseScan: skip segment {} as it was deleted", segment_id));
+            task_id = segment_ids_idx;
+            continue;
         }
         size_t segment_row_count = segment_it->second.segment_offset();
 

@@ -323,8 +323,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         SegmentOffset segment_row_count = 0;
         SegmentMeta *segment_meta = nullptr;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
-        if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            UnrecoverableError(fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id));
+        auto iter = segment_index_hashmap.find(segment_id);
+        if (iter == segment_index_hashmap.end()) {
+            // Segment was deleted during execution (concurrent delete/compact), skip this task
+            LOG_INFO(fmt::format("MatchTensorScan: skip segment {} as it was deleted", segment_id));
+            return;
         } else {
             // segment_entry = iter->second.segment_entry_;
             segment_meta = iter->second.segment_meta_.get();
