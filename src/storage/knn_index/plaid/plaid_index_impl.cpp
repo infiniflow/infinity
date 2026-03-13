@@ -516,10 +516,10 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
     n_total_embeddings_ += total_embedding_num;
     n_docs_ += doc_lens.size();
 
-    LOG_INFO(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: Added {} docs ({} embeddings). Total docs: {}",
-                         doc_lens.size(),
-                         total_embedding_num,
-                         n_docs_.load()));
+    LOG_TRACE(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: Added {} docs ({} embeddings). Total docs: {}",
+                          doc_lens.size(),
+                          total_embedding_num,
+                          n_docs_.load()));
 }
 
 void PlaidIndex::CopyCentroidsFrom(const std::vector<f32> &centroids_data,
@@ -1145,29 +1145,19 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
 
 void PlaidIndex::InitializeMerge(u32 n_centroids) {
     std::unique_lock lock(rw_mutex_);
-    
-    // DEBUG: Log state before clearing
-    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: BEFORE clear - n_docs={}, n_centroids={}, ivf_lists_size={}, doc_lens_size={}",
-                         n_docs_.load(), n_centroids_, ivf_lists_.size(), doc_lens_.size()));
-    
-    // Clear existing data for fresh merge
+
     doc_lens_.clear();
     doc_offsets_.clear();
     centroid_ids_.clear();
     packed_residuals_.reset();
     packed_residuals_size_ = 0;
-    
-    // CRITICAL: Set n_centroids_ and ensure IVF lists are sized correctly
+
     n_centroids_ = n_centroids;
     ivf_lists_.clear();
     ivf_lists_.resize(n_centroids_);
-    
+
     n_docs_ = 0;
     n_total_embeddings_ = 0;
-    
-    // DEBUG: Log state after clearing
-    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: AFTER clear - n_docs={}, n_centroids={}, ivf_lists_size={}, doc_lens_size={}",
-                         n_docs_.load(), n_centroids_, ivf_lists_.size(), doc_lens_.size()));
 }
 
 void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
@@ -1179,11 +1169,6 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
 
     const u32 chunk_doc_num = chunk->GetDocNum();
     const u64 chunk_embedding_num = chunk->GetTotalEmbeddingNum();
-
-    LOG_INFO(fmt::format("PlaidIndex::MergeOneChunk: Merging chunk with {} docs, {} embeddings at offset {}",
-                         chunk_doc_num,
-                         chunk_embedding_num,
-                         doc_offset));
 
     // Get current state
     u32 current_docs = n_docs_.load();
@@ -1237,32 +1222,13 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
             }
         }
     }
-    LOG_INFO(fmt::format("PlaidIndex::MergeOneChunk: Added doc_ids from {} to {}, total docs in index: {}",
-                         doc_offset,
-                         max_doc_id_added,
-                         current_docs + chunk_doc_num));
 
-    // Update counters
     n_docs_ = current_docs + chunk_doc_num;
     n_total_embeddings_ = current_embeddings + chunk_embedding_num;
 }
 
 void PlaidIndex::FinalizeMerge() {
-    std::shared_lock lock(rw_mutex_);
-
-    // Find max doc_id in IVF lists for debugging
-    u32 max_doc_id = 0;
-    for (const auto &list : ivf_lists_) {
-        for (u32 doc_id : list) {
-            max_doc_id = std::max(max_doc_id, doc_id);
-        }
-    }
-
-    LOG_INFO(fmt::format("PlaidIndex::FinalizeMerge: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, max_doc_id in IVF: {}",
-                         n_docs_.load(),
-                         n_total_embeddings_,
-                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
-                         max_doc_id));
+    // No-op: counters are already updated in MergeOneChunk
 }
 
 void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,

@@ -349,7 +349,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     }
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_0).count();
-    LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexWithGlobalCentroids: Incremental build complete. Total time: {} ms, total docs={}",
+    LOG_Trace(fmt::format("PlaidIndexInMem::BuildIndexWithGlobalCentroids: Incremental build complete. Total time: {} ms, total docs={}",
                          total_ms,
                          plaid_index_->GetDocNum()));
     return true;
