@@ -62,6 +62,8 @@ export struct PlaidIndexFileWorker : IndexFileWorker {
 
     [[nodiscard]] FileWorkerType Type() const override { return FileWorkerType::kPLAIDIndexFile; }
 
+    size_t GetMemoryCost() const override;
+
     const EmbeddingInfo *GetEmbeddingInfo() const;
 
     const u32 start_segment_offset_;

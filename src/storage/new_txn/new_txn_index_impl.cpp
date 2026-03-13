@@ -56,6 +56,7 @@ import :emvb_index_in_mem;
 import :plaid_index_in_mem;
 import :plaid_index_file_worker;
 import :plaid_index;
+import :plaid_index_disk_merger;
 import :index_plaid;
 import :emvb_index;
 import :meta_key;
@@ -501,7 +502,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 }
                 column_def = std::move(col_def);
             }
-            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj);
+            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj, deprecate_ids);
             if (!status.ok()) {
                 return status;
             }
@@ -521,7 +522,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
 
     buffer_obj->Save();
     if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP ||
-        index_base->index_type_ == IndexType::kSecondary || index_base->index_type_ == IndexType::kSecondaryFunctional) {
+        index_base->index_type_ == IndexType::kSecondary || index_base->index_type_ == IndexType::kSecondaryFunctional ||
+        index_base->index_type_ == IndexType::kPLAID) {
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();
         }
@@ -1531,7 +1533,26 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
         }
 
         ColumnID column_id = column_def->id();
+        RowID current_base_row_id = base_row_id;
         for (BlockID block_id : *block_ids) {
+            // Check if we need to recreate PlaidIndexInMem (was destroyed after incremental dump)
+            if (!plaid_index_in_mem) {
+                // Recreate with existing global centroids for incremental build
+                // Use current_base_row_id which tracks the next row after dumps
+                auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+                if (global_centroids && global_centroids->IsTrained()) {
+                    plaid_index_in_mem =
+                        PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, current_base_row_id, global_centroids);
+                } else {
+                    plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, current_base_row_id);
+                }
+                plaid_index_in_mem->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+                plaid_index_in_mem->index_name_ = *index_base->index_name_;
+                if (existing_mem_index) {
+                    existing_mem_index->SetPlaidIndex(plaid_index_in_mem);
+                }
+            }
+
             BlockMeta block_meta(block_id, segment_meta);
             ColumnMeta column_meta(column_id, block_meta);
 
@@ -1542,13 +1563,33 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
             }
             row_cnt = block_row_cnt;
 
-            ColumnVector col;
-            Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
-            if (!status.ok()) {
-                return status;
-            }
+            {
+                // Use a scope to ensure ColumnVector is destroyed before we cleanup the buffer
+                ColumnVector col;
+                Status status = NewCatalog::GetColumnVector(column_meta, column_def, row_cnt, ColumnVectorMode::kReadOnly, col);
+                if (!status.ok()) {
+                    return status;
+                }
 
-            plaid_index_in_mem->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+                plaid_index_in_mem->Insert(col, 0, row_cnt, *kv_instance_, MAX_TIMESTAMP, nullptr);
+            } // ColumnVector destroyed here, BufferHandle released
+
+            // CRITICAL: Explicitly cleanup column buffer to release mmap memory
+            // This prevents RSS accumulation when creating index without restart
+            // After ColumnVector is destroyed, rc_ should be 0, call Munmap directly
+            // NOTE: Do NOT use PickForCleanup() as it will delete the file!
+            {
+                BufferObj *column_buffer = nullptr;
+                BufferObj *outline_buffer = nullptr;
+                Status cleanup_status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+                if (cleanup_status.ok() && column_buffer != nullptr) {
+                    // Directly call Munmap to release mmap memory without deleting file
+                    column_buffer->file_worker()->Munmap();
+                    if (outline_buffer != nullptr) {
+                        outline_buffer->file_worker()->Munmap();
+                    }
+                }
+            }
 
             // Check if we need to dump (incremental dump when exceeding capacity)
             if (plaid_index_in_mem->IsBuilt() && plaid_index_in_mem->GetRowCount() >= mem_index_capacity) {
@@ -1556,8 +1597,32 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
                 if (!dump_status.ok()) {
                     return dump_status;
                 }
-                // After dump, PlaidIndexInMem resets and can accept more data
+                // CRITICAL: After dump, destroy PlaidIndexInMem to release chunk_handle_ and free mmap memory
+                // Then recreate for next batch to avoid memory accumulation
+                // Get the updated begin_row_id before destroying (PlaidIndexInMem updates it in Dump)
+                current_base_row_id = plaid_index_in_mem->GetBeginRowID();
+                if (existing_mem_index) {
+                    existing_mem_index->SetPlaidIndex(nullptr);
+                }
+                plaid_index_in_mem.reset();
+                // Continue to next iteration - PlaidIndexInMem will be recreated at loop start
             }
+        }
+    }
+
+    // Check if we need to recreate PlaidIndexInMem (was destroyed after loop ended with incremental dump)
+    if (!plaid_index_in_mem) {
+        // Recreate with existing global centroids for incremental build
+        auto global_centroids = segment_index_meta.GetPlaidGlobalCentroids();
+        if (global_centroids && global_centroids->IsTrained()) {
+            plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(index_base, column_def, base_row_id, global_centroids);
+        } else {
+            plaid_index_in_mem = PlaidIndexInMem::NewPlaidIndexInMem(index_base, column_def, base_row_id);
+        }
+        plaid_index_in_mem->SetSegmentID(db_name, table_name, segment_index_meta.segment_id());
+        plaid_index_in_mem->index_name_ = *index_base->index_name_;
+        if (existing_mem_index) {
+            existing_mem_index->SetPlaidIndex(plaid_index_in_mem);
         }
     }
 
@@ -1577,7 +1642,17 @@ Status NewTxn::PopulatePlaidIndexInner(std::shared_ptr<IndexBase> index_base,
     }
 
     // Final dump for remaining data
-    return dump_current_index(plaid_index_in_mem.get());
+    Status final_dump_status = dump_current_index(plaid_index_in_mem.get());
+    if (!final_dump_status.ok()) {
+        return final_dump_status;
+    }
+    // CRITICAL: Destroy PlaidIndexInMem after final dump to release chunk_handle_ and free mmap memory
+    if (existing_mem_index) {
+        existing_mem_index->SetPlaidIndex(nullptr);
+    }
+    plaid_index_in_mem.reset();
+
+    return Status::OK();
 }
 
 Status NewTxn::PopulateHnswIndexInner(std::shared_ptr<IndexBase> index_base,
@@ -2165,7 +2240,8 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
                                   std::shared_ptr<ColumnDef> column_def,
                                   RowID base_rowid,
                                   u32 total_row_cnt,
-                                  BufferObj *buffer_obj) {
+                                  BufferObj *buffer_obj,
+                                  const std::vector<ChunkID> &chunks_to_merge) {
     Status status;
 
     // Get or load global centroids
@@ -2175,88 +2251,63 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
         return Status::UnexpectedError("No trained global centroids for PLAID index optimization");
     }
 
-    // Get old chunk IDs
-    std::vector<ChunkID> *old_chunk_ids_ptr = nullptr;
-    std::tie(old_chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-
-    if (old_chunk_ids_ptr->empty()) {
+    // Use the provided chunks_to_merge instead of fetching all chunks
+    // This is critical because GetChunkIDs1() would include the newly created chunk
+    if (chunks_to_merge.empty()) {
         LOG_WARN("OptimizePlaidIndex: No chunks to merge");
         return Status::UnexpectedError("No chunks to merge");
     }
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging {} chunks with {} centroids, {} total rows starting at {}",
-                         old_chunk_ids_ptr->size(),
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merging {} chunks with {} centroids, {} total rows",
+                         chunks_to_merge.size(),
                          global_centroids->n_centroids(),
-                         total_row_cnt,
-                         base_rowid.ToUint64()));
+                         total_row_cnt));
 
-    // OPTIMIZATION: Streaming merge - load one chunk at a time to control memory
-    // This is critical for large indexes that exceed available RAM
-
-    // Step 1: Create new merged index with shared global centroids
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
-    const u32 embedding_dimension = embedding_info->Dimension();
-    const IndexPLAID *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
+    [[maybe_unused]] const u32 embedding_dimension = embedding_info->Dimension();
+    [[maybe_unused]] const IndexPLAID *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
 
-    auto merged_index =
-        std::make_unique<PlaidIndex>(base_rowid.segment_offset_, embedding_dimension, index_plaid->nbits_, global_centroids->n_centroids());
+    BufferHandle buffer_handle = buffer_obj->Load();
+    auto *merged_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
 
-    // Share global centroids (no copy)
-    merged_index->ShareGlobalCentroids(global_centroids);
+    merged_index->InitializeMerge(global_centroids->n_centroids());
 
-    // Step 2: Initialize streaming merge
-    merged_index->InitializeMerge();
-
-    // Step 3: Load and merge chunks one at a time (streaming to control memory)
     u32 current_doc_offset = 0;
-    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+    for (ChunkID old_chunk_id : chunks_to_merge) {
         ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
-
         BufferObj *chunk_buffer_obj = nullptr;
         status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
         if (!status.ok()) {
             return status;
         }
 
-        // Load chunk (uses mmap if buffer is kMmap type)
-        BufferHandle buffer_handle = chunk_buffer_obj->Load();
-        auto *plaid_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
+        BufferHandle chunk_handle = chunk_buffer_obj->Load();
+        auto *chunk_index = static_cast<PlaidIndex *>(chunk_handle.GetDataMut());
 
-        LOG_INFO(fmt::format("OptimizePlaidIndex: Loading chunk {} with {} docs, {} embeddings",
-                             old_chunk_id,
-                             plaid_index->GetDocNum(),
-                             plaid_index->GetTotalEmbeddingNum()));
+        if (chunk_index && chunk_index->GetDocNum() > 0) {
+            merged_index->MergeOneChunk(chunk_index, current_doc_offset);
+            current_doc_offset += chunk_index->GetDocNum();
+        }
 
-        // Merge this chunk
-        merged_index->MergeOneChunk(plaid_index, current_doc_offset);
-
-        current_doc_offset += plaid_index->GetDocNum();
-
-        // Release handle immediately to allow buffer manager to free memory
-        // This is crucial for streaming merge - we don't keep all chunks in memory
-        buffer_handle = BufferHandle();
+        chunk_handle = BufferHandle();
     }
 
-    // Step 4: Finalize merge
+    // Finalize merge
     merged_index->FinalizeMerge();
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
+    // Copy centroids from global centroids to make index self-contained
+    // This is necessary for mmap-based access
+    // IMPORTANT: preserve_ivf_lists = true because MergeOneChunk has already populated the IVF lists
+    const auto &global_centroids_data = global_centroids->centroids_data();
+    const auto &global_norms = global_centroids->centroid_norms_neg_half();
+    merged_index->CopyCentroidsFrom(global_centroids_data, global_norms, global_centroids->n_centroids(), global_centroids->quantizer(), true);
 
-    // Step 5: Write to buffer and convert to mmap for large index support
-    BufferHandle buffer_handle = buffer_obj->Load();
-    auto *data_ptr = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
-    *data_ptr = std::move(*merged_index);
-
-    // Save and convert to mmap
     buffer_obj->Save();
     if (buffer_obj->type() != BufferType::kMmap) {
         buffer_obj->ToMmap();
     }
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", old_chunk_ids_ptr->size(), data_ptr->GetDocNum()));
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", chunks_to_merge.size(), merged_index->GetDocNum()));
     return Status::OK();
 }
 
@@ -2357,24 +2408,8 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 }
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
-    // For PLAID index, we don't PopMemIndex because PlaidIndexInMem continues to handle insertions after dump.
-    // It maintains state (like updated begin_row_id) across dump operations.
-    // For other index types, we PopMemIndex and ClearMemIndex as usual.
-    std::shared_ptr<MemIndex> mem_index;
-    bool keep_mem_index_after_dump = false;
-    {
-        auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
-        if (index_status.ok()) {
-            keep_mem_index_after_dump = (index_base->index_type_ == IndexType::kPLAID);
-        }
-    }
-    if (keep_mem_index_after_dump) {
-        mem_index = segment_index_meta.GetMemIndex();
-    } else {
-        mem_index = segment_index_meta.PopMemIndex();
-    }
-    if (mem_index == nullptr ||
-        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetPlaidIndex() == nullptr)) {
+    auto mem_index = segment_index_meta.PopMemIndex();
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
@@ -2541,10 +2576,13 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         case IndexType::kPLAID: {
             memory_plaid_index->Dump(buffer_obj);
             buffer_obj->Save();
-            // Convert to mmap for large index support - OS manages memory
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
             }
+            // Note: Like HNSW, we don't manually release chunk_handle_ here.
+            // The memory management is handled by BufferManager:
+            // - When there's no query, the buffer can be evicted by the buffer manager
+            // - When there's a query, the buffer will be loaded via chunk_handle_
 
             // Save global centroids after dump (if trained)
             auto global_centroids = memory_plaid_index->GetGlobalCentroids();
@@ -2572,11 +2610,7 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         }
     }
 
-    // For PLAID index, don't ClearMemIndex because PlaidIndexInMem continues to handle insertions after dump.
-    // The PlaidIndexInMem object is preserved with its updated state (current_begin_row_id_, etc.).
-    if (!keep_mem_index_after_dump) {
-        mem_index->ClearMemIndex();
-    }
+    mem_index->ClearMemIndex();
     auto *storage = InfinityContext::instance().storage();
     if (storage != nullptr) {
         auto *memindex_tracer = storage->memindex_tracer();
