@@ -42,8 +42,11 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         self._is_connected = True
 
     def __del__(self):
-        if self._is_connected is True:
-            self.disconnect()
+        try:
+            if hasattr(self, '_is_connected') and self._is_connected:
+                self.disconnect()
+        except Exception:
+            pass  # Ignore errors in destructor
 
     @name_validity_check("db_name", "DB")
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error, comment: str = None):

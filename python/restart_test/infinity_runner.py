@@ -132,7 +132,7 @@ class InfinityRunner:
                     else:
                         raise e
                 else:
-                    self.logger.warn(str(e))
+                    self.logger.warning(str(e))
                 sleep_time = 1 * (count + 1)
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -169,7 +169,7 @@ class InfinityRunner:
                     else:
                         raise e
                 else:
-                    self.logger.warn(str(e))
+                    self.logger.warning(str(e))
                 sleep_time = 1 * (i + 1)
                 time.sleep(sleep_time)
                 current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())

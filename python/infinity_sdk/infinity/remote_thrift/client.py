@@ -70,8 +70,11 @@ class ThriftInfinityClient:
             self.logger.addHandler(ch)
 
     def __del__(self):
-        if self._is_connected:
-            self.disconnect()
+        try:
+            if hasattr(self, '_is_connected') and self._is_connected:
+                self.disconnect()
+        except Exception:
+            pass  # Ignore errors in destructor
 
     def _reconnect(self):
         if self.transport is not None:
