@@ -69,10 +69,13 @@ public:
                                                 u32 packed_dim);
 
     // Copy centroids from external source (for global centroids support)
+    // preserve_ivf_lists = true: for merge
+    // preserve_ivf_lists = false: build from scratch
     void CopyCentroidsFrom(const std::vector<f32> &centroids_data,
                            const std::vector<f32> &centroid_norms_neg_half,
                            u32 n_centroids,
-                           const PlaidQuantizer *quantizer = nullptr);
+                           const PlaidQuantizer *quantizer = nullptr,
+                           bool preserve_ivf_lists = false);
 
     // Share global centroids (avoids copying, preferred for incremental updates)
     void ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> global_centroids);
@@ -123,8 +126,8 @@ public:
     void MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *>> &chunks_with_doc_offsets);
 
     // Streaming merge: merge one chunk at a time (memory efficient for large indexes)
-    // InitializeMerge() -> MergeOneChunk() x N -> FinalizeMerge()
-    void InitializeMerge();
+    // InitializeMerge(n_centroids) -> MergeOneChunk() x N -> FinalizeMerge()
+    void InitializeMerge(u32 n_centroids);
     void MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset);
     void FinalizeMerge();
 
@@ -136,7 +139,17 @@ public:
     const std::vector<u32> &doc_offsets() const { return doc_offsets_; }
     const std::vector<std::vector<u32>> &ivf_lists() const { return ivf_lists_; }
 
-private:
+    // Accept merged data from disk merger - efficient move semantics
+    void AcceptMergedData(std::vector<u32> &&doc_lens,
+                          std::vector<u32> &&doc_offsets,
+                          std::vector<u32> &&centroid_ids,
+                          std::unique_ptr<u8[]> &&packed_residuals,
+                          size_t packed_residuals_size,
+                          std::vector<std::vector<u32>> &&ivf_lists,
+                          u32 total_docs,
+                          u64 total_embeddings);
+
+public:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;
     const u32 embedding_dimension_ = 0;
