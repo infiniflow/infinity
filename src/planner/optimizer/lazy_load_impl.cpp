@@ -69,6 +69,16 @@ std::optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
 }
 
 void RefencecColumnCollection::VisitNode(LogicalNode &op) {
+    // Clear state at the start of root node visit to ensure fresh state for each query
+    if (depth_ == 0) {
+        scan_bindings_.clear();
+        column_types_.clear();
+        column_names_.clear();
+        unloaded_bindings_.clear();
+        load_metas_.clear();
+    }
+    ++depth_;
+
     auto base_table_ref = GetScanTableRef(op);
     if (base_table_ref.has_value()) {
         auto table_idx = base_table_ref.value()->table_index_;
@@ -97,6 +107,7 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
 
     op.set_load_metas(std::make_shared<std::vector<LoadMeta>>(std::move(load_metas_)));
     load_metas_.clear();
+    --depth_;
 }
 
 std::shared_ptr<BaseExpression> RefencecColumnCollection::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {
@@ -118,14 +129,20 @@ std::shared_ptr<BaseExpression> RefencecColumnCollection::VisitReplace(const std
         }
     }
 
-    for (auto &[_, scan_bindings] : scan_bindings_) {
+    for (auto &[table_idx, scan_bindings] : scan_bindings_) {
         for (size_t idx = 0; idx < scan_bindings.size(); ++idx) {
             if (auto scan_binding = scan_bindings[idx]; expression->binding() == scan_binding) {
                 if (unloaded_bindings_.contains(scan_binding)) {
-                    auto types = column_types_[scan_binding.table_idx].get();
-                    auto names = column_names_[scan_binding.table_idx].get();
-                    load_metas_.emplace_back(scan_binding, idx, (*types)[idx], (*names)[idx]);
-                    unloaded_bindings_.erase(scan_binding);
+                    auto types_it = column_types_.find(scan_binding.table_idx);
+                    auto names_it = column_names_.find(scan_binding.table_idx);
+                    if (types_it != column_types_.end() && names_it != column_names_.end()) {
+                        auto types = types_it->second.get();
+                        auto names = names_it->second.get();
+                        if (types && names && idx < types->size() && idx < names->size()) {
+                            load_metas_.emplace_back(scan_binding, idx, (*types)[idx], (*names)[idx]);
+                            unloaded_bindings_.erase(scan_binding);
+                        }
+                    }
                 }
                 return expression;
             }
@@ -168,6 +185,14 @@ inline void CleanScanVisitBaseTableRefNode(LogicalNode &op,
 }
 
 void CleanScan::VisitNode(LogicalNode &op) {
+    // Clear state at the start of root node visit to ensure fresh state for each query
+    if (depth_ == 0) {
+        last_op_load_metas_.reset();
+        last_op_node_id_ = 0;
+        scan_table_indexes_.clear();
+    }
+    ++depth_;
+
     switch (op.operator_type()) {
         case LogicalNodeType::kTableScan: {
             auto &table_scan = static_cast<LogicalTableScan &>(op);
@@ -305,6 +330,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             break;
         }
     }
+    --depth_;
 }
 
 } // namespace infinity

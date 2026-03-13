@@ -74,22 +74,31 @@ std::vector<std::shared_ptr<std::vector<GlobalBlockID>>> PhysicalIndexScan::Plan
 }
 
 std::vector<std::unique_ptr<std::vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 parallel_count) const {
-    const u32 total_segment_num = base_table_ref_->block_index_->SegmentCount();
+    const auto &segment_block_index = base_table_ref_->block_index_->new_segment_block_index_;
+    const u32 total_segment_num = segment_block_index.size();
     const u32 segment_num_per_tasklet = total_segment_num / parallel_count;
     const u32 segment_num_remainder = total_segment_num % parallel_count;
-    SegmentID next_segment_id = 0;
+
+    // Get actual segment IDs from the block index
+    std::vector<SegmentID> all_segment_ids;
+    all_segment_ids.reserve(total_segment_num);
+    for (const auto &[segment_id, _] : segment_block_index) {
+        all_segment_ids.emplace_back(segment_id);
+    }
+
     std::vector<std::unique_ptr<std::vector<SegmentID>>> result;
     result.reserve(parallel_count);
+    size_t next_idx = 0;
     for (u32 i = 0; i < parallel_count; ++i) {
         auto segment_ids = std::make_unique<std::vector<SegmentID>>();
         u32 segment_num = segment_num_per_tasklet + (i < segment_num_remainder ? 1 : 0);
         segment_ids->reserve(segment_num);
         for (u32 j = 0; j < segment_num; ++j) {
-            segment_ids->emplace_back(next_segment_id++);
+            segment_ids->emplace_back(all_segment_ids[next_idx++]);
         }
         result.emplace_back(std::move(segment_ids));
     }
-    if (next_segment_id != total_segment_num) {
+    if (next_idx != total_segment_num) {
         UnrecoverableError("PhysicalIndexScan::PlanSegments(): segment number error.");
     }
     return result;

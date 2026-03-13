@@ -29,6 +29,14 @@ import third_party;
 namespace infinity {
 
 void BindingRemapper::VisitNode(LogicalNode &op) {
+    // Clear state at the start of root node visit to ensure fresh state for each query
+    if (depth_ == 0) {
+        bindings_.clear();
+        output_types_.reset();
+        column_cnt_ = 0;
+    }
+    ++depth_;
+
     auto load_func = [&]() {
         auto load_metas = op.load_metas();
         column_cnt_ = output_types_ ? output_types_->size() : 0;
@@ -57,6 +65,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kCommand:
         case LogicalNodeType::kPrepare: {
             // skip
+            --depth_;
             return;
         }
         case LogicalNodeType::kJoin:
@@ -88,6 +97,7 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
             break;
         }
     }
+    --depth_;
 }
 
 std::shared_ptr<BaseExpression> BindingRemapper::VisitReplace(const std::shared_ptr<ColumnExpression> &expression) {

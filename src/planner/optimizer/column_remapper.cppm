@@ -33,6 +33,7 @@ private:
     std::vector<ColumnBinding> bindings_;
     std::shared_ptr<std::vector<std::shared_ptr<DataType>>> output_types_;
     u32 column_cnt_{};
+    u32 depth_{0};
 };
 
 export class ColumnRemapper : public OptimizerRule {
