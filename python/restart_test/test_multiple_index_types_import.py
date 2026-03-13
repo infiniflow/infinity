@@ -31,10 +31,7 @@ class TestMultipleIndexTypesImport:
     ):
         # Initialize
         infinity_runner.clear()
-        columns = generator.columns()
-        indexes = generator.index()
-        import_file = generator.import_file()
-        import_size = generator.import_size()
+        self.generator = generator
         import_options = {"file_type": "csv", "delimiter": "\t"}
         table_name = "test_multi_index_types"
         uri = common_values.TEST_LOCAL_HOST
@@ -46,19 +43,19 @@ class TestMultipleIndexTypesImport:
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table(table_name, ConflictType.Ignore)
 
-            table_obj = db_obj.create_table(table_name, columns, ConflictType.Error)
+            table_obj = db_obj.create_table(table_name, self.generator.columns(), ConflictType.Error)
             assert table_obj is not None
 
-            for idx in indexes:
+            for idx in self.generator.index():
                 idx_name = f"idx_{idx.target_name}"
                 logging.info(f"Creating index {idx_name}...")
                 table_obj.create_index(idx_name, idx)
 
-            logging.info(f" Created table and {len(indexes)} indexes")
+            logging.info(f" Created table and {len(self.generator.index())} indexes")
 
         part1()
 
-        # Part 2: Import data
+        # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
             kImportRepeat = 10
@@ -68,7 +65,7 @@ class TestMultipleIndexTypesImport:
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
 
-            abs_import_file = os.path.abspath(import_file)
+            abs_import_file = os.path.abspath(self.generator.generate_import_file())
 
             for import_round in range(kImportRepeat):
                 import_start = time.time()
@@ -78,7 +75,7 @@ class TestMultipleIndexTypesImport:
                 logging.info(f"Import round {import_round + 1} completed in {import_duration:.2f} seconds")
 
             # Verify row count after all imports
-            expected_count = import_size * kImportRepeat
+            expected_count = self.generator.import_size() * kImportRepeat
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
             logging.info(f"Total rows after {kImportRepeat} imports: {count}")
@@ -92,13 +89,7 @@ class TestMultipleIndexTypesImport:
                 batch_data = []
                 for row_idx in range(kRowsPerBatch):
                     row_id = batch_idx * kRowsPerBatch + row_idx
-                    vec = [random.random() for _ in range(2048)]
-                    multivec = [[random.random() for _ in range(1024)] for _ in range(2)]
-                    sparse_indices = [j for j in range(1024) if random.random() > 0.9]
-                    if not sparse_indices:
-                        sparse_indices = [0, 1, 2]
-                    sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
-                    sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+                    vec, multivec, sparse_vec = self.generator.generate_random_row()
 
                     batch_data.append({
                         "doctitle": f"test_title_{row_id}",
@@ -119,7 +110,7 @@ class TestMultipleIndexTypesImport:
             # Verify row count after insert
             res, _, _ = table_obj.output(["count(*)"]).to_result()
             count = res["count(star)"][0]
-            expected_count = import_size * kImportRepeat + kBatchCount * kRowsPerBatch
+            expected_count = self.generator.import_size() * kImportRepeat + kBatchCount * kRowsPerBatch
             logging.info(f"Total rows after batch insert: {count}, expected: {expected_count}")
             assert count == expected_count, f"Expected {expected_count} rows after batch insert, got {count}"
 
@@ -200,13 +191,7 @@ class TestMultipleIndexTypesImport:
 
         while time.time() < end_time:
             try:
-                vec = [random.random() for _ in range(2048)]
-                multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                sparse_indices = [j for j in range(1024) if random.random() > 0.9]
-                if not sparse_indices:
-                    sparse_indices = [0, 1, 2]
-                sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
-                sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+                vec, multivec, sparse_vec = self.generator.generate_random_row()
 
                 row_id = thread_id * 100000 + local_count
                 table_obj.insert([{
@@ -237,13 +222,7 @@ class TestMultipleIndexTypesImport:
         while time.time() < end_time:
             try:
                 update_id = random.randint(0, max_row_id)
-                vec = [random.random() for _ in range(2048)]
-                multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
-                sparse_indices = [j for j in range(1024) if random.random() > 0.9]
-                if not sparse_indices:
-                    sparse_indices = [0, 1, 2]
-                sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
-                sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+                vec, multivec, sparse_vec = self.generator.generate_random_row()
 
                 logging.info(f"thread {thread_id}: updating num={update_id}")
                 table_obj.update(f"num = {update_id}", {

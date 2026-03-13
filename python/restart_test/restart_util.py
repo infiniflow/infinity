@@ -203,10 +203,6 @@ class LChYDataGenerato:
 
 
 class MultiIndexTypesGenerator:
-
-    DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
-    DEFAULT_NUM_ROWS = 9999
-
     def columns():
         return {
             "doctitle": {"type": "varchar"},
@@ -229,8 +225,8 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
 
-    def import_file() -> str:
-        filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
+    def generate_import_file() -> str:
+        filepath = "test/data/csv/enwiki_embedding_plus_9999.csv"
         if os.path.exists(filepath):
             return filepath
         print(f"CSV file not found: {filepath}. Generating...")
@@ -239,7 +235,18 @@ class MultiIndexTypesGenerator:
         return filepath
 
     def import_size() -> int:
-        return MultiIndexTypesGenerator.DEFAULT_NUM_ROWS
+        return 9999
+
+    @staticmethod
+    def generate_random_row():
+        vec = np.array([random.random() for _ in range(2048)], dtype=np.float32)
+        multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
+        sparse_indices = [j for j in range(1024) if random.random() > 0.9]
+        if not sparse_indices:
+            sparse_indices = [0, 1, 2]
+        sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
+        sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+        return vec, multivec, sparse_vec
 
 
 if __name__ == "__main__":
