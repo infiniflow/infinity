@@ -334,11 +334,14 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     TableMeta &table_meta = table_index_meta.table_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
 
+    LOG_INFO(fmt::format("OptimizeIndexInner ENTER: segment_id={}, index_name={}", segment_id, index_name));
+
     auto [old_chunk_ids_ptr, status] = segment_index_meta.GetChunkIDs1();
     if (!status.ok()) {
         return status;
     }
     if (old_chunk_ids_ptr->size() <= 1) {
+        LOG_INFO(fmt::format("OptimizeIndexInner: Only {} chunk(s), skipping merge", old_chunk_ids_ptr->size()));
         return Status::OK();
     }
     RowID base_rowid;
@@ -502,7 +505,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 }
                 column_def = std::move(col_def);
             }
-            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj);
+            status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj, deprecate_ids);
             if (!status.ok()) {
                 return status;
             }
@@ -514,9 +517,21 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     }
     {
         // To delete deprecated chunk ids
+        LOG_INFO(fmt::format("OptimizeIndexInner: Removing {} deprecated chunk IDs, new chunk ID is {}", 
+                             deprecate_ids.size(), chunk_id));
         status = segment_index_meta.RemoveChunkIDs(deprecate_ids);
         if (!status.ok()) {
             return status;
+        }
+        // DEBUG: Verify chunks were removed
+        auto [verify_chunk_ids_ptr, verify_status] = segment_index_meta.GetChunkIDs1();
+        if (verify_status.ok()) {
+            std::string remaining_chunks;
+            for (ChunkID id : *verify_chunk_ids_ptr) {
+                remaining_chunks += std::to_string(id) + " ";
+            }
+            LOG_INFO(fmt::format("OptimizeIndexInner: After removal, remaining chunks: [{}] (count={})", 
+                                 remaining_chunks, verify_chunk_ids_ptr->size()));
         }
     }
 
@@ -2238,7 +2253,8 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
                                   std::shared_ptr<ColumnDef> column_def,
                                   RowID base_rowid,
                                   u32 total_row_cnt,
-                                  BufferObj *buffer_obj) {
+                                  BufferObj *buffer_obj,
+                                  const std::vector<ChunkID> &chunks_to_merge) {
     Status status;
 
     // Get or load global centroids
@@ -2248,23 +2264,24 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
         return Status::UnexpectedError("No trained global centroids for PLAID index optimization");
     }
 
-    // Get old chunk IDs
-    std::vector<ChunkID> *old_chunk_ids_ptr = nullptr;
-    std::tie(old_chunk_ids_ptr, status) = segment_index_meta.GetChunkIDs1();
-    if (!status.ok()) {
-        return status;
-    }
-
-    if (old_chunk_ids_ptr->empty()) {
+    // Use the provided chunks_to_merge instead of fetching all chunks
+    // This is critical because GetChunkIDs1() would include the newly created chunk
+    if (chunks_to_merge.empty()) {
         LOG_WARN("OptimizePlaidIndex: No chunks to merge");
         return Status::UnexpectedError("No chunks to merge");
     }
 
+    // DEBUG: Log all chunk IDs to check for duplicates
+    std::string chunk_ids_str;
+    for (ChunkID id : chunks_to_merge) {
+        chunk_ids_str += std::to_string(id) + " ";
+    }
     LOG_INFO(fmt::format("OptimizePlaidIndex: Merging {} chunks with {} centroids, {} total rows starting at {}",
-                         old_chunk_ids_ptr->size(),
+                         chunks_to_merge.size(),
                          global_centroids->n_centroids(),
                          total_row_cnt,
                          base_rowid.ToUint64()));
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Chunk IDs: [{}]", chunk_ids_str));
 
     // OPTIMIZATION: Use PlaidIndexDiskMerger for streaming merge with controlled memory
     // This is critical for large indexes that exceed available RAM
@@ -2279,14 +2296,22 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
     // This avoids keeping intermediate merge state in memory
     BufferHandle buffer_handle = buffer_obj->Load();
     auto *merged_index = static_cast<PlaidIndex *>(buffer_handle.GetDataMut());
-
+    
+    // DEBUG: Check initial state
+    LOG_INFO(fmt::format("OptimizePlaidIndex: BEFORE InitializeMerge - GetDocNum()={}",
+                         merged_index->GetDocNum()));
+    
     // Initialize the output index with global centroids
     merged_index->InitializeMerge(global_centroids->n_centroids());
+    
+    // DEBUG: Check after InitializeMerge
+    LOG_INFO(fmt::format("OptimizePlaidIndex: AFTER InitializeMerge - GetDocNum()={}",
+                         merged_index->GetDocNum()));
 
     // Step 3: Merge chunks directly into output index (streaming)
     u32 current_doc_offset = 0;
     u64 total_merged_embeddings = 0;
-    for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+    for (ChunkID old_chunk_id : chunks_to_merge) {
         ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
         BufferObj *chunk_buffer_obj = nullptr;
         status = old_chunk_meta.GetIndexBuffer(chunk_buffer_obj);
@@ -2302,10 +2327,25 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
         auto *chunk_index = static_cast<PlaidIndex *>(chunk_handle.GetDataMut());
 
         if (chunk_index && chunk_index->GetDocNum() > 0) {
-            LOG_INFO(fmt::format("OptimizePlaidIndex: Merging chunk {} with {} docs, {} embeddings",
+            LOG_INFO(fmt::format("OptimizePlaidIndex: Merging chunk {} with {} docs, {} embeddings, doc_offset={}",
                                  old_chunk_id,
                                  chunk_index->GetDocNum(),
-                                 chunk_index->GetTotalEmbeddingNum()));
+                                 chunk_index->GetTotalEmbeddingNum(),
+                                 current_doc_offset));
+            
+            // DEBUG: Check chunk's IVF lists max doc_id and n_docs_
+            u32 chunk_max_doc_id = 0;
+            u32 ivf_entry_count = 0;
+            for (u32 cid = 0; cid < chunk_index->n_centroids_; ++cid) {
+                ivf_entry_count += chunk_index->ivf_lists_[cid].size();
+                for (u32 doc_id : chunk_index->ivf_lists_[cid]) {
+                    chunk_max_doc_id = std::max(chunk_max_doc_id, doc_id);
+                }
+            }
+            LOG_INFO(fmt::format("OptimizePlaidIndex: Chunk {} has n_docs_={}, max_doc_id={}, centroid_ids_size={}, ivf_entries={}",
+                                 old_chunk_id, chunk_index->n_docs_.load(), chunk_max_doc_id, 
+                                 chunk_index->centroid_ids_.size(), ivf_entry_count));
+            
             merged_index->MergeOneChunk(chunk_index, current_doc_offset);
             current_doc_offset += chunk_index->GetDocNum();
             total_merged_embeddings += chunk_index->GetTotalEmbeddingNum();
@@ -2327,7 +2367,7 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
     const auto &global_norms = global_centroids->centroid_norms_neg_half();
     merged_index->CopyCentroidsFrom(global_centroids_data, global_norms, global_centroids->n_centroids(), global_centroids->quantizer(), true);
 
-    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), old_chunk_ids_ptr->size()));
+    LOG_INFO(fmt::format("OptimizePlaidIndex: Merged {} embeddings from {} chunks", merged_index->GetTotalEmbeddingNum(), chunks_to_merge.size()));
 
     // Step 4: Save and convert to mmap
     buffer_obj->Save();
@@ -2336,7 +2376,7 @@ Status NewTxn::OptimizePlaidIndex(std::shared_ptr<IndexBase> index_base,
     }
 
     LOG_INFO(
-        fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", old_chunk_ids_ptr->size(), merged_index->GetDocNum()));
+        fmt::format("OptimizePlaidIndex: Merged {} chunks into single chunk with {} docs", chunks_to_merge.size(), merged_index->GetDocNum()));
     return Status::OK();
 }
 

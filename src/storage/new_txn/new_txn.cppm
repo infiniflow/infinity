@@ -606,7 +606,8 @@ private:
                               std::shared_ptr<ColumnDef> column_def,
                               RowID base_rowid,
                               u32 row_cnt,
-                              BufferObj *buffer_obj);
+                              BufferObj *buffer_obj,
+                              const std::vector<ChunkID> &chunks_to_merge);
 
     Status AlterSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const std::vector<std::unique_ptr<InitParameter>> &params);
 

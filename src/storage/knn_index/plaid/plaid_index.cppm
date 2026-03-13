@@ -149,7 +149,7 @@ public:
                           u32 total_docs,
                           u64 total_embeddings);
 
-private:
+public:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;
     const u32 embedding_dimension_ = 0;

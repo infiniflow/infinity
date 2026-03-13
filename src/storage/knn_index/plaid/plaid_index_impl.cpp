@@ -1145,21 +1145,29 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
 
 void PlaidIndex::InitializeMerge(u32 n_centroids) {
     std::unique_lock lock(rw_mutex_);
+    
+    // DEBUG: Log state before clearing
+    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: BEFORE clear - n_docs={}, n_centroids={}, ivf_lists_size={}, doc_lens_size={}",
+                         n_docs_.load(), n_centroids_, ivf_lists_.size(), doc_lens_.size()));
+    
     // Clear existing data for fresh merge
     doc_lens_.clear();
     doc_offsets_.clear();
     centroid_ids_.clear();
     packed_residuals_.reset();
     packed_residuals_size_ = 0;
-
+    
     // CRITICAL: Set n_centroids_ and ensure IVF lists are sized correctly
     n_centroids_ = n_centroids;
     ivf_lists_.clear();
     ivf_lists_.resize(n_centroids_);
-
+    
     n_docs_ = 0;
     n_total_embeddings_ = 0;
-    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: Ready for streaming merge with {} centroids", n_centroids_));
+    
+    // DEBUG: Log state after clearing
+    LOG_INFO(fmt::format("PlaidIndex::InitializeMerge: AFTER clear - n_docs={}, n_centroids={}, ivf_lists_size={}, doc_lens_size={}",
+                         n_docs_.load(), n_centroids_, ivf_lists_.size(), doc_lens_.size()));
 }
 
 void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
