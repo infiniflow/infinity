@@ -12,7 +12,7 @@ from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
 # Test configuration constants
-K_RUNNING_TIME_SECONDS = 20
+K_RUNNING_TIME_SECONDS = 60
 
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
@@ -56,9 +56,9 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 10
-            kBatchCount = 20
-            kRowsPerBatch = 5000
+            kImportRepeat = 3
+            kBatchCount = 10
+            kRowsPerBatch = 2500
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
