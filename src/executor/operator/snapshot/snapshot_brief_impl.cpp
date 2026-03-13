@@ -92,8 +92,8 @@ std::vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const std::string &dir) {
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_pad);
             SnapshotBrief snapshot_brief;
-            snapshot_brief.snapshot_name_ = doc["snapshot_name"].get<std::string>();
-            snapshot_brief.scope_ = (SnapshotScope)(u8)doc["snapshot_scope"].get<u8>();
+            snapshot_brief.snapshot_name_ = static_cast<std::string>(doc["snapshot_name"].get<std::string_view>().value());
+            snapshot_brief.scope_ = (SnapshotScope)(u8)(doc["snapshot_scope"].get<int64_t>().value());
 
             // snapshot_brief.commit_ts_ = doc["commit_ts"].get<u64>();
 

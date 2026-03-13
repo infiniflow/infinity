@@ -395,9 +395,9 @@ nlohmann::json IndexIVF::Serialize() const {
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFCentroidOption &ivf_centroid_option) {
     simdjson::object obj = val.get_object();
-    ivf_centroid_option.centroids_num_ratio_ = obj["centroids_num_ratio_"].get<float>();
-    ivf_centroid_option.min_points_per_centroid_ = obj["min_points_per_centroid_"].get<u32>();
-    ivf_centroid_option.max_points_per_centroid_ = obj["max_points_per_centroid_"].get<u32>();
+    ivf_centroid_option.centroids_num_ratio_ = static_cast<float>(obj["centroids_num_ratio_"].get<double>().value());
+    ivf_centroid_option.min_points_per_centroid_ = static_cast<u32>(obj["min_points_per_centroid_"].get<uint64_t>().value());
+    ivf_centroid_option.max_points_per_centroid_ = static_cast<u32>(obj["max_points_per_centroid_"].get<uint64_t>().value());
     return simdjson::SUCCESS;
 }
 template <typename simdjson_value>
@@ -405,15 +405,15 @@ auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFStorageO
     simdjson::object obj = val.get_object();
     ivf_storage_option.type_ = (IndexIVFStorageOption::Type)(int64_t)obj["type_"].get<int64_t>();
     ivf_storage_option.plain_storage_data_type_ = (EmbeddingDataType)(int64_t)obj["plain_storage_data_type_"].get<int64_t>();
-    ivf_storage_option.scalar_quantization_bits_ = obj["scalar_quantization_bits_"].get<u32>();
-    ivf_storage_option.product_quantization_subspace_num_ = obj["product_quantization_subspace_num_"].get<u32>();
-    ivf_storage_option.product_quantization_subspace_bits_ = obj["product_quantization_subspace_bits_"].get<u32>();
+    ivf_storage_option.scalar_quantization_bits_ = static_cast<u32>(obj["scalar_quantization_bits_"].get<uint64_t>().value());
+    ivf_storage_option.product_quantization_subspace_num_ = static_cast<u32>(obj["product_quantization_subspace_num_"].get<uint64_t>().value());
+    ivf_storage_option.product_quantization_subspace_bits_ = static_cast<u32>(obj["product_quantization_subspace_bits_"].get<uint64_t>().value());
     return simdjson::SUCCESS;
 }
 template <typename simdjson_value>
 auto tag_invoke(simdjson::deserialize_tag, simdjson_value &val, IndexIVFOption &ivf_option) {
     simdjson::object obj = val.get_object();
-    ivf_option.metric_ = (MetricType)(i8)obj["metric_"].get<i8>();
+    ivf_option.metric_ = (MetricType)(i8)(obj["metric_"].get<int64_t>().value());
     ivf_option.centroid_option_ = obj["centroid_option_"].get<IndexIVFCentroidOption>();
     ivf_option.storage_option_ = obj["storage_option_"].get<IndexIVFStorageOption>();
     return simdjson::SUCCESS;

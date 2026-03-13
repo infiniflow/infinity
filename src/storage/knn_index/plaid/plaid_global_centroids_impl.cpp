@@ -14,9 +14,6 @@
 
 module;
 
-#include <algorithm>
-#include <random>
-
 export module infinity_core:plaid_global_centroids.impl;
 
 import :plaid_global_centroids;

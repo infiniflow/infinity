@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-#include "default_value.h"
-
 export module parser_defaults;
+
+import std.compat;
 
 namespace infinity {
 
-export constexpr int64_t PARSER_EMBEDDING_LIMIT = PARSER_EMBEDDING_LIMIT_INTERNAL;
-export constexpr int64_t PARSER_MAX_BITMAP_SIZE = PARSER_MAX_BITMAP_SIZE_INTERNAL;
+export constexpr int64_t PARSER_EMBEDDING_LIMIT = 65536;
+export constexpr int64_t PARSER_MAX_BITMAP_SIZE = 65536;
 
 } // namespace infinity

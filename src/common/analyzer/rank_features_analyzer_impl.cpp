@@ -34,7 +34,7 @@ int RankFeaturesAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType fu
         if (item.type() == simdjson::json_type::object) {
             for (auto field : item.get_object()) {
                 std::string_view key = field.unescaped_key();
-                float value = field.value().get<float>();
+                auto value = static_cast<float>(field.value().get<double>());
                 u16 weight = SmallFloat::Float122ToUInt16(value);
                 func(data, key.data(), key.size(), offset++, 0, false, weight);
             }

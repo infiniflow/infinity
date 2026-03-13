@@ -158,7 +158,9 @@ bool MinMaxDataFilter::LoadFromJsonFile(std::string_view json_sv) {
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
     std::string filter_base64;
-    if (doc[JsonTag].get<std::string>(filter_base64) != simdjson::SUCCESS) {
+    if (std::string_view view; doc[JsonTag].get<std::string_view>(view) == simdjson::SUCCESS) {
+        filter_base64 = view;
+    } else {
         LOG_ERROR("MinMaxDataFilter::LoadFromJsonFile(): found no data.");
         return false;
     }

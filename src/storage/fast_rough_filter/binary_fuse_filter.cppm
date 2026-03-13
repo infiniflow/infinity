@@ -79,7 +79,7 @@ public:
         finished_build_filter_.test_and_set(std::memory_order_release);
     }
 
-    inline bool Contain(TxnTimeStamp query_ts, uint64_t &item) const {
+    bool Contain(TxnTimeStamp query_ts, uint64_t &item) const {
         if (!HaveFilter()) {
             return true;
         }

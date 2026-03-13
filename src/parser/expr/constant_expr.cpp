@@ -533,7 +533,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
     simdjson::parser parser;
     simdjson::padded_string constant_expr_json(constant_expr_str);
     simdjson::document doc = parser.iterate(constant_expr_json);
-    LiteralType literal_type = (LiteralType)(int32_t)doc["type"].get<int32_t>();
+    LiteralType literal_type = (LiteralType)(int32_t)doc["type"].get<int64_t>().value();
     auto const_expr = new ConstantExpr(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
@@ -545,7 +545,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             break;
         }
         case LiteralType::kString: {
-            const_expr->str_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
+            const_expr->str_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string_view>().value()).c_str());
             break;
         }
         case LiteralType::kInteger: {
@@ -560,15 +560,21 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
         case LiteralType::kTime:
         case LiteralType::kDateTime:
         case LiteralType::kTimestamp: {
-            const_expr->date_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
+            const_expr->date_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string_view>().value()).c_str());
             break;
         }
         case LiteralType::kIntegerArray: {
-            const_expr->long_array_ = doc["value"].get<std::vector<int64_t>>();
+            simdjson::array arr = doc["value"].get_array().value();
+            for (auto elem : arr) {
+                const_expr->long_array_.push_back(elem.get<int64_t>().value());
+            }
             break;
         }
         case LiteralType::kDoubleArray: {
-            const_expr->double_array_ = doc["value"].get<std::vector<double>>();
+            simdjson::array arr = doc["value"].get_array().value();
+            for (auto elem : arr) {
+                const_expr->double_array_.push_back(elem.get<double>().value());
+            }
             break;
         }
         case LiteralType::kSubArrayArray: {
@@ -582,13 +588,25 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             ParserError("Interval type is not supported in JSON serialization");
         }
         case LiteralType::kLongSparseArray: {
-            const_expr->long_sparse_array_.first = doc["value"]["indices"].get<std::vector<int64_t>>();
-            const_expr->long_sparse_array_.second = doc["value"]["data"].get<std::vector<int64_t>>();
+            simdjson::array indices_arr = doc["value"]["indices"].get_array().value();
+            for (auto elem : indices_arr) {
+                const_expr->long_sparse_array_.first.push_back(elem.get<int64_t>().value());
+            }
+            simdjson::array data_arr = doc["value"]["data"].get_array().value();
+            for (auto elem : data_arr) {
+                const_expr->long_sparse_array_.second.push_back(elem.get<int64_t>().value());
+            }
             break;
         }
         case LiteralType::kDoubleSparseArray: {
-            const_expr->double_sparse_array_.first = doc["value"]["indices"].get<std::vector<int64_t>>();
-            const_expr->double_sparse_array_.second = doc["value"]["data"].get<std::vector<double>>();
+            simdjson::array indices_arr = doc["value"]["indices"].get_array().value();
+            for (auto elem : indices_arr) {
+                const_expr->double_sparse_array_.first.push_back(elem.get<int64_t>().value());
+            }
+            simdjson::array data_arr = doc["value"]["data"].get_array().value();
+            for (auto elem : data_arr) {
+                const_expr->double_sparse_array_.second.push_back(elem.get<double>().value());
+            }
             break;
         }
         case LiteralType::kCurlyBracketsArray: {
@@ -599,7 +617,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(std::string_view constant_
             break;
         }
         case LiteralType::kJson: {
-            const_expr->json_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string>()).c_str());
+            const_expr->json_value_ = strdup(static_cast<std::string>(doc["value"].get<std::string_view>().value()).c_str());
             break;
         }
     }

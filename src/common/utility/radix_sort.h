@@ -1,11 +1,7 @@
 #pragma once
 
 #include "builtin.h"
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <limits>
+import std.compat;
 
 namespace infinity {
 

@@ -238,7 +238,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     ToLower(option_key);
                     if (option_key == "total_hits_count") {
                         if (option_value.is_string()) {
-                            std::string value_str = option_value.get<std::string>();
+                            std::string value_str(option_value.get<std::string_view>().value());
                             [[maybe_unused]] auto maybe_a_bug = std::tolower(value);
                             if (value_str == "true") {
                                 total_hits_count_flag = true;
@@ -514,7 +514,7 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                     return;
                 }
             } else if (key == "explain_type") {
-                if (std::string type = value.get<std::string>(); type == "analyze") {
+                if (std::string type(value.get<std::string_view>().value()); type == "analyze") {
                     explain_type = ExplainType::kAnalyze;
                 } else if (type == "ast") {
                     explain_type = ExplainType::kAst;
@@ -600,7 +600,7 @@ std::unique_ptr<ParsedExpr> HTTPSearch::ParseFilter(std::string_view json_sv, HT
     }
     std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
     ExprParser expr_parser;
-    expr_parser.Parse(doc.get<std::string>(), expr_parsed_result.get());
+    expr_parser.Parse(std::string(doc.get<std::string_view>().value()), expr_parsed_result.get());
     if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_msg"] = fmt::format("Invalid expression: {}", std::string(json_sv));
@@ -639,11 +639,11 @@ std::vector<ParsedExpr *> *HTTPSearch::ParseOutput(std::string_view json_sv, HTT
                 response["error_msg"] = fmt::format("Invalid expression: {}", std::string(json_sv));
                 return nullptr;
             }
-            output_exprs.push_back(output_expr.get<std::string>());
+            output_exprs.push_back(std::string(output_expr.get<std::string_view>().value()));
         }
     } else if (doc.type() == simdjson::json_type::string) {
         output_columns->reserve(1);
-        output_exprs.push_back(doc.get<std::string>());
+        output_exprs.push_back(std::string(doc.get<std::string_view>().value()));
     } else {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_msg"] = fmt::format("Invalid expression: {}", std::string(json_sv));
@@ -742,7 +742,7 @@ std::vector<OrderByExpr *> *HTTPSearch::ParseSort(std::string_view json_sv, HTTP
                 expr_parsed_result->exprs_ptr_->at(0) = nullptr;
             }
 
-            std::string value = expression.value().get<std::string>();
+            std::string value(expression.value().get<std::string_view>().value());
             ToLower(value);
             if (value == "asc") {
                 order_by_expr->type_ = OrderType::kAsc;
@@ -797,8 +797,8 @@ SearchExpr *HTTPSearch::ParseSearchExpr(std::string_view json_sv, HTTPStatus &ht
             return {};
         }
 
-        auto fusion = sub_doc["fusion_method"].get<std::string>();
-        auto match = sub_doc["match_method"].get<std::string>();
+        auto fusion = sub_doc["fusion_method"].get<std::string_view>();
+        auto match = sub_doc["match_method"].get<std::string_view>();
 
         if (fusion.error() == simdjson::SUCCESS && match.error() == simdjson::SUCCESS) {
             response["error_code"] = ErrorCode::kInvalidExpression;
@@ -813,7 +813,7 @@ SearchExpr *HTTPSearch::ParseSearchExpr(std::string_view json_sv, HTTPStatus &ht
             child_expr->push_back(fusion_expr.release());
         } else {
             // match type
-            std::string match_method = match.value();
+            std::string match_method(match.value());
             ToLower(match_method);
             if (match_method == "dense") {
                 auto match_dense_expr = ParseMatchDense(search_obj_sv, http_status, response);
@@ -886,7 +886,7 @@ std::unique_ptr<FusionExpr> HTTPSearch::ParseFusion(std::string_view json_sv, HT
             return nullptr;
         }
         if (key == "fusion_method") {
-            std::string method_str = params.get<std::string>();
+            std::string method_str(params.get<std::string_view>().value());
             ToLower(method_str);
             fusion_expr->method_ = std::move(method_str);
         } else if (key == "topn") {
@@ -940,7 +940,7 @@ std::unique_ptr<FusionExpr> HTTPSearch::ParseFusion(std::string_view json_sv, HT
         if (fusion_doc.type() == simdjson::json_type::object) {
             for (auto param : fusion_doc.get_object()) {
                 std::string param_k = std::string((std::string_view)param.unescaped_key());
-                std::string param_v = param.value().get<std::string>();
+                std::string param_v(param.value().get<std::string_view>().value());
                 extra_params_str += fmt::format(";{}={}", param_k, param_v);
             }
         }
@@ -979,7 +979,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
             return nullptr;
         }
         if (key == "match_method") {
-            std::string match_method = value.get<std::string>();
+            std::string match_method(value.get<std::string_view>().value());
             ToLower(match_method);
             if (match_method != "dense") {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -988,7 +988,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
             }
         } else if (key == "fields") {
             auto column_expr = std::make_unique<ColumnExpr>();
-            auto column_str = value.get<std::string>();
+            std::string column_str(value.get<std::string_view>().value());
             column_expr->names_.push_back(std::move(column_str));
             knn_expr->column_expr_ = column_expr.release();
         } else if (key == "query_vector") {
@@ -998,7 +998,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
             fde_json = value.raw_json();
             has_fde = true;
         } else if (key == "element_type") {
-            std::string element_type = value.get<std::string>();
+            std::string element_type(value.get<std::string_view>().value());
             ToUpper(element_type);
             try {
                 knn_expr->embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(element_type);
@@ -1008,7 +1008,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
                 return nullptr;
             }
         } else if (key == "metric_type") {
-            std::string metric_type = value.get<std::string>();
+            std::string metric_type(value.get<std::string_view>().value());
             ToLower(metric_type);
             if (!knn_expr->InitDistanceType(metric_type.c_str())) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1045,10 +1045,10 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
                     continue;
                 }
                 if (param_k == "index_name") {
-                    knn_expr->index_name_ = param_v.get<std::string>();
+                    knn_expr->index_name_ = std::string(param_v.get<std::string_view>().value());
                     continue;
                 }
-                if (param_k == "ignore_index" && (std::string)param_v.get<std::string>() == "true") {
+                if (param_k == "ignore_index" && std::string(param_v.get<std::string_view>().value()) == "true") {
                     knn_expr->ignore_index_ = true;
                     continue;
                 }
@@ -1057,7 +1057,7 @@ std::unique_ptr<KnnExpr> HTTPSearch::ParseMatchDense(std::string_view json_sv, H
                 }
                 auto parameter = std::make_unique<InitParameter>();
                 parameter->param_name_ = param_k;
-                parameter->param_value_ = param_v.get<std::string>();
+                parameter->param_value_ = std::string(param_v.get<std::string_view>().value());
                 knn_expr->opt_params_->emplace_back(parameter.release());
             }
         }
@@ -1144,7 +1144,7 @@ std::unique_ptr<MatchExpr> HTTPSearch::ParseMatchText(std::string_view json_sv, 
             return nullptr;
         }
         if (key == "match_method") {
-            std::string match_method = value.get<std::string>();
+            std::string match_method(value.get<std::string_view>().value());
             ToLower(match_method);
             if (match_method != "text") {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1152,9 +1152,9 @@ std::unique_ptr<MatchExpr> HTTPSearch::ParseMatchText(std::string_view json_sv, 
                 return nullptr;
             }
         } else if (key == "fields") {
-            match_expr->fields_ = value.get<std::string>();
+            match_expr->fields_ = std::string(value.get<std::string_view>().value());
         } else if (key == "matching_text") {
-            match_expr->matching_text_ = value.get<std::string>();
+            match_expr->matching_text_ = std::string(value.get<std::string_view>().value());
         } else if (key == "topn") {
             if (!value.is_integer()) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1184,7 +1184,7 @@ std::unique_ptr<MatchExpr> HTTPSearch::ParseMatchText(std::string_view json_sv, 
                     // do not put it into extra_params
                     continue;
                 }
-                extra_params += fmt::format(";{}={}", param_k, (std::string)param_v.get<std::string>());
+                extra_params += fmt::format(";{}={}", param_k, std::string(param_v.get<std::string_view>().value()));
             }
         }
     }
@@ -1236,7 +1236,7 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
             return nullptr;
         }
         if (key == "match_method") {
-            std::string match_method = value.get<std::string>();
+            std::string match_method(value.get<std::string_view>().value());
             ToLower(match_method);
             if (match_method != "tensor") {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1244,7 +1244,7 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
                 return nullptr;
             }
         } else if (key == "field") {
-            auto column_str = value.get<std::string>();
+            auto column_str = static_cast<std::string>(value.get<std::string_view>().value());
             auto column_expr = std::make_unique<ColumnExpr>();
             column_expr->names_.push_back(std::move(column_str));
             match_tensor_expr->column_expr_ = std::move(column_expr);
@@ -1264,7 +1264,7 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
                 return nullptr;
             }
         } else if (key == "element_type") {
-            element_type = value.get<std::string>();
+            element_type = static_cast<std::string>(value.get<std::string_view>().value());
         } else if (key == "topn") {
             if (!value.is_integer()) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1282,10 +1282,10 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
                 auto param_k = std::string(static_cast<std::string_view>(param.unescaped_key()));
                 auto param_v = param.value();
                 if (param_k == "index_name") {
-                    match_tensor_expr->index_name_ = param_v.get<std::string>();
+                    match_tensor_expr->index_name_ = static_cast<std::string>(param_v.get<std::string_view>().value());
                     continue;
                 }
-                if (param_k == "ignore_index" && (std::string)param_v.get<std::string>() == "true") {
+                if (param_k == "ignore_index" && static_cast<std::string>(param_v.get<std::string_view>().value()) == "true") {
                     match_tensor_expr->ignore_index_ = true;
                     continue;
                 }
@@ -1302,7 +1302,7 @@ std::unique_ptr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(std::string_view j
                     // do not put it into extra_params
                     continue;
                 }
-                extra_params += fmt::format(";{}={}", param_k, static_cast<std::string>(param_v.get<std::string>()));
+                extra_params += fmt::format(";{}={}", param_k, static_cast<std::string>(param_v.get<std::string_view>().value()));
             }
         }
     }
@@ -1367,7 +1367,7 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
             return nullptr;
         }
         if (key == "match_method") {
-            std::string match_method = value.get<std::string>();
+            std::string match_method(value.get<std::string_view>().value());
             ToLower(match_method);
             if (match_method != "sparse") {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1376,7 +1376,7 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
             }
         } else if (key == "fields") {
             auto column_expr = std::make_unique<ColumnExpr>();
-            auto column_str = value.get<std::string>();
+            std::string column_str(value.get<std::string_view>().value());
             column_expr->names_.push_back(std::move(column_str));
             match_sparse_expr->column_expr_ = std::move(column_expr);
         } else if (key == "query_vector") {
@@ -1389,11 +1389,11 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
             assert(const_sparse_expr == nullptr);
         } else if (key == "metric_type") {
             try {
-                match_sparse_expr->SetMetricType(value.get<std::string>());
+                match_sparse_expr->SetMetricType(static_cast<std::string>(value.get<std::string_view>().value()));
             } catch (std::exception &e) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_msg"] = fmt::format("Invalid metric_type: {}, error info: {}",
-                                                    static_cast<std::string>(field_json_obj.value().get<std::string>()),
+                                                    static_cast<std::string>(field_json_obj.value().get<std::string_view>().value()),
                                                     e.what());
                 return nullptr;
             }
@@ -1427,16 +1427,16 @@ std::unique_ptr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(std::string_view j
                     continue;
                 }
                 if (param_k == "index_name") {
-                    match_sparse_expr->index_name_ = param_v.get<std::string>();
+                    match_sparse_expr->index_name_ = static_cast<std::string>(param_v.get<std::string_view>().value());
                     continue;
                 }
-                if (param_k == "ignore_index" && static_cast<std::string>(param_v.get<std::string>()) == "true") {
+                if (param_k == "ignore_index" && static_cast<std::string>(param_v.get<std::string_view>().value()) == "true") {
                     match_sparse_expr->ignore_index_ = true;
                     continue;
                 }
                 auto *init_parameter = new InitParameter();
                 init_parameter->param_name_ = param_k;
-                init_parameter->param_value_ = param_v.get<std::string>();
+                init_parameter->param_value_ = static_cast<std::string>(param_v.get<std::string_view>().value());
                 opt_params_ptr->emplace_back(init_parameter);
             }
         }

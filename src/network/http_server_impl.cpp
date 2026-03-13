@@ -173,14 +173,14 @@ infinity::Status ParseColumnDefs(std::string_view json_sv, std::vector<ColumnDef
         if (simdjson::value val; element["name"].get(val) != simdjson::SUCCESS || !val.is_string()) {
             return infinity::Status::InvalidColumnDefinition("Name field is missing or not string");
         } else {
-            column_name = val.get<std::string>();
+            column_name = val.get<std::string_view>().value();
         }
 
         std::string value_type;
         if (simdjson::value val; element["type"].get(val) != simdjson::SUCCESS || !val.is_string()) {
             return infinity::Status::InvalidColumnDefinition("Type field is missing or not string");
         } else {
-            value_type = val.get<std::string>();
+            value_type = val.get<std::string_view>().value();
         }
         ToLower(value_type);
 
@@ -202,7 +202,7 @@ infinity::Status ParseColumnDefs(std::string_view json_sv, std::vector<ColumnDef
             std::set<ConstraintType> constraints;
             if (simdjson::array array; element["constraints"].get(array) == simdjson::SUCCESS) {
                 for (auto constraint_json : array) {
-                    std::string constraint = constraint_json.get<std::string>();
+                    std::string constraint(constraint_json.get<std::string_view>().value());
                     ToLower(constraint);
                     constraints.insert(StringToConstraintType(constraint));
                 }
@@ -210,7 +210,7 @@ infinity::Status ParseColumnDefs(std::string_view json_sv, std::vector<ColumnDef
 
             std::string table_comment;
             if (simdjson::value val; element["comment"].get(val) == simdjson::SUCCESS) {
-                table_comment = val.get<std::string>();
+                table_comment = val.get<std::string_view>().value();
             }
 
             std::shared_ptr<ParsedExpr> default_expr{nullptr};
@@ -282,7 +282,7 @@ public:
         simdjson::padded_string json_pad(body_info);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string option = doc["create_option"].get<std::string>();
+        std::string option(doc["create_option"].get<std::string_view>().value());
 
         HTTPStatus http_status;
         nlohmann::json json_response;
@@ -290,7 +290,7 @@ public:
         CreateDatabaseOptions options;
         if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -313,7 +313,7 @@ public:
 
         std::string db_comment;
         if (simdjson::value val; doc["comment"].get(val) == simdjson::SUCCESS) {
-            db_comment = val.get<std::string>();
+            db_comment = val.get<std::string_view>().value();
         }
 
         // create database
@@ -351,7 +351,7 @@ public:
         DropDatabaseOptions options;
         if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -483,7 +483,7 @@ public:
         CreateTableOptions options;
         if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -531,7 +531,7 @@ public:
         simdjson::padded_string json_pad(body_info);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string new_table_name = doc["new_table_name"].get<std::string>();
+        std::string new_table_name(doc["new_table_name"].get<std::string_view>().value());
 
         auto result = infinity->RenameTable(database_name, table_name, new_table_name);
 
@@ -571,7 +571,7 @@ public:
         DropTableOptions options;
         if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -700,7 +700,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             ExportOptions export_options;
 
-            std::string file_type_str = doc["file_type"].get<std::string>();
+            std::string file_type_str(doc["file_type"].get<std::string_view>().value());
             ToLower(file_type_str);
             if (file_type_str == "csv") {
                 export_options.copy_file_type_ = CopyFileType::kCSV;
@@ -728,7 +728,7 @@ public:
                     export_options.row_limit_ = val.get<size_t>();
                 }
                 if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
-                    std::string delimiter = val.get<std::string>();
+                    std::string delimiter(val.get<std::string_view>().value());
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_msg"] = fmt::format("Not supported delimiter: {}", delimiter);
@@ -739,7 +739,7 @@ public:
                     export_options.delimiter_ = ',';
                 }
             }
-            std::string file_path = doc["file_path"].get<std::string>();
+            std::string file_path(doc["file_path"].get<std::string_view>().value());
             std::vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
                 if (export_columns != nullptr) {
@@ -757,7 +757,7 @@ public:
 
                 for (auto column : val.get_array()) {
                     if (column.is_string()) {
-                        std::string column_name = column.get<std::string>();
+                        std::string column_name(column.get<std::string_view>().value());
                         ToLower(column_name);
                         if (column_name == "_row_id") {
                             auto *expr = new FunctionExpr();
@@ -862,7 +862,7 @@ public:
             simdjson::document doc = parser.iterate(json_pad);
             ImportOptions import_options;
 
-            std::string file_type_str = doc["file_type"].get<std::string>();
+            std::string file_type_str(doc["file_type"].get<std::string_view>().value());
             ToLower(file_type_str);
             if (file_type_str == "csv") {
                 import_options.copy_file_type_ = CopyFileType::kCSV;
@@ -883,7 +883,7 @@ public:
                     import_options.header_ = val.get<bool>();
                 }
                 if (simdjson::value val; doc["delimiter"].get(val) == simdjson::SUCCESS) {
-                    std::string delimiter = val.get<std::string>();
+                    std::string delimiter(val.get<std::string_view>().value());
                     if (delimiter.size() != 1) {
                         json_response["error_code"] = ErrorCode::kNotSupported;
                         json_response["error_msg"] = fmt::format("Not supported delimiter: {}", delimiter);
@@ -894,7 +894,7 @@ public:
                     import_options.delimiter_ = ',';
                 }
             }
-            std::string file_path = doc["file_path"].get<std::string>();
+            std::string file_path(doc["file_path"].get<std::string_view>().value());
 
             auto result = infinity->Import(database_name, table_name, file_path, import_options);
             if (result.IsOk()) {
@@ -997,7 +997,7 @@ public:
                         }
                         case simdjson::json_type::string: {
                             auto const_expr = std::make_unique<ConstantExpr>(LiteralType::kString);
-                            const_expr->str_value_ = strdup(((std::string)value.get<std::string>()).c_str());
+                            const_expr->str_value_ = strdup(std::string(value.get<std::string_view>().value()).c_str());
                             insert_one_row->values_.emplace_back(std::move(const_expr));
                             break;
                         }
@@ -1379,7 +1379,7 @@ public:
             simdjson::padded_string json_pad(data_body);
             simdjson::parser parser;
             simdjson::document doc = parser.iterate(json_pad);
-            const std::string filter_string = doc["filter"].get<std::string>();
+            const std::string filter_string(doc["filter"].get<std::string_view>().value());
             if (filter_string != "") {
                 std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
                 ExprParser expr_parser;
@@ -1521,7 +1521,7 @@ public:
                     }
                     case simdjson::json_type::string: {
                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
-                        std::string str_value = value.get<std::string>();
+                        std::string str_value(value.get<std::string_view>().value());
                         const_expr->str_value_ = strdup(str_value.c_str());
                         update_expr->value = const_expr;
                         const_expr = nullptr;
@@ -1601,7 +1601,7 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            std::string where_clause = filter_value.get<std::string>();
+            std::string where_clause(filter_value.get<std::string_view>().value());
 
             std::unique_ptr<ExpressionParserResult> expr_parsed_result = std::make_unique<ExpressionParserResult>();
             ExprParser expr_parser;
@@ -1876,7 +1876,7 @@ public:
 
         if (simdjson::value val; doc["drop_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_not_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -1930,13 +1930,13 @@ public:
 
         std::string index_comment;
         if (simdjson::value val; doc["comment"].get(val) == simdjson::SUCCESS) {
-            index_comment = val.get<std::string>();
+            index_comment = val.get<std::string_view>().value();
         }
 
         CreateIndexOptions options;
         if (simdjson::value val; doc["create_option"].get(val) == simdjson::SUCCESS) {
             if (val.is_string()) {
-                std::string option = val.get<std::string>();
+                std::string option(val.get<std::string_view>().value());
                 if (option == "ignore_if_exists") {
                     options.conflict_type_ = ConflictType::kIgnore;
                 } else if (option == "error") {
@@ -1979,7 +1979,7 @@ public:
                 ToLower(name);
                 std::string value;
                 if (element.value().is_string()) {
-                    value = element.value().get<std::string>();
+                    value = std::string(element.value().get<std::string_view>().value());
                 } else {
                     value = std::string((std::string_view)element.value().raw_json());
                 }
@@ -2000,7 +2000,7 @@ public:
             }
 
             if (index_info->index_type_ == IndexType::kSecondaryFunctional) {
-                std::string func_str = doc["fields"].get_array().at(0).get<std::string>();
+                std::string func_str(doc["fields"].get_array().at(0).get<std::string_view>().value());
                 nlohmann::json func_str_json_wrapper = func_str;
                 std::string func_json_str = func_str_json_wrapper.dump();
                 std::string_view func_sv(func_json_str);
@@ -2017,7 +2017,7 @@ public:
                     return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
             } else {
-                index_info->column_name_ = doc["fields"].get_array().at(0).get<std::string>();
+                index_info->column_name_ = std::string(doc["fields"].get_array().at(0).get<std::string_view>().value());
                 ToLower(index_info->column_name_);
             }
 
@@ -2097,7 +2097,7 @@ public:
             }
             for (auto option : val.get_object()) {
                 const std::string key = std::string((std::string_view)option.unescaped_key());
-                const std::string value = option.value().get<std::string>();
+                const std::string value(option.value().get<std::string_view>().value());
                 auto *init_param = new InitParameter();
                 init_param->param_name_ = key;
                 init_param->param_value_ = value;
@@ -2219,7 +2219,7 @@ public:
 
         std::vector<std::string> column_names;
         for (auto column : doc["column_names"].get_array()) {
-            column_names.emplace_back(column.get<std::string>());
+            column_names.emplace_back(column.get<std::string_view>().value());
         }
 
         const QueryResult result = infinity->DropColumns(database_name, table_name, std::move(column_names));
@@ -2645,7 +2645,7 @@ public:
                         }
                     }
                     case simdjson::json_type::string: {
-                        std::string str_value = var_value.get<std::string>();
+                        std::string str_value(var_value.get<std::string_view>().value());
                         result = infinity->SetVariableOrConfig(var_name, str_value, SetScope::kGlobal);
                         break;
                     }
@@ -2792,7 +2792,7 @@ public:
                         }
                     }
                     case simdjson::json_type::string: {
-                        std::string str_value = var_value.get<std::string>();
+                        std::string str_value(var_value.get<std::string_view>().value());
                         result = infinity->SetVariableOrConfig(var_name, str_value, SetScope::kSession);
                         break;
                     }
@@ -2875,7 +2875,7 @@ public:
                         }
                     }
                     case simdjson::json_type::string: {
-                        std::string str_value = config_value.get<std::string>();
+                        std::string str_value(config_value.get<std::string_view>().value());
                         result = infinity->SetVariableOrConfig(config_name, str_value, SetScope::kConfig);
                         break;
                     }
@@ -3486,9 +3486,9 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string db_name = doc["db_name"].get<std::string>();
-        std::string table_name = doc["table_name"].get<std::string>();
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
+        std::string db_name(doc["db_name"].get<std::string_view>().value());
+        std::string table_name(doc["table_name"].get<std::string_view>().value());
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -3516,7 +3516,7 @@ class RestoreTableSnapshotHandler final : public HttpRequestHandler {
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -3744,7 +3744,7 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -3772,7 +3772,7 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -3800,8 +3800,8 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
-        std::string db_name = doc["db_name"].get<std::string>();
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
+        std::string db_name(doc["db_name"].get<std::string_view>().value());
         nlohmann::json json_response;
         HTTPStatus http_status;
         QueryResult result = infinity->CreateDatabaseSnapshot(db_name, snapshot_name);
@@ -3828,7 +3828,7 @@ public:
         simdjson::padded_string json_pad(data_body);
         simdjson::parser parser;
         simdjson::document doc = parser.iterate(json_pad);
-        std::string snapshot_name = doc["snapshot_name"].get<std::string>();
+        std::string snapshot_name(doc["snapshot_name"].get<std::string_view>().value());
 
         nlohmann::json json_response;
         HTTPStatus http_status;
@@ -4005,7 +4005,7 @@ public:
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            std::string role = doc["role"].get<std::string>();
+            std::string role(doc["role"].get<std::string_view>().value());
             QueryResult result;
             ToLower(role);
             if (role == "admin") {
@@ -4013,11 +4013,13 @@ public:
             } else if (role == "standalone") {
                 result = infinity->AdminSetStandalone();
             } else if (role == "leader") {
-                result = infinity->AdminSetLeader(doc["name"].get<std::string>());
+                result = infinity->AdminSetLeader(std::string(doc["name"].get<std::string_view>().value()));
             } else if (role == "follower") {
-                result = infinity->AdminSetFollower(doc["name"].get<std::string>(), doc["address"].get<std::string>());
+                result = infinity->AdminSetFollower(std::string(doc["name"].get<std::string_view>().value()),
+                                                    std::string(doc["address"].get<std::string_view>().value()));
             } else if (role == "learner") {
-                result = infinity->AdminSetLearner(doc["name"].get<std::string>(), doc["address"].get<std::string>());
+                result = infinity->AdminSetLearner(std::string(doc["name"].get<std::string_view>().value()),
+                                                   std::string(doc["address"].get<std::string_view>().value()));
             } else {
                 http_status = HTTPStatus::CODE_500;
                 json_response["error_code"] = ErrorCode::kInvalidNodeRole;

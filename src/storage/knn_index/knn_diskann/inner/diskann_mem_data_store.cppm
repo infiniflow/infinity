@@ -14,13 +14,8 @@
 
 module;
 
+#include "common/simd/simd_common_intrin_include.h"
 #include <cassert>
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
 
 export module infinity_core:diskann_mem_data_store;
 
@@ -28,11 +23,11 @@ import :diskann_dist_func;
 import :diskann_utils;
 import :infinity_exception;
 import :local_file_handle;
+import :simd_common_tools;
 
 import std.compat;
-
-namespace infinity {
-export template <typename DataType>
+export namespace infinity {
+template <typename DataType>
 class DiskAnnMemDataStore {
 public:
     using This = DiskAnnMemDataStore<DataType>;
@@ -139,7 +134,7 @@ public:
     void PrefetchVector(size_t idx) {
         size_t max_prefetch_size = (aligned_dim_ * sizeof(DataType) / 64) * 64;
         for (size_t i = 0; i < max_prefetch_size; i += 64) {
-            _mm_prefetch(((const char *)data_ + idx * aligned_dim_ * sizeof(DataType)) + i, _MM_HINT_T0);
+            simd_prefetch<_MM_HINT_T0>(((const char *)data_ + idx * aligned_dim_ * sizeof(DataType)) + i);
         }
     }
 

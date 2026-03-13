@@ -348,6 +348,15 @@ using parquet::arrow::FileWriter;
 }
 }; // namespace parquet
 
+export namespace phmap {
+namespace priv {
+namespace flat_hash_map {
+using ::phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
+using ::phmap::priv::raw_hash_set;
+}
+} // namespace priv
+}; // namespace phmap
+
 namespace infinity {
 
 // spdlog

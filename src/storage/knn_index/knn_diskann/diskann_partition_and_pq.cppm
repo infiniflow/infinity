@@ -14,15 +14,9 @@
 
 module;
 
+#include "common/simd/simd_common_intrin_include.h"
 #include <cassert>
 #include <cstring>
-#include <random>
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
 
 export module infinity_core:diskann_partition_and_pq;
 
@@ -34,10 +28,10 @@ import :simd_functions;
 import :diskann_dist_func;
 import :default_values;
 import :local_file_handle;
+import :simd_common_tools;
 import :virtual_store;
 
-// import std;
-// import std.compat;
+import std;
 import third_party;
 
 namespace infinity {
@@ -569,15 +563,15 @@ export void AggregateCoords(const size_t *ids, const size_t n_ids, const u8 *all
 
 // look up distances in PQ table
 export void PqDistLookup(const u8 *pq_ids, const size_t n_pts, const size_t pq_nchunks, const f32 *pq_dists, f32 *dists_out) {
-    _mm_prefetch((char *)dists_out, _MM_HINT_T0);
-    _mm_prefetch((char *)pq_ids, _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 64), _MM_HINT_T0);
-    _mm_prefetch((char *)(pq_ids + 128), _MM_HINT_T0);
+    simd_prefetch<_MM_HINT_T0>((char *)dists_out);
+    simd_prefetch<_MM_HINT_T0>((char *)pq_ids);
+    simd_prefetch<_MM_HINT_T0>((char *)(pq_ids + 64));
+    simd_prefetch<_MM_HINT_T0>((char *)(pq_ids + 128));
     memset(dists_out, 0, n_pts * sizeof(f32));
     for (size_t chunk = 0; chunk < pq_nchunks; chunk++) {
         const f32 *chunk_dists = pq_dists + 256 * chunk;
         if (chunk < pq_nchunks - 1) {
-            _mm_prefetch((char *)(chunk_dists + 256), _MM_HINT_T0);
+            simd_prefetch<_MM_HINT_T0>((char *)(chunk_dists + 256));
         }
         for (size_t idx = 0; idx < n_pts; idx++) {
             u8 pq_centerid = pq_ids[idx * pq_nchunks + chunk];
