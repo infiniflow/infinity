@@ -136,8 +136,7 @@ class TestMultipleIndexTypesImport:
                 threads = []
                 for worker_func, num_threads in workers:
                     for _ in range(num_threads):
-                        args = [infinity_pool, table_name, end_time, thread_id, round_num, max_row_id]
-                        t = Thread(target=worker_func, args=args)
+                        t = Thread(target=worker_func, args=[infinity_pool, table_name, end_time, thread_id, round_num, max_row_id])
                         threads.append(t)
                         thread_id += 1
 
