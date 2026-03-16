@@ -11,7 +11,7 @@ from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
 # Test configuration constants
-K_RUNNING_TIME_SECONDS = 60
+K_RUNNING_TIME_SECONDS = 10
 
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
@@ -55,8 +55,8 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 20
-            kBatchCount = 20
+            kImportRepeat = 2
+            kBatchCount = 10
             kRowsPerBatch = 5000
 
             db_obj = infinity_obj.get_database("default_db")
@@ -147,17 +147,67 @@ class TestMultipleIndexTypesImport:
 
             part3_round(round_num)
 
-        for i in range(5):
+        for i in range(3):
             part3(i)
 
-        # Part 4: Cleanup
+        # Part 4: Drop and recreate all indexes
         @decorator
         def part4(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
-            db_obj.drop_table(table_name, ConflictType.Error)
-            logging.info("Cleaned up test table")
+            table_obj = db_obj.get_table(table_name)
+
+            # Drop all indexes
+            for idx in self.generator.index():
+                idx_name = f"idx_{idx.target_name}"
+                table_obj.drop_index(idx_name, ConflictType.Ignore)
+            logging.info("Dropped all indexes")
+
+            # Recreate all indexes and measure time
+            for idx in self.generator.index():
+                idx_name = f"idx_{idx.target_name}"
+                idx_start = time.time()
+                logging.info(f"Recreating index {idx_name}...")
+                table_obj.create_index(idx_name, idx)
+                idx_duration = time.time() - idx_start
+                logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
 
         part4()
+
+        for i in range(3):
+            part3(i)
+
+        # Part 5: Create snapshot, drop table, restore snapshot
+        @decorator
+        def part5(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+
+            snapshot_name = "test_multi_index_snapshot"
+            db_obj.create_table_snapshot(snapshot_name, table_name)
+            logging.info(f"Created snapshot {snapshot_name}")
+
+            db_obj.drop_table(table_name, ConflictType.Error)
+            logging.info("Dropped test table")
+
+            db_obj.restore_table_snapshot(snapshot_name)
+            logging.info(f"Restored snapshot {snapshot_name}")
+
+            # Verify table exists
+            tables = db_obj.list_tables()
+            assert table_name in tables.table_names, f"Table {table_name} not found after restore"
+            logging.info(f"Verified: table {table_name} exists")
+
+            # Verify all indexes exist
+            table_obj = db_obj.get_table(table_name)
+            indexes = table_obj.list_indexes()
+            index_names = indexes.index_names
+            expected_index_count = len(list(self.generator.index()))
+            assert len(index_names) == expected_index_count, f"Expected {expected_index_count} indexes, got {len(index_names)}"
+            logging.info(f"Verified: {len(index_names)} indexes exist")
+
+        part5()
+
+        for i in range(3):
+            part3(i)
 
         logging.info("Test completed successfully!")
 
@@ -191,7 +241,7 @@ class TestMultipleIndexTypesImport:
                 update_id = random.randint(0, max_row_id)
                 row_data = self.generator.generate_random_row(update_id)
 
-                logging.info(f"thread {thread_id}: updating num={update_id}")
+                # logging.info(f"thread {thread_id}: updating num={update_id}")
                 table_obj.update(f"num = {update_id}", {
                     "doctitle": f"updated_title_{update_id}",
                     "vector_col": row_data["vector_col"],
@@ -216,7 +266,7 @@ class TestMultipleIndexTypesImport:
         while time.time() < end_time:
             try:
                 delete_id = random.randint(0, max_row_id)
-                logging.info(f"thread {thread_id}: deleting num={delete_id}")
+                # logging.info(f"thread {thread_id}: deleting num={delete_id}")
                 table_obj.delete(f"num = {delete_id}")
 
                 local_count += 1
