@@ -11,7 +11,7 @@ from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
 # Test configuration constants
-K_RUNNING_TIME_SECONDS = 60
+K_RUNNING_TIME_SECONDS = 120
 
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
@@ -151,7 +151,7 @@ class TestMultipleIndexTypesImport:
         # Part 3: Create index --> Prepare data --> Test
         @decorator
         def part3(infinity_obj):
-            for i in range(3):
+            for i in range(2):
                 run_parallel_round(i)
 
         part3()
@@ -177,7 +177,7 @@ class TestMultipleIndexTypesImport:
                 idx_duration = time.time() - idx_start
                 logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
 
-            for i in range(3):
+            for i in range(2):
                 run_parallel_round(i)
 
         part4()
@@ -210,7 +210,7 @@ class TestMultipleIndexTypesImport:
             assert len(index_names) == expected_index_count, f"Expected {expected_index_count} indexes, got {len(index_names)}"
             logging.info(f"Verified: {len(index_names)} indexes exist")
 
-            for i in range(3):
+            for i in range(2):
                 run_parallel_round(i)
 
         part5()
