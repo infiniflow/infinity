@@ -212,7 +212,7 @@ class TestMultipleIndexTypesImport:
             logging.info("Dropped test table")
 
             snapshot_name = "test_multi_index_snapshot"
-            db_obj.drop_snapshot(snapshot_name)
+            infinity_obj.drop_snapshot(snapshot_name)
             logging.info(f"Dropped snapshot {snapshot_name}")
 
         part5()
