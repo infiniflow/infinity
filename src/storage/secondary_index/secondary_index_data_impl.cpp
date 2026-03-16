@@ -356,7 +356,32 @@ public:
         }
     }
 
-    void ReadIndexInner(const char *ptr, size_t size) override {}
+    void ReadIndexInner(const char *ptr, size_t size) override {
+        // Read unique key count
+        unique_key_count_ = *reinterpret_cast<const u32 *>(ptr);
+        ptr += sizeof(unique_key_count_);
+
+        if (unique_key_count_ > 0) {
+            // Read unique keys
+            unique_keys_.resize(unique_key_count_);
+            std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
+            ptr += unique_key_count_ * sizeof(OrderedKeyType);
+
+            // Read RoaringBitmaps
+            offset_bitmaps_.clear();
+            offset_bitmaps_.reserve(unique_key_count_);
+            for (u32 i = 0; i < unique_key_count_; ++i) {
+                i32 bitmap_size = *reinterpret_cast<const i32 *>(ptr);
+                ptr += sizeof(bitmap_size);
+
+                auto bitmap_ptr = Bitmap::ReadAdv(ptr, bitmap_size);
+                offset_bitmaps_.emplace_back(*bitmap_ptr);
+            }
+
+            // Set up key_ptr_ and offset_ptr_ for compatibility
+            SetupCompatibilityPointers();
+        }
+    }
 
     void InsertData(const void *ptr) override {
         auto map_ptr = static_cast<const std::multimap<OrderedKeyType, u32> *>(ptr);
@@ -369,9 +394,15 @@ public:
 
         // Build unique keys and corresponding bitmaps
         std::map<OrderedKeyType, std::vector<u32>> key_to_offsets;
+        u32 max_offset = 0;
         for (const auto &[key, offset] : *map_ptr) {
             key_to_offsets[key].push_back(offset);
+            max_offset = std::max(max_offset, offset);
         }
+
+        // Bitmap size should be max_offset + 1, not chunk_row_count_
+        // because offsets are segment offsets, not relative offsets
+        u32 bitmap_size = max_offset + 1;
 
         // Convert to vectors
         unique_key_count_ = key_to_offsets.size();
@@ -382,7 +413,7 @@ public:
             unique_keys_.push_back(key);
 
             // Create Bitmap and add all offsets
-            Bitmap bitmap(chunk_row_count_);
+            Bitmap bitmap(bitmap_size);
             for (u32 offset : offsets) {
                 bitmap.SetTrue(offset);
             }
@@ -401,15 +432,29 @@ public:
         OrderedKeyType key = {};
         u32 offset = 0;
         u32 total_count = 0;
+        u32 max_offset = 0;
 
         while (merger.GetNextDataPair(key, offset)) {
             key_to_offsets[key].push_back(offset);
             ++total_count;
+            max_offset = std::max(max_offset, offset);
         }
 
         if (total_count != chunk_row_count_) {
+            // Debug: print more information about the mismatch
+            LOG_ERROR(fmt::format("InsertMergeData(): total_count: {} != chunk_row_count_: {}", total_count, chunk_row_count_));
+            LOG_ERROR(fmt::format("InsertMergeData(): old_chunks.size(): {}", old_chunks.size()));
+            for (size_t i = 0; i < old_chunks.size(); ++i) {
+                LOG_ERROR(fmt::format("InsertMergeData(): old_chunks[{}].first (row_count): {}", i, old_chunks[i].first));
+            }
+            LOG_ERROR(fmt::format("InsertMergeData(): unique_key_count_: {}", unique_key_count_));
+            LOG_ERROR(fmt::format("InsertMergeData(): key_to_offsets.size(): {}", key_to_offsets.size()));
             UnrecoverableError(fmt::format("InsertMergeData(): error: total_count: {} != chunk_row_count_: {}", total_count, chunk_row_count_));
         }
+
+        // Bitmap size should be max_offset + 1, not chunk_row_count_
+        // because offsets are segment offsets, not relative offsets
+        u32 bitmap_size = max_offset + 1;
 
         // Convert to vectors
         unique_key_count_ = key_to_offsets.size();
@@ -420,7 +465,7 @@ public:
             unique_keys_.push_back(key_val);
 
             // Create Bitmap and add all offsets
-            Bitmap bitmap(chunk_row_count_);
+            Bitmap bitmap(bitmap_size);
             for (u32 offset_val : offsets) {
                 bitmap.SetTrue(offset_val);
             }
@@ -534,7 +579,32 @@ public:
         }
     }
 
-    void ReadIndexInner(const char *ptr, size_t size) override {}
+    void ReadIndexInner(const char *ptr, size_t size) override {
+        // Read unique key count
+        unique_key_count_ = *reinterpret_cast<const u32 *>(ptr);
+        ptr += sizeof(unique_key_count_);
+
+        if (unique_key_count_ > 0) {
+            // Read unique keys
+            unique_keys_.resize(unique_key_count_);
+            std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
+            ptr += unique_key_count_ * sizeof(OrderedKeyType);
+
+            // Read RoaringBitmaps
+            offset_bitmaps_.clear();
+            offset_bitmaps_.reserve(unique_key_count_);
+            for (u32 i = 0; i < unique_key_count_; ++i) {
+                i32 bitmap_size = *reinterpret_cast<const i32 *>(ptr);
+                ptr += sizeof(bitmap_size);
+
+                auto bitmap_ptr = Bitmap::ReadAdv(ptr, bitmap_size);
+                offset_bitmaps_.emplace_back(*bitmap_ptr);
+            }
+
+            // Set up key_ptr_ and offset_ptr_ for compatibility
+            SetupCompatibilityPointers();
+        }
+    }
 
     void InsertData(const void *ptr) override {
         // For BooleanT, we need to convert from bool to uint8_t
@@ -548,11 +618,17 @@ public:
 
         // Build unique keys and corresponding bitmaps
         std::map<OrderedKeyType, std::vector<u32>> key_to_offsets;
+        u32 max_offset = 0;
         for (const auto &[key, offset] : *map_ptr) {
             // Convert bool to uint8_t
             OrderedKeyType converted_key = key ? 1 : 0;
             key_to_offsets[converted_key].push_back(offset);
+            max_offset = std::max(max_offset, offset);
         }
+
+        // Bitmap size should be max_offset + 1, not chunk_row_count_
+        // because offsets are segment offsets, not relative offsets
+        u32 bitmap_size = max_offset + 1;
 
         // Convert to vectors
         unique_key_count_ = key_to_offsets.size();
@@ -563,7 +639,7 @@ public:
             unique_keys_.push_back(key);
 
             // Create Bitmap and add all offsets
-            Bitmap bitmap(chunk_row_count_);
+            Bitmap bitmap(bitmap_size);
             for (u32 offset : offsets) {
                 bitmap.SetTrue(offset);
             }
@@ -583,6 +659,17 @@ public:
             merged_data[unique_keys_[i]] = offset_bitmaps_[i];
         }
 
+        // Calculate total bitmap size needed
+        u32 total_bitmap_size = 0;
+        // First, get the max offset from current data
+        for (size_t i = 0; i < offset_bitmaps_.size(); ++i) {
+            u32 pos = 0;
+            while (offset_bitmaps_[i].NextSetBit(pos)) {
+                total_bitmap_size = std::max(total_bitmap_size, pos + 1);
+                pos++;
+            }
+        }
+
         // Then merge data from old buffers
         u32 offset_shift = 0;
         for (const auto &[old_row_count, old_buffer] : old_buffers) {
@@ -592,9 +679,19 @@ public:
             const auto &old_keys = old_data->GetUniqueKeys();
             const auto &old_bitmaps = old_data->offset_bitmaps_;
 
+            // Find max offset in old data to calculate total size
+            for (size_t i = 0; i < old_bitmaps.size(); ++i) {
+                u32 pos = 0;
+                while (old_bitmaps[i].NextSetBit(pos)) {
+                    total_bitmap_size = std::max(total_bitmap_size, pos + offset_shift + 1);
+                    pos++;
+                }
+            }
+
             for (size_t i = 0; i < old_keys.size(); ++i) {
                 // Create a new bitmap with shifted offsets
-                Bitmap shifted_bitmap(chunk_row_count_);
+                // Use a temporary large enough bitmap
+                Bitmap shifted_bitmap(total_bitmap_size);
                 // Efficiently iterate over set bits using NextSetBit
                 u32 pos = 0;
                 while (old_bitmaps[i].NextSetBit(pos)) {
