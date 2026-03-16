@@ -49,10 +49,12 @@ def generate(num_rows: int = 9999):
                 original = line.rstrip()
 
                 # Generate 2048-dim vector (all values = i)
-                vector_2048 = ', '.join([str(i)] * 2048)
+                vector_2048 = '[' + ', '.join([str(i)] * 2048) + ']'
 
                 # Generate multi-vector (2 vectors, each 1024-dim, total 2048 values)
-                multi_vector = ', '.join([str(i)] * 2048)
+                # Format: [[1,2,...,1024], [1,2,...,1024]]
+                embedding_1024 = '[' + ', '.join([str(i)] * 1024) + ']'
+                multi_vector = f'[{embedding_1024}, {embedding_1024}]'
 
                 # Category (cycle through A, B, C, D)
                 category = categories[i % 4]
@@ -63,7 +65,7 @@ def generate(num_rows: int = 9999):
                 sparse_str = '[' + ', '.join(sparse_parts) + ']'
 
                 # Combine: original + num + vector + multi_vector + category + sparse
-                new_line = f"{original}\t{i}\t[{vector_2048}]\t[{multi_vector}]\t{category}\t{sparse_str}\n"
+                new_line = f"{original}\t{i}\t{vector_2048}\t{multi_vector}\t{category}\t{sparse_str}\n"
                 dst.write(new_line)
 
 

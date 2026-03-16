@@ -220,7 +220,7 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("body", index.IndexType.FullText),
             index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
             index.IndexInfo("vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            # index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
+            index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
             index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "8", "compress_type": "compress"}),
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]

@@ -55,7 +55,7 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 20
+            kImportRepeat = 30
             kBatchCount = 20
             kRowsPerBatch = 5000
 
@@ -120,13 +120,13 @@ class TestMultipleIndexTypesImport:
                     (self.delete_worker, 2),
                     (self.read_worker_fulltext, 1),
                     (self.read_worker_hnsw, 1),
-                    (self.read_worker_hnsw_mv, 0),
+                    (self.read_worker_hnsw_mv, 1),
                     (self.read_worker_secondary_high, 1),
                     (self.read_worker_secondary_low, 1),
                     (self.read_worker_sparse, 1),
                     (self.read_worker_fusion_rrf, 1),
                     (self.read_worker_fusion_weighted_sum, 1),
-                    (self.read_worker_fusion_mv_rrf, 0),
+                    (self.read_worker_fusion_mv_rrf, 1),
                 ]
 
                 end_time = time.time() + K_RUNNING_TIME_SECONDS
