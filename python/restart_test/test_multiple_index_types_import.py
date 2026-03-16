@@ -96,8 +96,6 @@ class TestMultipleIndexTypesImport:
             logging.info(f"Total rows after batch insert: {count}, expected: {expected_count}")
             assert count == expected_count, f"Expected {expected_count} rows after batch insert, got {count}"
 
-        part2()
-
         # Parallel operations round (used multiple times)
         def run_parallel_round(round_num: int):
             decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner)
@@ -148,17 +146,12 @@ class TestMultipleIndexTypesImport:
 
             round_worker(round_num)
 
-        # Part 3: Create index --> Prepare data --> Test
+        part2()
+        run_parallel_round(1)
+        run_parallel_round(2)
+
         @decorator
         def part3(infinity_obj):
-            for i in range(2):
-                run_parallel_round(i)
-
-        part3()
-
-        # Part 4: Prepare data --> Create index --> Test
-        @decorator
-        def part4(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
 
@@ -177,14 +170,12 @@ class TestMultipleIndexTypesImport:
                 idx_duration = time.time() - idx_start
                 logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
 
-            for i in range(2):
-                run_parallel_round(i)
+        part3()
+        run_parallel_round(3)
+        run_parallel_round(4)
 
-        part4()
-
-        # Part 5: Restore snapshot --> Test
         @decorator
-        def part5(infinity_obj):
+        def part4(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
 
             snapshot_name = "test_multi_index_snapshot"
@@ -210,11 +201,17 @@ class TestMultipleIndexTypesImport:
             assert len(index_names) == expected_index_count, f"Expected {expected_index_count} indexes, got {len(index_names)}"
             logging.info(f"Verified: {len(index_names)} indexes exist")
 
-            for i in range(2):
-                run_parallel_round(i)
+        part4()
+        run_parallel_round(5)
+        run_parallel_round(6)
+
+        @decorator
+        def part5(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Error)
+            logging.info("Dropped test table")
 
         part5()
-
         logging.info("Test completed successfully!")
 
     # Worker functions
