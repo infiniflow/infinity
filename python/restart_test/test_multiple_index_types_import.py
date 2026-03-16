@@ -11,7 +11,7 @@ from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
 # Test configuration constants
-K_RUNNING_TIME_SECONDS = 10
+K_RUNNING_TIME_SECONDS = 60
 
 class TestMultipleIndexTypesImport:
     @pytest.mark.slow
@@ -55,8 +55,8 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 2
-            kBatchCount = 10
+            kImportRepeat = 20
+            kBatchCount = 20
             kRowsPerBatch = 5000
 
             db_obj = infinity_obj.get_database("default_db")
@@ -98,11 +98,12 @@ class TestMultipleIndexTypesImport:
 
         part2()
 
-        def part3(round_num: int):
+        # Parallel operations round (used multiple times)
+        def run_parallel_round(round_num: int):
             decorator_round = infinity_runner_decorator_factory2(config, uri, infinity_runner)
 
             @decorator_round
-            def part3_round(infinity_pool, round_num: int):
+            def round_worker(infinity_pool, round_num: int):
                 db_obj = infinity_pool.get_conn().get_database("default_db")
                 table_obj = db_obj.get_table(table_name)
 
@@ -145,12 +146,17 @@ class TestMultipleIndexTypesImport:
                 for t in threads:
                     t.join()
 
-            part3_round(round_num)
+            round_worker(round_num)
 
-        for i in range(3):
-            part3(i)
+        # Part 3: Create index --> Prepare data --> Test
+        @decorator
+        def part3(infinity_obj):
+            for i in range(3):
+                run_parallel_round(i)
 
-        # Part 4: Drop and recreate all indexes
+        part3()
+
+        # Part 4: Prepare data --> Create index --> Test
         @decorator
         def part4(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
@@ -171,12 +177,12 @@ class TestMultipleIndexTypesImport:
                 idx_duration = time.time() - idx_start
                 logging.info(f"Index {idx_name} created in {idx_duration:.2f} seconds")
 
+            for i in range(3):
+                run_parallel_round(i)
+
         part4()
 
-        for i in range(3):
-            part3(i)
-
-        # Part 5: Create snapshot, drop table, restore snapshot
+        # Part 5: Restore snapshot --> Test
         @decorator
         def part5(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
@@ -204,10 +210,10 @@ class TestMultipleIndexTypesImport:
             assert len(index_names) == expected_index_count, f"Expected {expected_index_count} indexes, got {len(index_names)}"
             logging.info(f"Verified: {len(index_names)} indexes exist")
 
-        part5()
+            for i in range(3):
+                run_parallel_round(i)
 
-        for i in range(3):
-            part3(i)
+        part5()
 
         logging.info("Test completed successfully!")
 
