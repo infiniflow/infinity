@@ -3,7 +3,6 @@ from infinity import index
 import csv
 import json
 import numpy as np
-import random
 from infinity.common import SparseVector
 
 
@@ -218,89 +217,10 @@ class MultiIndexTypesGenerator:
             "body": {"type": "varchar"},
             "num": {"type": "int"},
             "vector_col": {"type": "vector,2048,float"},
-            "multi_vector_col": {"type": "multivector,2,float"},
+            "multi_vector_col": {"type": "multivector,1024,float"},
             "category": {"type": "varchar"},
-            "sparse_col": {"type": "sparse,100,float,int8"}
+            "sparse_col": {"type": "sparse,1024,float,int16"}
         }
-
-    def _generate_sparse_vector(self, dim, density=0.3):
-        indices = []
-        values = []
-        for i in range(dim):
-            if random.random() < density:
-                indices.append(i)
-                values.append(float(random.randint(1, 100)))
-        if not indices:
-            indices = [0]
-            values = [round(random.random(), 6)]
-        return indices, values
-
-    def _generate_vector(self, dim):
-        return [random.randint(0, 100) for _ in range(dim)]
-
-    def _generate_multivector(self, sub_vec_dim, num_sub_vecs):
-        # Returns flattened list for multivector (matching original format)
-        result = []
-        for _ in range(num_sub_vecs):
-            for _ in range(sub_vec_dim):
-                result.append(random.randint(0, 100))
-        return result
-
-    def _format_vector(self, vec):
-        return "[" + ", ".join(str(v) for v in vec) + "]"
-
-    def _format_multivector(self, mv):
-        # multivector uses flat format like vector
-        return "[" + ", ".join(str(v) for v in mv) + "]"
-
-    def _format_sparse(self, indices, values):
-        return "[" + ", ".join(f"{idx}:{val}" for idx, val in zip(indices, values)) + "]"
-
-    def _generate_csv_internal(self, output_file, num_rows, seed=42):
-        random.seed(seed)
-        categories = ["A", "B", "C", "D"]
-        text_words = ["apple", "banana", "cherry", "date", "elder", "fig", "grape"]
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-        with open(output_file, 'w', newline='') as f:
-            writer = csv.writer(f, delimiter='\t')  # Use tab delimiter
-            for i in range(num_rows):
-                doctitle = f"title_{i}"
-                docdate = "01-JAN-2024 00:00:00.000"
-                body = f"test_text_{i}_{random.choice(text_words)}"
-                num = i
-                # vector_col: 2048 dimensions
-                vector = self._generate_vector(2048)
-                # multi_vector_col: 2 sub-vectors, each 1024 dimensions (multivector,2,float)
-                multivec = self._generate_multivector(1024, 2)
-                category = categories[i % len(categories)]
-                sparse_indices, sparse_values = self._generate_sparse_vector(100, density=0.3)
-
-                writer.writerow([
-                    doctitle, docdate, body, num,
-                    self._format_vector(vector),
-                    self._format_multivector(multivec),
-                    category,
-                    self._format_sparse(sparse_indices, sparse_values)
-                ])
-        print(f"Generated {num_rows} rows to {output_file}")
-
-    def gen_factory(csv_path: str):
-        if not csv_path.endswith(".csv"):
-            raise ValueError("csv_path should be csv file")
-
-        def gen(insert_n: int):
-            i = 0
-            while i < insert_n:
-                f = open(csv_path, "r")
-                reader = csv.reader(f, delimiter="\t")
-                for row in reader:
-                    yield [row[0], row[1], row[2], int(row[3]), row[4], row[5], row[6], row[7]]
-                    i += 1
-                    if i >= insert_n:
-                        break
-
-        return gen
 
     def index():
         return [
@@ -316,10 +236,9 @@ class MultiIndexTypesGenerator:
         filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
         if os.path.exists(filepath):
             return filepath
-        # If file doesn't exist, generate it using generate_plus()
         print(f"CSV file not found: {filepath}. Generating...")
-        from tools.generate_wiki_embedding_plus import generate_plus
-        generate_plus()
+        from tools.generate_wiki_embedding_plus import generate
+        generate()
         return filepath
 
     def import_size() -> int:
