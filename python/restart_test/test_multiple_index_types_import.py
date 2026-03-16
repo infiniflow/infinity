@@ -211,6 +211,10 @@ class TestMultipleIndexTypesImport:
             db_obj.drop_table(table_name, ConflictType.Error)
             logging.info("Dropped test table")
 
+            snapshot_name = "test_multi_index_snapshot"
+            db_obj.drop_snapshot(snapshot_name)
+            logging.info(f"Dropped snapshot {snapshot_name}")
+
         part5()
         logging.info("Test completed successfully!")
 
