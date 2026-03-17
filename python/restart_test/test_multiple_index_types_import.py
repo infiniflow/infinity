@@ -21,7 +21,6 @@ class TestMultipleIndexTypesImport:
             # pytest.param("test/data/config/restart_test/test_insert/6.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
 
             ("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120)
-
         ],
     )
     def test_multiple_index_types_import_restart(
@@ -111,11 +110,11 @@ class TestMultipleIndexTypesImport:
                 # Verify indexes exist
                 res = table_obj.list_indexes()
                 index_names = res.index_names
-                logging.info(f"Round {round_num + 1}: Indexes after restart: {index_names}")
+                logging.info(f"Round {round_num}: Indexes after restart: {index_names}")
 
                 res, _, _ = table_obj.output(["count(*)"]).to_result()
                 max_row_id = res["count(star)"][0]
-                logging.info(f"Round {round_num + 1}: Start count: {max_row_id}")
+                logging.info(f"Round {round_num}: Start count: {max_row_id}")
 
                 workers = [
                     (self.insert_worker, 2),
