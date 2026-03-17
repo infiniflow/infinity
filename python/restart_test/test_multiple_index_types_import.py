@@ -237,7 +237,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: insert done, executed {local_count} times")
+        logging.info(f"Round {round_num} - thread {thread_id}: insert done, executed {local_count} times")
 
     def update_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -264,7 +264,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: update done, executed {local_count} times")
+        logging.info(f"Round {round_num} - thread {thread_id}: update done, executed {local_count} times")
 
     def delete_worker(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -284,7 +284,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id}: delete done, executed {local_count} times")
+        logging.info(f"Round {round_num} - thread {thread_id}: delete done, executed {local_count} times")
 
     def read_worker_fulltext(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -303,7 +303,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (FullText): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (FullText): read done, {local_count} queries")
 
     def read_worker_hnsw(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -322,7 +322,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Hnsw): read done, {local_count} queries")
 
     def read_worker_hnsw_mv(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -341,7 +341,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Hnsw MV): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Hnsw MV): read done, {local_count} queries")
 
     def read_worker_secondary_high(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -360,7 +360,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary High): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Secondary High): read done, {local_count} queries")
 
     def read_worker_sparse(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -380,7 +380,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Sparse BMP): read done, {local_count} queries")
 
     def read_worker_secondary_low(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -399,7 +399,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Secondary Low): read done, {local_count} queries")
 
     def read_worker_fusion_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -423,7 +423,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Fusion RRF): read done, {local_count} queries")
 
     def read_worker_fusion_weighted_sum(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -447,7 +447,7 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Fusion Weighted Sum): read done, {local_count} queries")
 
     def read_worker_fusion_mv_rrf(self, connection_pool: ConnectionPool, table_name, end_time, thread_id, round_num, max_row_id):
         infinity_obj = connection_pool.get_conn()
@@ -472,4 +472,4 @@ class TestMultipleIndexTypesImport:
             time.sleep(0.1)
 
         connection_pool.release_conn(infinity_obj)
-        logging.info(f"Round {round_num + 1} - thread {thread_id} (Fusion MV RRF): read done, {local_count} queries")
+        logging.info(f"Round {round_num} - thread {thread_id} (Fusion MV RRF): read done, {local_count} queries")
