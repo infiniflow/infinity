@@ -161,9 +161,10 @@ private:
             offset += sizeof(u32);
         }
         if (option.HasDocPayload()) {
-            PostingField *doc_payload_value = new TypedPostingField<u16>;
+            TypedPostingField<u16> *doc_payload_value = new TypedPostingField<u16>;
             doc_payload_value->location_ = row_count++;
             doc_payload_value->offset_ = offset;
+            doc_payload_value->encoder_ = GetDocPayloadEncoder();
             values_.push_back(doc_payload_value);
         }
         if (skiplist_format_) {
