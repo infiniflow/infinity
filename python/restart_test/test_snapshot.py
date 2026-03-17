@@ -5,6 +5,7 @@ from infinity import index
 import time
 from infinity.common import ConflictType, SparseVector
 from util import RtnThread
+import pytest
 
 
 def infinity_runner_decorator_factory_interrupted(
@@ -32,6 +33,7 @@ def infinity_runner_decorator_factory_interrupted(
 
 
 class TestSnapshot:
+    @pytest.mark.ubsan
     def test_snapshot_basic_restart(self, infinity_runner: InfinityRunner):
         """Test basic snapshot creation and restoration across restarts"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -153,6 +155,7 @@ class TestSnapshot:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_snapshot_during_operations(self, infinity_runner: InfinityRunner):
         """Test snapshot creation during concurrent operations"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -261,6 +264,7 @@ class TestSnapshot:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_snapshot_with_indexes(self, infinity_runner: InfinityRunner):
         """Test snapshot with various index types"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -341,6 +345,7 @@ class TestSnapshot:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_snapshot_error_recovery(self, infinity_runner: InfinityRunner):
         """Test snapshot operations during error conditions"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -416,6 +421,7 @@ class TestSnapshot:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_snapshot_large_data(self, infinity_runner: InfinityRunner):
         """Test snapshot with large amount of data"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -506,6 +512,7 @@ class TestSnapshot:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_snapshot_interrupted_creation(self, infinity_runner: InfinityRunner):
         """Test snapshot creation that gets interrupted by restart"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
@@ -611,6 +618,7 @@ class TestSnapshot:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_snapshot_interrupted_restore(self, infinity_runner: InfinityRunner):
         """Test snapshot restore that gets interrupted by restart"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"

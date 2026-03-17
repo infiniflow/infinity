@@ -13,9 +13,10 @@ if __name__ == "__main__":
         default="./build/Debug/src/infinity",
     )
     parser.add_argument(
-        "--slow",
-        type=bool,
-        default=False,
+        "--marker",
+        type=str,
+        default="not slow",
+        required=False,
     )
     parser.add_argument(
         "--test_case",
@@ -30,7 +31,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     infinity_path = args.infinity_path
-    slow = args.slow
+    marker = args.marker
 
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
@@ -47,40 +48,22 @@ if __name__ == "__main__":
 
     for idx in range(loop):
         print(f"Running test case: {test_case}, loop: {idx + 1}/{loop}")
-        if not slow:
-            process = subprocess.Popen(
-                [
-                    python_executable,
-                    "-m",
-                    "pytest",
-                    "-v",
-                    "--tb=short",
-                    test_case,
-                    f"--infinity_path={infinity_path}",
-                    "-x",
-                    "-s",
-                    "-m",
-                    "not slow",
-                    # "-W",
-                    # "error",
-                    # "-k",
-                    # "test_optimize_from_different_database"
-                ]
-            )
-        else:
-            process = subprocess.Popen(
-                [
-                    python_executable,
-                    "-m",
-                    "pytest",
-                    "-v",
-                    "--tb=short",
-                    test_case,
-                    f"--infinity_path={infinity_path}",
-                    "-x",
-                    "-s",
-                ]
-            )
+
+        pytest_args = [
+            python_executable,
+            "-m",
+            "pytest",
+            "-m",
+            marker,
+            "-v",
+            "--tb=short",
+            test_case,
+            f"--infinity_path={infinity_path}",
+            "-x",
+            "-s",
+        ]
+
+        process = subprocess.Popen(pytest_args)
         process.wait()
         if process.returncode != 0:
             print(f"An error occurred: {process.stderr}")
