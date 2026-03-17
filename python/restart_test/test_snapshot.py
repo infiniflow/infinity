@@ -619,7 +619,7 @@ class TestSnapshot:
         part2()
 
     @pytest.mark.ubsan
-    def test_snapshot_interrupted_restore(self, infinity_runner: InfinityRunner, test_marker):
+    def test_snapshot_interrupted_restore(self, infinity_runner: InfinityRunner):
         """Test snapshot restore that gets interrupted by restart"""
         config1 = "test/data/config/restart_test/test_snapshot/1.toml"
         config2 = "test/data/config/restart_test/test_snapshot/2.toml"
