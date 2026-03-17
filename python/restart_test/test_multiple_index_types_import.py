@@ -10,15 +10,14 @@ from common import common_values
 from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
-# Test configuration constants
-K_RUNNING_TIME_SECONDS = 120
-
 class TestMultipleIndexTypesImport:
-    @pytest.mark.slow
     @pytest.mark.parametrize(
-        "config, generator",
+        "config, generator, kImportRepeat, kBatchCount, kRunTime",
         [
-            ("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator),
+            pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120, marks=pytest.mark.slow),
+            # pytest.param("test/data/config/restart_test/test_insert/4.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=[pytest.mark.slow, pytest.mark.ubsan]),
+            # pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=[pytest.mark.slow, pytest.mark.ubsan]),
+            # pytest.param("test/data/config/restart_test/test_insert/6.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=[pytest.mark.slow, pytest.mark.ubsan]),
         ],
     )
     def test_multiple_index_types_import_restart(
@@ -26,6 +25,9 @@ class TestMultipleIndexTypesImport:
         infinity_runner: InfinityRunner,
         config: str,
         generator,
+        kImportRepeat,
+        kBatchCount,
+        kRunTime
     ):
         # Initialize
         infinity_runner.clear()
@@ -55,10 +57,6 @@ class TestMultipleIndexTypesImport:
         # Part 2: Import and insert data
         @decorator
         def part2(infinity_obj):
-            kImportRepeat = 30
-            kBatchCount = 20
-            kRowsPerBatch = 5000
-
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
 
@@ -78,6 +76,7 @@ class TestMultipleIndexTypesImport:
             logging.info(f"Total rows after {kImportRepeat} imports: {count}")
             assert count == expected_count, f"Expected {expected_count} rows, got {count}"
 
+            kRowsPerBatch = 5000
             for batch_idx in range(kBatchCount):
                 batch_data = []
                 for row_idx in range(kRowsPerBatch):
@@ -129,7 +128,7 @@ class TestMultipleIndexTypesImport:
                     (self.read_worker_fusion_mv_rrf, 1),
                 ]
 
-                end_time = time.time() + K_RUNNING_TIME_SECONDS
+                end_time = time.time() + kRunTime
                 thread_id = 0
                 threads = []
                 for worker_func, num_threads in workers:
