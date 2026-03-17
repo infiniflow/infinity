@@ -178,6 +178,10 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, Row
     // Select template specialization based on cardinality
     if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
         switch (index_data_type.type()) {
+            case LogicalType::kBoolean: {
+                // Boolean is inherently low cardinality (only 2 values), use LowCardinalityTag
+                return std::make_shared<SecondaryIndexInMemT<BooleanT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
             case LogicalType::kTinyInt: {
                 return std::make_shared<SecondaryIndexInMemT<TinyIntT, HighCardinalityTag>>(begin_row_id, cardinality);
             }

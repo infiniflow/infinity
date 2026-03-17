@@ -20,6 +20,8 @@ import :column_vector;
 import :sparse_util;
 import :multivector_util;
 import :column_vector;
+import :infinity_exception;
+import :value;
 
 import std;
 
@@ -73,6 +75,42 @@ private:
     BlockOffset cur_;
     BlockOffset end_;
     size_t row_count_ = 0;
+};
+
+// Specialization for BooleanT - boolean values are stored as compact bits
+export template <>
+class MemIndexInserterIter1<BooleanT> {
+public:
+    using ValueType = const BooleanT *;
+
+    MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
+        : block_offset_(block_offset), col_(col), cur_(offset), end_(offset + row_cnt), row_count_(row_cnt) {
+        if (!col_.buffer_) {
+            UnrecoverableError("Boolean column vector buffer is null");
+        }
+    }
+
+    std::optional<std::pair<ValueType, SegmentOffset>> Next() {
+        if (cur_ == end_) {
+            return std::nullopt;
+        }
+        // Boolean values are stored as compact bits, use GetCompactBit to read
+        // Use the column vector's public method to get boolean value safely
+        bool_value_ = col_.GetValueByIndex(cur_).GetValue<BooleanT>();
+        return std::make_pair(&bool_value_, block_offset_ + cur_++);
+    }
+
+    size_t GetRowCount() const { return row_count_; }
+
+    const ColumnVector *column_vector() const { return &col_; }
+
+private:
+    SegmentOffset block_offset_;
+    const ColumnVector &col_;
+    BlockOffset cur_;
+    BlockOffset end_;
+    size_t row_count_ = 0;
+    BooleanT bool_value_ = false; // Storage for the boolean value to return pointer to
 };
 
 export template <typename ElementT>

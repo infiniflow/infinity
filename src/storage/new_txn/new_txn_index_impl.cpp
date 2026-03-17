@@ -792,6 +792,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
             if (!status.ok()) {
                 return status;
             }
+            if (!memory_secondary_index) {
+                UnrecoverableError("Failed to create secondary index in memory for column");
+            }
             memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
             break;
         }
@@ -804,6 +807,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, BlockID block_id, c
                 GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
             if (!status.ok()) {
                 return status;
+            }
+            if (!memory_secondary_index) {
+                UnrecoverableError("Failed to create secondary index in memory for functional index");
             }
 
             auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
@@ -1790,6 +1796,10 @@ Status NewTxn::PopulateSecondaryIndexInner(std::shared_ptr<IndexBase> index_base
             return status;
         }
 
+        if (!memory_secondary_index) {
+            UnrecoverableError("Failed to create secondary index in memory for Boolean column");
+        }
+
         memory_secondary_index->InsertBlockData(block_offset, col, offset, row_cnt);
         if (!status.ok()) {
             return status;
@@ -1877,6 +1887,9 @@ Status NewTxn::PopulateSecondaryFunctionalIndexInner(std::shared_ptr<IndexBase> 
         std::tie(memory_functional_index, status) = GetSecondaryIndexInMem(segment_index_meta, index_data_type, base_row_id, mem_index, cardinality);
         if (!status.ok()) {
             return status;
+        }
+        if (!memory_functional_index) {
+            UnrecoverableError("Failed to create secondary index in memory for functional index");
         }
 
         auto output_column = ExecuteFunctionExpression(secondary_functional_index, col, column_id);
