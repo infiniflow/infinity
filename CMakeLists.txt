@@ -276,6 +276,7 @@ endif ()
 message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
 option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" OFF)
+option(ENABLE_SANITIZER_UNDEFINED "Enable undefined behavior sanitizer" OFF)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
@@ -312,6 +313,12 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
             message(STATUS "Enable Thread Sanitizer in target: infinity")
         endif ()
 
+        if (ENABLE_SANITIZER_UNDEFINED)
+            add_compile_options(-fsanitize=undefined)
+            add_link_options(-fsanitize=undefined)
+            message(STATUS "Enable Undefined Behavior Sanitizer in target: infinity")
+        endif ()
+
         message(STATUS "Enable Sanitizer in target: infinity")
 
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
@@ -320,10 +327,6 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
         add_compile_options("-fno-omit-frame-pointer")
         add_link_options("-fno-omit-frame-pointer")
-
-        #    add_compile_options("-fsanitize=undefined")
-        #    add_link_options("-fsanitize=undefined")
-
     else ()
         message(STATUS "Disable AddressSanitizer because jemalloc")
     endif ()

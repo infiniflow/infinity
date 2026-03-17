@@ -84,9 +84,13 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug-tsan && mkdir -p cmake-build-debug-tsan && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER_THREAD=ON -S /infinity -B /infinity/cmake-build-debug-tsan && cmake --build /infinity/cmake-build-debug-tsan -j 6 --target infinity"
 
+      - name: Build debug-ubsan version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug-ubsan && mkdir -p cmake-build-debug-ubsan && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER_UNDEFINED=ON -S /infinity -B /infinity/cmake-build-debug-ubsan && cmake --build /infinity/cmake-build-debug-ubsan -j 6 --target infinity"
+
       - name: Upload artifacts
         if: ${{ !cancelled() && !failure() }}
-        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} cmake-build-debug-tsan/src/infinity | tar --extract --directory=${ARTIFACTS_DIR} --file=-
+        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} cmake-build-debug-tsan/src/infinity cmake-build-debug-ubsan/src/infinity | tar --extract --directory=${ARTIFACTS_DIR} --file=-
 
       - name: Remove build container
         if: always()
@@ -178,6 +182,42 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_tsan_restart_test && sudo chown -R ${USER} . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_tsan_restart_test/
+          echo "restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
+
+  debug_ubsan_restart_test:
+    name: debug_ubsan_restart_test
+    runs-on: [ "self-hosted", "slow-test" ]
+    needs: debug_build
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug-ubsan/src/infinity | tar --extract --file=-
+          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+
+      - name: Prepare restart test data
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          tar --directory=${RUNNER_WORKSPACE_PREFIX} --create --file=- benchmark/sift_1m/{sift_base.fvecs,sift_query.fvecs} benchmark/enwiki/enwiki-10w.csv | tar --directory=test/data --extract --file=-
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        run: uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-ubsan/src/infinity --marker="ubsan"
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/debug_ubsan_restart_test && sudo chown -R ${USER} . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_ubsan_restart_test/
           echo "restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
 
   debug_tsan_cluster_test:
