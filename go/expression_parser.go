@@ -711,20 +711,31 @@ func splitByAlias(expr string) (string, string, bool) {
 	return expr, "", false
 }
 
-// splitByComma splits a string by commas, respecting parentheses
+// splitByComma splits a string by commas, respecting parentheses and string literals
 func splitByComma(expr string) []string {
 	parts := []string{}
 	current := ""
 	parenCount := 0
+	inString := false
+	stringQuote := byte(0)
 
 	for _, ch := range expr {
-		if ch == '(' {
+		// Handle string literals
+		if !inString && (ch == '\'' || ch == '"') {
+			inString = true
+			stringQuote = byte(ch)
+		} else if inString && byte(ch) == stringQuote {
+			inString = false
+			stringQuote = 0
+		}
+
+		if ch == '(' && !inString {
 			parenCount++
-		} else if ch == ')' {
+		} else if ch == ')' && !inString {
 			parenCount--
 		}
 
-		if ch == ',' && parenCount == 0 {
+		if ch == ',' && parenCount == 0 && !inString {
 			parts = append(parts, strings.TrimSpace(current))
 			current = ""
 		} else {
