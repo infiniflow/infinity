@@ -136,6 +136,9 @@ constexpr LogicalType GetLogicalType<TimestampT> = LogicalType::kTimestamp;
 template <>
 constexpr LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
 
+template <>
+constexpr LogicalType GetLogicalType<BooleanT> = LogicalType::kBoolean;
+
 // Cardinality tag types for template specialization
 export struct HighCardinalityTag {};
 export struct LowCardinalityTag {};

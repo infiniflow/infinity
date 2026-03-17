@@ -86,9 +86,18 @@ public:
             data_ptr->InsertData(&temp_map);
         } else if constexpr (std::is_same_v<CardinalityTag, LowCardinalityTag>) {
             auto data_ptr = static_cast<SecondaryIndexDataBase<LowCardinalityTag> *>(handle.GetDataMut());
-            std::multimap<KeyType, u32> temp_map;
-            const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
-            data_ptr->InsertData(&temp_map);
+
+            // For BooleanT, SecondaryIndexDataLowCardinalityT<bool> expects std::multimap<bool, u32>
+            // even though it stores uint8_t internally
+            if constexpr (std::is_same_v<RawValueType, BooleanT>) {
+                std::multimap<bool, u32> bool_map;
+                const_cast<RcuMultiMap<bool, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(bool_map);
+                data_ptr->InsertData(&bool_map);
+            } else {
+                std::multimap<KeyType, u32> temp_map;
+                const_cast<RcuMultiMap<KeyType, u32> &>(in_mem_secondary_index_).GetMergedMultiMap(temp_map);
+                data_ptr->InsertData(&temp_map);
+            }
         } else {
             UnrecoverableError("Unsupported cardinality tag type");
         }
@@ -117,6 +126,16 @@ private:
                 auto column_vector = iter.column_vector();
                 std::span<const char> data = column_vector->GetVarcharInner(*v_ptr);
                 const KeyType key = ConvertToOrderedKeyValue(std::string_view{data.data(), data.size()});
+                // Insert u32 offset directly
+                in_mem_secondary_index_.Insert(key, offset);
+            } else if constexpr (std::is_same_v<RawValueType, BooleanT>) {
+                // Boolean values are stored as compact bits in ColumnVector, not as regular bytes
+                // We need to read them using GetCompactBit instead of direct pointer access
+                auto column_vector = iter.column_vector();
+                // The offset in the iterator is the actual segment offset
+                // We need to get the boolean value using the correct method
+                const bool bool_value = column_vector->buffer_->GetCompactBit(offset);
+                const KeyType key = ConvertToOrderedKeyValue(bool_value);
                 // Insert u32 offset directly
                 in_mem_secondary_index_.Insert(key, offset);
             } else {
@@ -159,6 +178,10 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, Row
     // Select template specialization based on cardinality
     if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
         switch (index_data_type.type()) {
+            case LogicalType::kBoolean: {
+                // Boolean is inherently low cardinality (only 2 values), use LowCardinalityTag
+                return std::make_shared<SecondaryIndexInMemT<BooleanT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
             case LogicalType::kTinyInt: {
                 return std::make_shared<SecondaryIndexInMemT<TinyIntT, HighCardinalityTag>>(begin_row_id, cardinality);
             }
