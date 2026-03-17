@@ -968,6 +968,10 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
         const auto secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
         cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
     }
+    // Boolean type is inherently low cardinality (only 2 values), force LowCardinality
+    if (column_logical_type_ == LogicalType::kBoolean) {
+        cardinality = SecondaryIndexCardinality::kLowCardinality;
+    }
 
     Bitmask result(segment_row_count);
     result.SetAllFalse();
