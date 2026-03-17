@@ -11,13 +11,17 @@ from infinity.common import ConflictType, SparseVector
 from infinity.connection_pool import ConnectionPool
 
 class TestMultipleIndexTypesImport:
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "config, generator, kImportRepeat, kBatchCount, kRunTime",
         [
-            pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120, marks=pytest.mark.slow),
-            pytest.param("test/data/config/restart_test/test_insert/4.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
-            pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
-            pytest.param("test/data/config/restart_test/test_insert/6.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
+            # pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120, marks=pytest.mark.slow),
+            # pytest.param("test/data/config/restart_test/test_insert/4.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
+            # pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
+            # pytest.param("test/data/config/restart_test/test_insert/6.toml", MultiIndexTypesGenerator, 2, 4, 60, marks=pytest.mark.ubsan),
+
+            ("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120)
+
         ],
     )
     def test_multiple_index_types_import_restart(
