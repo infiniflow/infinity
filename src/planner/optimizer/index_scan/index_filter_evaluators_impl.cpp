@@ -435,6 +435,9 @@ std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Ma
         index_data_type = scalar_function_expr->Type().type();
     }
     switch (index_data_type) {
+        case LogicalType::kBoolean: {
+            return IndexFilterEvaluatorSecondaryT<BooleanT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
+        }
         case LogicalType::kTinyInt: {
             return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
@@ -672,20 +675,44 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             if (unique_key_count == 0)
                 return;
 
-            const KeyType *unique_keys = static_cast<const KeyType *>(index->GetUniqueKeysPtr());
+            // Special handling for BooleanT: SecondaryIndexDataLowCardinalityT<BooleanT> uses uint8_t internally
+            if constexpr (std::is_same_v<ColumnValueType, BooleanT>) {
+                // For Boolean, the key is stored as uint8_t (0 for false, 1 for true)
+                const uint8_t *unique_keys = static_cast<const uint8_t *>(index->GetUniqueKeysPtr());
+                const uint8_t begin_key = begin_val ? 1 : 0;
+                const uint8_t end_key = end_val ? 1 : 0;
 
-            // Find keys in range [begin_val, end_val]
-            auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_val);
-            auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_val);
+                // Find keys in range [begin_key, end_key]
+                auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_key);
+                auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_key);
 
-            // For each key in range, add its offsets to the result
-            for (auto it = begin_it; it != end_it; ++it) {
-                const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(it));
-                if (bitmap) {
-                    bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
-                        selected_rows.SetTrue(offset);
-                        return true; // continue iteration
-                    });
+                // For each key in range, add its offsets to the result
+                for (auto it = begin_it; it != end_it; ++it) {
+                    const uint8_t key_val = *it;
+                    const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(&key_val));
+                    if (bitmap) {
+                        bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
+                            selected_rows.SetTrue(offset);
+                            return true; // continue iteration
+                        });
+                    }
+                }
+            } else {
+                const KeyType *unique_keys = static_cast<const KeyType *>(index->GetUniqueKeysPtr());
+
+                // Find keys in range [begin_val, end_val]
+                auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_val);
+                auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_val);
+
+                // For each key in range, add its offsets to the result
+                for (auto it = begin_it; it != end_it; ++it) {
+                    const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(it));
+                    if (bitmap) {
+                        bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
+                            selected_rows.SetTrue(offset);
+                            return true; // continue iteration
+                        });
+                    }
                 }
             }
         }
@@ -940,6 +967,10 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
     } else {
         const auto secondary_functional_index = reinterpret_cast<const IndexSecondaryFunctional *>(index_base.get());
         cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+    }
+    // Boolean type is inherently low cardinality (only 2 values), force LowCardinality
+    if (column_logical_type_ == LogicalType::kBoolean) {
+        cardinality = SecondaryIndexCardinality::kLowCardinality;
     }
 
     Bitmask result(segment_row_count);
