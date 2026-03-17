@@ -44,6 +44,8 @@ public:
 
     u32 MatchCount() const override;
 
+    void SetMinimumShouldMatchHint(u32 minimum_should_match) override;
+
 private:
     // Advanced optimization methods
     size_t FindPivotOptimized(float threshold);
@@ -51,6 +53,10 @@ private:
     bool ShouldSkipSort() const;
     void OptimizedPartialSort(size_t limit);
     bool TryFastPivotEstimation(float threshold, size_t &estimated_pivot);
+
+    // Lucene-inspired MSM optimization methods
+    u32 EstimateMaxPossibleMatches(RowID doc_id);
+    bool CanSatisfyMinimumShouldMatch(RowID doc_id, u32 current_matches);
 
     // block max info
     RowID common_block_min_possible_doc_id_{}; // not always exist
@@ -77,6 +83,12 @@ private:
     bool bm25_score_cached_ = false;
     float bm25_score_cache_ = 0.0f;
     std::vector<std::tuple<u32, u64, float>> pivot_history_; // pivot, row_id, score
+
+    // Minimum should match optimization
+    u32 minimum_should_match_hint_ = 0; // Hint from wrapper (0 = no hint)
+    // TODO: block_min_match_counts_ is reserved for future MSM-aware block pruning optimization
+    // Currently not used but kept for potential future enhancement to estimate match counts per block
+
     // debug info
     u32 next_sort_cnt_ = 0;
     u32 next_it0_docid_mismatch_cnt_ = 0;
