@@ -42,15 +42,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
         UnrecoverableError("AllocateInMemory: Already allocated.");
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         // Determine cardinality and use appropriate function
-        // For secondary indexes, cast to IndexSecondary to get cardinality
-        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
-            cardinality = secondary_index->GetSecondaryIndexCardinality();
-        } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
-            auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
-            cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-        }
+        SecondaryIndexCardinality cardinality = GetCardinalityType();
 
         // Use the correct factory function based on cardinality
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
@@ -69,14 +61,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
 void SecondaryIndexFileWorker::FreeInMemory() {
     if (data_) [[likely]] {
         // Determine cardinality and delete the correct type
-        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
-            cardinality = secondary_index->GetSecondaryIndexCardinality();
-        } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
-            auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
-            cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-        }
+        SecondaryIndexCardinality cardinality = GetCardinalityType();
 
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
@@ -95,14 +80,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
 bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_) [[likely]] {
         // Determine cardinality and use the correct type
-        SecondaryIndexCardinality cardinality = SecondaryIndexCardinality::kHighCardinality;
-        if (index_base_->index_type_ == IndexType::kSecondary) {
-            auto secondary_index = std::static_pointer_cast<IndexSecondary>(index_base_);
-            cardinality = secondary_index->GetSecondaryIndexCardinality();
-        } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
-            auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
-            cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
-        }
+        SecondaryIndexCardinality cardinality = GetCardinalityType();
 
         if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
             auto index = static_cast<SecondaryIndexDataBase<HighCardinalityTag> *>(data_);
@@ -127,6 +105,10 @@ SecondaryIndexCardinality SecondaryIndexFileWorker::GetCardinalityType() {
     } else if (index_base_->index_type_ == IndexType::kSecondaryFunctional) {
         auto secondary_functional_index = std::static_pointer_cast<IndexSecondaryFunctional>(index_base_);
         cardinality = secondary_functional_index->GetSecondaryIndexCardinality();
+    }
+    // Boolean type is inherently low cardinality (only 2 values), force LowCardinality
+    if (index_data_type_.type() == LogicalType::kBoolean) {
+        cardinality = SecondaryIndexCardinality::kLowCardinality;
     }
     return cardinality;
 }
