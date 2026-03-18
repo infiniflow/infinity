@@ -306,6 +306,7 @@ class TestInsert:
         drop_table()
         print("drop table done")
 
+    @pytest.mark.ubsan
     def test_insert_checkpoint(self, infinity_runner: InfinityRunner):
         self._test_insert_checkpoint_inner(infinity_runner, 10)
 
