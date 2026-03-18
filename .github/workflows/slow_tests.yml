@@ -212,12 +212,13 @@ jobs:
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
-        run: uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug-ubsan/src/infinity --marker="ubsan"
+        run: UBSAN_OPTIONS=log_path=restart_test_ubsan.log uv run python3 tools/run_restart_test.py --marker="ubsan" --infinity_path=cmake-build-debug-ubsan/src/infinity
 
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
           mkdir -p ${ARTIFACTS_DIR}/debug_ubsan_restart_test && sudo chown -R ${USER} . && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_ubsan_restart_test/
+          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_ubsan_restart_test/
           echo "restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
 
   debug_tsan_cluster_test:

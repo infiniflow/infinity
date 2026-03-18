@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--marker",
         type=str,
-        default="not slow",
+        default="not slow and not ubsan",
         required=False,
     )
     parser.add_argument(
