@@ -257,7 +257,7 @@ jobs:
       - name: Collect infinity log
         if: ${{ !cancelled() }}
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_ubsan_pysdk_test && sudo chown -R ${USER} . && cp pysdk_ubsan*.log* ${ARTIFACTS_DIR}/debug_ubsan_pysdk_test/
+          mkdir -p ${ARTIFACTS_DIR}/debug_ubsan_pysdk_test && sudo chown -R ${USER} . && cp pysdk_test*.log* ${ARTIFACTS_DIR}/debug_ubsan_pysdk_test/
           cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_ubsan_pysdk_test/
           echo "pysdk ubsan test log(last 1000 lines):" && tail -n 1000 pysdk_test*.log*
 
