@@ -14,6 +14,7 @@ class TestMultipleIndexTypesImport:
     @pytest.mark.parametrize(
         "config, generator, kImportRepeat, kBatchCount, kRunTime",
         [
+            pytest.param("test/data/config/restart_test/test_insert/3.toml", MultiIndexTypesGenerator, 5, 10, 120, marks=pytest.mark.ubsan),
             pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 50, 100, 120, marks=pytest.mark.slow),
             pytest.param("test/data/config/restart_test/test_insert/4.toml", MultiIndexTypesGenerator, 2, 4, 30, marks=pytest.mark.ubsan),
             pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 2, 4, 30, marks=pytest.mark.ubsan),
