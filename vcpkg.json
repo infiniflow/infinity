@@ -1,6 +1,6 @@
 {
   "name": "infinity",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense vector, sparse vector, tensor (multi-vector), and full-text.",
   "homepage": "https://github.com/infiniflow/infinity",
   "license": "Apache-2.0",

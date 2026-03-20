@@ -362,7 +362,6 @@ target_link_libraries(infinity
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
-        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -527,7 +526,6 @@ target_link_libraries(unit_test
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
-        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
