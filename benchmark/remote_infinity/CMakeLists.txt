@@ -45,6 +45,7 @@ target_link_libraries(
         OpenSSL::Crypto
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum

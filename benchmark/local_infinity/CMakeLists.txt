@@ -36,6 +36,7 @@ target_link_libraries(infinity_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -93,6 +94,7 @@ target_link_libraries(knn_import_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -148,6 +150,7 @@ target_link_libraries(knn_query_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -204,6 +207,7 @@ target_link_libraries(fulltext_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -254,6 +258,7 @@ target_link_libraries(sparse_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -307,6 +312,7 @@ target_link_libraries(bmp_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum
@@ -360,6 +366,7 @@ target_link_libraries(hnsw_benchmark
         PCRE2::8BIT
         RocksDB::rocksdb
         simdjson::simdjson
+        $<IF:$<BOOL:${ARM64}>,simde::simde,>
         nlohmann_json::nlohmann_json
         CLI11::CLI11
         magic_enum::magic_enum

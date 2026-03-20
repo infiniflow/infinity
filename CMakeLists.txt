@@ -81,36 +81,36 @@ set(GCC_SEARCH_ROOTS
 )
 
 #if you encounter a problem, try commenting out the code below.
-set(GCC15_SUFFIXES
-        #        lib
-        lib/gcc/15
-	lib/gcc/aarch64-linux-gnu/15
-        lib/gcc/x86_64-linux-gnu/15
-        lib/gcc/x86_64-pc-linux-gnu/15.1.0
-        lib64/gcc/x86_64-linux-gnu/15
-        lib64/gcc/15
-        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
-)
+#set(GCC15_SUFFIXES
+#        #        lib
+#        lib/gcc/15
+#	lib/gcc/aarch64-linux-gnu/15
+#        lib/gcc/x86_64-linux-gnu/15
+#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
+#        lib64/gcc/x86_64-linux-gnu/15
+#        lib64/gcc/15
+#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
+#)
+#
+#find_library(STDCXX15_STATIC
+#        NAMES libstdc++.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
+#
+#find_library(STDCXX15EXP_STATIC
+#        NAMES libstdc++exp.a
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${GCC15_SUFFIXES}
+#        REQUIRED
+#        NO_DEFAULT_PATH
+#)
 
-find_library(STDCXX15_STATIC
-        NAMES libstdc++.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
+#get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
-find_library(STDCXX15EXP_STATIC
-        NAMES libstdc++exp.a
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${GCC15_SUFFIXES}
-        REQUIRED
-        NO_DEFAULT_PATH
-)
-
-get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
-
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
 ########
 
 find_package(absl CONFIG REQUIRED)
@@ -142,20 +142,7 @@ find_package(RocksDB CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 if (ARM64)
-    add_library(sse2neon INTERFACE)
-    if (EXISTS "${VCPKG_INSTALLED_DIR}/include/sse2neon/sse2neon.h")
-	    set(SSE2NEON_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/include")
-	    message(STATUS "Found sse2neon in vcpkg: ${SSE2NEON_INCLUDE_DIRS}")
-	    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
-    else()
-	    find_path(SSE2NEON_INCLUDE_DIRS "sse2neon/sse2neon.h")
-	    if (SSE2NEON_INCLUDE_DIRS)
-		    message(STATUS "Found sse2neon: ${SSE2NEON_INCLUDE_DIRS}")
-		    target_include_directories(sse2neon SYSTEM INTERFACE ${SSE2NEON_INCLUDE_DIRS})
-	    else()
-		    message(WARNING "sse2neon not found, proceeding without it.")
-	    endif()
-    endif()
+    find_package(simde CONFIG REQUIRED)
 endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
@@ -180,30 +167,30 @@ include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
 
-# https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-add_library(unused_std_target STATIC)
-
-# just tmp solution
-set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
-        include/c++/15/bits
-        include/c++/15.2.0/bits
-)
-
-find_file(LIBSTDCXX_MODULE_FILE
-        NAMES std.cc
-        PATHS ${GCC_SEARCH_ROOTS}
-        PATH_SUFFIXES ${LIBSTDCXX_MODULE_FILE_PATH_SUFFIX}
-        REQUIRED
-)
-
-get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
-
-target_sources(unused_std_target
-        PRIVATE
-        FILE_SET CXX_MODULES
-        BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
-        FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
-)
+## https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
+#add_library(unused_std_target STATIC)
+#
+## just tmp solution
+#set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
+#        include/c++/15/bits
+#        include/c++/15.2.0/bits
+#)
+#
+#find_file(LIBSTDCXX_MODULE_FILE
+#        NAMES std.cc
+#        PATHS ${GCC_SEARCH_ROOTS}
+#        PATH_SUFFIXES ${LIBSTDCXX_MODULE_FILE_PATH_SUFFIX}
+#        REQUIRED
+#)
+#
+#get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
+#
+#target_sources(unused_std_target
+#        PRIVATE
+#        FILE_SET CXX_MODULES
+#        BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
+#        FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
+#)
 
 
 # Get current system time and print the build time
