@@ -3,6 +3,7 @@ from infinity import index
 import csv
 import json
 import numpy as np
+import random
 from infinity.common import SparseVector
 
 
@@ -14,7 +15,6 @@ class SimpleEmbeddingGenerator:
         def gen(insert: int):
             for i in range(insert):
                 yield [i, [0.1, 0.2, 0.3, 0.4]]
-
         return gen
 
     def index():
@@ -38,7 +38,6 @@ class SimpleVarcharGenerator:
                     yield [i, "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"]
                 else:
                     yield [i, "test"]
-
         return gen
 
     def index():
@@ -56,7 +55,6 @@ class SimpleTensorGenerator:
                     yield [i, [0.1, 0.2, 0.3, 0.4]]
                 else:
                     yield [i, [[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]]
-
         return gen
 
 
@@ -85,7 +83,6 @@ class EnwikiGenerator:
                     i += 1
                     if i >= insert_n:
                         break
-
         return gen
 
     def index():
@@ -165,7 +162,6 @@ class LChYDataGenerato:
                     i += 1
                     if i >= insert_n:
                         break
-
         return gen
 
     def index():
@@ -207,9 +203,6 @@ class LChYDataGenerato:
 
 
 class MultiIndexTypesGenerator:
-    DEFAULT_CSV_FILE = "test/data/csv/enwiki_embedding_plus_9999.csv"
-    DEFAULT_NUM_ROWS = 9999
-
     def columns():
         return {
             "doctitle": {"type": "varchar"},
@@ -227,22 +220,50 @@ class MultiIndexTypesGenerator:
             index.IndexInfo("body", index.IndexType.FullText),
             index.IndexInfo("num", index.IndexType.Secondary, {"cardinality": "high"}),
             index.IndexInfo("vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
-            # index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
+            index.IndexInfo("multi_vector_col", index.IndexType.Hnsw, {"M": "16", "ef_construction": "50", "metric": "l2"}),
             index.IndexInfo("sparse_col", index.IndexType.BMP, {"block_size": "8", "compress_type": "compress"}),
             index.IndexInfo("category", index.IndexType.Secondary, {"cardinality": "low"}),
         ]
 
-    def import_file() -> str:
-        filepath = MultiIndexTypesGenerator.DEFAULT_CSV_FILE
+    K_NUM_ROWS = 9999
+    def generate_import_file() -> str:
+        filepath = f"test/data/csv/enwiki_embedding_plus_{MultiIndexTypesGenerator.K_NUM_ROWS}.csv"
         if os.path.exists(filepath):
             return filepath
         print(f"CSV file not found: {filepath}. Generating...")
         from tools.generate_wiki_embedding_plus import generate
-        generate()
+        generate(MultiIndexTypesGenerator.K_NUM_ROWS)
         return filepath
 
     def import_size() -> int:
-        return MultiIndexTypesGenerator.DEFAULT_NUM_ROWS
+        return MultiIndexTypesGenerator.K_NUM_ROWS
+
+    def import_options():
+        return {"file_type": "csv", "delimiter": "\t"}
+
+    K_CATEGORIES = ["A", "B", "C", "D"]
+    K_TEXT_WORDS = ["apple", "banana", "cherry", "date"]
+
+    @staticmethod
+    def generate_random_row(num: int):
+        vec = np.array([random.random() for _ in range(2048)], dtype=np.float32)
+        multivec = np.array([[random.random() for _ in range(1024)] for _ in range(2)], dtype=np.float32)
+        sparse_indices = [j for j in range(1024) if random.random() > 0.9]
+        if not sparse_indices:
+            sparse_indices = [0, 1, 2]
+        sparse_values = [random.randint(1, 100) for _ in range(len(sparse_indices))]
+        sparse_vec = SparseVector(indices=sparse_indices, values=sparse_values)
+
+        return {
+            "doctitle": f"test_title_{num}",
+            "docdate": "01-JAN-2024 00:00:00.000",
+            "body": f"test_text_{num}_{random.choice(MultiIndexTypesGenerator.K_TEXT_WORDS)}",
+            "num": num,
+            "category": MultiIndexTypesGenerator.K_CATEGORIES[num % len(MultiIndexTypesGenerator.K_CATEGORIES)],
+            "vector_col": vec,
+            "multi_vector_col": multivec,
+            "sparse_col": sparse_vec
+        }
 
 
 if __name__ == "__main__":
