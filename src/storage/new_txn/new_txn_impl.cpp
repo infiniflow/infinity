@@ -3950,7 +3950,7 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
-            UnrecoverableError("There should be no concurrent optimize txns");
+            conflict = true;
             break;
         }
         case TransactionType::kAppend: {

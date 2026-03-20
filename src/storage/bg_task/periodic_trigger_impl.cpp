@@ -93,6 +93,7 @@ void CheckpointPeriodicTrigger::Trigger() {
 void CompactPeriodicTrigger::Trigger() {
     if (compact_task_ != nullptr and !compact_task_->IsComplete()) {
         LOG_DEBUG(fmt::format("Skipping compact task, after {} seconds", duration_.load()));
+        return;
     }
 
     LOG_DEBUG(fmt::format("Trigger compact task, after {} seconds", duration_.load()));
@@ -104,6 +105,7 @@ void OptimizeIndexPeriodicTrigger::Trigger() {
 
     if (optimize_task_ != nullptr and !optimize_task_->IsComplete()) {
         LOG_DEBUG(fmt::format("Skipping optimize index task, after {} seconds", duration_.load()));
+        return;
     }
 
     LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_.load()));
