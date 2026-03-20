@@ -10,6 +10,7 @@ import infinity.index as index
 
 
 class TestAlter:
+    @pytest.mark.ubsan
     def test_alter_simple(self, infinity_runner: InfinityRunner):
         table_name = "test_alter1"
         config = "test/data/config/restart_test/test_alter/1.toml"
@@ -76,6 +77,7 @@ class TestAlter:
         part1()
         part2()
 
+    @pytest.mark.ubsan
     @pytest.mark.parametrize(
         "flush, flush_mid",
         [
@@ -186,6 +188,7 @@ class TestAlter:
         part1()
         part2()
 
+    @pytest.mark.ubsan
     def test_alter_cleanup_simple(self, infinity_runner: InfinityRunner):
         table_name = "test_alter3"
         config = "test/data/config/restart_test/test_alter/3.toml"
@@ -242,6 +245,7 @@ class TestAlter:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_restart_after_alter_and_checkpoint(self, infinity_runner: InfinityRunner):
         table_name = "test_alter4"
         config = "test/data/config/restart_test/test_alter/1.toml"

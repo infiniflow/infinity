@@ -29,6 +29,7 @@ def setup_class(request, http):
 
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.ubsan
 class TestInfinity:
     @pytest.mark.usefixtures("skip_if_local_infinity")
     @pytest.mark.usefixtures("skip_if_http")

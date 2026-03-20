@@ -1,3 +1,4 @@
+import pytest
 from common import common_values
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import time
@@ -6,6 +7,7 @@ from infinity.errors import ErrorCode
 
 class TestDrop:
     # drop table will drop all wal before so delete will not be replayed
+    @pytest.mark.ubsan
     def test_drop_and_replay(self, infinity_runner: InfinityRunner):
         config = "test/data/config/restart_test/test_drop/1.toml"
         uri = common_values.TEST_LOCAL_HOST

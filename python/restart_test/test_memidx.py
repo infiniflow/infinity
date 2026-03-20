@@ -1,4 +1,5 @@
 import infinity
+import pytest
 from common import common_values
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from infinity import index
@@ -8,6 +9,7 @@ from infinity.common import ConflictType, SparseVector
 
 
 class TestMemIdx:
+    @pytest.mark.ubsan
     def test_mem_hnsw(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -109,6 +111,7 @@ class TestMemIdx:
         part3()
 
     # recover cose hnsw from mmap column
+    @pytest.mark.ubsan
     def test_mem_hnsw_cos(self, infinity_runner: InfinityRunner):
         # 100M quota in 7.toml not dump index when insert 1024 rows
         row_n = 1024
@@ -161,6 +164,7 @@ class TestMemIdx:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_mem_ivf(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -258,6 +262,7 @@ class TestMemIdx:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_mem_indexer(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -369,6 +374,7 @@ class TestMemIdx:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_mem_bmp(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -476,6 +482,7 @@ class TestMemIdx:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_optimize_from_different_database(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
 
@@ -618,6 +625,7 @@ class TestMemIdx:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_recover_memindex_with_dump(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
         config1 = "test/data/config/restart_test/test_memidx/4.toml"
@@ -668,6 +676,7 @@ class TestMemIdx:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_memidx_recover2(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
 
@@ -752,6 +761,7 @@ class TestMemIdx:
 
         infinity_runner.clear()
 
+    @pytest.mark.ubsan
     def test_tmp(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
 
@@ -793,6 +803,7 @@ class TestMemIdx:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_optimize_empty_index(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
         config = "test/data/config/restart_test/test_memidx/6.toml"
