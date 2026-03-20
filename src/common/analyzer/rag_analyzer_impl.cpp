@@ -1334,11 +1334,12 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
 void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res) {
     for (auto &t : tokens) {
         if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = wordnet_lemma_->Lemmatize(t);
+            // Apply lowercase before lemmatization to match Python NLTK behavior
             char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
+            ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
             std::string stem_term;
-            stemmer_->Stem(lowercase_term, stem_term);
+            stemmer_->Stem(lemma_term, stem_term);
             res.push_back(stem_term);
         } else {
             res.push_back(t);
@@ -1695,11 +1696,12 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
                 NLTKWordTokenizer::GetInstance().Tokenize(sentence, term_list);
             }
             for (unsigned i = 0; i < term_list.size(); ++i) {
-                std::string t = wordnet_lemma_->Lemmatize(term_list[i]);
+                // Apply lowercase before lemmatization to match Python NLTK behavior
                 char *lowercase_term = lowercase_string_buffer_.data();
-                ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                ToLower(term_list[i].c_str(), term_list[i].size(), lowercase_term, term_string_buffer_limit_);
+                std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
                 std::string stem_term;
-                stemmer_->Stem(lowercase_term, stem_term);
+                stemmer_->Stem(lemma_term, stem_term);
                 res.push_back(stem_term);
             }
             continue;
@@ -1811,11 +1813,12 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                     if (pos_in_sentence != std::string::npos) {
                         unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
                         unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
-                        std::string t = wordnet_lemma_->Lemmatize(term);
+                        // Apply lowercase before lemmatization to match Python NLTK behavior
                         char *lowercase_term = lowercase_string_buffer_.data();
-                        ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+                        ToLower(term.c_str(), term.size(), lowercase_term, term_string_buffer_limit_);
+                        std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
                         std::string stem_term;
-                        stemmer_->Stem(lowercase_term, stem_term);
+                        stemmer_->Stem(lemma_term, stem_term);
 
                         tokens.push_back(stem_term);
 
@@ -2135,11 +2138,12 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
         const auto &[start_pos, end_pos] = positions[i];
 
         if (re2::RE2::PartialMatch(token, pattern1_)) { //"[a-zA-Z_-]+$"
-            std::string lemma_term = wordnet_lemma_->Lemmatize(token);
+            // Apply lowercase before lemmatization to match Python NLTK behavior
             char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(lemma_term.c_str(), lemma_term.size(), lowercase_term, term_string_buffer_limit_);
+            ToLower(token.c_str(), token.size(), lowercase_term, term_string_buffer_limit_);
+            std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
             std::string stem_term;
-            stemmer_->Stem(lowercase_term, stem_term);
+            stemmer_->Stem(lemma_term, stem_term);
 
             normalize_tokens.push_back(stem_term);
             normalize_positions.emplace_back(start_pos, end_pos);

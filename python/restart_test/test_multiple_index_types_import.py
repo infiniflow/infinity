@@ -350,7 +350,7 @@ class TestMultipleIndexTypesImport:
             try:
                 result, _ = table_obj.output(["num"]).filter("num >= 0").to_pl()
                 if len(result) == 0:
-                    raise Exception(f"SecondaryHigh query returned 0 results")
+                    raise Exception("SecondaryHigh query returned 0 results")
                 local_count += 1
             except Exception as e:
                 raise e
@@ -389,7 +389,7 @@ class TestMultipleIndexTypesImport:
             try:
                 result, _ = table_obj.output(["num", "category"]).filter("category = 'A'").to_pl()
                 if len(result) == 0:
-                    raise Exception(f"SecondaryLow query returned 0 results")
+                    raise Exception("SecondaryLow query returned 0 results")
                 local_count += 1
             except Exception as e:
                 raise e
