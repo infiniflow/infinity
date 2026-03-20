@@ -149,9 +149,9 @@ sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /us
 
 ```shell
 sudo apt update && sudo apt install -y git wget lsb-release software-properties-common pkg-config bison mold autoconf-archive libtool
-wget https://github.com/Kitware/CMake/releases/download/v4.0.3/cmake-4.0.3-linux-x86_64.tar.gz
-tar zxvf cmake-4.0.3-linux-x86_64.tar.gz
-sudo cp -rf cmake-4.0.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.0.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.0.3-linux-x86_64
+wget https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz
+tar zxvf cmake-4.2.3-linux-x86_64.tar.gz
+sudo cp -rf cmake-4.2.3-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-4.2.3-linux-x86_64/share/* /usr/local/share && rm -rf cmake-4.2.3-linux-x86_64
 wget https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.1.zip
 unzip v1.13.1.zip && cd ninja-1.13.1 && cmake -Bbuild-cmake -DBUILD_TESTING=OFF && cmake --build build-cmake --parallel $(nproc) && cd build-cmake && sudo cp ninja /usr/local/bin
 cd ../.. && rm -rf v1.13.1.zip ninja-1.13.1
