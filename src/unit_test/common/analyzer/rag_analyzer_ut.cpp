@@ -68,7 +68,7 @@ public:
     }
 
     RAGAnalyzer *analyzer_;
-    std::string rag_tokenizer_path_ = "/home/qinling/github.com/infiniflow/infinity_new_2/python/infinity_sdk/infinity";
+    std::string rag_tokenizer_path_ = "python/infinity_sdk/infinity";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
 };
 
