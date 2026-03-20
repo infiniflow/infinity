@@ -30,6 +30,7 @@ def setup_class(request, http):
 
 @pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("suffix")
+@pytest.mark.ubsan
 class TestInfinity:
     def _test_insert_basic(self, suffix):
         """

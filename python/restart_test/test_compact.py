@@ -1,3 +1,4 @@
+import pytest
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from common import common_values
 from restart_util import LChYDataGenerato
@@ -6,6 +7,7 @@ from infinity.common import ConflictType
 
 
 class TestCompact:
+    @pytest.mark.ubsan
     def test_restart_after_compact_and_cleanup(self, infinity_runner: InfinityRunner):
         config = "test/data/config/restart_test/test_compact/1.toml"
         uri = common_values.TEST_LOCAL_HOST
@@ -50,6 +52,7 @@ class TestCompact:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_restart_compact_index(self, infinity_runner: InfinityRunner):
         config = "test/data/config/restart_test/test_compact/1.toml"
         uri = common_values.TEST_LOCAL_HOST
@@ -108,6 +111,7 @@ class TestCompact:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_compact_restart_repeatedly(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_compact/1.toml"
         config2 = "test/data/config/restart_test/test_compact/2.toml"
