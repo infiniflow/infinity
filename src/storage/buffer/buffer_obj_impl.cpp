@@ -184,6 +184,14 @@ bool BufferObj::Free() {
     if (!locker.try_lock()) {
         return false; // when other thread is loading or cleaning, return false
     }
+    // Buffer already freed by GC, skip.
+    // This can happen when:
+    // 1. GC triggers due to memory pressure between Save() and Free() in Import operations
+    // 2. Import creates temporary buffers in TempDir, which are freed by GC
+    if (status_ == BufferStatus::kFreed) {
+        LOG_WARN(fmt::format("Buffer already freed by GC, file: {}", GetFilename()));
+        return true;
+    }
     if (status_ != BufferStatus::kUnloaded) {
         UnrecoverableError(fmt::format("attempt to free {} buffer object", BufferStatusToString(status_)));
     }
@@ -379,7 +387,7 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::ToMmap() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ == BufferType::kMmap || type_ == BufferType::kEphemeral) {
+    if (type_ == BufferType::kMmap || type_ == BufferType::kToMmap || type_ == BufferType::kEphemeral) {
         return;
     }
     if (type_ != BufferType::kPersistent) {

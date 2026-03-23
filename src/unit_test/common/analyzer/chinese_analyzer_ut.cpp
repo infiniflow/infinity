@@ -22,6 +22,7 @@ import :ut.base_test;
 import :term;
 import :analyzer;
 import :chinese_analyzer;
+import :status;
 
 using namespace infinity;
 
@@ -32,12 +33,14 @@ class ChineseAnalyzerTest : public BaseTest {};
 TEST_F(ChineseAnalyzerTest, test1) {
     fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
     if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
+        FAIL() << "Resource directory doesn't exist: " << RESOURCE_DIR;
     }
 
     ChineseAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
+    auto status = analyzer.Load();
+    if (!status.ok()) {
+        FAIL() << "Failed to load ChineseAnalyzer: " << status.message();
+    }
     std::vector<std::string> queries = {
         R"#(graphic card)#",
         R"#(graphics card)#",

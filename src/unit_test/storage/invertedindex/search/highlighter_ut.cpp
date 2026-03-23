@@ -24,6 +24,7 @@ import :rag_analyzer;
 import :highlighter;
 import :term;
 import :analyzer_pool;
+import :status;
 
 using namespace infinity;
 
@@ -37,12 +38,17 @@ public:
 
         fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
         if (!fs::exists(RESOURCE_DIR)) {
-            std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-            return;
+            FAIL() << "Resource directory doesn't exist: " << RESOURCE_DIR;
         }
 
         analyzer_ = new RAGAnalyzer(RESOURCE_DIR.string());
-        analyzer_->Load();
+        auto status = analyzer_->Load();
+        if (!status.ok()) {
+            FAIL() << "Failed to load RAGAnalyzer for HighlighterTest: " << status.message();
+            delete analyzer_;
+            analyzer_ = nullptr;
+            return;
+        }
 
         analyzer_->SetEnablePosition(true);
         analyzer_->SetFineGrained(false);
@@ -52,6 +58,8 @@ public:
 };
 
 TEST_F(HighlighterTest, test1) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
     std::string raw_text = R"##(
 once upon a time there lives an dog.this is a sentence,That is another.你好 世界 dog 你好dog
 
@@ -69,6 +77,8 @@ once upon a time there lives an dog.this is a sentence,That is another.你好 �
 }
 
 TEST_F(HighlighterTest, test2) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
     std::string raw_text = R"##(The runner is running and jumped over jumps happily
     )##";
 
@@ -84,6 +94,8 @@ TEST_F(HighlighterTest, test2) {
 }
 
 TEST_F(HighlighterTest, test3) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
     std::string raw_text =
         R"##({{Redirect|Anarchist|the fictional character|Anarchist (comics)}} {{Redirect|Anarchists}} {{Anarchism sidebar}} {{Libertarianism sidebar}}  '''Anarchism''' is generally defined as the [[political philosophy]] which holds the [[state (polity)|state]] to be undesirable, unnecessary, and harmful,<ref name="definition"> {{Cite journal|last=Malatesta|first=Errico|title=Towards Anarchism|journal=MAN!|publisher=International Group of San Francisco|location=Los Angeles|oclc=3930443|url=http://www.marxists.org/archive/malatesta/1930s/xx/toanarchy.htm|authorlink=Errico Malatesta}} {{Cite journal|url=http://www.theglobeandmail.com/servlet/story/RTGAM.20070514.wxlanarchist14/BNStory/lifeWork/home/ |title=Working for The Man |journal=[[The Globe and Mail]] |accessdate=2008-04-14 |last=Agrell |first=Siri |date=2007-05-14}} {{cite web|url=http://www.britannica.com/eb/article-9117285|title=Anarchism|year=2006|work=Encyclopædia Britannica|publisher=Encyclopædia Britannica Premium Service|accessdate=2006-08-29| archiveurl=)##";
 
@@ -99,6 +111,8 @@ TEST_F(HighlighterTest, test3) {
 }
 
 TEST_F(HighlighterTest, test4) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
     std::string raw_text = "南京的南京长江大桥是中国的一条重要的交通. 南京长江大桥很壮观";
 
     std::cout << "-----------------" << std::endl;
