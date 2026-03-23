@@ -22,6 +22,7 @@ import :ut.base_test;
 import :term;
 import :analyzer;
 import :ik_analyzer;
+import :status;
 
 using namespace infinity;
 
@@ -37,7 +38,11 @@ TEST_F(IKAnalyzerTest, test1) {
     }
 
     IKAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
+    auto status = analyzer.Load();
+    if (!status.ok()) {
+        std::cerr << "Failed to load IKAnalyzer: " << status.message() << std::endl;
+        return;
+    }
     // analyzer.SetFineGrained(true);
     std::vector<std::string> queries = {
         // R"#(哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈)#",

@@ -24,6 +24,7 @@ import :analyzer;
 import :rag_analyzer;
 import :darts_trie;
 import :darts;
+import :status;
 
 using namespace infinity;
 
@@ -44,7 +45,13 @@ public:
         }
 
         analyzer_ = new RAGAnalyzer(RESOURCE_DIR.string());
-        analyzer_->Load();
+        auto status = analyzer_->Load();
+        if (!status.ok()) {
+            std::cerr << "Failed to load RAGAnalyzer: " << status.message() << std::endl;
+            delete analyzer_;
+            analyzer_ = nullptr;
+            return;
+        }
 
         analyzer_->SetEnablePosition(false);
         analyzer_->SetFineGrained(false);
