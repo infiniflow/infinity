@@ -110,7 +110,7 @@ set(GCC_SEARCH_ROOTS
 
 #get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
 
-#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${GCC15_LIB_DIR} -static-libstdc++ -static-libgcc")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 ########
 
 find_package(absl CONFIG REQUIRED)
