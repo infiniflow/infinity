@@ -22,6 +22,7 @@ import :ut.base_test;
 import :term;
 import :analyzer;
 import :ik_analyzer;
+import :status;
 
 using namespace infinity;
 
@@ -32,12 +33,14 @@ class IKAnalyzerTest : public BaseTest {};
 TEST_F(IKAnalyzerTest, test1) {
     fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
     if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
+        FAIL() << "Resource directory doesn't exist: " << RESOURCE_DIR;
     }
 
     IKAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
+    auto status = analyzer.Load();
+    if (!status.ok()) {
+        FAIL() << "Failed to load IKAnalyzer: " << status.message();
+    }
     // analyzer.SetFineGrained(true);
     std::vector<std::string> queries = {
         // R"#(哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈)#",
