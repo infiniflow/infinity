@@ -77,9 +77,6 @@ public:
     RAGAnalyzer *analyzer_;
     std::string rag_tokenizer_path_ = "python/infinity_sdk/infinity";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
-
-    // Mismatch tokens for: is, data, CCS, experiencing, faster, LLMs, largest, assessment
-    std::unordered_set<std::string> mismatch_tokens_ = {"be", "datum", "ccs", "experi", "fast", "llms", "larg", "ass"};
 };
 
 TEST_F(RAGAnalyzerTest, test_analyze_enable_position) {
@@ -227,20 +224,18 @@ TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_python) {
         EXPECT_TRUE(is_size_match);
 
         bool is_match = true;
-        bool is_bad_token = false;
         if (is_size_match) {
             for (size_t i = 0; i < tokenize_result.size(); ++i) {
                 if (tokenize_result[i] != python_tokenize_result[i]) {
-                    is_bad_token = mismatch_tokens_.contains(tokenize_result[i]);
-                    if (!is_bad_token) {
-                        is_match = false;
-                        break;
-                    }
+                    std::cout << "MISMATCH at " << i << ": C++='" << tokenize_result[i] << "' Python='" << python_tokenize_result[i] << "'"
+                              << std::endl;
+                    is_match = false;
+                    break;
                 }
             }
             EXPECT_TRUE(is_match);
         }
-        if (!is_size_match || !is_match || is_bad_token) {
+        if (!is_size_match || !is_match) {
             std::cout << "Tokenize count: " << tokenize_result.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
 
             std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
@@ -294,20 +289,18 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
         EXPECT_TRUE(is_size_match);
 
         bool is_match = true;
-        bool is_bad_token = false;
         if (is_size_match) {
             for (size_t i = 0; i < term_list.size(); ++i) {
                 if (term_list[i].text_ != python_tokenize_result[i]) {
-                    is_bad_token = mismatch_tokens_.contains(term_list[i].text_);
-                    if (!is_bad_token) {
-                        is_match = false;
-                        break;
-                    }
+                    std::cout << "MISMATCH at " << i << ": C++='" << term_list[i].text_ << "' Python='" << python_tokenize_result[i] << "'"
+                              << std::endl;
+                    is_match = false;
+                    break;
                 }
             }
             EXPECT_TRUE(is_match);
         }
-        if (!is_size_match || !is_match || is_bad_token) {
+        if (!is_size_match || !is_match) {
             std::cout << "Tokenize count: " << term_list.size() << ", Python tokenize count: " << python_tokenize_result.size() << std::endl;
 
             std::cout << "Python tokenize result: " << std::endl << python_tokens << std::endl;
