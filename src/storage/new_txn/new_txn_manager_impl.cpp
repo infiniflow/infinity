@@ -777,9 +777,8 @@ std::vector<std::shared_ptr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn
             TxnTimeStamp other_commit_ts = other_txn->CommitTS();
             TxnTimeStamp other_begin_ts = other_txn->BeginTS();
             TxnState other_txn_state = other_txn->GetTxnState();
-            bool is_committed = (other_txn->GetTxnState() == TxnState::kCommitted);
             bool is_rollback = (other_txn_state == TxnState::kRollbacking) || (other_txn_state == TxnState::kRollbacked);
-            if (other_kv_commit_ts < this_begin_ts || is_committed || is_rollback) {
+            if (other_kv_commit_ts < this_begin_ts || is_rollback) {
                 // SKIP, other txn is committed before this txn begin
                 // SKIP, other txn is rolled back.
                 continue;
