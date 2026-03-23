@@ -379,7 +379,7 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::ToMmap() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ == BufferType::kMmap || type_ == BufferType::kEphemeral) {
+    if (type_ == BufferType::kMmap || type_ == BufferType::kToMmap || type_ == BufferType::kEphemeral) {
         return;
     }
     if (type_ != BufferType::kPersistent) {
