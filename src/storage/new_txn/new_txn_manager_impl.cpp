@@ -769,6 +769,9 @@ std::vector<std::shared_ptr<NewTxn>> NewTxnManager::GetCheckCandidateTxns(NewTxn
             //                                 other_txn->TxnID(),
             //                                 other_txn->BeginTS(),
             //                                 other_txn->CommitTS()));
+            if (other_txn->GetTxnState() == TxnState::kCommitted || other_txn->GetTxnState() == TxnState::kRollbacked) {
+                continue;
+            }
             if (this_txn_id == other_txn->TxnID()) {
                 // Same txn, SKIP
                 continue;
