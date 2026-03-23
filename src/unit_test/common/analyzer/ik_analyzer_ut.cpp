@@ -33,15 +33,13 @@ class IKAnalyzerTest : public BaseTest {};
 TEST_F(IKAnalyzerTest, test1) {
     fs::path RESOURCE_DIR = "/usr/share/infinity/resource";
     if (!fs::exists(RESOURCE_DIR)) {
-        std::cerr << "Resource directory doesn't exist: " << RESOURCE_DIR << std::endl;
-        return;
+        FAIL() << "Resource directory doesn't exist: " << RESOURCE_DIR;
     }
 
     IKAnalyzer analyzer(RESOURCE_DIR.string());
     auto status = analyzer.Load();
     if (!status.ok()) {
-        std::cerr << "Failed to load IKAnalyzer: " << status.message() << std::endl;
-        return;
+        FAIL() << "Failed to load IKAnalyzer: " << status.message();
     }
     // analyzer.SetFineGrained(true);
     std::vector<std::string> queries = {

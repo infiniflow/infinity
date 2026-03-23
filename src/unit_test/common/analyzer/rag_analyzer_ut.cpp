@@ -83,6 +83,9 @@ public:
 };
 
 TEST_F(RAGAnalyzerTest, test_analyze_enable_position) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
     analyzer_->SetEnablePosition(true);
     analyzer_->SetFineGrained(false);
 
@@ -107,6 +110,9 @@ TEST_F(RAGAnalyzerTest, test_analyze_enable_position) {
 }
 
 TEST_F(RAGAnalyzerTest, test_analyze_enable_position_fine_grained) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
     analyzer_->SetEnablePosition(true);
     analyzer_->SetFineGrained(true);
 
@@ -132,6 +138,9 @@ TEST_F(RAGAnalyzerTest, test_analyze_enable_position_fine_grained) {
 
 // Test Tokenize vs TokenizeWithPosition consistency
 TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_posiiton) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
     std::ifstream infile(input_file_);
     std::string line;
 
@@ -182,6 +191,9 @@ TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_posiiton) {
 }
 
 TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
     std::string call_python_tokenizer_command = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-f \"" + input_file_ + "\" -o \"" +
                                                 rag_tokenizer_path_ + "/tokenizer_python_output.txt\"";
 
@@ -238,6 +250,9 @@ TEST_F(RAGAnalyzerTest, test_tokenize_consistency_with_python) {
 }
 
 TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
     std::string call_python_tokenizer_command = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-f \"" + input_file_ + "\" -o \"" +
                                                 rag_tokenizer_path_ + "/fine_grained_tokenizer_python_output.txt\"" + " --fine-grained";
 
