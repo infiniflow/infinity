@@ -232,6 +232,7 @@ class TestFullText:
 
         part3()
 
+    @pytest.mark.ubsan
     def test_fulltext_realtime(self, infinity_runner: InfinityRunner):
         enwiki_path = "test/data/csv/enwiki_9999.csv"
         enwiki_size = 10000
@@ -352,6 +353,7 @@ class TestFullText:
 
         test()
 
+    @pytest.mark.ubsan
     def test_fulltext_offline(self, infinity_runner: InfinityRunner):
         # should add symbolic link in advance
         enwiki_path = "test/data/csv/enwiki_9999.csv"
@@ -429,6 +431,7 @@ class TestFullText:
 
         part2()
 
+    @pytest.mark.ubsan
     def test_fulltext_multi_index(self, infinity_runner: InfinityRunner):
         """Demonstrate querying multiple fulltext indexes on the same column using new field@index syntax."""
         config = "test/data/config/restart_test/test_fulltext/1.toml"
