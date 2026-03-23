@@ -22,6 +22,7 @@ import :ut.base_test;
 import :term;
 import :analyzer;
 import :chinese_analyzer;
+import :status;
 
 using namespace infinity;
 
@@ -37,7 +38,11 @@ TEST_F(ChineseAnalyzerTest, test1) {
     }
 
     ChineseAnalyzer analyzer(RESOURCE_DIR.string());
-    analyzer.Load();
+    auto status = analyzer.Load();
+    if (!status.ok()) {
+        std::cerr << "Failed to load ChineseAnalyzer: " << status.message() << std::endl;
+        return;
+    }
     std::vector<std::string> queries = {
         R"#(graphic card)#",
         R"#(graphics card)#",
