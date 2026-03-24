@@ -37,6 +37,7 @@ type ColumnDefinition struct {
 	DataType    string
 	Constraints []ColumnConstraint
 	Default     interface{}
+	Comment     string
 }
 
 // TableSchema defines the schema of a table
@@ -73,7 +74,7 @@ func (d *Database) CreateTable(tableName string, columnsDefinition TableSchema, 
 		colDef := thriftapi.NewColumnDef()
 		colDef.ID = int32(index)
 		colDef.Name = columnInfo.Name
-		colDef.Comment = ""
+		colDef.Comment = columnInfo.Comment
 
 		// Parse data type
 		dataType, err := parseDataType(columnInfo.DataType)

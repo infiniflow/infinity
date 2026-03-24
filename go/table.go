@@ -1539,7 +1539,7 @@ func (t *Table) AddColumns(columnDefs TableSchema) (interface{}, error) {
 		colDef := thriftapi.NewColumnDef()
 		colDef.ID = int32(index)
 		colDef.Name = columnInfo.Name
-		colDef.Comment = ""
+		colDef.Comment = columnInfo.Comment
 
 		// Parse data type
 		dataType, err := parseDataType(columnInfo.DataType)
