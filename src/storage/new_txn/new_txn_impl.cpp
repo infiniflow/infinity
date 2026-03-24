@@ -3950,7 +3950,8 @@ bool NewTxn::CheckConflictTxnStore(const OptimizeIndexTxnStore &txn_store, NewTx
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kOptimizeIndex: {
-            // A background optimize task can fail if a previous optimize is still waiting for an older uncommitted transaction to finish.
+            // Even if a previous optimize transaction has committed, it may still be in the conflict detection list if there are older
+            // uncommitted transactions. The next optimize will detect this conflict.
             conflict = true;
             break;
         }
