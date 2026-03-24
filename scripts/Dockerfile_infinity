@@ -17,6 +17,6 @@ RUN \
 # If <src> is a directory, the entire contents of the directory are copied, including filesystem metadata.
 # The directory itself isn't copied, only its contents.
 COPY resource /usr/share/infinity/resource
-COPY cmake-build-relwithdebinfo/src/infinity /usr/bin
+COPY cmake-build-reldeb/src/infinity /usr/bin
 
 ENTRYPOINT ["/usr/bin/infinity"]
