@@ -1,12 +1,13 @@
 FROM ubuntu:22.04
 
-RUN --mount=type=cache,id=infinity_apt,target=/var/cache/apt,sharing=locked \
-    if [ "$NEED_MIRROR" == "1" ]; then \
-        sed -i 's|http://archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
-    fi; \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
-    chmod 1777 /tmp && \
+RUN \
+# --mount=type=cache,id=infinity_apt,target=/var/cache/apt,sharing=locked \
+#    if [ "$NEED_MIRROR" == "1" ]; then \
+#        sed -i 's|http://archive.ubuntu.com|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
+#    fi; \
+#    rm -f /etc/apt/apt.conf.d/docker-clean && \
+#    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
+#    chmod 1777 /tmp && \
     apt update && \
     apt --no-install-recommends install -y ca-certificates && \
     apt update && \
@@ -16,6 +17,6 @@ RUN --mount=type=cache,id=infinity_apt,target=/var/cache/apt,sharing=locked \
 # If <src> is a directory, the entire contents of the directory are copied, including filesystem metadata.
 # The directory itself isn't copied, only its contents.
 COPY resource /usr/share/infinity/resource
-COPY cmake-build-reldeb/src/infinity /usr/bin
+COPY cmake-build-relwithdebinfo/src/infinity /usr/bin
 
 ENTRYPOINT ["/usr/bin/infinity"]
