@@ -546,7 +546,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/test_main
+          chmod +x test_main
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -581,7 +581,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -601,7 +601,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 15s
 
       - name: Run sqllogictest
@@ -636,7 +636,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -650,7 +650,7 @@ jobs:
 
       - name: Run restart test
         run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity
+          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
@@ -677,7 +677,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -691,7 +691,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 15s
 
       - name: Run pysdk test
@@ -726,7 +726,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -746,7 +746,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 15s
 
       - name: Run Go tests
@@ -784,7 +784,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -798,7 +798,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 15s
 
       - name: Run http test
@@ -833,7 +833,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
@@ -847,7 +847,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 15s
 
       - name: Run pysdk test
