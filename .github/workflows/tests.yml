@@ -202,9 +202,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x test_main
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Unit test
         run: |
@@ -236,9 +237,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -284,9 +286,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -324,9 +327,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -372,9 +376,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -423,9 +428,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -471,9 +477,10 @@ jobs:
       - name: Prepare environment
         run: |
           chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
