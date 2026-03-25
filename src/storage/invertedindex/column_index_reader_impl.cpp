@@ -170,6 +170,13 @@ void ColumnIndexReader::InvalidateSegment(SegmentID segment_id) {
             ++iter;
         }
     }
+    for (auto iter = memory_indexers_.begin(); iter != memory_indexers_.end();) {
+        if ((*iter).segment_id_ == segment_id) {
+            iter = memory_indexers_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
 
 void ColumnIndexReader::InvalidateChunk(SegmentID segment_id, ChunkID chunk_id) {
