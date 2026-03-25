@@ -1129,7 +1129,7 @@ jobs:
           tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+          sudo rm -rf ${ARTIFACTS_DIR} && sudo mkdir -p ${ARTIFACTS_DIR} && sudo chown -R ${USER} ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -1204,7 +1204,7 @@ jobs:
           tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+          sudo rm -rf ${ARTIFACTS_DIR} && sudo mkdir -p ${ARTIFACTS_DIR} && sudo chown -R ${USER} ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
