@@ -104,12 +104,12 @@ jobs:
             build_type: Debug
             build_dir: cmake-build-debug
             coverage: ON
-            targets: infinity test_main
+            targets: infinity
           - type: reldeb
             build_type: RelWithDebInfo
             build_dir: cmake-build-reldeb
             coverage: OFF
-            targets: infinity test_main knn_import_benchmark knn_query_benchmark
+            targets: infinity knn_import_benchmark knn_query_benchmark
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -132,9 +132,51 @@ jobs:
           name: ${{ matrix.type }}-build
           path: |
             ${{ matrix.build_dir }}/src/infinity
-            ${{ matrix.build_dir }}/src/test_main
             ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_import_benchmark', matrix.build_dir) || '' }}
             ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_query_benchmark', matrix.build_dir) || '' }}
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Remove build container
+        if: always()
+        run: docker rm -f infinity_builder || true
+
+  unit_test_build:
+    name: ${{ matrix.type }}_unit_test_build
+    runs-on: ubuntu-latest
+    needs: code_static_check
+    strategy:
+      matrix:
+        include:
+          - type: debug
+            build_type: Debug
+            build_dir: cmake-build-debug
+            coverage: ON
+          - type: reldeb
+            build_type: RelWithDebInfo
+            build_dir: cmake-build-reldeb
+            coverage: OFF
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          submodules: recursive
+
+      - name: Start builder container
+        run: |
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+
+      - name: Build ${{ matrix.type }} unit test
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCODE_COVERAGE=${{ matrix.coverage }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target test_main"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.type }}-unit-test-build
+          path: ${{ matrix.build_dir }}/src/test_main
           retention-days: 1
           if-no-files-found: warn
 
@@ -145,7 +187,7 @@ jobs:
   debug_unit_test:
     name: debug_unit_test
     runs-on: ubuntu-latest
-    needs: build
+    needs: unit_test_build
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -154,10 +196,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download debug build artifacts
+      - name: Download debug unit test build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: debug-build
+          name: debug-unit-test-build
           path: .
 
       - name: Prepare environment
@@ -565,7 +607,7 @@ jobs:
   reldeb_unit_test:
     name: reldeb_unit_test
     runs-on: ubuntu-latest
-    needs: build
+    needs: unit_test_build
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -574,10 +616,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download reldeb build artifacts
+      - name: Download reldeb unit test build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: reldeb-build
+          name: reldeb-unit-test-build
           path: .
 
       - name: Prepare environment
