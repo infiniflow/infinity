@@ -249,8 +249,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+          sleep 15s
 
       - name: Run sqllogictest
         run: uv run python3 tools/sqllogictest.py
@@ -338,8 +337,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+          sleep 15s
 
       - name: Run pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -387,8 +385,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+          sleep 15s
 
       - name: Run Go tests
         run: |
@@ -439,8 +436,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+          sleep 15s
 
       - name: Run http test
         run: uv run python3 tools/run_http_api.py
@@ -488,8 +484,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+          sleep 15s
 
       - name: Run pysdk test
         run: uv run python3 tools/run_parallel_test.py
@@ -581,8 +576,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run sqllogictest
   #       run: uv run python3 tools/sqllogictest.py
@@ -630,8 +624,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run pysdk test
   #       run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -679,8 +672,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run Go tests
   #       run: |
@@ -731,8 +723,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run http api test
   #       run: uv run python3 tools/run_http_api.py
@@ -780,8 +771,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run parallel test
   #       run: uv run python3 tools/run_parallel_test.py
@@ -835,8 +825,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run minio pysdk test
   #       run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -894,8 +883,7 @@ jobs:
   #     - name: Start infinity server
   #       run: |
   #         nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-  #         sleep 10s
-  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #         sleep 15s
   #
   #     - name: Run minio parallel test
   #       run: uv run python3 tools/run_parallel_test.py
