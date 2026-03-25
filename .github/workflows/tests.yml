@@ -363,6 +363,11 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
       - name: Install sqllogictest
         run: |
           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
@@ -554,7 +559,7 @@ jobs:
 
       - name: Unit test
         run: |
-          cmake-build-debug/src/test_main > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
+          ./test_main > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
@@ -731,6 +736,11 @@ jobs:
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
 
       - name: Install sqllogictest
         run: |
