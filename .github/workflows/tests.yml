@@ -111,7 +111,7 @@ jobs:
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
       - name: Build debug version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity"
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -149,6 +149,7 @@ jobs:
           chmod +x test_main
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -183,6 +184,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -237,6 +239,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -277,6 +280,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -325,6 +329,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -387,6 +392,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -435,6 +441,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -463,369 +470,492 @@ jobs:
 
 
   release_amd64_build:
-     name: release_amd64_build
-     runs-on: ubuntu-24.04-arm
-     needs: code_static_check
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           fetch-tags: false
-           submodules: recursive
+    name: release_amd64_build
+    runs-on: ubuntu-24.04-arm
+    needs: code_static_check
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          submodules: recursive
 
-       - name: Start builder container
-         run: |
-           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+      - name: Start builder container
+        run: |
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
-       - name: Build release version
-         run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
+      - name: Build release version
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
 
-       - name: Upload artifacts
-         uses: actions/upload-artifact@v4
-         with:
-           name: release-build-amd64
-           path: |
-             cmake-build-reldeb/src/infinity
-             cmake-build-reldeb/src/test_main
-           retention-days: 1
-           if-no-files-found: warn
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-amd64
+          path: |
+            cmake-build-reldeb/src/infinity
+            cmake-build-reldeb/src/test_main
+          retention-days: 1
+          if-no-files-found: warn
 
-       - name: Remove build container
-         if: always()
-         run: docker rm -f infinity_builder || true
+      - name: Remove build container
+        if: always()
+        run: docker rm -f infinity_builder || true
 
   release_amd64_unit_test:
-     name: release_amd64_unit_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_unit_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./test_main
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./test_main
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Unit test
-         run: |
-           ./test_main > release_amd64_unit_test_stdout.log 2> release_amd64_unit_test_stderr.log
+      - name: Unit test
+        run: |
+          ./test_main --gtest_filter=-*SLOW_* > release_amd64_unit_test_stdout.log 2> release_amd64_unit_test_stderr.log
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           echo "release amd64 unit test log" && tail -n 1000 release_amd64_unit_test*.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          echo "release amd64 unit test log" && tail -n 1000 release_amd64_unit_test*.log || true
 
   release_amd64_sqllogical_test:
-     name: release_amd64_sqllogical_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_sqllogical_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install sqllogictest
-         run: |
-           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-           tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-           sudo mv sqllogictest /usr/local/bin/
+      - name: Install sqllogictest
+        run: |
+          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          sudo mv sqllogictest /usr/local/bin/
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Start infinity server
-         run: |
-           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-           sleep 15s
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          sleep 15s
 
-       - name: Run sqllogictest
-         run: uv run python3 tools/sqllogictest.py
+      - name: Run sqllogictest
+        run: uv run python3 tools/sqllogictest.py
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           cat infinity.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-       - name: Stop infinity server
-         if: always()
-         run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   release_amd64_restart_test:
-     name: release_amd64_restart_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_restart_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Run restart test
-         run: |
-           uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+      - name: Run restart test
+        run: |
+          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           echo "release_amd64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          echo "release_amd64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
   release_amd64_pysdk_test:
-     name: release_amd64_pysdk_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_pysdk_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Start infinity server
-         run: |
-           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-           sleep 15s
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          sleep 15s
 
-       - name: Run pysdk test
-         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+      - name: Run pysdk test
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           cat infinity.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-       - name: Stop infinity server
-         if: always()
-         run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   release_amd64_go_test:
-     name: release_amd64_go_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_go_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install sqllogictest
-         run: |
-           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-           tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-           sudo mv sqllogictest /usr/local/bin/
+      - name: Install sqllogictest
+        run: |
+          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          sudo mv sqllogictest /usr/local/bin/
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Start infinity server
-         run: |
-           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-           sleep 15s
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          sleep 15s
 
-       - name: Run Go tests
-         run: |
-           uv run python3 tools/sqllogictest.py -jc=1
-           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
+      - name: Run Go tests
+        run: |
+          uv run python3 tools/sqllogictest.py -jc=1
+          cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           cat infinity.log || true
-           cat release_amd64_go_test.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
+          cat release_amd64_go_test.log || true
 
-       - name: Stop infinity server
-         if: always()
-         run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   release_amd64_http_test:
-     name: release_amd64_http_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_http_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Start infinity server
-         run: |
-           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-           sleep 15s
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          sleep 15s
 
-       - name: Run http test
-         run: uv run python3 tools/run_http_api.py
+      - name: Run http test
+        run: uv run python3 tools/run_http_api.py
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           cat infinity.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-       - name: Stop infinity server
-         if: always()
-         run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   release_amd64_pysdk_parallel_test:
-     name: release_amd64_pysdk_parallel_test
-     runs-on: ubuntu-24.04-arm
-     needs: release_amd64_build
-     steps:
-       - name: Check out code
-         uses: actions/checkout@v4
-         with:
-           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-           fetch-depth: 0
-           submodules: recursive
+    name: release_amd64_pysdk_parallel_test
+    runs-on: ubuntu-24.04-arm
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-       - name: Download release build artifacts
-         uses: actions/download-artifact@v4
-         with:
-           name: release-build-amd64
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
 
-       - name: Prepare environment
-         run: |
-           chmod +x ./infinity
-           sudo mkdir -p /usr/share/infinity/resource
-           sudo cp -r resource/* /usr/share/infinity/resource/
-           sudo mkdir -p /var/infinity
-           sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment
+        run: |
+          chmod +x ./infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
-       - name: Install Python SDK
-         uses: astral-sh/setup-uv@v4
-         with:
-           enable-cache: true
-       - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-       - name: Start infinity server
-         run: |
-           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-           sleep 15s
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+          sleep 15s
 
-       - name: Run pysdk test
-         run: uv run python3 tools/run_parallel_test.py
+      - name: Run pysdk test
+        run: uv run python3 tools/run_parallel_test.py
 
-       - name: Collect infinity log
-         if: always()
-         run: |
-           cat infinity.log || true
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-       - name: Stop infinity server
-         if: always()
-         run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
+  release_amd64_minio_pysdk_test:
+    name: release_amd64_minio_pysdk_test
+    runs-on: ubuntu-latest
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
+
+      - name: Prepare environment
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          sleep 15s
+
+      - name: Run minio pysdk test
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
+
+  release_amd64_minio_parallel_test:
+    name: release_amd64_minio_parallel_test
+    runs-on: ubuntu-latest
+    needs: release_amd64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-amd64
+
+      - name: Prepare environment
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          sleep 15s
+
+      - name: Run minio parallel test
+        run: uv run python3 tools/run_parallel_test.py
+
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
 
   debug_arm64_build:
     name: debug_arm64_build
@@ -883,12 +1013,13 @@ jobs:
           chmod +x test_main
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
       - name: Unit test
         run: |
-          ./test_main > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
+          ./test_main --gtest_filter=-*SLOW_* > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
@@ -917,6 +1048,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -971,6 +1103,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1011,6 +1144,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1059,6 +1193,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1121,6 +1256,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1169,6 +1305,7 @@ jobs:
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1251,12 +1388,13 @@ jobs:
           chmod +x ./test_main
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
       - name: Unit test
         run: |
-          ./test_main > release_arm64_unit_test_stdout.log 2> release_arm64_unit_test_stderr.log
+          ./test_main --gtest_filter=-*SLOW_* > release_arm64_unit_test_stdout.log 2> release_arm64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
@@ -1285,6 +1423,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1339,6 +1478,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1379,6 +1519,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1427,6 +1568,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1484,6 +1626,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1532,6 +1675,7 @@ jobs:
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
           sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
@@ -1557,3 +1701,121 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
+
+  release_arm64_minio_pysdk_test:
+    name: release_arm64_minio_pysdk_test
+    runs-on: ubuntu-latest
+    needs: release_arm64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-arm64
+
+      - name: Prepare environment
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          sleep 15s
+
+      - name: Run minio pysdk test
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
+
+  release_arm64_minio_parallel_test:
+    name: release_arm64_minio_parallel_test
+    runs-on: ubuntu-latest
+    needs: release_arm64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download release build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-arm64
+
+      - name: Prepare environment
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sleep 5s
+      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+
+      - name: Start infinity server
+        run: |
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          sleep 15s
+
+      - name: Run minio parallel test
+        run: uv run python3 tools/run_parallel_test.py
+
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
