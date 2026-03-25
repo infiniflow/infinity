@@ -171,7 +171,7 @@ void ColumnIndexReader::InvalidateSegment(SegmentID segment_id) {
         }
     }
     for (auto iter = memory_indexers_.begin(); iter != memory_indexers_.end();) {
-        if ((*iter).segment_id_ == segment_id) {
+        if ((*iter)->segment_id_ == segment_id) {
             iter = memory_indexers_.erase(iter);
         } else {
             ++iter;
