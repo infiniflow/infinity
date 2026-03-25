@@ -130,10 +130,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.type }}-build
-          path: |
-            ${{ matrix.build_dir }}/src/infinity
-            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_import_benchmark', matrix.build_dir) || '' }}
-            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_query_benchmark', matrix.build_dir) || '' }}
+          path: ${{ matrix.build_dir }}/src/infinity
           retention-days: 1
           if-no-files-found: warn
 
@@ -204,7 +201,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/test_main
+          chmod +x test_main
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -260,7 +257,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -323,7 +320,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -369,7 +366,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -432,7 +429,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -498,7 +495,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -561,7 +558,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-debug/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -624,7 +621,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/test_main
+          chmod +x test_main
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -672,7 +669,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -722,7 +719,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -772,7 +769,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -825,7 +822,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -875,7 +872,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -925,7 +922,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -985,7 +982,7 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x infinity
           mkdir -p /tmp/infinity/resource
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
@@ -1048,9 +1045,9 @@ jobs:
 
       - name: Prepare environment
         run: |
-          chmod +x cmake-build-reldeb/src/infinity
-          chmod +x cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark || true
-          chmod +x cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark || true
+          chmod +x infinity
+          chmod +x knn_import_benchmark || true
+          chmod +x knn_query_benchmark || true
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
