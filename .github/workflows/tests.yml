@@ -1110,15 +1110,26 @@ jobs:
   debug_build_arm:
     name: debug_build_arm
     runs-on: [ "self-hosted", "infinity-build-arm" ]
-    needs: code_static_check
     steps:
-      - name: Prepare code
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          submodules: recursive
+
+      - name: Backup code
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
@@ -1174,15 +1185,26 @@ jobs:
   reldeb_build_arm:
     name: reldeb_build_arm
     runs-on: [ "self-hosted", "infinity-build-arm" ]
-    needs: code_static_check
     steps:
-      - name: Prepare code
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          submodules: recursive
+
+      - name: Backup code
         if: ${{ !cancelled() && !failure() }}
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
           ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
           echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
