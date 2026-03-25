@@ -94,22 +94,9 @@ jobs:
         run: docker rm -f infinity_builder || true
 
   build:
-    name: ${{ matrix.type }}_build
+    name: debug_build
     runs-on: ubuntu-latest
     needs: code_static_check
-    strategy:
-      matrix:
-        include:
-          - type: debug
-            build_type: Debug
-            build_dir: cmake-build-debug
-            coverage: ON
-            targets: infinity
-          # - type: reldeb
-          #   build_type: RelWithDebInfo
-          #   build_dir: cmake-build-reldeb
-          #   coverage: OFF
-          #   targets: infinity knn_import_benchmark knn_query_benchmark
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -123,14 +110,14 @@ jobs:
         run: |
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
-      - name: Build ${{ matrix.type }} version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCODE_COVERAGE=${{ matrix.coverage }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target ${{ matrix.targets }}"
+      - name: Build debug version
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.type }}-build
-          path: ${{ matrix.build_dir }}/src/infinity
+          name: debug-build
+          path: cmake-build-debug/src/infinity
           retention-days: 1
           if-no-files-found: warn
 
@@ -139,20 +126,9 @@ jobs:
         run: docker rm -f infinity_builder || true
 
   unit_test_build:
-    name: ${{ matrix.type }}_unit_test_build
+    name: debug_unit_test_build
     runs-on: ubuntu-latest
     needs: code_static_check
-    strategy:
-      matrix:
-        include:
-          - type: debug
-            build_type: Debug
-            build_dir: cmake-build-debug
-            coverage: ON
-          # - type: reldeb
-          #   build_type: RelWithDebInfo
-          #   build_dir: cmake-build-reldeb
-          #   coverage: OFF
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -166,14 +142,14 @@ jobs:
         run: |
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
-      - name: Build ${{ matrix.type }} unit test
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCODE_COVERAGE=${{ matrix.coverage }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target test_main"
+      - name: Build debug unit test
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target test_main"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.type }}-unit-test-build
-          path: ${{ matrix.build_dir }}/src/test_main
+          name: debug-unit-test-build
+          path: cmake-build-debug/src/test_main
           retention-days: 1
           if-no-files-found: warn
 
@@ -241,6 +217,12 @@ jobs:
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+
+      - name: Install sqllogictest
+        run: |
+          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+          sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -380,6 +362,12 @@ jobs:
           sudo cp -r resource/* /usr/share/infinity/resource/
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+
+      - name: Install sqllogictest
+        run: |
+          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+          sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v4
@@ -526,9 +514,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x test_main
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Start minio container
   #       run: |
@@ -570,9 +559,16 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
+  #
+  #     - name: Install sqllogictest
+  #       run: |
+  #         curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+  #         tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+  #         sudo mv sqllogictest /usr/local/bin/
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -618,9 +614,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -666,9 +663,16 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
+  #
+  #     - name: Install sqllogictest
+  #       run: |
+  #         curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+  #         tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+  #         sudo mv sqllogictest /usr/local/bin/
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -717,9 +721,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -765,9 +770,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -813,9 +819,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -871,9 +878,10 @@ jobs:
   #     - name: Prepare environment
   #       run: |
   #         chmod +x infinity
-  #         mkdir -p /tmp/infinity/resource
-  #         cp -r resource/* /tmp/infinity/resource/
-  #         mkdir -p /tmp/var/infinity
+  #         sudo mkdir -p /usr/share/infinity/resource
+  #         sudo cp -r resource/* /usr/share/infinity/resource/
+  #         sudo mkdir -p /var/infinity
+  #         sudo chown -R ${USER} /var/infinity
   #
   #     - name: Install Python SDK
   #       uses: astral-sh/setup-uv@v4
@@ -970,17 +978,8 @@ jobs:
   #         sudo rm -rf ${PWD}/db_tmp
 
   build_arm:
-    name: ${{ matrix.type }}_build_arm
+    name: debug_build_arm
     runs-on: [ "self-hosted", "infinity-build-arm" ]
-    strategy:
-      matrix:
-        include:
-          - type: debug
-            build_type: Debug
-            build_dir: cmake-build-debug
-          # - type: reldeb
-          #   build_type: RelWithDebInfo
-          #   build_dir: cmake-build-reldeb
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
@@ -1000,16 +999,16 @@ jobs:
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
           sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
-      - name: Build ${{ matrix.type }} version
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target infinity test_main"
+      - name: Build debug version
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.type }}-build-arm
+          name: debug-build-arm
           path: |
-            ${{ matrix.build_dir }}/src/infinity
-            ${{ matrix.build_dir }}/src/test_main
+            cmake-build-debug/src/infinity
+            cmake-build-debug/src/test_main
           retention-days: 1
           if-no-files-found: warn
 
@@ -1021,16 +1020,9 @@ jobs:
           fi
 
   unit_test_arm:
-    name: ${{ matrix.type }}_unit_test_arm
+    name: debug_unit_test_arm
     runs-on: [ "self-hosted", "infinity-test-arm" ]
     needs: build_arm
-    strategy:
-      matrix:
-        include:
-          - type: debug
-            build_dir: cmake-build-debug
-          # - type: reldeb
-          #   build_dir: cmake-build-reldeb
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
@@ -1042,23 +1034,23 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download ${{ matrix.type }} build artifacts
+      - name: Download debug build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.type }}-build-arm
+          name: debug-build-arm
           path: .
 
       - name: Prepare environment
         run: |
-          chmod +x ${{ matrix.build_dir }}/src/test_main
+          chmod +x cmake-build-debug/src/test_main
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Unit test
         run: |
-          ${{ matrix.build_dir }}/src/test_main > ${{ matrix.type }}_unit_test_arm_stdout.log 2> ${{ matrix.type }}_unit_test_arm_stderr.log
+          cmake-build-debug/src/test_main > debug_unit_test_arm_stdout.log 2> debug_unit_test_arm_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
-          echo "${{ matrix.type }} unit test arm log" && tail -n 1000 ${{ matrix.type }}_unit_test_arm*.log || true
+          echo "debug unit test arm log" && tail -n 1000 debug_unit_test_arm*.log || true
