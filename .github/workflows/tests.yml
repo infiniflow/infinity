@@ -206,36 +206,14 @@ jobs:
           cp -r resource/* /tmp/infinity/resource/
           mkdir -p /tmp/var/infinity
 
-      - name: Start builder container
-        run: |
-          docker run --privileged -d --name infinity_test -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20
-          sleep 5s
-
       - name: Unit test
         run: |
-          docker exec infinity_test bash -c 'export LLVM_PROFILE_FILE="infinity-%p.profraw" && ASAN_OPTIONS=detect_leaks=0 /infinity/cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > /infinity/debug_unit_test_stdout.log 2> /infinity/debug_unit_test_stderr.log'
+          ./test_main --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "debug unit test log" && tail -n 1000 debug_unit_test*.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_test bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov'
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_unit_test
-
-      - name: Remove container
-        if: always()
-        run: docker rm -f infinity_test || true
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
@@ -270,7 +248,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_sqllogictest_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -280,25 +258,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat debug_sqllogictest_stderr.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_sqllogical_test
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   debug_restart_test:
     name: debug_restart_test
@@ -333,18 +297,12 @@ jobs:
 
       - name: Run restart test
         run: |
-          docker run --privileged -d --name infinity_test --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 sleep infinity
-          sleep 5s
-          docker exec infinity_test bash -c 'cd /infinity && uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity'
+          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
-
-      - name: Remove container
-        if: always()
-        run: docker rm -f infinity_test || true
 
   debug_pysdk_test:
     name: debug_pysdk_test
@@ -379,7 +337,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_pysdk_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -389,25 +347,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat debug_pysdk_stderr.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_pysdk_test
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   debug_go_test:
     name: debug_go_test
@@ -442,38 +386,24 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_go_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run Go tests
         run: |
-          docker exec infinity_server bash -c 'cd /infinity && uv run python3 tools/sqllogictest.py -jc=1'
-          docker exec infinity_server bash -c 'cd /infinity/go && go version && go test ./tests/... -v 2>&1 | tee /infinity/debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" /infinity/debug_go_test.log || true; exit $exit_code; fi'
+          uv run python3 tools/sqllogictest.py -jc=1
+          cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat debug_go_stderr.log || true
+          cat infinity.log || true
           cat debug_go_test.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_go_test
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   debug_http_test:
     name: debug_http_test
@@ -508,7 +438,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_http_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -518,25 +448,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat debug_http_stderr.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_http_test
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   debug_pysdk_parallel_test:
     name: debug_pysdk_parallel_test
@@ -571,7 +487,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_parallel_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -581,25 +497,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat debug_parallel_stderr.log || true
-
-      - name: Generate LCOV report
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
-          head -10 coverage.lcov || true
-
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: coverage.lcov
-          flags: debug_pysdk_parallel_test
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_unit_test:
     name: reldeb_unit_test
@@ -634,20 +536,16 @@ jobs:
 
       - name: Unit test reldeb version
         run: |
-          docker run --privileged -d --name infinity_test --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 sleep infinity
-          sleep 5s
-          docker exec infinity_test bash -c '/infinity/cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > /infinity/reldeb_unit_test_stdout.log 2> /infinity/reldeb_unit_test_stderr.log'
+          ./test_main --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log || true
 
-      - name: Remove containers
+      - name: Remove minio container
         if: always()
-        run: |
-          docker rm -f infinity_test || true
-          docker rm -f minio || true
+        run: docker rm -f minio || true
 
   reldeb_sqllogical_test:
     name: reldeb_sqllogical_test
@@ -682,7 +580,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_sqllogic_test_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -692,12 +590,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_sqllogic_test_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_pysdk_test:
     name: reldeb_pysdk_test
@@ -732,7 +629,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_pysdk_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -742,12 +639,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_pysdk_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_go_test:
     name: reldeb_go_test
@@ -782,25 +678,24 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_go_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run Go tests
         run: |
-          docker exec infinity_server bash -c 'cd /infinity && uv run python3 tools/sqllogictest.py -jc=1'
-          docker exec infinity_server bash -c 'cd /infinity/go && go version && go test ./tests/... -v 2>&1 | tee /infinity/reldeb_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" /infinity/reldeb_go_test.log || true; exit $exit_code; fi'
+          uv run python3 tools/sqllogictest.py -jc=1
+          cd go && go version && go test ./tests/... -v 2>&1 | tee ../reldeb_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../reldeb_go_test.log || true; exit $exit_code; fi
 
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_go_stderr.log || true
+          cat infinity.log || true
           cat reldeb_go_test.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_http_test:
     name: reldeb_http_test
@@ -835,7 +730,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_http_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -845,12 +740,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_http_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_pysdk_parallel_test:
     name: reldeb_pysdk_parallel_test
@@ -885,7 +779,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_pysdk_parallel_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -895,12 +789,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_pysdk_parallel_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
   reldeb_minio_pysdk_test:
     name: reldeb_minio_pysdk_test
@@ -941,7 +834,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_minio.toml > /infinity/reldeb_minio_pysdk_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -951,12 +844,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_minio_pysdk_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
       - name: Remove minio container
         if: always()
@@ -1001,7 +893,7 @@ jobs:
 
       - name: Start infinity server
         run: |
-          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_minio.toml > /infinity/reldeb_minio_parallel_stderr.log 2>&1'
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
           sleep 10s
           curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
@@ -1011,12 +903,11 @@ jobs:
       - name: Collect infinity log
         if: always()
         run: |
-          docker logs infinity_server || true
-          cat reldeb_minio_parallel_stderr.log || true
+          cat infinity.log || true
 
       - name: Stop infinity server
         if: always()
-        run: docker rm -f infinity_server || true
+        run: pkill -f infinity || true
 
       - name: Remove minio container
         if: always()
