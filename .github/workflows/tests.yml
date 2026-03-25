@@ -131,11 +131,13 @@ jobs:
         with:
           name: ${{ matrix.type }}-build
           path: |
-            ${{ matrix.build_dir }}/src/infinity
-            ${{ matrix.build_dir }}/src/test_main
-            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_import_benchmark', matrix.build_dir) || '' }}
-            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_query_benchmark', matrix.build_dir) || '' }}
+            src/infinity
+            src/test_main
+            benchmark/local_infinity/knn_import_benchmark
+            benchmark/local_infinity/knn_query_benchmark
+          working-directory: ${{ matrix.build_dir }}
           retention-days: 1
+          if-no-files-found: warn
 
       - name: Remove build container
         if: always()
@@ -157,7 +159,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -213,7 +215,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -276,7 +278,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -322,7 +324,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -385,7 +387,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -451,7 +453,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -514,7 +516,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug/src
+          path: cmake-build-debug
 
       - name: Prepare environment
         run: |
@@ -577,7 +579,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -625,7 +627,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -675,7 +677,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -725,7 +727,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -778,7 +780,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -828,7 +830,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -878,7 +880,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -938,7 +940,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
@@ -1001,13 +1003,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb/src
+          path: cmake-build-reldeb
 
       - name: Prepare environment
         run: |
           chmod +x cmake-build-reldeb/src/infinity
-          chmod +x cmake-build-reldeb/src/knn_import_benchmark || true
-          chmod +x cmake-build-reldeb/src/knn_query_benchmark || true
+          chmod +x cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark || true
+          chmod +x cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark || true
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
@@ -1032,9 +1034,9 @@ jobs:
       - name: Latest benchmark sift
         run: |
           rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ./cmake-build-reldeb/src/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml || ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
-          echo "1 50" | (./cmake-build-reldeb/src/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml 2>/dev/null || ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml) | tee benchmark_sift_1_thread.log
-          echo "8 50" | (./cmake-build-reldeb/src/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml 2>/dev/null || ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml) | tee benchmark_sift_8_threads.log
+          ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
+          echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
+          echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
@@ -1082,9 +1084,11 @@ jobs:
         with:
           name: ${{ matrix.type }}-build-arm
           path: |
-            ${{ matrix.build_dir }}/src/infinity
-            ${{ matrix.build_dir }}/src/test_main
+            src/infinity
+            src/test_main
+          working-directory: ${{ matrix.build_dir }}
           retention-days: 1
+          if-no-files-found: warn
 
       - name: Remove build container
         if: always()
@@ -1119,7 +1123,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.type }}-build-arm
-          path: ${{ matrix.build_dir }}/src
+          path: ${{ matrix.build_dir }}
 
       - name: Prepare environment
         run: |
@@ -1129,7 +1133,7 @@ jobs:
 
       - name: Unit test
         run: |
-          ${{ matrix.build_dir }}/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > ${{ matrix.type }}_unit_test_arm_stdout.log 2> ${{ matrix.type }}_unit_test_arm_stderr.log
+          ${{ matrix.build_dir }}/src/test_main > ${{ matrix.type }}_unit_test_arm_stdout.log 2> ${{ matrix.type }}_unit_test_arm_stderr.log
 
       - name: Collect infinity log
         if: always()
