@@ -120,8 +120,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeta &table_index_me
                 }
                 std::shared_ptr<InMemIndexSegmentReader> segment_reader = std::make_shared<InMemIndexSegmentReader>(segment_id, memory_indexer.get());
                 segment_readers_.push_back(std::move(segment_reader));
-                // for loading column length file
-                memory_indexer_ = memory_indexer;
+                memory_indexers_.push_back(memory_indexer);
             }
         }
     }

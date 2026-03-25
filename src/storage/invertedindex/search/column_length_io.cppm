@@ -41,11 +41,13 @@ public:
             assert(column_lengths_ != nullptr);
             return column_lengths_[row_id - current_chunk_base_rowid_];
         }
-        if (memory_indexer_.get() != nullptr) {
-            RowID base_rowid = memory_indexer_->GetBeginRowID();
-            u32 doc_count = memory_indexer_->GetDocCount();
-            if (row_id >= base_rowid && row_id < base_rowid + doc_count) {
-                return memory_indexer_->GetColumnLength(row_id - base_rowid);
+        for (const auto &memory_indexer : memory_indexers_) {
+            if (memory_indexer != nullptr) {
+                RowID base_rowid = memory_indexer->GetBeginRowID();
+                u32 doc_count = memory_indexer->GetDocCount();
+                if (row_id >= base_rowid && row_id < base_rowid + doc_count) {
+                    return memory_indexer->GetColumnLength(row_id - base_rowid);
+                }
             }
         }
         return SeekFile(row_id);
@@ -57,7 +59,7 @@ private:
     u32 SeekFile(RowID row_id);
     const std::string &index_dir_;
     std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_{}; // must in ascending order
-    std::shared_ptr<MemoryIndexer> memory_indexer_{};
+    std::vector<std::shared_ptr<MemoryIndexer>> memory_indexers_{};
     size_t chunk_doc_cnt_{};
     size_t chunk_term_cnt_{};
 
