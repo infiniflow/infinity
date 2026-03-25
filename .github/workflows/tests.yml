@@ -594,7 +594,7 @@ jobs:
   debug_upload_codecov:
     name: debug_upload_codecov
     runs-on: [ "self-hosted", "infinity-test" ]
-    needs: [debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test, debug_pysdk_parallel_test, debug_go_test]
+    needs: [ debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test, debug_pysdk_parallel_test, debug_go_test ]
     steps:
       - name: Prepare code and artifacts
         if: ${{ !cancelled() && !failure() }}
@@ -911,7 +911,7 @@ jobs:
           nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_parallel_stderr.log &
           ./scripts/wait_for_infinity.sh
 
-      - name: Run parallel test 
+      - name: Run parallel test
         if: ${{ !cancelled() && !failure() }}
         run: |
           uv run python3 tools/run_parallel_test.py
@@ -1106,3 +1106,130 @@ jobs:
         if: always()
         run: |
           sudo rm -rf ${PWD}/db_tmp
+
+  debug_build_arm:
+    name: debug_build_arm
+    runs-on: [ "self-hosted", "infinity-build-arm" ]
+    needs: code_static_check
+    steps:
+      - name: Prepare code
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20_arm64
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} | tar --extract --directory=${ARTIFACTS_DIR} --file=-
+
+      - name: Remove build container
+        if: always()
+        run: |
+          if [[ -n "${BUILDER_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${BUILDER_CONTAINER}"
+          fi
+
+  debug_unit_test_arm:
+    name: debug_unit_test_arm
+    runs-on: [ "self-hosted", "infinity-test-arm" ]
+    needs: debug_build_arm
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
+          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+
+      - name: Unit test
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_arm_stdout.log 2> debug_unit_test_arm_stderr.log
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          echo "debug unit test arm log" && tail -n 1000 debug_unit_test_arm*.log
+          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test_arm/ && cp debug_unit_test_arm*.log ${ARTIFACTS_DIR}/debug_unit_test_arm/
+
+  reldeb_build_arm:
+    name: reldeb_build_arm
+    runs-on: [ "self-hosted", "infinity-build-arm" ]
+    needs: code_static_check
+    steps:
+      - name: Prepare code
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20_arm64
+
+      - name: Build reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: tar -cf - cmake-build-reldeb/src/{infinity,test_main} | tar -C ${ARTIFACTS_DIR} -xf -
+
+      - name: Remove build container
+        if: always()
+        run: |
+          if [[ -n "${BUILDER_CONTAINER}" ]]; then
+            sudo docker rm -f -v "${BUILDER_CONTAINER}"
+          fi
+
+  reldeb_unit_test_arm:
+    name: reldeb_unit_test_arm
+    runs-on: [ "self-hosted", "infinity-test-arm" ]
+    needs: reldeb_build_arm
+    steps:
+      - name: Prepare code and artifacts
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
+          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/test_main | tar -xf -
+          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+
+      - name: Unit test reldeb version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > reldeb_unit_test_arm_stdout.log 2> reldeb_unit_test_arm_stderr.log
+
+      - name: Collect infinity log
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test_arm && cp reldeb_unit_test_arm*.log ${ARTIFACTS_DIR}/reldeb_unit_test_arm/
