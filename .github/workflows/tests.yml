@@ -32,73 +32,15 @@ jobs:
   code_static_check:
     name: code_static_check
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
-    runs-on: [ "self-hosted", "infinity-test" ]
+    runs-on: ubuntu-latest
     steps:
-      - name: Ensure workspace ownership
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "Workflow triggered by ${GITHUB_EVENT_NAME}"
-          if [[ ${GITHUB_EVENT_NAME} == 'pull_request' ]]; then
-            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
-          fi
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           fetch-tags: false
           submodules: recursive
-
-      - name: Backup code
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          if [[ ${GITHUB_EVENT_NAME} != 'pull_request' ]]; then
-            HEAD=$(git rev-parse HEAD)
-            # Find a PR that introduced a given commit
-            gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-            PR_NUMBER=$(gh pr list --search ${HEAD} --state merged --json number --jq .[0].number)
-            echo "HEAD=${HEAD}"
-            echo "PR_NUMBER=${PR_NUMBER}"
-            if [[ -n ${PR_NUMBER} ]]; then
-              PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/PR_${PR_NUMBER}
-              if [[ -f ${PR_SHA_FP} ]]; then
-                read -r PR_SHA PR_RUN_ID < "${PR_SHA_FP}"
-                # Calculate the hash of the current workspace content
-                HEAD_SHA=$(git rev-parse HEAD^{tree})
-                if [[ ${HEAD_SHA} == ${PR_SHA} ]]; then
-                  echo "The workspace content hash is the same with PR #${PR_NUMBER} merged. See ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${PR_RUN_ID} for details."
-                  echo "Upload coverage report of PR #${PR_NUMBER}"
-                  export ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${PR_RUN_ID}
-                  echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}"
-                  export CODECOV_COMMIT_SHA=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }}
-                  echo "CODECOV_COMMIT_SHA=${CODECOV_COMMIT_SHA}"
-                  ./scripts/upload_codecov.sh
-                  echo "Cancel myself"
-                  gh run cancel ${GITHUB_RUN_ID}
-                  while true; do
-                    status=$(gh run view ${GITHUB_RUN_ID} --json status -q .status)
-                    [ "$status" = "completed" ] && break
-                    sleep 5
-                  done
-                  exit 1
-                fi
-              fi
-            fi
-          else
-            PR_NUMBER=${{ github.event.pull_request.number }}
-            PR_SHA_FP=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/PR_${PR_NUMBER}
-            # Calculate the hash of the current workspace content
-            PR_SHA=$(git rev-parse HEAD^{tree})
-            echo "PR #${PR_NUMBER} workspace content hash: ${PR_SHA}"
-            mkdir -p ${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}
-            echo "${PR_SHA} ${GITHUB_RUN_ID}" > ${PR_SHA_FP}
-          fi
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          rm -rf ${ARTIFACTS_DIR} && mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
 
       # https://github.com/astral-sh/ruff-action
       - name: Static check with Ruff
@@ -108,15 +50,10 @@ jobs:
           args: "check --exclude=**/remote_thrift/infinity_thrift_rpc/**"
 
       - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          CHECK_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "CHECK_CONTAINER=${CHECK_CONTAINER}" >> ${GITHUB_ENV}
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged --cap-add=NET_ADMIN -d --name ${CHECK_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
       - name: Check format of changed C/C++ files
-        if: ${{ !cancelled() && !failure() }}
         run: |
           if [[ ${{ github.event_name }} == 'pull_request' ]]; then
             CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} \
@@ -134,7 +71,7 @@ jobs:
 
               for file in "${files[@]}"; do
                 if [ -f "$file" ]; then
-                  if sudo docker exec ${CHECK_CONTAINER} bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
+                  if docker exec infinity_builder bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
                     echo "✅ $file"
                   else
                     echo "❌ $file"
@@ -154,926 +91,927 @@ jobs:
 
       - name: Remove container
         if: always()
-        run: |
-          if [[ -n "${CHECK_CONTAINER}" ]]; then
-            sudo docker rm -f -v "${CHECK_CONTAINER}"
-          fi
+        run: docker rm -f infinity_builder || true
 
-  debug_build:
-    name: debug_build
-    runs-on: [ "self-hosted", "infinity-build" ]
+  build:
+    name: ${{ matrix.type }}_build
+    runs-on: ubuntu-latest
     needs: code_static_check
+    strategy:
+      matrix:
+        include:
+          - type: debug
+            build_type: Debug
+            build_dir: cmake-build-debug
+            coverage: ON
+            targets: infinity test_main
+          - type: reldeb
+            build_type: RelWithDebInfo
+            build_dir: cmake-build-reldeb
+            coverage: OFF
+            targets: infinity test_main knn_import_benchmark knn_query_benchmark
     steps:
-      - name: Prepare code
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          fetch-tags: false
+          submodules: recursive
 
       - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
-      - name: Build debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+      - name: Build ${{ matrix.type }} version
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCODE_COVERAGE=${{ matrix.coverage }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target ${{ matrix.targets }}"
 
       - name: Upload artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: tar --create --file=- cmake-build-debug/src/{infinity,test_main} | tar --extract --directory=${ARTIFACTS_DIR} --file=-
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.type }}-build
+          path: |
+            ${{ matrix.build_dir }}/src/infinity
+            ${{ matrix.build_dir }}/src/test_main
+            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_import_benchmark', matrix.build_dir) || '' }}
+            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_query_benchmark', matrix.build_dir) || '' }}
+          retention-days: 1
 
       - name: Remove build container
         if: always()
-        run: |
-          if [[ -n "${BUILDER_CONTAINER}" ]]; then
-            sudo docker rm -f -v "${BUILDER_CONTAINER}"
-          fi
+        run: docker rm -f infinity_builder || true
 
   debug_unit_test:
     name: debug_unit_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/test_main | tar --extract --file=-
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
+
+      - name: Prepare environment
         run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          chmod +x cmake-build-debug/src/test_main
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Start builder container
+        run: |
+          docker run --privileged -d --name infinity_test -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20
           sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
 
       - name: Unit test
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          ASAN_OPTIONS=detect_leaks=0 cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
+          docker exec infinity_test bash -c 'export LLVM_PROFILE_FILE="infinity-%p.profraw" && ASAN_OPTIONS=detect_leaks=0 /infinity/cmake-build-debug/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > /infinity/debug_unit_test_stdout.log 2> /infinity/debug_unit_test_stderr.log'
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
+        if: always()
         run: |
-          echo "debug unit test log" && tail -n 1000 debug_unit_test*.log
-          mkdir -p ${ARTIFACTS_DIR}/debug_unit_test/ && cp debug_unit_test*.log ${ARTIFACTS_DIR}/debug_unit_test/
+          echo "debug unit test log" && tail -n 1000 debug_unit_test*.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_unit_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_unit_test
+          docker exec infinity_test bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov'
+          head -10 coverage.lcov || true
 
-      - name: Remove minio container
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && !failure() }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_unit_test
+
+      - name: Remove container
         if: always()
-        run: |
-          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
-          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
+        run: docker rm -f infinity_test || true
 
   debug_sqllogical_test:
     name: debug_sqllogical_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar --extract --gzip --file=${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar --directory=${ARTIFACTS_DIR} --create --file=- cmake-build-debug/src/infinity | tar --extract --file=-
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          export LLVM_PROFILE_DUMP_ON_EXIT=1
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_sqllogictest_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_sqllogictest_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run sqllogictest
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/sqllogictest.py
+        run: uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_sqllogic_test/ && cp debug_sqllogictest*.log ${ARTIFACTS_DIR}/debug_sqllogic_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_sqllogic_test/
-          echo "debug sqllogictest log" && tail -n 1000 debug_sqllogictest*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat debug_sqllogictest_stderr.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          timeout 30s bash -c '
-            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
-              sleep 1s
-            done
-          ' || echo "Warning: infinity*.profraw is still empty after 30s"
-          ls -lh infinity*.profraw
-          
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_sqllogical_test
+          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
+          head -10 coverage.lcov || true
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && !failure() }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_sqllogical_test
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   debug_restart_test:
     name: debug_restart_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
+
+      - name: Prepare environment
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
 
-
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Run restart test
-        if: ${{ !cancelled() && !failure() }}
-        run: uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity
+        run: |
+          docker run --privileged -d --name infinity_test --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 sleep infinity
+          sleep 5s
+          docker exec infinity_test bash -c 'cd /infinity && uv run python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity'
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
+        if: always()
         run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_restart_test && cp restart_test*.log* ${ARTIFACTS_DIR}/debug_restart_test/
-          echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log*
+          echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f infinity_test || true
 
   debug_pysdk_test:
     name: debug_pysdk_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          export LLVM_PROFILE_DUMP_ON_EXIT=1
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_pysdk_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_pysdk_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run pysdk test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_pysdk_test && cp debug_pysdk*.log ${ARTIFACTS_DIR}/debug_pysdk_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_pysdk_test/
-          echo "debug pysdk log" && tail -n 1000 debug_pysdk*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat debug_pysdk_stderr.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          timeout 30s bash -c '
-            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
-              sleep 1s
-            done
-          ' || echo "Warning: infinity*.profraw is still empty after 30s"
-          ls -lh infinity*.profraw
-          
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_pysdk_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_pysdk_test
+          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
+          head -10 coverage.lcov || true
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && !failure() }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_pysdk_test
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   debug_go_test:
     name: debug_go_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
+
+      - name: Prepare environment
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          export LLVM_PROFILE_DUMP_ON_EXIT=1
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_go_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_go_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run Go tests
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go
-          go version
-          go test ./tests/... -v 2>&1 | tee debug_go_test.log
-          exit_code=${PIPESTATUS[0]}
-          if [ $exit_code -ne 0 ]; then
-            echo "=== FAILED TESTS ==="
-            grep -E "^(FAIL|panic:|^--- FAIL)" debug_go_test.log || true
-            exit $exit_code
-          fi
+          docker exec infinity_server bash -c 'cd /infinity && uv run python3 tools/sqllogictest.py -jc=1'
+          docker exec infinity_server bash -c 'cd /infinity/go && go version && go test ./tests/... -v 2>&1 | tee /infinity/debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" /infinity/debug_go_test.log || true; exit $exit_code; fi'
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_go_test && cp debug_go*.log ${ARTIFACTS_DIR}/debug_go_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_go_test/
-          echo "debug go test log" && tail -n 1000 debug_go*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat debug_go_stderr.log || true
+          cat debug_go_test.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          timeout 30s bash -c '
-            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
-              sleep 1s
-            done
-          ' || echo "Warning: infinity*.profraw is still empty after 30s"
-          ls -lh infinity*.profraw
-          
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_go_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_go_test
+          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
+          head -10 coverage.lcov || true
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && !failure() }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_go_test
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   debug_http_test:
     name: debug_http_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          export LLVM_PROFILE_DUMP_ON_EXIT=1
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_http_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_http_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run http test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_http_api.py
+        run: uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_http_test && cp debug_http*.log ${ARTIFACTS_DIR}/debug_http_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_http_test/
-          echo "debug http log" && tail -n 1000 debug_http*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat debug_http_stderr.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          timeout 30s bash -c '
-            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
-              sleep 1s
-            done
-          ' || echo "Warning: infinity*.profraw is still empty after 30s"
-          ls -lh infinity*.profraw
-          
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_http_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_http_test
+          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
+          head -10 coverage.lcov || true
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && !failure() }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_http_test
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   debug_pysdk_parallel_test:
     name: debug_pysdk_parallel_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs:
-      - debug_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-build
+          path: cmake-build-debug/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          export LLVM_PROFILE_DUMP_ON_EXIT=1
-          nohup cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> debug_parallel_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-debug/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity -e LLVM_PROFILE_FILE="infinity-%p.profraw" -e LLVM_PROFILE_DUMP_ON_EXIT=1 infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-debug/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/debug_parallel_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run pysdk test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_parallel_test.py
+        run: uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/debug_parallel_test && cp debug_parallel_stderr.log ${ARTIFACTS_DIR}/debug_parallel_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/debug_parallel_test/
-          echo "debug parallel log" && tail -n 1000 debug_parallel*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat debug_parallel_stderr.log || true
 
       - name: Generate LCOV report
         if: ${{ !cancelled() && !failure() }}
         run: |
-          timeout 30s bash -c '
-            until find . -name "infinity*.profraw" -size +0 | grep -q .; do
-              sleep 1s
-            done
-          ' || echo "Warning: infinity*.profraw is still empty after 30s"
-          ls -lh infinity*.profraw
-          
-          llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-          mkdir -p ${ARTIFACTS_DIR}/coverage/debug_parallel_test && cp coverage.lcov ${ARTIFACTS_DIR}/coverage/debug_parallel_test
+          docker exec infinity_server bash -c 'cd /infinity && llvm-profdata-20 merge -sparse infinity-*.profraw -o coverage.profdata && llvm-cov-20 export cmake-build-debug/src/infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex=".*third_party.*|.*cmake-build-debug.*|.*cppm.*" > coverage.lcov' || true
+          head -10 coverage.lcov || true
 
-  debug_upload_codecov:
-    name: debug_upload_codecov
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: [ debug_unit_test, debug_sqllogical_test, debug_pysdk_test, debug_http_test, debug_pysdk_parallel_test, debug_go_test ]
-    steps:
-      - name: Prepare code and artifacts
+      - name: Upload coverage to Codecov
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-debug/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          flags: debug_pysdk_parallel_test
 
-      - name: Upload coverage reports to Codecov
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          export CODECOV_COMMIT_SHA=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }}
-          echo "CODECOV_COMMIT_SHA=${CODECOV_COMMIT_SHA}"
-          export GITHUB_REF_NAME=${{ github.ref_name }}
-          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
-          export PR_NUMBER=${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.number || '' }}
-          echo "PR_NUMBER=${PR_NUMBER}"
-          ./scripts/upload_codecov.sh
-
-
-  reldeb_build:
-    name: reldeb_build
-    runs-on: [ "self-hosted", "infinity-build" ]
-    needs: code_static_check
-    steps:
-      - name: Prepare code
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-
-      - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
-
-      - name: Build reldeb version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main knn_import_benchmark knn_query_benchmark"
-
-      - name: Upload artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - cmake-build-reldeb/src/{infinity,test_main} cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
-
-      - name: Remove build container
+      - name: Stop infinity server
         if: always()
-        run: |
-          if [[ -n "${BUILDER_CONTAINER}" ]]; then
-            sudo docker rm -f -v "${BUILDER_CONTAINER}"
-          fi
+        run: docker rm -f infinity_server || true
 
   reldeb_unit_test:
     name: reldeb_unit_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
+
+      - name: Prepare environment
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/test_main | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+          chmod +x cmake-build-reldeb/src/test_main
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
 
       - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
 
       - name: Unit test reldeb version
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log
+          docker run --privileged -d --name infinity_test --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 sleep infinity
+          sleep 5s
+          docker exec infinity_test bash -c '/infinity/cmake-build-reldeb/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > /infinity/reldeb_unit_test_stdout.log 2> /infinity/reldeb_unit_test_stderr.log'
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_unit_test && cp reldeb_unit_test*.log ${ARTIFACTS_DIR}/reldeb_unit_test/
-          echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log
-
-      - name: Remove minio container
         if: always()
         run: |
-          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
-          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
+          echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log || true
+
+      - name: Remove containers
+        if: always()
+        run: |
+          docker rm -f infinity_test || true
+          docker rm -f minio || true
 
   reldeb_sqllogical_test:
     name: reldeb_sqllogical_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_sqllogic_test_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_sqllogic_test_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run sqllogictest
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/sqllogictest.py
+        run: uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_sqllogic_test && cp reldeb_sqllogic_test*.log ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
-          cp reldeb_sqllogic_test* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_sqllogic_test/
-          echo "reldeb sqllogic test log" && tail -n 1000 reldeb_sqllogic_test*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_sqllogic_test_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   reldeb_pysdk_test:
     name: reldeb_pysdk_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_pysdk_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run pysdk test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_test && cp reldeb_pysdk*.log ${ARTIFACTS_DIR}/reldeb_pysdk_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_test/
-          echo "reldeb pysdk log" && tail -n 1000 reldeb_pysdk*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_pysdk_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   reldeb_go_test:
     name: reldeb_go_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
+
+      - name: Prepare environment
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_go_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_go_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run Go tests
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go
-          go version
-          go test ./tests/... -v 2>&1 | tee reldeb_go_test.log
-          exit_code=${PIPESTATUS[0]}
-          if [ $exit_code -ne 0 ]; then
-            echo "=== FAILED TESTS ==="
-            grep -E "^(FAIL|panic:|^--- FAIL)" reldeb_go_test.log || true
-            exit $exit_code
-          fi
+          docker exec infinity_server bash -c 'cd /infinity && uv run python3 tools/sqllogictest.py -jc=1'
+          docker exec infinity_server bash -c 'cd /infinity/go && go version && go test ./tests/... -v 2>&1 | tee /infinity/reldeb_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" /infinity/reldeb_go_test.log || true; exit $exit_code; fi'
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_go_test && cp reldeb_go*.log ${ARTIFACTS_DIR}/reldeb_go_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_go_test/
-          echo "reldeb go test log" && tail -n 1000 reldeb_go*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_go_stderr.log || true
+          cat reldeb_go_test.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   reldeb_http_test:
     name: reldeb_http_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_http_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_http_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run http api test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_http_api.py
+        run: uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_http_test && cp reldeb_http*.log ${ARTIFACTS_DIR}/reldeb_http_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_http_test/
-          echo "reldeb http log" && tail -n 1000 reldeb_http*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_http_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   reldeb_pysdk_parallel_test:
     name: reldeb_pysdk_parallel_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Prepare environment
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > /dev/null 2> reldeb_pysdk_parallel_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
+
+      - name: Start infinity server
+        run: |
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_conf.toml > /infinity/reldeb_pysdk_parallel_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run parallel test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_parallel_test.py
+        run: uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test && cp reldeb_pysdk_parallel*.log ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_pysdk_parallel_test/
-          echo "reldeb parallel log" && tail -n 1000 reldeb_pysdk_parallel*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_pysdk_parallel_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
   reldeb_minio_pysdk_test:
     name: reldeb_minio_pysdk_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
+
+      - name: Prepare environment
+        run: |
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Start infinity server
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_pysdk_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_minio.toml > /infinity/reldeb_minio_pysdk_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run minio pysdk test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
+        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test && cp reldeb_minio_pysdk*.log ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_pysdk_test/
-          echo "reldeb minio pysdk log" && tail -n 1000 reldeb_minio_pysdk*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_minio_pysdk_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
       - name: Remove minio container
         if: always()
-        run: |
-          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
-          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
+        run: docker rm -f minio || true
 
   reldeb_minio_parallel_test:
     name: reldeb_minio_parallel_test
-    runs-on: [ "self-hosted", "infinity-test" ]
-    needs: reldeb_build
+    runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/src/infinity | tar -xf -
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: uv sync --python 3.11 --frozen --extra test
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
+
+      - name: Prepare environment
+        run: |
+          chmod +x cmake-build-reldeb/src/infinity
+          mkdir -p /tmp/infinity/resource
+          cp -r resource/* /tmp/infinity/resource/
+          mkdir -p /tmp/var/infinity
+
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Start minio container
-        if: ${{ !cancelled() && !failure() }}
         run: |
-          MINIO_CONTAINER=minio_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          MINIO_VOLUME_PATH=${PWD}/${MINIO_CONTAINER}
-          echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
-          echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
-          rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
           sleep 5s
-          if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
-              echo "Minio container is not running"
-              exit 1
-          fi
+          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
 
-      - name: Start infinity
-        if: ${{ !cancelled() && !failure() }}
+      - name: Start infinity server
         run: |
-          nohup cmake-build-reldeb/src/infinity --config=conf/pytest_parallel_infinity_minio.toml > /dev/null 2> reldeb_minio_parallel_stderr.log &
-          ./scripts/wait_for_infinity.sh
+          docker run --privileged -d --name infinity_server --network host -v ${PWD}:/infinity -v /tmp/infinity/resource:/usr/share/infinity/resource -v /tmp/var/infinity:/var/infinity infiniflow/infinity_builder:ubuntu22_clang20 bash -c 'cd /infinity && /infinity/cmake-build-reldeb/src/infinity --config=/infinity/conf/pytest_parallel_infinity_minio.toml > /infinity/reldeb_minio_parallel_stderr.log 2>&1'
+          sleep 10s
+          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
 
       - name: Run minio parallel test
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          uv run python3 tools/run_parallel_test.py
+        run: uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
-        run: |
-          mkdir -p ${ARTIFACTS_DIR}/reldeb_minio_parallel_test && cp reldeb_minio_parallel*.log ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
-          cp /var/infinity/log/infinity.log* ${ARTIFACTS_DIR}/reldeb_minio_parallel_test/
-          echo "reldeb minio parallel log" && tail -n 1000 reldeb_minio_parallel*.log
-
-      - name: Stop infinity
         if: always()
-        run: python3 scripts/timeout_kill.py 10 $(pgrep infinity)
+        run: |
+          docker logs infinity_server || true
+          cat reldeb_minio_parallel_stderr.log || true
+
+      - name: Stop infinity server
+        if: always()
+        run: docker rm -f infinity_server || true
 
       - name: Remove minio container
         if: always()
-        run: |
-          if [[ -n "${MINIO_CONTAINER}" ]]; then sudo docker rm -f -v "${MINIO_CONTAINER}"; fi
-          if [[ -n "${MINIO_VOLUME_PATH}" ]]; then sudo rm -rf "${MINIO_VOLUME_PATH}"; fi
+        run: docker rm -f minio || true
 
   reldeb_benchmark:
     name: reldeb_benchmark
     runs-on: [ "self-hosted", "benchmark" ]
-    needs: reldeb_build
+    needs: build
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
+      - name: Ensure workspace ownership
+        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download reldeb build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reldeb-build
+          path: cmake-build-reldeb/src
+
+      - name: Prepare environment
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -xf -
+          chmod +x cmake-build-reldeb/src/infinity
+          chmod +x cmake-build-reldeb/src/knn_import_benchmark || true
+          chmod +x cmake-build-reldeb/src/knn_query_benchmark || true
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Prepare sift dataset
-        if: ${{ !cancelled() && !failure() }}
         run: |
           RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-${HOME}}
           echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> ${GITHUB_ENV}
@@ -1081,7 +1019,6 @@ jobs:
           rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
 
       - name: Golden benchmark sift
-        if: ${{ !cancelled() && !failure() }}
         run: |
           if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
               echo "golden benchmark result already exists!"
@@ -1093,12 +1030,11 @@ jobs:
           echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
 
       - name: Latest benchmark sift
-        if: ${{ !cancelled() && !failure() }}
         run: |
           rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
-          echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
-          echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
+          ./cmake-build-reldeb/src/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml || ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
+          echo "1 50" | (./cmake-build-reldeb/src/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml 2>/dev/null || ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml) | tee benchmark_sift_1_thread.log
+          echo "8 50" | (./cmake-build-reldeb/src/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml 2>/dev/null || ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml) | tee benchmark_sift_8_threads.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
 
@@ -1121,27 +1057,17 @@ jobs:
             build_dir: cmake-build-reldeb
     steps:
       - name: Ensure workspace ownership
-        if: ${{ !cancelled() && !failure() }}
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
 
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           fetch-tags: false
           submodules: recursive
 
-      - name: Backup code
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files --recurse-submodules)
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          sudo rm -rf ${ARTIFACTS_DIR} && sudo mkdir -p ${ARTIFACTS_DIR} && sudo chown -R ${USER} ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
-
       - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
@@ -1149,12 +1075,16 @@ jobs:
           sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
       - name: Build ${{ matrix.type }} version
-        if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf ${{ matrix.build_dir }} && mkdir -p ${{ matrix.build_dir }} && cmake -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -S /infinity -B /infinity/${{ matrix.build_dir }} && cmake --build /infinity/${{ matrix.build_dir }} -j --target infinity test_main"
 
       - name: Upload artifacts
-        if: ${{ !cancelled() && !failure() }}
-        run: tar -cf - ${{ matrix.build_dir }}/src/{infinity,test_main} | tar -C ${ARTIFACTS_DIR} -xf -
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.type }}-build-arm
+          path: |
+            ${{ matrix.build_dir }}/src/infinity
+            ${{ matrix.build_dir }}/src/test_main
+          retention-days: 1
 
       - name: Remove build container
         if: always()
@@ -1175,25 +1105,33 @@ jobs:
           - type: reldeb
             build_dir: cmake-build-reldeb
     steps:
-      - name: Prepare code and artifacts
-        if: ${{ !cancelled() && !failure() }}
+      - name: Ensure workspace ownership
+        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Download ${{ matrix.type }} build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.type }}-build-arm
+          path: ${{ matrix.build_dir }}/src
+
+      - name: Prepare environment
         run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          echo "INFINITY_ROOT_PATH=${PWD}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - ${{ matrix.build_dir }}/src/test_main | tar -xf -
+          chmod +x ${{ matrix.build_dir }}/src/test_main
           sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
           sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
 
       - name: Unit test
-        if: ${{ !cancelled() && !failure() }}
         run: |
           ${{ matrix.build_dir }}/src/test_main --gtest_also_run_disabled_tests --gtest_filter=-*SLOW_* > ${{ matrix.type }}_unit_test_arm_stdout.log 2> ${{ matrix.type }}_unit_test_arm_stderr.log
 
       - name: Collect infinity log
-        if: ${{ !cancelled() }}
+        if: always()
         run: |
-          echo "${{ matrix.type }} unit test arm log" && tail -n 1000 ${{ matrix.type }}_unit_test_arm*.log
-          mkdir -p ${ARTIFACTS_DIR}/${{ matrix.type }}_unit_test_arm/ && cp ${{ matrix.type }}_unit_test_arm*.log ${ARTIFACTS_DIR}/${{ matrix.type }}_unit_test_arm/
+          echo "${{ matrix.type }} unit test arm log" && tail -n 1000 ${{ matrix.type }}_unit_test_arm*.log || true
