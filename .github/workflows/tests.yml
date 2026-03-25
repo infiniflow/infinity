@@ -131,11 +131,10 @@ jobs:
         with:
           name: ${{ matrix.type }}-build
           path: |
-            src/infinity
-            src/test_main
-            benchmark/local_infinity/knn_import_benchmark
-            benchmark/local_infinity/knn_query_benchmark
-          working-directory: ${{ matrix.build_dir }}
+            ${{ matrix.build_dir }}/src/infinity
+            ${{ matrix.build_dir }}/src/test_main
+            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_import_benchmark', matrix.build_dir) || '' }}
+            ${{ matrix.type == 'reldeb' && format('{0}/benchmark/local_infinity/knn_query_benchmark', matrix.build_dir) || '' }}
           retention-days: 1
           if-no-files-found: warn
 
@@ -159,7 +158,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -215,7 +214,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -278,7 +277,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -324,7 +323,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -387,7 +386,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -453,7 +452,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -516,7 +515,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-build
-          path: cmake-build-debug
+          path: .
 
       - name: Prepare environment
         run: |
@@ -579,7 +578,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -627,7 +626,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -677,7 +676,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -727,7 +726,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -780,7 +779,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -830,7 +829,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -880,7 +879,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -940,7 +939,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -1003,7 +1002,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reldeb-build
-          path: cmake-build-reldeb
+          path: .
 
       - name: Prepare environment
         run: |
@@ -1084,9 +1083,8 @@ jobs:
         with:
           name: ${{ matrix.type }}-build-arm
           path: |
-            src/infinity
-            src/test_main
-          working-directory: ${{ matrix.build_dir }}
+            ${{ matrix.build_dir }}/src/infinity
+            ${{ matrix.build_dir }}/src/test_main
           retention-days: 1
           if-no-files-found: warn
 
@@ -1123,7 +1121,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.type }}-build-arm
-          path: ${{ matrix.build_dir }}
+          path: .
 
       - name: Prepare environment
         run: |
