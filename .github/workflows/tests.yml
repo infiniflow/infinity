@@ -105,11 +105,11 @@ jobs:
             build_dir: cmake-build-debug
             coverage: ON
             targets: infinity
-          - type: reldeb
-            build_type: RelWithDebInfo
-            build_dir: cmake-build-reldeb
-            coverage: OFF
-            targets: infinity knn_import_benchmark knn_query_benchmark
+          # - type: reldeb
+          #   build_type: RelWithDebInfo
+          #   build_dir: cmake-build-reldeb
+          #   coverage: OFF
+          #   targets: infinity knn_import_benchmark knn_query_benchmark
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -149,10 +149,10 @@ jobs:
             build_type: Debug
             build_dir: cmake-build-debug
             coverage: ON
-          - type: reldeb
-            build_type: RelWithDebInfo
-            build_dir: cmake-build-reldeb
-            coverage: OFF
+          # - type: reldeb
+          #   build_type: RelWithDebInfo
+          #   build_dir: cmake-build-reldeb
+          #   coverage: OFF
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -503,476 +503,476 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-  reldeb_unit_test:
-    name: reldeb_unit_test
-    runs-on: ubuntu-latest
-    needs: unit_test_build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb unit test build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-unit-test-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x test_main
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Unit test reldeb version
-        run: |
-          ./test_main --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  reldeb_sqllogical_test:
-    name: reldeb_sqllogical_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run sqllogictest
-        run: uv run python3 tools/sqllogictest.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  reldeb_pysdk_test:
-    name: reldeb_pysdk_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  reldeb_go_test:
-    name: reldeb_go_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run Go tests
-        run: |
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go && go version && go test ./tests/... -v 2>&1 | tee ../reldeb_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../reldeb_go_test.log || true; exit $exit_code; fi
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-          cat reldeb_go_test.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  reldeb_http_test:
-    name: reldeb_http_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run http api test
-        run: uv run python3 tools/run_http_api.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  reldeb_pysdk_parallel_test:
-    name: reldeb_pysdk_parallel_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run parallel test
-        run: uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  reldeb_minio_pysdk_test:
-    name: reldeb_minio_pysdk_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run minio pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  reldeb_minio_parallel_test:
-    name: reldeb_minio_parallel_test
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          mkdir -p /tmp/infinity/resource
-          cp -r resource/* /tmp/infinity/resource/
-          mkdir -p /tmp/var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-          curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 10s
-          curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
-
-      - name: Run minio parallel test
-        run: uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  reldeb_benchmark:
-    name: reldeb_benchmark
-    runs-on: [ "self-hosted", "benchmark" ]
-    needs: build
-    steps:
-      - name: Ensure workspace ownership
-        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download reldeb build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: reldeb-build
-          path: .
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          chmod +x knn_import_benchmark || true
-          chmod +x knn_query_benchmark || true
-          sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
-          sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
-
-      - name: Prepare sift dataset
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-${HOME}}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> ${GITHUB_ENV}
-          chmod +x ./tools/ci_tools/check_benchmark_result.py
-          rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
-
-      - name: Golden benchmark sift
-        run: |
-          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
-              echo "golden benchmark result already exists!"
-              exit 0
-          fi
-          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp
-          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log
-          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
-
-      - name: Latest benchmark sift
-        run: |
-          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
-          echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
-          echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
-
-      - name: Cleanup
-        if: always()
-        run: |
-          sudo rm -rf ${PWD}/db_tmp
+  # reldeb_unit_test:
+  #   name: reldeb_unit_test
+  #   runs-on: ubuntu-latest
+  #   needs: unit_test_build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb unit test build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-unit-test-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x test_main
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Start minio container
+  #       run: |
+  #         docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+  #         sleep 5s
+  #         curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+  #
+  #     - name: Unit test reldeb version
+  #       run: |
+  #         ./test_main --gtest_filter=-*SLOW_* > reldeb_unit_test_stdout.log 2> reldeb_unit_test_stderr.log
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         echo "reldeb unit test log" && tail -n 1000 reldeb_unit_test*.log || true
+  #
+  #     - name: Remove minio container
+  #       if: always()
+  #       run: docker rm -f minio || true
+
+  # reldeb_sqllogical_test:
+  #   name: reldeb_sqllogical_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run sqllogictest
+  #       run: uv run python3 tools/sqllogictest.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+
+  # reldeb_pysdk_test:
+  #   name: reldeb_pysdk_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run pysdk test
+  #       run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+
+  # reldeb_go_test:
+  #   name: reldeb_go_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run Go tests
+  #       run: |
+  #         uv run python3 tools/sqllogictest.py -jc=1
+  #         cd go && go version && go test ./tests/... -v 2>&1 | tee ../reldeb_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../reldeb_go_test.log || true; exit $exit_code; fi
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #         cat reldeb_go_test.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+
+  # reldeb_http_test:
+  #   name: reldeb_http_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run http api test
+  #       run: uv run python3 tools/run_http_api.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+
+  # reldeb_pysdk_parallel_test:
+  #   name: reldeb_pysdk_parallel_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run parallel test
+  #       run: uv run python3 tools/run_parallel_test.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+
+  # reldeb_minio_pysdk_test:
+  #   name: reldeb_minio_pysdk_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start minio container
+  #       run: |
+  #         docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+  #         sleep 5s
+  #         curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run minio pysdk test
+  #       run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+  #
+  #     - name: Remove minio container
+  #       if: always()
+  #       run: docker rm -f minio || true
+
+  # reldeb_minio_parallel_test:
+  #   name: reldeb_minio_parallel_test
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         mkdir -p /tmp/infinity/resource
+  #         cp -r resource/* /tmp/infinity/resource/
+  #         mkdir -p /tmp/var/infinity
+  #
+  #     - name: Install Python SDK
+  #       uses: astral-sh/setup-uv@v4
+  #       with:
+  #         enable-cache: true
+  #     - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #     - name: Start minio container
+  #       run: |
+  #         docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+  #         sleep 5s
+  #         curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
+  #
+  #     - name: Start infinity server
+  #       run: |
+  #         nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+  #         sleep 10s
+  #         curl -s http://localhost:23817/api/v1/database || { echo "Infinity server not ready"; exit 1; }
+  #
+  #     - name: Run minio parallel test
+  #       run: uv run python3 tools/run_parallel_test.py
+  #
+  #     - name: Collect infinity log
+  #       if: always()
+  #       run: |
+  #         cat infinity.log || true
+  #
+  #     - name: Stop infinity server
+  #       if: always()
+  #       run: pkill -f infinity || true
+  #
+  #     - name: Remove minio container
+  #       if: always()
+  #       run: docker rm -f minio || true
+
+  # reldeb_benchmark:
+  #   name: reldeb_benchmark
+  #   runs-on: [ "self-hosted", "benchmark" ]
+  #   needs: build
+  #   steps:
+  #     - name: Ensure workspace ownership
+  #       run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+  #
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         submodules: recursive
+  #
+  #     - name: Download reldeb build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: reldeb-build
+  #         path: .
+  #
+  #     - name: Prepare environment
+  #       run: |
+  #         chmod +x infinity
+  #         chmod +x knn_import_benchmark || true
+  #         chmod +x knn_query_benchmark || true
+  #         sudo mkdir -p /usr/share/infinity/ && sudo cp -rf resource /usr/share/infinity/ && sudo chown -R ${USER} /usr/share/infinity/resource
+  #         sudo rm -rf /var/infinity && sudo mkdir -p /var/infinity && sudo chown -R ${USER} /var/infinity
+  #
+  #     - name: Prepare sift dataset
+  #       run: |
+  #         RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-${HOME}}
+  #         echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> ${GITHUB_ENV}
+  #         chmod +x ./tools/ci_tools/check_benchmark_result.py
+  #         rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
+  #
+  #     - name: Golden benchmark sift
+  #       run: |
+  #         if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
+  #             echo "golden benchmark result already exists!"
+  #             exit 0
+  #         fi
+  #         rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
+  #         ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp
+  #         echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log
+  #         echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+  #
+  #     - name: Latest benchmark sift
+  #       run: |
+  #         rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
+  #         ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
+  #         echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
+  #         echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
+  #         ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
+  #         ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+  #
+  #     - name: Cleanup
+  #       if: always()
+  #       run: |
+  #         sudo rm -rf ${PWD}/db_tmp
 
   build_arm:
     name: ${{ matrix.type }}_build_arm
@@ -983,9 +983,9 @@ jobs:
           - type: debug
             build_type: Debug
             build_dir: cmake-build-debug
-          - type: reldeb
-            build_type: RelWithDebInfo
-            build_dir: cmake-build-reldeb
+          # - type: reldeb
+          #   build_type: RelWithDebInfo
+          #   build_dir: cmake-build-reldeb
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
@@ -1034,8 +1034,8 @@ jobs:
         include:
           - type: debug
             build_dir: cmake-build-debug
-          - type: reldeb
-            build_dir: cmake-build-reldeb
+          # - type: reldeb
+          #   build_dir: cmake-build-reldeb
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
