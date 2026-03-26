@@ -138,10 +138,23 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download debug unit test build artifacts
         uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
+
+      - name: Prepare environment
+        run: |
+          chmod +x test_main
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -160,26 +173,18 @@ jobs:
               nltk.download(data, download_dir=local_dir)
           "
 
-      - name: Prepare environment
-        run: |
-          chmod +x test_main
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
       - name: Install LLVM 20
         run: |
           curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Unit test
+      - name: Wait for minio and run unit test
         env:
           NLTK_DATA: ${{ github.workspace }}/nltk_data
           LLVM_PROFILE_FILE: "infinity-%p.profraw"
         run: |
+          ./scripts/wait_for_minio.sh
           ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
 
       - name: Collect infinity log
@@ -204,6 +209,10 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
+
   debug_amd64_sqllogical_test:
     name: debug_amd64_sqllogical_test
     runs-on: ubuntu-latest
@@ -221,7 +230,7 @@ jobs:
         with:
           name: debug-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -229,6 +238,8 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install sqllogictest
         run: |
@@ -248,14 +259,10 @@ jobs:
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Start infinity server
+      - name: Wait for infinity and run sqllogictest
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run sqllogictest
-        run: uv run python3 tools/sqllogictest.py
+          uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -341,7 +348,7 @@ jobs:
         with:
           name: debug-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -349,6 +356,8 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -362,14 +371,10 @@ jobs:
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Start infinity server
+      - name: Wait for infinity and run pysdk test
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -414,7 +419,7 @@ jobs:
         with:
           name: debug-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -422,6 +427,8 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -446,14 +453,9 @@ jobs:
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Start infinity server
+      - name: Wait for infinity and run Go tests
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run Go tests
-        run: |
           uv run python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
 
@@ -501,7 +503,7 @@ jobs:
         with:
           name: debug-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -509,6 +511,8 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -522,14 +526,10 @@ jobs:
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Start infinity server
+      - name: Wait for infinity and run http test
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run http test
-        run: uv run python3 tools/run_http_api.py
+          uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -574,7 +574,7 @@ jobs:
         with:
           name: debug-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -582,6 +582,8 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -595,14 +597,10 @@ jobs:
           tar -xf LLVM-20.1.0-Linux-X64.tar.xz
           echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
 
-      - name: Start infinity server
+      - name: Wait for infinity and run pysdk test
         run: |
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run pysdk test
-        run: uv run python3 tools/run_parallel_test.py
+          uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -765,6 +763,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
@@ -796,16 +798,21 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
-      - name: Unit test
+      - name: Wait for minio and run unit test
         env:
           NLTK_DATA: ${{ github.workspace }}/nltk_data
         run: |
+          ./scripts/wait_for_minio.sh
           ./test_main --gtest_filter=-*SLOW_* > release_amd64_unit_test_stdout.log 2> release_amd64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "release amd64 unit test log" && tail -n 1000 release_amd64_unit_test*.log || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
 
   release_amd64_sqllogical_test:
     name: release_amd64_sqllogical_test
@@ -824,7 +831,7 @@ jobs:
         with:
           name: release-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -832,6 +839,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install sqllogictest
         run: |
@@ -845,13 +853,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run sqllogictest
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run sqllogictest
-        run: uv run python3 tools/sqllogictest.py
+          uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -969,7 +974,7 @@ jobs:
         with:
           name: release-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -977,6 +982,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -995,13 +1001,9 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run Go tests
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run Go tests
-        run: |
           uv run python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
 
@@ -1032,7 +1034,7 @@ jobs:
         with:
           name: release-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1040,6 +1042,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -1047,13 +1050,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run http test
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run http test
-        run: uv run python3 tools/run_http_api.py
+          uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1125,12 +1125,16 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1138,6 +1142,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -1145,19 +1150,11 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start minio container
+      - name: Wait for services and run minio pysdk test
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-
-      - name: Run minio pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1184,12 +1181,16 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1197,6 +1198,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -1204,19 +1206,11 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start minio container
+      - name: Wait for services and run minio parallel test
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-
-      - name: Run minio parallel test
-        run: uv run python3 tools/run_parallel_test.py
+          uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -1277,6 +1271,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download debug build artifacts
         uses: actions/download-artifact@v8
         with:
@@ -1308,16 +1306,21 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
-      - name: Unit test
+      - name: Wait for minio and run unit test
         env:
           NLTK_DATA: ${{ github.workspace }}/nltk_data
         run: |
+          ./scripts/wait_for_minio.sh
           ./test_main --gtest_filter=-*SLOW_* > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "debug arm64 unit test log" && tail -n 1000 debug_arm64_unit_test*.log || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
 
   debug_arm64_sqllogical_test:
     name: debug_arm64_sqllogical_test
@@ -1337,7 +1340,7 @@ jobs:
         with:
           name: debug-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1345,6 +1348,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install sqllogictest
         run: |
@@ -1358,13 +1362,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run sqllogictest
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run sqllogictest
-        run: uv run python3 tools/sqllogictest.py
+          uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1417,53 +1418,51 @@ jobs:
           echo "debug_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
   debug_arm64_pysdk_test:
-      name: debug_arm64_pysdk_test
-      runs-on: ubuntu-24.04-arm
-      needs: debug_arm64_build
-      steps:
-        - name: Check out code
-          uses: actions/checkout@v6
-          with:
-            ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-            fetch-depth: 0
-            submodules: recursive
+    name: debug_arm64_pysdk_test
+    runs-on: ubuntu-24.04-arm
+    needs: debug_arm64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-        - name: Download debug build artifacts
-          uses: actions/download-artifact@v8
-          with:
-            name: debug-build-arm64
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: debug-build-arm64
 
-        - name: Prepare environment
-          run: |
-            chmod +x infinity
-            sudo mkdir -p /usr/share/infinity/resource
-            sudo cp -r resource/* /usr/share/infinity/resource/
-            sudo chown -R ${USER} /usr/share/infinity
-            sudo mkdir -p /var/infinity
-            sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment and start infinity
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
-        - name: Install Python SDK
-          uses: astral-sh/setup-uv@v7
-          with:
-            enable-cache: true
-        - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-        - name: Start infinity server
-          run: |
-            nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-            ./scripts/wait_for_infinity.sh
+      - name: Wait for infinity and run pysdk test
+        run: |
+          ./scripts/wait_for_infinity.sh
+          uv run python3 tools/run_pysdk_remote_infinity_test.py
 
-        - name: Run pysdk test
-          run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-        - name: Collect infinity log
-          if: always()
-          run: |
-            cat infinity.log || true
-
-        - name: Stop infinity server
-          if: always()
-          run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   debug_arm64_go_test:
     name: debug_arm64_go_test
@@ -1482,7 +1481,7 @@ jobs:
         with:
           name: debug-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1490,6 +1489,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -1508,13 +1508,9 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run Go tests
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run Go tests
-        run: |
           uv run python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_arm64_go_test.log || true; exit $exit_code; fi
 
@@ -1545,7 +1541,7 @@ jobs:
         with:
           name: debug-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1553,6 +1549,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -1560,13 +1557,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run http test
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run http test
-        run: uv run python3 tools/run_http_api.py
+          uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1578,53 +1572,51 @@ jobs:
         run: pkill -f infinity || true
 
   debug_arm64_pysdk_parallel_test:
-      name: debug_arm64_pysdk_parallel_test
-      runs-on: ubuntu-24.04-arm
-      needs: debug_arm64_build
-      steps:
-        - name: Check out code
-          uses: actions/checkout@v6
-          with:
-            ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-            fetch-depth: 0
-            submodules: recursive
+    name: debug_arm64_pysdk_parallel_test
+    runs-on: ubuntu-24.04-arm
+    needs: debug_arm64_build
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
 
-        - name: Download debug build artifacts
-          uses: actions/download-artifact@v8
-          with:
-            name: debug-build-arm64
+      - name: Download debug build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: debug-build-arm64
 
-        - name: Prepare environment
-          run: |
-            chmod +x infinity
-            sudo mkdir -p /usr/share/infinity/resource
-            sudo cp -r resource/* /usr/share/infinity/resource/
-            sudo chown -R ${USER} /usr/share/infinity
-            sudo mkdir -p /var/infinity
-            sudo chown -R ${USER} /var/infinity
+      - name: Prepare environment and start infinity
+        run: |
+          chmod +x infinity
+          sudo mkdir -p /usr/share/infinity/resource
+          sudo cp -r resource/* /usr/share/infinity/resource/
+          sudo chown -R ${USER} /usr/share/infinity
+          sudo mkdir -p /var/infinity
+          sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
-        - name: Install Python SDK
-          uses: astral-sh/setup-uv@v7
-          with:
-            enable-cache: true
-        - run: uv sync --python 3.11 --frozen --extra test
+      - name: Install Python SDK
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --python 3.11 --frozen --extra test
 
-        - name: Start infinity server
-          run: |
-            nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-            ./scripts/wait_for_infinity.sh
+      - name: Wait for infinity and run pysdk test
+        run: |
+          ./scripts/wait_for_infinity.sh
+          uv run python3 tools/run_parallel_test.py
 
-        - name: Run pysdk test
-          run: uv run python3 tools/run_parallel_test.py
+      - name: Collect infinity log
+        if: always()
+        run: |
+          cat infinity.log || true
 
-        - name: Collect infinity log
-          if: always()
-          run: |
-            cat infinity.log || true
-
-        - name: Stop infinity server
-          if: always()
-          run: pkill -f infinity || true
+      - name: Stop infinity server
+        if: always()
+        run: pkill -f infinity || true
 
   release_arm64_build:
     name: release_arm64_build
@@ -1672,6 +1664,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
@@ -1703,16 +1699,21 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
-      - name: Unit test
+      - name: Wait for minio and run unit test
         env:
           NLTK_DATA: ${{ github.workspace }}/nltk_data
         run: |
+          ./scripts/wait_for_minio.sh
           ./test_main --gtest_filter=-*SLOW_* > release_arm64_unit_test_stdout.log 2> release_arm64_unit_test_stderr.log
 
       - name: Collect infinity log
         if: always()
         run: |
           echo "release arm64 unit test log" && tail -n 1000 release_arm64_unit_test*.log || true
+
+      - name: Remove minio container
+        if: always()
+        run: docker rm -f minio || true
 
   release_arm64_sqllogical_test:
     name: release_arm64_sqllogical_test
@@ -1732,7 +1733,7 @@ jobs:
         with:
           name: release-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1740,6 +1741,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install sqllogictest
         run: |
@@ -1753,13 +1755,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run sqllogictest
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run sqllogictest
-        run: uv run python3 tools/sqllogictest.py
+          uv run python3 tools/sqllogictest.py
 
       - name: Collect infinity log
         if: always()
@@ -1811,54 +1810,54 @@ jobs:
         run: |
           echo "release_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
-#  release_arm64_pysdk_test:
-#    name: release_arm64_pysdk_test
-#    runs-on: ubuntu-24.04-arm
-#    needs: release_arm64_build
-#    steps:
-#      - name: Check out code
-#        uses: actions/checkout@v6
-#        with:
-#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-#          fetch-depth: 0
-#          submodules: recursive
-#
-#      - name: Download release build artifacts
-#        uses: actions/download-artifact@v8
-#        with:
-#          name: release-build-arm64
-#
-#      - name: Prepare environment
-#        run: |
-#          chmod +x ./infinity
-#          sudo mkdir -p /usr/share/infinity/resource
-#          sudo cp -r resource/* /usr/share/infinity/resource/
-#          sudo chown -R ${USER} /usr/share/infinity
-#          sudo mkdir -p /var/infinity
-#          sudo chown -R ${USER} /var/infinity
-#
-#      - name: Install Python SDK
-#        uses: astral-sh/setup-uv@v7
-#        with:
-#          enable-cache: true
-#      - run: uv sync --python 3.11 --frozen --extra test
-#
-#      - name: Start infinity server
-#        run: |
-#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-#          ./scripts/wait_for_infinity.sh
-#
-#      - name: Run pysdk test
-#        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-#
-#      - name: Collect infinity log
-#        if: always()
-#        run: |
-#          cat infinity.log || true
-#
-#      - name: Stop infinity server
-#        if: always()
-#        run: pkill -f infinity || true
+  #  release_arm64_pysdk_test:
+  #    name: release_arm64_pysdk_test
+  #    runs-on: ubuntu-24.04-arm
+  #    needs: release_arm64_build
+  #    steps:
+  #      - name: Check out code
+  #        uses: actions/checkout@v6
+  #        with:
+  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #          fetch-depth: 0
+  #          submodules: recursive
+  #
+  #      - name: Download release build artifacts
+  #        uses: actions/download-artifact@v8
+  #        with:
+  #          name: release-build-arm64
+  #
+  #      - name: Prepare environment
+  #        run: |
+  #          chmod +x ./infinity
+  #          sudo mkdir -p /usr/share/infinity/resource
+  #          sudo cp -r resource/* /usr/share/infinity/resource/
+  #          sudo chown -R ${USER} /usr/share/infinity
+  #          sudo mkdir -p /var/infinity
+  #          sudo chown -R ${USER} /var/infinity
+  #
+  #      - name: Install Python SDK
+  #        uses: astral-sh/setup-uv@v7
+  #        with:
+  #          enable-cache: true
+  #      - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #      - name: Start infinity server
+  #        run: |
+  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #          ./scripts/wait_for_infinity.sh
+  #
+  #      - name: Run pysdk test
+  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+  #
+  #      - name: Collect infinity log
+  #        if: always()
+  #        run: |
+  #          cat infinity.log || true
+  #
+  #      - name: Stop infinity server
+  #        if: always()
+  #        run: pkill -f infinity || true
 
   release_arm64_go_test:
     name: release_arm64_go_test
@@ -1877,7 +1876,7 @@ jobs:
         with:
           name: release-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1885,6 +1884,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -1903,13 +1903,9 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run Go tests
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run Go tests
-        run: |
           uv run python3 tools/sqllogictest.py -jc=1
           cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_arm64_go_test.log || true; exit $exit_code; fi
 
@@ -1940,7 +1936,7 @@ jobs:
         with:
           name: release-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x ./infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -1948,6 +1944,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -1955,13 +1952,10 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start infinity server
+      - name: Wait for infinity and run http test
         run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
           ./scripts/wait_for_infinity.sh
-
-      - name: Run http test
-        run: uv run python3 tools/run_http_api.py
+          uv run python3 tools/run_http_api.py
 
       - name: Collect infinity log
         if: always()
@@ -1972,54 +1966,54 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-#  release_arm64_pysdk_parallel_test:
-#    name: release_arm64_pysdk_parallel_test
-#    runs-on: ubuntu-24.04-arm
-#    needs: release_arm64_build
-#    steps:
-#      - name: Check out code
-#        uses: actions/checkout@v6
-#        with:
-#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-#          fetch-depth: 0
-#          submodules: recursive
-#
-#      - name: Download release build artifacts
-#        uses: actions/download-artifact@v8
-#        with:
-#          name: release-build-arm64
-#
-#      - name: Prepare environment
-#        run: |
-#          chmod +x ./infinity
-#          sudo mkdir -p /usr/share/infinity/resource
-#          sudo cp -r resource/* /usr/share/infinity/resource/
-#          sudo chown -R ${USER} /usr/share/infinity
-#          sudo mkdir -p /var/infinity
-#          sudo chown -R ${USER} /var/infinity
-#
-#      - name: Install Python SDK
-#        uses: astral-sh/setup-uv@v7
-#        with:
-#          enable-cache: true
-#      - run: uv sync --python 3.11 --frozen --extra test
-#
-#      - name: Start infinity server
-#        run: |
-#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-#          ./scripts/wait_for_infinity.sh
-#
-#      - name: Run pysdk test
-#        run: uv run python3 tools/run_parallel_test.py
-#
-#      - name: Collect infinity log
-#        if: always()
-#        run: |
-#          cat infinity.log || true
-#
-#      - name: Stop infinity server
-#        if: always()
-#        run: pkill -f infinity || true
+  #  release_arm64_pysdk_parallel_test:
+  #    name: release_arm64_pysdk_parallel_test
+  #    runs-on: ubuntu-24.04-arm
+  #    needs: release_arm64_build
+  #    steps:
+  #      - name: Check out code
+  #        uses: actions/checkout@v6
+  #        with:
+  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #          fetch-depth: 0
+  #          submodules: recursive
+  #
+  #      - name: Download release build artifacts
+  #        uses: actions/download-artifact@v8
+  #        with:
+  #          name: release-build-arm64
+  #
+  #      - name: Prepare environment
+  #        run: |
+  #          chmod +x ./infinity
+  #          sudo mkdir -p /usr/share/infinity/resource
+  #          sudo cp -r resource/* /usr/share/infinity/resource/
+  #          sudo chown -R ${USER} /usr/share/infinity
+  #          sudo mkdir -p /var/infinity
+  #          sudo chown -R ${USER} /var/infinity
+  #
+  #      - name: Install Python SDK
+  #        uses: astral-sh/setup-uv@v7
+  #        with:
+  #          enable-cache: true
+  #      - run: uv sync --python 3.11 --frozen --extra test
+  #
+  #      - name: Start infinity server
+  #        run: |
+  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+  #          ./scripts/wait_for_infinity.sh
+  #
+  #      - name: Run pysdk test
+  #        run: uv run python3 tools/run_parallel_test.py
+  #
+  #      - name: Collect infinity log
+  #        if: always()
+  #        run: |
+  #          cat infinity.log || true
+  #
+  #      - name: Stop infinity server
+  #        if: always()
+  #        run: pkill -f infinity || true
 
   release_arm64_minio_pysdk_test:
     name: release_arm64_minio_pysdk_test
@@ -2033,12 +2027,16 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -2046,6 +2044,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -2053,19 +2052,11 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start minio container
+      - name: Wait for services and run minio pysdk test
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-
-      - name: Run minio pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+          uv run python3 tools/run_pysdk_remote_infinity_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2092,12 +2083,16 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Start minio container
+        run: |
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
-      - name: Prepare environment
+      - name: Prepare environment and start infinity
         run: |
           chmod +x infinity
           sudo mkdir -p /usr/share/infinity/resource
@@ -2105,6 +2100,7 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
+          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
@@ -2112,19 +2108,11 @@ jobs:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
-      - name: Start minio container
+      - name: Wait for services and run minio parallel test
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-          sleep 5s
-      #           curl -s http://localhost:9005/minio/health/live || { echo "Minio not ready"; exit 1; }
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+          ./scripts/wait_for_minio.sh
           ./scripts/wait_for_infinity.sh
-
-      - name: Run minio parallel test
-        run: uv run python3 tools/run_parallel_test.py
+          uv run python3 tools/run_parallel_test.py
 
       - name: Collect infinity log
         if: always()
@@ -2142,7 +2130,6 @@ jobs:
   # ============================================
   # AMD64 Benchmark (self-hosted runner)
   # ============================================
-
   reldeb_amd64_benchmark_prepare:
     name: reldeb_amd64_benchmark_prepare
     runs-on: [ "self-hosted", "infinity-build" ]
@@ -2244,3 +2231,48 @@ jobs:
           echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
           ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+
+  # ============================================
+  # Final cleanup job
+  # ============================================
+  workflow_cleanup:
+    name: workflow_cleanup
+    runs-on: ubuntu-slim
+    needs:
+      - code_static_check
+      - debug_amd64_build
+      - debug_amd64_unit_test
+      - debug_amd64_sqllogical_test
+      - debug_amd64_restart_test
+      - debug_amd64_pysdk_test
+      - debug_amd64_go_test
+      - debug_amd64_http_test
+      - debug_amd64_pysdk_parallel_test
+      - release_amd64_build
+      - release_amd64_unit_test
+      - release_amd64_sqllogical_test
+      - release_amd64_restart_test
+      - release_amd64_go_test
+      - release_amd64_http_test
+      - release_amd64_minio_pysdk_test
+      - release_amd64_minio_parallel_test
+      - debug_arm64_build
+      - debug_arm64_unit_test
+      - debug_arm64_sqllogical_test
+      - debug_arm64_restart_test
+      - debug_arm64_pysdk_test
+      - debug_arm64_go_test
+      - debug_arm64_http_test
+      - debug_arm64_pysdk_parallel_test
+      - release_arm64_build
+      - release_arm64_unit_test
+      - release_arm64_sqllogical_test
+      - release_arm64_restart_test
+      - release_arm64_go_test
+      - release_arm64_http_test
+      - release_arm64_minio_pysdk_test
+      - release_arm64_minio_parallel_test
+    if: always()
+    steps:
+      - name: Cleanup
+        run: echo "Workflow cleanup. Just a placeholder now."

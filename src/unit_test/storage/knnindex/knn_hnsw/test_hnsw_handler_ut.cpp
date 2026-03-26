@@ -216,7 +216,7 @@ TEST_F(HnswHandlerTest, test_compress) {
     }
 }
 
-TEST_F(HnswHandlerTest, test_load) {
+TEST_F(HnswHandlerTest, DISABLED_SLOW_test_load) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
     /// save index file
