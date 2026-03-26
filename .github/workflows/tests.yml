@@ -2141,6 +2141,9 @@ jobs:
     runs-on: [ "self-hosted", "infinity-build" ]
     needs: code_static_check
     steps:
+      - name: Ensure workspace ownership
+        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+
       - name: Check out code
         uses: actions/checkout@v6
         with:
