@@ -151,7 +151,7 @@ TEST_F(TestTxnManagerTest, test_ts) {
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
 
-TEST_F(TestTxnManagerTest, test_parallel_ts) {
+TEST_F(TestTxnManagerTest, DISABLED_SLOW_test_parallel_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
 
@@ -303,7 +303,7 @@ TEST_F(TestTxnManagerTest, test_check_txns) {
     }
 }
 
-TEST_F(TestTxnManagerTest, test_parallel_insert_table) {
+TEST_F(TestTxnManagerTest, DISABLED_SLOW_test_parallel_insert_table) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
     // Create db

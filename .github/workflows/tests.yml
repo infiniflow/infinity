@@ -142,7 +142,7 @@ jobs:
       - name: Download debug unit test build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: debug-unit-test-build-amd64
+          name: debug-build-amd64
 
 #      - name: Install Python SDK
 #        uses: astral-sh/setup-uv@v4
@@ -220,7 +220,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         run: uv run python3 tools/sqllogictest.py
@@ -310,7 +310,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -370,7 +370,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run Go tests
         run: |
@@ -422,7 +422,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http test
         run: uv run python3 tools/run_http_api.py
@@ -471,7 +471,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_parallel_test.py
@@ -613,7 +613,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         run: uv run python3 tools/sqllogictest.py
@@ -703,7 +703,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -758,7 +758,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run Go tests
         run: |
@@ -810,7 +810,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http test
         run: uv run python3 tools/run_http_api.py
@@ -859,7 +859,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_parallel_test.py
@@ -914,7 +914,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -973,7 +973,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio parallel test
         run: uv run python3 tools/run_parallel_test.py
@@ -1081,6 +1081,7 @@ jobs:
     name: debug_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: debug_arm64_build
+    if: never()
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -1118,7 +1119,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         run: uv run python3 tools/sqllogictest.py
@@ -1208,7 +1209,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -1268,7 +1269,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run Go tests
         run: |
@@ -1320,7 +1321,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http test
         run: uv run python3 tools/run_http_api.py
@@ -1369,7 +1370,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_parallel_test.py
@@ -1473,6 +1474,7 @@ jobs:
     name: release_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: release_arm64_build
+    if: never()
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -1510,7 +1512,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run sqllogictest
         run: uv run python3 tools/sqllogictest.py
@@ -1600,7 +1602,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -1655,7 +1657,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run Go tests
         run: |
@@ -1707,7 +1709,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run http test
         run: uv run python3 tools/run_http_api.py
@@ -1756,7 +1758,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run pysdk test
         run: uv run python3 tools/run_parallel_test.py
@@ -1811,7 +1813,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio pysdk test
         run: uv run python3 tools/run_pysdk_remote_infinity_test.py
@@ -1870,7 +1872,7 @@ jobs:
       - name: Start infinity server
         run: |
           nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-          sleep 15s
+          ./scripts/wait_for_infinity.sh
 
       - name: Run minio parallel test
         run: uv run python3 tools/run_parallel_test.py

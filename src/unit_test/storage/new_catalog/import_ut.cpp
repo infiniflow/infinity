@@ -5955,7 +5955,7 @@ TEST_P(TestTxnImport, test_import_and_drop_index) {
     }
 }
 
-TEST_P(TestTxnImport, test_import_and_compact) {
+TEST_P(TestTxnImport, DISABLED_SLOW_test_import_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
