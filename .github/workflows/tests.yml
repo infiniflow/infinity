@@ -1081,7 +1081,7 @@ jobs:
     name: debug_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: debug_arm64_build
-    if: never()
+    if: false
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -1474,7 +1474,7 @@ jobs:
     name: release_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: release_arm64_build
-    if: never()
+    if: false
     steps:
       - name: Check out code
         uses: actions/checkout@v4
