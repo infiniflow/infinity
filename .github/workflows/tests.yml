@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
@@ -99,7 +99,7 @@ jobs:
     needs: code_static_check
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
@@ -133,19 +133,19 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug unit test build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -187,14 +187,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -214,7 +214,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -242,14 +242,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -263,7 +263,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -283,14 +283,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -304,7 +304,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -332,14 +332,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -353,7 +353,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.23'
 
@@ -364,7 +364,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -395,14 +395,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -416,7 +416,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -444,14 +444,14 @@ jobs:
     needs: debug_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-amd64
 
@@ -465,7 +465,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -490,11 +490,11 @@ jobs:
 
   release_amd64_build:
     name: release_amd64_build
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: code_static_check
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
@@ -524,23 +524,23 @@ jobs:
 
   release_amd64_unit_test:
     name: release_amd64_unit_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -578,18 +578,18 @@ jobs:
 
   release_amd64_sqllogical_test:
     name: release_amd64_sqllogical_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -609,7 +609,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -633,18 +633,18 @@ jobs:
 
   release_amd64_restart_test:
     name: release_amd64_restart_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -658,7 +658,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -674,18 +674,18 @@ jobs:
 
   release_amd64_pysdk_test:
     name: release_amd64_pysdk_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -699,7 +699,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -723,18 +723,18 @@ jobs:
 
   release_amd64_go_test:
     name: release_amd64_go_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -747,6 +747,11 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23'
+
       - name: Install sqllogictest
         run: |
           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
@@ -754,7 +759,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -781,18 +786,18 @@ jobs:
 
   release_amd64_http_test:
     name: release_amd64_http_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -806,7 +811,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -830,18 +835,18 @@ jobs:
 
   release_amd64_pysdk_parallel_test:
     name: release_amd64_pysdk_parallel_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -855,7 +860,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -883,14 +888,14 @@ jobs:
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -904,7 +909,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -942,14 +947,14 @@ jobs:
     needs: release_amd64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-amd64
 
@@ -963,7 +968,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1001,7 +1006,7 @@ jobs:
     needs: code_static_check
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
@@ -1031,23 +1036,23 @@ jobs:
 
   debug_arm64_unit_test:
     name: debug_arm64_unit_test
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest-arm
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1090,14 +1095,14 @@ jobs:
     if: false
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1117,7 +1122,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1145,14 +1150,14 @@ jobs:
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1166,7 +1171,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1186,14 +1191,14 @@ jobs:
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1207,7 +1212,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1235,14 +1240,14 @@ jobs:
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1256,7 +1261,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.23'
 
@@ -1267,7 +1272,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1298,14 +1303,14 @@ jobs:
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1319,7 +1324,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1347,14 +1352,14 @@ jobs:
     needs: debug_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download debug build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: debug-build-arm64
 
@@ -1368,7 +1373,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1396,7 +1401,7 @@ jobs:
     needs: code_static_check
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
@@ -1430,19 +1435,19 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1485,14 +1490,14 @@ jobs:
     if: false
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1512,7 +1517,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1540,14 +1545,14 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1561,7 +1566,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1581,14 +1586,14 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1602,7 +1607,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1630,14 +1635,14 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1650,6 +1655,11 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23'
+
       - name: Install sqllogictest
         run: |
           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
@@ -1657,7 +1667,7 @@ jobs:
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1688,14 +1698,14 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1709,7 +1719,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1737,14 +1747,14 @@ jobs:
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1758,7 +1768,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1782,18 +1792,18 @@ jobs:
 
   release_arm64_minio_pysdk_test:
     name: release_arm64_minio_pysdk_test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1807,7 +1817,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
@@ -1841,18 +1851,18 @@ jobs:
 
   release_arm64_minio_parallel_test:
     name: release_arm64_minio_parallel_test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: release_arm64_build
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
           fetch-depth: 0
           submodules: recursive
 
       - name: Download release build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-build-arm64
 
@@ -1866,7 +1876,7 @@ jobs:
           sudo chown -R ${USER} /var/infinity
 
       - name: Install Python SDK
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
