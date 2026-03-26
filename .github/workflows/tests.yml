@@ -997,8 +997,8 @@ jobs:
 
       - name: Install sqllogictest
         run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
