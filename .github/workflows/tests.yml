@@ -175,9 +175,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for minio and run unit test
         env:
@@ -255,9 +256,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run sqllogictest
         run: |
@@ -367,9 +369,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
@@ -449,9 +452,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run Go tests
         run: |
@@ -522,9 +526,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run http test
         run: |
@@ -593,9 +598,10 @@ jobs:
 
       - name: Install LLVM 20
         run: |
-          curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.0/LLVM-20.1.0-Linux-X64.tar.xz
-          tar -xf LLVM-20.1.0-Linux-X64.tar.xz
-          echo "$PWD/LLVM-20.1.0-Linux-X64/bin" >> $GITHUB_PATH
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
