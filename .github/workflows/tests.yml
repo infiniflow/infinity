@@ -1416,7 +1416,7 @@ jobs:
         run: |
           echo "debug_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
-    debug_arm64_pysdk_test:
+  debug_arm64_pysdk_test:
       name: debug_arm64_pysdk_test
       runs-on: ubuntu-24.04-arm
       needs: debug_arm64_build
@@ -1577,7 +1577,7 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-    debug_arm64_pysdk_parallel_test:
+  debug_arm64_pysdk_parallel_test:
       name: debug_arm64_pysdk_parallel_test
       runs-on: ubuntu-24.04-arm
       needs: debug_arm64_build
