@@ -2142,10 +2142,31 @@ jobs:
   # ============================================
   # AMD64 Benchmark (self-hosted runner)
   # ============================================
-  reldeb_benchmark_build:
-    name: reldeb_benchmark_build
+
+  reldeb_amd64_benchmark_prepare:
+    name: reldeb_amd64_benchmark_prepare
     runs-on: [ "self-hosted", "infinity-build" ]
     needs: code_static_check
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Prepare and upload source tarball
+        run: |
+          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+
+  reldeb_amd64_benchmark_build:
+    name: reldeb_benchmark_build
+    runs-on: [ "self-hosted", "infinity-build" ]
+    needs: reldeb_amd64_benchmark_prepare
     continue-on-error: true
     outputs:
       build_status: ${{ steps.build.outcome }}
@@ -2183,11 +2204,11 @@ jobs:
             sudo docker rm -f -v "${BUILDER_CONTAINER}"
           fi
 
-  reldeb_benchmark:
+  reldeb_amd64_benchmark:
     name: reldeb_benchmark
     runs-on: [ "self-hosted", "benchmark" ]
-    needs: reldeb_benchmark_build
-    if: needs.reldeb_benchmark_build.outputs.build_status == 'success'
+    needs: reldeb_amd64_benchmark_build
+    if: needs.reldeb_amd64_benchmark_build.outputs.build_status == 'success'
     steps:
       - name: Prepare code and artifacts
         run: |
