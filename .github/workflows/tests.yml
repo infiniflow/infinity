@@ -1416,54 +1416,54 @@ jobs:
         run: |
           echo "debug_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
-  #  debug_arm64_pysdk_test:
-  #    name: debug_arm64_pysdk_test
-  #    runs-on: ubuntu-24.04-arm
-  #    needs: debug_arm64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download debug build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: debug-build-arm64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
+    debug_arm64_pysdk_test:
+      name: debug_arm64_pysdk_test
+      runs-on: ubuntu-24.04-arm
+      needs: debug_arm64_build
+      steps:
+        - name: Check out code
+          uses: actions/checkout@v6
+          with:
+            ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+            fetch-depth: 0
+            submodules: recursive
+
+        - name: Download debug build artifacts
+          uses: actions/download-artifact@v8
+          with:
+            name: debug-build-arm64
+
+        - name: Prepare environment
+          run: |
+            chmod +x infinity
+            sudo mkdir -p /usr/share/infinity/resource
+            sudo cp -r resource/* /usr/share/infinity/resource/
+            sudo chown -R ${USER} /usr/share/infinity
+            sudo mkdir -p /var/infinity
+            sudo chown -R ${USER} /var/infinity
+
+        - name: Install Python SDK
+          uses: astral-sh/setup-uv@v7
+          with:
+            enable-cache: true
+        - run: uv sync --python 3.11 --frozen --extra test
+
+        - name: Start infinity server
+          run: |
+            nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+            ./scripts/wait_for_infinity.sh
+
+        - name: Run pysdk test
+          run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+
+        - name: Collect infinity log
+          if: always()
+          run: |
+            cat infinity.log || true
+
+        - name: Stop infinity server
+          if: always()
+          run: pkill -f infinity || true
 
   debug_arm64_go_test:
     name: debug_arm64_go_test
@@ -1577,54 +1577,54 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-  #  debug_arm64_pysdk_parallel_test:
-  #    name: debug_arm64_pysdk_parallel_test
-  #    runs-on: ubuntu-24.04-arm
-  #    needs: debug_arm64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download debug build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: debug-build-arm64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
+    debug_arm64_pysdk_parallel_test:
+      name: debug_arm64_pysdk_parallel_test
+      runs-on: ubuntu-24.04-arm
+      needs: debug_arm64_build
+      steps:
+        - name: Check out code
+          uses: actions/checkout@v6
+          with:
+            ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+            fetch-depth: 0
+            submodules: recursive
+
+        - name: Download debug build artifacts
+          uses: actions/download-artifact@v8
+          with:
+            name: debug-build-arm64
+
+        - name: Prepare environment
+          run: |
+            chmod +x infinity
+            sudo mkdir -p /usr/share/infinity/resource
+            sudo cp -r resource/* /usr/share/infinity/resource/
+            sudo chown -R ${USER} /usr/share/infinity
+            sudo mkdir -p /var/infinity
+            sudo chown -R ${USER} /var/infinity
+
+        - name: Install Python SDK
+          uses: astral-sh/setup-uv@v7
+          with:
+            enable-cache: true
+        - run: uv sync --python 3.11 --frozen --extra test
+
+        - name: Start infinity server
+          run: |
+            nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+            ./scripts/wait_for_infinity.sh
+
+        - name: Run pysdk test
+          run: uv run python3 tools/run_parallel_test.py
+
+        - name: Collect infinity log
+          if: always()
+          run: |
+            cat infinity.log || true
+
+        - name: Stop infinity server
+          if: always()
+          run: pkill -f infinity || true
 
   release_arm64_build:
     name: release_arm64_build
@@ -1811,54 +1811,54 @@ jobs:
         run: |
           echo "release_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
 
-  release_arm64_pysdk_test:
-    name: release_arm64_pysdk_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          ./scripts/wait_for_infinity.sh
-
-      - name: Run pysdk test
-        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
+#  release_arm64_pysdk_test:
+#    name: release_arm64_pysdk_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Start infinity server
+#        run: |
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#          ./scripts/wait_for_infinity.sh
+#
+#      - name: Run pysdk test
+#        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
 
   release_arm64_go_test:
     name: release_arm64_go_test
@@ -1972,54 +1972,54 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-  release_arm64_pysdk_parallel_test:
-    name: release_arm64_pysdk_parallel_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test
-
-      - name: Start infinity server
-        run: |
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-          ./scripts/wait_for_infinity.sh
-
-      - name: Run pysdk test
-        run: uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
+#  release_arm64_pysdk_parallel_test:
+#    name: release_arm64_pysdk_parallel_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Start infinity server
+#        run: |
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#          ./scripts/wait_for_infinity.sh
+#
+#      - name: Run pysdk test
+#        run: uv run python3 tools/run_parallel_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
 
   release_arm64_minio_pysdk_test:
     name: release_arm64_minio_pysdk_test
