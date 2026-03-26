@@ -57,7 +57,7 @@ jobs:
             builder_image: infiniflow/infinity_builder:ubuntu22_clang20
           - runner: ["self-hosted", "infinity-release-arm"]
             arch: arm64
-            builder_image: infiniflow/infinity_builder:ubuntu22_clang20_arm64
+            builder_image: infiniflow/infinity_builder:ubuntu22_clang20
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Ensure workspace ownership
