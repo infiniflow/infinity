@@ -144,6 +144,23 @@ jobs:
         with:
           name: debug-unit-test-build-amd64
 
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v4
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python3 -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+
       - name: Prepare environment
         run: |
           chmod +x test_main
@@ -519,6 +536,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-build-amd64
+
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v4
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
 
       - name: Prepare environment
         run: |
@@ -1008,6 +1042,23 @@ jobs:
         with:
           name: debug-build-arm64
 
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v4
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+
       - name: Prepare environment
         run: |
           chmod +x test_main
@@ -1382,6 +1433,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-build-arm64
+
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v4
+#        with:
+#          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
 
       - name: Prepare environment
         run: |
