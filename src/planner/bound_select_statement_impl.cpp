@@ -271,6 +271,11 @@ std::shared_ptr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query
                         match_node->bm25_params_.delta_phrase = delta_phrase_v;
                     }
 
+                    // Empty matching_text will cause parse error. Set to "." which will match nothing in the inverted index.
+                    if (match_node->match_expr_->matching_text_.empty()) {
+                        match_node->match_expr_->matching_text_ = ".";
+                    }
+
                     SearchDriver search_driver(std::move(column2analyzer), default_field, query_operator_option);
                     std::unique_ptr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);

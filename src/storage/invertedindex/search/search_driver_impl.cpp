@@ -248,9 +248,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         RecoverableError(std::move(status));
     }
     TermList terms = GetTermListFromAnalyzer(analyzer_name, analyzer.get(), text);
-    if (terms.empty()) {
-        return nullptr;
-    }
+
     if (AnalyzerPool::AnalyzerNameToInt(analyzer_name.c_str()) == keyword_analyzer_name_int) {
         auto result = std::make_unique<KeywordQueryNode>();
         for (const auto &term : terms) {
