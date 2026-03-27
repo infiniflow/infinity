@@ -141,6 +141,42 @@ Anarchism 30-APR-2012 03:25:17.000 0 26.372100
 Anarchism 30-APR-2012 03:25:17.000 4294967296 26.372100
 Anarchism 30-APR-2012 03:25:17.000 8589934592 26.372100
 
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', '', 'topn=3;block_max=compare');
+----
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', '\    ', 'topn=3;block_max=compare');
+----
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', '.', 'topn=3;block_max=compare');
+----
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', '\?', 'topn=3;block_max=compare');
+----
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', 'harmful^0.2 chemical^0.3 anarchism^0.2', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 5.274400
+Anarchism 30-APR-2012 03:25:17.000 4294967296 5.274400
+Anarchism 30-APR-2012 03:25:17.000 8589934592 5.274400
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', 'harmful^0.2 chemical^0.3 anarchism^0.2 .', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 5.274400
+Anarchism 30-APR-2012 03:25:17.000 4294967296 5.274400
+Anarchism 30-APR-2012 03:25:17.000 8589934592 5.274400
+
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), ROUND(SCORE(), 4) FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle@ft_index2,body@ft_index^5', 'harmful^0.2 \: chemical^0.3 \* anarchism^0.2 .', 'topn=3;block_max=compare');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 5.274400
+Anarchism 30-APR-2012 03:25:17.000 4294967296 5.274400
+Anarchism 30-APR-2012 03:25:17.000 8589934592 5.274400
 
 # Clean up
 statement ok
