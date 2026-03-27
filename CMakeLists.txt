@@ -371,7 +371,7 @@ option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
 
 if (IS_CI_TEST_PIPELINE)
     if (X86_64)
-        add_definitions(-march=x86-64-v3)
+        add_definitions(-march=x86-64-v2)
     else ()
         add_definitions(-march=native)
     endif ()
