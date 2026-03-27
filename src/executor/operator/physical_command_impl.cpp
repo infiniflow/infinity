@@ -400,6 +400,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             }
 
             NewTxn *new_txn = query_context->GetNewTxn();
+            // If new_txn is nullptr, it means another cleanup is in progress, just skip
+            if (new_txn == nullptr) {
+                break;
+            }
             Status status = new_txn->Cleanup();
             if (!status.ok()) {
                 RecoverableError(status);

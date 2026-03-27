@@ -33,10 +33,10 @@ struct SegmentTreeForTopnDistance {
     RawDataT max_raw_data_ = std::numeric_limits<RawDataT>::max();
     RawLabelT max_raw_label_ = {};
     const u32 topn_ = 0;
-    std::unique_ptr<InnerIndexT[]> inner_index_ = std::make_unique_for_overwrite<InnerIndexT[]>(topn_ << 1);
+    std::unique_ptr<InnerIndexT[]> inner_index_;
 
     explicit SegmentTreeForTopnDistance(RawDataT *raw_data, RawLabelT *raw_label, const u32 topn)
-        : raw_data_(raw_data), raw_label_(raw_label), topn_(topn) {}
+        : raw_data_(raw_data), raw_label_(raw_label), topn_(topn), inner_index_(std::make_unique_for_overwrite<InnerIndexT[]>(topn << 1)) {}
 
     [[nodiscard]] InnerIndexT index_max_v(const InnerIndexT lhs, const InnerIndexT rhs) const {
         return CompareDistanceIdPair(raw_data_[lhs], raw_data_[rhs], raw_label_[lhs], raw_label_[rhs]) ? lhs : rhs;

@@ -15,8 +15,6 @@
 module;
 
 #include <cassert>
-#include <ostream>
-#include <random>
 
 #include <common/simd/simd_functions.h>
 
@@ -28,7 +26,6 @@ import :infinity_exception;
 import :hnsw_common;
 import :mlas_matrix_multiply;
 
-import std;
 import std.compat;
 import serialize;
 
@@ -51,7 +48,7 @@ void GenerateRandomOrthogonalMatrix(DataType *rom, size_t dim) {
     // Random Givens Rotation
     for (size_t i = 0; i < dim; ++i) {
         for (size_t j = i + 1; j < dim; ++j) {
-            DataType angle = 2 * M_PI * dist(gen);
+            DataType angle = 2 * std::numbers::pi * dist(gen);
             DataType c = std::cos(angle);
             DataType s = std::sin(angle);
             for (size_t k = 0; k < dim; ++k) {
