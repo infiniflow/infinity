@@ -57,7 +57,9 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     auto *filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
 
     if (prev_op_state->data_block_array_.empty()) {
-        UnrecoverableError("No input data array from input");
+        // No data to filter - return empty result gracefully
+        filter_operator_state->SetComplete();
+        return true;
     }
 
     size_t input_block_count = prev_op_state->data_block_array_.size();
