@@ -158,8 +158,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Download nltk data
@@ -250,8 +250,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Install LLVM 20
@@ -320,8 +320,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Run restart test
@@ -363,8 +363,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Install LLVM 20
@@ -446,8 +446,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Install LLVM 20
@@ -520,8 +520,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Install LLVM 20
@@ -592,8 +592,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Install LLVM 20
@@ -780,8 +780,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Download nltk data
@@ -850,13 +850,13 @@ jobs:
       - name: Install sqllogictest
         run: |
           curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
           sudo mv sqllogictest /usr/local/bin/
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run sqllogictest
@@ -901,8 +901,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Run restart test
@@ -1003,8 +1003,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run Go tests
@@ -1052,8 +1052,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run http test
@@ -1152,8 +1152,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for services and run minio pysdk test
@@ -1208,8 +1208,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for services and run minio parallel test
@@ -1288,8 +1288,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Download nltk data
@@ -1364,8 +1364,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run sqllogictest
@@ -1410,8 +1410,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Run restart test
@@ -1452,8 +1452,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run pysdk test
@@ -1510,8 +1510,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run Go tests
@@ -1559,8 +1559,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run http test
@@ -1606,8 +1606,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run pysdk test
@@ -1681,8 +1681,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Download nltk data
@@ -1757,8 +1757,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run sqllogictest
@@ -1803,8 +1803,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Run restart test
@@ -1905,8 +1905,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run Go tests
@@ -1954,8 +1954,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for infinity and run http test
@@ -2054,8 +2054,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for services and run minio pysdk test
@@ -2110,8 +2110,8 @@ jobs:
 
       - name: Install Python SDK
         uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
+#        with:
+#          enable-cache: true
       - run: uv sync --python 3.11 --frozen --extra test
 
       - name: Wait for services and run minio parallel test
