@@ -75,8 +75,7 @@ public:
     std::string analyzer_;
     // for loading column length files
     std::string index_dir_;
-    std::shared_ptr<MemoryIndexer> memory_indexer_{nullptr};
-
+    std::vector<std::shared_ptr<MemoryIndexer>> memory_indexers_;
     std::vector<ColumnReaderChunkInfo> chunk_index_meta_infos_;
 };
 

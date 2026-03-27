@@ -27,7 +27,7 @@ import row_id;
 namespace infinity {
 
 FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader)
-    : index_dir_(reader->index_dir_), memory_indexer_(reader->memory_indexer_) {
+    : index_dir_(reader->index_dir_), memory_indexers_(reader->memory_indexers_) {
     chunk_index_meta_infos_ = reader->chunk_index_meta_infos_;
     for (const auto &chunk_meta_info : chunk_index_meta_infos_) {
         chunk_doc_cnt_ += chunk_meta_info.row_cnt_;
@@ -67,13 +67,13 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
 }
 
 std::pair<size_t, size_t> FullTextColumnLengthReader::GetDocTermCount() const {
-    if (memory_indexer_ != nullptr) {
-        std::pair<size_t, size_t> doc_cnt_len = memory_indexer_->GetDocTermCount();
-        doc_cnt_len.first += chunk_doc_cnt_;
-        doc_cnt_len.second += chunk_term_cnt_;
-        return doc_cnt_len;
-    } else {
-        return {chunk_doc_cnt_, chunk_term_cnt_};
+    std::pair<size_t, size_t> doc_cnt_len(chunk_doc_cnt_, chunk_term_cnt_);
+    for (const auto &memory_indexer : memory_indexers_) {
+        if (memory_indexer != nullptr) {
+            doc_cnt_len.first += memory_indexer->GetDocTermCount().first;
+            doc_cnt_len.second += memory_indexer->GetDocTermCount().second;
+        }
     }
+    return doc_cnt_len;
 }
 } // namespace infinity
