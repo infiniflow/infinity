@@ -18,6 +18,7 @@ class TestMultipleIndexTypesImport:
             pytest.param("test/data/config/restart_test/test_insert/5.toml", MultiIndexTypesGenerator, 25, 50, 120, marks=pytest.mark.slow),
             pytest.param("test/data/config/restart_test/test_insert/6.toml", MultiIndexTypesGenerator, 2, 4, 30, marks=pytest.mark.slow),
             pytest.param("test/data/config/restart_test/test_insert/7.toml", MultiIndexTypesGenerator, 5, 10, 120, marks=pytest.mark.slow),
+            pytest.param("test/data/config/restart_test/test_insert/8.toml", MultiIndexTypesGenerator, 0, 10, 30, marks=pytest.mark.slow),
         ],
     )
     def test_multiple_index_types_import_restart(
