@@ -446,8 +446,8 @@ export float I8CosBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     int norm1 = 0;
     int norm2 = 0;
     for (size_t i = 0; i < dim; i++) {
-        const int v1 = *pv1;
-        const int v2 = *pv2;
+        const int v1 = pv1[i];
+        const int v2 = pv2[i];
         dot_product += v1 * v2;
         norm1 += v1 * v1;
         norm2 += v2 * v2;
