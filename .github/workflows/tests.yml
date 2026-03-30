@@ -97,1307 +97,1307 @@ jobs:
         if: always()
         run: docker rm -f infinity_builder || true
 
-  debug_amd64_build:
-    name: debug_amd64_build
-    runs-on: ubuntu-latest
-    needs: code_static_check
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          fetch-tags: false
-          submodules: recursive
-
-      - name: Start builder container
-        run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
-
-      - name: Build debug version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -DIS_CI_TEST_PIPELINE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: debug-build-amd64
-          path: |
-            cmake-build-debug/src/infinity
-            cmake-build-debug/src/test_main
-          retention-days: 1
-          if-no-files-found: warn
-
-      - name: Remove build container
-        if: always()
-        run: docker rm -f infinity_builder || true
-
-  debug_amd64_unit_test:
-    name: debug_amd64_unit_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download debug unit test build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment
-        run: |
-          chmod +x test_main
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#  debug_amd64_build:
+#    name: debug_amd64_build
+#    runs-on: ubuntu-latest
+#    needs: code_static_check
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Download nltk data
-        run: |
-          uv run python3 -c "
-          import os
-          import nltk
-          local_dir = os.path.abspath('nltk_data')
-          for data in ['wordnet', 'punkt', 'punkt_tab']:
-              print(f'Downloading nltk {data}...')
-              nltk.download(data, download_dir=local_dir)
-          "
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for minio and run unit test
-        env:
-          NLTK_DATA: ${{ github.workspace }}/nltk_data
-          LLVM_PROFILE_FILE: "infinity-%p.profraw"
-        run: |
-          ./scripts/wait_for_minio.sh
-          ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "debug unit test log" && tail -n 1000 debug_unit_test*.log || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-unit-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  debug_amd64_sqllogical_test:
-    name: debug_amd64_sqllogical_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          fetch-tags: false
+#          submodules: recursive
+#
+#      - name: Start builder container
+#        run: |
+#          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+#
+#      - name: Build debug version
+#        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -DIS_CI_TEST_PIPELINE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v7
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for infinity and run sqllogictest
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-sqllogical-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-  debug_amd64_restart_test:
-    name: debug_amd64_restart_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: debug-build-amd64
+#          path: |
+#            cmake-build-debug/src/infinity
+#            cmake-build-debug/src/test_main
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#      - name: Remove build container
+#        if: always()
+#        run: docker rm -f infinity_builder || true
+#
+#  debug_amd64_unit_test:
+#    name: debug_amd64_unit_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Run restart test
-        run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
-
-  debug_amd64_pysdk_test:
-    name: debug_amd64_pysdk_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for infinity and run pysdk test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-pysdk-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-  debug_amd64_go_test:
-    name: debug_amd64_go_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.23'
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download debug unit test build artifacts
+#        uses: actions/download-artifact@v8
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for infinity and run Go tests
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-          cat debug_go_test.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-go-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-  debug_amd64_http_test:
-    name: debug_amd64_http_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x test_main
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python3 -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for minio and run unit test
+#        env:
+#          NLTK_DATA: ${{ github.workspace }}/nltk_data
+#          LLVM_PROFILE_FILE: "infinity-%p.profraw"
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_unit_test_stdout.log 2> debug_unit_test_stderr.log
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "debug unit test log" && tail -n 1000 debug_unit_test*.log || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for infinity and run http test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-http-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-  debug_amd64_pysdk_parallel_test:
-    name: debug_amd64_pysdk_parallel_test
-    runs-on: ubuntu-latest
-    needs: debug_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: coverage-debug-unit-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
+#
+#  debug_amd64_sqllogical_test:
+#    name: debug_amd64_sqllogical_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
-      - name: Wait for infinity and run pysdk test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-pysdk-parallel-test-amd64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
-
-  debug_amd64_upload_codecov:
-    name: debug_amd64_upload_codecov
-    runs-on: ubuntu-latest
-    needs: [ debug_amd64_unit_test, debug_amd64_sqllogical_test, debug_amd64_pysdk_test, debug_amd64_go_test, debug_amd64_http_test, debug_amd64_pysdk_parallel_test ]
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download unit test coverage
-        if: needs.debug_amd64_unit_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-unit-test-amd64
-          path: coverage/unit_test
-
-      - name: Download sqllogical test coverage
-        if: needs.debug_amd64_sqllogical_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-sqllogical-test-amd64
-          path: coverage/sqllogical_test
-
-      - name: Download pysdk test coverage
-        if: needs.debug_amd64_pysdk_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-test-amd64
-          path: coverage/pysdk_test
-
-      - name: Download go test coverage
-        if: needs.debug_amd64_go_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-go-test-amd64
-          path: coverage/go_test
-
-      - name: Download http test coverage
-        if: needs.debug_amd64_http_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-http-test-amd64
-          path: coverage/http_test
-
-      - name: Download pysdk parallel test coverage
-        if: needs.debug_amd64_pysdk_parallel_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-parallel-test-amd64
-          path: coverage/pysdk_parallel_test
-
-      - name: Merge coverage reports
-        run: |
-          mkdir -p merged_coverage
-          if [ -f coverage/unit_test/coverage.lcov ]; then
-            cat coverage/unit_test/coverage.lcov > merged_coverage/coverage.lcov
-          fi
-          for dir in coverage/sqllogical_test coverage/pysdk_test coverage/go_test coverage/http_test coverage/pysdk_parallel_test; do
-            if [ -f "$dir/coverage.lcov" ]; then
-              if [ -f merged_coverage/coverage.lcov ]; then
-                echo "" >> merged_coverage/coverage.lcov
-                grep -v "^TN:" "$dir/coverage.lcov" >> merged_coverage/coverage.lcov || true
-              else
-                cat "$dir/coverage.lcov" > merged_coverage/coverage.lcov
-              fi
-            fi
-          done
-          if [ -f merged_coverage/coverage.lcov ]; then
-            echo "Merged coverage file lines: $(wc -l < merged_coverage/coverage.lcov)"
-          else
-            echo "No coverage files found"
-            exit 1
-          fi
-
-      - name: Upload coverage to Codecov
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          ./codecov -t ${{ secrets.CODECOV_TOKEN }} \
-            -f merged_coverage/coverage.lcov \
-            -F "debug_amd64" \
-            -C ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }} \
-            -B ${{ github.ref_name }} \
-            -n "debug_amd64_coverage"
-
-
-  release_amd64_build:
-    name: release_amd64_build
-    runs-on: ubuntu-latest
-    needs: code_static_check
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          fetch-tags: false
-          submodules: recursive
-
-      - name: Start builder container
-        run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
-
-      - name: Build release version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-build-amd64
-          path: |
-            cmake-build-reldeb/src/infinity
-            cmake-build-reldeb/src/test_main
-          retention-days: 1
-          if-no-files-found: warn
-
-      - name: Remove build container
-        if: always()
-        run: docker rm -f infinity_builder || true
-
-  release_amd64_unit_test:
-    name: release_amd64_unit_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Download nltk data
-        run: |
-          uv run python -c "
-          import os
-          import nltk
-          local_dir = os.path.abspath('nltk_data')
-          for data in ['wordnet', 'punkt', 'punkt_tab']:
-              print(f'Downloading nltk {data}...')
-              nltk.download(data, download_dir=local_dir)
-          "
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./test_main
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Wait for minio and run unit test
-        env:
-          NLTK_DATA: ${{ github.workspace }}/nltk_data
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./test_main --gtest_filter=-*SLOW_* > release_amd64_unit_test_stdout.log 2> release_amd64_unit_test_stderr.log
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "release amd64 unit test log" && tail -n 1000 release_amd64_unit_test*.log || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  release_amd64_sqllogical_test:
-    name: release_amd64_sqllogical_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run sqllogictest
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  release_amd64_restart_test:
-    name: release_amd64_restart_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for infinity and run sqllogictest
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Run restart test
-        run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "release_amd64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
-
-  #  release_amd64_pysdk_test:
-  #    name: release_amd64_pysdk_test
-  #    runs-on: ubuntu-latest
-  #    needs: release_amd64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download release build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: release-build-amd64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x ./infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
-
-  release_amd64_go_test:
-    name: release_amd64_go_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.23'
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: coverage-debug-sqllogical-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#  debug_amd64_restart_test:
+#    name: debug_amd64_restart_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run Go tests
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-          cat release_amd64_go_test.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  release_amd64_http_test:
-    name: release_amd64_http_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run http test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  #  release_amd64_pysdk_parallel_test:
-  #    name: release_amd64_pysdk_parallel_test
-  #    runs-on: ubuntu-latest
-  #    needs: release_amd64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download release build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: release-build-amd64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x ./infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
-
-  release_amd64_minio_pysdk_test:
-    name: release_amd64_minio_pysdk_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for services and run minio pysdk test
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  release_amd64_minio_parallel_test:
-    name: release_amd64_minio_parallel_test
-    runs-on: ubuntu-latest
-    needs: release_amd64_build
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-amd64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Run restart test
+#        run: |
+#          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "debug_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+#
+#  debug_amd64_pysdk_test:
+#    name: debug_amd64_pysdk_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for services and run minio parallel test
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for infinity and run pysdk test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_pysdk_remote_infinity_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
+#        with:
+#          name: coverage-debug-pysdk-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#  debug_amd64_go_test:
+#    name: debug_amd64_go_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version: '1.23'
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for infinity and run Go tests
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py -jc=1
+#          cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_go_test.log || true; exit $exit_code; fi
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#          cat debug_go_test.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
+#        with:
+#          name: coverage-debug-go-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#  debug_amd64_http_test:
+#    name: debug_amd64_http_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for infinity and run http test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_http_api.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
+#        with:
+#          name: coverage-debug-http-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#  debug_amd64_pysdk_parallel_test:
+#    name: debug_amd64_pysdk_parallel_test
+#    runs-on: ubuntu-latest
+#    needs: debug_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          export LLVM_PROFILE_FILE="infinity-%p.profraw"
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Install LLVM 20
+#        run: |
+#          wget https://apt.llvm.org/llvm.sh
+#          chmod +x llvm.sh
+#          sudo ./llvm.sh 20
+#          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
+#
+#      - name: Wait for infinity and run pysdk test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_parallel_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Generate LCOV report
+#        if: always()
+#        run: |
+#          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
+#          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
+#          head -10 coverage.lcov
+#          echo "LCOV file lines: $(wc -l < coverage.lcov)"
+#
+#      - name: Upload coverage artifact
+#        if: always()
+#        uses: actions/upload-artifact@v7
+#        with:
+#          name: coverage-debug-pysdk-parallel-test-amd64
+#          path: coverage.lcov
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#  debug_amd64_upload_codecov:
+#    name: debug_amd64_upload_codecov
+#    runs-on: ubuntu-latest
+#    needs: [ debug_amd64_unit_test, debug_amd64_sqllogical_test, debug_amd64_pysdk_test, debug_amd64_go_test, debug_amd64_http_test, debug_amd64_pysdk_parallel_test ]
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download unit test coverage
+#        if: needs.debug_amd64_unit_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-unit-test-amd64
+#          path: coverage/unit_test
+#
+#      - name: Download sqllogical test coverage
+#        if: needs.debug_amd64_sqllogical_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-sqllogical-test-amd64
+#          path: coverage/sqllogical_test
+#
+#      - name: Download pysdk test coverage
+#        if: needs.debug_amd64_pysdk_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-pysdk-test-amd64
+#          path: coverage/pysdk_test
+#
+#      - name: Download go test coverage
+#        if: needs.debug_amd64_go_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-go-test-amd64
+#          path: coverage/go_test
+#
+#      - name: Download http test coverage
+#        if: needs.debug_amd64_http_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-http-test-amd64
+#          path: coverage/http_test
+#
+#      - name: Download pysdk parallel test coverage
+#        if: needs.debug_amd64_pysdk_parallel_test.result == 'success'
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: coverage-debug-pysdk-parallel-test-amd64
+#          path: coverage/pysdk_parallel_test
+#
+#      - name: Merge coverage reports
+#        run: |
+#          mkdir -p merged_coverage
+#          if [ -f coverage/unit_test/coverage.lcov ]; then
+#            cat coverage/unit_test/coverage.lcov > merged_coverage/coverage.lcov
+#          fi
+#          for dir in coverage/sqllogical_test coverage/pysdk_test coverage/go_test coverage/http_test coverage/pysdk_parallel_test; do
+#            if [ -f "$dir/coverage.lcov" ]; then
+#              if [ -f merged_coverage/coverage.lcov ]; then
+#                echo "" >> merged_coverage/coverage.lcov
+#                grep -v "^TN:" "$dir/coverage.lcov" >> merged_coverage/coverage.lcov || true
+#              else
+#                cat "$dir/coverage.lcov" > merged_coverage/coverage.lcov
+#              fi
+#            fi
+#          done
+#          if [ -f merged_coverage/coverage.lcov ]; then
+#            echo "Merged coverage file lines: $(wc -l < merged_coverage/coverage.lcov)"
+#          else
+#            echo "No coverage files found"
+#            exit 1
+#          fi
+#
+#      - name: Upload coverage to Codecov
+#        run: |
+#          curl -Os https://uploader.codecov.io/latest/linux/codecov
+#          chmod +x codecov
+#          ./codecov -t ${{ secrets.CODECOV_TOKEN }} \
+#            -f merged_coverage/coverage.lcov \
+#            -F "debug_amd64" \
+#            -C ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }} \
+#            -B ${{ github.ref_name }} \
+#            -n "debug_amd64_coverage"
+#
+#
+#  release_amd64_build:
+#    name: release_amd64_build
+#    runs-on: ubuntu-latest
+#    needs: code_static_check
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          fetch-tags: false
+#          submodules: recursive
+#
+#      - name: Start builder container
+#        run: |
+#          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+#
+#      - name: Build release version
+#        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v7
+#        with:
+#          name: release-build-amd64
+#          path: |
+#            cmake-build-reldeb/src/infinity
+#            cmake-build-reldeb/src/test_main
+#          retention-days: 1
+#          if-no-files-found: warn
+#
+#      - name: Remove build container
+#        if: always()
+#        run: docker rm -f infinity_builder || true
+#
+#  release_amd64_unit_test:
+#    name: release_amd64_unit_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./test_main
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Wait for minio and run unit test
+#        env:
+#          NLTK_DATA: ${{ github.workspace }}/nltk_data
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./test_main --gtest_filter=-*SLOW_* > release_amd64_unit_test_stdout.log 2> release_amd64_unit_test_stderr.log
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "release amd64 unit test log" && tail -n 1000 release_amd64_unit_test*.log || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
+#
+#  release_amd64_sqllogical_test:
+#    name: release_amd64_sqllogical_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run sqllogictest
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  release_amd64_restart_test:
+#    name: release_amd64_restart_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Run restart test
+#        run: |
+#          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "release_amd64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+#
+#  #  release_amd64_pysdk_test:
+#  #    name: release_amd64_pysdk_test
+#  #    runs-on: ubuntu-latest
+#  #    needs: release_amd64_build
+#  #    steps:
+#  #      - name: Check out code
+#  #        uses: actions/checkout@v6
+#  #        with:
+#  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#  #          fetch-depth: 0
+#  #          submodules: recursive
+#  #
+#  #      - name: Download release build artifacts
+#  #        uses: actions/download-artifact@v8
+#  #        with:
+#  #          name: release-build-amd64
+#  #
+#  #      - name: Prepare environment
+#  #        run: |
+#  #          chmod +x ./infinity
+#  #          sudo mkdir -p /usr/share/infinity/resource
+#  #          sudo cp -r resource/* /usr/share/infinity/resource/
+#  #          sudo chown -R ${USER} /usr/share/infinity
+#  #          sudo mkdir -p /var/infinity
+#  #          sudo chown -R ${USER} /var/infinity
+#  #
+#  #      - name: Install Python SDK
+#  #        uses: astral-sh/setup-uv@v7
+#  #        with:
+#  #          enable-cache: true
+#  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#  #
+#  #      - name: Start infinity server
+#  #        run: |
+#  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#  #          ./scripts/wait_for_infinity.sh
+#  #
+#  #      - name: Run pysdk test
+#  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+#  #
+#  #      - name: Collect infinity log
+#  #        if: always()
+#  #        run: |
+#  #          cat infinity.log || true
+#  #
+#  #      - name: Stop infinity server
+#  #        if: always()
+#  #        run: pkill -f infinity || true
+#
+#  release_amd64_go_test:
+#    name: release_amd64_go_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version: '1.23'
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-x86_64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run Go tests
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py -jc=1
+#          cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_amd64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_amd64_go_test.log || true; exit $exit_code; fi
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#          cat release_amd64_go_test.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  release_amd64_http_test:
+#    name: release_amd64_http_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run http test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_http_api.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  #  release_amd64_pysdk_parallel_test:
+#  #    name: release_amd64_pysdk_parallel_test
+#  #    runs-on: ubuntu-latest
+#  #    needs: release_amd64_build
+#  #    steps:
+#  #      - name: Check out code
+#  #        uses: actions/checkout@v6
+#  #        with:
+#  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#  #          fetch-depth: 0
+#  #          submodules: recursive
+#  #
+#  #      - name: Download release build artifacts
+#  #        uses: actions/download-artifact@v8
+#  #        with:
+#  #          name: release-build-amd64
+#  #
+#  #      - name: Prepare environment
+#  #        run: |
+#  #          chmod +x ./infinity
+#  #          sudo mkdir -p /usr/share/infinity/resource
+#  #          sudo cp -r resource/* /usr/share/infinity/resource/
+#  #          sudo chown -R ${USER} /usr/share/infinity
+#  #          sudo mkdir -p /var/infinity
+#  #          sudo chown -R ${USER} /var/infinity
+#  #
+#  #      - name: Install Python SDK
+#  #        uses: astral-sh/setup-uv@v7
+#  #        with:
+#  #          enable-cache: true
+#  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#  #
+#  #      - name: Start infinity server
+#  #        run: |
+#  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#  #          ./scripts/wait_for_infinity.sh
+#  #
+#  #      - name: Run pysdk test
+#  #        run: uv run python3 tools/run_parallel_test.py
+#  #
+#  #      - name: Collect infinity log
+#  #        if: always()
+#  #        run: |
+#  #          cat infinity.log || true
+#  #
+#  #      - name: Stop infinity server
+#  #        if: always()
+#  #        run: pkill -f infinity || true
+#
+#  release_amd64_minio_pysdk_test:
+#    name: release_amd64_minio_pysdk_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for services and run minio pysdk test
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_pysdk_remote_infinity_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
+#
+#  release_amd64_minio_parallel_test:
+#    name: release_amd64_minio_parallel_test
+#    runs-on: ubuntu-latest
+#    needs: release_amd64_build
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-amd64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for services and run minio parallel test
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_parallel_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
 
   debug_arm64_build:
     name: debug_arm64_build
@@ -1438,85 +1438,85 @@ jobs:
         if: always()
         run: docker rm -f infinity_builder || true
 
-  debug_arm64_unit_test:
-    name: debug_arm64_unit_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#  debug_arm64_unit_test:
+#    name: debug_arm64_unit_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Download nltk data
-        run: |
-          uv run python -c "
-          import os
-          import nltk
-          local_dir = os.path.abspath('nltk_data')
-          for data in ['wordnet', 'punkt', 'punkt_tab']:
-              print(f'Downloading nltk {data}...')
-              nltk.download(data, download_dir=local_dir)
-          "
-
-      - name: Prepare environment
-        run: |
-          chmod +x test_main
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Wait for minio and run unit test
-        env:
-          NLTK_DATA: ${{ github.workspace }}/nltk_data
-        run: |
-          ./scripts/wait_for_minio.sh
-          ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "debug arm64 unit test log" && tail -n 1000 debug_arm64_unit_test*.log || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-arm64
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x test_main
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Wait for minio and run unit test
+#        env:
+#          NLTK_DATA: ${{ github.workspace }}/nltk_data
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "debug arm64 unit test log" && tail -n 1000 debug_arm64_unit_test*.log || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
 
   debug_arm64_sqllogical_test:
     name: debug_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: debug_arm64_build
-    if: false
+#    if: false
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -1566,302 +1566,302 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-  debug_arm64_restart_test:
-    name: debug_arm64_restart_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Prepare environment
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#  debug_arm64_restart_test:
+#    name: debug_arm64_restart_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Run restart test
-        run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "debug_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
-
-  debug_arm64_pysdk_test:
-    name: debug_arm64_pysdk_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run pysdk test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  debug_arm64_go_test:
-    name: debug_arm64_go_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.23'
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run Go tests
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_arm64_go_test.log || true; exit $exit_code; fi
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-          cat debug_arm64_go_test.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  debug_arm64_http_test:
-    name: debug_arm64_http_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: debug-build-arm64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Run restart test
+#        run: |
+#          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "debug_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+#
+#  debug_arm64_pysdk_test:
+#    name: debug_arm64_pysdk_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run http test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  debug_arm64_pysdk_parallel_test:
-    name: debug_arm64_pysdk_parallel_test
-    runs-on: ubuntu-24.04-arm
-    needs: debug_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download debug build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: debug-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run pysdk test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run pysdk test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_pysdk_remote_infinity_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  debug_arm64_go_test:
+#    name: debug_arm64_go_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version: '1.23'
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run Go tests
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py -jc=1
+#          cd go && go version && go test ./tests/... -v 2>&1 | tee ../debug_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../debug_arm64_go_test.log || true; exit $exit_code; fi
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#          cat debug_arm64_go_test.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  debug_arm64_http_test:
+#    name: debug_arm64_http_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run http test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_http_api.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  debug_arm64_pysdk_parallel_test:
+#    name: debug_arm64_pysdk_parallel_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: debug_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download debug build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: debug-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run pysdk test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_parallel_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
 
   release_arm64_build:
     name: release_arm64_build
@@ -1902,85 +1902,85 @@ jobs:
         if: always()
         run: docker rm -f infinity_builder || true
 
-  release_arm64_unit_test:
-    name: release_arm64_unit_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#  release_arm64_unit_test:
+#    name: release_arm64_unit_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Download nltk data
-        run: |
-          uv run python -c "
-          import os
-          import nltk
-          local_dir = os.path.abspath('nltk_data')
-          for data in ['wordnet', 'punkt', 'punkt_tab']:
-              print(f'Downloading nltk {data}...')
-              nltk.download(data, download_dir=local_dir)
-          "
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./test_main
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Wait for minio and run unit test
-        env:
-          NLTK_DATA: ${{ github.workspace }}/nltk_data
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./test_main --gtest_filter=-*SLOW_* > release_arm64_unit_test_stdout.log 2> release_arm64_unit_test_stderr.log
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "release arm64 unit test log" && tail -n 1000 release_arm64_unit_test*.log || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Download nltk data
+#        run: |
+#          uv run python -c "
+#          import os
+#          import nltk
+#          local_dir = os.path.abspath('nltk_data')
+#          for data in ['wordnet', 'punkt', 'punkt_tab']:
+#              print(f'Downloading nltk {data}...')
+#              nltk.download(data, download_dir=local_dir)
+#          "
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./test_main
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Wait for minio and run unit test
+#        env:
+#          NLTK_DATA: ${{ github.workspace }}/nltk_data
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./test_main --gtest_filter=-*SLOW_* > release_arm64_unit_test_stdout.log 2> release_arm64_unit_test_stderr.log
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "release arm64 unit test log" && tail -n 1000 release_arm64_unit_test*.log || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
 
   release_arm64_sqllogical_test:
     name: release_arm64_sqllogical_test
     runs-on: ubuntu-24.04-arm
     needs: release_arm64_build
-    if: false
+#    if: false
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -2030,556 +2030,556 @@ jobs:
         if: always()
         run: pkill -f infinity || true
 
-  release_arm64_restart_test:
-    name: release_arm64_restart_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#  release_arm64_restart_test:
+#    name: release_arm64_restart_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Run restart test
-        run: |
-          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          echo "release_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
-
-  #  release_arm64_pysdk_test:
-  #    name: release_arm64_pysdk_test
-  #    runs-on: ubuntu-24.04-arm
-  #    needs: release_arm64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download release build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: release-build-arm64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x ./infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
-
-  release_arm64_go_test:
-    name: release_arm64_go_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.23'
-
-      - name: Install sqllogictest
-        run: |
-          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
-          sudo mv sqllogictest /usr/local/bin/
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run Go tests
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/sqllogictest.py -jc=1
-          cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_arm64_go_test.log || true; exit $exit_code; fi
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-          cat release_arm64_go_test.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  release_arm64_http_test:
-    name: release_arm64_http_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x ./infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for infinity and run http test
-        run: |
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_http_api.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-  #  release_arm64_pysdk_parallel_test:
-  #    name: release_arm64_pysdk_parallel_test
-  #    runs-on: ubuntu-24.04-arm
-  #    needs: release_arm64_build
-  #    steps:
-  #      - name: Check out code
-  #        uses: actions/checkout@v6
-  #        with:
-  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-  #          fetch-depth: 0
-  #          submodules: recursive
-  #
-  #      - name: Download release build artifacts
-  #        uses: actions/download-artifact@v8
-  #        with:
-  #          name: release-build-arm64
-  #
-  #      - name: Prepare environment
-  #        run: |
-  #          chmod +x ./infinity
-  #          sudo mkdir -p /usr/share/infinity/resource
-  #          sudo cp -r resource/* /usr/share/infinity/resource/
-  #          sudo chown -R ${USER} /usr/share/infinity
-  #          sudo mkdir -p /var/infinity
-  #          sudo chown -R ${USER} /var/infinity
-  #
-  #      - name: Install Python SDK
-  #        uses: astral-sh/setup-uv@v7
-  #        with:
-  #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-  #
-  #      - name: Start infinity server
-  #        run: |
-  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
-  #          ./scripts/wait_for_infinity.sh
-  #
-  #      - name: Run pysdk test
-  #        run: uv run python3 tools/run_parallel_test.py
-  #
-  #      - name: Collect infinity log
-  #        if: always()
-  #        run: |
-  #          cat infinity.log || true
-  #
-  #      - name: Stop infinity server
-  #        if: always()
-  #        run: pkill -f infinity || true
-
-  release_arm64_minio_pysdk_test:
-    name: release_arm64_minio_pysdk_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          name: release-build-arm64
+#
+#      - name: Prepare environment
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Run restart test
+#        run: |
+#          uv run python3 tools/run_restart_test.py --infinity_path=./infinity
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          echo "release_arm64_restart_test log(last 1000 lines):" && tail -n 1000 restart_test*.log* || true
+#
+#  #  release_arm64_pysdk_test:
+#  #    name: release_arm64_pysdk_test
+#  #    runs-on: ubuntu-24.04-arm
+#  #    needs: release_arm64_build
+#  #    steps:
+#  #      - name: Check out code
+#  #        uses: actions/checkout@v6
+#  #        with:
+#  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#  #          fetch-depth: 0
+#  #          submodules: recursive
+#  #
+#  #      - name: Download release build artifacts
+#  #        uses: actions/download-artifact@v8
+#  #        with:
+#  #          name: release-build-arm64
+#  #
+#  #      - name: Prepare environment
+#  #        run: |
+#  #          chmod +x ./infinity
+#  #          sudo mkdir -p /usr/share/infinity/resource
+#  #          sudo cp -r resource/* /usr/share/infinity/resource/
+#  #          sudo chown -R ${USER} /usr/share/infinity
+#  #          sudo mkdir -p /var/infinity
+#  #          sudo chown -R ${USER} /var/infinity
+#  #
+#  #      - name: Install Python SDK
+#  #        uses: astral-sh/setup-uv@v7
+#  #        with:
+#  #          enable-cache: true
+#  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#  #
+#  #      - name: Start infinity server
+#  #        run: |
+#  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#  #          ./scripts/wait_for_infinity.sh
+#  #
+#  #      - name: Run pysdk test
+#  #        run: uv run python3 tools/run_pysdk_remote_infinity_test.py
+#  #
+#  #      - name: Collect infinity log
+#  #        if: always()
+#  #        run: |
+#  #          cat infinity.log || true
+#  #
+#  #      - name: Stop infinity server
+#  #        if: always()
+#  #        run: pkill -f infinity || true
+#
+#  release_arm64_go_test:
+#    name: release_arm64_go_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for services and run minio pysdk test
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_pysdk_remote_infinity_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  release_arm64_minio_parallel_test:
-    name: release_arm64_minio_parallel_test
-    runs-on: ubuntu-24.04-arm
-    needs: release_arm64_build
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Start minio container
-        run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
-
-      - name: Download release build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build-arm64
-
-      - name: Prepare environment and start infinity
-        run: |
-          chmod +x infinity
-          sudo mkdir -p /usr/share/infinity/resource
-          sudo cp -r resource/* /usr/share/infinity/resource/
-          sudo chown -R ${USER} /usr/share/infinity
-          sudo mkdir -p /var/infinity
-          sudo chown -R ${USER} /var/infinity
-          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
-
-      - name: Install Python SDK
-        uses: astral-sh/setup-uv@v7
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
 #        with:
-#          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
-
-      - name: Wait for services and run minio parallel test
-        run: |
-          ./scripts/wait_for_minio.sh
-          ./scripts/wait_for_infinity.sh
-          uv run python3 tools/run_parallel_test.py
-
-      - name: Collect infinity log
-        if: always()
-        run: |
-          cat infinity.log || true
-
-      - name: Stop infinity server
-        if: always()
-        run: pkill -f infinity || true
-
-      - name: Remove minio container
-        if: always()
-        run: docker rm -f minio || true
-
-  # ============================================
-  # AMD64 Benchmark (self-hosted runner)
-  # ============================================
-  reldeb_amd64_benchmark_prepare:
-    name: reldeb_amd64_benchmark_prepare
-    runs-on: [ "self-hosted", "infinity-build" ]
-    needs: code_static_check
-    steps:
-      - name: Ensure workspace ownership
-        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Prepare and upload source tarball
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
-
-  reldeb_amd64_benchmark_build:
-    name: reldeb_benchmark_build
-    runs-on: [ "self-hosted", "infinity-build" ]
-    needs: reldeb_amd64_benchmark_prepare
-    continue-on-error: true
-    outputs:
-      build_status: ${{ steps.build.outcome }}
-    steps:
-      - name: Prepare code
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-
-      - name: Start builder container
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
-          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
-          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
-
-      - name: Build reldeb version
-        id: build
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity knn_import_benchmark knn_query_benchmark"
-
-      - name: Upload artifacts
-        if: ${{ !cancelled() && !failure() && steps.build.outcome == 'success' }}
-        run: |
-          tar -cf - cmake-build-reldeb/src/infinity cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
-
-      - name: Remove build container
-        if: always()
-        run: |
-          if [[ -n "${BUILDER_CONTAINER}" ]]; then
-            sudo docker rm -f -v "${BUILDER_CONTAINER}"
-          fi
-
-  reldeb_amd64_benchmark:
-    name: reldeb_benchmark
-    runs-on: [ "self-hosted", "benchmark" ]
-    needs: reldeb_amd64_benchmark_build
-    if: needs.reldeb_amd64_benchmark_build.outputs.build_status == 'success'
-    steps:
-      - name: Prepare code and artifacts
-        run: |
-          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
-          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
-          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
-          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -xf -
-
-      - name: Prepare sift dataset
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-${HOME}}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> ${GITHUB_ENV}
-          chmod +x ./tools/ci_tools/check_benchmark_result.py
-          rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
-
-      - name: Golden benchmark sift
-        run: |
-          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
-              echo "golden benchmark result already exists!"
-              exit 0
-          fi
-          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp
-          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log
-          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
-
-      - name: Latest benchmark sift
-        run: |
-          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
-          ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
-          echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
-          echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
-          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
-
-  # ============================================
-  # Final cleanup job
-  # ============================================
-  workflow_cleanup:
-    name: workflow_cleanup
-    runs-on: ubuntu-slim
-    needs:
-      - code_static_check
-      - debug_amd64_build
-      - debug_amd64_unit_test
-      - debug_amd64_sqllogical_test
-      - debug_amd64_restart_test
-      - debug_amd64_pysdk_test
-      - debug_amd64_go_test
-      - debug_amd64_http_test
-      - debug_amd64_pysdk_parallel_test
-      - release_amd64_build
-      - release_amd64_unit_test
-      - release_amd64_sqllogical_test
-      - release_amd64_restart_test
-      - release_amd64_go_test
-      - release_amd64_http_test
-      - release_amd64_minio_pysdk_test
-      - release_amd64_minio_parallel_test
-      - debug_arm64_build
-      - debug_arm64_unit_test
-      - debug_arm64_sqllogical_test
-      - debug_arm64_restart_test
-      - debug_arm64_pysdk_test
-      - debug_arm64_go_test
-      - debug_arm64_http_test
-      - debug_arm64_pysdk_parallel_test
-      - release_arm64_build
-      - release_arm64_unit_test
-      - release_arm64_sqllogical_test
-      - release_arm64_restart_test
-      - release_arm64_go_test
-      - release_arm64_http_test
-      - release_arm64_minio_pysdk_test
-      - release_arm64_minio_parallel_test
-    if: always()
-    steps:
-      - name: Cleanup
-        run: echo "Workflow cleanup. Just a placeholder now."
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version: '1.23'
+#
+#      - name: Install sqllogictest
+#        run: |
+#          curl -sLO https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.28.4/sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+#          tar -xzf sqllogictest-bin-v0.28.4-aarch64-unknown-linux-musl.tar.gz
+#          sudo mv sqllogictest /usr/local/bin/
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run Go tests
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/sqllogictest.py -jc=1
+#          cd go && go version && go test ./tests/... -v 2>&1 | tee ../release_arm64_go_test.log; exit_code=${PIPESTATUS[0]}; if [ $exit_code -ne 0 ]; then echo "=== FAILED TESTS ==="; grep -E "^(FAIL|panic:|^--- FAIL)" ../release_arm64_go_test.log || true; exit $exit_code; fi
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#          cat release_arm64_go_test.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  release_arm64_http_test:
+#    name: release_arm64_http_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        uses: jlumbroso/free-disk-space@main
+#        with:
+#          tool-cache: false
+#          android: true
+#          dotnet: true
+#          haskell: true
+#          large-packages: true
+#          docker-images: true
+#          swap-storage: true
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x ./infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for infinity and run http test
+#        run: |
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_http_api.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#  #  release_arm64_pysdk_parallel_test:
+#  #    name: release_arm64_pysdk_parallel_test
+#  #    runs-on: ubuntu-24.04-arm
+#  #    needs: release_arm64_build
+#  #    steps:
+#  #      - name: Check out code
+#  #        uses: actions/checkout@v6
+#  #        with:
+#  #          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#  #          fetch-depth: 0
+#  #          submodules: recursive
+#  #
+#  #      - name: Download release build artifacts
+#  #        uses: actions/download-artifact@v8
+#  #        with:
+#  #          name: release-build-arm64
+#  #
+#  #      - name: Prepare environment
+#  #        run: |
+#  #          chmod +x ./infinity
+#  #          sudo mkdir -p /usr/share/infinity/resource
+#  #          sudo cp -r resource/* /usr/share/infinity/resource/
+#  #          sudo chown -R ${USER} /usr/share/infinity
+#  #          sudo mkdir -p /var/infinity
+#  #          sudo chown -R ${USER} /var/infinity
+#  #
+#  #      - name: Install Python SDK
+#  #        uses: astral-sh/setup-uv@v7
+#  #        with:
+#  #          enable-cache: true
+#  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#  #
+#  #      - name: Start infinity server
+#  #        run: |
+#  #          nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
+#  #          ./scripts/wait_for_infinity.sh
+#  #
+#  #      - name: Run pysdk test
+#  #        run: uv run python3 tools/run_parallel_test.py
+#  #
+#  #      - name: Collect infinity log
+#  #        if: always()
+#  #        run: |
+#  #          cat infinity.log || true
+#  #
+#  #      - name: Stop infinity server
+#  #        if: always()
+#  #        run: pkill -f infinity || true
+#
+#  release_arm64_minio_pysdk_test:
+#    name: release_arm64_minio_pysdk_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for services and run minio pysdk test
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_pysdk_remote_infinity_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
+#
+#  release_arm64_minio_parallel_test:
+#    name: release_arm64_minio_parallel_test
+#    runs-on: ubuntu-24.04-arm
+#    needs: release_arm64_build
+#    steps:
+#      - name: Free disk space
+#        run: |
+#          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+#          df -h /
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Start minio container
+#        run: |
+#          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+#
+#      - name: Download release build artifacts
+#        uses: actions/download-artifact@v8
+#        with:
+#          name: release-build-arm64
+#
+#      - name: Prepare environment and start infinity
+#        run: |
+#          chmod +x infinity
+#          sudo mkdir -p /usr/share/infinity/resource
+#          sudo cp -r resource/* /usr/share/infinity/resource/
+#          sudo chown -R ${USER} /usr/share/infinity
+#          sudo mkdir -p /var/infinity
+#          sudo chown -R ${USER} /var/infinity
+#          nohup ./infinity --config=conf/pytest_parallel_infinity_minio.toml > infinity.log 2>&1 &
+#
+#      - name: Install Python SDK
+#        uses: astral-sh/setup-uv@v7
+##        with:
+##          enable-cache: true
+#      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+#
+#      - name: Wait for services and run minio parallel test
+#        run: |
+#          ./scripts/wait_for_minio.sh
+#          ./scripts/wait_for_infinity.sh
+#          uv run python3 tools/run_parallel_test.py
+#
+#      - name: Collect infinity log
+#        if: always()
+#        run: |
+#          cat infinity.log || true
+#
+#      - name: Stop infinity server
+#        if: always()
+#        run: pkill -f infinity || true
+#
+#      - name: Remove minio container
+#        if: always()
+#        run: docker rm -f minio || true
+#
+#  # ============================================
+#  # AMD64 Benchmark (self-hosted runner)
+#  # ============================================
+#  reldeb_amd64_benchmark_prepare:
+#    name: reldeb_amd64_benchmark_prepare
+#    runs-on: [ "self-hosted", "infinity-build" ]
+#    needs: code_static_check
+#    steps:
+#      - name: Ensure workspace ownership
+#        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+#
+#      - name: Check out code
+#        uses: actions/checkout@v6
+#        with:
+#          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+#          fetch-depth: 0
+#          submodules: recursive
+#
+#      - name: Prepare and upload source tarball
+#        run: |
+#          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+#          tar --create --gzip --file=infinity.tgz .git $(git ls-files)
+#          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+#          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+#          mkdir -p ${ARTIFACTS_DIR} && cp infinity.tgz ${ARTIFACTS_DIR}/
+#
+#  reldeb_amd64_benchmark_build:
+#    name: reldeb_benchmark_build
+#    runs-on: [ "self-hosted", "infinity-build" ]
+#    needs: reldeb_amd64_benchmark_prepare
+#    continue-on-error: true
+#    outputs:
+#      build_status: ${{ steps.build.outcome }}
+#    steps:
+#      - name: Prepare code
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+#          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+#          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+#          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+#
+#      - name: Start builder container
+#        if: ${{ !cancelled() && !failure() }}
+#        run: |
+#          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
+#          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
+#          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+#          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+#
+#      - name: Build reldeb version
+#        id: build
+#        if: ${{ !cancelled() && !failure() }}
+#        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity knn_import_benchmark knn_query_benchmark"
+#
+#      - name: Upload artifacts
+#        if: ${{ !cancelled() && !failure() && steps.build.outcome == 'success' }}
+#        run: |
+#          tar -cf - cmake-build-reldeb/src/infinity cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -C ${ARTIFACTS_DIR} -xf -
+#
+#      - name: Remove build container
+#        if: always()
+#        run: |
+#          if [[ -n "${BUILDER_CONTAINER}" ]]; then
+#            sudo docker rm -f -v "${BUILDER_CONTAINER}"
+#          fi
+#
+#  reldeb_amd64_benchmark:
+#    name: reldeb_benchmark
+#    runs-on: [ "self-hosted", "benchmark" ]
+#    needs: reldeb_amd64_benchmark_build
+#    if: needs.reldeb_amd64_benchmark_build.outputs.build_status == 'success'
+#    steps:
+#      - name: Prepare code and artifacts
+#        run: |
+#          echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
+#          ARTIFACTS_DIR=${RUNNER_WORKSPACE_PREFIX}/artifacts/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}
+#          echo "ARTIFACTS_DIR=${ARTIFACTS_DIR}" >> ${GITHUB_ENV}
+#          tar xzf ${ARTIFACTS_DIR}/infinity.tgz && git reset --hard && git clean -ffdx
+#          tar -C ${ARTIFACTS_DIR} -cf - cmake-build-reldeb/benchmark/local_infinity/{knn_import_benchmark,knn_query_benchmark} | tar -xf -
+#
+#      - name: Prepare sift dataset
+#        run: |
+#          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-${HOME}}
+#          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> ${GITHUB_ENV}
+#          chmod +x ./tools/ci_tools/check_benchmark_result.py
+#          rm -rf test/data/benchmark && ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark test/data/benchmark
+#
+#      - name: Golden benchmark sift
+#        run: |
+#          if [[ -f "${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log" ]]; then
+#              echo "golden benchmark result already exists!"
+#              exit 0
+#          fi
+#          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat ${RUNNER_WORKSPACE_PREFIX}/benchmark/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
+#          ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp
+#          echo "1 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log
+#          echo "8 50" | ${RUNNER_WORKSPACE_PREFIX}/benchmark/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp | sudo tee ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log
+#
+#      - name: Latest benchmark sift
+#        run: |
+#          rm -rf ${PWD}/db_tmp && mkdir -p ${PWD}/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|${PWD}/db_tmp|g" > ${PWD}/db_tmp/infinity_conf.toml
+#          ./cmake-build-reldeb/benchmark/local_infinity/knn_import_benchmark --dataset=sift --dataset_dir=${PWD}/test/data --infinity_dir=${PWD}/db_tmp --config_path=db_tmp/infinity_conf.toml
+#          echo "1 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_1_thread.log
+#          echo "8 50" | ./cmake-build-reldeb/benchmark/local_infinity/knn_query_benchmark sift 200 false ${PWD}/test/data ${PWD}/db_tmp db_tmp/infinity_conf.toml | tee benchmark_sift_8_threads.log
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_1_thread.log benchmark_sift_1_thread.log
+#          ./tools/ci_tools/check_benchmark_result.py ${RUNNER_WORKSPACE_PREFIX}/benchmark/golden_benchmark_sift_8_threads.log benchmark_sift_8_threads.log
+#
+#  # ============================================
+#  # Final cleanup job
+#  # ============================================
+#  workflow_cleanup:
+#    name: workflow_cleanup
+#    runs-on: ubuntu-slim
+#    needs:
+#      - code_static_check
+#      - debug_amd64_build
+#      - debug_amd64_unit_test
+#      - debug_amd64_sqllogical_test
+#      - debug_amd64_restart_test
+#      - debug_amd64_pysdk_test
+#      - debug_amd64_go_test
+#      - debug_amd64_http_test
+#      - debug_amd64_pysdk_parallel_test
+#      - release_amd64_build
+#      - release_amd64_unit_test
+#      - release_amd64_sqllogical_test
+#      - release_amd64_restart_test
+#      - release_amd64_go_test
+#      - release_amd64_http_test
+#      - release_amd64_minio_pysdk_test
+#      - release_amd64_minio_parallel_test
+#      - debug_arm64_build
+#      - debug_arm64_unit_test
+#      - debug_arm64_sqllogical_test
+#      - debug_arm64_restart_test
+#      - debug_arm64_pysdk_test
+#      - debug_arm64_go_test
+#      - debug_arm64_http_test
+#      - debug_arm64_pysdk_parallel_test
+#      - release_arm64_build
+#      - release_arm64_unit_test
+#      - release_arm64_sqllogical_test
+#      - release_arm64_restart_test
+#      - release_arm64_go_test
+#      - release_arm64_http_test
+#      - release_arm64_minio_pysdk_test
+#      - release_arm64_minio_parallel_test
+#    if: always()
+#    steps:
+#      - name: Cleanup
+#        run: echo "Workflow cleanup. Just a placeholder now."
