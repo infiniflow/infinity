@@ -264,6 +264,7 @@ message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
 option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" OFF)
 option(ENABLE_SANITIZER_UNDEFINED "Enable undefined behavior sanitizer" OFF)
+option(ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" OFF)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
@@ -277,7 +278,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
 
     if ("${CODE_COVERAGE}" STREQUAL "ON")
@@ -290,11 +291,15 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
     if (NOT ENABLE_JEMALLOC)
-        if (NOT ENABLE_SANITIZER_THREAD)
+        if (ENABLE_SANITIZER_THREAD AND ENABLE_SANITIZER_ADDRESS)
+            message(FATAL_ERROR "Could not enable THREAD-SANITIZER and ADDRESS-SANITIZER simultaneously.")
+        endif ()
+        if (ENABLE_SANITIZER_ADDRESS)
             add_compile_options(-fsanitize=address -fsanitize=leak)
             add_link_options(-fsanitize=address -fsanitize=leak)
             message(STATUS "Enable Address Sanitizer in target: infinity")
-        else ()
+        endif ()
+        if (ENABLE_SANITIZER_THREAD)
             add_compile_options(-fsanitize=thread)
             add_link_options(-fsanitize=thread)
             message(STATUS "Enable Thread Sanitizer in target: infinity")
@@ -324,11 +329,7 @@ else ()
     message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
-if (CLANG_VERSION_STRING VERSION_EQUAL 17)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-else ()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
-endif ()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
@@ -370,6 +371,16 @@ else ()
 endif ()
 
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
+
+option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
+
+#if (IS_CI_TEST_PIPELINE)
+#    if (X86_64)
+#        add_definitions(-march=x86-64-v2)
+#    else ()
+#        add_definitions(-march=native)
+#    endif ()
+#else ()
 if (X86_64)
     if (SUPPORT_AVX512 EQUAL 0)
         message(STATUS "Compiled by AVX512")
@@ -387,6 +398,8 @@ if (X86_64)
 else ()
     add_definitions(-march=native)
 endif ()
+#endif ()
+
 
 execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"

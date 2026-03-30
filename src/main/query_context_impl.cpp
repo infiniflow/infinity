@@ -41,6 +41,7 @@ import parser_result;
 import sql_parser;
 import admin_statement;
 import show_statement;
+import command_statement;
 import parser_assert;
 import global_resource_usage;
 
@@ -204,6 +205,24 @@ QueryResult QueryContext::QueryStatementInternal(const BaseStatement *base_state
         }
 
         this->BeginTxn(base_statement);
+        // Check if cleanup was skipped (BeginTxn returns false for skipped cleanup)
+        NewTxn *new_txn = this->GetNewTxn();
+        if (new_txn == nullptr) {
+            // Only cleanup statement is allowed to be skipped
+            bool is_cleanup = false;
+            if (base_statement->type_ == StatementType::kCommand) {
+                const CommandStatement *cmd = static_cast<const CommandStatement *>(base_statement);
+                is_cleanup = (cmd->command_info_->type() == CommandType::kCleanup);
+            }
+            if (is_cleanup) {
+                // Cleanup was skipped because another cleanup is in progress
+                query_result.result_table_ = nullptr;
+                query_result.status_ = Status::OK();
+                return query_result;
+            }
+            // Other statements should not have null transaction
+            UnrecoverableError("Unexpected null transaction after BeginTxn");
+        }
         // LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
         //                 session_ptr_->GetNewTxn()->TxnID(),
         //                 session_ptr_->GetNewTxn()->BeginTS(),
@@ -360,7 +379,7 @@ void QueryContext::StopProfile() {
 
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
-void QueryContext::BeginTxn(const BaseStatement *base_statement) {
+bool QueryContext::BeginTxn(const BaseStatement *base_statement) {
     auto *txn_manager = storage_->new_txn_manager();
     auto txn_text = std::make_unique<std::string>(base_statement ? base_statement->ToString() : "");
 
@@ -582,6 +601,11 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (transaction_type == TransactionType::kNewCheckpoint || transaction_type == TransactionType::kCleanup) {
         new_txn = txn_manager->BeginTxnShared(std::make_unique<std::string>(base_statement->ToString()), transaction_type);
         if (new_txn == nullptr) {
+            // For cleanup transactions, if another cleanup is in progress, just skip this one
+            if (transaction_type == TransactionType::kCleanup) {
+                LOG_INFO("System is cleaning up, skip this cleanup.");
+                return false;
+            }
             RecoverableError(Status::FailToStartTxn(
                 fmt::format("System is {}", transaction_type == TransactionType::kNewCheckpoint ? "checkpointing" : "cleaning up")));
         }
@@ -594,10 +618,16 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     }
 
     session_ptr_->SetNewTxn(new_txn);
+    return true;
 }
 
 void QueryContext::CommitTxn() {
     auto *new_txn = session_ptr_->GetNewTxn();
+    if (new_txn == nullptr) {
+        // This should not happen under normal circumstances.
+        // Cleanup skipped case is handled in QueryStatementInternal before reaching here.
+        UnrecoverableError("CommitTxn called with null transaction.");
+    }
     if (auto status = storage_->new_txn_manager()->CommitTxn(new_txn); !status.ok()) {
         session_ptr_->ResetNewTxn();
         RecoverableError(status);

@@ -349,16 +349,15 @@ struct CompiledRegex {
 class NLTKWordTokenizer {
     MacIntyreContractions contractions_;
 
-    // Static singleton instance
-    static std::unique_ptr<NLTKWordTokenizer> instance_;
-    static std::once_flag init_flag_;
-
 public:
-    // Static method to get the singleton instance
+    // Magic Static singleton
     static NLTKWordTokenizer &GetInstance() {
-        std::call_once(init_flag_, []() { instance_ = std::make_unique<NLTKWordTokenizer>(); });
-        return *instance_;
+        static NLTKWordTokenizer instance;
+        return instance;
     }
+
+    NLTKWordTokenizer(const NLTKWordTokenizer &) = delete;
+    NLTKWordTokenizer &operator=(const NLTKWordTokenizer &) = delete;
 
     // Starting quotes.
     std::vector<std::pair<std::string, std::string>> STARTING_QUOTES = {
@@ -602,10 +601,6 @@ private:
         return std::string(reinterpret_cast<char *>(buffer.get()), outlength);
     }
 };
-
-// Static member definitions for NLTKWordTokenizer singleton
-std::unique_ptr<NLTKWordTokenizer> NLTKWordTokenizer::instance_ = nullptr;
-std::once_flag NLTKWordTokenizer::init_flag_;
 
 void SentenceSplitter(const std::string &text, std::vector<std::string> &result) {
     int error_code;

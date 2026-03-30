@@ -14,9 +14,7 @@
 
 module;
 
-#include <cstdlib>
-#include <string>
-#include <filesystem>
+import std.compat;
 
 export module compilation_config;
 

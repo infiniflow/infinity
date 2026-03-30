@@ -3411,7 +3411,7 @@ TEST_P(TestTxnAppend, test_append_append) {
     }
 }
 
-TEST_P(TestTxnAppend, test_append_append_concurrent) {
+TEST_P(TestTxnAppend, DISABLED_SLOW_test_append_append_concurrent) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);

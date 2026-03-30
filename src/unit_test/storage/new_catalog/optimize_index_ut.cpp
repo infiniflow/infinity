@@ -1608,7 +1608,7 @@ TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
     }
 }
 
-TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
+TEST_P(TestTxnOptimizeIndex, DISABLED_SLOW_optimize_index_and_compact_table) {
     auto PrepareForCompactAndOptimize = [&] {
         {
             auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);

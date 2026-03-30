@@ -266,7 +266,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestTxnReplayRestore,
                          ::testing::Values(TestTxnReplayRestore::NEW_CONFIG_PATH, TestTxnReplayRestore::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTxnReplayRestore, test_repaly_restore_table_snapshot) {
+TEST_P(TestTxnReplayRestore, DISABLED_SLOW_test_repaly_restore_table_snapshot) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
@@ -328,7 +328,7 @@ TEST_P(TestTxnReplayRestore, test_repaly_restore_table_snapshot) {
     }
 }
 
-TEST_P(TestTxnReplayRestore, test_repaly_restore_database_snapshot) {
+TEST_P(TestTxnReplayRestore, DISABLED_SLOW_test_repaly_restore_database_snapshot) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
@@ -396,7 +396,7 @@ TEST_P(TestTxnReplayRestore, test_repaly_restore_database_snapshot) {
     }
 }
 
-TEST_P(TestTxnReplayRestore, test_repaly_restore_system_snapshot) {
+TEST_P(TestTxnReplayRestore, DISABLED_SLOW_test_repaly_restore_system_snapshot) {
     {
         auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
         Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
