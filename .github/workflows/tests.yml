@@ -1422,7 +1422,7 @@ jobs:
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
       - name: Build debug version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -1886,7 +1886,7 @@ jobs:
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
 
       - name: Build release version
-        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
+        run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
