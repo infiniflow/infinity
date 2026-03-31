@@ -1861,7 +1861,6 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     DeleteState &delete_state = txn_table_store->delete_state();
-    DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
             segment_meta.emplace(segment_id, table_meta);
