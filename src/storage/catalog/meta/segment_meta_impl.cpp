@@ -44,6 +44,7 @@ SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeta &table_meta)
       segment_id_(segment_id) {}
 
 Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
+    std::lock_guard<std::mutex> lock(mtx_);
     std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
     std::string first_delete_ts_str = fmt::format("{}", first_delete_ts);
     Status status = kv_instance_.Put(first_delete_ts_key, first_delete_ts_str);
