@@ -1657,18 +1657,77 @@ func parseSliceConstantValue(rv reflect.Value, expr *thriftapi.ConstantExpr) (*t
 			return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported slice dimension: %d", dim))
 		}
 	case reflect.Interface:
-		// []interface{} - try to treat as CurlyBracketsArray
-		children := make([]*thriftapi.ConstantExpr, 0, rv.Len())
+		allFloat := true
+		allInt := true
 		for i := 0; i < rv.Len(); i++ {
 			elem := rv.Index(i).Interface()
-			childExpr, err := ParseConstantValue(elem)
-			if err != nil {
-				return nil, err
+			switch elem.(type) {
+			case float64:
+				// ok
+			case float32:
+				// ok
+			case int, int8, int16, int32, int64:
+				// ok, but will be handled as IntegerArray
+			case nil:
+				// ok, null
+			default:
+				allFloat = false
+				allInt = false
+				break
 			}
-			children = append(children, childExpr)
+			if !allFloat && !allInt {
+				break
+			}
 		}
-		expr.LiteralType = thriftapi.LiteralType_CurlyBracketsArray
-		expr.CurlyBracketsArray = children
+
+		if allFloat && rv.Len() > 0 {
+			// All elements are floats - treat as DoubleArray (matching Python)
+			arr := make([]float64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elem := rv.Index(i).Interface()
+				switch v := elem.(type) {
+				case float64:
+					arr[i] = v
+				case float32:
+					arr[i] = float64(v)
+				}
+			}
+			expr.LiteralType = thriftapi.LiteralType_DoubleArray
+			expr.F64ArrayValue = arr
+		} else if allInt && rv.Len() > 0 {
+			// All elements are integers - treat as IntegerArray (matching Python)
+			arr := make([]int64, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elem := rv.Index(i).Interface()
+				switch v := elem.(type) {
+				case int:
+					arr[i] = int64(v)
+				case int8:
+					arr[i] = int64(v)
+				case int16:
+					arr[i] = int64(v)
+				case int32:
+					arr[i] = int64(v)
+				case int64:
+					arr[i] = v
+				}
+			}
+			expr.LiteralType = thriftapi.LiteralType_IntegerArray
+			expr.I64ArrayValue = arr
+		} else {
+			// Mixed types or empty - treat as CurlyBracketsArray
+			children := make([]*thriftapi.ConstantExpr, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elem := rv.Index(i).Interface()
+				childExpr, err := ParseConstantValue(elem)
+				if err != nil {
+					return nil, err
+				}
+				children = append(children, childExpr)
+			}
+			expr.LiteralType = thriftapi.LiteralType_CurlyBracketsArray
+			expr.CurlyBracketsArray = children
+		}
 	default:
 		return nil, NewInfinityException(int(ErrorCodeInvalidConstantType), fmt.Sprintf("Unsupported slice element type: %v", elemType.Kind()))
 	}
