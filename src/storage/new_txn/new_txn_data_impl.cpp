@@ -1813,7 +1813,6 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
 }
 
 Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     const std::string &db_id_str = delete_cmd->db_id_;
     const std::string &table_id_str = delete_cmd->table_id_;
     const std::string &table_name = delete_cmd->table_name_;
