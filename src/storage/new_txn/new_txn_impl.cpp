@@ -4586,7 +4586,7 @@ void NewTxn::CommitBottom() {
             }
             case WalCommandType::DELETE_V2: {
                 auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
-                auto status = CommitBottomAppend(delete_cmd);
+                auto status = CommitBottomDelete(delete_cmd);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("CommitBottomDelete failed: {}", status.message()));
                 }
