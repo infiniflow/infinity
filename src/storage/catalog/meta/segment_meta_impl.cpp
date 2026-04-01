@@ -294,7 +294,7 @@ Status SegmentMeta::CommitFirstDeleteTS(const TxnTimeStamp &commit_ts) {
             return status;
         }
     }
-    if (*first_delete_ts_ == UNCOMMIT_TS) {
+    if (*first_delete_ts_ == UNCOMMIT_TS && commit_ts != UNCOMMIT_TS) {
         std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
         std::string first_delete_ts_str = fmt::format("{}", commit_ts);
         Status status = kv_instance_.Put(first_delete_ts_key, first_delete_ts_str);
