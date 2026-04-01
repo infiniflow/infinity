@@ -1846,18 +1846,10 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
                 return status;
             }
         }
-        {
-            TxnTimeStamp first_delete_ts = 0;
-            Status status = segment_meta->GetFirstDeleteTS(first_delete_ts);
-            if (!status.ok()) {
-                return status;
-            }
-            if (first_delete_ts == UNCOMMIT_TS) {
-                status = segment_meta->SetFirstDeleteTS(commit_ts);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
+
+        Status status = segment_meta->GetAndSetFirstDeleteTS(commit_ts);
+        if (!status.ok()) {
+            return status;
         }
     }
     delete_state.rows_.clear();
