@@ -301,7 +301,7 @@ Status SegmentMeta::CommitFirstDeleteTS(const TxnTimeStamp &commit_ts) {
         if (!status.ok()) {
             return status;
         }
-        first_delete_ts_ = first_delete_ts;
+        first_delete_ts_ = commit_ts;
     }
     return Status::OK();
 }
