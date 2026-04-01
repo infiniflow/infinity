@@ -2301,6 +2301,14 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DELETE_V2: {
+                if (IsReplay()) {
+                    break;
+                }
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
+                Status status = PrepareCommitDelete(delete_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
                 break;
             }
             case WalCommandType::IMPORT_V2: {

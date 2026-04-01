@@ -644,6 +644,7 @@ private:
     Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
     Status PrepareCommitReplayImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
+    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
     Status CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd);
     Status RollbackDelete(const DeleteTxnStore *delete_txn_store);
     Status PrepareCommitCompact(WalCmdCompactV2 *compact_cmd);

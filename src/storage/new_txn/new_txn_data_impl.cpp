@@ -559,7 +559,7 @@ Status NewTxn::ReplayDelete(WalCmdDeleteV2 *delete_cmd, TxnTimeStamp commit_ts, 
                                                 table_meta->table_id_str()));
     }
 
-    return Status::OK();
+    return PrepareCommitDelete(delete_cmd);
 }
 
 Status NewTxn::DeleteInner(const std::string &db_name, const std::string &table_name, TableMeta &table_meta, const std::vector<RowID> &row_ids) {
@@ -1812,8 +1812,7 @@ Status NewTxn::CommitBottomAppend(WalCmdAppendV2 *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+Status NewTxn::PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd) {
     const std::string &db_id_str = delete_cmd->db_id_;
     const std::string &table_id_str = delete_cmd->table_id_;
     const std::string &table_name = delete_cmd->table_name_;
@@ -1846,7 +1845,25 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
                 return status;
             }
         }
+    }
+    return Status::OK();
+}
 
+Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const std::string &db_id_str = delete_cmd->db_id_;
+    const std::string &table_id_str = delete_cmd->table_id_;
+    const std::string &table_name = delete_cmd->table_name_;
+    TableMeta table_meta(db_id_str, table_id_str, table_name, this);
+
+    std::optional<SegmentMeta> segment_meta;
+
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    DeleteState &delete_state = txn_table_store->delete_state();
+    for (const auto &[segment_id, block_map] : delete_state.rows_) {
+        if (!segment_meta || segment_id != segment_meta->segment_id()) {
+            segment_meta.emplace(segment_id, table_meta);
+        }
         Status status = segment_meta->CommitFirstDeleteTS(commit_ts);
         if (!status.ok()) {
             return status;
