@@ -644,7 +644,6 @@ private:
     Status PrepareCommitImport(WalCmdImportV2 *import_cmd);
     Status PrepareCommitReplayImport(WalCmdImportV2 *import_cmd);
     Status CommitBottomAppend(WalCmdAppendV2 *append_cmd);
-    Status PrepareCommitDelete(const WalCmdDeleteV2 *delete_cmd);
     Status CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd);
     Status RollbackDelete(const DeleteTxnStore *delete_txn_store);
     Status PrepareCommitCompact(WalCmdCompactV2 *compact_cmd);
@@ -659,7 +658,6 @@ private:
     Status PrepareCommitRestoreTableSnapshot(const WalCmdRestoreTableSnapshot *restore_table_snapshot_cmd, bool is_link_files = false);
     Status PrepareCommitRestoreDatabaseSnapshot(const WalCmdRestoreDatabaseSnapshot *restore_database_snapshot_cmd);
     Status PrepareCommitRestoreSystemSnapshot(const WalCmdRestoreSystemSnapshot *restore_system_snapshot_cmd);
-    Status CommitBottomCreateTableSnapshot(WalCmdCreateTableSnapshot *create_table_snapshot_cmd);
     Status CheckpointforSnapshot(TxnTimeStamp last_ckp_ts, CheckpointTxnStore *txn_store, SnapshotType snapshot_type);
 
     Status AddSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
