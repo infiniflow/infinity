@@ -1866,7 +1866,7 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
         }
         Status status = segment_meta->CommitFirstDeleteTS(commit_ts);
         if (!status.ok()) {
-            return status;
+            LOG_WARN(fmt::format("NewTxn::CommitBottomDelete: {}", status.message()));
         }
     }
     delete_state.rows_.clear();
