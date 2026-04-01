@@ -286,7 +286,7 @@ Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
     return Status::OK();
 }
 
-Status SegmentMeta::GetAndSetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
+Status SegmentMeta::CommitFirstDeleteTS(const TxnTimeStamp &commit_ts) {
     std::lock_guard<std::mutex> lock(mtx_);
     if (!first_delete_ts_) {
         Status status = LoadFirstDeleteTS();
@@ -296,7 +296,7 @@ Status SegmentMeta::GetAndSetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
     }
     if (*first_delete_ts_ == UNCOMMIT_TS) {
         std::string first_delete_ts_key = GetSegmentTag("first_delete_ts");
-        std::string first_delete_ts_str = fmt::format("{}", first_delete_ts);
+        std::string first_delete_ts_str = fmt::format("{}", commit_ts);
         Status status = kv_instance_.Put(first_delete_ts_key, first_delete_ts_str);
         if (!status.ok()) {
             return status;
