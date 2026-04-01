@@ -4133,6 +4133,10 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
 bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *previous_txn, std::string &cause, bool &retry_query) {
     const std::string &db_name = txn_store.db_name_;
     const std::string &table_name = txn_store.table_name_;
+    std::set<SegmentID> segment_ids;
+    for (const auto &row_id : txn_store.row_ids_) {
+        segment_ids.insert(row_id.segment_id_);
+    }
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kCompact: {
@@ -4144,24 +4148,23 @@ bool NewTxn::CheckConflictTxnStore(const DeleteTxnStore &txn_store, NewTxn *prev
         }
         case TransactionType::kDelete: {
             DeleteTxnStore *delete_txn_store = static_cast<DeleteTxnStore *>(previous_txn->base_txn_store_.get());
-            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name &&
-                std::find_first_of(txn_store.row_ids_.begin(),
-                                   txn_store.row_ids_.end(),
-                                   delete_txn_store->row_ids_.begin(),
-                                   delete_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
-                conflict = true;
+            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name) {
+                conflict = std::any_of(segment_ids.begin(), segment_ids.end(), [&](SegmentID segment_id) {
+                    return std::any_of(delete_txn_store->row_ids_.begin(), delete_txn_store->row_ids_.end(), [segment_id](const RowID &row_id) {
+                        return row_id.segment_id_ == segment_id;
+                    });
+                });
             }
             break;
         }
         case TransactionType::kUpdate: {
             UpdateTxnStore *update_txn_store = static_cast<UpdateTxnStore *>(previous_txn->base_txn_store_.get());
-            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name &&
-                std::find_first_of(txn_store.row_ids_.begin(),
-                                   txn_store.row_ids_.end(),
-                                   update_txn_store->row_ids_.begin(),
-                                   update_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
-
-                conflict = true;
+            if (update_txn_store->db_name_ == db_name && update_txn_store->table_name_ == table_name) {
+                conflict = std::any_of(segment_ids.begin(), segment_ids.end(), [&](SegmentID segment_id) {
+                    return std::any_of(update_txn_store->row_ids_.begin(), update_txn_store->row_ids_.end(), [segment_id](const RowID &row_id) {
+                        return row_id.segment_id_ == segment_id;
+                    });
+                });
             }
             break;
         }
@@ -4322,12 +4325,12 @@ bool NewTxn::CheckConflictTxnStore(const UpdateTxnStore &txn_store, NewTxn *prev
         }
         case TransactionType::kDelete: {
             auto *delete_txn_store = static_cast<DeleteTxnStore *>(previous_txn->base_txn_store_.get());
-            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name &&
-                std::find_first_of(txn_store.row_ids_.begin(),
-                                   txn_store.row_ids_.end(),
-                                   delete_txn_store->row_ids_.begin(),
-                                   delete_txn_store->row_ids_.end()) != txn_store.row_ids_.end()) {
-                conflict = true;
+            if (delete_txn_store->db_name_ == db_name && delete_txn_store->table_name_ == table_name) {
+                conflict = std::any_of(segment_ids.begin(), segment_ids.end(), [&](SegmentID segment_id) {
+                    return std::any_of(delete_txn_store->row_ids_.begin(), delete_txn_store->row_ids_.end(), [segment_id](const RowID &row_id) {
+                        return row_id.segment_id_ == segment_id;
+                    });
+                });
             }
             break;
         }
