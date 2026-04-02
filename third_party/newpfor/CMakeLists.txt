@@ -1,6 +1,10 @@
 project(NewPFOR CXX C)
 
-add_definitions(-march=native)
+if(NOT DEFINED INFINITY_MARCH_FLAG)
+    set(INFINITY_MARCH_FLAG "-march=native")
+endif()
+
+add_definitions(${INFINITY_MARCH_FLAG})
 
 # library target
 add_library(newpfor STATIC
