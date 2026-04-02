@@ -1866,6 +1866,8 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
         }
         Status status = segment_meta->CommitFirstDeleteTS(commit_ts);
         if (!status.ok()) {
+            // first_delete_ts is set-once; if another txn already wrote it after our snapshot,
+            // RocksDB returns "Resource busy" — this is expected and benign.
             LOG_WARN(fmt::format("NewTxn::CommitBottomDelete: {}", status.message()));
         }
     }
