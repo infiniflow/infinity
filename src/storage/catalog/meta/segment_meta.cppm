@@ -89,6 +89,7 @@ public:
     std::tuple<size_t, Status> GetRowCnt1();
 
     Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
+    Status CommitFirstDeleteTS(const TxnTimeStamp &first_delete_ts);
 
     std::tuple<std::shared_ptr<SegmentInfo>, Status> GetSegmentInfo();
 

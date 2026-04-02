@@ -2302,11 +2302,9 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::DELETE_V2: {
                 if (IsReplay()) {
-                    // Skip replay of DROP_INDEX_V2 command.
                     break;
                 }
                 auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
-
                 Status status = PrepareCommitDelete(delete_cmd);
                 if (!status.ok()) {
                     return status;
@@ -4581,6 +4579,14 @@ void NewTxn::CommitBottom() {
                 auto status = CommitBottomAppend(append_cmd);
                 if (!status.ok()) {
                     UnrecoverableError(fmt::format("CommitBottomAppend failed: {}", status.message()));
+                }
+                break;
+            }
+            case WalCommandType::DELETE_V2: {
+                auto *delete_cmd = static_cast<WalCmdDeleteV2 *>(command.get());
+                auto status = CommitBottomDelete(delete_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("CommitBottomDelete failed: {}", status.message()));
                 }
                 break;
             }

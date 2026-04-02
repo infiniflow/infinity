@@ -513,3 +513,62 @@ TEST_F(TestTxnKVStoreTest, wal) {
     status = kv_store->Destroy(rocksdb_tmp_path);
     EXPECT_TRUE(status.ok());
 }
+
+TEST_F(TestTxnKVStoreTest, txn_conflict_same_key_snapshot_isolation) {
+    using namespace infinity;
+    const auto rocksdb_tmp_path = fmt::format("{}/rocksdb_snapshot_isolation", GetFullTmpDir());
+
+    std::unique_ptr<KVStore> kv_store = std::make_unique<KVStore>();
+    Status status = kv_store->Init(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
+
+    const std::string key = "seg|2|0|0|first_delete_ts";
+
+    // Step 1: Create TX_A (simulates update txn), snapshot = T0
+    std::unique_ptr<KVInstance> tx_a = kv_store->GetInstance();
+
+    // Step 2: Create TX_B (simulates delete txn), snapshot = T0
+    std::unique_ptr<KVInstance> tx_b = kv_store->GetInstance();
+
+    // Step 3: TX_A reads the key from snapshot T0 → not found (expected, key doesn't exist yet)
+    std::string value;
+    status = tx_a->Get(key, value);
+    EXPECT_FALSE(status.ok()); // key doesn't exist in T0 snapshot
+
+    // Step 4: TX_B writes the key and commits first
+    status = tx_b->Put(key, "14");
+    EXPECT_TRUE(status.ok());
+    status = tx_b->Commit();
+    EXPECT_TRUE(status.ok());
+
+    // Now RocksDB has: seg|2|0|0|first_delete_ts = 14
+    // But TX_A's snapshot is still T0!
+
+    // Step 5: TX_A reads from its stale snapshot → still not found
+    value.clear();
+    status = tx_a->Get(key, value);
+    EXPECT_FALSE(status.ok());
+
+    // Step 6: TX_A tries to write the same key → "Resource busy"!
+    status = tx_a->Put(key, "16");
+    EXPECT_FALSE(status.ok()); // Resource busy!
+    std::cout << "Snapshot isolation conflict: " << status.message() << std::endl;
+
+    // Step 7: TX_A can still commit (the failed Put is just skipped)
+    status = tx_a->Commit();
+    EXPECT_TRUE(status.ok());
+
+    // Step 8: Verify — only TX_B's write persists (TX_A's Put was rejected)
+    {
+        std::unique_ptr<KVInstance> tx_verify = kv_store->GetInstance();
+        status = tx_verify->Get(key, value);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(value, "14"); // TX_B's value, not TX_A's "16"
+        tx_verify->Commit();
+    }
+
+    status = kv_store->Uninit();
+    EXPECT_TRUE(status.ok());
+    status = kv_store->Destroy(rocksdb_tmp_path);
+    EXPECT_TRUE(status.ok());
+}
