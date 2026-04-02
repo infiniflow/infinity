@@ -1856,18 +1856,21 @@ Status NewTxn::CommitBottomDelete(const WalCmdDeleteV2 *delete_cmd) {
     const std::string &table_name = delete_cmd->table_name_;
     TableMeta table_meta(db_id_str, table_id_str, table_name, this);
 
-    std::optional<SegmentMeta> segment_meta;
-
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     DeleteState &delete_state = txn_table_store->delete_state();
-    for (const auto &[segment_id, block_map] : delete_state.rows_) {
-        if (!segment_meta || segment_id != segment_meta->segment_id()) {
-            segment_meta.emplace(segment_id, table_meta);
-        }
-        Status status = segment_meta->CommitFirstDeleteTS(commit_ts);
+
+    std::set<SegmentID> segment_ids;
+    for (const auto &[segment_id, _] : delete_state.rows_) {
+        segment_ids.insert(segment_id);
+    }
+    for (const SegmentID &segment_id : segment_ids) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        Status status = segment_meta.CommitFirstDeleteTS(commit_ts);
         if (!status.ok()) {
-            // first_delete_ts is set-once; if another txn already wrote it after our snapshot,
-            // RocksDB returns "Resource busy" — this is expected and benign.
+            // Our RocksDB snapshot is frozen at BeginTxn time. If another txn has already
+            // committed first_delete_ts for this segment after our snapshot, RocksDB detects
+            // a write-write conflict and returns "Resource busy". Since first_delete_ts only
+            // needs to be set once (by whichever txn commits first), this error is benign.
             LOG_WARN(fmt::format("NewTxn::CommitBottomDelete: {}", status.message()));
         }
     }
