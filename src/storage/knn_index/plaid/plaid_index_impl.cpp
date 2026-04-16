@@ -129,9 +129,8 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
     }
 
     if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
-        const auto error_msg =
-            fmt::format("PlaidIndex::TrainWithSampling: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
-        UnrecoverableError(error_msg);
+        LOG_WARN(fmt::format("PlaidIndex::TrainWithSampling: embedding_num ({}) < minimum ({}). Proceeding with reduced quality.",
+                             embedding_num, least_num));
     }
 
     // Use fastkmeans-rs sampling strategy: max k * 256 samples
@@ -621,54 +620,80 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
     // Apply bitmask filtering to candidates
     std::shared_lock lock(rw_mutex_);
 
-    // Compute query-centroid scores
+    // Decide whether to use batched mode for memory efficiency
+    // Batched path: avoids allocating [n_query_tokens * n_centroids] score matrix
+    const bool use_batched = n_centroids_ > centroid_batch_size_;
+
+    if (use_batched) {
+        return GetQueryResultBatched(query_ptr, query_embedding_num, n_ivf_probe, centroid_score_threshold,
+                                     n_doc_to_score, n_full_scores, top_k, bitmask, start_segment_offset);
+    }
+
+    // === Standard path: compute full query-centroid scores upfront ===
     auto query_centroid_scores = ComputeQueryCentroidScores(query_ptr, query_embedding_num);
 
-    // Step 1: IVF Probing
+    // Step 1: IVF Probing - top-k per token, then apply threshold
     std::vector<std::vector<u32>> token_top_centroids(query_embedding_num);
     for (u32 i = 0; i < query_embedding_num; ++i) {
         const f32 *scores = query_centroid_scores.get() + i * n_centroids_;
 
+        // Use partial_sort to find top n_ivf_probe centroids
+        std::vector<std::pair<f32, u32>> centroid_scores;
+        centroid_scores.reserve(n_centroids_);
         for (u32 j = 0; j < n_centroids_; ++j) {
-            if (scores[j] >= centroid_score_threshold) {
-                token_top_centroids[i].push_back(j);
-            }
+            centroid_scores.emplace_back(scores[j], j);
         }
+        const u32 n_select = std::min(n_ivf_probe, n_centroids_);
+        std::partial_sort(centroid_scores.begin(),
+                          centroid_scores.begin() + n_select,
+                          centroid_scores.end(),
+                          std::greater<>());
+        for (u32 j = 0; j < n_select; ++j) {
+            token_top_centroids[i].push_back(centroid_scores[j].second);
+        }
+    }
 
-        if (token_top_centroids[i].size() < n_ivf_probe) {
-            std::vector<std::pair<f32, u32>> centroid_scores;
-            for (u32 j = 0; j < n_centroids_; ++j) {
-                centroid_scores.emplace_back(scores[j], j);
-            }
-            std::partial_sort(centroid_scores.begin(),
-                              centroid_scores.begin() + std::min(n_ivf_probe, n_centroids_),
-                              centroid_scores.end(),
-                              std::greater<>());
-            token_top_centroids[i].clear();
-            for (u32 j = 0; j < n_ivf_probe && j < n_centroids_; ++j) {
-                token_top_centroids[i].push_back(centroid_scores[j].second);
+    // Union top centroids across all query tokens, then apply threshold
+    std::vector<bool> selected(n_centroids_, false);
+    std::vector<u32> probed_centroids;
+    for (const auto &centroids : token_top_centroids) {
+        for (u32 cid : centroids) {
+            if (!selected[cid]) {
+                selected[cid] = true;
+                probed_centroids.push_back(cid);
             }
         }
     }
 
+    // Apply centroid score threshold: filter centroids where max score < threshold
+    if (centroid_score_threshold > 0.0f) {
+        probed_centroids.erase(
+            std::remove_if(probed_centroids.begin(), probed_centroids.end(),
+                           [&](u32 cid) {
+                               f32 max_score = std::numeric_limits<f32>::lowest();
+                               for (u32 q = 0; q < query_embedding_num; ++q) {
+                                   max_score = std::max(max_score, query_centroid_scores[q * n_centroids_ + cid]);
+                               }
+                               return max_score < centroid_score_threshold;
+                           }),
+            probed_centroids.end());
+    }
+
     // Step 2: Collect candidates with bitmask filtering
-    // Note: bitmask is segment-level with indices 0 to segment_row_count-1
-    // doc_id is already a segment-relative index (0 to n_docs_-1)
-    // Use a marker vector instead of unordered_set for O(1) insert/lookup and cache locality
     const u32 n_docs = n_docs_.load();
     std::vector<bool> candidate_marker(n_docs, false);
     u32 candidate_count = 0;
 
-    for (const auto &centroids : token_top_centroids) {
-        for (u32 cid : centroids) {
-            for (u32 doc_id : ivf_lists_[cid]) {
-                // Apply bitmask filter - doc_id is already segment-relative
-                if (!bitmask.IsTrue(doc_id))
-                    continue;
-                if (!candidate_marker[doc_id]) {
-                    candidate_marker[doc_id] = true;
-                    ++candidate_count;
-                }
+    for (u32 cid : probed_centroids) {
+        const u32 list_len = GetIVFListLength(cid);
+        const u32 *list_data = GetIVFListData(cid);
+        for (u32 i = 0; i < list_len; ++i) {
+            u32 doc_id = list_data[i];
+            if (!bitmask.IsTrue(doc_id))
+                continue;
+            if (!candidate_marker[doc_id]) {
+                candidate_marker[doc_id] = true;
+                ++candidate_count;
             }
         }
     }
@@ -690,10 +715,107 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
         return std::make_tuple(0, nullptr, nullptr);
     }
 
-    // Step 3-5: Scoring and reranking (same as GetQueryResult)
+    // Step 3-5: Scoring and reranking
     std::vector<std::pair<f32, u32>> doc_scores;
     for (u32 doc_id : candidates) {
         f32 score = ApproximateScore(&centroid_ids_[doc_offsets_[doc_id]], doc_lens_[doc_id], query_centroid_scores.get(), query_embedding_num);
+        doc_scores.emplace_back(score, doc_id);
+    }
+
+    std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(n_doc_to_score, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
+
+    const u32 n_to_rerank = std::min(n_full_scores, std::min(n_doc_to_score, (u32)doc_scores.size()));
+
+    std::vector<std::pair<f32, u32>> final_scores;
+    for (u32 i = 0; i < n_to_rerank; ++i) {
+        u32 doc_id = doc_scores[i].second;
+        f32 score = ExactScore(query_ptr, query_embedding_num, doc_id, nullptr);
+        final_scores.emplace_back(score, doc_id);
+    }
+
+    std::partial_sort(final_scores.begin(), final_scores.begin() + std::min(top_k, (u32)final_scores.size()), final_scores.end(), std::greater<>());
+
+    const u32 result_count = std::min(top_k, (u32)final_scores.size());
+    auto scores = std::make_unique<f32[]>(result_count);
+    auto ids = std::make_unique<u32[]>(result_count);
+
+    for (u32 i = 0; i < result_count; ++i) {
+        scores[i] = final_scores[i].first;
+        ids[i] = final_scores[i].second + start_segment_offset_;
+    }
+
+    return std::make_tuple(result_count, std::move(scores), std::move(ids));
+}
+
+PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
+                                                        const u32 query_embedding_num,
+                                                        const u32 n_ivf_probe,
+                                                        const f32 centroid_score_threshold,
+                                                        const u32 n_doc_to_score,
+                                                        const u32 n_full_scores,
+                                                        const u32 top_k,
+                                                        Bitmask &bitmask,
+                                                        const u32 start_segment_offset) const {
+    // Batched IVF Probing: memory-efficient path for large n_centroids
+    std::vector<u32> probed_centroids;
+    std::unique_ptr<f32[]> sparse_centroid_scores;
+    u32 n_sparse_centroids = 0;
+
+    BatchedIVFProbe(query_ptr, query_embedding_num, n_ivf_probe, centroid_score_threshold,
+                    centroid_batch_size_, probed_centroids, sparse_centroid_scores, n_sparse_centroids);
+
+    if (probed_centroids.empty()) {
+        return std::make_tuple(0, nullptr, nullptr);
+    }
+
+    // Build centroid_id -> sparse_index mapping for fast lookup
+    std::vector<u32> sparse_centroid_id_map(n_centroids_, std::numeric_limits<u32>::max());
+    for (u32 i = 0; i < n_sparse_centroids; ++i) {
+        sparse_centroid_id_map[probed_centroids[i]] = i;
+    }
+
+    // Collect candidates with bitmask filtering
+    const u32 n_docs = n_docs_.load();
+    std::vector<bool> candidate_marker(n_docs, false);
+    u32 candidate_count = 0;
+
+    for (u32 cid : probed_centroids) {
+        const u32 list_len = GetIVFListLength(cid);
+        const u32 *list_data = GetIVFListData(cid);
+        for (u32 i = 0; i < list_len; ++i) {
+            u32 doc_id = list_data[i];
+            if (!bitmask.IsTrue(doc_id))
+                continue;
+            if (!candidate_marker[doc_id]) {
+                candidate_marker[doc_id] = true;
+                ++candidate_count;
+            }
+        }
+    }
+
+    if (candidate_count == 0) {
+        return std::make_tuple(0, nullptr, nullptr);
+    }
+
+    std::vector<u32> candidates;
+    candidates.reserve(candidate_count);
+    for (u32 doc_id = 0; doc_id < n_docs; ++doc_id) {
+        if (candidate_marker[doc_id]) {
+            candidates.push_back(doc_id);
+        }
+    }
+
+    if (candidates.empty()) {
+        return std::make_tuple(0, nullptr, nullptr);
+    }
+
+    // Approximate scoring using sparse centroid scores
+    std::vector<std::pair<f32, u32>> doc_scores;
+    doc_scores.reserve(candidates.size());
+    for (u32 doc_id : candidates) {
+        f32 score = ApproximateScoreSparse(&centroid_ids_[doc_offsets_[doc_id]], doc_lens_[doc_id],
+                                           sparse_centroid_scores.get(), sparse_centroid_id_map.data(),
+                                           n_sparse_centroids, query_embedding_num);
         doc_scores.emplace_back(score, doc_id);
     }
 
@@ -737,6 +859,198 @@ std::unique_ptr<f32[]> PlaidIndex::ComputeQueryCentroidScores(const f32 *query_p
     }
 
     return scores;
+}
+
+u32 PlaidIndex::ComputeAutoNCentroids(const u64 embedding_count) {
+    // Auto: k = 2^floor(log2(16 * sqrt(N)))
+    // Matches next-plaid/fast-plaid heuristic for finer IVF partitioning
+    if (embedding_count < 256) {
+        return 8;
+    }
+    double sqrt_n = std::sqrt(static_cast<double>(embedding_count));
+    double log2_val = std::log2(16.0 * sqrt_n);
+    u32 n_centroids;
+    if (log2_val < 3.0) {
+        n_centroids = 8;
+    } else {
+        n_centroids = 1u << static_cast<u32>(std::floor(log2_val));
+    }
+    // Cap at total embedding count
+    n_centroids = std::min(n_centroids, static_cast<u32>(embedding_count));
+    // Downgrade if not enough data for K-means (need at least 32 * n_centroids)
+    while (n_centroids > 8 && embedding_count < 32u * n_centroids) {
+        n_centroids >>= 1;
+    }
+    // Ensure n_centroids is a multiple of 8 for SIMD alignment
+    n_centroids = ((n_centroids + 7) / 8) * 8;
+    n_centroids = std::max(8u, n_centroids);
+    return n_centroids;
+}
+
+void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
+                                  const u32 n_query_tokens,
+                                  const u32 n_ivf_probe,
+                                  const f32 centroid_score_threshold,
+                                  const u32 centroid_batch_size,
+                                  std::vector<u32> &probed_centroids,
+                                  std::unique_ptr<f32[]> &sparse_centroid_scores,
+                                  u32 &n_sparse_centroids) const {
+    // Process centroids in batches to bound memory usage
+    // Each batch computes [n_query_tokens, batch_size] score matrix
+    // Per-token top-k heaps are maintained across batches
+    const auto &centroids = centroids_data();
+    const auto &norms = centroid_norms_neg_half();
+    const u32 batch_size = (centroid_batch_size > 0) ? centroid_batch_size : DEFAULT_CENTROID_BATCH_SIZE;
+
+    // Per-token top-k min-heaps: store (score, centroid_id)
+    // Using vectors of pairs sorted as min-heaps (smallest at front)
+    std::vector<std::vector<std::pair<f32, u32>>> token_heaps(n_query_tokens);
+    for (auto &heap : token_heaps) {
+        heap.reserve(n_ivf_probe + 1);
+    }
+
+    // Track max score per centroid across all query tokens (for threshold filtering)
+    std::vector<f32> centroid_max_score(n_centroids_, std::numeric_limits<f32>::lowest());
+
+    // Allocate batch score buffer
+    auto batch_scores = std::make_unique<f32[]>(n_query_tokens * batch_size);
+
+    for (u32 batch_start = 0; batch_start < n_centroids_; batch_start += batch_size) {
+        const u32 batch_end = std::min(batch_start + batch_size, n_centroids_);
+        const u32 current_batch_size = batch_end - batch_start;
+
+        // Compute scores for this batch: [n_query_tokens, current_batch_size]
+        const f32 *batch_centroids = centroids.data() + batch_start * embedding_dimension_;
+        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, batch_centroids, n_query_tokens, current_batch_size, embedding_dimension_, batch_scores.get());
+
+        // Add centroid_norms_neg_half for L2 distance computation
+        for (u32 i = 0; i < n_query_tokens; ++i) {
+            for (u32 j = 0; j < current_batch_size; ++j) {
+                batch_scores[i * current_batch_size + j] += norms[batch_start + j];
+            }
+        }
+
+        // Update per-token top-k heaps
+        for (u32 q = 0; q < n_query_tokens; ++q) {
+            auto &heap = token_heaps[q];
+            for (u32 j = 0; j < current_batch_size; ++j) {
+                const f32 score = batch_scores[q * current_batch_size + j];
+                const u32 global_cid = batch_start + j;
+
+                // Track max score for this centroid
+                centroid_max_score[global_cid] = std::max(centroid_max_score[global_cid], score);
+
+                if (heap.size() < n_ivf_probe) {
+                    // Heap not full yet, just push
+                    heap.emplace_back(score, global_cid);
+                    std::push_heap(heap.begin(), heap.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+                } else if (score > heap.front().first) {
+                    // Score is better than worst in heap, replace
+                    std::pop_heap(heap.begin(), heap.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+                    heap.back() = {score, global_cid};
+                    std::push_heap(heap.begin(), heap.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+                }
+            }
+        }
+    }
+
+    // Collect union of top centroids across all query tokens
+    std::vector<bool> selected(n_centroids_, false);
+    probed_centroids.clear();
+    for (const auto &heap : token_heaps) {
+        for (const auto &[score, cid] : heap) {
+            if (!selected[cid]) {
+                selected[cid] = true;
+                probed_centroids.push_back(cid);
+            }
+        }
+    }
+
+    // Apply centroid score threshold: filter out centroids where max score < threshold
+    if (centroid_score_threshold > 0.0f) {
+        probed_centroids.erase(
+            std::remove_if(probed_centroids.begin(), probed_centroids.end(),
+                           [&](u32 cid) { return centroid_max_score[cid] < centroid_score_threshold; }),
+            probed_centroids.end());
+    }
+
+    // Build sparse centroid scores: only for probed centroids
+    // Layout: [n_sparse_centroids, n_query_tokens]
+    // Also build a mapping from centroid_id -> sparse_index
+    n_sparse_centroids = probed_centroids.size();
+    if (n_sparse_centroids == 0) {
+        sparse_centroid_scores.reset();
+        return;
+    }
+
+    sparse_centroid_scores = std::make_unique<f32[]>(n_sparse_centroids * n_query_tokens);
+
+    // Compute sparse scores by re-computing only for probed centroids
+    // This is more memory-efficient than storing the full [n_query_tokens, n_centroids] matrix
+    // Process in small batches for cache efficiency
+    constexpr u32 SPARSE_BATCH = 256;
+    auto sparse_batch_scores = std::make_unique<f32[]>(n_query_tokens * SPARSE_BATCH);
+
+    for (u32 batch_start = 0; batch_start < n_sparse_centroids; batch_start += SPARSE_BATCH) {
+        const u32 batch_end = std::min(batch_start + SPARSE_BATCH, n_sparse_centroids);
+        const u32 current_batch = batch_end - batch_start;
+
+        // Gather centroid vectors for this batch
+        auto batch_centroid_data = std::make_unique<f32[]>(current_batch * embedding_dimension_);
+        for (u32 i = 0; i < current_batch; ++i) {
+            const u32 cid = probed_centroids[batch_start + i];
+            std::copy_n(centroids.data() + cid * embedding_dimension_, embedding_dimension_, batch_centroid_data.get() + i * embedding_dimension_);
+        }
+
+        // Compute [n_query_tokens, current_batch]
+        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, batch_centroid_data.get(), n_query_tokens, current_batch, embedding_dimension_, sparse_batch_scores.get());
+
+        // Add norms and store
+        for (u32 q = 0; q < n_query_tokens; ++q) {
+            for (u32 i = 0; i < current_batch; ++i) {
+                const u32 cid = probed_centroids[batch_start + i];
+                sparse_centroid_scores[(batch_start + i) * n_query_tokens + q] =
+                    sparse_batch_scores[q * current_batch + i] + norms[cid];
+            }
+        }
+    }
+}
+
+f32 PlaidIndex::ApproximateScoreSparse(const u32 *doc_centroid_ids,
+                                        const u32 doc_len,
+                                        const f32 *sparse_scores,
+                                        const u32 *sparse_centroid_id_map,
+                                        const u32 n_sparse_centroids,
+                                        const u32 n_query_tokens) const {
+    // sparse_scores layout: [n_sparse_centroids, n_query_tokens]
+    // sparse_centroid_id_map maps centroid_id -> sparse index (or UINT32_MAX if not in sparse set)
+    // Track max score per query token
+    auto max_scores = std::make_unique<f32[]>(n_query_tokens);
+    std::fill_n(max_scores.get(), n_query_tokens, std::numeric_limits<f32>::lowest());
+
+    for (u32 d = 0; d < doc_len; ++d) {
+        const u32 cid = doc_centroid_ids[d];
+        if (cid >= n_centroids_) {
+            continue;
+        }
+        const u32 sparse_idx = sparse_centroid_id_map[cid];
+        if (sparse_idx == std::numeric_limits<u32>::max() || sparse_idx >= n_sparse_centroids) {
+            continue;
+        }
+        const f32 *score_row = sparse_scores + sparse_idx * n_query_tokens;
+        for (u32 q = 0; q < n_query_tokens; ++q) {
+            max_scores[q] = std::max(max_scores[q], score_row[q]);
+        }
+    }
+
+    // Sum max scores across query tokens
+    f32 total_score = 0.0f;
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        if (max_scores[q] > std::numeric_limits<f32>::lowest()) {
+            total_score += max_scores[q];
+        }
+    }
+    return total_score;
 }
 
 f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const f32 *query_centroid_scores, u32 n_query_tokens) const {
@@ -852,11 +1166,21 @@ void PlaidIndex::SaveIndexInner(LocalFileHandle &file_handle) const {
     file_handle.Append(&centroid_ids_size, sizeof(centroid_ids_size));
     file_handle.Append(centroid_ids_.data(), centroid_ids_size * sizeof(u32));
 
-    // IVF lists
-    for (u32 i = 0; i < n_centroids_; ++i) {
-        u32 list_size = ivf_lists_[i].size();
-        file_handle.Append(&list_size, sizeof(list_size));
-        file_handle.Append(ivf_lists_[i].data(), list_size * sizeof(u32));
+    // IVF lists - support both nested and flattened formats
+    if (ivf_flattened_) {
+        for (u32 i = 0; i < n_centroids_; ++i) {
+            u32 list_size = ivf_lengths_[i];
+            file_handle.Append(&list_size, sizeof(list_size));
+            if (list_size > 0) {
+                file_handle.Append(ivf_data_.data() + ivf_offsets_[i], list_size * sizeof(u32));
+            }
+        }
+    } else {
+        for (u32 i = 0; i < n_centroids_; ++i) {
+            u32 list_size = ivf_lists_[i].size();
+            file_handle.Append(&list_size, sizeof(list_size));
+            file_handle.Append(ivf_lists_[i].data(), list_size * sizeof(u32));
+        }
     }
 
     // Residual codes
@@ -948,8 +1272,14 @@ size_t PlaidIndex::CalcSize() const {
     size += sizeof(u32) + doc_offsets_.size() * sizeof(u32);
     size += sizeof(u32) + centroid_ids_.size() * sizeof(u32);
 
-    for (const auto &list : ivf_lists_) {
-        size += sizeof(u32) + list.size() * sizeof(u32);
+    if (ivf_flattened_) {
+        for (u32 i = 0; i < n_centroids_; ++i) {
+            size += sizeof(u32) + ivf_lengths_[i] * sizeof(u32);
+        }
+    } else {
+        for (const auto &list : ivf_lists_) {
+            size += sizeof(u32) + list.size() * sizeof(u32);
+        }
     }
 
     size += sizeof(u32) + packed_residuals_size_;
@@ -1001,10 +1331,20 @@ void PlaidIndex::SaveToPtr(void *ptr, size_t &offset) const {
     append(&centroid_ids_size, sizeof(centroid_ids_size));
     append(centroid_ids_.data(), centroid_ids_.size() * sizeof(u32));
 
-    for (const auto &list : ivf_lists_) {
-        u32 list_size = list.size();
-        append(&list_size, sizeof(list_size));
-        append(list.data(), list.size() * sizeof(u32));
+    if (ivf_flattened_) {
+        for (u32 i = 0; i < n_centroids_; ++i) {
+            u32 list_size = ivf_lengths_[i];
+            append(&list_size, sizeof(list_size));
+            if (list_size > 0) {
+                append(ivf_data_.data() + ivf_offsets_[i], list_size * sizeof(u32));
+            }
+        }
+    } else {
+        for (const auto &list : ivf_lists_) {
+            u32 list_size = list.size();
+            append(&list_size, sizeof(list_size));
+            append(list.data(), list.size() * sizeof(u32));
+        }
     }
 
     u32 packed_size = packed_residuals_size_;
@@ -1287,6 +1627,260 @@ void PlaidIndex::FinalizeMerge() {
     // No-op: counters are already updated in MergeOneChunk
 }
 
+void PlaidIndex::FinalizeIVF() {
+    std::unique_lock lock(rw_mutex_);
+
+    if (ivf_flattened_) {
+        return; // Already flattened
+    }
+
+    if (ivf_lists_.empty()) {
+        return; // Nothing to flatten
+    }
+
+    // Calculate total entries
+    u64 total_entries = 0;
+    for (const auto &list : ivf_lists_) {
+        total_entries += list.size();
+    }
+
+    // Allocate flattened storage
+    ivf_data_.resize(total_entries);
+    ivf_offsets_.resize(n_centroids_);
+    ivf_lengths_.resize(n_centroids_);
+
+    // Copy data
+    u64 offset = 0;
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        ivf_offsets_[i] = static_cast<u32>(offset);
+        ivf_lengths_[i] = static_cast<u32>(ivf_lists_[i].size());
+        if (!ivf_lists_[i].empty()) {
+            std::copy_n(ivf_lists_[i].data(), ivf_lengths_[i], ivf_data_.data() + offset);
+        }
+        offset += ivf_lengths_[i];
+    }
+
+    // Release nested vectors
+    ivf_lists_.clear();
+    ivf_lists_.shrink_to_fit();
+
+    ivf_flattened_ = true;
+
+    LOG_INFO(fmt::format("PlaidIndex::FinalizeIVF: Flattened {} IVF lists into {} entries", n_centroids_, total_entries));
+}
+
+const u32 *PlaidIndex::GetIVFListData(const u32 centroid_id) const {
+    if (ivf_flattened_) {
+        if (centroid_id >= n_centroids_ || ivf_lengths_[centroid_id] == 0) {
+            return nullptr;
+        }
+        return ivf_data_.data() + ivf_offsets_[centroid_id];
+    }
+    // Legacy path
+    if (centroid_id >= ivf_lists_.size() || ivf_lists_[centroid_id].empty()) {
+        return nullptr;
+    }
+    return ivf_lists_[centroid_id].data();
+}
+
+u32 PlaidIndex::GetIVFListLength(const u32 centroid_id) const {
+    if (ivf_flattened_) {
+        if (centroid_id >= n_centroids_) {
+            return 0;
+        }
+        return ivf_lengths_[centroid_id];
+    }
+    // Legacy path
+    if (centroid_id >= ivf_lists_.size()) {
+        return 0;
+    }
+    return static_cast<u32>(ivf_lists_[centroid_id].size());
+}
+
+std::vector<u64> PlaidIndex::FindOutliers(const f32 *embeddings, const u64 n_embeddings, const f32 threshold_sq) const {
+    // Find embeddings whose minimum L2² distance to any centroid exceeds threshold_sq
+    // Uses tiled blocked processing to avoid O(n*k) memory allocation
+    const auto &centroids = centroids_data();
+    const auto &norms = centroid_norms_neg_half();
+
+    std::vector<u64> outlier_indices;
+
+    // Process in chunks to limit memory usage
+    constexpr u32 CHUNK_SIZE = 16384;
+    auto dist_table_chunk = std::make_unique<f32[]>(CHUNK_SIZE * n_centroids_);
+
+    for (u64 chunk_start = 0; chunk_start < n_embeddings; chunk_start += CHUNK_SIZE) {
+        const u32 chunk_end = std::min(static_cast<u64>(chunk_start + CHUNK_SIZE), n_embeddings);
+        const u32 chunk_count = chunk_end - chunk_start;
+
+        // Compute distances for this chunk
+        matrixA_multiply_transpose_matrixB_output_to_C(embeddings + chunk_start * embedding_dimension_,
+                                                       centroids.data(),
+                                                       chunk_count,
+                                                       n_centroids_,
+                                                       embedding_dimension_,
+                                                       dist_table_chunk.get());
+
+        for (u32 i = 0; i < chunk_count; ++i) {
+            const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
+
+            // Find minimum L2² distance to any centroid
+            // neg_distance = (query · centroid) - 0.5 * ||centroid||²
+            // L2² = ||query||² - 2 * neg_distance
+            // We only need to find max neg_distance (min L2²)
+            f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+            for (u32 k = 0; k < n_centroids_; ++k) {
+                const f32 neg_distance = dist_ptr[k] + norms[k];
+                max_neg_distance = std::max(max_neg_distance, neg_distance);
+            }
+
+            // Compute min L2²: ||embedding||² - 2 * max_neg_distance
+            // We can avoid computing ||embedding||² by using a relative threshold:
+            // Since neg_distance = (q·c) - 0.5*||c||² and L2² = ||q-c||² = ||q||² - 2*(q·c) + ||c||²
+            // = ||q||² - 2*max_neg_distance - ||c||² + 2*0.5*||c||² ... actually:
+            // neg_distance = q·c - 0.5*||c||², so -2*neg_distance = -2*q·c + ||c||²
+            // L2² = ||q||² - 2*q·c + ||c||² = ||q||² - 2*neg_distance - ||c||²
+            // Hmm, this is getting complex. Let's compute ||embedding||² and L2² directly.
+            const f32 *emb = embeddings + (chunk_start + i) * embedding_dimension_;
+            f32 emb_norm_sq = 0.0f;
+            for (u32 d = 0; d < embedding_dimension_; ++d) {
+                emb_norm_sq += emb[d] * emb[d];
+            }
+            f32 min_l2_sq = emb_norm_sq - 2.0f * max_neg_distance;
+
+            if (min_l2_sq > threshold_sq) {
+                outlier_indices.push_back(chunk_start + i);
+            }
+        }
+    }
+
+    return outlier_indices;
+}
+
+u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embeddings, const f32 cluster_threshold) {
+    std::unique_lock lock(rw_mutex_);
+
+    if (n_new_embeddings == 0 || n_centroids_ == 0) {
+        return 0;
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Checking {} new embeddings for outliers (threshold={})",
+                         n_new_embeddings, cluster_threshold));
+
+    // Step 1: Find outlier embeddings
+    const f32 threshold_sq = cluster_threshold * cluster_threshold;
+    auto outlier_indices = FindOutliers(new_embeddings, n_new_embeddings, threshold_sq);
+
+    const u64 num_outliers = outlier_indices.size();
+    if (num_outliers == 0) {
+        LOG_INFO("PlaidIndex::ExpandCentroids: No outliers found, no expansion needed");
+        return 0;
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Found {} outlier embeddings", num_outliers));
+
+    // Step 2: Compute number of new centroids
+    // k_update = max(1, ceil(num_outliers / max_points_per_centroid)) * 4
+    // Following next-plaid's formula
+    constexpr u32 MAX_POINTS_PER_CENTROID = 256;
+    u32 target_k = std::max(1u, static_cast<u32>(std::ceil(static_cast<double>(num_outliers) / MAX_POINTS_PER_CENTROID))) * 4;
+    u32 k_update = std::min(target_k, static_cast<u32>(num_outliers));
+    // Round up to multiple of 8
+    k_update = ((k_update + 7) / 8) * 8;
+    k_update = std::max(8u, k_update);
+
+    if (k_update > num_outliers) {
+        k_update = ((static_cast<u32>(num_outliers) / 8) * 8);
+        if (k_update == 0) {
+            k_update = 8;
+        }
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Will add {} new centroids from {} outliers", k_update, num_outliers));
+
+    // Step 3: Extract outlier embeddings
+    auto outlier_data = std::make_unique<f32[]>(num_outliers * embedding_dimension_);
+    for (u64 i = 0; i < num_outliers; ++i) {
+        std::copy_n(new_embeddings + outlier_indices[i] * embedding_dimension_,
+                    embedding_dimension_,
+                    outlier_data.get() + i * embedding_dimension_);
+    }
+
+    // Step 4: Cluster outliers to get new centroids
+    std::vector<f32> new_centroids_data(k_update * embedding_dimension_);
+    const auto result_k = GetKMeansCentroids(MetricType::kMetricL2,
+                                              embedding_dimension_,
+                                              num_outliers,
+                                              outlier_data.get(),
+                                              new_centroids_data,
+                                              k_update,
+                                              4); // 4 iterations
+
+    if (result_k != k_update) {
+        LOG_WARN(fmt::format("PlaidIndex::ExpandCentroids: KMeans returned {} centroids, requested {}", result_k, k_update));
+        if (result_k == 0) {
+            return 0;
+        }
+        // Adjust to actual result
+        k_update = result_k;
+        // Round to multiple of 8
+        k_update = ((k_update + 7) / 8) * 8;
+        if (k_update == 0) {
+            return 0;
+        }
+    }
+
+    // Step 5: Append new centroids
+    // If using shared global centroids, we need to copy them locally first
+    if (global_centroids_ref_) {
+        centroids_data_ = global_centroids_ref_->centroids_data();
+        centroid_norms_neg_half_ = global_centroids_ref_->centroid_norms_neg_half();
+        quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+        global_centroids_ref_.reset();
+    }
+
+    const u32 old_n_centroids = n_centroids_;
+    const u32 new_n_centroids = old_n_centroids + k_update;
+
+    // Append centroid data
+    centroids_data_.resize(new_n_centroids * embedding_dimension_);
+    std::copy_n(new_centroids_data.data(), k_update * embedding_dimension_,
+                centroids_data_.data() + old_n_centroids * embedding_dimension_);
+
+    // Compute norms for new centroids and append
+    centroid_norms_neg_half_.resize(new_n_centroids);
+    for (u32 i = 0; i < k_update; ++i) {
+        const f32 *centroid_vec = centroids_data_.data() + (old_n_centroids + i) * embedding_dimension_;
+        centroid_norms_neg_half_[old_n_centroids + i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_vec, embedding_dimension_);
+    }
+
+    // Append empty IVF lists for new centroids
+    if (ivf_flattened_) {
+        // Need to un-flatten to add new centroids
+        // Reconstruct ivf_lists_ from flattened data
+        ivf_lists_.resize(old_n_centroids);
+        for (u32 i = 0; i < old_n_centroids; ++i) {
+            const u32 len = ivf_lengths_[i];
+            ivf_lists_[i].resize(len);
+            if (len > 0) {
+                std::copy_n(ivf_data_.data() + ivf_offsets_[i], len, ivf_lists_[i].data());
+            }
+        }
+        ivf_data_.clear();
+        ivf_offsets_.clear();
+        ivf_lengths_.clear();
+        ivf_flattened_ = false;
+    }
+
+    ivf_lists_.resize(new_n_centroids); // New lists are empty
+
+    n_centroids_ = new_n_centroids;
+
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Expanded from {} to {} centroids", old_n_centroids, new_n_centroids));
+
+    return k_update;
+}
+
 void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
                                   std::vector<u32> &&doc_offsets,
                                   std::vector<u32> &&centroid_ids,
@@ -1368,8 +1962,13 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, quantizer n_buckets: {}",
                          n_docs_.load(),
                          n_total_embeddings_,
-                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
+                         ivf_flattened_ ? ivf_data_.size() : std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
                          quantizer_->n_buckets()));
+
+    // Auto-flatten IVF after merge for cache-friendly search
+    if (!ivf_flattened_ && n_centroids_ > DEFAULT_CENTROID_BATCH_SIZE) {
+        FinalizeIVF();
+    }
 }
 
 } // namespace infinity

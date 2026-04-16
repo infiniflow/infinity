@@ -26,6 +26,7 @@ import :buffer_obj;
 import :buffer_handle;
 import :mlas_matrix_multiply;
 
+import std.compat;
 import column_def;
 import internal_types;
 
@@ -193,11 +194,26 @@ bool PlaidIndexInMem::BuildIndexFromScratch() {
     // Determine number of centroids
     u32 n_centroids = local_requested_n_centroids;
     if (n_centroids == 0) {
-        // Auto: sqrt(N) rounded to multiple of 8
-        n_centroids = static_cast<u32>(std::sqrt(local_embedding_count));
-        n_centroids = ((n_centroids + 7) / 8) * 8;
-        n_centroids = std::max(8u, n_centroids);
+        // Auto: k = 2^floor(log2(16 * sqrt(N)))
+        // Matches next-plaid/fast-plaid heuristic for finer IVF partitioning
+        double sqrt_n = std::sqrt(static_cast<double>(local_embedding_count));
+        double log2_val = std::log2(16.0 * sqrt_n);
+        if (log2_val < 3.0) {
+            n_centroids = 8;
+        } else {
+            n_centroids = 1u << static_cast<u32>(std::floor(log2_val));
+        }
+        // Cap at total embedding count
+        n_centroids = std::min(n_centroids, static_cast<u32>(local_embedding_count));
     }
+
+    // Downgrade if not enough data for K-means (need at least 32 * n_centroids)
+    while (n_centroids > 8 && local_embedding_count < 32u * n_centroids) {
+        n_centroids >>= 1;
+    }
+    // Ensure n_centroids is a multiple of 8 for SIMD alignment
+    n_centroids = ((n_centroids + 7) / 8) * 8;
+    n_centroids = std::max(8u, n_centroids);
 
     // Release lock before training to prevent deadlock
     lock.unlock();

@@ -30,7 +30,15 @@ public:
     ~PlaidQuantizer() = default;
 
     // Train the quantizer: compute bucket cutoffs and weights
+    // Memory-bounded: if n_embeddings * embedding_dim exceeds MAX_RESIDUAL_VALUES,
+    // randomly samples down to the limit before processing.
     void Train(const f32 *residuals, u64 n_embeddings);
+
+    // Maximum number of residual *values* (not embeddings) used for quantizer training.
+    // This bounds memory usage regardless of how many embeddings are passed.
+    // next-plaid uses ~50K embeddings (50K * dim values); we set a generous limit
+    // that allows high quality while preventing OOM on large datasets.
+    static constexpr u64 MAX_RESIDUAL_VALUES = 50'000ULL * 1024ULL; // ~50K embeddings × 1024 dim
 
     // Quantize residuals into packed bytes
     // Returns: packed data of shape [n_embeddings, packed_dim] where packed_dim = embedding_dim * nbits / 8
