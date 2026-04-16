@@ -264,7 +264,10 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
                                         const u8 *packed_residuals,
                                         const u32 *centroid_ids,
                                         const f32 *centroids_data) const {
-    std::shared_lock lock(rw_mutex_);
+    // No lock needed: after Train(), all accessed members (packed_dim_, nbits_,
+    // byte_reversed_bits_map_, bucket_weight_indices_lookup_) are immutable.
+    // This function is called in tight inner loops during ExactScore, so
+    // removing the lock avoids significant contention overhead.
 
     const u32 keys_per_byte = 8 / nbits_;
     u32 centroid_id = centroid_ids[embedding_id];

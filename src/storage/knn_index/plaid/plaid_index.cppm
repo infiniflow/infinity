@@ -174,6 +174,7 @@ public:
     std::vector<u32> centroid_ids_;          // [n_total_embeddings_] centroid assignment for each embedding
     std::unique_ptr<u8[]> packed_residuals_; // Quantized residuals
     size_t packed_residuals_size_ = 0;
+    size_t packed_residuals_capacity_ = 0; // Tracked capacity for amortized growth in MergeOneChunk
 
     // Inverted index: centroid -> doc ids
     std::vector<std::vector<u32>> ivf_lists_; // [n_centroids_] posting lists

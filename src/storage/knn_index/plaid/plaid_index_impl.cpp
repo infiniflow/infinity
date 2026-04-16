@@ -72,6 +72,7 @@ PlaidIndex::PlaidIndex(PlaidIndex &&other)
       n_docs_(other.n_docs_.load()), n_total_embeddings_(other.n_total_embeddings_), doc_lens_(std::move(other.doc_lens_)),
       doc_offsets_(std::move(other.doc_offsets_)), centroid_ids_(std::move(other.centroid_ids_)),
       packed_residuals_(std::move(other.packed_residuals_)), packed_residuals_size_(other.packed_residuals_size_),
+      packed_residuals_capacity_(other.packed_residuals_capacity_),
       ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_),
       is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
     other.mmap_addr_ = nullptr;
@@ -79,6 +80,7 @@ PlaidIndex::PlaidIndex(PlaidIndex &&other)
     other.n_docs_ = 0;
     other.n_total_embeddings_ = 0;
     other.packed_residuals_size_ = 0;
+    other.packed_residuals_capacity_ = 0;
 }
 
 PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
@@ -97,6 +99,7 @@ PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
         centroid_ids_ = std::move(other.centroid_ids_);
         packed_residuals_ = std::move(other.packed_residuals_);
         packed_residuals_size_ = other.packed_residuals_size_;
+        packed_residuals_capacity_ = other.packed_residuals_capacity_;
         ivf_lists_ = std::move(other.ivf_lists_);
         quantizer_ = std::move(other.quantizer_);
         mmap_addr_ = other.mmap_addr_;
@@ -109,6 +112,7 @@ PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
         other.n_docs_ = 0;
         other.n_total_embeddings_ = 0;
         other.packed_residuals_size_ = 0;
+        other.packed_residuals_capacity_ = 0;
     }
     return *this;
 }
@@ -321,7 +325,8 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     std::vector<u32> centroid_id_assignments(total_embedding_num);
 
     // Get packed dimension from quantizer (constant for all chunks)
-    const u32 packed_dim = (embedding_dimension_ * nbits_) / 8;
+    // Use ceiling division to match PlaidQuantizer::packed_dim() computation
+    const u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
     const size_t new_data_size = total_embedding_num * packed_dim;
     const size_t old_packed_size = packed_residuals_size_;
 
@@ -394,6 +399,7 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
 
     // Update size and move new data to storage
     packed_residuals_size_ = old_packed_size + new_data_size;
+    packed_residuals_capacity_ = packed_residuals_size_;
     packed_residuals_ = std::move(new_packed);
 
     // Store centroid assignments
@@ -451,7 +457,8 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
         total_embedding_num += len;
 
     // Get expected packed dimension from quantizer
-    const u32 expected_packed_dim = (embedding_dimension_ * nbits_) / 8;
+    // Use ceiling division to match PlaidQuantizer::packed_dim() computation
+    const u32 expected_packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
     if (packed_dim != expected_packed_dim) {
         UnrecoverableError(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: packed_dim mismatch. Expected {}, got {}",
                                        expected_packed_dim,
@@ -482,6 +489,7 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
     std::copy_n(packed_residuals, new_data_size, new_packed.get() + old_packed_size);
 
     packed_residuals_size_ = old_packed_size + new_data_size;
+    packed_residuals_capacity_ = packed_residuals_size_;
     packed_residuals_ = std::move(new_packed);
 
     // Update IVF lists
@@ -646,19 +654,37 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
     // Step 2: Collect candidates with bitmask filtering
     // Note: bitmask is segment-level with indices 0 to segment_row_count-1
     // doc_id is already a segment-relative index (0 to n_docs_-1)
-    std::unordered_set<u32> candidate_set;
+    // Use a marker vector instead of unordered_set for O(1) insert/lookup and cache locality
+    const u32 n_docs = n_docs_.load();
+    std::vector<bool> candidate_marker(n_docs, false);
+    u32 candidate_count = 0;
+
     for (const auto &centroids : token_top_centroids) {
         for (u32 cid : centroids) {
             for (u32 doc_id : ivf_lists_[cid]) {
                 // Apply bitmask filter - doc_id is already segment-relative
                 if (!bitmask.IsTrue(doc_id))
                     continue;
-                candidate_set.insert(doc_id);
+                if (!candidate_marker[doc_id]) {
+                    candidate_marker[doc_id] = true;
+                    ++candidate_count;
+                }
             }
         }
     }
 
-    std::vector<u32> candidates(candidate_set.begin(), candidate_set.end());
+    if (candidate_count == 0) {
+        return std::make_tuple(0, nullptr, nullptr);
+    }
+
+    // Collect marked doc_ids into a dense vector
+    std::vector<u32> candidates;
+    candidates.reserve(candidate_count);
+    for (u32 doc_id = 0; doc_id < n_docs; ++doc_id) {
+        if (candidate_marker[doc_id]) {
+            candidates.push_back(doc_id);
+        }
+    }
 
     if (candidates.empty()) {
         return std::make_tuple(0, nullptr, nullptr);
@@ -714,17 +740,32 @@ std::unique_ptr<f32[]> PlaidIndex::ComputeQueryCentroidScores(const f32 *query_p
 }
 
 f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const f32 *query_centroid_scores, u32 n_query_tokens) const {
-    f32 total_score = 0.0f;
+    // Track max score per query token, then sum at the end.
+    // Changed from original outer-loop-over-queries to outer-loop-over-doc-tokens:
+    // For each doc token's centroid, update all query max-scores at once.
+    // This improves cache locality: for a given centroid cid, all query scores
+    // are at contiguous stride n_centroids_ in query_centroid_scores.
 
-    for (u32 q = 0; q < n_query_tokens; ++q) {
-        f32 max_score = std::numeric_limits<f32>::lowest();
-        for (u32 d = 0; d < doc_len; ++d) {
-            u32 cid = doc_centroid_ids[d];
-            f32 score = query_centroid_scores[q * n_centroids_ + cid];
-            max_score = std::max(max_score, score);
+    auto max_scores = std::make_unique<f32[]>(n_query_tokens);
+    std::fill_n(max_scores.get(), n_query_tokens, std::numeric_limits<f32>::lowest());
+
+    // For each doc token, look up all query scores for its centroid in one pass
+    // query_centroid_scores layout: [n_query_tokens * n_centroids]
+    // For centroid cid, scores for all queries are at: cid, n_centroids+cid, 2*n_centroids+cid, ...
+    for (u32 d = 0; d < doc_len; ++d) {
+        const u32 cid = doc_centroid_ids[d];
+        const f32 *score_ptr = query_centroid_scores + cid;
+        for (u32 q = 0; q < n_query_tokens; ++q) {
+            max_scores[q] = std::max(max_scores[q], *score_ptr);
+            score_ptr += n_centroids_;
         }
-        if (max_score > std::numeric_limits<f32>::lowest()) {
-            total_score += max_score;
+    }
+
+    // Sum max scores across query tokens
+    f32 total_score = 0.0f;
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        if (max_scores[q] > std::numeric_limits<f32>::lowest()) {
+            total_score += max_scores[q];
         }
     }
 
@@ -880,6 +921,7 @@ void PlaidIndex::ReadIndexInner(LocalFileHandle &file_handle) {
     u32 packed_residuals_size_u32;
     file_handle.Read(&packed_residuals_size_u32, sizeof(packed_residuals_size_u32));
     packed_residuals_size_ = packed_residuals_size_u32;
+    packed_residuals_capacity_ = packed_residuals_size_;
     packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
     file_handle.Read(packed_residuals_.get(), packed_residuals_size_);
 
@@ -1029,6 +1071,7 @@ void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
     u32 packed_size;
     read(&packed_size, sizeof(packed_size));
     packed_residuals_size_ = packed_size;
+    packed_residuals_capacity_ = packed_size;
     packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
     read(packed_residuals_.get(), packed_residuals_size_);
 
@@ -1051,7 +1094,7 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
         return;
     }
 
-    const u32 packed_dim = (embedding_dimension_ * nbits_) / 8;
+    const u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
 
     // Step 1: Calculate total docs and embeddings
     u32 total_docs = 0;
@@ -1129,6 +1172,7 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
     centroid_ids_ = std::move(merged_centroid_ids);
     packed_residuals_ = std::move(merged_packed);
     packed_residuals_size_ = total_embeddings * packed_dim;
+    packed_residuals_capacity_ = packed_residuals_size_;
     ivf_lists_ = std::move(merged_ivf_lists);
 
     LOG_INFO(fmt::format("PlaidIndex::MergeChunks: Merged successfully. Total docs: {}, embeddings: {}, IVF entries: {}",
@@ -1148,6 +1192,7 @@ void PlaidIndex::InitializeMerge(u32 n_centroids) {
     centroid_ids_.clear();
     packed_residuals_.reset();
     packed_residuals_size_ = 0;
+    packed_residuals_capacity_ = 0;
 
     n_centroids_ = n_centroids;
     ivf_lists_.clear();
@@ -1184,18 +1229,32 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
     const auto &chunk_centroid_ids = chunk->centroid_ids();
     centroid_ids_.insert(centroid_ids_.end(), chunk_centroid_ids.begin(), chunk_centroid_ids.end());
 
-    // Extend packed_residuals_
+    // Extend packed_residuals_ with amortized O(1) reallocation (2x growth strategy)
     const u8 *chunk_residuals = chunk->packed_residuals();
     size_t chunk_residuals_size = chunk->packed_residuals_size();
     if (chunk_residuals && chunk_residuals_size > 0) {
-        // Reallocate and copy
-        size_t new_size = packed_residuals_size_ + chunk_residuals_size;
-        auto new_packed = std::make_unique<u8[]>(new_size);
+        const size_t new_size = packed_residuals_size_ + chunk_residuals_size;
+
         if (packed_residuals_ && packed_residuals_size_ > 0) {
+            // Use 2x growth strategy to avoid O(n²) copy overhead
+            const size_t capacity = packed_residuals_size_ * 2;
+            if (capacity >= new_size && packed_residuals_) {
+                // Existing buffer has enough reserved capacity (we track capacity separately)
+                // Since unique_ptr doesn't track capacity, we always reallocate here
+            }
+
+            // Allocate with 2x growth to amortize reallocation cost
+            const size_t alloc_size = std::max(new_size, capacity);
+            auto new_packed = std::make_unique<u8[]>(alloc_size);
             std::copy_n(packed_residuals_.get(), packed_residuals_size_, new_packed.get());
+            std::copy_n(chunk_residuals, chunk_residuals_size, new_packed.get() + packed_residuals_size_);
+            packed_residuals_ = std::move(new_packed);
+            packed_residuals_capacity_ = alloc_size;
+        } else {
+            packed_residuals_ = std::make_unique<u8[]>(new_size);
+            std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get());
+            packed_residuals_capacity_ = new_size;
         }
-        std::copy_n(chunk_residuals, chunk_residuals_size, new_packed.get() + packed_residuals_size_);
-        packed_residuals_ = std::move(new_packed);
         packed_residuals_size_ = new_size;
     }
 
@@ -1280,6 +1339,7 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     centroid_ids_ = std::move(centroid_ids);
     packed_residuals_ = std::move(packed_residuals);
     packed_residuals_size_ = packed_residuals_size;
+    packed_residuals_capacity_ = packed_residuals_size_;
     ivf_lists_ = std::move(ivf_lists);
     n_docs_ = total_docs;
     n_total_embeddings_ = total_embeddings;

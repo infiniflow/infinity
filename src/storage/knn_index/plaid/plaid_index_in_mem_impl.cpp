@@ -309,6 +309,9 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     auto packed_residuals = global_centroids_->quantizer()->Quantize(all_embeddings.get(), local_embedding_count, packed_dim);
 
     // Release all_embeddings early to free memory
+    // Note: all_embeddings is no longer needed after quantization.
+    // AddMultipleDocsEmbeddingsWithCentroids uses pre-computed centroid_ids and packed_residuals,
+    // not the raw embedding_data parameter (which is unused in that code path).
     all_embeddings.reset();
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
@@ -322,7 +325,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         temp_index->ShareGlobalCentroids(global_centroids_);
 
         // Add documents with pre-computed centroid IDs and packed residuals
-        temp_index->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
+        temp_index->AddMultipleDocsEmbeddingsWithCentroids(nullptr,
                                                            local_doc_lens,
                                                            centroid_ids.get(),
                                                            packed_residuals.get(),
@@ -341,7 +344,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         is_built_.test_and_set();
     } else {
         // Add to existing index
-        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
+        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(nullptr,
                                                              local_doc_lens,
                                                              centroid_ids.get(),
                                                              packed_residuals.get(),
