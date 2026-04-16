@@ -1597,22 +1597,19 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
     if (chunk_residuals && chunk_residuals_size > 0) {
         const size_t new_size = packed_residuals_size_ + chunk_residuals_size;
 
-        if (packed_residuals_ && packed_residuals_size_ > 0) {
-            // Use 2x growth strategy to avoid O(n²) copy overhead
-            const size_t capacity = packed_residuals_size_ * 2;
-            if (capacity >= new_size && packed_residuals_) {
-                // Existing buffer has enough reserved capacity (we track capacity separately)
-                // Since unique_ptr doesn't track capacity, we always reallocate here
-            }
-
-            // Allocate with 2x growth to amortize reallocation cost
-            const size_t alloc_size = std::max(new_size, capacity);
+        if (new_size <= packed_residuals_capacity_) {
+            // Existing buffer has enough capacity — just append in place
+            std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get() + packed_residuals_size_);
+        } else if (packed_residuals_ && packed_residuals_size_ > 0) {
+            // Need to grow: allocate max(new_size, capacity * 2) to amortize reallocation
+            const size_t alloc_size = std::max(new_size, packed_residuals_capacity_ * 2);
             auto new_packed = std::make_unique<u8[]>(alloc_size);
             std::copy_n(packed_residuals_.get(), packed_residuals_size_, new_packed.get());
             std::copy_n(chunk_residuals, chunk_residuals_size, new_packed.get() + packed_residuals_size_);
             packed_residuals_ = std::move(new_packed);
             packed_residuals_capacity_ = alloc_size;
         } else {
+            // First allocation
             packed_residuals_ = std::make_unique<u8[]>(new_size);
             std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get());
             packed_residuals_capacity_ = new_size;
