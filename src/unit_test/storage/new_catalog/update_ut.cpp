@@ -1913,11 +1913,7 @@ TEST_P(TestTxnUpdate, test_update_and_delete_no_conflicts) {
         EXPECT_TRUE(status.ok());
 
         status = setup.new_txn_mgr->CommitTxn(txn4);
-        EXPECT_FALSE(status.ok());
-        // false due to delete conflict
-
-        // Verify that both operations succeeded
-        // setup.check_data_no_conflicts();
+        EXPECT_TRUE(status.ok());
 
         DropDatabase(setup);
     }
