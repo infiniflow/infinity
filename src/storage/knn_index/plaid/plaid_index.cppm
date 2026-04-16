@@ -204,10 +204,10 @@ public:
     // Legacy: nested vector (used during build/incremental update)
     std::vector<std::vector<u32>> ivf_lists_; // [n_centroids_] posting lists
     // Flattened: contiguous storage (used after FinalizeIVF() for cache-friendly search)
-    std::vector<u32> ivf_data_;     // contiguous posting list entries
-    std::vector<u32> ivf_offsets_;  // [n_centroids_] start offset of each list in ivf_data_
-    std::vector<u32> ivf_lengths_;  // [n_centroids_] length of each list
-    bool ivf_flattened_ = false;    // true when using flattened IVF
+    std::vector<u32> ivf_data_;    // contiguous posting list entries
+    std::vector<u32> ivf_offsets_; // [n_centroids_] start offset of each list in ivf_data_
+    std::vector<u32> ivf_lengths_; // [n_centroids_] length of each list
+    bool ivf_flattened_ = false;   // true when using flattened IVF
 
     // Quantizer
     std::unique_ptr<PlaidQuantizer> quantizer_;
@@ -239,14 +239,14 @@ public:
 
     // Batched search path: memory-efficient for large centroid counts
     PlaidQueryResultType GetQueryResultBatched(const f32 *query_ptr,
-                                                u32 query_embedding_num,
-                                                u32 n_ivf_probe,
-                                                f32 centroid_score_threshold,
-                                                u32 n_doc_to_score,
-                                                u32 n_full_scores,
-                                                u32 top_k,
-                                                Bitmask &bitmask,
-                                                u32 start_segment_offset) const;
+                                               u32 query_embedding_num,
+                                               u32 n_ivf_probe,
+                                               f32 centroid_score_threshold,
+                                               u32 n_doc_to_score,
+                                               u32 n_full_scores,
+                                               u32 top_k,
+                                               Bitmask &bitmask,
+                                               u32 start_segment_offset) const;
 
     // Compute approximate score using centroid lookups
     f32 ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const f32 *query_centroid_scores, u32 n_query_tokens) const;

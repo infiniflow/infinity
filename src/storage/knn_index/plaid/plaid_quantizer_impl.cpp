@@ -111,7 +111,10 @@ void PlaidQuantizer::Train(const f32 *residuals, u64 n_embeddings) {
         // Memory-bounded path: randomly sample embeddings to fit within limit
         const u64 sample_count = max_embeddings_for_limit;
         LOG_INFO(fmt::format("PlaidQuantizer::Train: Memory-bounded sampling {} from {} embeddings (total {} values > limit {})",
-                             sample_count, n_embeddings, total_values, max_values));
+                             sample_count,
+                             n_embeddings,
+                             total_values,
+                             max_values));
 
         // Reservoir sampling for embedding indices
         std::vector<u64> sample_indices;
@@ -170,7 +173,8 @@ void PlaidQuantizer::Train(const f32 *residuals, u64 n_embeddings) {
     all_residuals.shrink_to_fit();
 
     LOG_INFO(fmt::format("PlaidQuantizer::Train: Trained with {} residual values, avg_residual={:.6f}",
-                         std::min(total_values, max_values), avg_residual_));
+                         std::min(total_values, max_values),
+                         avg_residual_));
 }
 
 std::unique_ptr<u8[]> PlaidQuantizer::Quantize(const f32 *residuals, u64 n_embeddings, u32 &out_packed_dim) const {

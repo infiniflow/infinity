@@ -67,7 +67,8 @@ void PlaidGlobalCentroids::Train(const u32 n_centroids, const f32 *embedding_dat
     const u64 min_data = std::max<u64>(32ul * n_centroids, 256ul);
     if (embedding_num < min_data) {
         LOG_WARN(fmt::format("PlaidGlobalCentroids::Train: Not enough training data. Have {}, need at least {}. Proceeding with reduced quality.",
-                             embedding_num, min_data));
+                             embedding_num,
+                             min_data));
     }
 
     n_centroids_ = n_centroids;

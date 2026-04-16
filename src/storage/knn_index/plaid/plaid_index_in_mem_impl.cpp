@@ -341,11 +341,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         temp_index->ShareGlobalCentroids(global_centroids_);
 
         // Add documents with pre-computed centroid IDs and packed residuals
-        temp_index->AddMultipleDocsEmbeddingsWithCentroids(nullptr,
-                                                           local_doc_lens,
-                                                           centroid_ids.get(),
-                                                           packed_residuals.get(),
-                                                           packed_dim);
+        temp_index->AddMultipleDocsEmbeddingsWithCentroids(nullptr, local_doc_lens, centroid_ids.get(), packed_residuals.get(), packed_dim);
 
         // Re-acquire lock
         lock.lock();
@@ -360,11 +356,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         is_built_.test_and_set();
     } else {
         // Add to existing index
-        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(nullptr,
-                                                             local_doc_lens,
-                                                             centroid_ids.get(),
-                                                             packed_residuals.get(),
-                                                             packed_dim);
+        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(nullptr, local_doc_lens, centroid_ids.get(), packed_residuals.get(), packed_dim);
     }
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_0).count();

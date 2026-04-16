@@ -72,9 +72,8 @@ PlaidIndex::PlaidIndex(PlaidIndex &&other)
       n_docs_(other.n_docs_.load()), n_total_embeddings_(other.n_total_embeddings_), doc_lens_(std::move(other.doc_lens_)),
       doc_offsets_(std::move(other.doc_offsets_)), centroid_ids_(std::move(other.centroid_ids_)),
       packed_residuals_(std::move(other.packed_residuals_)), packed_residuals_size_(other.packed_residuals_size_),
-      packed_residuals_capacity_(other.packed_residuals_capacity_),
-      ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_),
-      is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
+      packed_residuals_capacity_(other.packed_residuals_capacity_), ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)),
+      mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_), is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
     other.mmap_addr_ = nullptr;
     other.mmap_size_ = 0;
     other.n_docs_ = 0;
@@ -130,7 +129,8 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
 
     if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
         LOG_WARN(fmt::format("PlaidIndex::TrainWithSampling: embedding_num ({}) < minimum ({}). Proceeding with reduced quality.",
-                             embedding_num, least_num));
+                             embedding_num,
+                             least_num));
     }
 
     // Use fastkmeans-rs sampling strategy: max k * 256 samples
@@ -625,8 +625,15 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
     const bool use_batched = n_centroids_ > centroid_batch_size_;
 
     if (use_batched) {
-        return GetQueryResultBatched(query_ptr, query_embedding_num, n_ivf_probe, centroid_score_threshold,
-                                     n_doc_to_score, n_full_scores, top_k, bitmask, start_segment_offset);
+        return GetQueryResultBatched(query_ptr,
+                                     query_embedding_num,
+                                     n_ivf_probe,
+                                     centroid_score_threshold,
+                                     n_doc_to_score,
+                                     n_full_scores,
+                                     top_k,
+                                     bitmask,
+                                     start_segment_offset);
     }
 
     // === Standard path: compute full query-centroid scores upfront ===
@@ -644,10 +651,7 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
             centroid_scores.emplace_back(scores[j], j);
         }
         const u32 n_select = std::min(n_ivf_probe, n_centroids_);
-        std::partial_sort(centroid_scores.begin(),
-                          centroid_scores.begin() + n_select,
-                          centroid_scores.end(),
-                          std::greater<>());
+        std::partial_sort(centroid_scores.begin(), centroid_scores.begin() + n_select, centroid_scores.end(), std::greater<>());
         for (u32 j = 0; j < n_select; ++j) {
             token_top_centroids[i].push_back(centroid_scores[j].second);
         }
@@ -667,16 +671,16 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
 
     // Apply centroid score threshold: filter centroids where max score < threshold
     if (centroid_score_threshold > 0.0f) {
-        probed_centroids.erase(
-            std::remove_if(probed_centroids.begin(), probed_centroids.end(),
-                           [&](u32 cid) {
-                               f32 max_score = std::numeric_limits<f32>::lowest();
-                               for (u32 q = 0; q < query_embedding_num; ++q) {
-                                   max_score = std::max(max_score, query_centroid_scores[q * n_centroids_ + cid]);
-                               }
-                               return max_score < centroid_score_threshold;
-                           }),
-            probed_centroids.end());
+        probed_centroids.erase(std::remove_if(probed_centroids.begin(),
+                                              probed_centroids.end(),
+                                              [&](u32 cid) {
+                                                  f32 max_score = std::numeric_limits<f32>::lowest();
+                                                  for (u32 q = 0; q < query_embedding_num; ++q) {
+                                                      max_score = std::max(max_score, query_centroid_scores[q * n_centroids_ + cid]);
+                                                  }
+                                                  return max_score < centroid_score_threshold;
+                                              }),
+                               probed_centroids.end());
     }
 
     // Step 2: Collect candidates with bitmask filtering
@@ -748,21 +752,27 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
 }
 
 PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
-                                                        const u32 query_embedding_num,
-                                                        const u32 n_ivf_probe,
-                                                        const f32 centroid_score_threshold,
-                                                        const u32 n_doc_to_score,
-                                                        const u32 n_full_scores,
-                                                        const u32 top_k,
-                                                        Bitmask &bitmask,
-                                                        const u32 start_segment_offset) const {
+                                                       const u32 query_embedding_num,
+                                                       const u32 n_ivf_probe,
+                                                       const f32 centroid_score_threshold,
+                                                       const u32 n_doc_to_score,
+                                                       const u32 n_full_scores,
+                                                       const u32 top_k,
+                                                       Bitmask &bitmask,
+                                                       const u32 start_segment_offset) const {
     // Batched IVF Probing: memory-efficient path for large n_centroids
     std::vector<u32> probed_centroids;
     std::unique_ptr<f32[]> sparse_centroid_scores;
     u32 n_sparse_centroids = 0;
 
-    BatchedIVFProbe(query_ptr, query_embedding_num, n_ivf_probe, centroid_score_threshold,
-                    centroid_batch_size_, probed_centroids, sparse_centroid_scores, n_sparse_centroids);
+    BatchedIVFProbe(query_ptr,
+                    query_embedding_num,
+                    n_ivf_probe,
+                    centroid_score_threshold,
+                    centroid_batch_size_,
+                    probed_centroids,
+                    sparse_centroid_scores,
+                    n_sparse_centroids);
 
     if (probed_centroids.empty()) {
         return std::make_tuple(0, nullptr, nullptr);
@@ -813,9 +823,12 @@ PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
     std::vector<std::pair<f32, u32>> doc_scores;
     doc_scores.reserve(candidates.size());
     for (u32 doc_id : candidates) {
-        f32 score = ApproximateScoreSparse(&centroid_ids_[doc_offsets_[doc_id]], doc_lens_[doc_id],
-                                           sparse_centroid_scores.get(), sparse_centroid_id_map.data(),
-                                           n_sparse_centroids, query_embedding_num);
+        f32 score = ApproximateScoreSparse(&centroid_ids_[doc_offsets_[doc_id]],
+                                           doc_lens_[doc_id],
+                                           sparse_centroid_scores.get(),
+                                           sparse_centroid_id_map.data(),
+                                           n_sparse_centroids,
+                                           query_embedding_num);
         doc_scores.emplace_back(score, doc_id);
     }
 
@@ -888,13 +901,13 @@ u32 PlaidIndex::ComputeAutoNCentroids(const u64 embedding_count) {
 }
 
 void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
-                                  const u32 n_query_tokens,
-                                  const u32 n_ivf_probe,
-                                  const f32 centroid_score_threshold,
-                                  const u32 centroid_batch_size,
-                                  std::vector<u32> &probed_centroids,
-                                  std::unique_ptr<f32[]> &sparse_centroid_scores,
-                                  u32 &n_sparse_centroids) const {
+                                 const u32 n_query_tokens,
+                                 const u32 n_ivf_probe,
+                                 const f32 centroid_score_threshold,
+                                 const u32 centroid_batch_size,
+                                 std::vector<u32> &probed_centroids,
+                                 std::unique_ptr<f32[]> &sparse_centroid_scores,
+                                 u32 &n_sparse_centroids) const {
     // Process centroids in batches to bound memory usage
     // Each batch computes [n_query_tokens, batch_size] score matrix
     // Per-token top-k heaps are maintained across batches
@@ -921,7 +934,12 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
 
         // Compute scores for this batch: [n_query_tokens, current_batch_size]
         const f32 *batch_centroids = centroids.data() + batch_start * embedding_dimension_;
-        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, batch_centroids, n_query_tokens, current_batch_size, embedding_dimension_, batch_scores.get());
+        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
+                                                       batch_centroids,
+                                                       n_query_tokens,
+                                                       current_batch_size,
+                                                       embedding_dimension_,
+                                                       batch_scores.get());
 
         // Add centroid_norms_neg_half for L2 distance computation
         for (u32 i = 0; i < n_query_tokens; ++i) {
@@ -968,10 +986,10 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
 
     // Apply centroid score threshold: filter out centroids where max score < threshold
     if (centroid_score_threshold > 0.0f) {
-        probed_centroids.erase(
-            std::remove_if(probed_centroids.begin(), probed_centroids.end(),
-                           [&](u32 cid) { return centroid_max_score[cid] < centroid_score_threshold; }),
-            probed_centroids.end());
+        probed_centroids.erase(std::remove_if(probed_centroids.begin(),
+                                              probed_centroids.end(),
+                                              [&](u32 cid) { return centroid_max_score[cid] < centroid_score_threshold; }),
+                               probed_centroids.end());
     }
 
     // Build sparse centroid scores: only for probed centroids
@@ -1003,25 +1021,29 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
         }
 
         // Compute [n_query_tokens, current_batch]
-        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, batch_centroid_data.get(), n_query_tokens, current_batch, embedding_dimension_, sparse_batch_scores.get());
+        matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
+                                                       batch_centroid_data.get(),
+                                                       n_query_tokens,
+                                                       current_batch,
+                                                       embedding_dimension_,
+                                                       sparse_batch_scores.get());
 
         // Add norms and store
         for (u32 q = 0; q < n_query_tokens; ++q) {
             for (u32 i = 0; i < current_batch; ++i) {
                 const u32 cid = probed_centroids[batch_start + i];
-                sparse_centroid_scores[(batch_start + i) * n_query_tokens + q] =
-                    sparse_batch_scores[q * current_batch + i] + norms[cid];
+                sparse_centroid_scores[(batch_start + i) * n_query_tokens + q] = sparse_batch_scores[q * current_batch + i] + norms[cid];
             }
         }
     }
 }
 
 f32 PlaidIndex::ApproximateScoreSparse(const u32 *doc_centroid_ids,
-                                        const u32 doc_len,
-                                        const f32 *sparse_scores,
-                                        const u32 *sparse_centroid_id_map,
-                                        const u32 n_sparse_centroids,
-                                        const u32 n_query_tokens) const {
+                                       const u32 doc_len,
+                                       const f32 *sparse_scores,
+                                       const u32 *sparse_centroid_id_map,
+                                       const u32 n_sparse_centroids,
+                                       const u32 n_query_tokens) const {
     // sparse_scores layout: [n_sparse_centroids, n_query_tokens]
     // sparse_centroid_id_map maps centroid_id -> sparse index (or UINT32_MAX if not in sparse set)
     // Track max score per query token
@@ -1764,8 +1786,7 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
         return 0;
     }
 
-    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Checking {} new embeddings for outliers (threshold={})",
-                         n_new_embeddings, cluster_threshold));
+    LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Checking {} new embeddings for outliers (threshold={})", n_new_embeddings, cluster_threshold));
 
     // Step 1: Find outlier embeddings
     const f32 threshold_sq = cluster_threshold * cluster_threshold;
@@ -1801,20 +1822,18 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
     // Step 3: Extract outlier embeddings
     auto outlier_data = std::make_unique<f32[]>(num_outliers * embedding_dimension_);
     for (u64 i = 0; i < num_outliers; ++i) {
-        std::copy_n(new_embeddings + outlier_indices[i] * embedding_dimension_,
-                    embedding_dimension_,
-                    outlier_data.get() + i * embedding_dimension_);
+        std::copy_n(new_embeddings + outlier_indices[i] * embedding_dimension_, embedding_dimension_, outlier_data.get() + i * embedding_dimension_);
     }
 
     // Step 4: Cluster outliers to get new centroids
     std::vector<f32> new_centroids_data(k_update * embedding_dimension_);
     const auto result_k = GetKMeansCentroids(MetricType::kMetricL2,
-                                              embedding_dimension_,
-                                              num_outliers,
-                                              outlier_data.get(),
-                                              new_centroids_data,
-                                              k_update,
-                                              4); // 4 iterations
+                                             embedding_dimension_,
+                                             num_outliers,
+                                             outlier_data.get(),
+                                             new_centroids_data,
+                                             k_update,
+                                             4); // 4 iterations
 
     if (result_k != k_update) {
         LOG_WARN(fmt::format("PlaidIndex::ExpandCentroids: KMeans returned {} centroids, requested {}", result_k, k_update));
@@ -1844,8 +1863,7 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
 
     // Append centroid data
     centroids_data_.resize(new_n_centroids * embedding_dimension_);
-    std::copy_n(new_centroids_data.data(), k_update * embedding_dimension_,
-                centroids_data_.data() + old_n_centroids * embedding_dimension_);
+    std::copy_n(new_centroids_data.data(), k_update * embedding_dimension_, centroids_data_.data() + old_n_centroids * embedding_dimension_);
 
     // Compute norms for new centroids and append
     centroid_norms_neg_half_.resize(new_n_centroids);
@@ -1962,7 +1980,9 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, quantizer n_buckets: {}",
                          n_docs_.load(),
                          n_total_embeddings_,
-                         ivf_flattened_ ? ivf_data_.size() : std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
+                         ivf_flattened_
+                             ? ivf_data_.size()
+                             : std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
                          quantizer_->n_buckets()));
 
     // Auto-flatten IVF after merge for cache-friendly search
