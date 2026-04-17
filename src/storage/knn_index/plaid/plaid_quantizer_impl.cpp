@@ -85,64 +85,96 @@ void PlaidQuantizer::Train(const f32 *residuals, u64 n_embeddings) {
         UnrecoverableError("PlaidQuantizer::Train: n_embeddings must be > 0");
     }
 
-    // Compute average residual
+    // ── Memory-bounded Compress (P3) ──────────────────────────────────
+    // Compute average residual first (streaming, O(1) extra memory)
     double sum = 0.0;
-    for (u64 i = 0; i < n_embeddings * embedding_dim_; ++i) {
+    const u64 total_values = n_embeddings * embedding_dim_;
+    for (u64 i = 0; i < total_values; ++i) {
         sum += residuals[i];
     }
-    avg_residual_ = static_cast<f32>(sum / (n_embeddings * embedding_dim_));
+    avg_residual_ = static_cast<f32>(sum / static_cast<double>(total_values));
 
-    // Collect all residual values for quantile computation
+    // Determine how many residual values we can afford to process.
+    // If total exceeds the limit, sample down to MAX_RESIDUAL_VALUES.
+    const u64 max_values = MAX_RESIDUAL_VALUES;
+    const u64 max_embeddings_for_limit = std::max<u64>(1, max_values / embedding_dim_);
+
     std::vector<f32> all_residuals;
-    all_residuals.reserve(n_embeddings * embedding_dim_);
-    for (u64 i = 0; i < n_embeddings * embedding_dim_; ++i) {
-        all_residuals.push_back(residuals[i] - avg_residual_);
+
+    if (total_values <= max_values) {
+        // Fast path: data fits within limit, copy all
+        all_residuals.reserve(total_values);
+        for (u64 i = 0; i < total_values; ++i) {
+            all_residuals.push_back(residuals[i] - avg_residual_);
+        }
+    } else {
+        // Memory-bounded path: randomly sample embeddings to fit within limit
+        const u64 sample_count = max_embeddings_for_limit;
+        LOG_INFO(fmt::format("PlaidQuantizer::Train: Memory-bounded sampling {} from {} embeddings (total {} values > limit {})",
+                             sample_count,
+                             n_embeddings,
+                             total_values,
+                             max_values));
+
+        // Reservoir sampling for embedding indices
+        std::vector<u64> sample_indices;
+        sample_indices.reserve(sample_count);
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<u64> dist(0, std::numeric_limits<u64>::max());
+
+        for (u64 i = 0; i < sample_count; ++i) {
+            sample_indices.push_back(i);
+        }
+        for (u64 i = sample_count; i < n_embeddings; ++i) {
+            u64 j = dist(gen) % (i + 1);
+            if (j < sample_count) {
+                sample_indices[j] = i;
+            }
+        }
+
+        // Collect sampled residuals
+        all_residuals.reserve(sample_count * embedding_dim_);
+        for (u64 i = 0; i < sample_count; ++i) {
+            const u64 idx = sample_indices[i];
+            const f32 *emb = residuals + idx * embedding_dim_;
+            for (u32 d = 0; d < embedding_dim_; ++d) {
+                all_residuals.push_back(emb[d] - avg_residual_);
+            }
+        }
     }
 
     // Sort for quantile computation
     std::sort(all_residuals.begin(), all_residuals.end());
 
-    // Compute bucket cutoffs (at quantile boundaries)
+    // ── Compute bucket cutoffs at quantile boundaries ────────────────
+    // Equivalent to next-plaid's: quantiles at i/n_buckets for i = 1..n_buckets-1
     bucket_cutoffs_ = std::make_unique<f32[]>(n_buckets_ - 1);
     for (u32 i = 1; i < n_buckets_; ++i) {
-        f32 quantile = static_cast<f32>(i) / n_buckets_;
+        f64 quantile = static_cast<f64>(i) / n_buckets_;
         u64 idx = static_cast<u64>(quantile * all_residuals.size());
         idx = std::min(idx, all_residuals.size() - 1);
         bucket_cutoffs_[i - 1] = all_residuals[idx];
     }
 
-    // Compute bucket weights (mean of values in each bucket)
+    // ── Compute bucket weights using quantile midpoints (next-plaid style) ──
+    // next-plaid: bucket_weights = quantiles at (i+0.5)/n_buckets
+    // This is more robust than per-bucket averaging and avoids an extra pass.
     bucket_weights_ = std::make_unique<f32[]>(n_buckets_);
-    std::vector<double> bucket_sums(n_buckets_, 0.0);
-    std::vector<u64> bucket_counts(n_buckets_, 0);
-
-    for (f32 val : all_residuals) {
-        u32 bucket = 0;
-        for (u32 i = 0; i < n_buckets_ - 1; ++i) {
-            if (val > bucket_cutoffs_[i]) {
-                bucket = i + 1;
-            } else {
-                break;
-            }
-        }
-        bucket_sums[bucket] += val;
-        bucket_counts[bucket]++;
-    }
-
     for (u32 i = 0; i < n_buckets_; ++i) {
-        if (bucket_counts[i] > 0) {
-            bucket_weights_[i] = static_cast<f32>(bucket_sums[i] / bucket_counts[i]) + avg_residual_;
-        } else {
-            // Fallback: use cutoff-based estimation
-            if (i == 0) {
-                bucket_weights_[i] = bucket_cutoffs_[0] - 0.1f;
-            } else if (i == n_buckets_ - 1) {
-                bucket_weights_[i] = bucket_cutoffs_[n_buckets_ - 2] + 0.1f;
-            } else {
-                bucket_weights_[i] = (bucket_cutoffs_[i - 1] + bucket_cutoffs_[i]) / 2.0f;
-            }
-        }
+        f64 quantile = (static_cast<f64>(i) + 0.5) / n_buckets_;
+        u64 idx = static_cast<u64>(quantile * all_residuals.size());
+        idx = std::min(idx, all_residuals.size() - 1);
+        bucket_weights_[i] = all_residuals[idx] + avg_residual_;
     }
+
+    // Free the sorted residuals early to release memory before returning
+    all_residuals.clear();
+    all_residuals.shrink_to_fit();
+
+    LOG_INFO(fmt::format("PlaidQuantizer::Train: Trained with {} residual values, avg_residual={:.6f}",
+                         std::min(total_values, max_values),
+                         avg_residual_));
 }
 
 std::unique_ptr<u8[]> PlaidQuantizer::Quantize(const f32 *residuals, u64 n_embeddings, u32 &out_packed_dim) const {
@@ -264,7 +296,10 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
                                         const u8 *packed_residuals,
                                         const u32 *centroid_ids,
                                         const f32 *centroids_data) const {
-    std::shared_lock lock(rw_mutex_);
+    // No lock needed: after Train(), all accessed members (packed_dim_, nbits_,
+    // byte_reversed_bits_map_, bucket_weight_indices_lookup_) are immutable.
+    // This function is called in tight inner loops during ExactScore, so
+    // removing the lock avoids significant contention overhead.
 
     const u32 keys_per_byte = 8 / nbits_;
     u32 centroid_id = centroid_ids[embedding_id];

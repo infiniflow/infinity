@@ -63,19 +63,15 @@ void PlaidIndexFileWorker::AllocateInMemory() {
 }
 
 void PlaidIndexFileWorker::FreeInMemory() {
-    // For mmap-loaded index, object is in mmap_data_
-    // For regular-loaded index, object is in data_
-    if (mmap_data_) {
-        auto *index = reinterpret_cast<PlaidIndex *>(mmap_data_);
-        delete index;
-        mmap_data_ = nullptr;
-    } else if (data_) {
-        auto *index = static_cast<PlaidIndex *>(data_);
-        delete index;
-        data_ = nullptr;
-    } else {
+    // FreeInMemory() must only handle data_, never mmap_data_.
+    // mmap_data_ is exclusively managed by FreeFromMmapImpl() / Munmap().
+    // This matches the contract used by HNSW, BMP, and all other FileWorkers.
+    if (!data_) {
         UnrecoverableError("PlaidIndexFileWorker::FreeInMemory: Data is not allocated.");
     }
+    auto *index = static_cast<PlaidIndex *>(data_);
+    delete index;
+    data_ = nullptr;
 }
 
 bool PlaidIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {

@@ -149,12 +149,36 @@ public:
                           u32 total_docs,
                           u64 total_embeddings);
 
+    // Flatten IVF lists from nested vector to contiguous arrays for cache-friendly search
+    // Call after all data is added (before dump or after merge)
+    void FinalizeIVF();
+
+    // Check if IVF is flattened (for search path selection)
+    bool IsIVFFlattened() const { return ivf_flattened_; }
+
+    // Access flattened IVF data for a centroid
+    const u32 *GetIVFListData(u32 centroid_id) const;
+    u32 GetIVFListLength(u32 centroid_id) const;
+
+    // Outlier-based Centroid Expansion for incremental updates
+    // Finds embeddings far from existing centroids, clusters them into new centroids
+    // Returns number of new centroids added
+    u32 ExpandCentroids(const f32 *new_embeddings, u64 n_new_embeddings, f32 cluster_threshold);
+
+    // Find outlier embeddings (distance > threshold^2 from nearest centroid)
+    // Returns indices of outlier embeddings
+    std::vector<u64> FindOutliers(const f32 *embeddings, u64 n_embeddings, f32 threshold_sq) const;
+
 public:
     // Fixed parameters (set at construction)
     const u32 start_segment_offset_ = 0;
     const u32 embedding_dimension_ = 0;
     const u32 nbits_ = 4;
     const u32 requested_n_centroids_ = 0; // 0 = auto
+
+    // Batch size for batched IVF probing (0 = auto, based on n_centroids)
+    static constexpr u32 DEFAULT_CENTROID_BATCH_SIZE = 4096;
+    u32 centroid_batch_size_ = DEFAULT_CENTROID_BATCH_SIZE;
 
     // Trained parameters
     u32 n_centroids_ = 0;
@@ -174,9 +198,16 @@ public:
     std::vector<u32> centroid_ids_;          // [n_total_embeddings_] centroid assignment for each embedding
     std::unique_ptr<u8[]> packed_residuals_; // Quantized residuals
     size_t packed_residuals_size_ = 0;
+    size_t packed_residuals_capacity_ = 0; // Tracked capacity for amortized growth in MergeOneChunk
 
     // Inverted index: centroid -> doc ids
+    // Legacy: nested vector (used during build/incremental update)
     std::vector<std::vector<u32>> ivf_lists_; // [n_centroids_] posting lists
+    // Flattened: contiguous storage (used after FinalizeIVF() for cache-friendly search)
+    std::vector<u32> ivf_data_;    // contiguous posting list entries
+    std::vector<u32> ivf_offsets_; // [n_centroids_] start offset of each list in ivf_data_
+    std::vector<u32> ivf_lengths_; // [n_centroids_] length of each list
+    bool ivf_flattened_ = false;   // true when using flattened IVF
 
     // Quantizer
     std::unique_ptr<PlaidQuantizer> quantizer_;
@@ -206,6 +237,17 @@ public:
                                                    const BlockIndex *block_index,
                                                    TxnTimeStamp begin_ts) const;
 
+    // Batched search path: memory-efficient for large centroid counts
+    PlaidQueryResultType GetQueryResultBatched(const f32 *query_ptr,
+                                               u32 query_embedding_num,
+                                               u32 n_ivf_probe,
+                                               f32 centroid_score_threshold,
+                                               u32 n_doc_to_score,
+                                               u32 n_full_scores,
+                                               u32 top_k,
+                                               Bitmask &bitmask,
+                                               u32 start_segment_offset) const;
+
     // Compute approximate score using centroid lookups
     f32 ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const f32 *query_centroid_scores, u32 n_query_tokens) const;
 
@@ -214,6 +256,36 @@ public:
 
     // Helper for batch centroid scoring
     std::unique_ptr<f32[]> ComputeQueryCentroidScores(const f32 *query_ptr, u32 n_query_tokens) const;
+
+    // Batched IVF Probing: processes centroids in chunks to bound memory usage
+    // Returns: set of centroid IDs to probe (union of top-k across all query tokens)
+    // Each query token maintains its own top-k heap; final result is the union
+    void BatchedIVFProbe(const f32 *query_ptr,
+                         u32 n_query_tokens,
+                         u32 n_ivf_probe,
+                         f32 centroid_score_threshold,
+                         u32 centroid_batch_size,
+                         std::vector<u32> &probed_centroids,
+                         std::unique_ptr<f32[]> &sparse_centroid_scores,
+                         u32 &n_sparse_centroids) const;
+
+    // Compute approximate score using sparse centroid score lookup (for batched path)
+    f32 ApproximateScoreSparse(const u32 *doc_centroid_ids,
+                               u32 doc_len,
+                               const f32 *sparse_scores,
+                               const u32 *sparse_centroid_id_map,
+                               u32 n_sparse_centroids,
+                               u32 n_query_tokens) const;
+
+    // Static helper: compute auto n_centroids using next-plaid formula
+    static u32 ComputeAutoNCentroids(u64 embedding_count);
+
+    // Ensure IVF is in mutable (nested vector) form.
+    // If currently flattened, reconstructs ivf_lists_ from ivf_data_ and clears
+    // the flattened arrays. Must be called at the start of any IVF-mutating
+    // operation (Add*, Merge*, ExpandCentroids, etc.).
+    // Caller must hold an exclusive lock (rw_mutex_) before calling.
+    void EnsureMutableIVF();
 };
 
 } // namespace infinity

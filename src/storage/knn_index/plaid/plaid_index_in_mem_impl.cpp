@@ -26,6 +26,7 @@ import :buffer_obj;
 import :buffer_handle;
 import :mlas_matrix_multiply;
 
+import std.compat;
 import column_def;
 import internal_types;
 
@@ -193,11 +194,26 @@ bool PlaidIndexInMem::BuildIndexFromScratch() {
     // Determine number of centroids
     u32 n_centroids = local_requested_n_centroids;
     if (n_centroids == 0) {
-        // Auto: sqrt(N) rounded to multiple of 8
-        n_centroids = static_cast<u32>(std::sqrt(local_embedding_count));
-        n_centroids = ((n_centroids + 7) / 8) * 8;
-        n_centroids = std::max(8u, n_centroids);
+        // Auto: k = 2^floor(log2(16 * sqrt(N)))
+        // Matches next-plaid/fast-plaid heuristic for finer IVF partitioning
+        double sqrt_n = std::sqrt(static_cast<double>(local_embedding_count));
+        double log2_val = std::log2(16.0 * sqrt_n);
+        if (log2_val < 3.0) {
+            n_centroids = 8;
+        } else {
+            n_centroids = 1u << static_cast<u32>(std::floor(log2_val));
+        }
+        // Cap at total embedding count
+        n_centroids = std::min(n_centroids, static_cast<u32>(local_embedding_count));
     }
+
+    // Downgrade if not enough data for K-means (need at least 32 * n_centroids)
+    while (n_centroids > 8 && local_embedding_count < 32u * n_centroids) {
+        n_centroids >>= 1;
+    }
+    // Ensure n_centroids is a multiple of 8 for SIMD alignment
+    n_centroids = ((n_centroids + 7) / 8) * 8;
+    n_centroids = std::max(8u, n_centroids);
 
     // Release lock before training to prevent deadlock
     lock.unlock();
@@ -309,6 +325,9 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     auto packed_residuals = global_centroids_->quantizer()->Quantize(all_embeddings.get(), local_embedding_count, packed_dim);
 
     // Release all_embeddings early to free memory
+    // Note: all_embeddings is no longer needed after quantization.
+    // AddMultipleDocsEmbeddingsWithCentroids uses pre-computed centroid_ids and packed_residuals,
+    // not the raw embedding_data parameter (which is unused in that code path).
     all_embeddings.reset();
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
@@ -322,11 +341,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         temp_index->ShareGlobalCentroids(global_centroids_);
 
         // Add documents with pre-computed centroid IDs and packed residuals
-        temp_index->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
-                                                           local_doc_lens,
-                                                           centroid_ids.get(),
-                                                           packed_residuals.get(),
-                                                           packed_dim);
+        temp_index->AddMultipleDocsEmbeddingsWithCentroids(nullptr, local_doc_lens, centroid_ids.get(), packed_residuals.get(), packed_dim);
 
         // Re-acquire lock
         lock.lock();
@@ -341,11 +356,7 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
         is_built_.test_and_set();
     } else {
         // Add to existing index
-        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(all_embeddings.get(),
-                                                             local_doc_lens,
-                                                             centroid_ids.get(),
-                                                             packed_residuals.get(),
-                                                             packed_dim);
+        plaid_index_->AddMultipleDocsEmbeddingsWithCentroids(nullptr, local_doc_lens, centroid_ids.get(), packed_residuals.get(), packed_dim);
     }
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_3 - time_0).count();
