@@ -1709,8 +1709,7 @@ void PlaidIndex::EnsureMutableIVF() {
         return; // Already in mutable form
     }
 
-    LOG_INFO(fmt::format("PlaidIndex::EnsureMutableIVF: Un-flattening {} centroids, {} entries",
-                         n_centroids_, ivf_data_.size()));
+    LOG_INFO(fmt::format("PlaidIndex::EnsureMutableIVF: Un-flattening {} centroids, {} entries", n_centroids_, ivf_data_.size()));
 
     // Reconstruct ivf_lists_ from flattened data
     ivf_lists_.resize(n_centroids_);
