@@ -311,6 +311,8 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
 
     std::unique_lock lock(rw_mutex_);
 
+    EnsureMutableIVF();
+
     const u32 old_doc_num = n_docs_;
     const u32 old_total_embeddings = n_total_embeddings_;
 
@@ -446,6 +448,8 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
         return;
 
     std::unique_lock lock(rw_mutex_);
+
+    EnsureMutableIVF();
 
     const u32 old_doc_num = n_docs_;
     const u32 old_total_embeddings = n_total_embeddings_;
@@ -957,6 +961,11 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
 
                 // Track max score for this centroid
                 centroid_max_score[global_cid] = std::max(centroid_max_score[global_cid], score);
+
+                // Guard: skip heap operations when n_ivf_probe == 0
+                if (n_ivf_probe == 0) {
+                    continue;
+                }
 
                 if (heap.size() < n_ivf_probe) {
                     // Heap not full yet, just push
@@ -1558,7 +1567,11 @@ void PlaidIndex::InitializeMerge(u32 n_centroids) {
 
     n_centroids_ = n_centroids;
     ivf_lists_.clear();
-    ivf_lists_.resize(n_centroids_);
+    ivf_lists_.resize(n_centroids);
+    ivf_data_.clear();
+    ivf_offsets_.clear();
+    ivf_lengths_.clear();
+    ivf_flattened_ = false;
 
     n_docs_ = 0;
     n_total_embeddings_ = 0;
@@ -1570,6 +1583,8 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
     if (!chunk) {
         return;
     }
+
+    EnsureMutableIVF();
 
     const u32 chunk_doc_num = chunk->GetDocNum();
     const u64 chunk_embedding_num = chunk->GetTotalEmbeddingNum();
@@ -1688,6 +1703,36 @@ void PlaidIndex::FinalizeIVF() {
     LOG_INFO(fmt::format("PlaidIndex::FinalizeIVF: Flattened {} IVF lists into {} entries", n_centroids_, total_entries));
 }
 
+void PlaidIndex::EnsureMutableIVF() {
+    // Caller must hold an exclusive lock (rw_mutex_).
+    if (!ivf_flattened_) {
+        return; // Already in mutable form
+    }
+
+    LOG_INFO(fmt::format("PlaidIndex::EnsureMutableIVF: Un-flattening {} centroids, {} entries",
+                         n_centroids_, ivf_data_.size()));
+
+    // Reconstruct ivf_lists_ from flattened data
+    ivf_lists_.resize(n_centroids_);
+    for (u32 i = 0; i < n_centroids_; ++i) {
+        const u32 len = ivf_lengths_[i];
+        ivf_lists_[i].resize(len);
+        if (len > 0) {
+            std::copy_n(ivf_data_.data() + ivf_offsets_[i], len, ivf_lists_[i].data());
+        }
+    }
+
+    // Clear flattened storage
+    ivf_data_.clear();
+    ivf_data_.shrink_to_fit();
+    ivf_offsets_.clear();
+    ivf_offsets_.shrink_to_fit();
+    ivf_lengths_.clear();
+    ivf_lengths_.shrink_to_fit();
+
+    ivf_flattened_ = false;
+}
+
 const u32 *PlaidIndex::GetIVFListData(const u32 centroid_id) const {
     if (ivf_flattened_) {
         if (centroid_id >= n_centroids_ || ivf_lengths_[centroid_id] == 0) {
@@ -1783,6 +1828,8 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
         return 0;
     }
 
+    EnsureMutableIVF();
+
     LOG_INFO(fmt::format("PlaidIndex::ExpandCentroids: Checking {} new embeddings for outliers (threshold={})", n_new_embeddings, cluster_threshold));
 
     // Step 1: Find outlier embeddings
@@ -1837,13 +1884,8 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
         if (result_k == 0) {
             return 0;
         }
-        // Adjust to actual result
+        // Use the actual number of centroids returned — do NOT round up
         k_update = result_k;
-        // Round to multiple of 8
-        k_update = ((k_update + 7) / 8) * 8;
-        if (k_update == 0) {
-            return 0;
-        }
     }
 
     // Step 5: Append new centroids
@@ -1870,23 +1912,7 @@ u32 PlaidIndex::ExpandCentroids(const f32 *new_embeddings, const u64 n_new_embed
     }
 
     // Append empty IVF lists for new centroids
-    if (ivf_flattened_) {
-        // Need to un-flatten to add new centroids
-        // Reconstruct ivf_lists_ from flattened data
-        ivf_lists_.resize(old_n_centroids);
-        for (u32 i = 0; i < old_n_centroids; ++i) {
-            const u32 len = ivf_lengths_[i];
-            ivf_lists_[i].resize(len);
-            if (len > 0) {
-                std::copy_n(ivf_data_.data() + ivf_offsets_[i], len, ivf_lists_[i].data());
-            }
-        }
-        ivf_data_.clear();
-        ivf_offsets_.clear();
-        ivf_lengths_.clear();
-        ivf_flattened_ = false;
-    }
-
+    // (ivf_lists_ is guaranteed to be in mutable form by EnsureMutableIVF at function entry)
     ivf_lists_.resize(new_n_centroids); // New lists are empty
 
     n_centroids_ = new_n_centroids;
@@ -1950,6 +1976,11 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     packed_residuals_size_ = packed_residuals_size;
     packed_residuals_capacity_ = packed_residuals_size_;
     ivf_lists_ = std::move(ivf_lists);
+    // AcceptMergedData receives nested ivf_lists, so clear flattened state
+    ivf_data_.clear();
+    ivf_offsets_.clear();
+    ivf_lengths_.clear();
+    ivf_flattened_ = false;
     n_docs_ = total_docs;
     n_total_embeddings_ = total_embeddings;
 
@@ -1977,14 +2008,18 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     LOG_INFO(fmt::format("PlaidIndex::AcceptMergedData: Completed. Total docs: {}, embeddings: {}, IVF entries: {}, quantizer n_buckets: {}",
                          n_docs_.load(),
                          n_total_embeddings_,
-                         ivf_flattened_
-                             ? ivf_data_.size()
-                             : std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
+                         std::accumulate(ivf_lists_.begin(), ivf_lists_.end(), 0u, [](u32 sum, const auto &list) { return sum + list.size(); }),
                          quantizer_->n_buckets()));
 
-    // Auto-flatten IVF after merge for cache-friendly search
-    if (!ivf_flattened_ && n_centroids_ > DEFAULT_CENTROID_BATCH_SIZE) {
-        FinalizeIVF();
+    // Detect need to flatten while still holding the lock, but defer
+    // FinalizeIVF() to outside the critical section to avoid deadlock
+    // (FinalizeIVF also takes rw_mutex_).
+    const bool should_flatten = !ivf_flattened_ && n_centroids_ > DEFAULT_CENTROID_BATCH_SIZE;
+
+    lock.unlock(); // Release lock before FinalizeIVF to avoid deadlock
+
+    if (should_flatten) {
+        FinalizeIVF(); // This takes its own lock
     }
 }
 

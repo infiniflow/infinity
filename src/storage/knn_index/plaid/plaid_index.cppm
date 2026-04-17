@@ -279,6 +279,13 @@ public:
 
     // Static helper: compute auto n_centroids using next-plaid formula
     static u32 ComputeAutoNCentroids(u64 embedding_count);
+
+    // Ensure IVF is in mutable (nested vector) form.
+    // If currently flattened, reconstructs ivf_lists_ from ivf_data_ and clears
+    // the flattened arrays. Must be called at the start of any IVF-mutating
+    // operation (Add*, Merge*, ExpandCentroids, etc.).
+    // Caller must hold an exclusive lock (rw_mutex_) before calling.
+    void EnsureMutableIVF();
 };
 
 } // namespace infinity
