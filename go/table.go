@@ -15,7 +15,9 @@
 package infinity
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -1333,6 +1335,277 @@ func (t *Table) ToResult() (interface{}, error) {
 	return buildResult(resp)
 }
 
+// DataFrame represents query results in a row-oriented format similar to pandas DataFrame
+type DataFrame struct {
+	Columns    []string               // Column names
+	ColumnData map[string][]interface{} // Column name -> slice of values
+	RowCount   int                    // Number of rows
+	ExtraInfo  string                 // Extra info from query (e.g., total_hits_count)
+}
+
+// ToDataFrame executes query and returns results as a DataFrame-like structure
+// This handles the case where VARCHAR columns may have all rows concatenated into
+// a single byte slice, similar to Python's to_df() behavior
+func (t *Table) ToDataFrame() (*DataFrame, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+
+	if t.db == nil || t.db.conn == nil {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Database or connection is nil")
+	}
+
+	if !t.db.conn.IsConnected() {
+		return nil, NewInfinityException(int(ErrorCodeClientClose), "Connection is closed")
+	}
+
+	// Initialize query builder if not exists
+	if t.queryBuilder == nil {
+		t.queryBuilder = NewQueryBuilder()
+	}
+
+	// Reset query builder after execution
+	defer t.queryBuilder.Reset()
+
+	// Build select request from query builder
+	req := thriftapi.NewSelectRequest()
+	req.SessionID = t.db.conn.GetSessionID()
+	req.DbName = t.db.dbName
+	req.TableName = t.tableName
+
+	// Set select list (columns)
+	if columns := t.queryBuilder.GetColumns(); columns != nil {
+		req.SelectList = columns
+	}
+
+	// Set highlight list
+	if highlight := t.queryBuilder.GetHighlight(); highlight != nil {
+		req.HighlightList = &highlight
+	}
+
+	// Set search expression
+	if search := t.queryBuilder.GetSearch(); search != nil {
+		req.SearchExpr = search
+	}
+
+	// Set where expression (filter)
+	if filter := t.queryBuilder.GetFilter(); filter != nil {
+		req.WhereExpr = filter
+	}
+
+	// Set group by list
+	if groupby := t.queryBuilder.GetGroupBy(); groupby != nil {
+		req.GroupByList = &groupby
+	}
+
+	// Set having expression
+	if having := t.queryBuilder.GetHaving(); having != nil {
+		req.HavingExpr = having
+	}
+
+	// Set limit expression
+	if limit := t.queryBuilder.GetLimit(); limit != nil {
+		req.LimitExpr = limit
+	}
+
+	// Set offset expression
+	if offset := t.queryBuilder.GetOffset(); offset != nil {
+		req.OffsetExpr = offset
+	}
+
+	// Set order by list (sort)
+	if sort := t.queryBuilder.GetSort(); sort != nil {
+		req.OrderByList = &sort
+	}
+
+	// Set total hits count
+	totalHitsCount := t.queryBuilder.GetTotalHitsCount()
+	req.TotalHitsCount = &totalHitsCount
+
+	// Call thrift Select
+	ctx := context.Background()
+	resp, err := t.db.conn.client.Select(ctx, req)
+	if err != nil {
+		return nil, NewInfinityException(
+			int(ErrorCodeCantConnectServer),
+			fmt.Sprintf("Failed to execute query: %v", err),
+		)
+	}
+
+	// Check response error code
+	if resp.ErrorCode != 0 {
+		return nil, NewInfinityException(
+			int(resp.ErrorCode),
+			fmt.Sprintf("Failed to execute query: %s", resp.ErrorMsg),
+		)
+	}
+
+	// Build DataFrame from response - handle concatenated VARCHAR columns
+	return buildDataFrame(resp)
+}
+
+// buildDataFrame builds a DataFrame from SelectResponse, properly handling
+// VARCHAR columns that may have all rows concatenated into a single byte slice
+func buildDataFrame(resp *thriftapi.SelectResponse) (*DataFrame, error) {
+	df := &DataFrame{
+		ColumnData: make(map[string][]interface{}),
+		ExtraInfo:  resp.ExtraResult_,
+	}
+
+	// Process column fields to get data
+	for idx, colField := range resp.ColumnFields {
+		colDef := resp.ColumnDefs[idx]
+		columnName := colDef.Name
+
+		columnType := colField.ColumnType
+		physicalDataType := colDef.DataType.PhysicalType
+		columnVectors := colField.ColumnVectors
+
+		// Parse column vectors based on column type, joining all vectors first
+		// to handle concatenated VARCHAR data (similar to Python's to_df())
+		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors)
+		df.ColumnData[columnName] = values
+	}
+
+	// Determine row count from the longest column
+	for _, values := range df.ColumnData {
+		if len(values) > df.RowCount {
+			df.RowCount = len(values)
+		}
+	}
+
+	// Build columns list
+	df.Columns = make([]string, 0, len(df.ColumnData))
+	for colName := range df.ColumnData {
+		df.Columns = append(df.Columns, colName)
+	}
+
+	return df, nil
+}
+
+// parseColumnVectorsJoined parses column vectors by first joining all byte slices
+// This handles the case where Infinity returns all VARCHAR rows concatenated
+// into a single byte slice (like Python's column_vector_to_list does)
+func parseColumnVectorsJoined(columnType thriftapi.ColumnType, physicalType *thriftapi.PhysicalType, columnVectors [][]byte) []interface{} {
+	if len(columnVectors) == 0 {
+		return []interface{}{}
+	}
+
+	// Join all column vectors first (like Python does)
+	// This is the key fix: Infinity may concatenate all VARCHAR rows into one entry
+	var allBytes []byte
+	for _, v := range columnVectors {
+		allBytes = append(allBytes, v...)
+	}
+
+	values := make([]interface{}, 0)
+
+	switch columnType {
+	case thriftapi.ColumnType_ColumnInt8,
+		thriftapi.ColumnType_ColumnInt16,
+		thriftapi.ColumnType_ColumnInt32,
+		thriftapi.ColumnType_ColumnInt64:
+		// Integer types
+		ints := parseIntVector(bytes.Join(columnVectors, nil), columnType)
+		for _, v := range ints {
+			values = append(values, v)
+		}
+	case thriftapi.ColumnType_ColumnFloat32,
+		thriftapi.ColumnType_ColumnFloat64,
+		thriftapi.ColumnType_ColumnFloat16,
+		thriftapi.ColumnType_ColumnBFloat16:
+		// Float types
+		floats := parseFloatVector(bytes.Join(columnVectors, nil), columnType)
+		for _, v := range floats {
+			values = append(values, v)
+		}
+	case thriftapi.ColumnType_ColumnVarchar:
+		// String type - join all bytes first then parse (fixes concatenated data issue)
+		strs := parseStringVector(allBytes)
+		for _, v := range strs {
+			values = append(values, v)
+		}
+	case thriftapi.ColumnType_ColumnBool:
+		// Boolean type
+		bools := parseBoolVector(bytes.Join(columnVectors, nil))
+		for _, v := range bools {
+			values = append(values, v)
+		}
+	case thriftapi.ColumnType_ColumnEmbedding:
+		// Embedding type - parse based on element type and dimension
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			embeddings := parseEmbeddingVector(allBytes, physicalType.EmbeddingType)
+			for _, v := range embeddings {
+				values = append(values, v)
+			}
+		} else {
+			values = append(values, allBytes)
+		}
+	case thriftapi.ColumnType_ColumnMultiVector,
+		thriftapi.ColumnType_ColumnTensor:
+		// Tensor types
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			tensors := parseTensorVector(allBytes, physicalType.EmbeddingType)
+			for _, v := range tensors {
+				values = append(values, v)
+			}
+		} else {
+			values = append(values, allBytes)
+		}
+	case thriftapi.ColumnType_ColumnTensorArray:
+		// TensorArray type
+		if physicalType != nil && physicalType.EmbeddingType != nil {
+			tensorArrays := parseTensorArrayVector(allBytes, physicalType.EmbeddingType)
+			for _, v := range tensorArrays {
+				values = append(values, v)
+			}
+		} else {
+			values = append(values, allBytes)
+		}
+	case thriftapi.ColumnType_ColumnSparse:
+		// Sparse type
+		if physicalType != nil && physicalType.SparseType != nil {
+			sparseVectors := parseSparseVector(allBytes, physicalType.SparseType)
+			for _, v := range sparseVectors {
+				values = append(values, v)
+			}
+		} else {
+			values = append(values, allBytes)
+		}
+	case thriftapi.ColumnType_ColumnRowID:
+		// RowID type
+		rowIDs := parseRowIDVector(allBytes)
+		for _, v := range rowIDs {
+			values = append(values, v)
+		}
+	case thriftapi.ColumnType_ColumnArray:
+		// Array type - join all bytes first then parse (fixes concatenated array data issue)
+		if physicalType != nil && physicalType.ArrayType != nil {
+			arrays := parseArrayVector(allBytes, physicalType.ArrayType)
+			for _, v := range arrays {
+				values = append(values, v)
+			}
+		} else {
+			values = append(values, allBytes)
+		}
+	default:
+		// For unknown types, return raw bytes
+		values = append(values, allBytes)
+	}
+
+	return values
+}
+
+// parseRowIDVector parses row ID vector from bytes
+func parseRowIDVector(data []byte) []int64 {
+	result := make([]int64, 0, len(data)/8)
+	for i := 0; i+8 <= len(data); i += 8 {
+		val := int64(binary.LittleEndian.Uint64(data[i : i+8]))
+		result = append(result, val)
+	}
+	return result
+}
+
 // Explain returns execution plan
 func (t *Table) Explain(explainType ExplainType) (interface{}, error) {
 	if t.db == nil || t.db.conn == nil {
@@ -1714,7 +1987,8 @@ func buildResult(resp *thriftapi.SelectResponse) (*QueryResult, error) {
 		columnVectors := colField.ColumnVectors
 
 		// Parse column vectors based on column type
-		values := parseColumnVectors(columnType, physicalDataType, columnVectors, colField.Bitmasks)
+		// Use parseColumnVectorsJoined to handle concatenated VARCHAR columns
+		values := parseColumnVectorsJoined(columnType, physicalDataType, columnVectors)
 		result.Data[columnName] = values
 	}
 
