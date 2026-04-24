@@ -479,26 +479,53 @@ func parseFunctionCall(expr string) (*Expression, error) {
 
 	args := []*Expression{}
 	if argsStr != "" {
-		argParts := splitByComma(argsStr)
-		for i, part := range argParts {
-			part = strings.TrimSpace(part)
-			// Check for DISTINCT keyword (only valid as first argument modifier for aggregate functions)
-			if i == 0 && strings.HasPrefix(strings.ToUpper(part), "DISTINCT ") {
-				// Parse the expression after DISTINCT
-				distinctExpr := strings.TrimSpace(part[9:])
-				arg, err := parseExpressionInternal(distinctExpr)
-				if err != nil {
-					return nil, err
+		// Special handling for filter_fulltext and filter_text functions
+		// These functions have a field list as first argument that contains commas
+		// which should NOT be treated as argument separators
+		if strings.ToLower(funcName) == "filter_fulltext" || strings.ToLower(funcName) == "filter_text" {
+			// For filter_fulltext/filter_text, the format is: filter_fulltext('fields', 'matching_text'[, 'options'])
+			// The first argument is a field list like 'f1^10,f2^5' - treat it as a quoted string constant
+			argParts := splitFilterFunctionArgs(argsStr)
+			for i, part := range argParts {
+				part = strings.TrimSpace(part)
+				var arg *Expression
+				var err error
+				if i == 0 {
+					// First argument (field list) - treat as string constant since it contains ^ operators
+					arg = &Expression{
+						Type:     ExprTypeConstant,
+						Constant: parseStringConstant(part),
+					}
+				} else {
+					arg, err = parseExpressionInternal(part)
+					if err != nil {
+						return nil, err
+					}
 				}
-				// Mark this argument as DISTINCT
-				arg.Distinct = true
 				args = append(args, arg)
-			} else {
-				arg, err := parseExpressionInternal(part)
-				if err != nil {
-					return nil, err
+			}
+		} else {
+			argParts := splitByComma(argsStr)
+			for i, part := range argParts {
+				part = strings.TrimSpace(part)
+				// Check for DISTINCT keyword (only valid as first argument modifier for aggregate functions)
+				if i == 0 && strings.HasPrefix(strings.ToUpper(part), "DISTINCT ") {
+					// Parse the expression after DISTINCT
+					distinctExpr := strings.TrimSpace(part[9:])
+					arg, err := parseExpressionInternal(distinctExpr)
+					if err != nil {
+						return nil, err
+					}
+					// Mark this argument as DISTINCT
+					arg.Distinct = true
+					args = append(args, arg)
+				} else {
+					arg, err := parseExpressionInternal(part)
+					if err != nil {
+						return nil, err
+					}
+					args = append(args, arg)
 				}
-				args = append(args, arg)
 			}
 		}
 	}
@@ -515,6 +542,70 @@ func isColumnReference(expr string) bool {
 	// Column reference: name, table.name, db.table.name
 	pattern := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$`)
 	return pattern.MatchString(expr)
+}
+
+// splitFilterFunctionArgs splits arguments for filter_fulltext/filter_text functions
+// These functions have a specific format: 'field1^10,field2^5', 'matching_text'[, options]
+// The first argument can contain commas within the quoted string
+func splitFilterFunctionArgs(argsStr string) []string {
+	var result []string
+	var current strings.Builder
+	inQuote := false
+	quoteChar := rune(0)
+	depth := 0
+
+	for i := 0; i < len(argsStr); i++ {
+		c := argsStr[i]
+
+		if !inQuote && (c == '\'' || c == '"') {
+			inQuote = true
+			quoteChar = rune(c)
+			current.WriteByte(c)
+		} else if inQuote && rune(c) == quoteChar {
+			// Check if it's escaped
+			if i > 0 && argsStr[i-1] == '\\' {
+				current.WriteByte(c)
+			} else {
+				inQuote = false
+				current.WriteByte(c)
+			}
+		} else if !inQuote && c == '(' {
+			depth++
+			current.WriteByte(c)
+		} else if !inQuote && c == ')' {
+			depth--
+			current.WriteByte(c)
+		} else if !inQuote && depth == 0 && c == ',' {
+			result = append(result, current.String())
+			current.Reset()
+		} else {
+			current.WriteByte(c)
+		}
+	}
+
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
+// parseStringConstant parses a string constant and returns a ConstantExpr
+func parseStringConstant(s string) *thriftapi.ConstantExpr {
+	// Remove surrounding quotes if present
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 {
+		if (s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"') {
+			s = s[1 : len(s)-1]
+		}
+	}
+	// Unescape any escaped quotes
+	s = strings.ReplaceAll(s, "\\'", "'")
+	s = strings.ReplaceAll(s, "\\\"", "\"")
+	return &thriftapi.ConstantExpr{
+		LiteralType: thriftapi.LiteralType_String,
+		StrValue:    &s,
+	}
 }
 
 // parseColumnReference parses a column reference
