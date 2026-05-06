@@ -308,3 +308,33 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
     }
     infile.close();
 }
+
+TEST_F(RAGAnalyzerTest, test_set_language_dutch) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // Dutch word "huizen" (houses) should stem to "huiz" with Dutch stemmer
+    // Compare C++ result with Python result
+    std::string python_cmd = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-l dutch \"huizen\"";
+    std::cout << "Call Python tokenizer: " << python_cmd << std::endl;
+
+    FILE *pipe = popen(python_cmd.c_str(), "r");
+    std::string python_result;
+    char buffer[128];
+    if (pipe) {
+        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+            python_result += buffer;
+        }
+        pclose(pipe);
+    }
+    // Remove trailing newline
+    python_result.erase(python_result.find_last_not_of(" \n\r\t") + 1);
+    std::cout << "Python 'huizen' tokenized (Dutch): " << python_result << std::endl;
+
+    analyzer_->SetLanguage("dutch");
+    std::string cxx_result = analyzer_->Tokenize("huizen");
+    std::cout << "C++ 'huizen' tokenized (Dutch): " << cxx_result << std::endl;
+
+    EXPECT_TRUE(cxx_result.find("huiz") != std::string::npos);
+    EXPECT_EQ(cxx_result, python_result);
+}
