@@ -24,6 +24,7 @@ import :darts_trie;
 import :stemmer;
 import :analyzer;
 import :wordnet_lemmatizer;
+import :logger;
 
 import third_party;
 
@@ -41,7 +42,9 @@ public:
 
     ~RAGAnalyzer();
 
-    void InitStemmer(Language language) { stemmer_->Init(language); }
+    void InitStemmer(Language language);
+
+    void SetLanguage(const std::string &language);
 
     Status Load();
 
@@ -131,6 +134,8 @@ public:
     POSTable *pos_table_{nullptr};
 
     WordNetLemmatizer *wordnet_lemma_{nullptr};
+
+    bool use_lemmatizer_{true}; // WordNet only supports English
 
     std::unique_ptr<Stemmer> stemmer_;
 
