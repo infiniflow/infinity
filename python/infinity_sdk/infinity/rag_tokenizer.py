@@ -43,6 +43,29 @@ from nltk import word_tokenize
 from nltk.stem import SnowballStemmer, WordNetLemmatizer
 
 
+# Map language names (lowercase) to NLTK SnowballStemmer language names.
+# Used by set_language() to configure language-specific stemming.
+_SNOWBALL_LANGUAGE_MAP = {
+    "english": "english",
+    "dutch": "dutch",
+    "german": "german",
+    "french": "french",
+    "spanish": "spanish",
+    "italian": "italian",
+    "portuguese": "portuguese",
+    "portuguese br": "portuguese",
+    "russian": "russian",
+    "arabic": "arabic",
+    "danish": "danish",
+    "finnish": "finnish",
+    "hungarian": "hungarian",
+    "norwegian": "norwegian",
+    "romanian": "romanian",
+    "swedish": "swedish",
+    "turkish": "turkish",
+}
+
+
 class RagTokenizer:
     def key_(self, line):
         return str(line.lower().encode("utf-8"))[2:-1]
@@ -98,6 +121,7 @@ class RagTokenizer:
 
         self.stemmer = SnowballStemmer("english")
         self.lemmatizer = WordNetLemmatizer()
+        self._use_lemmatizer = True  # WordNet only supports English
 
         self.SPLIT_CHAR = r"([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+)"
 
@@ -130,6 +154,38 @@ class RagTokenizer:
 
     def add_user_dict(self, fnm):
         self._load_dict(fnm)
+
+    def set_language(self, language: str):
+        """Configure stemmer/lemmatizer for the given language.
+
+        Args:
+            language: Language name (e.g. "English", "Dutch", "Chinese").
+                      Case-insensitive.
+        """
+        lang_key = language.strip().lower()
+        snowball_lang = _SNOWBALL_LANGUAGE_MAP.get(lang_key)
+
+        if snowball_lang is not None:
+            self.stemmer = SnowballStemmer(snowball_lang)
+            if snowball_lang == "english":
+                self.lemmatizer = WordNetLemmatizer()
+                self._use_lemmatizer = True
+            else:
+                # WordNet only supports English; disable lemmatizer for
+                # other languages and rely on Snowball stemming alone.
+                self._use_lemmatizer = False
+            logging.debug(
+                "Tokenizer language set to '%s' (Snowball: %s, lemmatizer: %s)",
+                language, snowball_lang, self._use_lemmatizer,
+            )
+        else:
+            # Unsupported language (Chinese, Japanese, Korean, etc.) –
+            # keep defaults.  CJK text uses dictionary segmentation,
+            # not stemming.
+            logging.debug(
+                "Language '%s' has no Snowball stemmer; keeping defaults",
+                language,
+            )
 
     def _strQ2B(self, ustring):
         """Convert full-width characters to half-width characters"""
@@ -326,7 +382,20 @@ class RagTokenizer:
         return self.score_(res[::-1])
 
     def english_normalize_(self, tks):
-        return [self.stemmer.stem(self.lemmatizer.lemmatize(t)) if re.match(r"[a-zA-Z_-]+$", t) else t for t in tks]
+        return [self._normalize_token(t) for t in tks]
+
+    def _normalize_token(self, t: str) -> str:
+        """Stem (and optionally lemmatize) a single alphabetic token.
+
+        When the lemmatizer is enabled (English), applies lemmatization
+        before stemming.  For other Snowball-supported languages, only
+        stemming is applied.  Non-alphabetic tokens are returned as-is.
+        """
+        if re.match(r"[a-zA-Z_-]+$", t):
+            if self._use_lemmatizer:
+                return self.stemmer.stem(self.lemmatizer.lemmatize(t))
+            return self.stemmer.stem(t)
+        return t
 
     def _split_by_lang(self, line):
         txt_lang_pairs = []
@@ -360,7 +429,7 @@ class RagTokenizer:
         res = []
         for L, lang in arr:
             if not lang:
-                res.extend([self.stemmer.stem(self.lemmatizer.lemmatize(t)) for t in word_tokenize(L)])
+                res.extend([self._normalize_token(t) for t in word_tokenize(L)])
                 continue
             if len(L) < 2 or re.match(r"[a-z\.-]+$", L) or re.match(r"[0-9\.-]+$", L):
                 res.append(L)
