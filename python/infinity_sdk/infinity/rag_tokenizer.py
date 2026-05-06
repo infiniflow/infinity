@@ -570,10 +570,15 @@ if __name__ == '__main__':
     parser.add_argument('--fine-grained', action='store_true',
                         help='Use fine-grained tokenization')
     parser.add_argument('--user-dict', help='User dictionary file')
+    parser.add_argument('-l', '--language', help='Language for stemming (e.g., english, dutch)')
 
     args = parser.parse_args()
 
     tokenizer = RagTokenizer(debug=True, user_dict=args.user_dict)
+
+    # Set language if specified
+    if args.language:
+        tokenizer.set_language(args.language)
 
     # Process input
     if args.file:

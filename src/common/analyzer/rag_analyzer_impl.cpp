@@ -46,6 +46,28 @@ static const std::string WORDNET_PATH = "wordnet";
 
 static const std::string OPENCC_PATH = "opencc";
 
+// Map language names (lowercase) to Stemmer Language enum.
+// Used by SetLanguage() to configure language-specific stemming.
+static const std::pair<std::string, Language> SNOWBALL_LANGUAGE_MAP[] = {
+    {"english", STEM_LANG_ENGLISH},
+    {"dutch", STEM_LANG_DUTCH},
+    {"german", STEM_LANG_GERMAN},
+    {"french", STEM_LANG_FRENCH},
+    {"spanish", STEM_LANG_SPANISH},
+    {"italian", STEM_LANG_ITALIAN},
+    {"portuguese", STEM_LANG_PORTUGUESE},
+    {"portuguese br", STEM_LANG_PORTUGUESE},
+    {"russian", STEM_LANG_RUSSIAN},
+    {"arabic", STEM_LANG_UNKNOWN}, // No Arabic entry in Language enum (stemmer.cppm), so use UNKNOWN to keep default stemming behavior
+    {"danish", STEM_LANG_DANISH},
+    {"finnish", STEM_LANG_FINNISH},
+    {"hungarian", STEM_LANG_HUNGARIAN},
+    {"norwegian", STEM_LANG_NORWEGIAN},
+    {"romanian", STEM_LANG_ROMANIAN},
+    {"swedish", STEM_LANG_SWEDISH},
+    {"turkish", STEM_LANG_TURKISH},
+};
+
 static const std::string REGEX_SPLIT_CHAR =
     R"#(([ ,\.<>/?;'\[\]\`!@#$%^&*$$\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z\.-]+|[0-9,\.-]+))#";
 
@@ -659,6 +681,40 @@ RAGAnalyzer::~RAGAnalyzer() {
         delete pos_table_;
         delete wordnet_lemma_;
         delete opencc_;
+    }
+}
+
+void RAGAnalyzer::InitStemmer(Language language) {
+    stemmer_->Init(language);
+    use_lemmatizer_ = (language == STEM_LANG_ENGLISH);
+}
+
+void RAGAnalyzer::SetLanguage(const std::string &language) {
+    std::string lang_key = language;
+    // Convert to lowercase
+    std::transform(lang_key.begin(), lang_key.end(), lang_key.begin(), [](unsigned char c) { return std::tolower(c); });
+    // Trim whitespace
+    lang_key.erase(lang_key.find_last_not_of(" \t") + 1);
+    lang_key.erase(0, lang_key.find_first_not_of(" \t"));
+
+    Language stem_lang = STEM_LANG_UNKNOWN;
+    std::string snowball_lang;
+    for (const auto &pair : SNOWBALL_LANGUAGE_MAP) {
+        if (pair.first == lang_key) {
+            stem_lang = pair.second;
+            snowball_lang = pair.first;
+            break;
+        }
+    }
+
+    if (stem_lang != STEM_LANG_UNKNOWN) {
+        stemmer_->Init(stem_lang);
+        use_lemmatizer_ = (stem_lang == STEM_LANG_ENGLISH);
+        LOG_DEBUG(fmt::format("Tokenizer language set to '{}' (Snowball: {}, lemmatizer: {})", language, snowball_lang, use_lemmatizer_));
+    } else {
+        // Unsupported language (Chinese, Japanese, Korean, etc.) –
+        // keep defaults. CJK text uses dictionary segmentation, not stemming.
+        LOG_DEBUG(fmt::format("Language '{}' has no Snowball stemmer; keeping defaults", language));
     }
 }
 
@@ -1332,9 +1388,14 @@ void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::
             // Apply lowercase before lemmatization to match Python NLTK behavior
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
-            std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
+            std::string term_to_stem;
+            if (use_lemmatizer_) {
+                term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
+            } else {
+                term_to_stem = lowercase_term;
+            }
             std::string stem_term;
-            stemmer_->Stem(lemma_term, stem_term);
+            stemmer_->Stem(term_to_stem, stem_term);
             res.push_back(stem_term);
         } else {
             res.push_back(t);
@@ -1694,9 +1755,14 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
                 // Apply lowercase before lemmatization to match Python NLTK behavior
                 char *lowercase_term = lowercase_string_buffer_.data();
                 ToLower(term_list[i].c_str(), term_list[i].size(), lowercase_term, term_string_buffer_limit_);
-                std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
+                std::string term_to_stem;
+                if (use_lemmatizer_) {
+                    term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
+                } else {
+                    term_to_stem = lowercase_term;
+                }
                 std::string stem_term;
-                stemmer_->Stem(lemma_term, stem_term);
+                stemmer_->Stem(term_to_stem, stem_term);
                 res.push_back(stem_term);
             }
             continue;
@@ -1811,9 +1877,14 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                         // Apply lowercase before lemmatization to match Python NLTK behavior
                         char *lowercase_term = lowercase_string_buffer_.data();
                         ToLower(term.c_str(), term.size(), lowercase_term, term_string_buffer_limit_);
-                        std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
+                        std::string term_to_stem;
+                        if (use_lemmatizer_) {
+                            term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
+                        } else {
+                            term_to_stem = lowercase_term;
+                        }
                         std::string stem_term;
-                        stemmer_->Stem(lemma_term, stem_term);
+                        stemmer_->Stem(term_to_stem, stem_term);
 
                         tokens.push_back(stem_term);
 
@@ -2136,9 +2207,14 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
             // Apply lowercase before lemmatization to match Python NLTK behavior
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(token.c_str(), token.size(), lowercase_term, term_string_buffer_limit_);
-            std::string lemma_term = wordnet_lemma_->Lemmatize(lowercase_term);
+            std::string term_to_stem;
+            if (use_lemmatizer_) {
+                term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
+            } else {
+                term_to_stem = lowercase_term;
+            }
             std::string stem_term;
-            stemmer_->Stem(lemma_term, stem_term);
+            stemmer_->Stem(term_to_stem, stem_term);
 
             normalize_tokens.push_back(stem_term);
             normalize_positions.emplace_back(start_pos, end_pos);
