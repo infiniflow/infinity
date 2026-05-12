@@ -864,7 +864,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             break;
         }
         case IndexType::kSecondary: {
-            assert(index_info->index_param_list_ != nullptr);
+            std::vector<InitParameter *> param_list;
+            bool added_cardinality_param = false;
 
             // Check if column is JSON type
             auto &column_names_vec = *(base_table_ref->column_names_);
@@ -872,8 +873,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             size_t column_id = std::find(column_names_vec.begin(), column_names_vec.end(), index_info->column_name_) - column_names_vec.begin();
             bool is_json_column = (column_id < column_types_vec.size()) && (column_types_vec[column_id]->type() == LogicalType::kJson);
 
-            std::vector<InitParameter *> param_list = *(index_info->index_param_list_);
-            bool added_cardinality_param = false;
+            if (index_info->index_param_list_ != nullptr) {
+                param_list = *(index_info->index_param_list_);
+            }
             if (is_json_column) {
                 // Check if user explicitly specified cardinality=high for JSON column
                 for (const auto *param : param_list) {
