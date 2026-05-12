@@ -24,8 +24,11 @@ import std;
 namespace infinity {
 
 std::string JsonFlattener::EncodeInteger(int64_t value) {
-    char buf[32];
-    int len = std::snprintf(buf, sizeof(buf), "%020ld", value);
+    // Flip the sign bit so signed integer order matches lexicographic order.
+    uint64_t sortable_bits = std::bit_cast<uint64_t>(value) ^ (uint64_t{1} << 63);
+
+    char buf[17];
+    int len = std::snprintf(buf, sizeof(buf), "%016llX", static_cast<unsigned long long>(sortable_bits));
     return std::string(buf, len);
 }
 

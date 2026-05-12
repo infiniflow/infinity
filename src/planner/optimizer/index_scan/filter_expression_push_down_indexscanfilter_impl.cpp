@@ -801,7 +801,7 @@ private:
                                 } else if (compare_type == FilterCompareType::kGreater || compare_type == FilterCompareType::kGreaterEqual) {
                                     // For > and >=, int range is [int_lower_bound, +inf)
                                     std::string path_prefix = json_path + ":i:";
-                                    evaluator->AddRange(std::make_pair(int_term_key, JsonTermT(path_prefix + ";")));
+                                    evaluator->AddRange(std::make_pair(int_term_key, JsonTermT(path_prefix + "~")));
                                 } else {
                                     // For < and <=, int range is (-inf, int_upper_bound]
                                     std::string path_prefix = json_path + ":i:";
