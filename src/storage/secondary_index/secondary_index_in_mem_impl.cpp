@@ -250,7 +250,8 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, Row
                 return std::make_shared<SecondaryIndexInMemT<VarcharT, HighCardinalityTag>>(begin_row_id, cardinality);
             }
             case LogicalType::kJson: {
-                return std::make_shared<SecondaryIndexInMemT<JsonTermT, LowCardinalityTag>>(begin_row_id, cardinality);
+                UnrecoverableError("JSON secondary index only supports low cardinality");
+                return nullptr;
             }
             default: {
                 return nullptr;

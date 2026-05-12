@@ -866,6 +866,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         case IndexType::kSecondary: {
             std::vector<InitParameter *> param_list;
             bool added_cardinality_param = false;
+            std::unique_ptr<InitParameter> injected_cardinality_param;
 
             // Check if column is JSON type
             auto &column_names_vec = *(base_table_ref->column_names_);
@@ -899,8 +900,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
                     }
                 }
                 if (!has_cardinality) {
-                    auto *cardinality_param = new InitParameter("cardinality", "low");
-                    param_list.push_back(cardinality_param);
+                    injected_cardinality_param = std::make_unique<InitParameter>("cardinality", "low");
+                    param_list.push_back(injected_cardinality_param.get());
                     added_cardinality_param = true;
                 }
             }
@@ -914,9 +915,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
                                                 secondary_index->GetSecondaryIndexCardinality(),
                                                 is_json_column); // may throw exception
 
-            // Clean up only the added parameter
             if (added_cardinality_param) {
-                delete param_list.back();
+                param_list.pop_back();
             }
             break;
         }
