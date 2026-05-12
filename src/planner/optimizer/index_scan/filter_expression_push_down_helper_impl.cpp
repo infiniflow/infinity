@@ -511,8 +511,10 @@ Value FilterExpressionPushDownHelper::CalcValueResult(const std::shared_ptr<Base
 }
 
 std::string FilterExpressionPushDownHelper::EncodeJsonInteger(int64_t value) {
-    char buf[32];
-    int len = std::snprintf(buf, sizeof(buf), "%020ld", value);
+    uint64_t sortable_bits = std::bit_cast<uint64_t>(value) ^ (uint64_t{1} << 63);
+
+    char buf[17];
+    int len = std::snprintf(buf, sizeof(buf), "%016llX", static_cast<unsigned long long>(sortable_bits));
     return std::string(buf, len);
 }
 
@@ -643,6 +645,11 @@ JsonTermT FilterExpressionPushDownHelper::BuildJsonTerm(const std::string &func_
             // > value: term = value + epsilon
             if (func_name == "json_extract_int") {
                 int64_t int_val = value.GetValue<int64_t>();
+                if (int_val == std::numeric_limits<int64_t>::max()) {
+                    term = JsonTermT("");
+                    compare_type = FilterCompareType::kAlwaysFalse;
+                    break;
+                }
                 std::string encoded_val = EncodeJsonInteger(int_val + 1);
                 term = JsonTermT(path + type_tag + encoded_val);
             } else if (func_name == "json_extract_double") {
@@ -676,6 +683,11 @@ JsonTermT FilterExpressionPushDownHelper::BuildJsonTerm(const std::string &func_
             // < value: term = value - epsilon
             if (func_name == "json_extract_int") {
                 int64_t int_val = value.GetValue<int64_t>();
+                if (int_val == std::numeric_limits<int64_t>::min()) {
+                    term = JsonTermT("");
+                    compare_type = FilterCompareType::kAlwaysFalse;
+                    break;
+                }
                 std::string encoded_val = EncodeJsonInteger(int_val - 1);
                 term = JsonTermT(path + type_tag + encoded_val);
             } else if (func_name == "json_extract_double") {
