@@ -67,6 +67,16 @@ true
 false
 null
 
+query B
+SELECT json_contains(c3, '$.1', 0.123) FROM test_json_filter WHERE c1 = 4;
+----
+true
+
+query B
+SELECT json_contains(c3, '$.1', 123) FROM test_json_filter WHERE c1 = 4;
+----
+false
+
 # ============================================================================
 # Part 2: JSON Path Extraction with WHERE clause
 # ============================================================================

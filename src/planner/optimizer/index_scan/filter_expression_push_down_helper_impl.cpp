@@ -28,6 +28,7 @@ import :value;
 import :secondary_index_data;
 import :table_meta;
 import :status;
+import :json_manager;
 
 import std.compat;
 import third_party;
@@ -35,6 +36,7 @@ import third_party;
 import internal_types;
 import data_type;
 import logical_type;
+import json_term;
 
 namespace infinity {
 
@@ -506,6 +508,211 @@ Value FilterExpressionPushDownHelper::CalcValueResult(const std::shared_ptr<Base
         expr_evaluator.Execute(expression, expression_state, result_vector);
         return result_vector->GetValueByIndex(0);
     }
+}
+
+std::string FilterExpressionPushDownHelper::EncodeJsonInteger(int64_t value) {
+    char buf[32];
+    int len = std::snprintf(buf, sizeof(buf), "%020ld", value);
+    return std::string(buf, len);
+}
+
+std::string FilterExpressionPushDownHelper::EncodeJsonDouble(double value) {
+    if (value == 0.0) {
+        value = 0.0;
+    }
+    uint64_t bits = std::bit_cast<uint64_t>(value);
+    const uint64_t sortable_bits = (bits & (uint64_t{1} << 63)) ? ~bits : (bits ^ (uint64_t{1} << 63));
+
+    char buf[17];
+    int len = std::snprintf(buf, sizeof(buf), "%016llX", static_cast<unsigned long long>(sortable_bits));
+    return std::string(buf, len);
+}
+
+JsonTermT FilterExpressionPushDownHelper::BuildJsonTerm(const std::string &func_name,
+                                                        const std::string &path,
+                                                        const Value &value,
+                                                        FilterCompareType &compare_type) {
+    // Determine the type tag based on function name
+    std::string type_tag;
+    bool is_contains = (func_name == "json_contains");
+
+    if (is_contains) {
+        // json_contains can match any value type - determine type from token value
+        std::string term_value = value.GetVarchar();
+
+        // Try to parse the token to determine its type
+        JsonTypeDef parsed_token;
+        bool parse_success = false;
+        try {
+            parsed_token = JsonTypeDef::parse(term_value);
+            parse_success = true;
+        } catch (...) {
+            // If parsing fails, treat as string literal
+        }
+
+        std::string encoded_value;
+        if (parse_success) {
+            switch (parsed_token.type()) {
+                case JsonValueType::number_integer: {
+                    type_tag = ":i:";
+                    int64_t int_val = parsed_token.get<int64_t>();
+                    encoded_value = EncodeJsonInteger(int_val);
+                    break;
+                }
+                case JsonValueType::number_unsigned: {
+                    type_tag = ":i:";
+                    int64_t int_val = static_cast<int64_t>(parsed_token.get<uint64_t>());
+                    encoded_value = EncodeJsonInteger(int_val);
+                    break;
+                }
+                case JsonValueType::number_float: {
+                    type_tag = ":d:";
+                    double double_val = parsed_token.get<double>();
+                    encoded_value = EncodeJsonDouble(double_val);
+                    break;
+                }
+                case JsonValueType::boolean: {
+                    type_tag = ":b:";
+                    bool bool_val = parsed_token.get<bool>();
+                    encoded_value = bool_val ? "1" : "0";
+                    break;
+                }
+                case JsonValueType::string: {
+                    type_tag = ":s:";
+                    encoded_value = parsed_token.get<std::string>();
+                    break;
+                }
+                default: {
+                    // For null or unknown types, treat as string
+                    type_tag = ":s:";
+                    encoded_value = term_value;
+                    break;
+                }
+            }
+        } else {
+            // Couldn't parse as JSON, treat as string
+            type_tag = ":s:";
+            encoded_value = term_value;
+        }
+
+        return JsonTermT(path + type_tag + encoded_value);
+    }
+
+    // json_extract_* functions
+    if (func_name == "json_extract_int" || func_name == "json_extract_isnull") {
+        type_tag = ":i:";
+    } else if (func_name == "json_extract_double") {
+        type_tag = ":d:";
+    } else if (func_name == "json_extract_bool") {
+        type_tag = ":b:";
+    } else if (func_name == "json_extract_string") {
+        type_tag = ":s:";
+    } else if (func_name == "json_exists_path") {
+        type_tag = ":p:";
+    } else {
+        // Unknown function, return empty term
+        return JsonTermT("");
+    }
+
+    // Build term based on comparison type
+    JsonTermT term;
+    switch (compare_type) {
+        case FilterCompareType::kEqual: {
+            if (func_name == "json_extract_int") {
+                int64_t int_val = value.GetValue<int64_t>();
+                std::string encoded_val = EncodeJsonInteger(int_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_double") {
+                double double_val = value.GetValue<DoubleT>();
+                std::string encoded_val = EncodeJsonDouble(double_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_string") {
+                std::string str_val = value.GetVarchar();
+                term = JsonTermT(path + type_tag + str_val);
+            } else if (func_name == "json_extract_bool") {
+                bool bool_val = value.GetValue<BooleanT>();
+                term = JsonTermT(path + type_tag + (bool_val ? "1" : "0"));
+            } else if (func_name == "json_exists_path") {
+                term = JsonTermT(path + type_tag);
+            } else if (func_name == "json_extract_isnull") {
+                term = JsonTermT(path + ":n:");
+            }
+            break;
+        }
+        case FilterCompareType::kGreater: {
+            // > value: term = value + epsilon
+            if (func_name == "json_extract_int") {
+                int64_t int_val = value.GetValue<int64_t>();
+                std::string encoded_val = EncodeJsonInteger(int_val + 1);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_double") {
+                double double_val = value.GetValue<DoubleT>();
+                std::string encoded_val = EncodeJsonDouble(std::nextafter(double_val, std::numeric_limits<double>::max()));
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_string") {
+                std::string str_val = value.GetVarchar();
+                term = JsonTermT(path + type_tag + str_val + '\x01'); // exclusive lower bound
+            }
+            compare_type = FilterCompareType::kGreaterEqual;
+            break;
+        }
+        case FilterCompareType::kGreaterEqual: {
+            // >= value: term = value
+            if (func_name == "json_extract_int") {
+                int64_t int_val = value.GetValue<int64_t>();
+                std::string encoded_val = EncodeJsonInteger(int_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_double") {
+                double double_val = value.GetValue<DoubleT>();
+                std::string encoded_val = EncodeJsonDouble(double_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_string") {
+                std::string str_val = value.GetVarchar();
+                term = JsonTermT(path + type_tag + str_val);
+            }
+            break;
+        }
+        case FilterCompareType::kLess: {
+            // < value: term = value - epsilon
+            if (func_name == "json_extract_int") {
+                int64_t int_val = value.GetValue<int64_t>();
+                std::string encoded_val = EncodeJsonInteger(int_val - 1);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_double") {
+                double double_val = value.GetValue<DoubleT>();
+                std::string encoded_val = EncodeJsonDouble(std::nextafter(double_val, std::numeric_limits<double>::lowest()));
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_string") {
+                std::string str_val = value.GetVarchar();
+                term = JsonTermT(path + type_tag + str_val);
+            }
+            compare_type = FilterCompareType::kLessEqual;
+            break;
+        }
+        case FilterCompareType::kLessEqual: {
+            // <= value: term = value
+            if (func_name == "json_extract_int") {
+                int64_t int_val = value.GetValue<int64_t>();
+                std::string encoded_val = EncodeJsonInteger(int_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_double") {
+                double double_val = value.GetValue<DoubleT>();
+                std::string encoded_val = EncodeJsonDouble(double_val);
+                term = JsonTermT(path + type_tag + encoded_val);
+            } else if (func_name == "json_extract_string") {
+                std::string str_val = value.GetVarchar();
+                term = JsonTermT(path + type_tag + str_val);
+            }
+            break;
+        }
+        default: {
+            // Invalid or always true/false
+            term = JsonTermT("");
+            break;
+        }
+    }
+
+    return term;
 }
 
 } // namespace infinity

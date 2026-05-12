@@ -31,12 +31,15 @@ import :memindex_tracer;
 import :column_vector;
 import :buffer_obj;
 import :rcu_multimap;
+import :json_flattener;
+import :value;
 
 import std;
 
 import logical_type;
 import internal_types;
 import column_def;
+import json_term;
 
 namespace infinity {
 
@@ -69,10 +72,36 @@ public:
     }
 
     void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) override {
+        if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+            // For JSON, we need to flatten each JSON document and insert multiple terms per row
+            return InsertBlockDataJson(block_offset, col, offset, row_count);
+        }
         MemIndexInserterIter1<RawValueType> iter(block_offset, col, offset, row_count);
         const auto inserted_rows = InsertInner(iter);
         assert(inserted_rows <= row_count);
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
+    }
+
+    // Special insertion for JSON: flatten each JSON document and insert multiple terms per row
+    void InsertBlockDataJson(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
+        // This method inserts multiple terms per JSON document
+        // For each row, we flatten the JSON and insert each term
+        u32 inserted_count = 0;
+        for (BlockOffset i = 0; i < row_count; ++i) {
+            // Get the JSON value at position offset + i
+            Value value = col.GetValueByIndex(offset + i);
+            const auto &extra_info = value.value_info_;
+            if (extra_info && extra_info->type_ == ExtraValueInfoType::JSON_VALUE_INFO) {
+                auto *json_info = static_cast<JsonValueInfo *>(extra_info.get());
+                auto terms = JsonFlattener::FlattenDocument(json_info->bson_elements_.data(), json_info->bson_elements_.size());
+                for (const auto &term : terms) {
+                    JsonTermT key(term.term_);
+                    in_mem_secondary_index_.Insert(key, block_offset + offset + i);
+                    ++inserted_count;
+                }
+            }
+        }
+        IncreaseMemoryUsageBase(inserted_count * MemoryCostOfEachRow());
     }
 
     void Dump(BufferObj *buffer_obj) const override {
@@ -138,6 +167,11 @@ private:
                 const KeyType key = ConvertToOrderedKeyValue(bool_value);
                 // Insert u32 offset directly
                 in_mem_secondary_index_.Insert(key, offset);
+            } else if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+                // JsonTermT is handled specially: it is already a string term
+                // No need to convert, just use it directly
+                const auto &json_term = *v_ptr;
+                in_mem_secondary_index_.Insert(json_term, offset);
             } else {
                 const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
                 // Insert u32 offset directly
@@ -215,6 +249,10 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, Row
             case LogicalType::kVarchar: {
                 return std::make_shared<SecondaryIndexInMemT<VarcharT, HighCardinalityTag>>(begin_row_id, cardinality);
             }
+            case LogicalType::kJson: {
+                UnrecoverableError("JSON secondary index only supports low cardinality");
+                return nullptr;
+            }
             default: {
                 return nullptr;
             }
@@ -256,6 +294,9 @@ SecondaryIndexInMem::NewSecondaryIndexInMem(const DataType &index_data_type, Row
             }
             case LogicalType::kVarchar: {
                 return std::make_shared<SecondaryIndexInMemT<VarcharT, LowCardinalityTag>>(begin_row_id, cardinality);
+            }
+            case LogicalType::kJson: {
+                return std::make_shared<SecondaryIndexInMemT<JsonTermT, LowCardinalityTag>>(begin_row_id, cardinality);
             }
             default: {
                 return nullptr;

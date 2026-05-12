@@ -793,3 +793,60 @@ TEST_P(TestTxnReplayIndex, drop_index) {
         EXPECT_FALSE(status.ok());
     }
 }
+
+TEST_P(TestTxnReplayIndex, test_json_index_replay) {
+    using namespace infinity;
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "id", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kJson), "meta", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    // Create JSON secondary index
+    auto index_name = std::make_shared<std::string>("idx_json");
+    std::vector<InitParameter *> index_params;
+    index_params.emplace_back(new InitParameter("cardinality", "low"));
+    auto index_def = IndexSecondary::Make(index_name, std::make_shared<std::string>(), "file_name", {column_def2->name()}, index_params, true);
+    for (auto *param : index_params) {
+        delete param;
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RestartTxnMgr();
+
+    // Verify index is replayed correctly
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("check index"), TransactionType::kRead);
+        Status status;
+        std::shared_ptr<DBMeta> db_meta;
+        std::shared_ptr<TableMeta> table_meta;
+        std::shared_ptr<TableIndexMeta> table_index_meta;
+        std::string table_key;
+        std::string index_key;
+        status = txn->GetTableIndexMeta(*db_name, *table_name, *index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        auto [index_base, index_status] = table_index_meta->GetIndexBase();
+        EXPECT_TRUE(index_status.ok());
+        auto *secondary_index = static_cast<IndexSecondary *>(index_base.get());
+        EXPECT_TRUE(secondary_index->IsJsonIndex());
+        EXPECT_EQ(secondary_index->GetSecondaryIndexCardinality(), SecondaryIndexCardinality::kLowCardinality);
+        EXPECT_EQ(secondary_index->BuildOtherParamsString(), "cardinality = low");
+    }
+}

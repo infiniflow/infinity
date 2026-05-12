@@ -31,6 +31,7 @@ import :scalar_function;
 import :scalar_function_set;
 import :index_base;
 import :index_secondary_functional;
+import :index_secondary;
 import :new_catalog;
 import :value;
 import :meta_info;
@@ -93,6 +94,13 @@ struct ExpressionIndexScanInfo {
         // logical expr ("not" is treated as unknown)
         kAndExpr,
         kOrExpr,
+
+        // JSON secondary index function
+        kJsonSecondaryIndexFunctionExprOrAfterCast,
+
+        // JSON secondary index filter
+        kJsonSecondaryIndexValueCompareExpr,
+        kValueJsonSecondaryIndexCompareExpr,
     };
 
     // for index scan
@@ -218,7 +226,8 @@ struct ExpressionIndexScanInfo {
                                 case Enum::kVarcharSecondaryIndexColumnExprOrAfterCast:
                                 case Enum::kSecondaryIndexColumnExprOrAfterCast:
                                 case Enum::kVarcharSecondaryIndexFunctionExprOrAfterCast:
-                                case Enum::kSecondaryIndexFunctionExprOrAfterCast: {
+                                case Enum::kSecondaryIndexFunctionExprOrAfterCast:
+                                case Enum::kJsonSecondaryIndexFunctionExprOrAfterCast: {
                                     break;
                                 }
                                 case Enum::kAndExpr:
@@ -228,7 +237,9 @@ struct ExpressionIndexScanInfo {
                                 case Enum::kSecondaryIndexValueCompareExpr:
                                 case Enum::kValueSecondaryIndexCompareExpr:
                                 case Enum::kSecondaryFunctionalIndexValueCompareExpr:
-                                case Enum::kValueSecondaryFunctionalIndexCompareExpr: {
+                                case Enum::kValueSecondaryFunctionalIndexCompareExpr:
+                                case Enum::kJsonSecondaryIndexValueCompareExpr:
+                                case Enum::kValueJsonSecondaryIndexCompareExpr: {
                                     all_column_function_or_unknown = false;
                                     break;
                                 }
@@ -283,6 +294,37 @@ struct ExpressionIndexScanInfo {
                             tree.info = Enum::kSecondaryFunctionalIndexValueCompareExpr;
                         } else if (check_func_value(tree.children[1].info, tree.children[0].info, is_equal_func)) {
                             tree.info = Enum::kValueSecondaryFunctionalIndexCompareExpr;
+                        } else if (tree.children[0].info == Enum::kJsonSecondaryIndexFunctionExprOrAfterCast ||
+                                   tree.children[1].info == Enum::kJsonSecondaryIndexFunctionExprOrAfterCast) {
+                            // JSON function comparison: json_extract_*(col, path) = value
+                            if (tree.children[0].info == Enum::kJsonSecondaryIndexFunctionExprOrAfterCast) {
+                                tree.info = Enum::kJsonSecondaryIndexValueCompareExpr;
+                            } else {
+                                tree.info = Enum::kValueJsonSecondaryIndexCompareExpr;
+                            }
+                        }
+                    }
+                    // Check for JSON function expressions (json_contains, json_extract_*, json_exists_path, etc.)
+                    else if (std::find(JsonIndexPushdownFunctionNames.begin(), JsonIndexPushdownFunctionNames.end(), f_name) !=
+                             JsonIndexPushdownFunctionNames.end()) {
+                        // First argument should be the column
+                        if (!tree.children.empty() && tree.children[0].info == Enum::kSecondaryIndexColumnExprOrAfterCast) {
+                            auto *column_expression = static_cast<const ColumnExpression *>(function_expression->arguments()[0].get());
+                            auto [column_id, status] = table_meta_->GetColumnIDByColumnName(column_expression->column_name());
+                            if (status.ok() && new_candidate_column_index_map_.contains(column_id)) {
+                                auto &index_meta = new_candidate_column_index_map_.at(column_id);
+                                auto [index_base, index_status] = index_meta->GetIndexBase();
+                                if (index_base->index_type_ == IndexType::kSecondary) {
+                                    auto *secondary_index = static_cast<const IndexSecondary *>(index_base.get());
+                                    if (secondary_index->IsJsonIndex()) {
+                                        tree.info = Enum::kJsonSecondaryIndexFunctionExprOrAfterCast;
+                                    }
+                                }
+                            } else {
+                                LOG_WARN(fmt::format("BuildTree: column_id {} not in candidate map, map size={}",
+                                                     column_id,
+                                                     new_candidate_column_index_map_.size()));
+                            }
                         }
                     }
                     // Identify the function expression in secondary functional index, ignore the negative function and not equal operator
@@ -409,6 +451,9 @@ private:
             case Enum::kSecondaryIndexValueCompareExpr:
             case Enum::kValueSecondaryFunctionalIndexCompareExpr:
             case Enum::kSecondaryFunctionalIndexValueCompareExpr:
+            case Enum::kJsonSecondaryIndexValueCompareExpr:
+            case Enum::kValueJsonSecondaryIndexCompareExpr:
+            case Enum::kJsonSecondaryIndexFunctionExprOrAfterCast:
             case Enum::kFilterFulltextExpr: {
                 result.first = *tree_node.src_ptr;
                 break;
@@ -493,7 +538,10 @@ private:
             case Enum::kValueSecondaryIndexCompareExpr:
             case Enum::kSecondaryIndexValueCompareExpr:
             case Enum::kValueSecondaryFunctionalIndexCompareExpr:
-            case Enum::kSecondaryFunctionalIndexValueCompareExpr: {
+            case Enum::kSecondaryFunctionalIndexValueCompareExpr:
+            case Enum::kJsonSecondaryIndexValueCompareExpr:
+            case Enum::kValueJsonSecondaryIndexCompareExpr:
+            case Enum::kJsonSecondaryIndexFunctionExprOrAfterCast: {
                 auto *function_expression = static_cast<FunctionExpression *>(index_filter_tree_node.src_ptr->get());
                 auto const &f_name = function_expression->ScalarFunctionName();
                 static constexpr std::array<std::string, 5> PossibleFunctionNames{"<", ">", "<=", ">=", "="};
@@ -509,7 +557,11 @@ private:
                                                                                        FilterCompareType::kEqual};
                 const auto it = std::find(PossibleFunctionNames.begin(), PossibleFunctionNames.end(), f_name);
                 if (it == PossibleFunctionNames.end()) {
-                    UnrecoverableError("Function name not found");
+                    if (index_filter_tree_node.info == Enum::kJsonSecondaryIndexFunctionExprOrAfterCast) {
+                        // Skip - this case is handled in the nested switch below
+                    } else {
+                        UnrecoverableError("Function name not found");
+                    }
                 }
 
                 auto SolveForColVal =
@@ -540,9 +592,115 @@ private:
                 ColumnID column_id;
                 FunctionExpression *scalar_func_expression{nullptr};
                 Value value = Value::MakeNull();
+                std::optional<Value> raw_value_for_double;
                 FilterCompareType compare_type;
                 std::shared_ptr<TableIndexMeta> table_index_meta;
+                std::string json_path;
+
+                // Helper lambda for JSON comparison: extracts common logic for json_extract_*(col, path) <op> value
+                auto HandleJsonComparison = [&](FunctionExpression *json_func_expr, const Value &raw_value, FilterCompareType &cmp_type) {
+                    scalar_func_expression = json_func_expr;
+                    auto *column_expr = static_cast<ColumnExpression *>(json_func_expr->arguments()[0].get());
+                    auto [col_id, status] = tree_info_.table_meta_->GetColumnIDByColumnName(column_expr->column_name());
+                    if (!status.ok()) {
+                        UnrecoverableError("Failed to get column ID for JSON index");
+                    }
+                    column_id = col_id;
+                    auto map_it = tree_info_.new_candidate_column_index_map_.find(column_id);
+                    if (map_it == tree_info_.new_candidate_column_index_map_.end()) {
+                        UnrecoverableError("JSON index not found in candidate map");
+                    }
+                    table_index_meta = map_it->second;
+
+                    // Get the path argument and store in outer scope
+                    if (json_func_expr->arguments().size() >= 2) {
+                        auto path_expr = json_func_expr->arguments()[1];
+                        if (path_expr->type() == ExpressionType::kValue) {
+                            auto *path_val = static_cast<const ValueExpression *>(path_expr.get());
+                            json_path = path_val->GetValue().ToString();
+                        }
+                    }
+
+                    // Build JSON term
+                    std::string func_name = json_func_expr->ScalarFunctionName();
+                    JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, json_path, raw_value, cmp_type);
+                    std::string term_str(term.data_, term.length_);
+                    value = Value::MakeVarchar(term_str);
+                };
+
                 switch (index_filter_tree_node.info) {
+                    case Enum::kJsonSecondaryIndexFunctionExprOrAfterCast: {
+                        // JSON function: json_contains, json_extract_*, json_exists_path, etc.
+                        // The function expression is the first argument (column is implicit in the function)
+                        auto *json_func_expr = static_cast<FunctionExpression *>(index_filter_tree_node.src_ptr->get());
+                        scalar_func_expression = json_func_expr;
+                        std::string func_name = json_func_expr->ScalarFunctionName();
+
+                        // Get column from first argument
+                        auto *column_expr = static_cast<ColumnExpression *>(json_func_expr->arguments()[0].get());
+                        auto [col_id, status] = tree_info_.table_meta_->GetColumnIDByColumnName(column_expr->column_name());
+                        if (!status.ok()) {
+                            UnrecoverableError("Failed to get column ID for JSON index");
+                        }
+                        column_id = col_id;
+                        auto it = tree_info_.new_candidate_column_index_map_.find(column_id);
+                        if (it == tree_info_.new_candidate_column_index_map_.end()) {
+                            UnrecoverableError("JSON index not found in candidate map");
+                        }
+                        table_index_meta = it->second;
+
+                        // Handle json_contains 3-argument version: json_contains(col, '$.path', 'token')
+                        if (func_name == "json_contains" && json_func_expr->arguments().size() >= 3) {
+                            // Extract path from arguments[1]
+                            std::string path;
+                            auto path_expr = json_func_expr->arguments()[1];
+                            if (path_expr->type() == ExpressionType::kValue) {
+                                auto *path_val = static_cast<const ValueExpression *>(path_expr.get());
+                                path = path_val->GetValue().ToString();
+                            }
+                            // Extract token from arguments[2]
+                            auto raw_value = FilterExpressionPushDownHelper::CalcValueResult(json_func_expr->arguments()[2]);
+                            compare_type = FilterCompareType::kEqual;
+                            // Build JSON term with the token value
+                            JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, path, raw_value, compare_type);
+                            std::string term_str(term.data_, term.length_);
+                            value = Value::MakeVarchar(term_str);
+                        }
+                        // Handle 2-arg json_contains: json_contains(col, 'token')
+                        else if (func_name == "json_contains" && json_func_expr->arguments().size() >= 2) {
+                            value = FilterExpressionPushDownHelper::CalcValueResult(json_func_expr->arguments()[1]);
+                            compare_type = FilterCompareType::kEqual;
+                            // Build term with "$" path for top-level array contains (root array uses "$" as parent path)
+                            JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, "$", value, compare_type);
+                            std::string term_str(term.data_, term.length_);
+                            value = Value::MakeVarchar(term_str);
+                        }
+                        // Handle json_exists_path: json_exists_path(col, '$.path')
+                        else if (func_name == "json_exists_path") {
+                            std::string path;
+                            if (json_func_expr->arguments().size() >= 2) {
+                                auto path_expr = json_func_expr->arguments()[1];
+                                if (path_expr->type() == ExpressionType::kValue) {
+                                    auto *path_val = static_cast<const ValueExpression *>(path_expr.get());
+                                    path = path_val->GetValue().ToString();
+                                }
+                            }
+                            compare_type = FilterCompareType::kEqual;
+                            JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, path, Value::MakeBool(true), compare_type);
+                            std::string term_str(term.data_, term.length_);
+                            value = Value::MakeVarchar(term_str);
+                        }
+                        // Fallback for other JSON functions
+                        else {
+                            if (json_func_expr->arguments().size() >= 2) {
+                                value = FilterExpressionPushDownHelper::CalcValueResult(json_func_expr->arguments()[1]);
+                            } else {
+                                value = Value::MakeBool(true); // Default for exists_path
+                            }
+                            compare_type = FilterCompareType::kEqual; // JSON contains/exists is equality check
+                        }
+                        break;
+                    }
                     case Enum::kSecondaryIndexValueCompareExpr: {
                         std::tie(column_id, value, compare_type, table_index_meta) =
                             SolveForColVal(function_expression->arguments()[0],
@@ -571,6 +729,24 @@ private:
                                             PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)]);
                         break;
                     }
+                    case Enum::kJsonSecondaryIndexValueCompareExpr: {
+                        // JSON function comparison: json_extract_*(col, path) <op> value
+                        // arguments[0] is the JSON function, arguments[1] is the value
+                        auto *json_func_expr = static_cast<FunctionExpression *>(function_expression->arguments()[0].get());
+                        raw_value_for_double = FilterExpressionPushDownHelper::CalcValueResult(function_expression->arguments()[1]);
+                        compare_type = PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)];
+                        HandleJsonComparison(json_func_expr, *raw_value_for_double, compare_type);
+                        break;
+                    }
+                    case Enum::kValueJsonSecondaryIndexCompareExpr: {
+                        // value <op> json_extract_*(col, path)
+                        // arguments[0] is the value, arguments[1] is the JSON function
+                        auto *json_func_expr = static_cast<FunctionExpression *>(function_expression->arguments()[1].get());
+                        raw_value_for_double = FilterExpressionPushDownHelper::CalcValueResult(function_expression->arguments()[0]);
+                        compare_type = PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)];
+                        HandleJsonComparison(json_func_expr, *raw_value_for_double, compare_type);
+                        break;
+                    }
                     default: {
                         UnrecoverableError("Wrong expression type!");
                         return {};
@@ -581,12 +757,59 @@ private:
                     case FilterCompareType::kEqual:
                     case FilterCompareType::kLessEqual:
                     case FilterCompareType::kGreaterEqual: {
-                        return IndexFilterEvaluatorSecondary::Make(function_expression,
-                                                                   column_id,
-                                                                   scalar_func_expression,
-                                                                   table_index_meta,
-                                                                   compare_type,
-                                                                   value);
+                        auto evaluator = IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                             column_id,
+                                                                             scalar_func_expression,
+                                                                             table_index_meta,
+                                                                             compare_type,
+                                                                             value);
+                        // For json_extract_double, also query int range
+                        // This implements the PostgreSQL/ES/MongoDB behavior:
+                        // double queries should also match int values (int is auto-promoted to double)
+                        if (scalar_func_expression) {
+                            const auto &func_name = scalar_func_expression->ScalarFunctionName();
+                            if (func_name == "json_extract_double") {
+                                // Build int term for the same value
+                                // For json_extract_double = 1 or 1.0, we need to also query int terms
+                                // Convert double value to int (floor for equality)
+                                double double_val = raw_value_for_double->GetValue<DoubleT>();
+                                int64_t int_val_for_eq = static_cast<int64_t>(double_val);
+
+                                FilterCompareType int_cmp_type = FilterCompareType::kEqual;
+                                int64_t int_val = int_val_for_eq;
+
+                                if (compare_type == FilterCompareType::kGreater || compare_type == FilterCompareType::kGreaterEqual) {
+                                    int_val = static_cast<int64_t>(std::ceil(double_val));
+                                    // For int >= ceil(X), we use kGreaterEqual with int_val - 1
+                                    // because BuildJsonTerm does int_val + 1 for kGreater
+                                    int_cmp_type = FilterCompareType::kGreaterEqual;
+                                } else if (compare_type == FilterCompareType::kLess || compare_type == FilterCompareType::kLessEqual) {
+                                    int_val = static_cast<int64_t>(std::floor(double_val));
+                                    // For int <= floor(X), we use kLessEqual with the floor value directly
+                                    int_cmp_type = FilterCompareType::kLessEqual;
+                                }
+
+                                Value int_value = Value::MakeBigInt(int_val);
+                                JsonTermT int_term =
+                                    FilterExpressionPushDownHelper::BuildJsonTerm("json_extract_int", json_path, int_value, int_cmp_type);
+                                std::string int_term_str(int_term.data_, int_term.length_);
+                                JsonTermT int_term_key(int_term_str);
+
+                                if (compare_type == FilterCompareType::kEqual) {
+                                    // For equality, just add the int term as an additional exact match
+                                    evaluator->AddRange(std::make_pair(int_term_key, int_term_key));
+                                } else if (compare_type == FilterCompareType::kGreater || compare_type == FilterCompareType::kGreaterEqual) {
+                                    // For > and >=, int range is [int_lower_bound, +inf)
+                                    std::string path_prefix = json_path + ":i:";
+                                    evaluator->AddRange(std::make_pair(int_term_key, JsonTermT(path_prefix + ";")));
+                                } else {
+                                    // For < and <=, int range is (-inf, int_upper_bound]
+                                    std::string path_prefix = json_path + ":i:";
+                                    evaluator->AddRange(std::make_pair(JsonTermT(path_prefix), int_term_key));
+                                }
+                            }
+                        }
+                        return evaluator;
                     }
                     case FilterCompareType::kAlwaysTrue: {
                         return std::make_unique<IndexFilterEvaluatorAllTrue>();

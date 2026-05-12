@@ -121,6 +121,47 @@ void JsonContains(const DataBlock &input, std::shared_ptr<ColumnVector> &output)
     }
 }
 
+void JsonContainsPath(const DataBlock &input, std::shared_ptr<ColumnVector> &output) {
+    if (input.column_count() != 3) {
+        RecoverableError(Status::SyntaxError("JsonContainsPath: Invalid column size."));
+    }
+
+    const auto &json_column = input.column_vectors_[0];
+    const auto &path_column = input.column_vectors_[1];
+    const auto &token_column = input.column_vectors_[2];
+
+    auto path_varchar = path_column->GetVarchar(0);
+    auto path_str = std::string(path_varchar.data(), path_varchar.size());
+    auto [is_valid, path_tokens] = JsonManager::get_json_tokens(path_varchar);
+    if (!is_valid) {
+        RecoverableError(Status::SyntaxError("JsonContainsPath: Invalid json path."));
+    }
+
+    auto token_varchar = token_column->GetVarchar(0);
+    auto token = std::string(token_varchar.data(), token_varchar.size());
+
+    auto json_column_data = reinterpret_cast<const JsonT *>(json_column->data());
+    auto row_count = input.row_count();
+
+    if (json_column->vector_type() == ColumnVectorType::kFlat) {
+        for (size_t row_index = 0; row_index < row_count; row_index++) {
+            const auto json_info = json_column_data[row_index];
+            auto json_data = json_column->buffer_->GetVarchar(json_info.file_offset_, json_info.length_);
+            auto json = JsonManager::from_bson(reinterpret_cast<const uint8_t *>(json_data), json_info.length_);
+            if (!json) {
+                output->AppendValue(Value::MakeBool(false));
+                continue;
+            }
+            auto [success, flag] = JsonManager::json_contains_path(*json, path_tokens, token);
+            Value v = Value::MakeBool(flag);
+            output->AppendValue(v);
+        }
+        output->Finalize(row_count);
+    } else {
+        RecoverableError(Status::SyntaxError("JsonContainsPath: Invalid column type."));
+    }
+}
+
 void RegisterJsonFunction(NewCatalog *catalog_ptr) {
     {
         std::string func_name = "json_extract";
@@ -195,11 +236,21 @@ void RegisterJsonFunction(NewCatalog *catalog_ptr) {
     {
         std::string func_name = "json_contains";
         std::shared_ptr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
-        ScalarFunction json_function(func_name,
-                                     {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
-                                     DataType(LogicalType::kBoolean),
-                                     JsonContains);
-        function_set_ptr->AddFunction(json_function);
+
+        // json_contains with 2 arguments: json_contains(json, token)
+        ScalarFunction json_contains_2arg(func_name,
+                                          {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar)},
+                                          DataType(LogicalType::kBoolean),
+                                          JsonContains);
+        function_set_ptr->AddFunction(json_contains_2arg);
+
+        // json_contains with 3 arguments: json_contains(json, path, token)
+        ScalarFunction json_contains_3arg(func_name,
+                                          {DataType(LogicalType::kJson), DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
+                                          DataType(LogicalType::kBoolean),
+                                          JsonContainsPath);
+        function_set_ptr->AddFunction(json_contains_3arg);
+
         NewCatalog::AddFunctionSet(catalog_ptr, function_set_ptr);
     }
 }

@@ -35,6 +35,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import json_term;
 
 namespace infinity {
 
@@ -860,6 +861,9 @@ GetSecondaryIndexDataWithCardinality<LowCardinalityTag>(const std::shared_ptr<Da
         }
         case LogicalType::kVarchar: {
             return new SecondaryIndexDataLowCardinalityT<VarcharT>(chunk_row_count, allocate);
+        }
+        case LogicalType::kJson: {
+            return new SecondaryIndexDataLowCardinalityT<JsonTermT>(chunk_row_count, allocate);
         }
         default: {
             UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));

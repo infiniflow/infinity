@@ -462,6 +462,140 @@ BooleanT JsonManager::json_contains(const JsonTypeDef &data, const std::string &
     }
 }
 
+std::tuple<bool, BooleanT>
+JsonManager::json_contains_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &path_tokens, const std::string &token) {
+    // Navigate to the target value using path_tokens
+    const JsonTypeDef *current = &data;
+    for (const auto &path_token : path_tokens) {
+        const auto &token_type = path_token.first;
+        const auto &token_value = path_token.second;
+        if (current->is_array() && token_type == JsonType::kJsonArray) {
+            try {
+                size_t index = std::stoul(token_value);
+                if (index >= current->size()) {
+                    return {true, false}; // Path doesn't exist
+                }
+                current = &(*current)[index];
+            } catch (const std::exception &) {
+                return {true, false}; // Invalid array index
+            }
+        } else if (current->is_object() && token_type == JsonType::kJsonObject) {
+            if (!current->contains(token_value)) {
+                return {true, false}; // Path doesn't exist
+            }
+            current = &(*current)[token_value];
+        } else {
+            return {true, false}; // Can't navigate further
+        }
+    }
+
+    // Now check if the value at path is an array containing the token, or equals the token
+    if (!current->is_array()) {
+        // For non-array values, check if the value equals the token
+        JsonTypeDef parsed_token;
+        bool parse_success = false;
+
+        try {
+            parsed_token = JsonTypeDef::parse(token);
+            parse_success = true;
+        } catch (...) {
+            // If parsing fails, treat token as a literal string value
+        }
+
+        if (!parse_success) {
+            // Token is not valid JSON, treat it as a literal string
+            return {true, current->is_string() && current->get_ref<const std::string &>() == token};
+        }
+
+        switch (parsed_token.type()) {
+            case JsonValueType::string: {
+                const auto &token_value = parsed_token.get_ref<const std::string &>();
+                return {true, current->is_string() && current->get_ref<const std::string &>() == token_value};
+            }
+            case JsonValueType::number_integer: {
+                auto token_value = parsed_token.get<int64_t>();
+                return {true, current->is_number_integer() && current->get<int64_t>() == token_value};
+            }
+            case JsonValueType::number_unsigned: {
+                auto token_value = parsed_token.get<uint64_t>();
+                return {true, current->is_number_unsigned() && current->get<uint64_t>() == token_value};
+            }
+            case JsonValueType::number_float: {
+                auto token_value = parsed_token.get<double>();
+                return {true, current->is_number_float() && std::abs(current->get<double>() - token_value) < 1e-10};
+            }
+            case JsonValueType::boolean: {
+                auto token_value = parsed_token.get<bool>();
+                return {true, current->is_boolean() && current->get<bool>() == token_value};
+            }
+            case JsonValueType::null: {
+                return {true, current->is_null()};
+            }
+            default: {
+                return {true, false};
+            }
+        }
+    }
+
+    const JsonTypeDef &arr = *current;
+    JsonTypeDef parsed_token;
+    bool parse_success = false;
+
+    try {
+        parsed_token = JsonTypeDef::parse(token);
+        parse_success = true;
+    } catch (...) {
+        // If parsing fails, treat token as a literal string value
+    }
+
+    if (!parse_success) {
+        // Token is not valid JSON, treat it as a literal string
+        return {true, std::any_of(arr.begin(), arr.end(), [&token](const JsonTypeDef &element) {
+                    return element.is_string() && element.get_ref<const std::string &>() == token;
+                })};
+    }
+
+    switch (parsed_token.type()) {
+        case JsonValueType::string: {
+            const auto &token_value = parsed_token.get_ref<const std::string &>();
+            return {true, std::any_of(arr.begin(), arr.end(), [&token_value](const JsonTypeDef &element) {
+                        return element.is_string() && element.get_ref<const std::string &>() == token_value;
+                    })};
+        }
+        case JsonValueType::number_integer: {
+            const auto token_value = parsed_token.get<int64_t>();
+            return {true, std::any_of(arr.begin(), arr.end(), [token_value](const JsonTypeDef &element) {
+                        return element.is_number_integer() && element.get<int64_t>() == token_value;
+                    })};
+        }
+        case JsonValueType::number_unsigned: {
+            const auto token_value = parsed_token.get<uint64_t>();
+            return {true, std::any_of(arr.begin(), arr.end(), [token_value](const JsonTypeDef &element) {
+                        return element.is_number_unsigned() && element.get<uint64_t>() == token_value;
+                    })};
+        }
+        case JsonValueType::number_float: {
+            const auto token_value = parsed_token.get<double>();
+            return {true, std::any_of(arr.begin(), arr.end(), [token_value](const JsonTypeDef &element) {
+                        return element.is_number_float() && std::abs(element.get<double>() - token_value) < 1e-10;
+                    })};
+        }
+        case JsonValueType::boolean: {
+            const auto token_value = parsed_token.get<bool>();
+            return {true, std::any_of(arr.begin(), arr.end(), [token_value](const JsonTypeDef &element) {
+                        return element.is_boolean() && element.get<bool>() == token_value;
+                    })};
+        }
+        case JsonValueType::null: {
+            return {true, std::any_of(arr.begin(), arr.end(), [](const JsonTypeDef &element) { return element.is_null(); })};
+        }
+        default: {
+            const std::string token_value = parsed_token.dump();
+            return {true, std::any_of(arr.begin(), arr.end(), [&token_value](const JsonTypeDef &element) { return element.dump() == token_value; })};
+        }
+    }
+}
+
 std::tuple<size_t, std::vector<std::string>> JsonManager::json_unnest(const JsonTypeDef &data) {
     std::vector<std::string> result;
     if (data.is_array()) {

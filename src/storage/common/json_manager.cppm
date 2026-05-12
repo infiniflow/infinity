@@ -65,6 +65,9 @@ public:
 
     static BooleanT json_contains(const JsonTypeDef &data, const std::string &token);
 
+    static std::tuple<bool, BooleanT>
+    json_contains_path(const JsonTypeDef &data, const std::vector<JsonTokenInfo> &path_tokens, const std::string &token);
+
     static std::tuple<size_t, std::vector<std::string>> json_unnest(const JsonTypeDef &data);
 };
 

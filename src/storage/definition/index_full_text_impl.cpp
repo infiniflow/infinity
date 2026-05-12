@@ -32,14 +32,9 @@ import third_party;
 import logical_type;
 import statement_common;
 import serialize;
+import :utility;
 
 namespace infinity {
-
-void ToLowerString(std::string &lower) {
-    for (auto &c : lower) {
-        c = tolower(c);
-    }
-}
 
 std::shared_ptr<IndexBase> IndexFullText::Make(std::shared_ptr<std::string> index_name,
                                                std::shared_ptr<std::string> index_comment,
@@ -52,14 +47,14 @@ std::shared_ptr<IndexBase> IndexFullText::Make(std::shared_ptr<std::string> inde
     for (size_t param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
         std::string para_name = parameter->param_name_;
-        ToLowerString(para_name);
+        ToLower(para_name);
         if (para_name == "analyzer") {
             analyzer_name = parameter->param_value_;
         } else if (para_name == "flag") {
             flag = std::strtoul(parameter->param_value_.c_str(), nullptr, 10);
         } else if (para_name == "realtime") {
             std::string realtime_str = parameter->param_value_;
-            ToLowerString(realtime_str);
+            ToLower(realtime_str);
             if (realtime_str == "true") {
                 FlagAddRealtime(flag);
             } else if (realtime_str != "false") {
