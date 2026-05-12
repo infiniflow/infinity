@@ -27,6 +27,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import json_term;
 
 namespace infinity {
 
@@ -44,6 +45,9 @@ concept ConvertToOrderedI64 = IsAnyOf<T, DateTimeT, TimestampT>;
 
 template <typename T>
 concept ConvertToHashU64 = IsAnyOf<T, VarcharT, std::string_view>;
+
+template <typename T>
+concept KeepOrderedString = IsAnyOf<T, JsonTermT>;
 
 template <typename ValueT>
 struct ConvertToOrdered;
@@ -68,8 +72,13 @@ struct ConvertToOrdered<T> {
     using type = u64;
 };
 
+template <KeepOrderedString T>
+struct ConvertToOrdered<T> {
+    using type = T;
+};
+
 export template <typename T>
-    requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T> or ConvertToHashU64<T>
+    requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T> or ConvertToHashU64<T> or KeepOrderedString<T>
 using ConvertToOrderedType = typename ConvertToOrdered<T>::type;
 
 export template <typename RawValueType>
@@ -98,6 +107,12 @@ ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) 
 export template <>
 ConvertToOrderedType<std::string_view> ConvertToOrderedKeyValue(std::string_view value) {
     return std::hash<std::string_view>{}(value);
+}
+
+// for JsonTermT
+export template <KeepOrderedString RawValueType>
+ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
+    return value;
 }
 
 export template <typename T>
@@ -138,6 +153,9 @@ constexpr LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
 
 template <>
 constexpr LogicalType GetLogicalType<BooleanT> = LogicalType::kBoolean;
+
+template <>
+constexpr LogicalType GetLogicalType<JsonTermT> = LogicalType::kJson;
 
 // Cardinality tag types for template specialization
 export struct HighCardinalityTag {};

@@ -112,6 +112,7 @@ public:
             case LogicalType::kDateTime:  // need to be converted to int64 and keep order
             case LogicalType::kTimestamp: // need to be converted to int64 and keep order
             case LogicalType::kVarchar:   // need to be converted to int64 by hash
+            case LogicalType::kJson:      // JSON index uses JsonTermT with LowCardinality
             {
                 return true;
             }

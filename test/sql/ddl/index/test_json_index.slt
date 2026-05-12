@@ -1,0 +1,200 @@
+# Test JSON index functionality with json_expand=true
+
+statement ok
+DROP TABLE IF EXISTS test_json_index;
+
+statement ok
+CREATE TABLE test_json_index (
+    id integer,
+    meta json
+);
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (1, '{"year": 2020, "character": ["value1", "value2"], "score": 1, "author": "Alice", "time": "2026-01-01T00:00:00"}');
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (2, '{"year": 2021, "character": ["value3"], "score": 2, "author": "Bob", "time": "2026-02-15T10:30:00"}');
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (3, '{"year": 2019, "character": ["value1", "value4"], "score": 2.5, "author": "Alice", "time": "2026-03-20T15:45:00"}');
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (4, '{"year": 2022, "name": "test", "score": 3.0, "author": "Charlie", "time": "2026-04-10T20:00:00"}');
+
+statement error
+CREATE INDEX idx_meta ON test_json_index (meta) USING SECONDARY WITH (cardinality=high);
+
+statement ok
+CREATE INDEX idx_meta ON test_json_index (meta) USING SECONDARY;
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (5, '{"year": 2020, "author": "Alice", "time": "2026-05-27T23:59:59"}');
+
+statement ok
+INSERT INTO test_json_index (id, meta) VALUES (6, '{"data": {"inner": 50, "outer": 100}}');
+
+statement ok
+SHOW TABLE test_json_index INDEX idx_meta;
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') = 2020;
+----
+1
+5
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') > 2020;
+----
+2
+4
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') >= 2021;
+----
+2
+4
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') < 2020;
+----
+3
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') <= 2020;
+----
+1
+3
+5
+
+query I
+SELECT id, json_extract_double(meta, '$.score') FROM test_json_index WHERE json_extract_double(meta, '$.score') = 1;
+----
+1 1.000000
+
+query I
+SELECT id, json_extract_double(meta, '$.score') FROM test_json_index WHERE json_extract_double(meta, '$.score') < 2.5;
+----
+1 1.000000
+2 2.000000
+
+query I
+SELECT id, json_extract_double(meta, '$.score') FROM test_json_index WHERE json_extract_double(meta, '$.score') > 1.5;
+----
+2 2.000000
+3 2.500000
+4 3.000000
+
+query I
+SELECT id, json_extract_double(meta, '$.score') FROM test_json_index WHERE json_extract_double(meta, '$.score') <= 3;
+----
+1 1.000000
+2 2.000000
+3 2.500000
+4 3.000000
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_string(meta, '$.author') == 'Bob';
+----
+2
+
+query T
+SELECT json_extract_string(meta, '$.time') FROM test_json_index WHERE id = 5;
+----
+"2026-05-27T23:59:59"
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_string(meta, '$.author') > 'Bob';
+----
+4
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_string(meta, '$.author') <= 'Bob';
+----
+1
+2
+3
+5
+
+query I
+SELECT id FROM test_json_index WHERE json_extract_int(meta, '$.year') > 2020 AND json_extract_double(meta, '$.score') > 2.6;
+----
+4
+
+query I
+SELECT id FROM test_json_index WHERE json_contains(meta, '$.character', 'value1');
+----
+1
+3
+
+query I
+SELECT id FROM test_json_index WHERE json_contains(meta, '$.author', '"Alice"');
+----
+1
+3
+5
+
+query I
+SELECT id FROM test_json_index WHERE json_contains(meta, '$.data.inner', 50);
+----
+6
+
+query I
+SELECT id FROM test_json_index WHERE json_contains(meta, '$.data.inner', 100);
+----
+
+query I
+SELECT id FROM test_json_index WHERE json_exists_path(meta, '$.name');
+----
+4
+
+statement ok
+DROP TABLE test_json_index;
+
+
+# Test 2-argument json_contains on root-level array
+statement ok
+DROP TABLE IF EXISTS test_json_root_array;
+
+statement ok
+CREATE TABLE test_json_root_array (
+    id integer,
+    meta json
+);
+
+statement ok
+INSERT INTO test_json_root_array (id, meta) VALUES (1, '["a", "b", 1, true]');
+
+statement ok
+INSERT INTO test_json_root_array (id, meta) VALUES (2, '["b", "d"]');
+
+statement ok
+INSERT INTO test_json_root_array (id, meta) VALUES (3, '["c", 2]');
+
+statement ok
+CREATE INDEX idx_data ON test_json_root_array (meta) USING SECONDARY;
+
+query I
+SELECT id FROM test_json_root_array WHERE json_contains(meta, 'b');
+----
+1
+2
+
+query I
+SELECT id FROM test_json_root_array WHERE json_contains(meta, 1);
+----
+1
+
+query I
+SELECT id FROM test_json_root_array WHERE json_contains(meta, '1');
+----
+1
+
+query I
+SELECT id FROM test_json_root_array WHERE json_contains(meta, '"1"');
+----
+
+statement ok
+DROP INDEX idx_data ON test_json_root_array;
+
+statement ok
+DROP TABLE test_json_root_array;

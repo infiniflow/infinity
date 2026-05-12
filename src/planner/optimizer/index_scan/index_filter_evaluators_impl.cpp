@@ -45,6 +45,7 @@ import third_party;
 import internal_types;
 import column_def;
 import logical_type;
+import json_term;
 
 namespace infinity {
 
@@ -112,7 +113,12 @@ bool SimplifySecondaryIndexEvaluators(std::vector<std::unique_ptr<IndexFilterEva
         return true;
     }
     std::map<ColumnID, std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>>> classify_evaluators;
+    std::vector<std::unique_ptr<IndexFilterEvaluatorSecondary>> json_evaluators;
     for (auto &evaluator : evaluators) {
+        if (evaluator->column_logical_type_ == LogicalType::kJson) {
+            json_evaluators.push_back(std::move(evaluator));
+            continue;
+        }
         const auto column_id = evaluator->column_id();
         classify_evaluators[column_id].push_back(std::move(evaluator));
     }
@@ -123,6 +129,9 @@ bool SimplifySecondaryIndexEvaluators(std::vector<std::unique_ptr<IndexFilterEva
             return false;
         }
         evaluators.push_back(std::move(sub_result));
+    }
+    for (auto &json_evaluator : json_evaluators) {
+        evaluators.push_back(std::move(json_evaluator));
     }
     return true;
 }
@@ -290,6 +299,13 @@ ConvertToOrderedType<VarcharT> GetOrderedV<VarcharT>(const Value &val) {
     return ConvertToOrderedKeyValue(static_cast<std::string_view>(str));
 }
 
+template <>
+ConvertToOrderedType<JsonTermT> GetOrderedV<JsonTermT>(const Value &val) {
+    // For JSON index, the value is expected to be a string that represents the term
+    const std::string &str = val.GetVarchar();
+    return JsonTermT(str);
+}
+
 // 1. secondary index
 // 2. filter_fulltext
 // 3. AND, OR
@@ -305,6 +321,14 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     Bitmask Evaluate(SegmentID segment_id, SegmentOffset segment_row_count) const override;
 
     bool IsValid() const override { return !secondary_index_start_end_pairs_.empty(); }
+
+    void AddRange(std::pair<JsonTermT, JsonTermT> range) override {
+        if constexpr (std::is_same_v<ColumnValueT, JsonTermT>) {
+            secondary_index_start_end_pairs_.emplace_back(range.first, range.second);
+        } else {
+            UnrecoverableError("AddRange only supported for JsonTermT");
+        }
+    }
 
     void Merge(IndexFilterEvaluatorSecondary &other, const Type op) override {
         assert(column_logical_type_ == other.column_logical_type_);
@@ -383,6 +407,24 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                                    std::shared_ptr<TableIndexMeta> new_secondary_index)
         : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, new_secondary_index) {}
 
+    // Helper to find the actual type tag delimiter position in a JSON term
+    // Type tags are :i:, :d:, :s:, :b:, :p: - we need to find the last one
+    // This correctly handles paths with colons like "$[0]"
+    static size_t FindJsonTypeTagPos(const std::string &val_str) {
+        std::string type_tags[] = {":i:", ":d:", ":s:", ":b:", ":p:"};
+        size_t type_tag_pos = std::string::npos;
+        for (auto tag : type_tags) {
+            size_t pos = val_str.rfind(tag);
+            if (pos != std::string::npos) {
+                size_t colon_pos = pos + tag.length() - 1; // position of last ':' in the tag
+                if (type_tag_pos == std::string::npos || colon_pos > type_tag_pos) {
+                    type_tag_pos = colon_pos;
+                }
+            }
+        }
+        return type_tag_pos;
+    }
+
     static std::unique_ptr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                                 const ColumnID column_id,
                                                                 std::shared_ptr<TableIndexMeta> new_secondary_index,
@@ -397,11 +439,40 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                 break;
             }
             case FilterCompareType::kGreaterEqual: {
-                result->secondary_index_start_end_pairs_.emplace_back(val_ordered, std::numeric_limits<SecondaryIndexOrderedT>::max());
+                if constexpr (std::is_same_v<ColumnValueT, JsonTermT>) {
+                    std::string val_str = val_ordered.ToString();
+                    size_t type_tag_pos = FindJsonTypeTagPos(val_str);
+                    JsonTermT end_key;
+                    if (type_tag_pos != std::string::npos && type_tag_pos >= 2) {
+                        // type_tag_pos is the position of the last ':' in the type tag (e.g., position of ':' in ":d:")
+                        // path_with_type includes the type tag letter but not the last colon
+                        // e.g., "$.score:d" for "$.score:d:2.5"
+                        std::string path_with_type = val_str.substr(0, type_tag_pos);
+                        end_key = JsonTermT(path_with_type + ";");
+                    } else {
+                        end_key = std::numeric_limits<SecondaryIndexOrderedT>::max();
+                    }
+                    result->secondary_index_start_end_pairs_.emplace_back(val_ordered, end_key);
+                } else {
+                    result->secondary_index_start_end_pairs_.emplace_back(val_ordered, std::numeric_limits<SecondaryIndexOrderedT>::max());
+                }
                 break;
             }
             case FilterCompareType::kLessEqual: {
-                result->secondary_index_start_end_pairs_.emplace_back(std::numeric_limits<SecondaryIndexOrderedT>::lowest(), val_ordered);
+                if constexpr (std::is_same_v<ColumnValueT, JsonTermT>) {
+                    std::string val_str = val_ordered.ToString();
+                    size_t type_tag_pos = FindJsonTypeTagPos(val_str);
+                    JsonTermT begin_key;
+                    if (type_tag_pos != std::string::npos && type_tag_pos >= 2) {
+                        // type_tag_pos is the position of the last ':' in the type tag
+                        // path_prefix should exclude the last colon: "$.score:d" not "$.score:d:"
+                        std::string path_prefix = val_str.substr(0, type_tag_pos);
+                        begin_key = JsonTermT(path_prefix);
+                    }
+                    result->secondary_index_start_end_pairs_.emplace_back(begin_key, val_ordered);
+                } else {
+                    result->secondary_index_start_end_pairs_.emplace_back(std::numeric_limits<SecondaryIndexOrderedT>::lowest(), val_ordered);
+                }
                 break;
             }
             default: {
@@ -474,6 +545,9 @@ std::unique_ptr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Ma
             }
             RecoverableError(Status::SyntaxError("VarcharT only support kEqual compare type in secondary index."));
             return {};
+        }
+        case LogicalType::kJson: {
+            return IndexFilterEvaluatorSecondaryT<JsonTermT>::Make(src_expr, column_id, new_secondary_index, compare_type, val);
         }
         default: {
             UnrecoverableError(fmt::format("Unexpected type for secondary index: {}", LogicalType2Str(index_data_type)));
@@ -699,8 +773,6 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
                 }
             } else {
                 const KeyType *unique_keys = static_cast<const KeyType *>(index->GetUniqueKeysPtr());
-
-                // Find keys in range [begin_val, end_val]
                 auto begin_it = std::lower_bound(unique_keys, unique_keys + unique_key_count, begin_val);
                 auto end_it = std::upper_bound(unique_keys, unique_keys + unique_key_count, end_val);
 
@@ -710,7 +782,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
                     if (bitmap) {
                         bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
                             selected_rows.SetTrue(offset);
-                            return true; // continue iteration
+                            return true;
                         });
                     }
                 }

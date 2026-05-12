@@ -18,6 +18,7 @@ import :index_base;
 import :base_table_ref;
 
 import create_index_info;
+import statement_common;
 
 namespace infinity {
 
@@ -27,17 +28,33 @@ public:
                                            std::shared_ptr<std::string> index_comment,
                                            const std::string &file_name,
                                            std::vector<std::string> column_names,
-                                           SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality) {
-        return std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
+                                           SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality,
+                                           bool is_json_index = false) {
+        return std::make_shared<IndexSecondary>(index_name,
+                                                index_comment,
+                                                file_name,
+                                                std::move(column_names),
+                                                secondary_index_cardinality,
+                                                is_json_index);
     }
+
+    // Overload that parses index_param_list
+    static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
+                                           std::shared_ptr<std::string> index_comment,
+                                           const std::string &file_name,
+                                           std::vector<std::string> column_names,
+                                           const std::vector<InitParameter *> &index_param_list,
+                                           bool is_json_index = false);
 
     IndexSecondary(std::shared_ptr<std::string> index_name,
                    std::shared_ptr<std::string> index_comment,
                    const std::string &file_name,
                    std::vector<std::string> column_names,
-                   SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality)
+                   SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality,
+                   bool is_json_index = false)
         : IndexBase(IndexType::kSecondary, index_name, index_comment, file_name, std::move(column_names)),
-          secondary_index_cardinality_(secondary_index_cardinality) {}
+          secondary_index_cardinality_(is_json_index ? SecondaryIndexCardinality::kLowCardinality : secondary_index_cardinality),
+          is_json_index_(is_json_index) {}
 
     ~IndexSecondary() final = default;
 
@@ -51,12 +68,16 @@ public:
 
     inline SecondaryIndexCardinality GetSecondaryIndexCardinality() const { return secondary_index_cardinality_; }
 
-    static void ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &base_table_ref,
-                                       const std::string &column_name,
-                                       SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality);
+    inline bool IsJsonIndex() const { return is_json_index_; }
+
+    static void ValidateIndexColumn(const std::shared_ptr<BaseTableRef> &base_table_ref,
+                                    const std::string &column_name,
+                                    SecondaryIndexCardinality secondary_index_cardinality = SecondaryIndexCardinality::kHighCardinality,
+                                    bool is_json_index = false);
 
 private:
     SecondaryIndexCardinality secondary_index_cardinality_{SecondaryIndexCardinality::kHighCardinality};
+    bool is_json_index_ = false;
 };
 
 } // namespace infinity

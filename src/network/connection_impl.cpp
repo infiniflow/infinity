@@ -160,7 +160,9 @@ void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     // Response to the result message to client
     if (result.result_table_.get() == nullptr) {
         std::unordered_map<PGMessageType, std::string> error_message_map;
-        error_message_map[PGMessageType::kHumanReadableError] = result.status_.message();
+        const char *err_msg = result.status_.message();
+        std::string err_str = err_msg ? err_msg : "Unknown error";
+        error_message_map[PGMessageType::kHumanReadableError] = err_str;
         pg_handler_->send_error_response(error_message_map);
     } else {
         // Have result

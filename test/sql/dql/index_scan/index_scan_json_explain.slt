@@ -1,0 +1,110 @@
+# Test EXPLAIN for JSON index functionality
+
+statement ok
+DROP TABLE IF EXISTS test_json_explain;
+
+statement ok
+CREATE TABLE test_json_explain (
+    id integer,
+    meta json
+);
+
+statement ok
+INSERT INTO test_json_explain (id, meta) VALUES (1, '{"year": 2020, "character": ["value1", "value2"]}');
+
+statement ok
+INSERT INTO test_json_explain (id, meta) VALUES (2, '{"year": 2021, "character": ["value3"]}');
+
+statement ok
+INSERT INTO test_json_explain (id, meta) VALUES (3, '{"year": 2019, "character": ["value1", "value4"]}');
+
+statement ok
+CREATE INDEX idx_meta_explain ON test_json_explain (meta) USING SECONDARY;
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_extract_string(meta, '$.character') = 'value1';
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: (meta (#1.1) json_extract_string $.character) = value1
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_extract_int(meta, '$.year') > 2020;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: (meta (#1.1) json_extract_int $.year) > 2020
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_extract_int(meta, '$.year') = 2020 AND json_extract_bool(meta, '$.active') = true;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: ((meta (#1.1) json_extract_int $.year) = 2020) AND ((meta (#1.1) json_extract_bool $.active) = true)
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_contains(meta, '$.character', 'value1');
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: json_contains(meta (#1.1), $.character, value1)
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_exists_path(meta, '$.year');
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: meta (#1.1) json_exists_path $.year
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_contains(meta, 'apple');
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: meta (#1.1) json_contains apple
+    - output_columns: [__rowid]
+
+query I
+EXPLAIN SELECT id FROM test_json_explain WHERE json_extract_int(meta, '$[0]') = 2020;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [id (#0)]
+ -> INDEX SCAN (6)
+    - table name: test_json_explain(default_db.test_json_explain)
+    - table index: #1
+    - filter: (meta (#1.1) json_extract_int $[0]) = 2020
+    - output_columns: [__rowid]
+
+
+statement ok
+DROP TABLE test_json_explain;
