@@ -154,7 +154,7 @@ export float F32CosAVXResidual(const float *pv1, const float *pv2, size_t dim) {
 
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 
 export float F32CosSSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float MulTmpRes[4];
@@ -309,7 +309,7 @@ export i32 I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 
 export i32 I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim16 = dim >> 4;
@@ -412,7 +412,7 @@ export i32 I8L2AVX2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export i32 I8L2SSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pEnd1 = pv1 + (dim & ~(15u));
     const __m128i fix_high_bit = _mm_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
@@ -543,7 +543,7 @@ export float I8CosAVX2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export float I8CosSSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     const int8_t *pend1 = pv1 + (dim & ~(15u));
     const int8_t *pend2 = pv1 + dim;
@@ -717,7 +717,7 @@ export float U8CosAVX2(const u8 *pv1, const u8 *pv2, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export float U8CosSSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pend1 = pv1 + (dim & ~(15u));
     const u8 *pend2 = pv1 + dim;
@@ -833,7 +833,7 @@ export i32 U8IPAVX2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export i32 U8IPSSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(15u));
     __m128i sum = _mm_setzero_si128();
@@ -923,7 +923,7 @@ export i32 U8L2AVX2Residual(const u8 *pv1, const u8 *pv2, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export i32 U8L2SSE2(const u8 *pv1, const u8 *pv2, size_t dim) {
     const u8 *pEnd1 = pv1 + (dim & ~(15u));
     __m128i sum = _mm_setzero_si128();
@@ -1031,7 +1031,7 @@ export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
 
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 
 export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float TmpRes[4];
@@ -1165,7 +1165,7 @@ export float F32IPAVXResidual(const float *pVect1, const float *pVect2, size_t q
 
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 
 export float F32IPSSE(const float *pVect1, const float *pVect2, size_t qty) {
     alignas(16) float TmpRes[4];
@@ -1494,7 +1494,7 @@ export i32 U8BinIPAVX2Residual(const u8 *pv, const u8 *pv_b, size_t dim) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 inline __m128i load_2u8_sse2(const u8 *pv) {
     return _mm_setr_epi8(pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1]);
 }

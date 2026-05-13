@@ -56,7 +56,7 @@ public:
                 return __builtin_cpu_supports("f16c") > 0;
                 break;
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
             case SimdTypeSSE2:
                 return __builtin_cpu_supports("sse2") > 0;
                 break;

@@ -107,7 +107,7 @@ f32 HammingDistance_avx2(const u8 *x, const u8 *y, size_t d) {
 
 #endif // defined (__AVX2__)
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 
 f32 HammingDistance_sse2(const u8 *x, const u8 *y, size_t d) {
     f32 result = 0;

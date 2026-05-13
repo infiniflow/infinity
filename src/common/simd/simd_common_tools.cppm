@@ -26,7 +26,7 @@ using U8MaskPtr = const u32 (*)[8];
 
 export U8MaskPtr GetU8MasksForAVX2();
 
-#ifdef __SSE__
+#if defined(__x86_64__) && defined(__AVX2__)
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export inline float hsum_ps_sse1(__m128 v) {                     // v = [ D C | B A ]
     __m128 shuf = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)); // [ C D | A B ]
@@ -59,7 +59,7 @@ export inline float hsum256_ps_avx(__m256 v) {
 }
 #endif
 
-#ifdef __SSE2__
+#if defined(__AVX2__)
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export int hsum_epi32_sse2(__m128i x) {
     __m128i hi64 = _mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2));
@@ -100,7 +100,7 @@ export int hsum_epi32_avx512(__m512i v) {
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 // https://github.com/WojciechMula/toys/blob/master/sse/simd-abs-sub-uint.c
 
 // Copyright (c) 2005-2016, Wojciech Muła
@@ -175,7 +175,7 @@ export inline int popcount_avx2(const __m256i v) {
 #endif // defined (__AVX2__)
 
 // https://github.com/WojciechMula/sse-popcount/blob/master/popcnt-sse-harley-seal.cpp
-#if defined(__SSE2__)
+#if defined(__AVX2__)
 export inline int popcount_sse2(const __m128i x) {
     const __m128i m1 = _mm_set1_epi8(0x55);
     const __m128i m2 = _mm_set1_epi8(0x33);
