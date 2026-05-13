@@ -736,7 +736,13 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
             const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
             // output result
             for (u32 i = begin_pos; i < end_pos; ++i) {
-                selected_rows.SetTrue(offset_ptr[i]);
+                const u32 offset = offset_ptr[i];
+                // Bounds check: offset may exceed segment_row_count_ if mem index contains
+                // uncommitted entries from concurrent INSERT. These should not be visible to
+                // this transaction, so we skip them.
+                if (offset < segment_row_count_) {
+                    selected_rows.SetTrue(offset);
+                }
             }
         } else {
             // Low cardinality: use RoaringBitmap approach
@@ -765,8 +771,13 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
                     const uint8_t key_val = *it;
                     const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(&key_val));
                     if (bitmap) {
-                        bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
-                            selected_rows.SetTrue(offset);
+                        // Bounds check: offset may exceed segment_row_count_ if mem index contains
+                        // uncommitted entries from concurrent INSERT. These should not be visible to
+                        // this transaction, so we skip them.
+                        bitmap->RoaringBitmapApplyFunc([&selected_rows, this](u32 offset) -> bool {
+                            if (offset < segment_row_count_) {
+                                selected_rows.SetTrue(offset);
+                            }
                             return true; // continue iteration
                         });
                     }
@@ -780,8 +791,13 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType, CardinalityTag> {
                 for (auto it = begin_it; it != end_it; ++it) {
                     const auto *bitmap = static_cast<const Bitmap *>(index->GetOffsetsForKeyPtr(it));
                     if (bitmap) {
-                        bitmap->RoaringBitmapApplyFunc([&selected_rows](u32 offset) -> bool {
-                            selected_rows.SetTrue(offset);
+                        // Bounds check: offset may exceed segment_row_count_ if mem index contains
+                        // uncommitted entries from concurrent INSERT. These should not be visible to
+                        // this transaction, so we skip them.
+                        bitmap->RoaringBitmapApplyFunc([&selected_rows, this](u32 offset) -> bool {
+                            if (offset < segment_row_count_) {
+                                selected_rows.SetTrue(offset);
+                            }
                             return true;
                         });
                     }
@@ -897,7 +913,13 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
         for (u32 i = begin_pos; i < end_pos; ++i) {
-            selected_rows.SetTrue(offset_ptr[i]);
+            const u32 offset = offset_ptr[i];
+            // Bounds check: offset may exceed segment_row_count_ if mem index contains
+            // uncommitted entries from concurrent INSERT. These should not be visible to
+            // this transaction, so we skip them.
+            if (offset < segment_row_count_) {
+                selected_rows.SetTrue(offset);
+            }
         }
     }
 };

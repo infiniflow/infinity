@@ -189,6 +189,9 @@ private:
         result_var.second.SetAllFalse();
 
         for (const u32 offset : result) {
+            // Bounds check: offset may exceed segment_row_count if mem index contains
+            // uncommitted entries from concurrent INSERT. These should not be visible to
+            // this transaction, so we skip them.
             if (offset < segment_row_count) {
                 result_var.second.SetTrue(offset);
             }
