@@ -53,7 +53,7 @@ inline void ToLower(const char *data, size_t len, char *out, size_t out_limit) {
     char *begin = out;
     char *end = out + len;
     char *p = begin;
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     static constexpr int SSE2_BYTES = sizeof(__m128i);
     const char *sse2_end = begin + (len & ~(SSE2_BYTES - 1));
     const auto a_minus1 = _mm_set1_epi8('A' - 1);
@@ -77,7 +77,7 @@ inline std::string ToLowerString(std::string_view s) {
     char *end = result.data() + s.size();
 
     char *p = begin;
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     const size_t size = result.size();
     static constexpr int SSE2_BYTES = sizeof(__m128i);
     const char *sse2_end = begin + (size & ~(SSE2_BYTES - 1));

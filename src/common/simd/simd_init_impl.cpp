@@ -29,7 +29,7 @@ F32DistanceFuncType GetL2DistanceFuncPtr() {
         return &L2Distance_avx2;
     }
 #endif
-#ifdef __SSE2__
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32L2SSEResidual;
     }
@@ -43,7 +43,7 @@ F32DistanceFuncType GetIPDistanceFuncPtr() {
         return &IPDistance_avx2;
     }
 #endif
-#ifdef __SSE2__
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32IPSSEResidual;
     }
@@ -57,7 +57,7 @@ F32DistanceFuncType GetCosineDistanceFuncPtr() {
         return &CosineDistance_avx2;
     }
 #endif
-#ifdef __SSE2__
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32CosSSEResidual;
     }
@@ -69,7 +69,7 @@ U8HammingDistanceFuncType GetHammingDistanceFuncPtr() {
 #ifdef __AVX2__
     return &HammingDistance_avx2;
 #endif
-#ifdef __SSE2__
+#if defined(__AVX2__)
     return &HammingDistance_sse2;
 #endif
     return &HammingDistance_common;
@@ -86,7 +86,7 @@ F32DistanceFuncType Get_HNSW_F32L2_16_ptr() {
         return &F32L2AVX;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32L2SSE;
     }
@@ -105,7 +105,7 @@ F32DistanceFuncType Get_HNSW_F32L2_ptr() {
         return &F32L2AVXResidual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32L2SSEResidual;
     }
@@ -124,7 +124,7 @@ F32DistanceFuncType Get_HNSW_F32IP_16_ptr() {
         return &F32IPAVX;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32IPSSE;
     }
@@ -143,7 +143,7 @@ F32DistanceFuncType Get_HNSW_F32IP_ptr() {
         return &F32IPAVXResidual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32IPSSEResidual;
     }
@@ -162,7 +162,7 @@ F32DistanceFuncType Get_HNSW_F32Cos_16_ptr() {
         return &F32CosAVX;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32CosSSE;
     }
@@ -181,7 +181,7 @@ F32DistanceFuncType Get_HNSW_F32Cos_ptr() {
         return &F32CosAVXResidual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &F32CosSSEResidual;
     }
@@ -200,7 +200,7 @@ I8DistanceFuncType Get_HNSW_I8IP_64_ptr() {
         return &I8IPAVX;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8IPSSE;
     }
@@ -219,7 +219,7 @@ I8DistanceFuncType Get_HNSW_I8IP_32_ptr() {
         return &I8IPAVX;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8IPSSE;
     }
@@ -238,7 +238,7 @@ I8DistanceFuncType Get_HNSW_I8IP_16_ptr() {
         return &I8IPAVXResidual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8IPSSE;
     }
@@ -257,7 +257,7 @@ I8DistanceFuncType Get_HNSW_I8IP_ptr() {
         return &I8IPAVXResidual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8IPSSEResidual;
     }
@@ -276,7 +276,7 @@ I8DistanceFuncType Get_HNSW_I8L2_64_ptr() {
         return &I8L2AVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8L2SSE2;
     }
@@ -295,7 +295,7 @@ I8DistanceFuncType Get_HNSW_I8L2_32_ptr() {
         return &I8L2AVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8L2SSE2;
     }
@@ -314,7 +314,7 @@ I8DistanceFuncType Get_HNSW_I8L2_16_ptr() {
         return &I8L2AVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8L2SSE2;
     }
@@ -333,7 +333,7 @@ I8DistanceFuncType Get_HNSW_I8L2_ptr() {
         return &I8L2AVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8L2SSE2Residual;
     }
@@ -352,7 +352,7 @@ I8CosDistanceFuncType Get_HNSW_I8Cos_ptr() {
         return &I8CosAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &I8CosSSE2;
     }
@@ -371,7 +371,7 @@ U8DistanceFuncType Get_HNSW_U8L2_64_ptr() {
         return &U8L2AVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8L2SSE2;
     }
@@ -390,7 +390,7 @@ U8DistanceFuncType Get_HNSW_U8L2_32_ptr() {
         return &U8L2AVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8L2SSE2;
     }
@@ -409,7 +409,7 @@ U8DistanceFuncType Get_HNSW_U8L2_16_ptr() {
         return &U8L2AVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8L2SSE2;
     }
@@ -428,7 +428,7 @@ U8DistanceFuncType Get_HNSW_U8L2_ptr() {
         return &U8L2AVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8L2SSE2Residual;
     }
@@ -447,7 +447,7 @@ U8DistanceFuncType Get_HNSW_U8IP_64_ptr() {
         return &U8IPAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8IPSSE2;
     }
@@ -466,7 +466,7 @@ U8DistanceFuncType Get_HNSW_U8IP_32_ptr() {
         return &U8IPAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8IPSSE2;
     }
@@ -485,7 +485,7 @@ U8DistanceFuncType Get_HNSW_U8IP_16_ptr() {
         return &U8IPAVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8IPSSE2;
     }
@@ -504,7 +504,7 @@ U8DistanceFuncType Get_HNSW_U8IP_ptr() {
         return &U8IPAVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8IPSSE2Residual;
     }
@@ -523,7 +523,7 @@ U8CosDistanceFuncType Get_HNSW_U8Cos_ptr() {
         return &U8CosAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8CosSSE2;
     }
@@ -543,7 +543,7 @@ U8DistanceFuncType Get_Rabitq_U8IP_64_ptr() {
         return &U8BinIPAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8BinIPSSE2;
     }
@@ -563,7 +563,7 @@ U8DistanceFuncType Get_Rabitq_U8IP_32_ptr() {
         return &U8BinIPAVX2;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8BinIPSSE2;
     }
@@ -583,7 +583,7 @@ U8DistanceFuncType Get_Rabitq_U8IP_16_ptr() {
         return &U8BinIPAVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8BinIPSSE2;
     }
@@ -603,7 +603,7 @@ U8DistanceFuncType Get_Rabitq_U8IP_ptr() {
         return &U8BinIPAVX2Residual;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &U8BinIPSSE2Residual;
     }
@@ -668,7 +668,7 @@ SearchTop1WithDisF32U32FuncType GetSearchTop1WithDisF32U32FuncPtr() {
         return &search_top_1_with_dis_avx2<u32>;
     }
 #endif
-#if defined(__SSE2__)
+#if defined(__AVX2__)
     if (IsSSE2Supported()) {
         return &search_top_1_with_dis_sse2<u32>;
     }

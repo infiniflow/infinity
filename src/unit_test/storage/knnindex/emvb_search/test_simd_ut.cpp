@@ -27,7 +27,7 @@ using namespace infinity;
 
 class SIMDTest : public BaseTest {};
 
-#if defined(__aarch64__)
+#if !defined(__AVX__)
 inline float hsum256_ps_avx(__m256 v) {
     const __m128 x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
     const __m128 x64 = _mm_add_ps(x128, _mm_movehl_ps(x128, x128));

@@ -134,7 +134,7 @@ void search_top_k_with_sgemm_avx2(u32 k, u32 dimension, u32 nx, const f32 *x, u3
 }
 #endif
 
-#if defined(__SSE2__)
+#if defined(__x86_64__) && defined(__AVX2__)
 template <typename ID>
 void inner_search_top_k_with_sgemm_sse2(u32 k,
                                         u32 dimension,

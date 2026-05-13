@@ -27,7 +27,7 @@ void search_top_k_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny,
             return search_top_k_with_sgemm_avx2(k, dimension, nx, x, ny, y, labels, distances, sort_);
         }
 #endif
-#if defined(__SSE2__)
+#if defined(__x86_64__) && defined(__AVX2__)
         if (IsSSE2Supported()) {
             return search_top_k_with_sgemm_sse2(k, dimension, nx, x, ny, y, labels, distances, sort_);
         }

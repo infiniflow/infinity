@@ -27,7 +27,7 @@ void search_top_1_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, con
             return search_top_1_without_dis_avx2(dimension, nx, x, ny, y, labels);
         }
 #endif
-#if defined(__SSE2__)
+#if defined(__x86_64__) && defined(__AVX2__)
         if (IsSSE2Supported()) {
             return search_top_1_without_dis_sse2(dimension, nx, x, ny, y, labels);
         }
