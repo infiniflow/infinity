@@ -125,7 +125,7 @@ class ThriftInfinityClient:
         # version: 0.6.15, client_version: 35
         # version: 0.7.0, 0.7.0.dev1, 0.7.0.dev2, 0.7.0.dev3, 0.7.0.dev4, 0.7.0.dev5,
         #          0.7.0.dev6 and 0.7.0.dev7, client_version: 36
-        res = self.client.Connect(ConnectRequest(client_version=36))  # 0.7.0.dev7
+        res = self.client.Connect(ConnectRequest(client_version=36))  # 0.7.0
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
