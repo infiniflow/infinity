@@ -164,6 +164,12 @@ SELECT id FROM test_json_index WHERE json_contains(meta, '$.author', '"Alice"');
 5
 
 query I
+SELECT id FROM test_json_index WHERE json_contains(meta, '$.year', 2020);
+----
+1
+5
+
+query I
 SELECT id FROM test_json_index WHERE json_contains(meta, '$.data.inner', 50);
 ----
 6
