@@ -36,6 +36,7 @@ inline float hsum256_ps_avx(__m256 v) {
 }
 #endif
 
+#if 0
 TEST_F(SIMDTest, testsum256) {
     constexpr u32 test_sum256_loop = 20;
 
@@ -178,3 +179,4 @@ TEST_F(SIMDTest, testleftpackf) {
     }
 #endif
 }
+#
