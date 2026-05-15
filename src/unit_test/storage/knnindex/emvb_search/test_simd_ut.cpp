@@ -179,4 +179,4 @@ TEST_F(SIMDTest, testleftpackf) {
     }
 #endif
 }
-#
+#endif
