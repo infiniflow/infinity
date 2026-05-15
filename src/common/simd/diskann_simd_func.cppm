@@ -42,55 +42,57 @@ inline float hsum_ps_sse1(__m128 v) {                            // v = [ D C | 
 }
 #endif
 
-// export float hsumFloatVec(const float *array, size_t size) {
-//     float sum = 0.0f;
-//     size_t i = 0;
-//
-//     for (; i < size; i++) {
-//         sum += array[i];
-//     }
-//
-//     return sum;
-// }
-//
-// export float hsumFloatVecSSE(const float *array, size_t size) {
-//     if (size < 4) {
-//         return hsumFloatVec(array, size);
-//     }
-//
-//     float sum = 0.0f;
-//     size_t i = 0;
-//
-//     for (; i + 4 <= size; i += 4) {
-//         __m128 vec = _mm_loadu_ps(&array[i]);
-//         sum += hsum_ps_sse1(vec);
-//     }
-//
-//     for (; i < size; i++) {
-//         sum += array[i];
-//     }
-//
-//     return sum;
-// }
-//
-// export float hsumFloatVecAVX(const float *array, size_t size) {
-//     if (size < 8) {
-//         return hsumFloatVec(array, size);
-//     }
-//
-//     float sum = 0.0f;
-//     size_t i = 0;
-//
-//     for (; i + 8 <= size; i += 8) {
-//         __m256 vec = _mm256_loadu_ps(&array[i]);
-//         sum += hsum256_ps_avx(vec);
-//     }
-//
-//     for (; i < size; i++) {
-//         sum += array[i];
-//     }
-//
-//     return sum;
-// }
+#if 0
+export float hsumFloatVec(const float *array, size_t size) {
+    float sum = 0.0f;
+    size_t i = 0;
+
+    for (; i < size; i++) {
+        sum += array[i];
+    }
+
+    return sum;
+}
+
+export float hsumFloatVecSSE(const float *array, size_t size) {
+    if (size < 4) {
+        return hsumFloatVec(array, size);
+    }
+
+    float sum = 0.0f;
+    size_t i = 0;
+
+    for (; i + 4 <= size; i += 4) {
+        __m128 vec = _mm_loadu_ps(&array[i]);
+        sum += hsum_ps_sse1(vec);
+    }
+
+    for (; i < size; i++) {
+        sum += array[i];
+    }
+
+    return sum;
+}
+
+export float hsumFloatVecAVX(const float *array, size_t size) {
+    if (size < 8) {
+        return hsumFloatVec(array, size);
+    }
+
+    float sum = 0.0f;
+    size_t i = 0;
+
+    for (; i + 8 <= size; i += 8) {
+        __m256 vec = _mm256_loadu_ps(&array[i]);
+        sum += hsum256_ps_avx(vec);
+    }
+
+    for (; i < size; i++) {
+        sum += array[i];
+    }
+
+    return sum;
+}
+#endif
 
 } // namespace infinity
