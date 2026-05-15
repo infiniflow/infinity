@@ -471,45 +471,33 @@ func parseLikeExpression(expr string) *Expression {
 	exprUpper := strings.ToUpper(expr)
 
 	// Check for NOT LIKE first (must come before LIKE)
-	notLikeIdx := strings.Index(exprUpper, " NOT LIKE ")
+	notLikeIdx := findTopLevelOperator(exprUpper, " NOT LIKE ")
 	if notLikeIdx != -1 {
-		// Verify it's not inside quotes
-		beforePart := expr[:notLikeIdx]
-		if countQuotes(beforePart)%2 == 0 {
-			leftExpr := strings.TrimSpace(beforePart)
-			patternExpr := strings.TrimSpace(expr[notLikeIdx+10:])
-
-			left, err1 := parseExpressionInternal(leftExpr)
-			pattern, err2 := parseExpressionInternal(patternExpr)
-
-			if err1 == nil && err2 == nil {
-				return &Expression{
-					Type:      ExprTypeNotLike,
-					Left:      left,
-					Arguments: []*Expression{pattern},
-				}
+		leftExpr := strings.TrimSpace(expr[:notLikeIdx])
+		patternExpr := strings.TrimSpace(expr[notLikeIdx+10:])
+		left, err1 := parseExpressionInternal(leftExpr)
+		pattern, err2 := parseExpressionInternal(patternExpr)
+		if err1 == nil && err2 == nil {
+			return &Expression{
+				Type:      ExprTypeNotLike,
+				Left:      left,
+				Arguments: []*Expression{pattern},
 			}
 		}
 	}
 
 	// Check for LIKE
-	likeIdx := strings.Index(exprUpper, " LIKE ")
+	likeIdx := findTopLevelOperator(exprUpper, " LIKE ")
 	if likeIdx != -1 {
-		// Verify it's not inside quotes
-		beforePart := expr[:likeIdx]
-		if countQuotes(beforePart)%2 == 0 {
-			leftExpr := strings.TrimSpace(beforePart)
-			patternExpr := strings.TrimSpace(expr[likeIdx+6:])
-
-			left, err1 := parseExpressionInternal(leftExpr)
-			pattern, err2 := parseExpressionInternal(patternExpr)
-
-			if err1 == nil && err2 == nil {
-				return &Expression{
-					Type:      ExprTypeLike,
-					Left:      left,
-					Arguments: []*Expression{pattern},
-				}
+		leftExpr := strings.TrimSpace(expr[:likeIdx])
+		patternExpr := strings.TrimSpace(expr[likeIdx+6:])
+		left, err1 := parseExpressionInternal(leftExpr)
+		pattern, err2 := parseExpressionInternal(patternExpr)
+		if err1 == nil && err2 == nil {
+			return &Expression{
+				Type:      ExprTypeLike,
+				Left:      left,
+				Arguments: []*Expression{pattern},
 			}
 		}
 	}
@@ -517,15 +505,36 @@ func parseLikeExpression(expr string) *Expression {
 	return nil
 }
 
-// countQuotes counts the number of single quotes in a string
-func countQuotes(s string) int {
-	count := 0
-	for _, ch := range s {
-		if ch == '\'' {
-			count++
+// findTopLevelOperator finds an operator at the top level (not inside quotes or parentheses)
+func findTopLevelOperator(expr, op string) int {
+	parenCount := 0
+	inSingle := false
+	inDouble := false
+	for i := 0; i <= len(expr)-len(op); i++ {
+		ch := expr[i]
+		switch ch {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '(':
+			if !inSingle && !inDouble {
+				parenCount++
+			}
+		case ')':
+			if !inSingle && !inDouble {
+				parenCount--
+			}
+		}
+		if !inSingle && !inDouble && parenCount == 0 && strings.EqualFold(expr[i:i+len(op)], op) {
+			return i
 		}
 	}
-	return count
+	return -1
 }
 
 // stringPtr returns a pointer to a string
@@ -990,7 +999,7 @@ func isOuterParentheses(expr string) bool {
 	if !strings.HasPrefix(expr, "(") || !strings.HasSuffix(expr, ")") {
 		return false
 	}
-	
+
 	// Track parentheses depth - the outermost pair should close at the end
 	depth := 0
 	for i, ch := range expr {
