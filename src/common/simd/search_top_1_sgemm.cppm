@@ -226,7 +226,7 @@ void inner_search_top_1_with_sgemm_sse2(u32 dimension,
 #if defined(__FMA__)
                     __m128 distances_0 = _mm_fmadd_ps(ip_0, mul_minus2, y_norm_0);
                     __m128 distances_1 = _mm_fmadd_ps(ip_1, mul_minus2, y_norm_1);
-#elif
+#else
                     __m128 distances_0 = _mm_add_ps(_mm_mul_ps(ip_0, mul_minus2), y_norm_0);
                     __m128 distances_1 = _mm_add_ps(_mm_mul_ps(ip_1, mul_minus2), y_norm_1);
 #endif
