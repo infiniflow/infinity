@@ -181,7 +181,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test -i https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
@@ -284,7 +284,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -365,7 +365,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
@@ -419,7 +419,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -513,7 +513,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -598,7 +598,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -681,7 +681,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Install LLVM 20
         run: |
@@ -896,7 +896,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
@@ -982,7 +982,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
@@ -1039,7 +1039,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
@@ -1080,7 +1080,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1152,7 +1152,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
@@ -1212,7 +1212,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
@@ -1258,7 +1258,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -1317,7 +1317,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
@@ -1378,7 +1378,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
@@ -1474,7 +1474,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
@@ -1550,7 +1550,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
@@ -1607,7 +1607,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
@@ -1660,7 +1660,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
@@ -1729,7 +1729,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
@@ -1789,7 +1789,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
@@ -1847,7 +1847,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run pysdk test
         run: |
@@ -1938,7 +1938,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Download nltk data
         run: |
@@ -2014,7 +2014,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run sqllogictest
         run: |
@@ -2071,7 +2071,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Run restart test
         run: |
@@ -2112,7 +2112,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2184,7 +2184,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run Go tests
         run: |
@@ -2244,7 +2244,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for infinity and run http test
         run: |
@@ -2290,7 +2290,7 @@ jobs:
   #        uses: astral-sh/setup-uv@v7
   #        with:
   #          enable-cache: true
-  #      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+  #      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
   #
   #      - name: Start infinity server
   #        run: |
@@ -2349,7 +2349,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio pysdk test
         run: |
@@ -2410,7 +2410,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
       #        with:
       #          enable-cache: true
-      - run: uv sync --python 3.11 --frozen --extra test --index-url https://pypi.org/simple/
+      - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
       - name: Wait for services and run minio parallel test
         run: |
