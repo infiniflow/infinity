@@ -518,7 +518,14 @@ JsonManager::json_contains_path(const JsonTypeDef &data, const std::vector<JsonT
             }
             case JsonValueType::number_unsigned: {
                 auto token_value = parsed_token.get<uint64_t>();
-                return {true, current->is_number_unsigned() && current->get<uint64_t>() == token_value};
+                if (current->is_number_unsigned()) {
+                    return {true, current->get<uint64_t>() == token_value};
+                }
+                if (current->is_number_integer()) {
+                    auto int_val = current->get<int64_t>();
+                    return {true, int_val >= 0 && static_cast<uint64_t>(int_val) == token_value};
+                }
+                return {true, false};
             }
             case JsonValueType::number_float: {
                 auto token_value = parsed_token.get<double>();
@@ -571,7 +578,14 @@ JsonManager::json_contains_path(const JsonTypeDef &data, const std::vector<JsonT
         case JsonValueType::number_unsigned: {
             const auto token_value = parsed_token.get<uint64_t>();
             return {true, std::any_of(arr.begin(), arr.end(), [token_value](const JsonTypeDef &element) {
-                        return element.is_number_unsigned() && element.get<uint64_t>() == token_value;
+                        if (element.is_number_unsigned()) {
+                            return element.get<uint64_t>() == token_value;
+                        }
+                        if (element.is_number_integer()) {
+                            const auto int_val = element.get<int64_t>();
+                            return int_val >= 0 && static_cast<uint64_t>(int_val) == token_value;
+                        }
+                        return false;
                     })};
         }
         case JsonValueType::number_float: {
