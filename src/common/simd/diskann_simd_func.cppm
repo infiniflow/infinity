@@ -42,6 +42,7 @@ inline float hsum_ps_sse1(__m128 v) {                            // v = [ D C | 
 }
 #endif
 
+#if 0
 export float hsumFloatVec(const float *array, size_t size) {
     float sum = 0.0f;
     size_t i = 0;
@@ -92,5 +93,6 @@ export float hsumFloatVecAVX(const float *array, size_t size) {
 
     return sum;
 }
+#endif
 
 } // namespace infinity
