@@ -18,3 +18,6 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
+
+# Use x86_64 cross-compilation libstdc++ modules JSON instead of host's
+set(CMAKE_CXX_STDLIB_MODULES_JSON "${CMAKE_CURRENT_LIST_DIR}/x86_64-libstdc++.modules.json")
