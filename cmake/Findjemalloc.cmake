@@ -10,10 +10,13 @@ pkg_check_modules(PC_JEMALLOC QUIET jemalloc)
 find_path(JEMALLOC_INCLUDE_DIR
   NAMES jemalloc/jemalloc.h
   HINTS ${PC_JEMALLOC_INCLUDE_DIRS}
+        "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include"
 )
 find_library(JEMALLOC_LIBRARY
-  NAMES jemalloc
+  NAMES jemalloc jemalloc_s
   HINTS ${PC_JEMALLOC_LIBRARY_DIRS}
+        "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"
+        "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib"
 )
 
 if(JEMALLOC_INCLUDE_DIR)

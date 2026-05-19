@@ -1,26 +1,11 @@
-cmake_minimum_required(VERSION 4.0.3...4.2.0)
+cmake_minimum_required(VERSION 4.0.3...4.2.5)
 
 cmake_policy(SET CMP0167 OLD)
 
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
-if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.0)
+if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.5)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
-endif ()
-
-# Auto-detect and set vcpkg toolchain if not already set
-if (NOT CMAKE_TOOLCHAIN_FILE)
-    # First try environment variable CMAKE_TOOLCHAIN_FILE (for container builds)
-    if (DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{CMAKE_TOOLCHAIN_FILE}"
-                CACHE STRING "Vcpkg toolchain file")
-        message(STATUS "Using vcpkg toolchain from environment: ${CMAKE_TOOLCHAIN_FILE}")
-        # Fallback to VCPKG_ROOT for backward compatibility
-    elseif (DEFINED ENV{VCPKG_ROOT})
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-                CACHE STRING "Vcpkg toolchain file")
-        message(STATUS "Using vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
-    endif ()
 endif ()
 
 project(infinity VERSION 0.7.0)
@@ -53,7 +38,9 @@ if (CLANG_VERSION_STRING VERSION_GREATER_EQUAL 20)
 
     # add_compile_options(-ftime-trace)
     #    add_compile_options(-fmodule-header)
-    add_link_options(-fuse-ld=mold)
+    if (NOT CMAKE_CROSSCOMPILING)
+        add_link_options(-fuse-ld=mold)
+    endif ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
     add_link_options(-L/usr/local/lib)
@@ -73,45 +60,6 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64.*")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
-
-#strength, for image maintainer
-set(GCC_SEARCH_ROOTS
-        /usr
-        /usr/local
-)
-
-#if you encounter a problem, try commenting out the code below.
-#set(GCC15_SUFFIXES
-#        #        lib
-#        lib/gcc/15
-#	lib/gcc/aarch64-linux-gnu/15
-#        lib/gcc/x86_64-linux-gnu/15
-#        lib/gcc/x86_64-pc-linux-gnu/15.1.0
-#        lib64/gcc/x86_64-linux-gnu/15
-#        lib64/gcc/15
-#        lib64/gcc/x86_64-pc-linux-gnu/15.1.0
-#)
-#
-#find_library(STDCXX15_STATIC
-#        NAMES libstdc++.a
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${GCC15_SUFFIXES}
-#        REQUIRED
-#        NO_DEFAULT_PATH
-#)
-#
-#find_library(STDCXX15EXP_STATIC
-#        NAMES libstdc++exp.a
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${GCC15_SUFFIXES}
-#        REQUIRED
-#        NO_DEFAULT_PATH
-#)
-
-#get_filename_component(GCC15_LIB_DIR ${STDCXX15_STATIC} DIRECTORY)
-
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-########
 
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
@@ -166,33 +114,6 @@ message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
-
-## https://youtrack.jetbrains.com/issue/CPP-39632/import-std-CLion-cant-resolve-module-std-in-case-of-clang
-#add_library(unused_std_target STATIC)
-#
-## just tmp solution
-#set(LIBSTDCXX_MODULE_FILE_PATH_SUFFIX
-#        include/c++/15/bits
-#        include/c++/15.2.0/bits
-#)
-#
-#find_file(LIBSTDCXX_MODULE_FILE
-#        NAMES std.cc
-#        PATHS ${GCC_SEARCH_ROOTS}
-#        PATH_SUFFIXES ${LIBSTDCXX_MODULE_FILE_PATH_SUFFIX}
-#        REQUIRED
-#)
-#
-#get_filename_component(LIBSTDCXX_MODULE_FILE_DIR ${LIBSTDCXX_MODULE_FILE} DIRECTORY)
-#
-#target_sources(unused_std_target
-#        PRIVATE
-#        FILE_SET CXX_MODULES
-#        BASE_DIRS ${LIBSTDCXX_MODULE_FILE_DIR}
-#        FILES ${LIBSTDCXX_MODULE_FILE_DIR}/std.cc ${LIBSTDCXX_MODULE_FILE_DIR}/std.compat.cc
-#)
-
-
 # Get current system time and print the build time
 execute_process(COMMAND "date" +"%Y-%m-%d %H:%M.%S" OUTPUT_VARIABLE CURRENT_SYS_TIME)
 string(REGEX REPLACE "\n" "" CURRENT_SYS_TIME ${CURRENT_SYS_TIME})
@@ -235,19 +156,19 @@ endif ()
 # attach additional cmake modules
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
-option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    message(STATUS "Disable jemalloc in Debug mode")
-    set(ENABLE_JEMALLOC OFF)
-endif ()
+ # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
+ option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+     message(STATUS "Disable jemalloc in Debug mode")
+     set(ENABLE_JEMALLOC OFF)
+ endif ()
 
-if (ENABLE_JEMALLOC)
-    find_package(jemalloc REQUIRED)
-    set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
-endif ()
+ if (ENABLE_JEMALLOC)
+     find_package(jemalloc REQUIRED)
+     set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
+     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
+ endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
     if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
@@ -268,12 +189,12 @@ option(ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" OFF)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -O2 -g -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -DNDEBUG")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
@@ -290,38 +211,38 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
-    if (NOT ENABLE_JEMALLOC)
-        if (ENABLE_SANITIZER_THREAD AND ENABLE_SANITIZER_ADDRESS)
-            message(FATAL_ERROR "Could not enable THREAD-SANITIZER and ADDRESS-SANITIZER simultaneously.")
-        endif ()
-        if (ENABLE_SANITIZER_ADDRESS)
-            add_compile_options(-fsanitize=address -fsanitize=leak)
-            add_link_options(-fsanitize=address -fsanitize=leak)
-            message(STATUS "Enable Address Sanitizer in target: infinity")
-        endif ()
-        if (ENABLE_SANITIZER_THREAD)
-            add_compile_options(-fsanitize=thread)
-            add_link_options(-fsanitize=thread)
-            message(STATUS "Enable Thread Sanitizer in target: infinity")
-        endif ()
+     if (NOT ENABLE_JEMALLOC)
+         if (ENABLE_SANITIZER_THREAD AND ENABLE_SANITIZER_ADDRESS)
+             message(FATAL_ERROR "Could not enable THREAD-SANITIZER and ADDRESS-SANITIZER simultaneously.")
+         endif ()
+         if (ENABLE_SANITIZER_ADDRESS)
+             add_compile_options(-fsanitize=address -fsanitize=leak)
+             add_link_options(-fsanitize=address -fsanitize=leak)
+             message(STATUS "Enable Address Sanitizer in target: infinity")
+         endif ()
+         if (ENABLE_SANITIZER_THREAD)
+             add_compile_options(-fsanitize=thread)
+             add_link_options(-fsanitize=thread)
+             message(STATUS "Enable Thread Sanitizer in target: infinity")
+         endif ()
 
-        if (ENABLE_SANITIZER_UNDEFINED)
-            add_compile_options(-fsanitize=undefined)
-            add_link_options(-fsanitize=undefined)
-            message(STATUS "Enable Undefined Behavior Sanitizer in target: infinity")
-        endif ()
+         if (ENABLE_SANITIZER_UNDEFINED)
+             add_compile_options(-fsanitize=undefined)
+             add_link_options(-fsanitize=undefined)
+             message(STATUS "Enable Undefined Behavior Sanitizer in target: infinity")
+         endif ()
 
-        message(STATUS "Enable Sanitizer in target: infinity")
+         message(STATUS "Enable Sanitizer in target: infinity")
 
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
-        add_compile_options(-fsanitize-recover=all)
-        add_link_options(-fsanitize-recover=all)
+         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
+         add_compile_options(-fsanitize-recover=all)
+         add_link_options(-fsanitize-recover=all)
 
-        add_compile_options("-fno-omit-frame-pointer")
-        add_link_options("-fno-omit-frame-pointer")
-    else ()
-        message(STATUS "Disable AddressSanitizer because jemalloc")
-    endif ()
+         add_compile_options("-fno-omit-frame-pointer")
+         add_link_options("-fno-omit-frame-pointer")
+     else ()
+         message(STATUS "Disable AddressSanitizer because jemalloc")
+     endif ()
 
     set(CMAKE_DEBUG_POSTFIX "")
 
@@ -333,71 +254,20 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-if (APPLE)
-    if (X86_64)
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep SSE4.2"
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX2"
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND sh -c "sysctl -a machdep.cpu.features | grep AVX512"
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
-    endif ()
-else ()
-    #Linux
-    if (X86_64)
-        execute_process(COMMAND grep -qw sse4_2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND grep -qw avx2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX2
-                OUTPUT_QUIET
-                ERROR_QUIET)
-
-        execute_process(COMMAND grep -qw avx512f /proc/cpuinfo && grep -qw avx512dq /proc/cpuinfo && grep -qw avx512bw /proc/cpuinfo && grep -qw avx512vl /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
-    endif ()
-endif ()
-
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 
 option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
 
 if (IS_CI_TEST_PIPELINE)
     if (X86_64)
-        add_definitions(-march=x86-64-v2)
+        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/x86_64-v2.cmake")
+    elseif (ARM64)
+        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/aarch64.cmake")
     else ()
-        add_definitions(-march=native)
+        message(FATAL_ERROR "Not support your arch yet.")
     endif ()
 else ()
-    if (X86_64)
-        if (SUPPORT_AVX512 EQUAL 0)
-            message(STATUS "Compiled by AVX512")
-            add_definitions(-mavx512f -mavx512dq -mavx512bw -mavx512vl -mevex512)
-        elseif (SUPPORT_AVX2 EQUAL 0)
-            message(STATUS "Compiled by AVX2")
-            add_definitions(-mavx2)
-        elseif (SUPPORT_SSE42 EQUAL 0)
-            message(STATUS "Compiled by SSE4_2")
-            add_definitions(-msse4.2)
-        else ()
-            message(FATAL_ERROR "This project requires following cpu flag: sse4_2.")
-        endif ()
-        add_definitions(-mfma -mf16c -mpopcnt -mbmi2)
-    else ()
-        add_definitions(-march=native)
-    endif ()
+    add_definitions(-march=native)
 endif ()
 
 
@@ -422,7 +292,7 @@ else ()
 endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-find_package(Python3 COMPONENTS Interpreter Development)
+find_package(Python3 COMPONENTS Development)
 #find_package(Python 3.8
 #        REQUIRED COMPONENTS Interpreter Development.Module
 #        OPTIONAL_COMPONENTS Development.SABIModule)

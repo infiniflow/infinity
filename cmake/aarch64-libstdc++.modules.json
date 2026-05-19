@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "revision": 1,
+  "modules": [
+    {
+      "logical-name": "std",
+      "source-path": "/usr/aarch64-linux-gnu/include/c++/15/bits/std.cc",
+      "is-std-library": true,
+      "local-arguments": {
+        "system-include-directories": [
+          "/usr/aarch64-linux-gnu/include/c++/15",
+          "/usr/aarch64-linux-gnu/include/c++/15/aarch64-linux-gnu",
+          "/usr/aarch64-linux-gnu/include/c++/15/backward",
+          "/usr/lib/llvm-20/lib/clang/20/include",
+          "/usr/aarch64-linux-gnu/include"
+        ]
+      }
+    },
+    {
+      "logical-name": "std.compat",
+      "source-path": "/usr/aarch64-linux-gnu/include/c++/15/bits/std.compat.cc",
+      "is-std-library": true,
+      "local-arguments": {
+        "system-include-directories": [
+          "/usr/aarch64-linux-gnu/include/c++/15",
+          "/usr/aarch64-linux-gnu/include/c++/15/aarch64-linux-gnu",
+          "/usr/aarch64-linux-gnu/include/c++/15/backward",
+          "/usr/lib/llvm-20/lib/clang/20/include",
+          "/usr/aarch64-linux-gnu/include"
+        ]
+      }
+    }
+  ]
+}

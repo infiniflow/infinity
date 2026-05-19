@@ -92,7 +92,10 @@ import std.compat;
 #include <oatpp/network/tcp/server/ConnectionProvider.hpp>
 #include <oatpp/web/server/HttpConnectionHandler.hpp>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmacro-redefined"
 #include "Python.h"
+#pragma clang diagnostic pop
 #include "miniocpp/client.h"
 #include <arrow/api.h>
 #include <arrow/io/file.h>
