@@ -116,14 +116,14 @@ find_package(unofficial-inih CONFIG REQUIRED)
 
 set(VCPKG_PROJECT_ROOT "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed")
 file(GLOB VCPKG_INCLUDE_DIRS
-        "${VCPKG_PROJECT_ROOT}/*/include"
+        "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/include"
 )
 message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
 include_directories(${VCPKG_INCLUDE_DIRS})
 
 # vcpkg oatpp bug
 file(GLOB OATPP_INCLUDE_DIRS
-        "${VCPKG_PROJECT_ROOT}/*/include/oatpp-1.3.0/oatpp"
+        "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/include/oatpp-1.3.0/oatpp"
 )
 message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
@@ -179,8 +179,9 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 endif ()
 
 if (ENABLE_JEMALLOC)
-    find_package(jemalloc REQUIRED)
-    set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(JEMALLOC REQUIRED jemalloc)
+    set(JEMALLOC_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/jemalloc_pic.a")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif ()
