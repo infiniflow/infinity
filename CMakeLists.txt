@@ -171,19 +171,19 @@ endif ()
 # attach additional cmake modules
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
- # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
- option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
- if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-     message(STATUS "Disable jemalloc in Debug mode")
-     set(ENABLE_JEMALLOC OFF)
- endif ()
+# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
+option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    message(STATUS "Disable jemalloc in Debug mode")
+    set(ENABLE_JEMALLOC OFF)
+endif ()
 
- if (ENABLE_JEMALLOC)
-     find_package(jemalloc REQUIRED)
-     set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
-     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
- endif ()
+if (ENABLE_JEMALLOC)
+    find_package(jemalloc REQUIRED)
+    set(JEMALLOC_STATIC_LIB "jemalloc_pic.a")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
+endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
     if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
