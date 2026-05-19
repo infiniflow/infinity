@@ -1,6 +1,6 @@
 # CMake toolchain file for x86-64 Linux (GNU libc)
 # Target: x86_64-linux-gnu-v3
-find_program(x86_64_GCC x86_64-linux-gnu-gcc REQUIRED)
+find_program(x86_64_GCC x86-64-linux-gnu-gcc REQUIRED)
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)

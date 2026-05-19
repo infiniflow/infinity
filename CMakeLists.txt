@@ -8,6 +8,21 @@ if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.5)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 endif ()
 
+# Auto-detect and set vcpkg toolchain if not already set
+if (NOT CMAKE_TOOLCHAIN_FILE)
+    # First try environment variable CMAKE_TOOLCHAIN_FILE (for container builds)
+    if (DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{CMAKE_TOOLCHAIN_FILE}"
+                CACHE STRING "Vcpkg toolchain file")
+        message(STATUS "Using vcpkg toolchain from environment: ${CMAKE_TOOLCHAIN_FILE}")
+        # Fallback to VCPKG_ROOT for backward compatibility
+    elseif (DEFINED ENV{VCPKG_ROOT})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "Vcpkg toolchain file")
+        message(STATUS "Using vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
+    endif ()
+endif ()
+
 project(infinity VERSION 0.7.0)
 
 set(CMAKE_CXX_STANDARD 23)
