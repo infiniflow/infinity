@@ -282,7 +282,7 @@ if (IS_CI_TEST_PIPELINE)
         message(FATAL_ERROR "Not support your arch yet.")
     endif ()
 else ()
-    add_definitions(-march=native)
+    add_compile_options(-march=native)
 endif ()
 
 
