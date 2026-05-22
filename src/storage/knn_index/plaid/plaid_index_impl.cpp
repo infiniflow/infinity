@@ -955,7 +955,7 @@ PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
 }
 
 std::unique_ptr<f32[]> PlaidIndex::ComputeQueryCentroidScores(const f32 *query_ptr, u32 n_query_tokens) const {
-    auto scores = std::make_unique<f32[]>(n_query_tokens * n_centroids_);
+    auto scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * n_centroids_]);
     // Use accessor to get centroids data (handles shared global centroids)
     const auto &centroids = centroids_data();
     const auto &norms = centroid_norms_neg_half();
@@ -1022,8 +1022,8 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
     // Track max score per centroid across all query tokens (for threshold filtering)
     std::vector<f32> centroid_max_score(n_centroids_, std::numeric_limits<f32>::lowest());
 
-    // Allocate batch score buffer
-    auto batch_scores = std::make_unique<f32[]>(n_query_tokens * batch_size);
+    // Allocate batch score buffer (no zero-init, immediately filled by GEMM)
+    auto batch_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * batch_size]);
 
     for (u32 batch_start = 0; batch_start < n_centroids_; batch_start += batch_size) {
         const u32 batch_end = std::min(batch_start + batch_size, n_centroids_);
@@ -1103,20 +1103,20 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
         return;
     }
 
-    sparse_centroid_scores = std::make_unique<f32[]>(n_sparse_centroids * n_query_tokens);
+    sparse_centroid_scores = std::unique_ptr<f32[]>(new f32[n_sparse_centroids * n_query_tokens]);
 
     // Compute sparse scores by re-computing only for probed centroids
     // This is more memory-efficient than storing the full [n_query_tokens, n_centroids] matrix
     // Process in small batches for cache efficiency
     constexpr u32 SPARSE_BATCH = 256;
-    auto sparse_batch_scores = std::make_unique<f32[]>(n_query_tokens * SPARSE_BATCH);
+    auto sparse_batch_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * SPARSE_BATCH]);
 
     for (u32 batch_start = 0; batch_start < n_sparse_centroids; batch_start += SPARSE_BATCH) {
         const u32 batch_end = std::min(batch_start + SPARSE_BATCH, n_sparse_centroids);
         const u32 current_batch = batch_end - batch_start;
 
-        // Gather centroid vectors for this batch
-        auto batch_centroid_data = std::make_unique<f32[]>(current_batch * embedding_dimension_);
+        // Gather centroid vectors for this batch (no zero-init, immediately filled)
+        auto batch_centroid_data = std::unique_ptr<f32[]>(new f32[current_batch * embedding_dimension_]);
         for (u32 i = 0; i < current_batch; ++i) {
             const u32 cid = probed_centroids[batch_start + i];
             std::copy_n(centroids.data() + cid * embedding_dimension_, embedding_dimension_, batch_centroid_data.get() + i * embedding_dimension_);
@@ -1144,13 +1144,18 @@ f32 PlaidIndex::ApproximateScoreSparse(const u32 *doc_centroid_ids,
                                        const u32 doc_len,
                                        const f32 *sparse_scores,
                                        const u32 *sparse_centroid_id_map,
-                                       const u32 n_sparse_centroids,
+                                       [[maybe_unused]] const u32 n_sparse_centroids,
                                        const u32 n_query_tokens) const {
     // sparse_scores layout: [n_sparse_centroids, n_query_tokens]
     // sparse_centroid_id_map maps centroid_id -> sparse index (or UINT32_MAX if not in sparse set)
-    // Track max score per query token
-    auto max_scores = std::make_unique<f32[]>(n_query_tokens);
-    std::fill_n(max_scores.get(), n_query_tokens, std::numeric_limits<f32>::lowest());
+    // Track max score per query token, then sum at the end.
+    // Use stack allocation for small n_query_tokens to avoid heap alloc per call
+    constexpr u32 STACK_MAX_QT = 256;
+    f32 stack_buf[STACK_MAX_QT];
+    f32 *max_scores = (n_query_tokens <= STACK_MAX_QT) ? stack_buf : new f32[n_query_tokens];
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        max_scores[q] = std::numeric_limits<f32>::lowest();
+    }
 
     for (u32 d = 0; d < doc_len; ++d) {
         const u32 cid = doc_centroid_ids[d];
@@ -1158,7 +1163,7 @@ f32 PlaidIndex::ApproximateScoreSparse(const u32 *doc_centroid_ids,
             continue;
         }
         const u32 sparse_idx = sparse_centroid_id_map[cid];
-        if (sparse_idx == std::numeric_limits<u32>::max() || sparse_idx >= n_sparse_centroids) {
+        if (sparse_idx == std::numeric_limits<u32>::max()) {
             continue;
         }
         const f32 *score_row = sparse_scores + sparse_idx * n_query_tokens;
@@ -1174,6 +1179,9 @@ f32 PlaidIndex::ApproximateScoreSparse(const u32 *doc_centroid_ids,
             total_score += max_scores[q];
         }
     }
+
+    if (n_query_tokens > STACK_MAX_QT)
+        delete[] max_scores;
     return total_score;
 }
 
@@ -1184,8 +1192,10 @@ f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const
     // This improves cache locality: for a given centroid cid, all query scores
     // are at contiguous stride n_centroids_ in query_centroid_scores.
 
-    auto max_scores = std::make_unique<f32[]>(n_query_tokens);
-    std::fill_n(max_scores.get(), n_query_tokens, std::numeric_limits<f32>::lowest());
+    auto max_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens]);
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        max_scores[q] = std::numeric_limits<f32>::lowest();
+    }
 
     // For each doc token, look up all query scores for its centroid in one pass
     // query_centroid_scores layout: [n_query_tokens * n_centroids]
@@ -1221,28 +1231,39 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
     const u32 *ci_ptr = centroid_ids_ptr();
     const u8 *pr_ptr = packed_residuals_ptr();
     const f32 *cdata = centroids.data();
+    const u32 n_buckets_val = quantizer_->n_buckets();
+    const u32 packed_dim = quantizer_->packed_dim();
 
     // ── P1: Batch centroid scoring via one GEMM ──
-    auto doc_ctrs = std::make_unique<f32[]>(doc_len * dim);
+    auto doc_ctrs = std::unique_ptr<f32[]>(new f32[doc_len * dim]);
     for (u32 d = 0; d < doc_len; ++d) {
         u32 cid = ci_ptr[doc_offset + d];
         std::copy_n(cdata + cid * dim, dim, doc_ctrs.get() + d * dim);
     }
-    auto c_scores = std::make_unique<f32[]>(n_query_tokens * doc_len);
+    auto c_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * doc_len]);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, doc_ctrs.get(), n_query_tokens, doc_len, dim, c_scores.get());
+
+    // ── Pre-compute all IP tables and position LUTs once (no zero-init, immediately filled) ──
+    auto ip_table_buf = std::unique_ptr<f32[]>(new f32[dim * n_buckets_val]);
+    auto all_luts = std::unique_ptr<f32[]>(new f32[n_query_tokens * packed_dim * 256]);
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        quantizer_->GetIPDistanceTableTo(query_ptr + q * dim, ip_table_buf.get());
+        quantizer_->BuildPositionLUT(ip_table_buf.get(), all_luts.get() + q * packed_dim * 256);
+    }
+    ip_table_buf.reset();
 
     // ── P0: Per-query-token loop with SIMD max ──
     constexpr u32 STACK_MAX = 256;
     f32 total_score = 0.0f;
     for (u32 q = 0; q < n_query_tokens; ++q) {
-        auto ip_table = quantizer_->GetIPDistanceTable(query_ptr + q * dim);
+        const f32 *position_lut = all_luts.get() + q * packed_dim * 256;
 
         f32 stack_buf[STACK_MAX];
         f32 *combined = (doc_len <= STACK_MAX) ? stack_buf : new f32[doc_len];
 
         for (u32 d = 0; d < doc_len; ++d) {
             u32 embedding_idx = doc_offset + d;
-            f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx, 0, 1, ip_table.get(), pr_ptr, ci_ptr, cdata);
+            f32 r_score = quantizer_->GetSingleIPDistanceFromLUT(embedding_idx, position_lut, pr_ptr);
             combined[d] = c_scores[q * doc_len + d] + r_score;
         }
 
@@ -1266,6 +1287,8 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
     const u32 *ci_ptr = centroid_ids_ptr();
     const u8 *pr_ptr = packed_residuals_ptr();
     const f32 *cdata = centroids.data();
+    const u32 n_buckets_val = quantizer_->n_buckets();
+    const u32 packed_dim = quantizer_->packed_dim();
 
     auto doc_lens_buf = std::make_unique<u32[]>(n_candidates);
     auto doc_offsets_buf = std::make_unique<u32[]>(n_candidates + 1);
@@ -1283,7 +1306,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
         return;
     }
 
-    auto gathered_ctrs = std::make_unique<f32[]>(total_tokens * dim);
+    auto gathered_ctrs = std::unique_ptr<f32[]>(new f32[total_tokens * dim]);
     for (u32 i = 0; i < n_candidates; ++i) {
         u32 did = candidate_ids[i];
         u32 doc_start = doc_offsets_[did];
@@ -1295,7 +1318,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
         }
     }
 
-    auto c_scores = std::make_unique<f32[]>(n_query_tokens * total_tokens);
+    auto c_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * total_tokens]);
     {
         constexpr u64 GEMM_BATCH = 16384;
         u64 go = 0;
@@ -1312,6 +1335,15 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
         }
     }
 
+    // Pre-compute all IP tables and position LUTs once (no zero-init, immediately filled)
+    auto ip_table_buf = std::unique_ptr<f32[]>(new f32[dim * n_buckets_val]);
+    auto all_luts = std::unique_ptr<f32[]>(new f32[n_query_tokens * packed_dim * 256]);
+    for (u32 q = 0; q < n_query_tokens; ++q) {
+        quantizer_->GetIPDistanceTableTo(query_ptr + q * dim, ip_table_buf.get());
+        quantizer_->BuildPositionLUT(ip_table_buf.get(), all_luts.get() + q * packed_dim * 256);
+    }
+    ip_table_buf.reset();
+
     constexpr u32 STACK_MAX = 256;
     for (u32 i = 0; i < n_candidates; ++i) {
         u32 did = candidate_ids[i];
@@ -1321,14 +1353,14 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
 
         f32 total_score = 0.0f;
         for (u32 q = 0; q < n_query_tokens; ++q) {
-            auto ip_table = quantizer_->GetIPDistanceTable(query_ptr + q * dim);
+            const f32 *position_lut = all_luts.get() + q * packed_dim * 256;
 
             f32 stack_buf[STACK_MAX];
             f32 *combined = (doc_len <= STACK_MAX) ? stack_buf : new f32[doc_len];
 
             for (u32 d = 0; d < doc_len; ++d) {
                 u32 embedding_idx = doc_start + d;
-                f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx, 0, 1, ip_table.get(), pr_ptr, ci_ptr, cdata);
+                f32 r_score = quantizer_->GetSingleIPDistanceFromLUT(embedding_idx, position_lut, pr_ptr);
                 combined[d] = c_scores[q * total_tokens + (go + d)] + r_score;
             }
 

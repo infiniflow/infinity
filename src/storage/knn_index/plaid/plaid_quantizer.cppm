@@ -56,6 +56,23 @@ public:
     // Returns: ip_table [embedding_dim, n_buckets] for fast lookup
     std::unique_ptr<f32[]> GetIPDistanceTable(const f32 *query) const;
 
+    // Write IP distance table into pre-allocated buffer (avoids unique_ptr allocation)
+    // output: [embedding_dim * n_buckets]
+    void GetIPDistanceTableTo(const f32 *query, f32 *output) const;
+
+    // Build position-level lookup table for fast GetSingleIPDistance
+    // ip_table: [embedding_dim * n_buckets]
+    // lut_out: [packed_dim * 256] - maps each (byte_pos, byte_value) to its IP contribution
+    void BuildPositionLUT(const f32 *ip_table, f32 *lut_out) const;
+
+    // Fast single IP distance using position LUT (no byte reversal chain at query time)
+    // embedding_id: index of the embedding
+    // position_lut: [packed_dim * 256] pre-built LUT
+    // packed_residuals: quantized residual data
+    f32 GetSingleIPDistanceFromLUT(u32 embedding_id,
+                                   const f32 *position_lut,
+                                   const u8 *packed_residuals) const;
+
     // Get single inner product distance using precomputed table
     // embedding_id: index of the embedding
     // query_id: index of the query (for multi-query)

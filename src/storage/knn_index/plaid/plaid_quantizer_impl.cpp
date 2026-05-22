@@ -279,14 +279,57 @@ std::unique_ptr<f32[]> PlaidQuantizer::GetIPDistanceTable(const f32 *query) cons
 
     // Compute IP table: [embedding_dim_, n_buckets_]
     auto table = std::make_unique<f32[]>(embedding_dim_ * n_buckets_);
+    GetIPDistanceTableTo(query, table.get());
+    return table;
+}
 
+void PlaidQuantizer::GetIPDistanceTableTo(const f32 *query, f32 *output) const {
+    std::shared_lock lock(rw_mutex_);
+    if (!bucket_weights_) {
+        UnrecoverableError("PlaidQuantizer::GetIPDistanceTableTo: must call Train first");
+    }
+    const f32 *bw = bucket_weights_.get(); // raw ptr, avoid unique_ptr::operator[] overhead
     for (u32 d = 0; d < embedding_dim_; ++d) {
         for (u32 b = 0; b < n_buckets_; ++b) {
-            table[d * n_buckets_ + b] = query[d] * bucket_weights_[b];
+            output[d * n_buckets_ + b] = query[d] * bw[b];
         }
     }
+}
 
-    return table;
+void PlaidQuantizer::BuildPositionLUT(const f32 *ip_table, f32 *lut_out) const {
+    // Build per-byte-position lookup table from ip_table
+    // lut_out[j * 256 + v] = contribution of byte value v at packed position j
+    // This replaces the byte_reversal + bucket_weight_index + ip_table access chain
+    // in GetSingleIPDistance with a single array lookup.
+    const u32 keys_per_byte = 8 / nbits_;
+    const u8 *rev_map = byte_reversed_bits_map_.get();       // raw ptr, avoid unique_ptr overhead
+    const u8 *bucket_lut = bucket_weight_indices_lookup_.get(); // raw ptr
+    for (u32 j = 0; j < packed_dim_; ++j) {
+        for (u32 v = 0; v < 256; ++v) {
+            u8 reversed = rev_map[v];
+            const u8 *indices = &bucket_lut[reversed * keys_per_byte];
+            f32 contrib = ip_table[(j * keys_per_byte) * n_buckets_ + indices[0]];
+            if (keys_per_byte > 1) {
+                contrib += ip_table[(j * keys_per_byte + 1) * n_buckets_ + indices[1]];
+            }
+            lut_out[j * 256 + v] = contrib;
+        }
+    }
+}
+
+f32 PlaidQuantizer::GetSingleIPDistanceFromLUT(u32 embedding_id,
+                                               const f32 *position_lut,
+                                               const u8 *packed_residuals) const {
+    // Fast path: use pre-built position LUT to avoid byte reversal chain at query time
+    // position_lut layout: [packed_dim_, 256]
+    // For each packed byte, direct LUT lookup replaces:
+    //   byte_reverse → bucket_weight_index → ip_table[mul+add]
+    const u8 *packed = packed_residuals + embedding_id * packed_dim_;
+    f32 result = 0.0f;
+    for (u32 j = 0; j < packed_dim_; ++j) {
+        result += position_lut[j * 256 + packed[j]];
+    }
+    return result;
 }
 
 f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
