@@ -956,15 +956,16 @@ PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
 
 std::unique_ptr<f32[]> PlaidIndex::ComputeQueryCentroidScores(const f32 *query_ptr, u32 n_query_tokens) const {
     auto scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * n_centroids_]);
+    f32 *sc = scores.get(); // raw ptr
     // Use accessor to get centroids data (handles shared global centroids)
     const auto &centroids = centroids_data();
     const auto &norms = centroid_norms_neg_half();
-    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, centroids.data(), n_query_tokens, n_centroids_, embedding_dimension_, scores.get());
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, centroids.data(), n_query_tokens, n_centroids_, embedding_dimension_, sc);
 
     // Add centroid_norms_neg_half for L2 distance computation
     for (u32 i = 0; i < n_query_tokens; ++i) {
         for (u32 j = 0; j < n_centroids_; ++j) {
-            scores[i * n_centroids_ + j] += norms[j];
+            sc[i * n_centroids_ + j] += norms[j];
         }
     }
 
@@ -1193,8 +1194,9 @@ f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const
     // are at contiguous stride n_centroids_ in query_centroid_scores.
 
     auto max_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens]);
+    f32 *ms = max_scores.get(); // raw ptr, avoid unique_ptr::operator[] overhead in hot loops
     for (u32 q = 0; q < n_query_tokens; ++q) {
-        max_scores[q] = std::numeric_limits<f32>::lowest();
+        ms[q] = std::numeric_limits<f32>::lowest();
     }
 
     // For each doc token, look up all query scores for its centroid in one pass
@@ -1204,7 +1206,7 @@ f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const
         const u32 cid = doc_centroid_ids[d];
         const f32 *score_ptr = query_centroid_scores + cid;
         for (u32 q = 0; q < n_query_tokens; ++q) {
-            max_scores[q] = std::max(max_scores[q], *score_ptr);
+            ms[q] = std::max(ms[q], *score_ptr);
             score_ptr += n_centroids_;
         }
     }
@@ -1212,8 +1214,8 @@ f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const
     // Sum max scores across query tokens
     f32 total_score = 0.0f;
     for (u32 q = 0; q < n_query_tokens; ++q) {
-        if (max_scores[q] > std::numeric_limits<f32>::lowest()) {
-            total_score += max_scores[q];
+        if (ms[q] > std::numeric_limits<f32>::lowest()) {
+            total_score += ms[q];
         }
     }
 
@@ -1241,7 +1243,8 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
         std::copy_n(cdata + cid * dim, dim, doc_ctrs.get() + d * dim);
     }
     auto c_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * doc_len]);
-    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, doc_ctrs.get(), n_query_tokens, doc_len, dim, c_scores.get());
+    f32 *cs = c_scores.get(); // raw ptr, avoid unique_ptr::operator[] in hot loop
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, doc_ctrs.get(), n_query_tokens, doc_len, dim, cs);
 
     // ── Pre-compute all IP tables and position LUTs once (no zero-init, immediately filled) ──
     auto ip_table_buf = std::unique_ptr<f32[]>(new f32[dim * n_buckets_val]);
@@ -1264,7 +1267,7 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
         for (u32 d = 0; d < doc_len; ++d) {
             u32 embedding_idx = doc_offset + d;
             f32 r_score = quantizer_->GetSingleIPDistanceFromLUT(embedding_idx, position_lut, pr_ptr);
-            combined[d] = c_scores[q * doc_len + d] + r_score;
+            combined[d] = cs[q * doc_len + d] + r_score;
         }
 
         f32 max_score = simd_hmax(combined, doc_len);
@@ -1307,6 +1310,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
     }
 
     auto gathered_ctrs = std::unique_ptr<f32[]>(new f32[total_tokens * dim]);
+    f32 *gc = gathered_ctrs.get();
     for (u32 i = 0; i < n_candidates; ++i) {
         u32 did = candidate_ids[i];
         u32 doc_start = doc_offsets_[did];
@@ -1314,11 +1318,12 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
         u32 go = doc_offsets_buf[i];
         for (u32 d = 0; d < doc_len; ++d) {
             u32 cid = ci_ptr[doc_start + d];
-            std::copy_n(cdata + cid * dim, dim, gathered_ctrs.get() + (go + d) * dim);
+            std::copy_n(cdata + cid * dim, dim, gc + (go + d) * dim);
         }
     }
 
     auto c_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * total_tokens]);
+    f32 *cs = c_scores.get(); // raw ptr, avoid unique_ptr::operator[] in hot loop
     {
         constexpr u64 GEMM_BATCH = 16384;
         u64 go = 0;
@@ -1326,11 +1331,11 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
             u64 be = std::min(go + GEMM_BATCH, total_tokens);
             u32 bt = static_cast<u32>(be - go);
             matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
-                                                           gathered_ctrs.get() + go * dim,
+                                                           gc + go * dim,
                                                            n_query_tokens,
                                                            bt,
                                                            dim,
-                                                           c_scores.get() + go * n_query_tokens);
+                                                           cs + go * n_query_tokens);
             go = be;
         }
     }
@@ -1361,7 +1366,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
             for (u32 d = 0; d < doc_len; ++d) {
                 u32 embedding_idx = doc_start + d;
                 f32 r_score = quantizer_->GetSingleIPDistanceFromLUT(embedding_idx, position_lut, pr_ptr);
-                combined[d] = c_scores[q * total_tokens + (go + d)] + r_score;
+                combined[d] = cs[q * total_tokens + (go + d)] + r_score;
             }
 
             f32 max_score = simd_hmax(combined, doc_len);

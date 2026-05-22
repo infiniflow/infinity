@@ -324,9 +324,25 @@ f32 PlaidQuantizer::GetSingleIPDistanceFromLUT(u32 embedding_id,
     // position_lut layout: [packed_dim_, 256]
     // For each packed byte, direct LUT lookup replaces:
     //   byte_reverse → bucket_weight_index → ip_table[mul+add]
+    //
+    // Process 4 bytes at a time to avoid L1 cache thrashing:
+    // position_lut (64KB) > L1 cache (32KB), so loading 1 packed byte then looking up
+    // position_lut evicts the next packed byte from L1. By reading 4 packed bytes into
+    // registers first, the LUT lookups don't compete with packed data for L1.
     const u8 *packed = packed_residuals + embedding_id * packed_dim_;
     f32 result = 0.0f;
-    for (u32 j = 0; j < packed_dim_; ++j) {
+    u32 j = 0;
+    for (; j + 4 <= packed_dim_; j += 4) {
+        u8 b0 = packed[j];
+        u8 b1 = packed[j + 1];
+        u8 b2 = packed[j + 2];
+        u8 b3 = packed[j + 3];
+        result += position_lut[(j + 0) * 256 + b0]
+                + position_lut[(j + 1) * 256 + b1]
+                + position_lut[(j + 2) * 256 + b2]
+                + position_lut[(j + 3) * 256 + b3];
+    }
+    for (; j < packed_dim_; ++j) {
         result += position_lut[j * 256 + packed[j]];
     }
     return result;
