@@ -199,21 +199,15 @@ public:
     // Embedding data — centroid_ids supports two storage modes:
     enum class CentroidIDsMode { kOwned, kMmap };
     CentroidIDsMode centroid_ids_mode_ = CentroidIDsMode::kOwned;
-    std::vector<u32> owned_centroid_ids_;          // [n_total_embeddings_] owned storage
-    const u32 *mmap_centroid_ids_ = nullptr;       // mmap pointer (valid only when centroid_ids_mode_ == kMmap)
-    u64 mmap_centroid_ids_size_ = 0;               // size in elements (valid only when centroid_ids_mode_ == kMmap)
+    std::vector<u32> owned_centroid_ids_;    // [n_total_embeddings_] owned storage
+    const u32 *mmap_centroid_ids_ = nullptr; // mmap pointer (valid only when centroid_ids_mode_ == kMmap)
+    u64 mmap_centroid_ids_size_ = 0;         // size in elements (valid only when centroid_ids_mode_ == kMmap)
 
     // Accessors for centroid_ids
-    const u32 *centroid_ids_ptr() const {
-        return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_ : owned_centroid_ids_.data();
-    }
-    u64 centroid_ids_size() const {
-        return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_size_ : owned_centroid_ids_.size();
-    }
+    const u32 *centroid_ids_ptr() const { return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_ : owned_centroid_ids_.data(); }
+    u64 centroid_ids_size() const { return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_size_ : owned_centroid_ids_.size(); }
     // Return a std::span for compatibility with existing iteration code (.begin(), .end(), .data(), .size())
-    std::span<const u32> centroid_ids() const {
-        return std::span<const u32>(centroid_ids_ptr(), centroid_ids_size());
-    }
+    std::span<const u32> centroid_ids() const { return std::span<const u32>(centroid_ids_ptr(), centroid_ids_size()); }
     // Ensure centroid_ids data is in owned mode so it can be mutated
     void EnsureMutableCentroidIDs() {
         if (centroid_ids_mode_ == CentroidIDsMode::kMmap) {
@@ -283,11 +277,7 @@ public:
     f32 ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id, const f32 *centroid_distances) const;
 
     // Batch exact scoring for multiple candidates
-    void ExactScoreBatch(const f32 *query_ptr,
-                         u32 n_query_tokens,
-                         const u32 *candidate_ids,
-                         u32 n_candidates,
-                         f32 *output_scores) const;
+    void ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const u32 *candidate_ids, u32 n_candidates, f32 *output_scores) const;
 
     // Helper for batch centroid scoring
     std::unique_ptr<f32[]> ComputeQueryCentroidScores(const f32 *query_ptr, u32 n_query_tokens) const;

@@ -52,11 +52,18 @@ namespace infinity {
 // ── simd_hmax: horizontal max via GCC vector extensions (no intrinsics header) ──
 #if defined(__AVX2__)
 inline f32 simd_hmax(const f32 *data, u32 len) {
-    if (len == 0) return -std::numeric_limits<f32>::infinity();
+    if (len == 0)
+        return -std::numeric_limits<f32>::infinity();
     // 256-bit vector of 8 floats; element-wise operators (>, &&, ?:) are built-in
     typedef float v8sf __attribute__((__vector_size__(32)));
-    v8sf neg_inf = (v8sf){-__builtin_inff(), -__builtin_inff(), -__builtin_inff(), -__builtin_inff(),
-                           -__builtin_inff(), -__builtin_inff(), -__builtin_inff(), -__builtin_inff()};
+    v8sf neg_inf = (v8sf){-__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff(),
+                          -__builtin_inff()};
     v8sf maxv = neg_inf;
     u32 i = 0;
     // Load via memcpy to avoid alignment UB; Clang optimizes to vmovups
@@ -78,18 +85,24 @@ inline f32 simd_hmax(const f32 *data, u32 len) {
         maxv = vmax(maxv, load(data + i));
     }
     // Extract 8 lanes to scalar
-    union { v8sf v; f32 a[8]; } u;
+    union {
+        v8sf v;
+        f32 a[8];
+    } u;
     u.v = maxv;
     f32 result = u.a[0];
     for (int k = 1; k < 8; ++k)
-        if (u.a[k] > result) result = u.a[k];
+        if (u.a[k] > result)
+            result = u.a[k];
     for (; i < len; ++i)
-        if (data[i] > result) result = data[i];
+        if (data[i] > result)
+            result = data[i];
     return result;
 }
 #else
 inline f32 simd_hmax(const f32 *data, u32 len) {
-    if (len == 0) return -std::numeric_limits<f32>::infinity();
+    if (len == 0)
+        return -std::numeric_limits<f32>::infinity();
     f32 result = -std::numeric_limits<f32>::infinity();
     for (u32 i = 0; i < len; ++i)
         result = std::max(result, data[i]);
@@ -118,12 +131,12 @@ PlaidIndex::PlaidIndex(PlaidIndex &&other)
       requested_n_centroids_(other.requested_n_centroids_), n_centroids_(other.n_centroids_), centroids_data_(std::move(other.centroids_data_)),
       centroid_norms_neg_half_(std::move(other.centroid_norms_neg_half_)), global_centroids_ref_(std::move(other.global_centroids_ref_)),
       n_docs_(other.n_docs_.load()), n_total_embeddings_(other.n_total_embeddings_), doc_lens_(std::move(other.doc_lens_)),
-      doc_offsets_(std::move(other.doc_offsets_)),
-      centroid_ids_mode_(other.centroid_ids_mode_), owned_centroid_ids_(std::move(other.owned_centroid_ids_)),
-      mmap_centroid_ids_(other.mmap_centroid_ids_), mmap_centroid_ids_size_(other.mmap_centroid_ids_size_),
-      packed_residuals_(std::move(other.packed_residuals_)), packed_residuals_size_(other.packed_residuals_size_),
-      packed_residuals_capacity_(other.packed_residuals_capacity_), ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)),
-      mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_), is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
+      doc_offsets_(std::move(other.doc_offsets_)), centroid_ids_mode_(other.centroid_ids_mode_),
+      owned_centroid_ids_(std::move(other.owned_centroid_ids_)), mmap_centroid_ids_(other.mmap_centroid_ids_),
+      mmap_centroid_ids_size_(other.mmap_centroid_ids_size_), packed_residuals_(std::move(other.packed_residuals_)),
+      packed_residuals_size_(other.packed_residuals_size_), packed_residuals_capacity_(other.packed_residuals_capacity_),
+      ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_),
+      is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
     other.mmap_addr_ = nullptr;
     other.mmap_size_ = 0;
     other.n_docs_ = 0;
@@ -804,25 +817,26 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
         for (u32 i = 0; i < n_to_rerank; ++i)
             rerank_ids[i] = doc_scores[i].second;
         std::vector<f32> batch_scores(n_to_rerank);
-        ExactScoreBatch(query_ptr, query_embedding_num,
-                        rerank_ids.data(), n_to_rerank,
-                        batch_scores.data());
+        ExactScoreBatch(query_ptr, query_embedding_num, rerank_ids.data(), n_to_rerank, batch_scores.data());
         std::vector<std::pair<f32, u32>> final_scores;
         for (u32 i = 0; i < n_to_rerank; ++i)
             final_scores.emplace_back(batch_scores[i], doc_scores[i].second);
 
-        std::partial_sort(final_scores.begin(), final_scores.begin() + std::min(top_k, (u32)final_scores.size()), final_scores.end(), std::greater<>());
+        std::partial_sort(final_scores.begin(),
+                          final_scores.begin() + std::min(top_k, (u32)final_scores.size()),
+                          final_scores.end(),
+                          std::greater<>());
 
         const u32 result_count = std::min(top_k, (u32)final_scores.size());
-    auto scores = std::make_unique<f32[]>(result_count);
-    auto ids = std::make_unique<u32[]>(result_count);
+        auto scores = std::make_unique<f32[]>(result_count);
+        auto ids = std::make_unique<u32[]>(result_count);
 
-    for (u32 i = 0; i < result_count; ++i) {
-        scores[i] = final_scores[i].first;
-        ids[i] = final_scores[i].second + start_segment_offset_;
-    }
+        for (u32 i = 0; i < result_count; ++i) {
+            scores[i] = final_scores[i].first;
+            ids[i] = final_scores[i].second + start_segment_offset_;
+        }
 
-    return std::make_tuple(result_count, std::move(scores), std::move(ids));
+        return std::make_tuple(result_count, std::move(scores), std::move(ids));
     }
 }
 
@@ -917,14 +931,15 @@ PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
         for (u32 i = 0; i < n_to_rerank; ++i)
             rerank_ids[i] = doc_scores[i].second;
         std::vector<f32> batch_scores(n_to_rerank);
-        ExactScoreBatch(query_ptr, query_embedding_num,
-                        rerank_ids.data(), n_to_rerank,
-                        batch_scores.data());
+        ExactScoreBatch(query_ptr, query_embedding_num, rerank_ids.data(), n_to_rerank, batch_scores.data());
         std::vector<std::pair<f32, u32>> final_scores;
         for (u32 i = 0; i < n_to_rerank; ++i)
             final_scores.emplace_back(batch_scores[i], doc_scores[i].second);
 
-        std::partial_sort(final_scores.begin(), final_scores.begin() + std::min(top_k, (u32)final_scores.size()), final_scores.end(), std::greater<>());
+        std::partial_sort(final_scores.begin(),
+                          final_scores.begin() + std::min(top_k, (u32)final_scores.size()),
+                          final_scores.end(),
+                          std::greater<>());
 
         const u32 result_count = std::min(top_k, (u32)final_scores.size());
         auto scores = std::make_unique<f32[]>(result_count);
@@ -1198,7 +1213,8 @@ f32 PlaidIndex::ApproximateScore(const u32 *doc_centroid_ids, u32 doc_len, const
 f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id, const f32 *centroid_distances) const {
     const u32 doc_offset = doc_offsets_[doc_id];
     const u32 doc_len = doc_lens_[doc_id];
-    if (doc_len == 0) return 0.0f;
+    if (doc_len == 0)
+        return 0.0f;
 
     const auto &centroids = centroids_data();
     const u32 dim = embedding_dimension_;
@@ -1213,9 +1229,7 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
         std::copy_n(cdata + cid * dim, dim, doc_ctrs.get() + d * dim);
     }
     auto c_scores = std::make_unique<f32[]>(n_query_tokens * doc_len);
-    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, doc_ctrs.get(),
-                                                    n_query_tokens, doc_len, dim,
-                                                    c_scores.get());
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, doc_ctrs.get(), n_query_tokens, doc_len, dim, c_scores.get());
 
     // ── P0: Per-query-token loop with SIMD max ──
     constexpr u32 STACK_MAX = 256;
@@ -1228,12 +1242,7 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
 
         for (u32 d = 0; d < doc_len; ++d) {
             u32 embedding_idx = doc_offset + d;
-            f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx,
-                                                          0, 1,
-                                                          ip_table.get(),
-                                                          pr_ptr,
-                                                          ci_ptr,
-                                                          cdata);
+            f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx, 0, 1, ip_table.get(), pr_ptr, ci_ptr, cdata);
             combined[d] = c_scores[q * doc_len + d] + r_score;
         }
 
@@ -1248,12 +1257,9 @@ f32 PlaidIndex::ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id,
 }
 
 // ── P2: Batch multi-document exact scoring ──
-void PlaidIndex::ExactScoreBatch(const f32 *query_ptr,
-                                 u32 n_query_tokens,
-                                 const u32 *candidate_ids,
-                                 u32 n_candidates,
-                                 f32 *output_scores) const {
-    if (n_candidates == 0) return;
+void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const u32 *candidate_ids, u32 n_candidates, f32 *output_scores) const {
+    if (n_candidates == 0)
+        return;
 
     const u32 dim = embedding_dimension_;
     const auto &centroids = centroids_data();
@@ -1296,9 +1302,12 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr,
         while (go < total_tokens) {
             u64 be = std::min(go + GEMM_BATCH, total_tokens);
             u32 bt = static_cast<u32>(be - go);
-            matrixA_multiply_transpose_matrixB_output_to_C(
-                query_ptr, gathered_ctrs.get() + go * dim,
-                n_query_tokens, bt, dim, c_scores.get() + go * n_query_tokens);
+            matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
+                                                           gathered_ctrs.get() + go * dim,
+                                                           n_query_tokens,
+                                                           bt,
+                                                           dim,
+                                                           c_scores.get() + go * n_query_tokens);
             go = be;
         }
     }
@@ -1319,12 +1328,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr,
 
             for (u32 d = 0; d < doc_len; ++d) {
                 u32 embedding_idx = doc_start + d;
-                f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx,
-                                                              0, 1,
-                                                              ip_table.get(),
-                                                              pr_ptr,
-                                                              ci_ptr,
-                                                              cdata);
+                f32 r_score = quantizer_->GetSingleIPDistance(embedding_idx, 0, 1, ip_table.get(), pr_ptr, ci_ptr, cdata);
                 combined[d] = c_scores[q * total_tokens + (go + d)] + r_score;
             }
 
@@ -1338,8 +1342,6 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr,
         output_scores[i] = total_score;
     }
 }
-
-
 
 void PlaidIndex::SaveIndexInner(LocalFileHandle &file_handle) const {
     std::shared_lock lock(rw_mutex_);
