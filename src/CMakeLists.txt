@@ -298,7 +298,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
+#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ijma/include")
@@ -335,7 +335,7 @@ target_link_libraries(infinity
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         #        $<IF:$<BOOL:${ARM64}>,opencc,>
@@ -369,9 +369,9 @@ target_link_libraries(infinity
         spdlog::spdlog
         fmt::fmt
         # turbo::base64
+        ZLIB::ZLIB
         resolv.a
         atomic.a
-        #        ${STDCXX15EXP_STATIC}
         libstdc++exp.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -412,7 +412,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 #            onnxruntime_mlas
 #            zsv_parser
 #            newpfor
-#            fastpfor
+#            ${FASTPFOR_STATIC_LIB}
 #            jma
 #            opencc
 #            dl
@@ -503,7 +503,7 @@ target_link_libraries(unit_test
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -535,10 +535,9 @@ target_link_libraries(unit_test
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
+        ZLIB::ZLIB
         resolv.a
-
         atomic.a
-        #        ${STDCXX15EXP_STATIC}
         libstdc++exp.a
 )
 

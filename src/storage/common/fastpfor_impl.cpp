@@ -17,13 +17,13 @@ module;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
 
-#include <compositecodec.h>
-#include <deltautil.h>
-#include <simdbinarypacking.h>
-#include <simdfastpfor.h>
-#include <simdnewpfor.h>
-#include <streamvariablebyte.h>
-#include <variablebyte.h>
+#include <fastpfor/compositecodec.h>
+#include <fastpfor/deltautil.h>
+#include <fastpfor/simdbinarypacking.h>
+#include <fastpfor/simdfastpfor.h>
+#include <fastpfor/simdnewpfor.h>
+#include <fastpfor/streamvariablebyte.h>
+#include <fastpfor/variablebyte.h>
 
 #pragma GCC diagnostic pop
 

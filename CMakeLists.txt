@@ -76,6 +76,15 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
 
+#if(ARM64)
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
+#endif ()
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
+
+find_package(PkgConfig REQUIRED)
+
 find_package(absl CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS asio)
@@ -83,6 +92,8 @@ find_package(CLI11 CONFIG REQUIRED)
 #find_package(CURL REQUIRED) # wait for s3
 #darts-clone # wait for fix
 #eigen3 fuck this package
+#find_package(FastPFOR CONFIG REQUIRED)
+
 find_package(fmt CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Libevent CONFIG REQUIRED)
@@ -113,11 +124,19 @@ find_package(Thrift CONFIG REQUIRED)
 #find_package(unofficial-curlpp CONFIG REQUIRED) # for s3
 find_package(unofficial-inih CONFIG REQUIRED)
 #find_path(VIT_VIT_CTPL_INCLUDE_DIRS "ctpl_stl.h")
+find_package(ZLIB REQUIRED)
 
 set(VCPKG_PROJECT_ROOT "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed")
 file(GLOB VCPKG_INCLUDE_DIRS
         "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/include"
 )
+
+#find_path(SIMDE_INCLUDE_DIRS "simde/arm/neon.h")
+#message(STATUS "asdasdasdsdas ${SIMDE_INCLUDE_DIRS}")
+#include_directories(${SIMDE_INCLUDE_DIRS})
+#
+#set(FASTPFOR_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/libFastPFOR.a")
+set(FASTPFOR_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/libFastPFOR.a")
 message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
 include_directories(${VCPKG_INCLUDE_DIRS})
 
@@ -127,6 +146,12 @@ file(GLOB OATPP_INCLUDE_DIRS
 )
 message(STATUS "Found oatpp include directories: ${OATPP_INCLUDE_DIRS}")
 include_directories(${OATPP_INCLUDE_DIRS})
+
+# vcpkg simde header
+find_path(GLOB SIMDE_INCLUDE_DIRS
+        "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/include/simde/arm/neon.h")
+include_directories(${SIMDE_INCLUDE_DIRS})
+
 message(STATUS "Using vcpkg toolchain - automatic package discovery enabled")
 
 # Get current system time and print the build time
@@ -179,9 +204,8 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 endif ()
 
 if (ENABLE_JEMALLOC)
-    find_package(PkgConfig REQUIRED)
     pkg_check_modules(JEMALLOC REQUIRED jemalloc)
-    set(JEMALLOC_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/jemalloc_pic.a")
+    set(JEMALLOC_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/libjemalloc_pic.a")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif ()
@@ -283,7 +307,7 @@ if (IS_CI_TEST_PIPELINE)
         message(FATAL_ERROR "Not support your arch yet.")
     endif ()
 else ()
-    add_compile_options(-march=native)
+#    add_compile_options(-march=native)
 endif ()
 
 

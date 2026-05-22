@@ -24,6 +24,7 @@
     "bzip2",
     "brotli",
     "cli11",
+    "fastpfor",
     "fmt",
     "gtest",
     "inih",

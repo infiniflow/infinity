@@ -1,6 +1,10 @@
 project(OpenCC CXX C)
 
-add_definitions(-march=native)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    add_definitions(-march=armv8-a)
+else()
+    add_definitions(-march=native)
+endif()
 
 # library target
 FILE(GLOB_RECURSE OPENCC_SRC

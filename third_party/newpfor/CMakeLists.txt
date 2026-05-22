@@ -1,6 +1,9 @@
 project(NewPFOR CXX C)
 
-add_definitions(-march=native)
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    add_definitions(-march=armv8-a)
+endif()
+# For x86_64, rely on the parent project's march flags instead of -march=native
 
 # library target
 add_library(newpfor STATIC
