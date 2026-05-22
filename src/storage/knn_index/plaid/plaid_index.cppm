@@ -132,8 +132,10 @@ public:
     void FinalizeMerge();
 
     // Accessors for merge operation (needed for direct data access)
-    const std::vector<u32> &centroid_ids() const { return centroid_ids_; }
+    // Note: centroid_ids() is defined inline with the data members below.
+    // Call .data() or .size() on the span, or iterate with .begin()/.end().
     const u8 *packed_residuals() const { return packed_residuals_.get(); }
+    const u8 *packed_residuals_ptr() const { return packed_residuals_.get(); }
     size_t packed_residuals_size() const { return packed_residuals_size_; }
     const std::vector<u32> &doc_lens() const { return doc_lens_; }
     const std::vector<u32> &doc_offsets() const { return doc_offsets_; }
@@ -194,8 +196,34 @@ public:
     std::vector<u32> doc_lens_;    // [n_docs_] length of each document
     std::vector<u32> doc_offsets_; // [n_docs_] offset of each doc in centroid_ids_
 
-    // Embedding data
-    std::vector<u32> centroid_ids_;          // [n_total_embeddings_] centroid assignment for each embedding
+    // Embedding data — centroid_ids supports two storage modes:
+    enum class CentroidIDsMode { kOwned, kMmap };
+    CentroidIDsMode centroid_ids_mode_ = CentroidIDsMode::kOwned;
+    std::vector<u32> owned_centroid_ids_;          // [n_total_embeddings_] owned storage
+    const u32 *mmap_centroid_ids_ = nullptr;       // mmap pointer (valid only when centroid_ids_mode_ == kMmap)
+    u64 mmap_centroid_ids_size_ = 0;               // size in elements (valid only when centroid_ids_mode_ == kMmap)
+
+    // Accessors for centroid_ids
+    const u32 *centroid_ids_ptr() const {
+        return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_ : owned_centroid_ids_.data();
+    }
+    u64 centroid_ids_size() const {
+        return (centroid_ids_mode_ == CentroidIDsMode::kMmap) ? mmap_centroid_ids_size_ : owned_centroid_ids_.size();
+    }
+    // Return a std::span for compatibility with existing iteration code (.begin(), .end(), .data(), .size())
+    std::span<const u32> centroid_ids() const {
+        return std::span<const u32>(centroid_ids_ptr(), centroid_ids_size());
+    }
+    // Ensure centroid_ids data is in owned mode so it can be mutated
+    void EnsureMutableCentroidIDs() {
+        if (centroid_ids_mode_ == CentroidIDsMode::kMmap) {
+            owned_centroid_ids_.assign(mmap_centroid_ids_, mmap_centroid_ids_ + mmap_centroid_ids_size_);
+            mmap_centroid_ids_ = nullptr;
+            mmap_centroid_ids_size_ = 0;
+            centroid_ids_mode_ = CentroidIDsMode::kOwned;
+        }
+    }
+
     std::unique_ptr<u8[]> packed_residuals_; // Quantized residuals
     size_t packed_residuals_size_ = 0;
     size_t packed_residuals_capacity_ = 0; // Tracked capacity for amortized growth in MergeOneChunk
@@ -253,6 +281,13 @@ public:
 
     // Compute exact score with dequantization
     f32 ExactScore(const f32 *query_ptr, u32 n_query_tokens, u32 doc_id, const f32 *centroid_distances) const;
+
+    // Batch exact scoring for multiple candidates
+    void ExactScoreBatch(const f32 *query_ptr,
+                         u32 n_query_tokens,
+                         const u32 *candidate_ids,
+                         u32 n_candidates,
+                         f32 *output_scores) const;
 
     // Helper for batch centroid scoring
     std::unique_ptr<f32[]> ComputeQueryCentroidScores(const f32 *query_ptr, u32 n_query_tokens) const;

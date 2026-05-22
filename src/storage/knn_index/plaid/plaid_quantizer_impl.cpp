@@ -302,9 +302,7 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
     // removing the lock avoids significant contention overhead.
 
     const u32 keys_per_byte = 8 / nbits_;
-    u32 centroid_id = centroid_ids[embedding_id];
     const u8 *packed = packed_residuals + embedding_id * packed_dim_;
-    const f32 *centroid = centroids_data + centroid_id * embedding_dim_;
 
     f32 result = 0.0f;
     u32 residual_idx = 0;
@@ -316,9 +314,9 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
 
         for (u32 k = 0; k < keys_per_byte && residual_idx < embedding_dim_; ++k) {
             u32 bucket_idx = indices[k];
-            // centroid[d] * query[d] + residual[d] * query[d]
-            // = centroid[d] * query[d] + bucket_weight * query[d]
-            result += centroid[residual_idx] * ip_table[residual_idx * n_buckets_ + bucket_idx];
+            // Correct PLAID reconstruction: query[d] * (centroid[d] + bucket_weights[bucket_idx])
+            // residual contribution = ip_table[d][bucket_idx] = query[d] * bucket_weights[bucket_idx]
+            result += ip_table[residual_idx * n_buckets_ + bucket_idx];
             residual_idx++;
         }
     }
