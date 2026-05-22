@@ -1330,12 +1330,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
         while (go < total_tokens) {
             u64 be = std::min(go + GEMM_BATCH, total_tokens);
             u32 bt = static_cast<u32>(be - go);
-            matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
-                                                           gc + go * dim,
-                                                           n_query_tokens,
-                                                           bt,
-                                                           dim,
-                                                           cs + go * n_query_tokens);
+            matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, gc + go * dim, n_query_tokens, bt, dim, cs + go * n_query_tokens);
             go = be;
         }
     }
