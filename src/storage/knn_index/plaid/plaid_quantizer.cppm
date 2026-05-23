@@ -69,9 +69,7 @@ public:
     // embedding_id: index of the embedding
     // position_lut: [packed_dim * 256] pre-built LUT
     // packed_residuals: quantized residual data
-    f32 GetSingleIPDistanceFromLUT(u32 embedding_id,
-                                   const f32 *position_lut,
-                                   const u8 *packed_residuals) const;
+    f32 GetSingleIPDistanceFromLUT(u32 embedding_id, const f32 *position_lut, const u8 *packed_residuals) const;
 
     // Get single inner product distance using precomputed table
     // embedding_id: index of the embedding

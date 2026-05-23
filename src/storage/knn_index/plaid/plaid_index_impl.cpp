@@ -1324,16 +1324,7 @@ void PlaidIndex::ExactScoreBatch(const f32 *query_ptr, u32 n_query_tokens, const
 
     auto c_scores = std::unique_ptr<f32[]>(new f32[n_query_tokens * total_tokens]);
     f32 *cs = c_scores.get(); // raw ptr, avoid unique_ptr::operator[] in hot loop
-    {
-        constexpr u64 GEMM_BATCH = 16384;
-        u64 go = 0;
-        while (go < total_tokens) {
-            u64 be = std::min(go + GEMM_BATCH, total_tokens);
-            u32 bt = static_cast<u32>(be - go);
-            matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, gc + go * dim, n_query_tokens, bt, dim, cs + go * n_query_tokens);
-            go = be;
-        }
-    }
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, gc, n_query_tokens, static_cast<u32>(total_tokens), dim, cs);
 
     // Pre-compute all IP tables and position LUTs once (no zero-init, immediately filled)
     auto ip_table_buf = std::unique_ptr<f32[]>(new f32[dim * n_buckets_val]);

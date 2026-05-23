@@ -308,9 +308,9 @@ void PlaidQuantizer::BuildPositionLUT(const f32 *ip_table, f32 *lut_out) const {
         for (u32 v = 0; v < 256; ++v) {
             u8 reversed = rev_map[v];
             const u8 *indices = &bucket_lut[reversed * keys_per_byte];
-            f32 contrib = ip_table[(j * keys_per_byte) * n_buckets_ + indices[0]];
-            if (keys_per_byte > 1) {
-                contrib += ip_table[(j * keys_per_byte + 1) * n_buckets_ + indices[1]];
+            f32 contrib = 0.0f;
+            for (u32 k = 0; k < keys_per_byte; ++k) {
+                contrib += ip_table[(j * keys_per_byte + k) * n_buckets_ + indices[k]];
             }
             lut_out[j * 256 + v] = contrib;
         }
