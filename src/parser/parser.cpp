@@ -940,7 +940,7 @@ static const yytype_int16 yyrline[] =
     4164,  4170,  4176,  4182,  4193,  4197,  4202,  4207,  4236,  4246,
     4251,  4256,  4261,  4267,  4271,  4272,  4274,  4275,  4277,  4278,
     4290,  4298,  4302,  4305,  4309,  4312,  4316,  4320,  4325,  4331,
-    4341,  4351,  4359,  4370,  4425,  4432,  4438
+    4341,  4351,  4359,  4370,  4427,  4434,  4440
 };
 #endif
 
@@ -10078,6 +10078,8 @@ Return4:
         index_type = infinity::IndexType::kSecondary;
     } else if(strcmp((yyvsp[-1].str_value), "plaid") == 0){
         index_type = infinity::IndexType::kPLAID;
+    } else if(strcmp((yyvsp[-1].str_value), "smve") == 0){
+        index_type = infinity::IndexType::kSMVE;
     } else {
         free((yyvsp[-1].str_value));
         free((yyvsp[-4].str_value));
@@ -10114,11 +10116,11 @@ Return4:
     
     free((yyvsp[-4].str_value));
 }
-#line 10118 "parser.cpp"
+#line 10120 "parser.cpp"
     break;
 
   case 584: /* index_info: '(' IDENTIFIER ')'  */
-#line 4425 "parser.y"
+#line 4427 "parser.y"
                      {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
@@ -10126,21 +10128,21 @@ Return4:
     (yyval.index_info_t)->column_name_ = (yyvsp[-1].str_value);
     free((yyvsp[-1].str_value));
 }
-#line 10130 "parser.cpp"
+#line 10132 "parser.cpp"
     break;
 
   case 585: /* index_info: '(' function_expr ')'  */
-#line 4432 "parser.y"
+#line 4434 "parser.y"
                         {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondaryFunctional;
     (yyval.index_info_t)->function_expr_ = (yyvsp[-1].expr_t);
 }
-#line 10140 "parser.cpp"
+#line 10142 "parser.cpp"
     break;
 
   case 586: /* index_info: '(' function_expr ')' USING IDENTIFIER with_index_param_list  */
-#line 4438 "parser.y"
+#line 4440 "parser.y"
                                                                {
 ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -10178,11 +10180,11 @@ ParserHelper::ToLower((yyvsp[-1].str_value));
         }
     }
 }
-#line 10182 "parser.cpp"
+#line 10184 "parser.cpp"
     break;
 
 
-#line 10186 "parser.cpp"
+#line 10188 "parser.cpp"
 
       default: break;
     }
@@ -10411,7 +10413,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 4477 "parser.y"
+#line 4479 "parser.y"
 
 
 void

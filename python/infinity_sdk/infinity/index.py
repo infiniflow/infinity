@@ -31,6 +31,7 @@ class IndexType(Enum):
     BMP = 7
     DiskAnn = 8
     PLAID = 9
+    SMVE = 10
 
     def to_ttype(self):
         match self:
@@ -52,6 +53,8 @@ class IndexType(Enum):
                 return ttypes.IndexType.DiskAnn
             case IndexType.PLAID:
                 return ttypes.IndexType.PLAID
+            case IndexType.SMVE:
+                return ttypes.IndexType.SMVE
             case _:
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 

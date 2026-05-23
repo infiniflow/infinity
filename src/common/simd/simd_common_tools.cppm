@@ -57,6 +57,16 @@ export inline float hsum256_ps_avx(__m256 v) {
     return hsum_ps_sse3(vlow);                  // and inline the sse3 version, which is optimal for AVX
     // (no wasted instructions, and all of them are the 4B minimum)
 }
+
+// Horizontal max across 8 packed f32 values
+export inline float hmax256_ps_avx(__m256 v) {
+    __m128 vlow = _mm256_castps256_ps128(v);
+    __m128 vhigh = _mm256_extractf128_ps(v, 1);
+    __m128 max128 = _mm_max_ps(vlow, vhigh);
+    max128 = _mm_max_ps(max128, _mm_shuffle_ps(max128, max128, _MM_SHUFFLE(2, 3, 0, 1)));
+    max128 = _mm_max_ps(max128, _mm_shuffle_ps(max128, max128, _MM_SHUFFLE(1, 0, 3, 2)));
+    return _mm_cvtss_f32(max128);
+}
 #endif
 
 #ifdef __SSE2__

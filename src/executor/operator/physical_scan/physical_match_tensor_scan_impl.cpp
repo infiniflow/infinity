@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include "common/simd/simd_common_intrin_include.h"
+
 module infinity_core:physical_match_tensor_scan.impl;
 
 import :physical_match_tensor_scan;
@@ -41,6 +45,10 @@ import :emvb_index_in_mem;
 import :emvb_index;
 import :plaid_index_in_mem;
 import :plaid_index;
+import :smve_index;
+import :smve_transform;
+import :bmp_handler;
+import :bmp_util;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
@@ -52,6 +60,7 @@ import :physical_fusion;
 import :filter_value_type_classification;
 import :logical_match_tensor_scan;
 import :simd_functions;
+import :simd_common_tools;
 import :knn_expression;
 import :result_cache_manager;
 import :buffer_obj;
@@ -208,7 +217,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     continue;
                 }
                 // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
+                if (auto index_type = index_base->index_type_;
+                    index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
                     LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -238,8 +248,9 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
-                Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB or PLAID");
+            if (auto index_type = index_base->index_type_;
+                index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
+                Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB, PLAID or SMVE");
                 RecoverableError(std::move(error_status));
             }
             table_index_meta_ = std::move(table_index_meta);
@@ -363,6 +374,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             std::shared_ptr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
             std::shared_ptr<PlaidIndexInMem> plaid_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetPlaidIndex();
+            std::shared_ptr<SMVEIndexInMem> smve_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetSMVEIndex();
 
             // 1. in mem index - EMVB
             if (emvb_index_in_mem) {
@@ -490,6 +502,61 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                              }},
                     result);
             }
+            // 1c. in mem index - SMVE
+            else if (smve_index_in_mem) {
+                const f32 *query_ptr = reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr);
+                const u32 n_query_tokens = calc_match_tensor_expr_->num_of_embedding_in_query_tensor_;
+
+                auto [result_num, bmp_scores, row_id_ptr] = smve_index_in_mem->Search(query_ptr,
+                                                                                      n_query_tokens,
+                                                                                      topn_,
+                                                                                      5, // default overfetch
+                                                                                      block_index,
+                                                                                      begin_ts,
+                                                                                      segment_bitmask);
+                if (result_num > 0) {
+                    // Group candidates by block for column reading and exact MaxSim re-rank
+                    std::unordered_map<BlockID, std::vector<u32>> candidates_by_block;
+                    for (u32 i = 0; i < result_num; ++i) {
+                        u32 segment_offset = row_id_ptr[i];
+                        BlockID bid = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                        candidates_by_block[bid].push_back(segment_offset % DEFAULT_BLOCK_CAPACITY);
+                    }
+                    for (auto &[block_id, block_offsets] : candidates_by_block) {
+                        BlockMeta block_meta(block_id, *segment_meta);
+                        ColumnMeta column_meta(this->search_column_id_, block_meta);
+                        BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
+                        ColumnVector column_vector;
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                    column_meta.get_column_def(),
+                                                                    block_row_cnt,
+                                                                    ColumnVectorMode::kReadOnly,
+                                                                    column_vector);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
+                        }
+                        // Build bitmask with only candidate rows set to true
+                        Bitmask block_bitmask(block_row_cnt);
+                        block_bitmask.SetAllFalse();
+                        for (u32 blk_offset : block_offsets) {
+                            block_bitmask.SetTrue(blk_offset);
+                        }
+                        // Apply delete bitmask for MVCC visibility (matching EMVB/PLAID pattern)
+                        status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
+                        }
+                        CalculateScoreOnColumnVector(column_vector,
+                                                     segment_id,
+                                                     block_id,
+                                                     0,
+                                                     block_row_cnt,
+                                                     block_bitmask,
+                                                     *(this->calc_match_tensor_expr_),
+                                                     function_data);
+                    }
+                }
+            }
             // 2. chunk index
             auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
             if (!index_status.ok()) {
@@ -548,6 +615,102 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                        index_options_->plaid_n_full_scores_);
                     for (u32 i = 0; i < result_num; ++i) {
                         function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                } else if (index_base->index_type_ == IndexType::kSMVE) {
+                    BufferObj *index_buffer = nullptr;
+                    Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                    BufferHandle index_handle = index_buffer->Load();
+                    auto *smve_data = static_cast<SMVESerializedData *>(index_handle.GetDataMut());
+                    if (!smve_data || !smve_data->bmp_handler) {
+                        UnrecoverableError("Failed to load SMVE index from file");
+                    }
+
+                    // SMVE chunk search: use serialized data directly
+                    // Step 1: SMVE transform query using stored projection matrix
+                    const f32 *query_ptr = reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr);
+                    u32 n_query_tokens = calc_match_tensor_expr_->num_of_embedding_in_query_tensor_;
+
+                    SMVEResult smve_query;
+                    if (smve_data->projection_matrix_copy) {
+                        smve_query = SMVETransform(query_ptr,
+                                                   n_query_tokens,
+                                                   smve_data->embedding_dim,
+                                                   smve_data->projection_matrix_copy.get(),
+                                                   smve_data->width,
+                                                   smve_data->topk,
+                                                   true);
+                    }
+
+                    // Step 2: Build SparseVecRef and search BMP for candidates
+                    if (!smve_query.indices.empty()) {
+                        i32 candidate_topk = static_cast<i32>(topn_ * 5); // overfetch=5
+                        SparseVecRef<float, i32> query_ref(static_cast<i32>(smve_query.values.size()),
+                                                           reinterpret_cast<const i32 *>(smve_query.indices.data()),
+                                                           smve_query.values.data());
+
+                        BmpSearchOptions bmp_options;
+                        bmp_options.alpha_ = 1.0f;
+                        bmp_options.beta_ = 1.0f;
+                        bmp_options.use_tail_ = true;
+                        bmp_options.use_lock_ = false;
+
+                        SMVEBMPCollector collector;
+                        struct SMVEBMPDist {
+                            using DataT = float;
+                            using IndexT = i32;
+                        };
+                        if (segment_bitmask.IsAllTrue()) {
+                            AppendFilter filter(segment_row_count);
+                            smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, bmp_options, filter, 0, 0, &collector);
+                        } else {
+                            BitmaskFilter<SegmentOffset> filter(segment_bitmask);
+                            smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, bmp_options, filter, 0, 0, &collector);
+                        }
+
+                        if (!collector.results.empty()) {
+                            // Group candidates by block for column reading and exact MaxSim re-rank
+                            std::unordered_map<BlockID, std::vector<u32>> candidates_by_block;
+                            for (auto &[bmp_score, doc_id] : collector.results) {
+                                BlockID bid = doc_id / DEFAULT_BLOCK_CAPACITY;
+                                candidates_by_block[bid].push_back(doc_id % DEFAULT_BLOCK_CAPACITY);
+                            }
+                            for (auto &[block_id, block_offsets] : candidates_by_block) {
+                                BlockMeta block_meta(block_id, *segment_meta);
+                                ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
+                                ColumnVector column_vector;
+                                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                            column_meta.get_column_def(),
+                                                                            block_row_cnt,
+                                                                            ColumnVectorMode::kReadOnly,
+                                                                            column_vector);
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                                // Build bitmask with only candidate rows set to true
+                                Bitmask block_bitmask(block_row_cnt);
+                                block_bitmask.SetAllFalse();
+                                for (u32 blk_offset : block_offsets) {
+                                    block_bitmask.SetTrue(blk_offset);
+                                }
+                                // Apply delete bitmask for MVCC visibility (matching EMVB/PLAID pattern)
+                                status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                                CalculateScoreOnColumnVector(column_vector,
+                                                             segment_id,
+                                                             block_id,
+                                                             0,
+                                                             block_row_cnt,
+                                                             block_bitmask,
+                                                             *(this->calc_match_tensor_expr_),
+                                                             function_data);
+                            }
+                        }
                     }
                 } else {
                     UnrecoverableError(fmt::format("Unsupported index type for tensor search: {}", static_cast<int>(index_base->index_type_)));
@@ -816,10 +979,24 @@ struct MaxSimOp<float, float> {
         float maxsim_score = 0.0f;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
             const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
-            float max_score_i = std::numeric_limits<float>::lowest();
+            float max_score_i;
+#if defined(__AVX__)
+            __m256 max_vec = _mm256_set1_ps(-std::numeric_limits<float>::max());
+            u32 k = 0;
+            for (; k + 8 <= target_embedding_num; k += 8) {
+                __m256 v = _mm256_loadu_ps(query_ip_ptr + k);
+                max_vec = _mm256_max_ps(max_vec, v);
+            }
+            max_score_i = hmax256_ps_avx(max_vec);
+            for (; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
+            }
+#else
+            max_score_i = -std::numeric_limits<float>::max();
             for (u32 k = 0; k < target_embedding_num; ++k) {
                 max_score_i = std::max(max_score_i, query_ip_ptr[k]);
             }
+#endif
             maxsim_score += max_score_i;
         }
         return maxsim_score;
@@ -850,10 +1027,24 @@ struct MaxSimOp<TensorElemT, float> {
         float maxsim_score = 0.0f;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
             const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
-            float max_score_i = std::numeric_limits<float>::lowest();
+            float max_score_i;
+#if defined(__AVX__)
+            __m256 max_vec = _mm256_set1_ps(-std::numeric_limits<float>::max());
+            u32 k = 0;
+            for (; k + 8 <= target_embedding_num; k += 8) {
+                __m256 v = _mm256_loadu_ps(query_ip_ptr + k);
+                max_vec = _mm256_max_ps(max_vec, v);
+            }
+            max_score_i = hmax256_ps_avx(max_vec);
+            for (; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
+            }
+#else
+            max_score_i = -std::numeric_limits<float>::max();
             for (u32 k = 0; k < target_embedding_num; ++k) {
                 max_score_i = std::max(max_score_i, query_ip_ptr[k]);
             }
+#endif
             maxsim_score += max_score_i;
         }
         return maxsim_score;

@@ -36,6 +36,7 @@ enum class IndexType {
     kSecondaryFunctional,
     kEMVB,
     kPLAID,
+    kSMVE,
     kInvalid,
     kDiskAnn,
 };
