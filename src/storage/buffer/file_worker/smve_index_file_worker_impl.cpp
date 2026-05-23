@@ -146,13 +146,12 @@ void SMVEIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     }
 
     // Create proper IndexBMP and sparse ColumnDef for BMPHandler
-    auto bmp_index_base = std::make_shared<IndexBMP>(
-        std::make_shared<std::string>("smve_internal"),
-        nullptr,
-        "",
-        std::vector<std::string>{},
-        BMP_BLOCK_SIZE,
-        BMPCompressType::kCompressed);
+    auto bmp_index_base = std::make_shared<IndexBMP>(std::make_shared<std::string>("smve_internal"),
+                                                     nullptr,
+                                                     "",
+                                                     std::vector<std::string>{},
+                                                     BMP_BLOCK_SIZE,
+                                                     BMPCompressType::kCompressed);
 
     auto sparse_data_type = std::make_shared<DataType>(
         LogicalType::kSparse,
@@ -180,10 +179,14 @@ bool SMVEIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     auto *smve_data = reinterpret_cast<SMVESerializedData *>(mmap_data_);
 
     const char *cursor = static_cast<const char *>(ptr);
-    std::memcpy(&smve_data->width, cursor, sizeof(u32)); cursor += sizeof(u32);
-    std::memcpy(&smve_data->topk, cursor, sizeof(u32)); cursor += sizeof(u32);
-    std::memcpy(&smve_data->embedding_dim, cursor, sizeof(u32)); cursor += sizeof(u32);
-    std::memcpy(&smve_data->n_docs, cursor, sizeof(u32)); cursor += sizeof(u32);
+    std::memcpy(&smve_data->width, cursor, sizeof(u32));
+    cursor += sizeof(u32);
+    std::memcpy(&smve_data->topk, cursor, sizeof(u32));
+    cursor += sizeof(u32);
+    std::memcpy(&smve_data->embedding_dim, cursor, sizeof(u32));
+    cursor += sizeof(u32);
+    std::memcpy(&smve_data->n_docs, cursor, sizeof(u32));
+    cursor += sizeof(u32);
 
     u32 dim = smve_data->embedding_dim;
     u32 width = smve_data->width;
@@ -196,13 +199,12 @@ bool SMVEIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     size_t bmp_remaining = size - (cursor - static_cast<const char *>(ptr));
 
     // Create proper IndexBMP and sparse ColumnDef for BMPHandler
-    auto mmap_bmp_index = std::make_shared<IndexBMP>(
-        std::make_shared<std::string>("smve_internal"),
-        nullptr,
-        "",
-        std::vector<std::string>{},
-        BMP_BLOCK_SIZE,
-        BMPCompressType::kCompressed);
+    auto mmap_bmp_index = std::make_shared<IndexBMP>(std::make_shared<std::string>("smve_internal"),
+                                                     nullptr,
+                                                     "",
+                                                     std::vector<std::string>{},
+                                                     BMP_BLOCK_SIZE,
+                                                     BMPCompressType::kCompressed);
 
     auto mmap_sparse_type = std::make_shared<DataType>(
         LogicalType::kSparse,
