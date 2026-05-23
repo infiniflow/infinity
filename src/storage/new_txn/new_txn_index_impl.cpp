@@ -128,7 +128,8 @@ Status NewTxn::DumpMemIndex(const std::string &db_name, const std::string &table
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-        if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+        if (mem_index == nullptr ||
+            (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetSMVEIndex() == nullptr)) {
             continue;
         }
 
@@ -176,7 +177,8 @@ Status NewTxn::DumpMemIndex(const std::string &db_name,
     std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
 
     // Return when there is no mem index to dump.
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr) ||
+    if (mem_index == nullptr ||
+        (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetSMVEIndex() == nullptr) ||
         (begin_row_id != RowID() && mem_index->GetBaseMemIndex() != nullptr && begin_row_id != mem_index->GetBaseMemIndex()->GetBeginRowID())) {
         LOG_WARN(fmt::format("NewTxn::DumpMemIndex skipped dumping MemIndex {}.{}.{}.{}.{} since it doesn't exist",
                              db_name,
@@ -506,6 +508,24 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 column_def = std::move(col_def);
             }
             status = OptimizePlaidIndex(index_base, segment_index_meta, segment_meta, column_def, base_rowid, row_cnt, buffer_obj, deprecate_ids);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kSMVE: {
+            // SMVE optimize: rebuild from column store (same pattern as kHnsw/kBMP)
+            // SMVE currently produces single-chunk segments, but handle multi-chunk for future-proofing
+            SegmentMeta segment_meta(segment_id, table_meta);
+            std::shared_ptr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+            status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, buffer_obj);
             if (!status.ok()) {
                 return status;
             }
@@ -2267,6 +2287,28 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
             memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
         memory_bmp_index->Dump(buffer_obj);
+    } else if (index_base->index_type_ == IndexType::kSMVE) {
+        auto memory_smve_index = std::make_shared<SMVEIndexInMem>(base_rowid, index_base.get(), column_def.get());
+
+        for (BlockID block_id : *block_ids) {
+            BlockMeta block_meta(block_id, segment_meta);
+            size_t block_row_cnt = 0;
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
+            if (!status.ok()) {
+                return status;
+            }
+            ColumnMeta column_meta(column_def->id(), block_meta);
+            size_t row_cnt = std::min(block_row_cnt, static_cast<size_t>(total_row_cnt));
+            total_row_cnt -= row_cnt;
+            ColumnVector col;
+            status = NewCatalog::GetColumnVector(column_meta, column_meta.get_column_def(), row_cnt, ColumnVectorMode::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
+            }
+            u32 offset = 0;
+            memory_smve_index->BuildFromColumn(col, base_rowid.segment_offset_, offset, row_cnt);
+        }
+        memory_smve_index->Dump(buffer_obj);
     } else {
         UnrecoverableError("Not implemented yet");
     }
@@ -3086,7 +3128,8 @@ Status NewTxn::ManualDumpIndex(const std::string &db_name, const std::string &ta
 
             // 4. Get memory index for this segment
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
-            if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+            if (mem_index == nullptr ||
+                (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetSMVEIndex() == nullptr)) {
                 LOG_INFO(fmt::format("Skipping segment {} - no memory index to dump", segment_id));
                 continue;
             }
