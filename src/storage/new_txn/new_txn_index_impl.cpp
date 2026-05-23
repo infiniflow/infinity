@@ -2306,7 +2306,8 @@ Status NewTxn::OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                 return status;
             }
             u32 offset = 0;
-            memory_smve_index->BuildFromColumn(col, base_rowid.segment_offset_, offset, row_cnt);
+            SegmentOffset block_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+            memory_smve_index->BuildFromColumn(col, block_offset, offset, row_cnt);
         }
         memory_smve_index->Dump(buffer_obj);
     } else {
