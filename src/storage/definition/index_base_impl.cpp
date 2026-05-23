@@ -164,7 +164,8 @@ std::shared_ptr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes
         }
         case IndexType::kSecondary: {
             SecondaryIndexCardinality cardinality = SecondaryIndexCardinality(ReadBufAdv<u8>(ptr));
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality);
+            bool is_json_index = ReadBufAdv<u8>(ptr);
+            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, column_names, cardinality, is_json_index);
             break;
         }
         case IndexType::kSecondaryFunctional: {
@@ -325,7 +326,16 @@ std::shared_ptr<IndexBase> IndexBase::Deserialize(std::string_view index_def_str
                     secondary_index_cardinality = SecondaryIndexCardinality::kLowCardinality;
                 }
             }
-            res = std::make_shared<IndexSecondary>(index_name, index_comment, file_name, std::move(column_names), secondary_index_cardinality);
+            bool is_json_index = false;
+            if (doc.contains("is_json_index") && doc["is_json_index"].is_boolean()) {
+                is_json_index = doc["is_json_index"].get<bool>();
+            }
+            res = std::make_shared<IndexSecondary>(index_name,
+                                                   index_comment,
+                                                   file_name,
+                                                   std::move(column_names),
+                                                   secondary_index_cardinality,
+                                                   is_json_index);
             break;
         }
         case IndexType::kSecondaryFunctional: {

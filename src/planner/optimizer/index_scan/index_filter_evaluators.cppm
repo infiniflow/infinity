@@ -65,6 +65,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     ColumnID column_id() const { return column_id_; }
     virtual bool IsValid() const = 0;
     virtual void Merge(IndexFilterEvaluatorSecondary &other, Type op) = 0;
+    virtual void AddRange(std::pair<JsonTermT, JsonTermT> range) = 0;
     static std::unique_ptr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                                ColumnID column_id,
                                                                FunctionExpression *scalar_func_expression,

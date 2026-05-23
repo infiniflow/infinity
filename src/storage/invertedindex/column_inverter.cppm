@@ -96,8 +96,6 @@ private:
         bool operator()(const u32 lhs, const u32 rhs) const;
     };
 
-    size_t InvertColumn(u32 doc_id, const std::string &val);
-
     const char *GetTermFromRef(u32 term_ref) const { return &terms_[term_ref << 2]; }
 
     const char *GetTermFromNum(u32 term_num) const { return GetTermFromRef(term_refs_[term_num]); }
@@ -112,6 +110,12 @@ private:
         *reinterpret_cast<u32 *>(p) = term_num;
     }
 
+    u32 merged_{1};
+    std::vector<std::binary_semaphore *> semas_{};
+
+protected:
+    size_t InvertColumn(u32 doc_id, const std::string &val);
+
     u32 AddTerm(StringRef term);
 
     void SortTerms();
@@ -119,13 +123,11 @@ private:
     std::unique_ptr<Analyzer> analyzer_{nullptr};
     u32 begin_doc_id_{0};
     u32 doc_count_{0};
-    u32 merged_{1};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;
     std::vector<std::pair<u32, std::unique_ptr<TermList>>> terms_per_doc_;
     PostingWriterProvider posting_writer_provider_{};
     VectorWithLock<u32> &column_lengths_;
-    std::vector<std::binary_semaphore *> semas_{};
 };
 } // namespace infinity

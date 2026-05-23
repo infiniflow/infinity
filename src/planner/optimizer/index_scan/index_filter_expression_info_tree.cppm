@@ -91,4 +91,24 @@ void CommonCheckCast(const T *src_info, ExpressionInfoTree<T> &tree, const std::
 export constexpr std::array CompareFunctionNames{"<", ">", "<=", ">=", "="};
 export constexpr std::array LogicalFunctionNames{"AND", "OR"};
 
+// JSON function names for JSON index
+export constexpr std::array JsonFunctionNames{"json_contains",
+                                              "json_extract_int",
+                                              "json_extract_double",
+                                              "json_extract_bool",
+                                              "json_extract_string",
+                                              "json_exists_path",
+                                              "json_extract_isnull"};
+
+// Only these JSON extraction functions are currently encoded in a way the
+// JSON secondary index can answer correctly.
+export constexpr std::array JsonIndexPushdownFunctionNames{
+    "json_extract_int",
+    "json_extract_double",
+    "json_extract_bool",
+    "json_extract_string",
+    "json_exists_path",
+    "json_contains",
+};
+
 } // namespace infinity

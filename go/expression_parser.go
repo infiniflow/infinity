@@ -39,6 +39,8 @@ const (
 	ExprTypeIn
 	ExprTypeBetween
 	ExprTypeParen
+	ExprTypeLike
+	ExprTypeNotLike
 )
 
 // Expression represents a parsed expression
@@ -185,6 +187,11 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 	// Check for BETWEEN expression (after binary operators to allow AND to work)
 	if betweenExpr := parseBetweenExpression(expr); betweenExpr != nil {
 		return betweenExpr, nil
+	}
+
+	// Check for LIKE / NOT LIKE expression (after binary operators to allow AND to work)
+	if likeExpr := parseLikeExpression(expr); likeExpr != nil {
+		return likeExpr, nil
 	}
 
 	// Check for unary minus
@@ -457,6 +464,82 @@ func parseBetweenExpression(expr string) *Expression {
 	}
 
 	return nil
+}
+
+// parseLikeExpression parses a LIKE or NOT LIKE expression
+func parseLikeExpression(expr string) *Expression {
+	exprUpper := strings.ToUpper(expr)
+
+	// Check for NOT LIKE first (must come before LIKE)
+	notLikeIdx := findTopLevelOperator(exprUpper, " NOT LIKE ")
+	if notLikeIdx != -1 {
+		leftExpr := strings.TrimSpace(expr[:notLikeIdx])
+		patternExpr := strings.TrimSpace(expr[notLikeIdx+10:])
+		left, err1 := parseExpressionInternal(leftExpr)
+		pattern, err2 := parseExpressionInternal(patternExpr)
+		if err1 == nil && err2 == nil {
+			return &Expression{
+				Type:      ExprTypeNotLike,
+				Left:      left,
+				Arguments: []*Expression{pattern},
+			}
+		}
+	}
+
+	// Check for LIKE
+	likeIdx := findTopLevelOperator(exprUpper, " LIKE ")
+	if likeIdx != -1 {
+		leftExpr := strings.TrimSpace(expr[:likeIdx])
+		patternExpr := strings.TrimSpace(expr[likeIdx+6:])
+		left, err1 := parseExpressionInternal(leftExpr)
+		pattern, err2 := parseExpressionInternal(patternExpr)
+		if err1 == nil && err2 == nil {
+			return &Expression{
+				Type:      ExprTypeLike,
+				Left:      left,
+				Arguments: []*Expression{pattern},
+			}
+		}
+	}
+
+	return nil
+}
+
+// findTopLevelOperator finds an operator at the top level (not inside quotes or parentheses)
+func findTopLevelOperator(expr, op string) int {
+	parenCount := 0
+	inSingle := false
+	inDouble := false
+	for i := 0; i <= len(expr)-len(op); i++ {
+		ch := expr[i]
+		switch ch {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '(':
+			if !inSingle && !inDouble {
+				parenCount++
+			}
+		case ')':
+			if !inSingle && !inDouble {
+				parenCount--
+			}
+		}
+		if !inSingle && !inDouble && parenCount == 0 && strings.EqualFold(expr[i:i+len(op)], op) {
+			return i
+		}
+	}
+	return -1
+}
+
+// stringPtr returns a pointer to a string
+func stringPtr(s string) *string {
+	return &s
 }
 
 // isFunctionCall checks if the expression is a function call
@@ -916,7 +999,7 @@ func isOuterParentheses(expr string) bool {
 	if !strings.HasPrefix(expr, "(") || !strings.HasSuffix(expr, ")") {
 		return false
 	}
-	
+
 	// Track parentheses depth - the outermost pair should close at the end
 	depth := 0
 	for i, ch := range expr {
@@ -1117,6 +1200,70 @@ func convertToThriftParsedExpr(expr *Expression) (*thriftapi.ParsedExpr, error) 
 			}
 			funcExpr.Arguments = append(funcExpr.Arguments, thriftArg)
 		}
+		exprType.FunctionExpr = funcExpr
+
+	case ExprTypeLike:
+		// LIKE is represented as a function: like(column, pattern, escape)
+		funcExpr := &thriftapi.FunctionExpr{
+			FunctionName: "like",
+		}
+		// Left operand is the column
+		leftArg, err := convertToThriftParsedExpr(expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, leftArg)
+
+		// Pattern is the first argument
+		patternArg, err := convertToThriftParsedExpr(expr.Arguments[0])
+		if err != nil {
+			return nil, err
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, patternArg)
+
+		// Default escape character is backslash
+		escapeConst := &thriftapi.ConstantExpr{
+			LiteralType: thriftapi.LiteralType_String,
+			StrValue:    stringPtr("\\"),
+		}
+		escapeArg := &thriftapi.ParsedExpr{
+			Type: &thriftapi.ParsedExprType{
+				ConstantExpr: escapeConst,
+			},
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, escapeArg)
+		exprType.FunctionExpr = funcExpr
+
+	case ExprTypeNotLike:
+		// NOT LIKE is represented as a function: not_like(column, pattern, escape)
+		funcExpr := &thriftapi.FunctionExpr{
+			FunctionName: "not_like",
+		}
+		// Left operand is the column
+		leftArg, err := convertToThriftParsedExpr(expr.Left)
+		if err != nil {
+			return nil, err
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, leftArg)
+
+		// Pattern is the first argument
+		patternArg, err := convertToThriftParsedExpr(expr.Arguments[0])
+		if err != nil {
+			return nil, err
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, patternArg)
+
+		// Default escape character is backslash
+		escapeConst := &thriftapi.ConstantExpr{
+			LiteralType: thriftapi.LiteralType_String,
+			StrValue:    stringPtr("\\"),
+		}
+		escapeArg := &thriftapi.ParsedExpr{
+			Type: &thriftapi.ParsedExprType{
+				ConstantExpr: escapeConst,
+			},
+		}
+		funcExpr.Arguments = append(funcExpr.Arguments, escapeArg)
 		exprType.FunctionExpr = funcExpr
 
 	default:

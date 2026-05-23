@@ -19,6 +19,7 @@ import :value;
 import :table_meta;
 
 import internal_types;
+import json_term;
 
 namespace infinity {
 
@@ -30,6 +31,13 @@ public:
 
     static std::tuple<ColumnID, Value, std::shared_ptr<BaseExpression>, FilterCompareType>
     UnwindCast(const std::shared_ptr<BaseExpression> &cast_expr, Value &&right_val, FilterCompareType compare_type, TableMeta *table_meta);
+
+    // JSON term helpers
+    static std::string EncodeJsonInteger(int64_t value);
+
+    static std::string EncodeJsonDouble(double value);
+
+    static JsonTermT BuildJsonTerm(const std::string &func_name, const std::string &path, const Value &value, FilterCompareType &compare_type);
 };
 
 } // namespace infinity

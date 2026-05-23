@@ -1101,3 +1101,78 @@ TEST_P(TestTxnIndexInternal, DISABLED_SLOW_test_populate_index) {
         return std::make_pair(begin_id, row_cnt);
     });
 }
+
+TEST_P(TestTxnIndexInternal, test_json_index) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    std::shared_ptr<std::string> db_name = std::make_shared<std::string>("db1");
+    auto table_name = std::make_shared<std::string>("tb1");
+
+    // Create table with JSON column
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "id", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kJson), "meta", std::set<ConstraintType>());
+    auto table_def = TableDef::Make(db_name, table_name, std::make_shared<std::string>(), {column_def1, column_def2});
+
+    // Create JSON secondary index
+    auto index_name = std::make_shared<std::string>("idx_json");
+    std::vector<InitParameter *> index_params;
+    index_params.emplace_back(new InitParameter("cardinality", "low"));
+    auto index_def = IndexSecondary::Make(index_name, std::make_shared<std::string>(), "file_name", {column_def2->name()}, index_params, true);
+    for (auto *param : index_params) {
+        delete param;
+    }
+
+    // Verify index properties
+    auto *secondary_index = static_cast<IndexSecondary *>(index_def.get());
+    EXPECT_TRUE(secondary_index->IsJsonIndex());
+    EXPECT_EQ(secondary_index->GetSecondaryIndexCardinality(), SecondaryIndexCardinality::kLowCardinality);
+    EXPECT_EQ(secondary_index->BuildOtherParamsString(), "cardinality = low");
+
+    // Test CreateIndex and CreateTable
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create db"), TransactionType::kCreateDB);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, std::make_shared<std::string>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create table"), TransactionType::kCreateTable);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("create index"), TransactionType::kCreateIndex);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // Drop index and table
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop index"), TransactionType::kDropIndex);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop table"), TransactionType::kDropTable);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(std::make_unique<std::string>("drop db"), TransactionType::kDropDB);
+        Status status = txn->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+}

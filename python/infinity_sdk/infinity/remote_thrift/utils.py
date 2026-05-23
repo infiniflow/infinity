@@ -224,13 +224,86 @@ def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
         return f"match_text(fields='{generic_match_expr.match_text_expr.fields}', matching_text='{generic_match_expr.match_text_expr.matching_text}', options='{generic_match_expr.match_text_expr.options_text}')"
 
 
+def _make_escape_expr(escape_char=None):
+    """Create escape expression, using explicit escape char if provided."""
+    escape_expr = ttypes.ParsedExpr()
+    escape_constant = ttypes.ConstantExpr()
+    escape_constant.literal_type = ttypes.LiteralType.String
+    # Use explicit escape char or default to backslash
+    # escape_char may be a sqlglot Literal or a string
+    if escape_char is not None:
+        if hasattr(escape_char, 'output_name'):
+            escape_value = escape_char.output_name
+        else:
+            escape_value = str(escape_char)
+    else:
+        escape_value = "\\"
+    escape_constant.str_value = escape_value
+    escape_expr_type = ttypes.ParsedExprType()
+    escape_expr_type.constant_expr = escape_constant
+    escape_expr.type = escape_expr_type
+    return escape_expr
+
+
+def _parse_like(like_node, escape_char=None):
+    """Parse a Like node into a ParsedExpr."""
+    parsed_expr = ttypes.ParsedExpr()
+    function_expr = ttypes.FunctionExpr()
+    function_expr.function_name = binary_exp_to_paser_exp('like')
+
+    left_expr = parse_expr(like_node.args['this'])
+    pattern_expr = parse_expr(like_node.args['expression'])
+
+    escape_expr = _make_escape_expr(escape_char)
+
+    function_expr.arguments = [left_expr, pattern_expr, escape_expr]
+    parser_expr_type = ttypes.ParsedExprType()
+    parser_expr_type.function_expr = function_expr
+    parsed_expr.type = parser_expr_type
+    return parsed_expr
+
+
+def _parse_not_like(like_node, escape_char=None):
+    """Parse a NOT LIKE node into a ParsedExpr."""
+    parsed_expr = ttypes.ParsedExpr()
+    function_expr = ttypes.FunctionExpr()
+    function_expr.function_name = binary_exp_to_paser_exp('notlike')
+
+    left_expr = parse_expr(like_node.args['this'])
+    pattern_expr = parse_expr(like_node.args['expression'])
+
+    escape_expr = _make_escape_expr(escape_char)
+
+    function_expr.arguments = [left_expr, pattern_expr, escape_expr]
+    parser_expr_type = ttypes.ParsedExprType()
+    parser_expr_type.function_expr = function_expr
+    parsed_expr.type = parser_expr_type
+    return parsed_expr
+
+
 def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
         expr.alias_name = cons.alias
         return expr
 
-    if isinstance(cons, exp.Binary):
+    if isinstance(cons, exp.Escape):
+        # Handle LIKE with explicit ESCAPE clause: LIKE 'pattern' ESCAPE '!'
+        # SQLGlot 30.8.0+ wraps Like node in Escape wrapper when ESCAPE is present
+        like_node = cons.args['this']
+        escape_char = cons.args.get('expression')
+        return _parse_like(like_node, escape_char)
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Escape):
+        # Handle NOT LIKE with explicit ESCAPE clause
+        raw_escape = cons.args['this']
+        like_node = raw_escape.args['this']
+        escape_char = raw_escape.args.get('expression')
+        return _parse_not_like(like_node, escape_char)
+    elif isinstance(cons, exp.Like):
+        return _parse_like(cons, None)
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Like):
+        return _parse_not_like(cons.args['this'], None)
+    elif isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = binary_exp_to_paser_exp(

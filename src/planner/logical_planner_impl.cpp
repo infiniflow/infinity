@@ -864,11 +864,60 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             break;
         }
         case IndexType::kSecondary: {
-            IndexSecondary::ValidateColumnDataType(base_table_ref,
-                                                   index_info->column_name_,
-                                                   index_info->secondary_index_cardinality_); // may throw exception
-            base_index_ptr =
-                IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_}, index_info->secondary_index_cardinality_);
+            std::vector<InitParameter *> param_list;
+            bool added_cardinality_param = false;
+            std::unique_ptr<InitParameter> injected_cardinality_param;
+
+            // Check if column is JSON type
+            auto &column_names_vec = *(base_table_ref->column_names_);
+            auto &column_types_vec = *(base_table_ref->column_types_);
+            size_t column_id = std::find(column_names_vec.begin(), column_names_vec.end(), index_info->column_name_) - column_names_vec.begin();
+            bool is_json_column = (column_id < column_types_vec.size()) && (column_types_vec[column_id]->type() == LogicalType::kJson);
+
+            if (index_info->index_param_list_ != nullptr) {
+                param_list = *(index_info->index_param_list_);
+            }
+            if (is_json_column) {
+                // Check if user explicitly specified cardinality=high for JSON column
+                for (const auto *param : param_list) {
+                    std::string param_name = param->param_name_;
+                    std::string param_value = param->param_value_;
+                    ToLower(param_name);
+                    ToLower(param_value);
+                    if (param_name == "cardinality" && param_value == "high") {
+                        RecoverableError(Status::InvalidIndexDefinition(
+                            fmt::format("cardinality is always low for JSON column. Column: {}", index_info->column_name_)));
+                    }
+                }
+                // Auto add cardinality=low for JSON columns if not specified
+                bool has_cardinality = false;
+                for (const auto *param : param_list) {
+                    std::string param_name = param->param_name_;
+                    ToLower(param_name);
+                    if (param_name == "cardinality") {
+                        has_cardinality = true;
+                        break;
+                    }
+                }
+                if (!has_cardinality) {
+                    injected_cardinality_param = std::make_unique<InitParameter>("cardinality", "low");
+                    param_list.push_back(injected_cardinality_param.get());
+                    added_cardinality_param = true;
+                }
+            }
+
+            base_index_ptr = IndexSecondary::Make(index_name, index_comment, index_filename, {index_info->column_name_}, param_list, is_json_column);
+
+            // Validate column type and cardinality
+            auto *secondary_index = static_cast<IndexSecondary *>(base_index_ptr.get());
+            IndexSecondary::ValidateIndexColumn(base_table_ref,
+                                                index_info->column_name_,
+                                                secondary_index->GetSecondaryIndexCardinality(),
+                                                is_json_column); // may throw exception
+
+            if (added_cardinality_param) {
+                param_list.pop_back();
+            }
             break;
         }
         case IndexType::kSecondaryFunctional: {

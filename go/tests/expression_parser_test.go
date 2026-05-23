@@ -852,6 +852,10 @@ func TestCondition(t *testing.T) {
 		{"not keyword", "NOT c1 = 1", "not(=(c1, 1))"},
 		// BETWEEN expressions
 		{"between", "c1 BETWEEN 1 AND 10", "between(c1, 1, 10)"},
+		// LIKE expressions
+		{"like simple", "c1 LIKE '%test%'", "like(c1, '%test%', '\\')"},
+		{"like without wildcards", "c1 LIKE 'test'", "like(c1, 'test', '\\')"},
+		{"not like simple", "c1 NOT LIKE '%test%'", "not_like(c1, '%test%', '\\')"},
 		// Arithmetic in conditions
 		{"addition in condition", "c1 + c2 > 10", ">(+(c1, c2), 10)"},
 		{"subtraction in condition", "c1 - c2 = 0", "=(-(c1, c2), 0)"},

@@ -437,6 +437,7 @@ export import :random;
 export import :defer_op;
 export import :simd_init;
 export import :hnsw_simd_func;
+export import :json_flattener;
 export import :search_top_k_sgemm;
 export import :simd_common_tools;
 export import :simd_functions;

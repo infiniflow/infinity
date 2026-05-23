@@ -258,6 +258,12 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
             {'json_contains(c3, null)': (False, False, False, True)}).astype('boolean'))
 
+        table_obj.insert([{"c1": 222, "c2": 'bbb',
+                           "c3": '{"character":["value1","value2"],"count":5}'}])
+        res, extra_res = table_obj.output(["json_contains(c3,'$.character','\"value1\"')"]).to_pl()
+        pd.testing.assert_frame_equal(res.to_pandas().astype('boolean'), pd.DataFrame(
+            {'json_contains(c3, $.character, "value1")': (False, False, False, False, True)}).astype('boolean'))
+
     def test_select_json_comprehensive(self, suffix):
         """
         Comprehensive test for JSON type operations based on json.slt test cases
