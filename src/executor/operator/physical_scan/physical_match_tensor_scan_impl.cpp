@@ -41,6 +41,10 @@ import :emvb_index_in_mem;
 import :emvb_index;
 import :plaid_index_in_mem;
 import :plaid_index;
+import :smve_index;
+import :smve_transform;
+import :bmp_handler;
+import :bmp_util;
 import :knn_filter;
 import :global_block_id;
 import :block_index;
@@ -208,7 +212,7 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     continue;
                 }
                 // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
+                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
                     LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -238,8 +242,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID) {
-                Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB or PLAID");
+            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
+                Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB, PLAID or SMVE");
                 RecoverableError(std::move(error_status));
             }
             table_index_meta_ = std::move(table_index_meta);
@@ -363,6 +367,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             std::shared_ptr<MemIndex> mem_index = segment_index_meta.GetMemIndex();
             std::shared_ptr<EMVBIndexInMem> emvb_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetEMVBIndex();
             std::shared_ptr<PlaidIndexInMem> plaid_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetPlaidIndex();
+            std::shared_ptr<SMVEIndexInMem> smve_index_in_mem = mem_index == nullptr ? nullptr : mem_index->GetSMVEIndex();
 
             // 1. in mem index - EMVB
             if (emvb_index_in_mem) {
@@ -490,6 +495,19 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                              }},
                     result);
             }
+            // 1c. in mem index - SMVE
+            else if (smve_index_in_mem) {
+                auto [result_num, score_ptr, row_id_ptr] =
+                    smve_index_in_mem->Search(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                              calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                              topn_,
+                                              5, // default overfetch
+                                              block_index,
+                                              begin_ts);
+                for (u32 i = 0; i < result_num; ++i) {
+                    function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                }
+            }
             // 2. chunk index
             auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
             if (!index_status.ok()) {
@@ -548,6 +566,81 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                        index_options_->plaid_n_full_scores_);
                     for (u32 i = 0; i < result_num; ++i) {
                         function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                } else if (index_base->index_type_ == IndexType::kSMVE) {
+                    BufferObj *index_buffer = nullptr;
+                    Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                    BufferHandle index_handle = index_buffer->Load();
+                    auto *smve_data = static_cast<SMVESerializedData *>(index_handle.GetDataMut());
+                    if (!smve_data || !smve_data->bmp_handler) {
+                        UnrecoverableError("Failed to load SMVE index from file");
+                    }
+
+                    // SMVE chunk search: use serialized data directly
+                    // Step 1: SMVE transform query using stored projection matrix
+                    const f32 *query_ptr = reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr);
+                    u32 n_query_tokens = calc_match_tensor_expr_->num_of_embedding_in_query_tensor_;
+
+                    SMVEResult smve_query;
+                    if (smve_data->projection_matrix_copy) {
+                        smve_query = SMVETransform(query_ptr, n_query_tokens,
+                                                    smve_data->embedding_dim,
+                                                    smve_data->projection_matrix_copy.get(),
+                                                    smve_data->width,
+                                                    smve_data->topk,
+                                                    true);
+                    }
+
+                    // Step 2: Build SparseVecRef and search BMP
+                    u32 result_count = 0;
+                    auto scores = std::make_unique<f32[]>(static_cast<u32>(topn_));
+                    auto row_ids = std::make_unique<u32[]>(static_cast<u32>(topn_));
+
+                    if (!smve_query.indices.empty()) {
+                        i32 candidate_topk = static_cast<i32>(topn_ * 5); // overfetch=5
+                        SparseVecRef<float, i32> query_ref(
+                            static_cast<i32>(smve_query.values.size()),
+                            reinterpret_cast<const i32 *>(smve_query.indices.data()),
+                            smve_query.values.data()
+                        );
+
+                        BmpSearchOptions bmp_options;
+                        bmp_options.alpha_ = 1.0f;
+                        bmp_options.beta_ = 1.0f;
+                        bmp_options.use_tail_ = true;
+                        bmp_options.use_lock_ = false;
+
+                        SMVEBMPCollector collector;
+                        auto accept_all = [](u32) { return true; };
+                        struct SMVEBMPDist {
+                            using DataT = float;
+                            using IndexT = i32;
+                        };
+                        smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(
+                            query_ref, candidate_topk, bmp_options, accept_all, 0, 0, &collector
+                        );
+
+                        // Sort results and take top_k
+                        if (!collector.results.empty()) {
+                            u32 n_candidates = static_cast<u32>(collector.results.size());
+                            std::partial_sort(collector.results.begin(),
+                                              collector.results.begin() + std::min<u32>(topn_, n_candidates),
+                                              collector.results.end(),
+                                              [](const auto &a, const auto &b) { return a.first > b.first; });
+
+                            result_count = std::min(topn_, n_candidates);
+                            for (u32 i = 0; i < result_count; ++i) {
+                                scores[i] = collector.results[i].first;
+                                row_ids[i] = collector.results[i].second;
+                            }
+                        }
+                    }
+
+                    for (u32 i = 0; i < result_count; ++i) {
+                        function_data.result_handler_->AddResult(0, scores[i], RowID(segment_id, row_ids[i]));
                     }
                 } else {
                     UnrecoverableError(fmt::format("Unsupported index type for tensor search: {}", static_cast<int>(index_base->index_type_)));

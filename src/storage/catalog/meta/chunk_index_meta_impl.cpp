@@ -32,6 +32,7 @@ import :raw_file_worker;
 import :hnsw_file_worker;
 import :bmp_index_file_worker;
 import :emvb_index_file_worker;
+import :smve_index_file_worker;
 import :infinity_exception;
 import :persistence_manager;
 import :persist_result_handler;
@@ -234,6 +235,19 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
                 index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
                 break;
             }
+            case IndexType::kSMVE: {
+                auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+                auto file_worker =
+                    std::make_unique<SMVEIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                          std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                          index_dir,
+                                                          std::move(index_file_name),
+                                                          index_base,
+                                                          column_def,
+                                                          buffer_mgr->persistence_manager());
+                index_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -378,6 +392,18 @@ Status ChunkIndexMeta::LoadSet() {
             index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
+        case IndexType::kSMVE: {
+            auto smve_index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            auto file_worker = std::make_unique<SMVEIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                     std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                     index_dir,
+                                                                     std::move(smve_index_file_name),
+                                                                     index_base,
+                                                                     column_def,
+                                                                     buffer_mgr->persistence_manager());
+            index_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -498,6 +524,18 @@ Status ChunkIndexMeta::RestoreSet() {
                                                                        column_def,
                                                                        segment_start_offset,
                                                                        buffer_mgr->persistence_manager());
+            break;
+        }
+        case IndexType::kSMVE: {
+            auto index_file_name = std::make_shared<std::string>(IndexFileName(chunk_id_));
+            index_file_worker = std::make_unique<SMVEIndexFileWorker>(std::make_shared<std::string>(InfinityContext::instance().config()->DataDir()),
+                                                                      std::make_shared<std::string>(InfinityContext::instance().config()->TempDir()),
+                                                                      index_dir,
+                                                                      std::move(index_file_name),
+                                                                      index_base,
+                                                                      column_def,
+                                                                      buffer_mgr->persistence_manager(),
+                                                                      index_size);
             break;
         }
         default: {
@@ -671,6 +709,8 @@ Status ChunkIndexMeta::FilePaths(std::vector<std::string> &paths) {
         case IndexType::kSecondary:
         case IndexType::kSecondaryFunctional:
             [[fallthrough]];
+        case IndexType::kSMVE:
+            [[fallthrough]];
         case IndexType::kBMP:
             [[fallthrough]];
         case IndexType::kPLAID: {
@@ -714,7 +754,8 @@ Status ChunkIndexMeta::LoadIndexBuffer() {
         case IndexType::kIVF:
         case IndexType::kHnsw:
         case IndexType::kBMP:
-        case IndexType::kEMVB: {
+        case IndexType::kEMVB:
+        case IndexType::kSMVE: {
             std::string index_file_name = IndexFileName(chunk_id_);
             std::string index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             index_buffer_ = buffer_mgr->GetBufferObject(index_filepath);

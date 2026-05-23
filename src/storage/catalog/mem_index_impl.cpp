@@ -23,6 +23,7 @@ import :memory_indexer;
 import :hnsw_handler;
 import :bmp_handler;
 import :plaid_index_in_mem;
+import :smve_index;
 
 import std;
 
@@ -176,6 +177,16 @@ std::shared_ptr<PlaidIndexInMem> MemIndex::GetPlaidIndex() {
 void MemIndex::SetPlaidIndex(std::shared_ptr<PlaidIndexInMem> plaid_index) {
     std::unique_lock<std::mutex> lock(mtx_);
     memory_plaid_index_ = plaid_index;
+}
+
+std::shared_ptr<SMVEIndexInMem> MemIndex::GetSMVEIndex() {
+    std::unique_lock<std::mutex> lock(mtx_);
+    return memory_smve_index_;
+}
+
+void MemIndex::SetSMVEIndex(std::shared_ptr<SMVEIndexInMem> smve_index) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    memory_smve_index_ = smve_index;
 }
 
 std::shared_ptr<DummyIndexInMem> MemIndex::GetDummyIndex() {

@@ -462,6 +462,7 @@ SecondaryFunctional,
 EMVB,
 DiskAnn,
 PLAID,
+SMVE,
 }
 
 struct IndexInfo {

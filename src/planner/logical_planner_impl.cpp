@@ -68,6 +68,7 @@ import :index_secondary_functional;
 import :index_emvb;
 import :index_bmp;
 import :index_plaid;
+import :index_smve;
 import :index_full_text;
 import :base_table_ref;
 import :table_ref;
@@ -983,6 +984,13 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
             IndexPLAID::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr =
                 IndexPLAID::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kSMVE: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexSMVE::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr =
+                IndexSMVE::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kDiskAnn: {
