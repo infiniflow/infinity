@@ -122,6 +122,9 @@ void SMVEIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
         UnrecoverableError("SMVEIndexInMem::Dump() called with own_memory_ = false.");
     }
 
+    // Capture size before ownership transfer (bmp_handler_ will be nulled)
+    size_t total_size = GetSizeInBytes();
+
     BufferHandle handle = buffer_obj->Load();
     auto *data_ptr = static_cast<SMVESerializedData *>(handle.GetDataMut());
     data_ptr->width = width_;
@@ -143,7 +146,7 @@ void SMVEIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     chunk_handle_ = std::move(handle);
 
     if (dump_size_ptr) {
-        *dump_size_ptr = GetSizeInBytes();
+        *dump_size_ptr = total_size;
     }
     LOG_TRACE(fmt::format("SMVEIndexInMem::Dump: Dumped {} docs, width={}, topk={}", n_docs_, width_, topk_));
 }

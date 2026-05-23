@@ -536,6 +536,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                         for (u32 blk_offset : block_offsets) {
                             block_bitmask.SetTrue(blk_offset);
                         }
+                        // Apply delete bitmask for MVCC visibility (matching EMVB/PLAID pattern)
+                        status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
+                        }
                         CalculateScoreOnColumnVector(column_vector,
                                                      segment_id,
                                                      block_id,
@@ -685,6 +690,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                 block_bitmask.SetAllFalse();
                                 for (u32 blk_offset : block_offsets) {
                                     block_bitmask.SetTrue(blk_offset);
+                                }
+                                // Apply delete bitmask for MVCC visibility (matching EMVB/PLAID pattern)
+                                status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, commit_ts, block_bitmask);
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
                                 }
                                 CalculateScoreOnColumnVector(column_vector,
                                                              segment_id,
