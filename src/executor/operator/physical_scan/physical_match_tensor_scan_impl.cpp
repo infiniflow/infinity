@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+module;
+
+#include "common/simd/simd_common_intrin_include.h"
+
 module infinity_core:physical_match_tensor_scan.impl;
 
 import :physical_match_tensor_scan;
@@ -56,6 +60,7 @@ import :physical_fusion;
 import :filter_value_type_classification;
 import :logical_match_tensor_scan;
 import :simd_functions;
+import :simd_common_tools;
 import :knn_expression;
 import :result_cache_manager;
 import :buffer_obj;
@@ -974,10 +979,24 @@ struct MaxSimOp<float, float> {
         float maxsim_score = 0.0f;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
             const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
-            float max_score_i = std::numeric_limits<float>::lowest();
+            float max_score_i;
+#if defined(__AVX__)
+            __m256 max_vec = _mm256_set1_ps(-std::numeric_limits<float>::max());
+            u32 k = 0;
+            for (; k + 8 <= target_embedding_num; k += 8) {
+                __m256 v = _mm256_loadu_ps(query_ip_ptr + k);
+                max_vec = _mm256_max_ps(max_vec, v);
+            }
+            max_score_i = hmax256_ps_avx(max_vec);
+            for (; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
+            }
+#else
+            max_score_i = -std::numeric_limits<float>::max();
             for (u32 k = 0; k < target_embedding_num; ++k) {
                 max_score_i = std::max(max_score_i, query_ip_ptr[k]);
             }
+#endif
             maxsim_score += max_score_i;
         }
         return maxsim_score;
@@ -1008,10 +1027,24 @@ struct MaxSimOp<TensorElemT, float> {
         float maxsim_score = 0.0f;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
             const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
-            float max_score_i = std::numeric_limits<float>::lowest();
+            float max_score_i;
+#if defined(__AVX__)
+            __m256 max_vec = _mm256_set1_ps(-std::numeric_limits<float>::max());
+            u32 k = 0;
+            for (; k + 8 <= target_embedding_num; k += 8) {
+                __m256 v = _mm256_loadu_ps(query_ip_ptr + k);
+                max_vec = _mm256_max_ps(max_vec, v);
+            }
+            max_score_i = hmax256_ps_avx(max_vec);
+            for (; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
+            }
+#else
+            max_score_i = -std::numeric_limits<float>::max();
             for (u32 k = 0; k < target_embedding_num; ++k) {
                 max_score_i = std::max(max_score_i, query_ip_ptr[k]);
             }
+#endif
             maxsim_score += max_score_i;
         }
         return maxsim_score;
