@@ -633,7 +633,7 @@ Status ChunkIndexMeta::UninitSet(UsageFlag usage_flag) {
                 VirtualStore::DeleteFile(absolute_posting_file);
                 VirtualStore::DeleteFile(absolute_dict_file);
             }
-        } else if (index_def->index_type_ == IndexType::kPLAID) {
+        } else if (index_def->index_type_ == IndexType::kPLAID || index_def->index_type_ == IndexType::kSMVE) {
             // Delete chunk index file for these index types
             std::shared_ptr<std::string> index_dir = segment_index_meta_.GetSegmentIndexDir();
             std::string file_name = IndexFileName(chunk_id_);

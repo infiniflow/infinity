@@ -212,7 +212,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                     continue;
                 }
                 // check index type
-                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
+                if (auto index_type = index_base->index_type_;
+                    index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
                     LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
                     continue;
                 }
@@ -242,7 +243,8 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
                 RecoverableError(std::move(error_status));
             }
             // check index type
-            if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
+            if (auto index_type = index_base->index_type_;
+                index_type != IndexType::kEMVB && index_type != IndexType::kPLAID && index_type != IndexType::kSMVE) {
                 Status error_status = Status::InvalidIndexType("invalid index type, expected EMVB, PLAID or SMVE");
                 RecoverableError(std::move(error_status));
             }
@@ -500,13 +502,13 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                 const f32 *query_ptr = reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr);
                 const u32 n_query_tokens = calc_match_tensor_expr_->num_of_embedding_in_query_tensor_;
 
-                auto [result_num, bmp_scores, row_id_ptr] =
-                    smve_index_in_mem->Search(query_ptr,
-                                              n_query_tokens,
-                                              topn_,
-                                              5, // default overfetch
-                                              block_index,
-                                              begin_ts);
+                auto [result_num, bmp_scores, row_id_ptr] = smve_index_in_mem->Search(query_ptr,
+                                                                                      n_query_tokens,
+                                                                                      topn_,
+                                                                                      5, // default overfetch
+                                                                                      block_index,
+                                                                                      begin_ts,
+                                                                                      segment_bitmask);
                 if (result_num > 0) {
                     // Group candidates by block for column reading and exact MaxSim re-rank
                     std::unordered_map<BlockID, std::vector<u32>> candidates_by_block;
@@ -521,10 +523,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                         BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
                         ColumnVector column_vector;
                         Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                     column_meta.get_column_def(),
-                                                                     block_row_cnt,
-                                                                     ColumnVectorMode::kReadOnly,
-                                                                     column_vector);
+                                                                    column_meta.get_column_def(),
+                                                                    block_row_cnt,
+                                                                    ColumnVectorMode::kReadOnly,
+                                                                    column_vector);
                         if (!status.ok()) {
                             UnrecoverableError(status.message());
                         }
@@ -623,22 +625,21 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
 
                     SMVEResult smve_query;
                     if (smve_data->projection_matrix_copy) {
-                        smve_query = SMVETransform(query_ptr, n_query_tokens,
-                                                    smve_data->embedding_dim,
-                                                    smve_data->projection_matrix_copy.get(),
-                                                    smve_data->width,
-                                                    smve_data->topk,
-                                                    true);
+                        smve_query = SMVETransform(query_ptr,
+                                                   n_query_tokens,
+                                                   smve_data->embedding_dim,
+                                                   smve_data->projection_matrix_copy.get(),
+                                                   smve_data->width,
+                                                   smve_data->topk,
+                                                   true);
                     }
 
                     // Step 2: Build SparseVecRef and search BMP for candidates
                     if (!smve_query.indices.empty()) {
                         i32 candidate_topk = static_cast<i32>(topn_ * 5); // overfetch=5
-                        SparseVecRef<float, i32> query_ref(
-                            static_cast<i32>(smve_query.values.size()),
-                            reinterpret_cast<const i32 *>(smve_query.indices.data()),
-                            smve_query.values.data()
-                        );
+                        SparseVecRef<float, i32> query_ref(static_cast<i32>(smve_query.values.size()),
+                                                           reinterpret_cast<const i32 *>(smve_query.indices.data()),
+                                                           smve_query.values.data());
 
                         BmpSearchOptions bmp_options;
                         bmp_options.alpha_ = 1.0f;
@@ -647,14 +648,17 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                         bmp_options.use_lock_ = false;
 
                         SMVEBMPCollector collector;
-                        auto accept_all = [](u32) { return true; };
                         struct SMVEBMPDist {
                             using DataT = float;
                             using IndexT = i32;
                         };
-                        smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(
-                            query_ref, candidate_topk, bmp_options, accept_all, 0, 0, &collector
-                        );
+                        if (segment_bitmask.IsAllTrue()) {
+                            AppendFilter filter(segment_row_count);
+                            smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, bmp_options, filter, 0, 0, &collector);
+                        } else {
+                            BitmaskFilter<SegmentOffset> filter(segment_bitmask);
+                            smve_data->bmp_handler->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, bmp_options, filter, 0, 0, &collector);
+                        }
 
                         if (!collector.results.empty()) {
                             // Group candidates by block for column reading and exact MaxSim re-rank
@@ -669,10 +673,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                 BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
                                 ColumnVector column_vector;
                                 Status status = NewCatalog::GetColumnVector(column_meta,
-                                                                             column_meta.get_column_def(),
-                                                                             block_row_cnt,
-                                                                             ColumnVectorMode::kReadOnly,
-                                                                             column_vector);
+                                                                            column_meta.get_column_def(),
+                                                                            block_row_cnt,
+                                                                            ColumnVectorMode::kReadOnly,
+                                                                            column_vector);
                                 if (!status.ok()) {
                                     UnrecoverableError(status.message());
                                 }

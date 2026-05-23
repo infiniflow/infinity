@@ -50,6 +50,10 @@ RowID MemIndex::GetBeginRowID() {
     if (emvb_index != nullptr) {
         return emvb_index->GetBeginRowID();
     }
+    std::shared_ptr<SMVEIndexInMem> smve_index = GetSMVEIndex();
+    if (smve_index != nullptr) {
+        return smve_index->GetBeginRowID();
+    }
     return RowID();
 }
 
@@ -62,13 +66,18 @@ size_t MemIndex::GetRowCount() {
     if (emvb_index != nullptr) {
         return emvb_index->GetRowCount();
     }
+    std::shared_ptr<SMVEIndexInMem> smve_index = GetSMVEIndex();
+    if (smve_index != nullptr) {
+        return smve_index->GetRowCount();
+    }
     return 0;
 }
 
 bool MemIndex::IsNull() const {
     std::unique_lock<std::mutex> lock(mtx_);
     return memory_hnsw_index_ == nullptr && memory_ivf_index_ == nullptr && memory_indexer_ == nullptr && memory_secondary_index_ == nullptr &&
-           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_plaid_index_ == nullptr && memory_dummy_index_ == nullptr;
+           memory_emvb_index_ == nullptr && memory_bmp_index_ == nullptr && memory_plaid_index_ == nullptr && memory_dummy_index_ == nullptr &&
+           memory_smve_index_ == nullptr;
 }
 
 void MemIndex::ClearMemIndex() {
@@ -81,6 +90,7 @@ void MemIndex::ClearMemIndex() {
     memory_emvb_index_.reset();
     memory_bmp_index_.reset();
     memory_plaid_index_.reset();
+    memory_smve_index_.reset();
 
     is_dumping_ = false;
 }
@@ -102,6 +112,8 @@ const BaseMemIndex *MemIndex::GetBaseMemIndex() const {
         res = static_cast<BaseMemIndex *>(memory_plaid_index_.get());
     } else if (memory_dummy_index_.get() != nullptr) {
         res = static_cast<BaseMemIndex *>(memory_dummy_index_.get());
+    } else if (memory_smve_index_.get() != nullptr) {
+        res = static_cast<BaseMemIndex *>(memory_smve_index_.get());
     } else {
         return nullptr;
     }

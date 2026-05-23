@@ -45,13 +45,7 @@ std::unique_ptr<f32[]> GenerateProjectionMatrix(u32 dim, u32 width) {
     return mat;
 }
 
-SMVEResult SMVETransform(const f32 *tensor_ptr,
-                         u32 n_tokens,
-                         u32 dim,
-                         const f32 *projection_matrix,
-                         u32 width,
-                         u32 topk,
-                         bool is_query) {
+SMVEResult SMVETransform(const f32 *tensor_ptr, u32 n_tokens, u32 dim, const f32 *projection_matrix, u32 width, u32 topk, bool is_query) {
     // Step 1: Projection - compute scores = tensor × projection_matrix^T
     // scores: [n_tokens × width]
     auto scores = std::make_unique<f32[]>(n_tokens * width);

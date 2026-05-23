@@ -27,6 +27,7 @@ import :block_index;
 import :mlas_matrix_multiply;
 import :sparse_vector_distance;
 import :bmp_util;
+import :knn_filter;
 
 import std;
 import embedding_info;
@@ -52,7 +53,7 @@ export struct SMVESerializedData {
     u32 topk{0};
     u32 embedding_dim{0};
     u32 n_docs{0};
-    std::unique_ptr<f32[]> projection_matrix_copy;  // projection matrix data (for file I/O)
+    std::unique_ptr<f32[]> projection_matrix_copy; // projection matrix data (for file I/O)
     BMPHandler *bmp_handler{nullptr};
 };
 
@@ -66,13 +67,13 @@ public:
     void BuildFromColumn(const ColumnVector &col, SegmentOffset block_offset, BlockOffset offset, BlockOffset row_count);
     void Dump(BufferObj *buffer_obj, size_t *dump_size = nullptr);
 
-    std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>
-    Search(const f32 *query_ptr,
-           u32 n_query_tokens,
-           u32 top_k,
-           u32 overfetch,
-           const BlockIndex *block_index,
-           TxnTimeStamp begin_ts) const;
+    std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> Search(const f32 *query_ptr,
+                                                                           u32 n_query_tokens,
+                                                                           u32 top_k,
+                                                                           u32 overfetch,
+                                                                           const BlockIndex *block_index,
+                                                                           TxnTimeStamp begin_ts,
+                                                                           const Bitmask &segment_bitmask) const;
 
     // Accessors
     u32 width() const { return width_; }

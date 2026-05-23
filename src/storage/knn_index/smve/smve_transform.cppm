@@ -34,12 +34,6 @@ export std::unique_ptr<f32[]> GenerateProjectionMatrix(u32 dim, u32 width);
 
 // Transform a single multi-vector tensor to SMVE sparse vector
 // tensor_ptr: [n_tokens × dim], query mode: sum pooling, doc mode: average pooling
-export SMVEResult SMVETransform(const f32 *tensor_ptr,
-                                u32 n_tokens,
-                                u32 dim,
-                                const f32 *projection_matrix,
-                                u32 width,
-                                u32 topk,
-                                bool is_query);
+export SMVEResult SMVETransform(const f32 *tensor_ptr, u32 n_tokens, u32 dim, const f32 *projection_matrix, u32 width, u32 topk, bool is_query);
 
 } // namespace infinity

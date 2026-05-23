@@ -36,6 +36,7 @@ import :vector_buffer;
 import :local_file_handle;
 import :merge_knn;
 import :emvb_result_handler;
+import :knn_filter;
 
 import std;
 import embedding_info;
@@ -47,8 +48,7 @@ import third_party;
 
 namespace infinity {
 
-SMVEIndexInMem::SMVEIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-    : begin_row_id_(begin_row_id) {
+SMVEIndexInMem::SMVEIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def) : begin_row_id_(begin_row_id) {
     auto *smve_def = static_cast<const IndexSMVE *>(index_base);
     width_ = smve_def->width_;
     topk_ = smve_def->topk_;
@@ -60,13 +60,12 @@ SMVEIndexInMem::SMVEIndexInMem(RowID begin_row_id, const IndexBase *index_base, 
 
     // Create proper IndexBMP and sparse ColumnDef for internal BMPHandler use
     // BMPHandler expects IndexBMP (not IndexSMVE) and sparse column type info
-    auto bmp_index_base = std::make_shared<IndexBMP>(
-        std::make_shared<std::string>("smve_internal"),
-        nullptr,
-        "",
-        std::vector<std::string>{},
-        BMP_BLOCK_SIZE,
-        BMPCompressType::kCompressed);
+    auto bmp_index_base = std::make_shared<IndexBMP>(std::make_shared<std::string>("smve_internal"),
+                                                     nullptr,
+                                                     "",
+                                                     std::vector<std::string>{},
+                                                     BMP_BLOCK_SIZE,
+                                                     BMPCompressType::kCompressed);
 
     auto sparse_data_type = std::make_shared<DataType>(
         LogicalType::kSparse,
@@ -80,7 +79,8 @@ SMVEIndexInMem::SMVEIndexInMem(RowID begin_row_id, const IndexBase *index_base, 
 }
 
 SMVEIndexInMem::~SMVEIndexInMem() {
-    if (!own_memory_) return;
+    if (!own_memory_)
+        return;
     if (bmp_handler_) {
         size_t mem_used = bmp_handler_->MemUsage();
         delete bmp_handler_;
@@ -90,8 +90,9 @@ SMVEIndexInMem::~SMVEIndexInMem() {
 }
 
 void SMVEIndexInMem::BuildFromColumn(const ColumnVector &col, SegmentOffset block_offset, BlockOffset offset, BlockOffset row_count) {
-    auto sparse_type = std::make_shared<DataType>(LogicalType::kSparse,
-                                                   std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, width_, SparseStoreType::kSorted));
+    auto sparse_type = std::make_shared<DataType>(
+        LogicalType::kSparse,
+        std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, width_, SparseStoreType::kSorted));
     auto sparse_col = ColumnVector::Make(sparse_type);
     sparse_col->Initialize(ColumnVectorType::kFlat, row_count);
 
@@ -105,8 +106,9 @@ void SMVEIndexInMem::BuildFromColumn(const ColumnVector &col, SegmentOffset bloc
         if (smve.indices.empty()) {
             sparse_col->AppendSparse<float, i32>(0, nullptr, nullptr);
         } else {
-            sparse_col->AppendSparse<float, i32>(static_cast<i32>(smve.values.size()), smve.values.data(),
-                                                  reinterpret_cast<const i32 *>(smve.indices.data()));
+            sparse_col->AppendSparse<float, i32>(static_cast<i32>(smve.values.size()),
+                                                 smve.values.data(),
+                                                 reinterpret_cast<const i32 *>(smve.indices.data()));
         }
     }
     size_t mem_delta = bmp_handler_->AddDocs(block_offset, *sparse_col, 0, static_cast<BlockOffset>(row_count));
@@ -146,13 +148,13 @@ void SMVEIndexInMem::Dump(BufferObj *buffer_obj, size_t *dump_size_ptr) {
     LOG_TRACE(fmt::format("SMVEIndexInMem::Dump: Dumped {} docs, width={}, topk={}", n_docs_, width_, topk_));
 }
 
-std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>
-SMVEIndexInMem::Search(const f32 *query_ptr,
-                       u32 n_query_tokens,
-                       u32 top_k,
-                       u32 overfetch,
-                       const BlockIndex *block_index,
-                       TxnTimeStamp begin_ts) const {
+std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> SMVEIndexInMem::Search(const f32 *query_ptr,
+                                                                                       u32 n_query_tokens,
+                                                                                       u32 top_k,
+                                                                                       u32 overfetch,
+                                                                                       const BlockIndex *block_index,
+                                                                                       TxnTimeStamp begin_ts,
+                                                                                       const Bitmask &segment_bitmask) const {
     // Step 1: SMVE transform query
     SMVEResult smve_query = SMVETransform(query_ptr, n_query_tokens, embedding_dim_, projection_matrix_.get(), width_, topk_, true);
 
@@ -162,13 +164,11 @@ SMVEIndexInMem::Search(const f32 *query_ptr,
 
     // Step 2: Build SparseVecRef from SMVE result for BMP search
     i32 candidate_topk = static_cast<i32>(top_k * overfetch);
-    SparseVecRef<float, i32> query_ref(
-        static_cast<i32>(smve_query.values.size()),
-        reinterpret_cast<const i32 *>(smve_query.indices.data()),
-        smve_query.values.data()
-    );
+    SparseVecRef<float, i32> query_ref(static_cast<i32>(smve_query.values.size()),
+                                       reinterpret_cast<const i32 *>(smve_query.indices.data()),
+                                       smve_query.values.data());
 
-    // Step 3: BMP search
+    // Step 3: BMP search with bitmask filter for concurrent visibility
     BmpSearchOptions options;
     options.alpha_ = 1.0f;
     options.beta_ = 1.0f;
@@ -176,14 +176,17 @@ SMVEIndexInMem::Search(const f32 *query_ptr,
     options.use_lock_ = false;
 
     SMVEBMPCollector collector;
-    auto accept_all = [](u32) { return true; };
     struct SMVEBMPDist {
         using DataT = float;
         using IndexT = i32;
     };
-    bmp_handler_->SearchIndex<float, SMVEBMPDist>(
-        query_ref, candidate_topk, options, accept_all, 0, 0, &collector
-    );
+    if (segment_bitmask.IsAllTrue()) {
+        AppendFilter filter(n_docs_);
+        bmp_handler_->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, options, filter, 0, 0, &collector);
+    } else {
+        BitmaskFilter<SegmentOffset> filter(segment_bitmask);
+        bmp_handler_->SearchIndex<float, SMVEBMPDist>(query_ref, candidate_topk, options, filter, 0, 0, &collector);
+    }
 
     if (collector.results.empty()) {
         return std::make_tuple(0u, nullptr, nullptr);
@@ -203,15 +206,12 @@ SMVEIndexInMem::Search(const f32 *query_ptr,
         row_ids[i] = collector.results[i].second;
     }
 
-    LOG_TRACE(fmt::format("SMVEIndexInMem::Search: candidates={}, top_k={}, results={}",
-                          collector.results.size(), top_k, n_results));
+    LOG_TRACE(fmt::format("SMVEIndexInMem::Search: candidates={}, top_k={}, results={}", collector.results.size(), top_k, n_results));
 
     return std::make_tuple(n_results, std::move(scores), std::move(row_ids));
 }
 
-const ChunkIndexMetaInfo SMVEIndexInMem::GetChunkIndexMetaInfo() const {
-    return ChunkIndexMetaInfo{"", begin_row_id_, n_docs_, 0, 0};
-}
+const ChunkIndexMetaInfo SMVEIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", begin_row_id_, n_docs_, 0, 0}; }
 
 size_t SMVEIndexInMem::GetSizeInBytes() const {
     size_t size = sizeof(SMVEIndexInMem);

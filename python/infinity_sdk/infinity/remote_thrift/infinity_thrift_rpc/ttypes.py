@@ -399,6 +399,7 @@ class IndexType(object):
     EMVB = 6
     DiskAnn = 7
     PLAID = 8
+    SMVE = 9
 
     _VALUES_TO_NAMES = {
         0: "IVF",
@@ -410,6 +411,7 @@ class IndexType(object):
         6: "EMVB",
         7: "DiskAnn",
         8: "PLAID",
+        9: "SMVE",
     }
 
     _NAMES_TO_VALUES = {
@@ -422,6 +424,7 @@ class IndexType(object):
         "EMVB": 6,
         "DiskAnn": 7,
         "PLAID": 8,
+        "SMVE": 9,
     }
 
 
