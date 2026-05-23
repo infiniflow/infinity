@@ -989,8 +989,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, std::s
         case IndexType::kSMVE: {
             assert(index_info->index_param_list_ != nullptr);
             IndexSMVE::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr =
-                IndexSMVE::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            base_index_ptr = IndexSMVE::Make(index_name, index_comment, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kDiskAnn: {
