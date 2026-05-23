@@ -19,13 +19,17 @@ module infinity_core:smve_index_file_worker.impl;
 import :smve_index_file_worker;
 import :smve_index;
 import :index_smve;
+import :index_bmp;
 import :bmp_handler;
+import :bmp_util;
+import :default_values;
 import :infinity_exception;
 import :local_file_handle;
 import :persistence_manager;
 
 import std;
 import column_def;
+import sparse_info;
 import internal_types;
 
 namespace infinity {
@@ -141,8 +145,21 @@ void SMVEIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
         file_handle_->Read(smve_data->projection_matrix_copy.get(), dim * width * sizeof(f32));
     }
 
-    // Read BMP handler data
-    smve_data->bmp_handler = BMPHandler::Make(index_base_.get(), column_def_.get()).release();
+    // Create proper IndexBMP and sparse ColumnDef for BMPHandler
+    auto bmp_index_base = std::make_shared<IndexBMP>(
+        std::make_shared<std::string>("smve_internal"),
+        nullptr,
+        "",
+        std::vector<std::string>{},
+        BMP_BLOCK_SIZE,
+        BMPCompressType::kCompressed);
+
+    auto sparse_data_type = std::make_shared<DataType>(
+        LogicalType::kSparse,
+        std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, width, SparseStoreType::kSorted));
+    auto sparse_col_def = std::make_shared<ColumnDef>(sparse_data_type, "");
+
+    smve_data->bmp_handler = BMPHandler::Make(bmp_index_base.get(), sparse_col_def.get()).release();
     if (!smve_data->bmp_handler) {
         UnrecoverableError("SMVEIndexFileWorker: Failed to create BMPHandler");
     }
@@ -177,7 +194,22 @@ bool SMVEIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     }
 
     size_t bmp_remaining = size - (cursor - static_cast<const char *>(ptr));
-    smve_data->bmp_handler = BMPHandler::Make(index_base_.get(), column_def_.get(), false).release();
+
+    // Create proper IndexBMP and sparse ColumnDef for BMPHandler
+    auto mmap_bmp_index = std::make_shared<IndexBMP>(
+        std::make_shared<std::string>("smve_internal"),
+        nullptr,
+        "",
+        std::vector<std::string>{},
+        BMP_BLOCK_SIZE,
+        BMPCompressType::kCompressed);
+
+    auto mmap_sparse_type = std::make_shared<DataType>(
+        LogicalType::kSparse,
+        std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, width, SparseStoreType::kSorted));
+    auto mmap_sparse_col_def = std::make_shared<ColumnDef>(mmap_sparse_type, "");
+
+    smve_data->bmp_handler = BMPHandler::Make(mmap_bmp_index.get(), mmap_sparse_col_def.get(), false).release();
     smve_data->bmp_handler->LoadFromPtr(cursor, bmp_remaining);
 
     return true;

@@ -4386,6 +4386,8 @@ index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
         index_type = infinity::IndexType::kSecondary;
     } else if(strcmp($5, "plaid") == 0){
         index_type = infinity::IndexType::kPLAID;
+    } else if(strcmp($5, "smve") == 0){
+        index_type = infinity::IndexType::kSMVE;
     } else {
         free($5);
         free($2);

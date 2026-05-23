@@ -497,15 +497,52 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             }
             // 1c. in mem index - SMVE
             else if (smve_index_in_mem) {
-                auto [result_num, score_ptr, row_id_ptr] =
-                    smve_index_in_mem->Search(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
-                                              calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                const f32 *query_ptr = reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr);
+                const u32 n_query_tokens = calc_match_tensor_expr_->num_of_embedding_in_query_tensor_;
+
+                auto [result_num, bmp_scores, row_id_ptr] =
+                    smve_index_in_mem->Search(query_ptr,
+                                              n_query_tokens,
                                               topn_,
                                               5, // default overfetch
                                               block_index,
                                               begin_ts);
-                for (u32 i = 0; i < result_num; ++i) {
-                    function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                if (result_num > 0) {
+                    // Group candidates by block for column reading and exact MaxSim re-rank
+                    std::unordered_map<BlockID, std::vector<u32>> candidates_by_block;
+                    for (u32 i = 0; i < result_num; ++i) {
+                        u32 segment_offset = row_id_ptr[i];
+                        BlockID bid = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                        candidates_by_block[bid].push_back(segment_offset % DEFAULT_BLOCK_CAPACITY);
+                    }
+                    for (auto &[block_id, block_offsets] : candidates_by_block) {
+                        BlockMeta block_meta(block_id, *segment_meta);
+                        ColumnMeta column_meta(this->search_column_id_, block_meta);
+                        BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
+                        ColumnVector column_vector;
+                        Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                     column_meta.get_column_def(),
+                                                                     block_row_cnt,
+                                                                     ColumnVectorMode::kReadOnly,
+                                                                     column_vector);
+                        if (!status.ok()) {
+                            UnrecoverableError(status.message());
+                        }
+                        // Build bitmask with only candidate rows set to true
+                        Bitmask block_bitmask(block_row_cnt);
+                        block_bitmask.SetAllFalse();
+                        for (u32 blk_offset : block_offsets) {
+                            block_bitmask.SetTrue(blk_offset);
+                        }
+                        CalculateScoreOnColumnVector(column_vector,
+                                                     segment_id,
+                                                     block_id,
+                                                     0,
+                                                     block_row_cnt,
+                                                     block_bitmask,
+                                                     *(this->calc_match_tensor_expr_),
+                                                     function_data);
+                    }
                 }
             }
             // 2. chunk index
@@ -594,11 +631,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                     true);
                     }
 
-                    // Step 2: Build SparseVecRef and search BMP
-                    u32 result_count = 0;
-                    auto scores = std::make_unique<f32[]>(static_cast<u32>(topn_));
-                    auto row_ids = std::make_unique<u32[]>(static_cast<u32>(topn_));
-
+                    // Step 2: Build SparseVecRef and search BMP for candidates
                     if (!smve_query.indices.empty()) {
                         i32 candidate_topk = static_cast<i32>(topn_ * 5); // overfetch=5
                         SparseVecRef<float, i32> query_ref(
@@ -623,24 +656,42 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                             query_ref, candidate_topk, bmp_options, accept_all, 0, 0, &collector
                         );
 
-                        // Sort results and take top_k
                         if (!collector.results.empty()) {
-                            u32 n_candidates = static_cast<u32>(collector.results.size());
-                            std::partial_sort(collector.results.begin(),
-                                              collector.results.begin() + std::min<u32>(topn_, n_candidates),
-                                              collector.results.end(),
-                                              [](const auto &a, const auto &b) { return a.first > b.first; });
-
-                            result_count = std::min(topn_, n_candidates);
-                            for (u32 i = 0; i < result_count; ++i) {
-                                scores[i] = collector.results[i].first;
-                                row_ids[i] = collector.results[i].second;
+                            // Group candidates by block for column reading and exact MaxSim re-rank
+                            std::unordered_map<BlockID, std::vector<u32>> candidates_by_block;
+                            for (auto &[bmp_score, doc_id] : collector.results) {
+                                BlockID bid = doc_id / DEFAULT_BLOCK_CAPACITY;
+                                candidates_by_block[bid].push_back(doc_id % DEFAULT_BLOCK_CAPACITY);
+                            }
+                            for (auto &[block_id, block_offsets] : candidates_by_block) {
+                                BlockMeta block_meta(block_id, *segment_meta);
+                                ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                BlockOffset block_row_cnt = block_index->GetBlockOffset(segment_id, block_id);
+                                ColumnVector column_vector;
+                                Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                             column_meta.get_column_def(),
+                                                                             block_row_cnt,
+                                                                             ColumnVectorMode::kReadOnly,
+                                                                             column_vector);
+                                if (!status.ok()) {
+                                    UnrecoverableError(status.message());
+                                }
+                                // Build bitmask with only candidate rows set to true
+                                Bitmask block_bitmask(block_row_cnt);
+                                block_bitmask.SetAllFalse();
+                                for (u32 blk_offset : block_offsets) {
+                                    block_bitmask.SetTrue(blk_offset);
+                                }
+                                CalculateScoreOnColumnVector(column_vector,
+                                                             segment_id,
+                                                             block_id,
+                                                             0,
+                                                             block_row_cnt,
+                                                             block_bitmask,
+                                                             *(this->calc_match_tensor_expr_),
+                                                             function_data);
                             }
                         }
-                    }
-
-                    for (u32 i = 0; i < result_count; ++i) {
-                        function_data.result_handler_->AddResult(0, scores[i], RowID(segment_id, row_ids[i]));
                     }
                 } else {
                     UnrecoverableError(fmt::format("Unsupported index type for tensor search: {}", static_cast<int>(index_base->index_type_)));

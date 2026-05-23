@@ -2447,7 +2447,7 @@ Status NewTxn::ReplayAlterIndexByParams(WalCmdAlterIndexV2 *alter_index_cmd) {
 
 Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const ChunkID &new_chunk_id) {
     auto mem_index = segment_index_meta.PopMemIndex();
-    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr)) {
+    if (mem_index == nullptr || (mem_index->GetBaseMemIndex() == nullptr && mem_index->GetEMVBIndex() == nullptr && mem_index->GetSMVEIndex() == nullptr)) {
         return Status::EmptyMemIndex();
     }
     mem_index->WaitUpdate();
@@ -2543,6 +2543,8 @@ Status NewTxn::DumpSegmentMemIndex(SegmentIndexMeta &segment_index_meta, const C
         chunk_index_meta_info = mem_index->GetEMVBIndex()->GetChunkIndexMetaInfo();
     } else if (mem_index->GetPlaidIndex() != nullptr) {
         chunk_index_meta_info = mem_index->GetPlaidIndex()->GetChunkIndexMetaInfo();
+    } else if (mem_index->GetSMVEIndex() != nullptr) {
+        chunk_index_meta_info = mem_index->GetSMVEIndex()->GetChunkIndexMetaInfo();
     } else {
         UnrecoverableError("Invalid mem index");
     }
@@ -3138,7 +3140,7 @@ Status NewTxn::PopulateSMVEIndexInner(std::shared_ptr<IndexBase> index_base,
                                       ColumnID column_id,
                                       std::shared_ptr<ColumnDef> column_def,
                                       std::vector<ChunkID> &new_chunk_ids) {
-    auto mem_index = std::make_shared<MemIndex>();
+    auto mem_index = segment_index_meta.GetMemIndex(true);
     std::shared_ptr<SMVEIndexInMem> memory_smve_index;
     bool is_null = true;
 
@@ -3173,6 +3175,8 @@ Status NewTxn::PopulateSMVEIndexInner(std::shared_ptr<IndexBase> index_base,
         memory_smve_index->BuildFromColumn(col, block_offset, offset, row_cnt);
     }
 
+    mem_index->UpdateEnd();
+
     ChunkID new_chunk_id = 0;
     std::tie(new_chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
     if (!status.ok()) {
@@ -3181,32 +3185,6 @@ Status NewTxn::PopulateSMVEIndexInner(std::shared_ptr<IndexBase> index_base,
 
     new_chunk_ids.push_back(new_chunk_id);
 
-    TableIndexMeta &table_index_meta = segment_index_meta.table_index_meta();
-    chunk_infos_.push_back(ChunkInfoForCreateIndex{table_index_meta.table_meta().db_id_str(),
-                                                   table_index_meta.table_meta().table_id_str(),
-                                                   segment_index_meta.segment_id(),
-                                                   new_chunk_id});
-
-    ChunkIndexMetaInfo chunk_index_meta_info;
-    if (mem_index->GetSMVEIndex()) {
-        chunk_index_meta_info = mem_index->GetSMVEIndex()->GetChunkIndexMetaInfo();
-    } else {
-        UnrecoverableError("Invalid mem index");
-    }
-
-    std::optional<ChunkIndexMeta> chunk_index_meta;
-    status = NewCatalog::AddNewChunkIndex1(segment_index_meta,
-                                           this,
-                                           new_chunk_id,
-                                           chunk_index_meta_info.base_row_id_,
-                                           chunk_index_meta_info.row_cnt_,
-                                           chunk_index_meta_info.term_cnt_,
-                                           chunk_index_meta_info.base_name_,
-                                           chunk_index_meta_info.index_size_,
-                                           chunk_index_meta);
-    if (!status.ok()) {
-        return status;
-    }
     status = DumpSegmentMemIndex(segment_index_meta, new_chunk_id);
     if (!status.ok()) {
         return status;

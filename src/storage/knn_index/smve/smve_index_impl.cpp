@@ -23,6 +23,7 @@ import :bmp_alg;
 import :bmp_util;
 import :index_base;
 import :index_smve;
+import :index_bmp;
 import :default_values;
 import :infinity_exception;
 import :logger;
@@ -56,7 +57,23 @@ SMVEIndexInMem::SMVEIndexInMem(RowID begin_row_id, const IndexBase *index_base, 
     embedding_dim_ = embedding_info->Dimension();
 
     projection_matrix_ = GenerateProjectionMatrix(embedding_dim_, width_);
-    bmp_handler_ = BMPHandler::Make(index_base, column_def, true).release();
+
+    // Create proper IndexBMP and sparse ColumnDef for internal BMPHandler use
+    // BMPHandler expects IndexBMP (not IndexSMVE) and sparse column type info
+    auto bmp_index_base = std::make_shared<IndexBMP>(
+        std::make_shared<std::string>("smve_internal"),
+        nullptr,
+        "",
+        std::vector<std::string>{},
+        BMP_BLOCK_SIZE,
+        BMPCompressType::kCompressed);
+
+    auto sparse_data_type = std::make_shared<DataType>(
+        LogicalType::kSparse,
+        std::make_shared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, width_, SparseStoreType::kSorted));
+    auto sparse_col_def = std::make_shared<ColumnDef>(sparse_data_type, "");
+
+    bmp_handler_ = BMPHandler::Make(bmp_index_base.get(), sparse_col_def.get(), true).release();
     if (!bmp_handler_) {
         UnrecoverableError("SMVEIndexInMem: Failed to create BMPHandler");
     }
