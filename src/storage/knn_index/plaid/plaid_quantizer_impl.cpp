@@ -279,14 +279,69 @@ std::unique_ptr<f32[]> PlaidQuantizer::GetIPDistanceTable(const f32 *query) cons
 
     // Compute IP table: [embedding_dim_, n_buckets_]
     auto table = std::make_unique<f32[]>(embedding_dim_ * n_buckets_);
+    GetIPDistanceTableTo(query, table.get());
+    return table;
+}
 
+void PlaidQuantizer::GetIPDistanceTableTo(const f32 *query, f32 *output) const {
+    std::shared_lock lock(rw_mutex_);
+    if (!bucket_weights_) {
+        UnrecoverableError("PlaidQuantizer::GetIPDistanceTableTo: must call Train first");
+    }
+    const f32 *bw = bucket_weights_.get(); // raw ptr, avoid unique_ptr::operator[] overhead
     for (u32 d = 0; d < embedding_dim_; ++d) {
         for (u32 b = 0; b < n_buckets_; ++b) {
-            table[d * n_buckets_ + b] = query[d] * bucket_weights_[b];
+            output[d * n_buckets_ + b] = query[d] * bw[b];
         }
     }
+}
 
-    return table;
+void PlaidQuantizer::BuildPositionLUT(const f32 *ip_table, f32 *lut_out) const {
+    // Build per-byte-position lookup table from ip_table
+    // lut_out[j * 256 + v] = contribution of byte value v at packed position j
+    // This replaces the byte_reversal + bucket_weight_index + ip_table access chain
+    // in GetSingleIPDistance with a single array lookup.
+    const u32 keys_per_byte = 8 / nbits_;
+    const u8 *rev_map = byte_reversed_bits_map_.get();          // raw ptr, avoid unique_ptr overhead
+    const u8 *bucket_lut = bucket_weight_indices_lookup_.get(); // raw ptr
+    for (u32 j = 0; j < packed_dim_; ++j) {
+        for (u32 v = 0; v < 256; ++v) {
+            u8 reversed = rev_map[v];
+            const u8 *indices = &bucket_lut[reversed * keys_per_byte];
+            f32 contrib = 0.0f;
+            for (u32 k = 0; k < keys_per_byte; ++k) {
+                contrib += ip_table[(j * keys_per_byte + k) * n_buckets_ + indices[k]];
+            }
+            lut_out[j * 256 + v] = contrib;
+        }
+    }
+}
+
+f32 PlaidQuantizer::GetSingleIPDistanceFromLUT(u32 embedding_id, const f32 *position_lut, const u8 *packed_residuals) const {
+    // Fast path: use pre-built position LUT to avoid byte reversal chain at query time
+    // position_lut layout: [packed_dim_, 256]
+    // For each packed byte, direct LUT lookup replaces:
+    //   byte_reverse → bucket_weight_index → ip_table[mul+add]
+    //
+    // Process 4 bytes at a time to avoid L1 cache thrashing:
+    // position_lut (64KB) > L1 cache (32KB), so loading 1 packed byte then looking up
+    // position_lut evicts the next packed byte from L1. By reading 4 packed bytes into
+    // registers first, the LUT lookups don't compete with packed data for L1.
+    const u8 *packed = packed_residuals + embedding_id * packed_dim_;
+    f32 result = 0.0f;
+    u32 j = 0;
+    for (; j + 4 <= packed_dim_; j += 4) {
+        u8 b0 = packed[j];
+        u8 b1 = packed[j + 1];
+        u8 b2 = packed[j + 2];
+        u8 b3 = packed[j + 3];
+        result +=
+            position_lut[(j + 0) * 256 + b0] + position_lut[(j + 1) * 256 + b1] + position_lut[(j + 2) * 256 + b2] + position_lut[(j + 3) * 256 + b3];
+    }
+    for (; j < packed_dim_; ++j) {
+        result += position_lut[j * 256 + packed[j]];
+    }
+    return result;
 }
 
 f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
@@ -302,9 +357,7 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
     // removing the lock avoids significant contention overhead.
 
     const u32 keys_per_byte = 8 / nbits_;
-    u32 centroid_id = centroid_ids[embedding_id];
     const u8 *packed = packed_residuals + embedding_id * packed_dim_;
-    const f32 *centroid = centroids_data + centroid_id * embedding_dim_;
 
     f32 result = 0.0f;
     u32 residual_idx = 0;
@@ -316,9 +369,9 @@ f32 PlaidQuantizer::GetSingleIPDistance(u32 embedding_id,
 
         for (u32 k = 0; k < keys_per_byte && residual_idx < embedding_dim_; ++k) {
             u32 bucket_idx = indices[k];
-            // centroid[d] * query[d] + residual[d] * query[d]
-            // = centroid[d] * query[d] + bucket_weight * query[d]
-            result += centroid[residual_idx] * ip_table[residual_idx * n_buckets_ + bucket_idx];
+            // Correct PLAID reconstruction: query[d] * (centroid[d] + bucket_weights[bucket_idx])
+            // residual contribution = ip_table[d][bucket_idx] = query[d] * bucket_weights[bucket_idx]
+            result += ip_table[residual_idx * n_buckets_ + bucket_idx];
             residual_idx++;
         }
     }

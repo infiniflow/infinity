@@ -148,9 +148,11 @@ export {
     constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
     constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
 
-    // default plaid index parameters
+    // default plaid index parameters (aligned with next-plaid v1.3.1)
+    //   next-plaid uses pure dot product q·c with threshold 0.4
+    //   infinity uses q·c - 0.5*||c||², so equivalent threshold is 0.4 - 0.5 = -0.1
     constexpr u32 PLAID_N_IVF_PROBE = 8;
-    constexpr f32 PLAID_CENTROID_SCORE_THRESHOLD = 0.5f;
+    constexpr f32 PLAID_CENTROID_SCORE_THRESHOLD = -0.1f;
     constexpr u32 PLAID_N_DOC_TO_SCORE_FACTOR = 100;
     constexpr u32 PLAID_N_FULL_SCORES_FACTOR = 10;
 
