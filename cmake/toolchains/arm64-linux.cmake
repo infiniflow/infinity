@@ -1,6 +1,6 @@
 # CMake toolchain file for ARM64 Linux (GNU libc)
 # Target: aarch64-linux-gnu
-find_program(AARCH64_GCC aarch64-linux-gnu-gcc REQUIRED)
+#find_program(AARCH64_GCC aarch64-linux-gnu-gcc REQUIRED)
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
@@ -21,7 +21,6 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
 
 # CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY prevents check_library_exists
 # from actually linking, so it falsely detects libraries like libsocket.
