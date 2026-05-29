@@ -51,8 +51,8 @@ RUN apt-get update \
     'https://astral.sh/uv/install.sh' \
     'https://apt.llvm.org/llvm.sh' \
     > downloads.txt  \
-    && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 \
     && aria2c -j 16 --min-split-size 1M -i downloads.txt \
+    && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 \
     && tar xf cmake-4.2.5-linux-x86_64.tar.gz \
     && cp -rf cmake-4.2.5-linux-x86_64/bin/* /usr/local/bin \
     && cp -rf cmake-4.2.5-linux-x86_64/share/* /usr/local/share \
