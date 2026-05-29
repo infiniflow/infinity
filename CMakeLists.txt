@@ -115,9 +115,6 @@ find_package(roaring CONFIG REQUIRED)
 find_package(RocksDB CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-#if (ARM64)
-#    find_path(SIMDE_INCLUDE_DIRS "simde/arm/neon.h")
-#endif ()
 find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
 find_package(Thrift CONFIG REQUIRED)
@@ -131,11 +128,6 @@ file(GLOB VCPKG_INCLUDE_DIRS
         "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/include"
 )
 
-#find_path(SIMDE_INCLUDE_DIRS "simde/arm/neon.h")
-#message(STATUS "asdasdasdsdas ${SIMDE_INCLUDE_DIRS}")
-#include_directories(${SIMDE_INCLUDE_DIRS})
-#
-#set(FASTPFOR_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/libFastPFOR.a")
 set(FASTPFOR_STATIC_LIB "${VCPKG_PROJECT_ROOT}/${VCPKG_TARGET_TRIPLET}/lib/libFastPFOR.a")
 message(STATUS "Found vcpkg include directories: ${VCPKG_INCLUDE_DIRS}")
 include_directories(${VCPKG_INCLUDE_DIRS})
@@ -307,9 +299,10 @@ if (IS_CI_TEST_PIPELINE)
         message(FATAL_ERROR "Not support your arch yet.")
     endif ()
 else ()
-#    add_compile_options(-march=native)
+    if (NOT CMAKE_CROSSCOMPILING)
+        add_compile_options(-march=native)
+    endif ()
 endif ()
-
 
 execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
@@ -333,16 +326,11 @@ endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 find_package(Python3 COMPONENTS Development)
-#find_package(Python 3.8
-#        REQUIRED COMPONENTS Interpreter Development.Module
-#        OPTIONAL_COMPONENTS Development.SABIModule)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
-
-#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
