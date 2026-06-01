@@ -1,0 +1,28 @@
+--- a/port/lang.h
++++ b/port/lang.h
+@@ -83,7 +83,11 @@
+ // but does some like __AVX__. Here we can infer some features from others.
+ #ifdef __AVX__
+ #define __SSE4_2__ 1
++// GCC/Clang define __PCLMUL__ only when -mpclmul is enabled, which is NOT
++// implied by -march=x86-64-v3. Only infer PCLMUL from AVX on MSVC.
++#ifdef _MSC_VER
+ #define __PCLMUL__ 1
++#endif
+ #endif  // __AVX__
+ 
+ // A way to disable PCLMUL
+
+--- a/util/crc32c.cc
++++ b/util/crc32c.cc
+@@ -49,8 +49,10 @@
+ 
+ #ifdef __SSE4_2__
+ #include <nmmintrin.h>
++#ifdef __PCLMUL__
+ #include <wmmintrin.h>
+ #endif
++#endif
+ 
+ #if defined(HAVE_ARM64_CRC)
+ bool pmull_runtime_flag = false;

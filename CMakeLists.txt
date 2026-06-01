@@ -23,6 +23,9 @@ if (NOT CMAKE_TOOLCHAIN_FILE)
     endif ()
 endif ()
 
+# Overlay ports for patches not yet upstreamed in vcpkg
+set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/ports")
+
 project(infinity VERSION 0.7.0)
 
 set(CMAKE_CXX_STANDARD 23)

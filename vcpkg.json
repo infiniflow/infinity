@@ -4,19 +4,7 @@
   "description": "The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense vector, sparse vector, tensor (multi-vector), and full-text.",
   "homepage": "https://github.com/infiniflow/infinity",
   "license": "Apache-2.0",
-  "builtin-baseline": "a7c451bd6cd6f4c223de0dbfdc28499262423538",
-  "overrides": [
-    {
-      "name": "python3",
-      "version": "3.12.13",
-      "port-version": 1
-    },
-    {
-      "name": "jemalloc",
-      "version": "5.3.1",
-      "port-version": 0
-    }
-  ],
+  "builtin-baseline": "aa40adda5352e87655b8583cfb2451d5e9e276fd",
   "dependencies": [
     "abseil",
     "arrow",

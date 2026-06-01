@@ -1,0 +1,10 @@
+--- a/snappy.cc
++++ b/snappy.cc
+@@ -29,6 +29,7 @@
+ #include "snappy-internal.h"
+ #include "snappy-sinksource.h"
+ #include "snappy.h"
++#include <immintrin.h>
+ #if !defined(SNAPPY_HAVE_BMI2)
+ // __BMI2__ is defined by GCC and Clang. Visual Studio doesn't target BMI2
+ // specifically, but it does define __AVX2__ when AVX2 support is available.

@@ -4,6 +4,9 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV VCPKG_ROOT=/opt/vcpkg
+COPY nltk_data /root/nltk_data
+
 SHELL ["/bin/bash", "-c"]
 
 COPY vcpkg.json /tmp
@@ -38,7 +41,6 @@ RUN apt-get update \
     perl flex bison binutils zip rpm iproute2 \
     libgmp-dev libmpfr-dev libmpc-dev libisl-dev \
     python3.11-dev \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311 \
     && mkdir infinity_download && cd infinity_download \
     && printf '%s\n' \
     'https://github.com/Kitware/CMake/releases/download/v4.2.5/cmake-4.2.5-linux-x86_64.tar.gz' \
@@ -47,6 +49,7 @@ RUN apt-get update \
     'https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.29.1/sqllogictest-bin-v0.29.1-x86_64-unknown-linux-musl.tar.gz' \
     'https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-x86_64-linux.tar.gz' \
     'https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/binrel/arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz' \
+    'https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz' \
     'https://download.docker.com/linux/static/stable/x86_64/docker-29.5.2.tgz' \
     'https://astral.sh/uv/install.sh' \
     'https://apt.llvm.org/llvm.sh' \
@@ -70,34 +73,14 @@ RUN apt-get update \
     && chmod +x uv-installer.sh && ./uv-installer.sh \
     && mkdir /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
     && tar xJf arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz -C /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
+    && tar xJf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz -C /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
     && cd .. && rm -rf infinity_download \
-    && git clone https://github.com/microsoft/vcpkg.git \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311 \
+    && cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
     && ./vcpkg install --clean-after-build
-
-
-ENV VCPKG_ROOT=/opt/vcpkg
-
-COPY nltk_data /root/nltk_data
-
-# # Install GCC 15 from source with complete libstdc++ support
-# RUN --mount=type=bind,source=gcc-15.2.0.tar.gz,target=/root/gcc-15.2.0.tar.gz \
-#     cd /root && tar xf gcc-15.2.0.tar.gz \
-#     && cd gcc-releases-gcc-15.2.0 && mkdir build && cd build \
-#     && ../configure --prefix=/usr \
-#     --enable-languages=c,c++ \
-#     --enable-shared \
-#     --enable-static \
-#     --disable-multilib \
-#     --program-suffix=-15 \
-#     && make -j$(nproc) \
-#     && make install \
-#     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 150 \
-#     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 150 \
-#     && update-alternatives --install /usr/bin/cpp cpp /usr/bin/cpp-15 150 \
-#     && cd /root && rm -rf gcc-releases-gcc-15.2.0
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
