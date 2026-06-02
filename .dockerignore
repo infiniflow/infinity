@@ -1,0 +1,6 @@
+*
+
+!cmake/
+!ports/
+!nltk_data/
+!vcpkg.json

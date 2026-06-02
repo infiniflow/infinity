@@ -1,17 +1,11 @@
-# NOTICE: This Dockerfile depends on BuildKit
-# NOTICE: You must run download_deps_infinity_builder_ubuntu20.py script BEFORE building this image
-
-FROM ubuntu:22.04
-
+FROM ubuntu:22.04 AS infinity-x64-builder-base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_ROOT=/opt/vcpkg
-COPY nltk_data /root/nltk_data
-
 SHELL ["/bin/bash", "-c"]
-
+COPY nltk_data /root/nltk_data
 COPY vcpkg.json /tmp
-
-# https://www.cnblogs.com/sparkdev/p/9573248.html
+COPY cmake /infinity/cmake
+COPY ports /infinity/ports
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install ca-certificates -y \
@@ -22,9 +16,7 @@ RUN apt-get update \
     && echo "apt-fast apt-fast/aptmanager select apt-get" | debconf-set-selections \
     && echo "debconf apt-fast/maxdownloads string 16" | debconf-set-selections \
     && add-apt-repository -y ppa:apt-fast/stable \
-    && DEBIAN_FRONTEND=noninteractive \
-    APT_LISTCHANGES_FRONTEND=none \
-    apt-get -y -o Dpkg::Options::="--force-confdef" \
+    && apt-get -y -o Dpkg::Options::="--force-confdef" \
     -o Dpkg::Options::="--force-confold" install apt-fast \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-fast -y update \
@@ -48,14 +40,14 @@ RUN apt-get update \
     'https://github.com/gperftools/gperftools/releases/download/gperftools-2.18.1/gperftools-2.18.1.tar.gz' \
     'https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.29.1/sqllogictest-bin-v0.29.1-x86_64-unknown-linux-musl.tar.gz' \
     'https://github.com/rui314/mold/releases/download/v2.41.0/mold-2.41.0-x86_64-linux.tar.gz' \
-    'https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/binrel/arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz' \
-    'https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz' \
     'https://download.docker.com/linux/static/stable/x86_64/docker-29.5.2.tgz' \
     'https://astral.sh/uv/install.sh' \
     'https://apt.llvm.org/llvm.sh' \
     > downloads.txt  \
     && aria2c -j 16 --min-split-size 1M -i downloads.txt \
     && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 \
+    && apt-get clean && apt-fast clean \
+    && rm -rf /var/lib/apt/lists/* \
     && tar xf cmake-4.2.5-linux-x86_64.tar.gz \
     && cp -rf cmake-4.2.5-linux-x86_64/bin/* /usr/local/bin \
     && cp -rf cmake-4.2.5-linux-x86_64/share/* /usr/local/share \
@@ -71,16 +63,95 @@ RUN apt-get update \
     && tar xzf docker-29.5.2.tgz \
     && cp docker/* /usr/bin \
     && chmod +x uv-installer.sh && ./uv-installer.sh \
-    && mkdir /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
-    && tar xJf arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz -C /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
-    && tar xJf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz -C /arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu \
     && cd .. && rm -rf infinity_download \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311 \
-    && cd /opt && git clone https://github.com/microsoft/vcpkg.git \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311
+
+FROM infinity-x64-builder-base AS infinity-x64-x64-builder-base
+RUN aria2c -j 16 --min-split-size 1M https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz \
+    && mkdir -p /x86_64-none-linux-gnu-15.2.1 \
+    && tar xJf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz -C /x86_64-none-linux-gnu-15.2.1 --strip-components=1 \
+    && rm -rf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz
+
+FROM infinity-x64-builder-base AS infinity-x64-arm64-builder-base
+RUN aria2c -j 16 --min-split-size 1M https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/binrel/arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz \
+    && mkdir -p /x86_64-aarch64-none-linux-gnu-15.2.1 \
+    && tar xJf arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz -C /x86_64-aarch64-none-linux-gnu-15.2.1 --strip-components=1 \
+    && rm -rf arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+
+FROM infinity-x64-arm64-builder-base AS infinity-x64-arm64-builder
+RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
-    && ./vcpkg install --clean-after-build
+    && export SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ \
+    && export GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ \
+    && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && ./vcpkg install \
+    --overlay-triplets=/infinity/cmake/triplets \
+    --triplet=arm64-linux \
+    --overlay-ports=/infinity/ports \
+    --clean-after-build
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
 
+FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v1-builder
+RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && ./vcpkg install \
+    --overlay-triplets=/infinity/cmake/triplets \
+    --triplet=x64-linux-v1 \
+    --overlay-ports=/infinity/ports \
+    --clean-after-build
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
+
+FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v2-builder
+RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && ./vcpkg install \
+    --overlay-triplets=/infinity/cmake/triplets \
+    --triplet=x64-linux-v2 \
+    --overlay-ports=/infinity/ports \
+    --clean-after-build
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
+
+FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v3-builder
+RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && ./vcpkg install \
+    --overlay-triplets=/infinity/cmake/triplets \
+    --triplet=x64-linux-v3 \
+    --overlay-ports=/infinity/ports \
+    --clean-after-build
+ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
+
+FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v4-builder
+RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
+    && cd /opt/vcpkg \
+    && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
+    && ./bootstrap-vcpkg.sh --disableMetrics \
+    && cp /tmp/vcpkg.json vcpkg.json \
+    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && ./vcpkg install \
+    --overlay-triplets=/infinity/cmake/triplets \
+    --triplet=x64-linux-v4 \
+    --overlay-ports=/infinity/ports \
+    --clean-after-build
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

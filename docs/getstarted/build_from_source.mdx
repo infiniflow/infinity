@@ -134,11 +134,6 @@ EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
 sudo apt update && sudo apt install clang-tools-20 flex zlib1g-dev python3-dev autoconf autoconf-archive libtool
-sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
-sudo ln -s /usr/bin/clang-format-20 /usr/bin/clang-format
-sudo ln -s /usr/bin/clang-tidy-20 /usr/bin/clang-tidy
-sudo ln -s /usr/bin/llvm-symbolizer-20 /usr/bin/llvm-symbolizer
-sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-20/include/c++/v1/__config_site
 ```
 
   </TabItem>
@@ -155,9 +150,9 @@ cd ../.. && rm -rf v1.13.1.zip ninja-1.13.1
 sudo add-apt-repository ppa:puni070/gcc-noble
 sudo apt update
 sudo apt install gcc-15 g++-15
-# Ensure that no other gcc&g++ versions have a priority set, or that if they do, their priority is below 100.
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15  100
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15  100
+# Ensure that no other gcc&g++ is gcc-15&g++-15.
+# sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15  100
+# sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15  100
 cd ~/Downloads # Of course, you can specify a different path.
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg && ./bootstrap-vcpkg.sh -disableMetrics
@@ -168,13 +163,6 @@ EOF'
 source ~/.bashrc
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20 && rm llvm.sh
 sudo apt install -y clang-tools-20 flex zlib1g-dev python3-dev autoconf libjemalloc-dev
-# Ensure that no other Clang versions have a priority set, or that if they do, their priority is below 100.
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100
-sudo ln -s /usr/lib/llvm-20/bin/clang-scan-deps /usr/bin/clang-scan-deps
-sudo ln -s /usr/bin/clang-format-20 /usr/bin/clang-format
-sudo ln -s /usr/bin/clang-tidy-20 /usr/bin/clang-tidy
-sudo ln -s /usr/bin/llvm-symbolizer-20 /usr/bin/llvm-symbolizer
-sudo ln -s /usr/lib/llvm-20/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-20/include/c++/v1/__config_site
 ```
 
   </TabItem>
