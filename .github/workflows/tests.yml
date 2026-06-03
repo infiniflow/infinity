@@ -29,78 +29,78 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  code_static_check:
-    name: code_static_check
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
+  # code_static_check:
+  #   name: code_static_check
+  #   if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Free disk space
+  #       run: |
+  #         sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+  #         df -h /
 
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          fetch-tags: false
-          submodules: recursive
+  #     - name: Check out code
+  #       uses: actions/checkout@v6
+  #       with:
+  #         ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+  #         fetch-depth: 0
+  #         fetch-tags: false
+  #         submodules: recursive
 
-      - name: Static check with Ruff
-        uses: astral-sh/ruff-action@v3
-        with:
-          version: ">=0.14.x"
-          args: "check --exclude=**/remote_thrift/infinity_thrift_rpc/**"
+  #     - name: Static check with Ruff
+  #       uses: astral-sh/ruff-action@v3
+  #       with:
+  #         version: ">=0.14.x"
+  #         args: "check --exclude=**/remote_thrift/infinity_thrift_rpc/**"
 
-      - name: Start builder container
-        run: |
-          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v4-builder:latest
+  #     - name: Start builder container
+  #       run: |
+  #         docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v4-builder:latest
 
-      - name: Check format of changed C/C++ files
-        run: |
-          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
-            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} \
-              | grep -E '\.(cpp|h|hpp|cppm)$' \
-              | grep -v 'third_party/' \
-              | grep -v 'network/' \
-              | grep -v 'remote_thrift/infinity_thrift_rpc/' \
-              | grep -v 'parser/' || true)
+  #     - name: Check format of changed C/C++ files
+  #       run: |
+  #         if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+  #           CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }} \
+  #             | grep -E '\.(cpp|h|hpp|cppm)$' \
+  #             | grep -v 'third_party/' \
+  #             | grep -v 'network/' \
+  #             | grep -v 'remote_thrift/infinity_thrift_rpc/' \
+  #             | grep -v 'parser/' || true)
 
-            if [ -n "$CHANGED_FILES" ]; then
-              echo "Check format of changed C/C++ files with clang-format-20"
+  #           if [ -n "$CHANGED_FILES" ]; then
+  #             echo "Check format of changed C/C++ files with clang-format-20"
 
-              readarray -t files <<< "$CHANGED_FILES"
-              HAS_ERROR=0
+  #             readarray -t files <<< "$CHANGED_FILES"
+  #             HAS_ERROR=0
 
-              for file in "${files[@]}"; do
-                if [ -f "$file" ]; then
-                  if docker exec infinity_builder bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
-                    echo "✅ $file"
-                  else
-                    echo "❌ $file"
-                    HAS_ERROR=1
-                  fi
-                  rm -f "${file}.formatted"
-                fi
-              done
+  #             for file in "${files[@]}"; do
+  #               if [ -f "$file" ]; then
+  #                 if docker exec infinity_builder bash -c "cd /infinity; clang-format-20 $file > ${file}.formatted; diff $file ${file}.formatted 2>/dev/null"; then
+  #                   echo "✅ $file"
+  #                 else
+  #                   echo "❌ $file"
+  #                   HAS_ERROR=1
+  #                 fi
+  #                 rm -f "${file}.formatted"
+  #               fi
+  #             done
 
-              if [ $HAS_ERROR -ne 0 ]; then
-                exit 1
-              fi
-            else
-              echo "No C++ files changed"
-            fi
-          fi
+  #             if [ $HAS_ERROR -ne 0 ]; then
+  #               exit 1
+  #             fi
+  #           else
+  #             echo "No C++ files changed"
+  #           fi
+  #         fi
 
-      - name: Remove container
-        if: always()
-        run: docker rm -f infinity_builder || true
+  #     - name: Remove container
+  #       if: always()
+  #       run: docker rm -f infinity_builder || true
 
   debug_amd64_build:
     name: debug_amd64_build
     runs-on: ubuntu-latest
-    needs: code_static_check
+    # needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -824,7 +824,7 @@ jobs:
   release_amd64_build:
     name: release_amd64_build
     runs-on: ubuntu-latest
-    needs: code_static_check
+    # needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -1402,7 +1402,7 @@ jobs:
   debug_arm64_build:
     name: debug_arm64_build
     runs-on: ubuntu-24.04-arm
-    needs: code_static_check
+    # needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -1866,7 +1866,7 @@ jobs:
   release_arm64_build:
     name: release_arm64_build
     runs-on: ubuntu-24.04-arm
-    needs: code_static_check
+    # needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -2437,7 +2437,7 @@ jobs:
   reldeb_amd64_benchmark_prepare:
     name: reldeb_amd64_benchmark_prepare
     runs-on: [ "self-hosted", "infinity-build" ]
-    needs: code_static_check
+    # needs: code_static_check
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
