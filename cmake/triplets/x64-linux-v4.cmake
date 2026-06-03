@@ -9,5 +9,5 @@ set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/../toolchains/x86_
 
 set(VCPKG_MAKE_BUILD_TRIPLET "--host=x86_64-linux-gnu")
 
-set(VCPKG_MAKE_OPTIONS "CC='clang-20 --target=aarch64-linux-gnu --sysroot=$ENV{SYS_ROOT} --gcc-toolchain=$ENV{GCC_TOOLCHAIN}'"
-    "CXX='clang++-20 --target=aarch64-linux-gnu --sysroot=$ENV{SYS_ROOT} --gcc-toolchain=$ENV{GCC_TOOLCHAIN}'")
+set(VCPKG_MAKE_OPTIONS "CC='clang-20 --target=x86_64-linux-gnu --sysroot=$ENV{SYS_ROOT} --gcc-toolchain=$ENV{GCC_TOOLCHAIN}'"
+    "CXX='clang++-20 --target=x86_64-linux-gnu --sysroot=$ENV{SYS_ROOT} --gcc-toolchain=$ENV{GCC_TOOLCHAIN}'")

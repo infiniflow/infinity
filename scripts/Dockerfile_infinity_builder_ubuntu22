@@ -24,14 +24,13 @@ RUN apt-get update \
     git make curl vim file gettext \
     libssl-dev unzip bzip2 libtool m4 tree \
     autoconf automake pkg-config autoconf-archive libtool \
-    software-properties-common gnupg2 lsb-release \
+    gnupg2 lsb-release \
     build-essential zlib1g-dev libncurses5-dev libgdbm-dev \
     libnss3-dev libreadline-dev libffi-dev libsqlite3-dev \
     libbz2-dev libexpat1-dev liblzma-dev tk-dev uuid-dev \
-    postgresql graphviz sudo bridge-utils iptables \
+    postgresql-client graphviz sudo bridge-utils iptables \
     libpcap-dev libpcre3-dev \
     perl flex bison binutils zip rpm iproute2 \
-    libgmp-dev libmpfr-dev libmpc-dev libisl-dev \
     python3.11-dev \
     && mkdir infinity_download && cd infinity_download \
     && printf '%s\n' \
@@ -68,9 +67,20 @@ RUN apt-get update \
 
 FROM infinity-x64-builder-base AS infinity-x64-x64-builder-base
 RUN aria2c -j 16 --min-split-size 1M https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz \
-    && mkdir -p /x86_64-none-linux-gnu-15.2.1 \
-    && tar xJf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz -C /x86_64-none-linux-gnu-15.2.1 --strip-components=1 \
-    && rm -rf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz
+    && mkdir -p /x86_64-linux-gnu-15.2.1 \
+    && tar xJf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz -C /x86_64-linux-gnu-15.2.1 --strip-components=1 \
+    && mv /x86_64-linux-gnu-15.2.1/x86_64-focal-linux-gnu /x86_64-linux-gnu \
+    && rm -rf x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz /x86_64-linux-gnu-15.2.1 \
+    && find /x86_64-linux-gnu -depth -type d -name 'x86_64-focal-linux-gnu' -print0 | \
+    while IFS= read -r -d '' d; do \
+    parent="$(dirname "$d")"; \
+    target="$parent/x86_64-linux-gnu"; \
+    if [ -e "$target" ]; then \
+    echo "SKIP (target exists): '$d' -> '$target'"; \
+    else \
+    mv -- "$d" "$target" && echo "OK: '$d' -> '$target'" || echo "ERROR: failed to move '$d'"; \
+    fi; \
+    done
 
 FROM infinity-x64-builder-base AS infinity-x64-arm64-builder-base
 RUN aria2c -j 16 --min-split-size 1M https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/binrel/arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz \
@@ -102,8 +112,11 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
-    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
-    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-linux-gnu/ \
+    && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v1 \
@@ -117,8 +130,11 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
-    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
-    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-linux-gnu/ \
+    && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v2 \
@@ -132,8 +148,11 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
-    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
-    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-linux-gnu/ \
+    && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v3 \
@@ -147,8 +166,11 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
     && ./bootstrap-vcpkg.sh --disableMetrics \
     && cp /tmp/vcpkg.json vcpkg.json \
-    && export SYS_ROOT=/x86_64-none-linux-gnu-15.2.1/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot/ \
-    && export GCC_TOOLCHAIN=/x86_64-none-linux-gnu-15.2.1/ \
+    && export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ \
+    && export GCC_TOOLCHAIN=/x86_64-linux-gnu/ \
+    && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
+    && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v4 \

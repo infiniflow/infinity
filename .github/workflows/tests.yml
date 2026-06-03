@@ -55,7 +55,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Check format of changed C/C++ files
         run: |
@@ -117,7 +117,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Build debug version
         run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -DIS_CI_TEST_PIPELINE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
@@ -841,7 +841,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Build release version
         run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
@@ -1419,7 +1419,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
       - name: Build debug version
         run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
@@ -1883,7 +1883,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity_builder:ubuntu22_clang20
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
       - name: Build release version
         run: docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb -j --target infinity test_main"
@@ -2479,7 +2479,7 @@ jobs:
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity_builder:ubuntu20_clang20
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Build reldeb version
         id: build

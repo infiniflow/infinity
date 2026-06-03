@@ -1,6 +1,5 @@
 # CMake toolchain file for ARM64 Linux (GNU libc)
 # Target: aarch64-linux-gnu
-#find_program(AARCH64_GCC aarch64-linux-gnu-gcc REQUIRED)
 
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
