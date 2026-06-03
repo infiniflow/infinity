@@ -2546,7 +2546,7 @@ jobs:
     name: workflow_cleanup
     runs-on: ubuntu-slim
     needs:
-      - code_static_check
+      # - code_static_check
       - debug_amd64_build
       - debug_amd64_unit_test
       - debug_amd64_sqllogical_test
