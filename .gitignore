@@ -4,6 +4,7 @@
 *
 !*.*
 !*/
+!ports/*/usage
 
 # names with special characters
 *#*
