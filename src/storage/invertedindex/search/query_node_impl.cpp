@@ -25,6 +25,7 @@ import :parse_fulltext_options;
 import :keyword_iterator;
 import :must_first_iterator;
 import :batch_or_iterator;
+import :block_at_a_time_iterator;
 import :blockmax_leaf_iterator;
 import :rank_feature_doc_iterator;
 import :rank_features_doc_iterator;
@@ -616,6 +617,32 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         }
         return df_sum && (df_sum * 5ull >= total_df);
     };
+    // BAAT condition: long query (>= 8 terms) with many common terms (avg DF > 10% total docs)
+    auto term_children_need_baat = [&sub_doc_iters, &params]() -> bool {
+        constexpr u32 kMinBaatTermCount = 8;
+        if (params.topn == 0u || sub_doc_iters.size() < kMinBaatTermCount) {
+            return false;
+        }
+        u64 total_df = 0u;
+        u64 df_sum = 0u;
+        u32 term_count = 0u;
+        for (const auto &iter : sub_doc_iters) {
+            if (iter->GetType() == DocIteratorType::kTermDocIterator) {
+                const auto tdi = static_cast<const TermDocIterator *>(iter.get());
+                if (term_count == 0u) {
+                    total_df = tdi->GetTotalDF();
+                }
+                df_sum += tdi->GetDocFreq();
+                term_count++;
+            }
+        }
+        if (term_count < kMinBaatTermCount) {
+            return false;
+        }
+        // Use BAAT when average DF > 10% of total docs (common terms dominate)
+        const float avg_df = static_cast<float>(df_sum) / static_cast<float>(term_count);
+        return avg_df > static_cast<float>(total_df) * 0.1f;
+    };
     if (sub_doc_iters.empty() && keyword_iters.empty()) {
         return nullptr;
     }
@@ -626,8 +653,11 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         auto choose_algo = EarlyTermAlgo::kNaive;
         switch (params.early_term_algo) {
             case EarlyTermAlgo::kAuto: {
-                if (params.topn) {
-                    // always prefer BMW
+                if (params.topn && term_children_need_baat()) {
+                    // Long query with common terms: block-at-a-time mode
+                    choose_algo = EarlyTermAlgo::kBlockAtATime;
+                } else if (params.topn) {
+                    // Short query: use BMW (DAAT with block max pruning)
                     choose_algo = EarlyTermAlgo::kBMW;
                 } else if (term_children_need_batch()) {
                     // topn == 0, case of filter
@@ -635,19 +665,11 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 } else {
                     choose_algo = EarlyTermAlgo::kNaive;
                 }
-                /* TODO: now always use BMW
-                if ((params.topn == 0u || sub_doc_iters.size() > term_num_threshold(params.topn)) && term_children_need_batch()) {
-                    choose_algo = EarlyTermAlgo::kBatch;
-                } else if (params.topn == 0u) {
-                    choose_algo = EarlyTermAlgo::kNaive;
-                } else {
-                    choose_algo = EarlyTermAlgo::kBMW;
-                }
-                */
                 break;
             }
             case EarlyTermAlgo::kBMW:
             case EarlyTermAlgo::kBatch:
+            case EarlyTermAlgo::kBlockAtATime:
             case EarlyTermAlgo::kNaive: {
                 choose_algo = params.early_term_algo;
                 break;
@@ -660,6 +682,12 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         switch (choose_algo) {
             case EarlyTermAlgo::kBMW: {
                 return GetIterResultT.template operator()<BlockMaxWandIterator>();
+            }
+            case EarlyTermAlgo::kBlockAtATime: {
+                assert(all_are_term_or_phrase);
+                assert(params.topn > 0u);
+                // BAAT works with term doc iterators; they are already in sub_doc_iters
+                return std::make_unique<BlockAtATimeIterator>(std::move(sub_doc_iters), params.topn);
             }
             case EarlyTermAlgo::kNaive: {
                 return GetIterResultT.template operator()<OrIterator>();
