@@ -198,9 +198,9 @@ void BlockAtATimeIterator::ProcessTerm(const u32 term_idx) {
     auto *leaf = params.leaf_iter;
     auto *tdi = params.is_term_doc ? dynamic_cast<TermDocIterator *>(leaf) : nullptr;
 
-    // Do not use the term-level threshold filter — we want ALL docs from this term
-    // because even a low individual score adds to the accumulated total.
-    leaf->UpdateScoreThreshold(0.0f);
+    // Unconditionally disable child-side threshold filtering so all docs are seen.
+    // UpdateScoreThreshold is monotonic so it cannot lower an already-raised value.
+    leaf->ForceSetScoreThreshold(0.0f);
 
     RowID target = 0;
     while (true) {
