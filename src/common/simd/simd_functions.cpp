@@ -14,11 +14,11 @@
 
 #include "simd_functions.h"
 
-// #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-// #include <xmmintrin.h>
-// #elif defined(__GNUC__) && defined(__aarch64__)
-// #include <simde/x86/sse.h>
-// #endif
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+#include <xmmintrin.h>
+#elif defined(__GNUC__) && defined(__aarch64__)
+#include <simde/x86/sse.h>
+#endif
 
 namespace infinity {
 
