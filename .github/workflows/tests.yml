@@ -1421,6 +1421,27 @@ jobs:
         run: |
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
+      - name: Create libstdc++ modules JSON for cross-compilation
+        run: |
+          docker exec infinity_builder bash -c 'mkdir -p /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/ && cat > /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json << EOF
+          {
+            "version": 1,
+            "revision": 1,
+            "modules": [
+              {
+                "logical-name": "std",
+                "source-path": "/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/include/c++/15.2.1/bits/std.cc",
+                "is-std-library": true
+              },
+              {
+                "logical-name": "std.compat",
+                "source-path": "/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/include/c++/15.2.1/bits/std.compat.cc",
+                "is-std-library": true
+              }
+            ]
+          }
+          EOF'
+
       - name: Build debug version
         run: |
           docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20  -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
