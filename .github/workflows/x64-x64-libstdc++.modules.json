@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "revision": 1,
+    "modules": [
+        {
+            "logical-name": "std",
+            "source-path": "/x86_64-linux-gnu/x86_64-linux-gnu/include/c++/15.2.0/bits/std.cc",
+            "is-std-library": true
+        },
+        {
+            "logical-name": "std.compat",
+            "source-path": "/x86_64-linux-gnu/x86_64-linux-gnu/include/c++/15.2.0/bits/std.compat.cc",
+            "is-std-library": true
+        }
+    ]
+}
