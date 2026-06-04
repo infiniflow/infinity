@@ -298,7 +298,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/zsv/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/tomlplusplus")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/newpfor")
-#target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/fastpfor/headers")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ijma/include")
@@ -379,82 +378,9 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-c
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-if (CMAKE_CROSSCOMPILING)
-    target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
-endif ()
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-
-# if (SKBUILD)
-#    add_library(embedded_infinity_ext MODULE
-#            embedded_infinity_ext.cpp
-#            embedded_infinity/wrap_infinity.cpp
-#    )
-#
-#    target_sources(embedded_infinity_ext
-#            PRIVATE
-#            FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
-#            embedded_infinity/wrap_infinity.cppm
-#    )
-
-#    nanobind_compile_options(embedded_infinity_ext)
-#    nanobind_link_options(embedded_infinity_ext)
-#    set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
-#    set(libname "nanobind-static-abi3")
-#    nanobind_build_library(${libname})
-#    nanobind_extension_abi3(embedded_infinity_ext)
-#    add_dependencies(embedded_infinity_ext miniocpp curlpp_static inih libcurl_static)
-
-#    target_link_libraries(embedded_infinity_ext PRIVATE
-#            ${libname}
-#            infinity_core
-#            sql_parser
-#            onnxruntime_mlas
-#            zsv_parser
-#            newpfor
-#            ${FASTPFOR_STATIC_LIB}
-#            jma
-#            opencc
-#            dl
-#            lz4.a
-#            event.a
-#            oatpp.a
-#            parquet.a
-#            arrow.a
-#            thrift.a
-#            thriftnb.a
-#            snappy.a
-#            ${JEMALLOC_STATIC_LIB}
-#            miniocpp.a
-#            pugixml.a
-#            curlpp_static
-#            inih.a
-#            libcurl_static
-#            ssl.a
-#            crypto.a
-#            re2.a
-#            pcre2-8.a
-#            rocksdb.a
-#            ${STDCXX15EXP_STATIC}
-#    )
-
-# WARN: python modules shall not link to static libstdc++!!!
-#    target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
-#    set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
-#
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-cpp/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/pugixml/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
-#    target_link_directories(embedded_infinity_ext PUBLIC "/usr/local/openssl30/lib64")
-#    nanobind_disable_stack_protector(embedded_infinity_ext)
-#    nanobind_opt_size(embedded_infinity_ext)
-#    nanobind_strip(embedded_infinity_ext)
-#
-#    install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity_embedded)
-# endif ()
 
 ### unit test
 
@@ -553,5 +479,6 @@ target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/minio-
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")

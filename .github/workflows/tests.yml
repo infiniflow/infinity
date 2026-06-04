@@ -1422,25 +1422,7 @@ jobs:
           docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
-        run: |
-          docker exec infinity_builder bash -c 'mkdir -p /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/ && cat > /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json << EOF
-          {
-            "version": 1,
-            "revision": 1,
-            "modules": [
-              {
-                "logical-name": "std",
-                "source-path": "/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/include/c++/15.2.1/bits/std.cc",
-                "is-std-library": true
-              },
-              {
-                "logical-name": "std.compat",
-                "source-path": "/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/include/c++/15.2.1/bits/std.compat.cc",
-                "is-std-library": true
-              }
-            ]
-          }
-          EOF'
+        run: docker cp .github/workflows/x64-arm64-libstdc++.modules.json infinity_builder:/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json
 
       - name: Build debug version
         run: |
