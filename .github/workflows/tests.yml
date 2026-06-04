@@ -2495,7 +2495,7 @@ jobs:
           sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
-        run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
+        run: sudo docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
 
       - name: Build release version
         id: build
