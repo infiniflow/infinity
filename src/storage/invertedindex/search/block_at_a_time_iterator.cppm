@@ -17,6 +17,7 @@ export module infinity_core:block_at_a_time_iterator;
 import :index_defines;
 import :doc_iterator;
 import :blockmax_leaf_iterator;
+import :term_doc_iterator;
 import :multi_doc_iterator;
 import :simd_functions;
 
@@ -26,14 +27,17 @@ import internal_types;
 namespace infinity {
 
 // Block-at-a-time (BAAT) iterator for long queries with many common terms.
-// Processes one term's posting list at a time, accumulating scores in a sparse
-// accumulator, then extracts top-k results.
 //
-// Reference: Hornet engine BAAT traversal for agent workloads (long queries).
-// BAAT is selected when query has >= 8 term children and average DF > 10% of total docs.
-// In BAAT, terms are processed in descending IDF order (rare terms first) to
-// quickly establish a high threshold, enabling aggressive block-level pruning
-// for subsequent common terms.
+// Processing order: terms sorted by IDF descending (rare first).
+// - Rare terms → few docs, small accumulator → quickly establish top-k threshold.
+// - Common terms → long posting lists → block-level pruning using threshold.
+//
+// For TermDocIterator children, per-block SIMD BM25 batch computation is used
+// (reusing GetSIMD_FUNCTIONS().BatchBM25_func_ptr_) to compute all document
+// scores in a block with a single AVX2-vectorized call.
+//
+// A running min-heap maintains the current top-k threshold during accumulation,
+// updated after each term so subsequent terms can skip irrelevant blocks.
 export class BlockAtATimeIterator : public MultiDocIterator {
 public:
     explicit BlockAtATimeIterator(std::vector<std::unique_ptr<DocIterator>> &&iterators, u32 topn);
@@ -54,10 +58,13 @@ public:
 
     u32 MatchCount() const override;
 
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
+
 private:
-    // Per-term BM25 parameters (extracted from TermDocIterator)
+    // Per-term BM25 parameters (extracted from the child iterator)
     struct TermBM25Params {
         BlockMaxLeafIterator *leaf_iter = nullptr;
+        bool is_term_doc = false; // true → TermDocIterator, supports SIMD batch
         float f1 = 0.0f;
         float f2 = 0.0f;
         float bm25_common_score = 0.0f;
@@ -70,38 +77,44 @@ private:
         u32 match_count = 0;
     };
 
-    // Sort term indices by IDF descending (rare terms first)
+    // Min-heap comparator by score (used for running top-k)
+    struct MinScore {
+        bool operator()(const std::pair<RowID, float> &a, const std::pair<RowID, float> &b) const { return a.second > b.second; }
+    };
+
     void SortTermsByIDF();
-
-    // Process a single term's entire posting list, accumulating scores
     void ProcessTerm(u32 term_idx);
-
-    // Extract top-k results from the accumulator into a sorted list
+    void ProcessBlockSIMD(TermDocIterator *tdi, RowID block_min, RowID block_last, u32 term_idx);
+    void AllocateBatchBuffers();
+    void AccumulateDoc(RowID doc_id, float score, u32 match);
+    void UpdateThresholdFromAccumulator();
     void ExtractTopK();
 
-    // Top-k
     u32 topn_;
 
-    // Term BM25 parameters (pointer into children_)
     std::vector<TermBM25Params> term_params_;
-
-    // Term order sorted by IDF descending
     std::vector<u32> sorted_term_order_;
 
-    // Sparse accumulator: doc_id -> (score, match_count)
+    // Sparse accumulator: doc_id → (score, match_count)
     std::unordered_map<RowID, AccumEntry> accumulator_;
 
-    // Final top-k results (doc_id, score) sorted by score descending
-    std::vector<std::pair<RowID, float>> topk_results_;
+    // Running min-heap of top-k candidates; updated incrementally during accumulation
+    std::priority_queue<std::pair<RowID, float>, std::vector<std::pair<RowID, float>>, MinScore> running_topk_heap_;
 
-    // Current iteration cursor into topk_results_
+    // Final sorted results
+    std::vector<std::pair<RowID, float>> topk_results_;
     size_t topk_cursor_ = 0;
 
-    // BM25 score cache for current doc
     mutable float bm25_score_cache_ = 0.0f;
     bool score_cached_ = false;
 
-    // Debug stats
+    // SIMD batch buffers (64-byte aligned, BAAT_BATCH_SIZE entries each)
+    void *aligned_buffer_ = nullptr;
+    u32 *batch_tf_ = nullptr;
+    u32 *batch_doc_len_ = nullptr;
+    u32 *batch_match_cnt_ = nullptr;
+    f32 *batch_score_sum_ = nullptr;
+
     u64 total_docs_processed_ = 0;
     u64 total_blocks_skipped_ = 0;
     u64 total_blocks_decoded_ = 0;
