@@ -289,7 +289,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
+# add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
 
 option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
 
