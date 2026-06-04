@@ -14,14 +14,17 @@
 
 #include "simd_functions.h"
 
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
+// #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+// #include <xmmintrin.h>
+// #elif defined(__GNUC__) && defined(__aarch64__)
+// #include <simde/x86/sse.h>
+// #endif
 
 namespace infinity {
 
-void SIMDPrefetch(const void *ptr) { _mm_prefetch(reinterpret_cast<const char *>(ptr), _MM_HINT_T0); }
+void SIMDPrefetch(const void *ptr) {
+    // _mm_prefetch(reinterpret_cast<const char *>(ptr), _MM_HINT_T0);
+    __builtin_prefetch(ptr, 0 /* rw:r */, 3 /* locality: high*/);
+}
 
 } // namespace infinity
