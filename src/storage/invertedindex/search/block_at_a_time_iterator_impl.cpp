@@ -74,8 +74,9 @@ BlockAtATimeIterator::BlockAtATimeIterator(std::vector<std::unique_ptr<DocIterat
 BlockAtATimeIterator::~BlockAtATimeIterator() {
     std::free(aligned_buffer_);
     if (SHOULD_LOG_TRACE()) {
-        LOG_TRACE(fmt::format("BlockAtATimeIterator: docs={} blocks_dec={} thr={}",
+        LOG_TRACE(fmt::format("BlockAtATimeIterator: docs={} blk_skip={} blk_dec={} thr={}",
                               total_docs_processed_,
+                              total_blocks_skipped_,
                               total_blocks_decoded_,
                               threshold_));
     }
@@ -126,11 +127,11 @@ void BlockAtATimeIterator::UpdateThresholdFromAccumulator() {
         running_topk_heap_.pop();
     }
     for (const auto &[doc_id, entry] : accumulator_) {
-        if (entry.score <= threshold_)
+        if (entry.score < threshold_)
             continue;
         if (running_topk_heap_.size() < topn_) {
             running_topk_heap_.emplace(doc_id, entry.score);
-        } else if (entry.score > running_topk_heap_.top().second) {
+        } else if (entry.score >= running_topk_heap_.top().second) {
             running_topk_heap_.pop();
             running_topk_heap_.emplace(doc_id, entry.score);
         }
@@ -178,7 +179,7 @@ bool BlockAtATimeIterator::Next(RowID doc_id) {
             continue;
         }
         ++topk_cursor_;
-        if (cs > threshold_) {
+        if (cs >= threshold_) {
             doc_id_ = cd;
             bm25_score_cache_ = cs;
             score_cached_ = true;
@@ -203,7 +204,8 @@ void BlockAtATimeIterator::ProcessTerm(const u32 term_idx) {
 
     RowID target = 0;
     while (true) {
-        if (!leaf->Next(target)) {
+        // Step 1: Advance block cursor with NextShallow (skiplist only, no doc decode)
+        if (!leaf->NextShallow(target)) {
             break;
         }
         RowID block_last = leaf->BlockLastDocID();
@@ -212,7 +214,20 @@ void BlockAtATimeIterator::ProcessTerm(const u32 term_idx) {
             break;
         }
 
+        // Step 2: Block-level pruning.
+        // If this term's max possible contribution in this block cannot reach
+        // the current top-k threshold, skip the entire block without decoding.
+        if (threshold_ > 0.0f && leaf->BlockMaxBM25Score() <= threshold_) {
+            ++total_blocks_skipped_;
+            target = block_last + 1;
+            continue;
+        }
         ++total_blocks_decoded_;
+
+        // Step 3: Decode first document in the block (also positions doc cursor)
+        if (!leaf->Next(target)) {
+            break;
+        }
 
         if (tdi != nullptr && batch_tf_ != nullptr) {
             ProcessBlockSIMD(tdi, block_min, block_last, term_idx);
@@ -283,17 +298,17 @@ void BlockAtATimeIterator::AccumulateDoc(const RowID doc_id, const float score, 
     }
 
     // Maintain running top-k heap for progressive threshold
-    if (new_score > threshold_) {
+    if (new_score >= threshold_) {
         running_topk_heap_.emplace(doc_id, new_score);
         // Lazy cleanup: only pop stale entries when heap is oversized
         if (running_topk_heap_.size() >= topn_ * 3u) {
-            while (running_topk_heap_.size() > topn_ && running_topk_heap_.top().second <= threshold_) {
+            while (running_topk_heap_.size() > topn_ && running_topk_heap_.top().second < threshold_) {
                 running_topk_heap_.pop();
             }
         }
         if (running_topk_heap_.size() >= topn_) {
             // Pop stale low-score entries from the top
-            while (running_topk_heap_.top().second <= threshold_) {
+            while (running_topk_heap_.top().second < threshold_) {
                 running_topk_heap_.pop();
                 if (running_topk_heap_.empty())
                     break;
@@ -314,10 +329,10 @@ void BlockAtATimeIterator::ExtractTopK() {
         running_topk_heap_.pop();
     }
     for (const auto &[doc_id, entry] : accumulator_) {
-        if (entry.score > threshold_) {
+        if (entry.score >= threshold_) {
             if (running_topk_heap_.size() < topn_) {
                 running_topk_heap_.emplace(doc_id, entry.score);
-            } else if (entry.score > running_topk_heap_.top().second) {
+            } else if (entry.score >= running_topk_heap_.top().second) {
                 running_topk_heap_.pop();
                 running_topk_heap_.emplace(doc_id, entry.score);
             }
