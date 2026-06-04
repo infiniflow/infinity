@@ -74,9 +74,8 @@ BlockAtATimeIterator::BlockAtATimeIterator(std::vector<std::unique_ptr<DocIterat
 BlockAtATimeIterator::~BlockAtATimeIterator() {
     std::free(aligned_buffer_);
     if (SHOULD_LOG_TRACE()) {
-        LOG_TRACE(fmt::format("BlockAtATimeIterator: docs={} blocks_skip={} blocks_dec={} thr={}",
+        LOG_TRACE(fmt::format("BlockAtATimeIterator: docs={} blocks_dec={} thr={}",
                               total_docs_processed_,
-                              total_blocks_skipped_,
                               total_blocks_decoded_,
                               threshold_));
     }
@@ -202,10 +201,6 @@ void BlockAtATimeIterator::ProcessTerm(const u32 term_idx) {
     // because even a low individual score adds to the accumulated total.
     leaf->UpdateScoreThreshold(0.0f);
 
-    // The global threshold_ is used only for block-level pruning below.
-    // A block whose max contribution can't meaningfully affect top-k candidates
-    // (even when combined with accumulated scores from earlier terms) is skipped.
-
     RowID target = 0;
     while (true) {
         if (!leaf->Next(target)) {
@@ -217,18 +212,6 @@ void BlockAtATimeIterator::ProcessTerm(const u32 term_idx) {
             break;
         }
 
-        // --- Block-level pruning ---
-        // threshold_ > 0 means we have top-k candidates from earlier (rarer) terms.
-        // A doc needs accumulated + this_block_max > threshold_ to enter top-k.
-        // Conservative: require block_max_score > threshold_ * 0.1f so that
-        // this term's contribution is at least 10% of threshold (the rest must
-        // come from earlier terms' accumulated scores already in the accumulator).
-        const float block_max_score = leaf->BlockMaxBM25Score();
-        if (threshold_ > 0.0f && block_max_score * 10.0f <= threshold_) {
-            ++total_blocks_skipped_;
-            target = block_last + 1;
-            continue;
-        }
         ++total_blocks_decoded_;
 
         if (tdi != nullptr && batch_tf_ != nullptr) {
