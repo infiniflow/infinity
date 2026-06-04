@@ -685,7 +685,10 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
             }
             case EarlyTermAlgo::kBlockAtATime: {
                 assert(all_are_term_or_phrase);
-                assert(params.topn > 0u);
+                if (params.topn == 0u) [[unlikely]] {
+                    // BAAT requires topn > 0 for top-k extraction; fall back to naive OR.
+                    return GetIterResultT.template operator()<OrIterator>();
+                }
                 // BAAT works with term doc iterators; they are already in sub_doc_iters
                 return std::make_unique<BlockAtATimeIterator>(std::move(sub_doc_iters), params.topn);
             }

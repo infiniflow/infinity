@@ -167,11 +167,19 @@ bool BlockAtATimeIterator::Next(RowID doc_id) {
         }
 
         ExtractTopK();
+        // Sort by doc_id ascending so linear cursor scan returns docs in increasing order.
+        std::sort(topk_results_.begin(), topk_results_.end(),
+            [](const auto &a, const auto &b) { return a.first < b.first; });
         topk_cursor_ = 0;
     }
     while (topk_cursor_ < topk_results_.size()) {
-        const auto &[cd, cs] = topk_results_[topk_cursor_++];
-        if (cd >= doc_id && cs > threshold_) {
+        const auto &[cd, cs] = topk_results_[topk_cursor_];
+        if (cd < doc_id) {
+            ++topk_cursor_;
+            continue;
+        }
+        ++topk_cursor_;
+        if (cs > threshold_) {
             doc_id_ = cd;
             bm25_score_cache_ = cs;
             score_cached_ = true;
