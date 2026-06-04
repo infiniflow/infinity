@@ -1423,7 +1423,7 @@ jobs:
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: |
-          docker exec infinity_builder bash -c 'mkdir -p /x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/lib/gcc/aarch64-none-linux-gnu/15.2.1/ && cat > /x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json << EOF
+          docker exec infinity_builder bash -c 'mkdir -p /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/ && cat > /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json << EOF
           {
             "version": 1,
             "revision": 1,
@@ -1444,7 +1444,7 @@ jobs:
 
       - name: Build debug version
         run: |
-          docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20  -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+          docker exec infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20  -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux -DCMAKE_CXX_STANDARD_LIBRARY=libstdc++ -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
