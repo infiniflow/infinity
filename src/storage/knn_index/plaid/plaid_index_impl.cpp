@@ -266,6 +266,21 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
     centroid_norms_neg_half_.resize(n_centroids_);
     ivf_lists_.resize(n_centroids_);
 
+    if (colbertsar_mode_) {
+        // ColBERTSaR: query-aware centroid training via SGD
+        const auto time_0 = std::chrono::high_resolution_clock::now();
+        TrainQueryAwareCentroids(n_centroids_, training_data, training_num);
+        const auto time_1 = std::chrono::high_resolution_clock::now();
+        auto train_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
+        LOG_INFO(fmt::format("PlaidIndex::Train: ColBERTSaR query-aware training done, time cost: {} ms", train_ms));
+
+        if (sampled_data) {
+            sampled_data.reset();
+        }
+        LOG_INFO(fmt::format("PlaidIndex::Train: Finish train, total time cost: {} ms", train_ms));
+        return;
+    }
+
     const auto time_0 = std::chrono::high_resolution_clock::now();
 
     // Train centroids using K-means on sampled data
@@ -1060,6 +1075,192 @@ u32 PlaidIndex::ComputeAutoNCentroids(const u64 embedding_count) {
     n_centroids = ((n_centroids + 7) / 8) * 8;
     n_centroids = std::max(8u, n_centroids);
     return n_centroids;
+}
+
+// ── ColBERTSaR query-aware centroid training ──
+// Implements unsupervised anchor optimization from the paper:
+//   min_C  mean_i( ||Q_i · C[assign(Q_i)]^T  -  Q_i · D^T|| )
+// where Q are query embeddings (in-batch docs as pseudo-queries), D are doc embeddings
+//
+// Gradient: d(loss)/d(c_k) ∝ sum_{i∈queries} sum_{j: assign[j]=k} (q_i·c_k - q_i·d_j) * q_i
+//
+// Uses SGD with the following per-batch computation:
+//   1. sims = D @ C.T          → assignments
+//   2. qc   = Q @ C[assign].T  → centroid-based scores
+//   3. qd   = Q @ D.T          → exact scores
+//   4. diff = qc - qd
+//   5. grad = diff^T @ Q       → gradient for each batch element
+//   6. scatter-add to centroids
+void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
+                                          const f32 *embedding_data,
+                                          const u64 embedding_num,
+                                          const u32 batch_size,
+                                          const u32 n_epochs,
+                                          const f32 learning_rate) {
+    const u32 dim = embedding_dimension_;
+    const u32 K = n_centroids;
+
+    // Sample K random embeddings as initial centroids
+    {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<u64> dist(0, embedding_num - 1);
+
+        std::unordered_set<u64> seen;
+        u64 centroid_idx = 0;
+        while (centroid_idx < K) {
+            const u64 idx = dist(gen);
+            if (seen.insert(idx).second) {
+                std::copy_n(embedding_data + idx * dim, dim, centroids_data_.data() + centroid_idx * dim);
+                ++centroid_idx;
+            }
+        }
+    }
+
+    // Compute initial centroid norms
+    for (u32 k = 0; k < K; ++k) {
+        centroid_norms_neg_half_[k] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_.data() + k * dim, dim);
+    }
+
+    LOG_INFO(fmt::format("TrainQueryAwareCentroids: Starting SGD with {} centroids, {} embeddings, batch={}, epochs={}, lr={}",
+                         K,
+                         embedding_num,
+                         batch_size,
+                         n_epochs,
+                         learning_rate));
+
+    // Create shuffled index array for epoch-based training
+    std::vector<u64> indices(embedding_num);
+    for (u64 i = 0; i < embedding_num; ++i)
+        indices[i] = i;
+
+    // Gradient accumulation buffer for centroids (one per batch)
+    auto grad_accum = std::make_unique<f32[]>(K * dim);
+
+    for (u32 epoch = 0; epoch < n_epochs; ++epoch) {
+        // Shuffle indices for this epoch
+        std::random_device rd;
+        std::mt19937 gen_epoch(rd());
+        std::shuffle(indices.begin(), indices.end(), gen_epoch);
+
+        f32 epoch_loss = 0.0f;
+        u32 n_batches = 0;
+
+        // Process data in mini-batches
+        for (u64 offset = 0; offset < embedding_num; offset += batch_size) {
+            const u32 cur_batch = static_cast<u32>(std::min(static_cast<u64>(batch_size), embedding_num - offset));
+            std::memset(grad_accum.get(), 0, K * dim * sizeof(f32));
+
+            // Gather batch embeddings: D [cur_batch, dim]
+            auto batch = std::make_unique<f32[]>(cur_batch * dim);
+            for (u32 j = 0; j < cur_batch; ++j) {
+                std::copy_n(embedding_data + indices[offset + j] * dim, dim, batch.get() + j * dim);
+            }
+
+            // 1. Compute sims = D @ C.T  [cur_batch, K]
+            auto sims = std::make_unique<f32[]>(cur_batch * K);
+            matrixA_multiply_transpose_matrixB_output_to_C(batch.get(), centroids_data_.data(), cur_batch, K, dim, sims.get());
+
+            // 2. assignments = argmax over K for each batch element
+            auto assignments = std::make_unique<u32[]>(cur_batch);
+            for (u32 j = 0; j < cur_batch; ++j) {
+                u32 best_k = 0;
+                f32 best_val = sims[j * K];
+                for (u32 k = 1; k < K; ++k) {
+                    const f32 val = sims[j * K + k];
+                    if (val > best_val) {
+                        best_val = val;
+                        best_k = k;
+                    }
+                }
+                assignments[j] = best_k;
+            }
+
+            // 3. Gather A = C[assignments]  [cur_batch, dim]
+            auto approx = std::make_unique<f32[]>(cur_batch * dim);
+            for (u32 j = 0; j < cur_batch; ++j) {
+                std::copy_n(centroids_data_.data() + assignments[j] * dim, dim, approx.get() + j * dim);
+            }
+
+            // 4. Compute query-centroid and query-doc scores (in-batch: docs = queries)
+            //    qc = Q @ A.T   [cur_batch, cur_batch] — centroid-based
+            auto qc = std::make_unique<f32[]>(cur_batch * cur_batch);
+            matrixA_multiply_transpose_matrixB_output_to_C(batch.get(), approx.get(), cur_batch, cur_batch, dim, qc.get());
+
+            //    qd = Q @ D.T   [cur_batch, cur_batch] — exact
+            auto qd = std::make_unique<f32[]>(cur_batch * cur_batch);
+            matrixA_multiply_transpose_matrixB_output_to_C(batch.get(), batch.get(), cur_batch, cur_batch, dim, qd.get());
+
+            // 5. diff = qc - qd  [cur_batch, cur_batch]
+            //    Compute loss = mean_i(||diff[i,:]||) = mean_i(sqrt(sum_j diff[i][j]²))
+            f32 batch_loss = 0.0f;
+            auto diff_T = std::make_unique<f32[]>(cur_batch * cur_batch); // Stored as [cur_batch, cur_batch] but as diff^T layout
+            for (u32 i = 0; i < cur_batch; ++i) {
+                f32 norm_sq = 0.0f;
+                for (u32 j = 0; j < cur_batch; ++j) {
+                    const f32 d = qc[i * cur_batch + j] - qd[i * cur_batch + j];
+                    // Store in diff^T layout: diff_T[j][i] = diff[i][j]
+                    diff_T[j * cur_batch + i] = d;
+                    norm_sq += d * d;
+                }
+                batch_loss += std::sqrt(norm_sq);
+            }
+            epoch_loss += batch_loss;
+            ++n_batches;
+
+            // 6. Compute gradient: grad_contrib = diff_T @ Q  [cur_batch, dim]
+            //    diff_T is [cur_batch, cur_batch], Q = batch is [cur_batch, dim]
+            //    Use: A = diff_T [cur_batch, cur_batch] (M=cur_batch, K=cur_batch)
+            //         B = batch [dim, cur_batch]        (N=dim, K=cur_batch)
+            //    out[M,N] = A @ B^T = diff_T @ batch^T... wait, we need diff_T @ batch
+            //
+            //    Actually: grad_contrib[j][d] = sum_i diff_T[j][i] * batch[i][d]
+            //    = (diff_T @ batch)[j, d] where diff_T [B,B] and batch [B,dim]
+            //    We need: A = diff_T [B, B], B = batch^T [dim, B]
+            //    C = A @ B^T = diff_T @ batch → [B, dim] ✓
+            //    So we need batch stored transposed: B_mat [dim, B] where B_mat[d][i] = batch[i][d]
+
+            // Transpose batch to [dim, cur_batch] for the GEMM
+            auto batch_T = std::make_unique<f32[]>(dim * cur_batch);
+            for (u32 i = 0; i < cur_batch; ++i) {
+                for (u32 d = 0; d < dim; ++d) {
+                    batch_T[d * cur_batch + i] = batch[i * dim + d];
+                }
+            }
+
+            // grad_contrib [cur_batch, dim] = diff_T @ batch
+            auto grad_contrib = std::make_unique<f32[]>(cur_batch * dim);
+            matrixA_multiply_transpose_matrixB_output_to_C(diff_T.get(), batch_T.get(), cur_batch, dim, cur_batch, grad_contrib.get());
+
+            // Scale: 2/(Nq * B) where Nq = B = cur_batch (in-batch mode)
+            const f32 scale = 2.0f / (static_cast<f32>(cur_batch) * static_cast<f32>(cur_batch));
+
+            // 7. Scatter-add gradients to centroids
+            for (u32 j = 0; j < cur_batch; ++j) {
+                const u32 k = assignments[j];
+                for (u32 d = 0; d < dim; ++d) {
+                    grad_accum[k * dim + d] += scale * grad_contrib[j * dim + d];
+                }
+            }
+
+            // 8. Apply SGD update
+            for (u32 k = 0; k < K; ++k) {
+                for (u32 d = 0; d < dim; ++d) {
+                    centroids_data_[k * dim + d] -= learning_rate * grad_accum[k * dim + d];
+                }
+            }
+        }
+
+        // Recompute centroid norms after each epoch
+        for (u32 k = 0; k < K; ++k) {
+            centroid_norms_neg_half_[k] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_.data() + k * dim, dim);
+        }
+
+        const f32 avg_loss = (n_batches > 0) ? epoch_loss / static_cast<f32>(n_batches) : 0.0f;
+        LOG_TRACE(fmt::format("TrainQueryAwareCentroids: Epoch {}/{} avg_loss={:.6f}", epoch + 1, n_epochs, avg_loss));
+    }
+
+    LOG_INFO(fmt::format("TrainQueryAwareCentroids: Training complete. {} centroids trained.", K));
 }
 
 void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,

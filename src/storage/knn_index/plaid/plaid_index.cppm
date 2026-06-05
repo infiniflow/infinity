@@ -315,6 +315,16 @@ public:
     // Static helper: compute auto n_centroids using next-plaid formula
     static u32 ComputeAutoNCentroids(u64 embedding_count);
 
+    // ColBERTSaR query-aware centroid training via SGD
+    // Uses in-batch document embeddings as pseudo-queries when no external queries provided
+    // Optimizes: min_C ||Q·C[assignments]^T - Q·D^T||  (MaxSim approximation error)
+    void TrainQueryAwareCentroids(u32 n_centroids,
+                                  const f32 *embedding_data,
+                                  u64 embedding_num,
+                                  u32 batch_size = 2048,
+                                  u32 n_epochs = 50,
+                                  f32 learning_rate = 1e-4f);
+
     // Ensure IVF is in mutable (nested vector) form.
     // If currently flattened, reconstructs ivf_lists_ from ivf_data_ and clears
     // the flattened arrays. Must be called at the start of any IVF-mutating
