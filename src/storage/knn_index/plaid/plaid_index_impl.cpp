@@ -110,19 +110,24 @@ inline f32 simd_hmax(const f32 *data, u32 len) {
 }
 #endif
 
-PlaidIndex::PlaidIndex(const u32 start_segment_offset, const u32 embedding_dimension, const u32 nbits, const u32 n_centroids)
+PlaidIndex::PlaidIndex(const u32 start_segment_offset,
+                       const u32 embedding_dimension,
+                       const u32 nbits,
+                       const u32 n_centroids,
+                       const bool colbertsar_mode)
     : start_segment_offset_(start_segment_offset), embedding_dimension_(embedding_dimension), nbits_(nbits), requested_n_centroids_(n_centroids),
-      quantizer_(std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)) {}
+      quantizer_(colbertsar_mode ? nullptr : std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)), colbertsar_mode_(colbertsar_mode) {}
 
 PlaidIndex::PlaidIndex(const u32 start_segment_offset,
                        const u32 embedding_dimension,
                        const u32 nbits,
                        const u32 n_centroids,
                        void *mmap_addr,
-                       const size_t mmap_size)
+                       const size_t mmap_size,
+                       const bool colbertsar_mode)
     : start_segment_offset_(start_segment_offset), embedding_dimension_(embedding_dimension), nbits_(nbits), requested_n_centroids_(n_centroids),
-      quantizer_(std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)), mmap_addr_(mmap_addr), mmap_size_(mmap_size), is_mmap_(true),
-      owns_data_(false) {}
+      quantizer_(colbertsar_mode ? nullptr : std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)), colbertsar_mode_(colbertsar_mode),
+      mmap_addr_(mmap_addr), mmap_size_(mmap_size), is_mmap_(true), owns_data_(false) {}
 
 PlaidIndex::~PlaidIndex() = default;
 
@@ -135,8 +140,8 @@ PlaidIndex::PlaidIndex(PlaidIndex &&other)
       owned_centroid_ids_(std::move(other.owned_centroid_ids_)), mmap_centroid_ids_(other.mmap_centroid_ids_),
       mmap_centroid_ids_size_(other.mmap_centroid_ids_size_), packed_residuals_(std::move(other.packed_residuals_)),
       packed_residuals_size_(other.packed_residuals_size_), packed_residuals_capacity_(other.packed_residuals_capacity_),
-      ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_),
-      is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
+      ivf_lists_(std::move(other.ivf_lists_)), quantizer_(std::move(other.quantizer_)), colbertsar_mode_(other.colbertsar_mode_),
+      mmap_addr_(other.mmap_addr_), mmap_size_(other.mmap_size_), is_mmap_(other.is_mmap_), owns_data_(other.owns_data_) {
     other.mmap_addr_ = nullptr;
     other.mmap_size_ = 0;
     other.n_docs_ = 0;
@@ -154,6 +159,7 @@ PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
         std::unique_lock other_lock(other.rw_mutex_);
 
         n_centroids_ = other.n_centroids_;
+        colbertsar_mode_ = other.colbertsar_mode_;
         centroids_data_ = std::move(other.centroids_data_);
         centroid_norms_neg_half_ = std::move(other.centroid_norms_neg_half_);
         global_centroids_ref_ = std::move(other.global_centroids_ref_);
@@ -190,7 +196,12 @@ PlaidIndex &PlaidIndex::operator=(PlaidIndex &&other) {
     return *this;
 }
 
-u64 PlaidIndex::ExpectLeastTrainingDataNum() const { return std::max<u64>(32ul * n_centroids_, 32ul * quantizer_->n_buckets()); }
+u64 PlaidIndex::ExpectLeastTrainingDataNum() const {
+    if (colbertsar_mode_) {
+        return std::max<u64>(32ul * n_centroids_, 256ul);
+    }
+    return std::max<u64>(32ul * n_centroids_, 32ul * quantizer_->n_buckets());
+}
 
 void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
     std::unique_lock lock(rw_mutex_);
@@ -286,6 +297,13 @@ void PlaidIndex::Train(const u32 centroids_num, const f32 *embedding_data, const
         sampled_data.reset();
         LOG_INFO(fmt::format("PlaidIndex::TrainWithSampling: Freed K-means sampling data, saved ~{} MB",
                              actual_sample_size * embedding_dimension_ * sizeof(f32) / (1024 * 1024)));
+    }
+
+    if (colbertsar_mode_) {
+        LOG_INFO("PlaidIndex::TrainWithSampling: ColBERTSaR mode, skipping residual quantizer training.");
+        auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_1 - time_0).count();
+        LOG_INFO(fmt::format("PlaidIndex::Train: Finish train, total time cost: {} ms", total_ms));
+        return;
     }
 
     // Sample residuals for quantizer training (following next-plaid's strategy)
@@ -396,35 +414,76 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
     for (u32 len : doc_lens)
         total_embedding_num += len;
 
-    // Assign to centroids and quantize residuals using STREAMING processing
-    // Following next-plaid's strategy: compute residuals -> quantize immediately -> release memory
+    // Assign to centroids and (optionally) quantize residuals using STREAMING processing
     std::vector<u32> centroid_id_assignments(total_embedding_num);
 
-    // Get packed dimension from quantizer (constant for all chunks)
-    // Use ceiling division to match PlaidQuantizer::packed_dim() computation
     const u32 packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
-    const size_t new_data_size = total_embedding_num * packed_dim;
-    const size_t old_packed_size = packed_residuals_size_;
 
-    // IMPORTANT: First release old packed_residuals_ to temporary, then allocate new memory
-    // This minimizes peak memory: at any point we only have old OR new, not both
-    auto old_packed = std::move(packed_residuals_);
-    packed_residuals_size_ = 0; // Reset size since we're moving ownership
+    if (!colbertsar_mode_) {
+        // PLAID mode: compute residuals -> quantize immediately -> release memory
+        const size_t new_data_size = total_embedding_num * packed_dim;
+        const size_t old_packed_size = packed_residuals_size_;
 
-    // Now allocate new buffer (old memory is in 'old_packed', will be freed after copy)
-    auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
+        // IMPORTANT: First release old packed_residuals_ to temporary, then allocate new memory
+        auto old_packed = std::move(packed_residuals_);
+        packed_residuals_size_ = 0;
 
-    // Copy old data first (if any), then immediately release old memory
-    if (old_packed_size > 0 && old_packed) {
-        std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
-        old_packed.reset(); // IMMEDIATELY release old memory
-    }
+        auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
 
-    // Process in chunks and write new data directly to the buffer
-    {
-        // Process in chunks to limit memory usage
-        // Target: keep distance table under ~256MB (64M floats)
-        // For n_centroids=4096, chunk_size = 64M / 4096 = 16384
+        if (old_packed_size > 0 && old_packed) {
+            std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
+            old_packed.reset();
+        }
+
+        {
+            constexpr u32 CHUNK_SIZE = 16384;
+            const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(CHUNK_SIZE * n_centroids_);
+
+            for (u64 chunk_start = 0; chunk_start < total_embedding_num; chunk_start += CHUNK_SIZE) {
+                const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(total_embedding_num));
+                const u32 chunk_count = chunk_end - chunk_start;
+
+                matrixA_multiply_transpose_matrixB_output_to_C(embedding_data + chunk_start * embedding_dimension_,
+                                                               centroids_data_.data(),
+                                                               chunk_count,
+                                                               n_centroids_,
+                                                               embedding_dimension_,
+                                                               dist_table_chunk.get());
+
+                const auto chunk_residuals = std::make_unique_for_overwrite<f32[]>(chunk_count * embedding_dimension_);
+
+                for (u32 i = 0; i < chunk_count; ++i) {
+                    const f32 *embedding_data_ptr = embedding_data + (chunk_start + i) * embedding_dimension_;
+                    f32 *output_ptr = chunk_residuals.get() + i * embedding_dimension_;
+                    f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+                    u32 max_id = 0;
+                    const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
+
+                    for (u32 k = 0; k < n_centroids_; ++k) {
+                        if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
+                            max_neg_distance = neg_distance;
+                            max_id = k;
+                        }
+                    }
+
+                    centroid_id_assignments[chunk_start + i] = max_id;
+                    const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
+                    for (u32 j = 0; j < embedding_dimension_; ++j) {
+                        output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
+                    }
+                }
+
+                u32 chunk_packed_dim = 0;
+                auto chunk_packed = quantizer_->Quantize(chunk_residuals.get(), chunk_count, chunk_packed_dim);
+                std::copy_n(chunk_packed.get(), chunk_count * chunk_packed_dim, new_packed.get() + old_packed_size + chunk_start * packed_dim);
+            }
+        }
+
+        packed_residuals_size_ = old_packed_size + new_data_size;
+        packed_residuals_capacity_ = packed_residuals_size_;
+        packed_residuals_ = std::move(new_packed);
+    } else {
+        // ColBERTSaR mode: only centroid assignment, no residuals
         constexpr u32 CHUNK_SIZE = 16384;
         const auto dist_table_chunk = std::make_unique_for_overwrite<f32[]>(CHUNK_SIZE * n_centroids_);
 
@@ -432,7 +491,6 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
             const u32 chunk_end = std::min(static_cast<u32>(chunk_start + CHUNK_SIZE), static_cast<u32>(total_embedding_num));
             const u32 chunk_count = chunk_end - chunk_start;
 
-            // Compute distances for this chunk
             matrixA_multiply_transpose_matrixB_output_to_C(embedding_data + chunk_start * embedding_dimension_,
                                                            centroids_data_.data(),
                                                            chunk_count,
@@ -440,12 +498,7 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
                                                            embedding_dimension_,
                                                            dist_table_chunk.get());
 
-            // Compute residuals for this chunk (STREAMING: only allocate chunk-sized residuals)
-            const auto chunk_residuals = std::make_unique_for_overwrite<f32[]>(chunk_count * embedding_dimension_);
-
             for (u32 i = 0; i < chunk_count; ++i) {
-                const f32 *embedding_data_ptr = embedding_data + (chunk_start + i) * embedding_dimension_;
-                f32 *output_ptr = chunk_residuals.get() + i * embedding_dimension_;
                 f32 max_neg_distance = std::numeric_limits<f32>::lowest();
                 u32 max_id = 0;
                 const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
@@ -456,27 +509,10 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
                         max_id = k;
                     }
                 }
-
                 centroid_id_assignments[chunk_start + i] = max_id;
-                const f32 *centroids_data_ptr = centroids_data_.data() + max_id * embedding_dimension_;
-                for (u32 j = 0; j < embedding_dimension_; ++j) {
-                    output_ptr[j] = embedding_data_ptr[j] - centroids_data_ptr[j];
-                }
             }
-
-            // Quantize this chunk immediately (STREAMING: quantize then release residuals memory)
-            u32 chunk_packed_dim = 0;
-            auto chunk_packed = quantizer_->Quantize(chunk_residuals.get(), chunk_count, chunk_packed_dim);
-
-            // Write new data after the old data
-            std::copy_n(chunk_packed.get(), chunk_count * chunk_packed_dim, new_packed.get() + old_packed_size + chunk_start * packed_dim);
         }
     }
-
-    // Update size and move new data to storage
-    packed_residuals_size_ = old_packed_size + new_data_size;
-    packed_residuals_capacity_ = packed_residuals_size_;
-    packed_residuals_ = std::move(new_packed);
 
     // Store centroid assignments
     // Reserve space first to avoid multiple reallocations
@@ -535,15 +571,6 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
     for (u32 len : doc_lens)
         total_embedding_num += len;
 
-    // Get expected packed dimension from quantizer
-    // Use ceiling division to match PlaidQuantizer::packed_dim() computation
-    const u32 expected_packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
-    if (packed_dim != expected_packed_dim) {
-        UnrecoverableError(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: packed_dim mismatch. Expected {}, got {}",
-                                       expected_packed_dim,
-                                       packed_dim));
-    }
-
     // Copy centroid IDs
     const size_t old_centroid_ids_size = owned_centroid_ids_.size();
     owned_centroid_ids_.reserve(old_centroid_ids_size + total_embedding_num);
@@ -551,25 +578,34 @@ void PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids(const f32 *embedding_dat
         owned_centroid_ids_.push_back(centroid_ids[i]);
     }
 
-    // Copy packed residuals
-    const size_t new_data_size = total_embedding_num * packed_dim;
-    const size_t old_packed_size = packed_residuals_size_;
+    if (!colbertsar_mode_) {
+        // PLAID mode: copy packed residuals
+        const u32 expected_packed_dim = (embedding_dimension_ * nbits_ + 7) / 8;
+        if (packed_dim != expected_packed_dim) {
+            UnrecoverableError(fmt::format("PlaidIndex::AddMultipleDocsEmbeddingsWithCentroids: packed_dim mismatch. Expected {}, got {}",
+                                           expected_packed_dim,
+                                           packed_dim));
+        }
 
-    auto old_packed = std::move(packed_residuals_);
-    packed_residuals_size_ = 0;
+        const size_t new_data_size = total_embedding_num * packed_dim;
+        const size_t old_packed_size = packed_residuals_size_;
 
-    auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
+        auto old_packed = std::move(packed_residuals_);
+        packed_residuals_size_ = 0;
 
-    if (old_packed_size > 0 && old_packed) {
-        std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
-        old_packed.reset();
+        auto new_packed = std::make_unique<u8[]>(old_packed_size + new_data_size);
+
+        if (old_packed_size > 0 && old_packed) {
+            std::copy_n(old_packed.get(), old_packed_size, new_packed.get());
+            old_packed.reset();
+        }
+
+        std::copy_n(packed_residuals, new_data_size, new_packed.get() + old_packed_size);
+
+        packed_residuals_size_ = old_packed_size + new_data_size;
+        packed_residuals_capacity_ = packed_residuals_size_;
+        packed_residuals_ = std::move(new_packed);
     }
-
-    std::copy_n(packed_residuals, new_data_size, new_packed.get() + old_packed_size);
-
-    packed_residuals_size_ = old_packed_size + new_data_size;
-    packed_residuals_capacity_ = packed_residuals_size_;
-    packed_residuals_ = std::move(new_packed);
 
     // Update IVF lists
     u64 offset = 0;
@@ -618,8 +654,8 @@ void PlaidIndex::CopyCentroidsFrom(const std::vector<f32> &centroids_data,
     centroids_data_ = centroids_data;
     centroid_norms_neg_half_ = centroid_norms_neg_half;
 
-    // Copy quantizer if provided
-    if (quantizer != nullptr) {
+    // Copy quantizer if provided (null in ColBERTSaR mode)
+    if (quantizer != nullptr && quantizer_) {
         quantizer_->CopyFrom(*quantizer);
     }
 
@@ -645,8 +681,10 @@ void PlaidIndex::ShareGlobalCentroids(std::shared_ptr<PlaidGlobalCentroids> glob
     global_centroids_ref_ = std::move(global_centroids);
     n_centroids_ = global_centroids_ref_->n_centroids();
 
-    // Copy quantizer from global centroids (still needed for dequantization)
-    quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+    // Copy quantizer from global centroids if not in ColBERTSaR mode
+    if (quantizer_) {
+        quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+    }
 
     // Resize IVF lists
     ivf_lists_.clear();
@@ -808,6 +846,19 @@ PlaidQueryResultType PlaidIndex::GetQueryResultWithBitmask(const f32 *query_ptr,
         doc_scores.emplace_back(score, doc_id);
     }
 
+    if (colbertsar_mode_) {
+        // ColBERTSaR: no residual rerank, approximate score is final
+        std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(top_k, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
+        const u32 result_count = std::min(top_k, (u32)doc_scores.size());
+        auto scores = std::make_unique<f32[]>(result_count);
+        auto ids = std::make_unique<u32[]>(result_count);
+        for (u32 i = 0; i < result_count; ++i) {
+            scores[i] = doc_scores[i].first;
+            ids[i] = doc_scores[i].second + start_segment_offset_;
+        }
+        return std::make_tuple(result_count, std::move(scores), std::move(ids));
+    }
+
     std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(n_doc_to_score, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
 
     const u32 n_to_rerank = std::min(n_full_scores, std::min(n_doc_to_score, (u32)doc_scores.size()));
@@ -920,6 +971,19 @@ PlaidQueryResultType PlaidIndex::GetQueryResultBatched(const f32 *query_ptr,
                                            n_sparse_centroids,
                                            query_embedding_num);
         doc_scores.emplace_back(score, doc_id);
+    }
+
+    if (colbertsar_mode_) {
+        // ColBERTSaR: no residual rerank, approximate score is final
+        std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(top_k, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
+        const u32 result_count = std::min(top_k, (u32)doc_scores.size());
+        auto scores = std::make_unique<f32[]>(result_count);
+        auto ids = std::make_unique<u32[]>(result_count);
+        for (u32 i = 0; i < result_count; ++i) {
+            scores[i] = doc_scores[i].first;
+            ids[i] = doc_scores[i].second + start_segment_offset_;
+        }
+        return std::make_tuple(result_count, std::move(scores), std::move(ids));
     }
 
     std::partial_sort(doc_scores.begin(), doc_scores.begin() + std::min(n_doc_to_score, (u32)doc_scores.size()), doc_scores.end(), std::greater<>());
@@ -1370,6 +1434,8 @@ void PlaidIndex::SaveIndexInner(LocalFileHandle &file_handle) const {
     std::shared_lock lock(rw_mutex_);
 
     // Header
+    const u32 format_version = colbertsar_mode_ ? 2 : 1; // 1=PLAID, 2=ColBERTSaR
+    file_handle.Append(&format_version, sizeof(format_version));
     file_handle.Append(&start_segment_offset_, sizeof(start_segment_offset_));
     file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
     file_handle.Append(&nbits_, sizeof(nbits_));
@@ -1414,17 +1480,21 @@ void PlaidIndex::SaveIndexInner(LocalFileHandle &file_handle) const {
         }
     }
 
-    // Residual codes
-    u32 packed_residuals_size_u32 = packed_residuals_size_;
-    file_handle.Append(&packed_residuals_size_u32, sizeof(packed_residuals_size_u32));
-    file_handle.Append(packed_residuals_.get(), packed_residuals_size_);
-
-    // Quantizer
-    quantizer_->Save(file_handle);
+    if (!colbertsar_mode_) {
+        // PLAID: write residual codes and quantizer
+        u32 packed_residuals_size_u32 = packed_residuals_size_;
+        file_handle.Append(&packed_residuals_size_u32, sizeof(packed_residuals_size_u32));
+        file_handle.Append(packed_residuals_.get(), packed_residuals_size_);
+        quantizer_->Save(file_handle);
+    }
 }
 
 void PlaidIndex::ReadIndexInner(LocalFileHandle &file_handle) {
     std::unique_lock lock(rw_mutex_);
+
+    // Read format version
+    u32 format_version;
+    file_handle.Read(&format_version, sizeof(format_version));
 
     // Verify header
     u32 stored_start_segment_offset, stored_embedding_dimension, stored_nbits;
@@ -1435,6 +1505,8 @@ void PlaidIndex::ReadIndexInner(LocalFileHandle &file_handle) {
     if (stored_start_segment_offset != start_segment_offset_ || stored_embedding_dimension != embedding_dimension_ || stored_nbits != nbits_) {
         UnrecoverableError("PlaidIndex::ReadIndexInner: header mismatch");
     }
+
+    colbertsar_mode_ = (format_version == 2);
 
     file_handle.Read(&n_centroids_, sizeof(n_centroids_));
     file_handle.Read(&n_docs_, sizeof(u32));
@@ -1473,22 +1545,31 @@ void PlaidIndex::ReadIndexInner(LocalFileHandle &file_handle) {
         file_handle.Read(ivf_lists_[i].data(), list_size * sizeof(u32));
     }
 
-    // Read residual codes
-    u32 packed_residuals_size_u32;
-    file_handle.Read(&packed_residuals_size_u32, sizeof(packed_residuals_size_u32));
-    packed_residuals_size_ = packed_residuals_size_u32;
-    packed_residuals_capacity_ = packed_residuals_size_;
-    packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
-    file_handle.Read(packed_residuals_.get(), packed_residuals_size_);
+    // Read residual codes (only in PLAID mode, format_version == 1)
+    if (format_version == 1) {
+        u32 packed_residuals_size_u32;
+        file_handle.Read(&packed_residuals_size_u32, sizeof(packed_residuals_size_u32));
+        packed_residuals_size_ = packed_residuals_size_u32;
+        packed_residuals_capacity_ = packed_residuals_size_;
+        packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
+        file_handle.Read(packed_residuals_.get(), packed_residuals_size_);
 
-    // Read quantizer
-    quantizer_->Load(file_handle);
+        // Read quantizer
+        if (quantizer_) {
+            quantizer_->Load(file_handle);
+        }
+    } else {
+        packed_residuals_ = nullptr;
+        packed_residuals_size_ = 0;
+        packed_residuals_capacity_ = 0;
+    }
 }
 
 size_t PlaidIndex::CalcSize() const {
     std::shared_lock lock(rw_mutex_);
     size_t size = 0;
 
+    size += sizeof(u32); // format_version
     size += sizeof(start_segment_offset_);
     size += sizeof(embedding_dimension_);
     size += sizeof(nbits_);
@@ -1514,14 +1595,16 @@ size_t PlaidIndex::CalcSize() const {
         }
     }
 
-    size += sizeof(u32) + packed_residuals_size_;
+    if (!colbertsar_mode_) {
+        size += sizeof(u32) + packed_residuals_size_;
 
-    // Quantizer size (now includes nbits_ and embedding_dim_ to match SaveToPtr format)
-    size += sizeof(u32);                                               // nbits_
-    size += sizeof(u32);                                               // embedding_dim_
-    size += sizeof(f32);                                               // avg_residual_
-    size += sizeof(u32) + (quantizer_->n_buckets() - 1) * sizeof(f32); // bucket_cutoffs (n_buckets - 1)
-    size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32);       // bucket_weights
+        // Quantizer size (now includes nbits_ and embedding_dim_ to match SaveToPtr format)
+        size += sizeof(u32);                                               // nbits_
+        size += sizeof(u32);                                               // embedding_dim_
+        size += sizeof(f32);                                               // avg_residual_
+        size += sizeof(u32) + (quantizer_->n_buckets() - 1) * sizeof(f32); // bucket_cutoffs
+        size += sizeof(u32) + quantizer_->n_buckets() * sizeof(f32);       // bucket_weights
+    }
 
     return size;
 }
@@ -1537,6 +1620,8 @@ void PlaidIndex::SaveToPtr(void *ptr, size_t &offset) const {
         offset += len;
     };
 
+    const u32 format_version = colbertsar_mode_ ? 2 : 1;
+    append(&format_version, sizeof(format_version));
     append(&start_segment_offset_, sizeof(start_segment_offset_));
     append(&embedding_dimension_, sizeof(embedding_dimension_));
     append(&nbits_, sizeof(nbits_));
@@ -1579,12 +1664,14 @@ void PlaidIndex::SaveToPtr(void *ptr, size_t &offset) const {
         }
     }
 
-    u32 packed_size = packed_residuals_size_;
-    append(&packed_size, sizeof(packed_size));
-    append(packed_residuals_.get(), packed_residuals_size_);
+    if (!colbertsar_mode_) {
+        u32 packed_size = packed_residuals_size_;
+        append(&packed_size, sizeof(packed_size));
+        append(packed_residuals_.get(), packed_residuals_size_);
 
-    // Save quantizer data
-    quantizer_->SaveToPtr(ptr, offset);
+        // Save quantizer data
+        quantizer_->SaveToPtr(ptr, offset);
+    }
 }
 
 void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
@@ -1596,6 +1683,10 @@ void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
         std::memcpy(dst, src + offset, len);
         offset += len;
     };
+
+    u32 format_version;
+    read(&format_version, sizeof(format_version));
+    colbertsar_mode_ = (format_version == 2);
 
     u32 stored_start_segment_offset, stored_embedding_dimension, stored_nbits;
     read(&stored_start_segment_offset, sizeof(stored_start_segment_offset));
@@ -1645,15 +1736,25 @@ void PlaidIndex::LoadFromPtr(void *ptr, size_t mmap_size, size_t file_size) {
         read(ivf_lists_[i].data(), list_size * sizeof(u32));
     }
 
-    u32 packed_size;
-    read(&packed_size, sizeof(packed_size));
-    packed_residuals_size_ = packed_size;
-    packed_residuals_capacity_ = packed_size;
-    packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
-    read(packed_residuals_.get(), packed_residuals_size_);
+    if (format_version == 1) {
+        // PLAID: read residual codes and quantizer
+        u32 packed_size;
+        read(&packed_size, sizeof(packed_size));
+        packed_residuals_size_ = packed_size;
+        packed_residuals_capacity_ = packed_size;
+        packed_residuals_ = std::make_unique<u8[]>(packed_residuals_size_);
+        read(packed_residuals_.get(), packed_residuals_size_);
 
-    // Load quantizer data
-    quantizer_->LoadFromPtr(ptr, offset);
+        // Load quantizer data
+        if (quantizer_) {
+            quantizer_->LoadFromPtr(ptr, offset);
+        }
+    } else {
+        // ColBERTSaR: no residuals or quantizer
+        packed_residuals_ = nullptr;
+        packed_residuals_size_ = 0;
+        packed_residuals_capacity_ = 0;
+    }
 }
 
 u32 PlaidIndex::GetDocLen(u32 doc_id) const {
@@ -1690,8 +1791,11 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
     std::vector<u32> merged_doc_lens;
     std::vector<u32> merged_doc_offsets;
     std::vector<u32> merged_centroid_ids;
-    auto merged_packed = std::make_unique<u8[]>(total_embeddings * packed_dim);
+    std::unique_ptr<u8[]> merged_packed;
     size_t merged_packed_offset = 0;
+    if (!colbertsar_mode_) {
+        merged_packed = std::make_unique<u8[]>(total_embeddings * packed_dim);
+    }
 
     merged_doc_lens.reserve(total_docs);
     merged_doc_offsets.reserve(total_docs);
@@ -1717,12 +1821,14 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
         const auto &chunk_centroid_ids = chunk->centroid_ids();
         merged_centroid_ids.insert(merged_centroid_ids.end(), chunk_centroid_ids.begin(), chunk_centroid_ids.end());
 
-        // Merge packed_residuals
-        const u8 *chunk_residuals = chunk->packed_residuals();
-        size_t chunk_residuals_size = chunk->packed_residuals_size();
-        if (chunk_residuals && chunk_residuals_size > 0) {
-            std::copy_n(chunk_residuals, chunk_residuals_size, merged_packed.get() + merged_packed_offset);
-            merged_packed_offset += chunk_residuals_size;
+        // Merge packed_residuals (PLAID mode only)
+        if (!colbertsar_mode_) {
+            const u8 *chunk_residuals = chunk->packed_residuals();
+            size_t chunk_residuals_size = chunk->packed_residuals_size();
+            if (chunk_residuals && chunk_residuals_size > 0) {
+                std::copy_n(chunk_residuals, chunk_residuals_size, merged_packed.get() + merged_packed_offset);
+                merged_packed_offset += chunk_residuals_size;
+            }
         }
 
         current_embedding_offset += chunk_embedding_num;
@@ -1749,9 +1855,11 @@ void PlaidIndex::MergeChunks(const std::vector<std::pair<u32, const PlaidIndex *
     // MergeChunks always produces owned data
     EnsureMutableCentroidIDs();
     owned_centroid_ids_ = std::move(merged_centroid_ids);
-    packed_residuals_ = std::move(merged_packed);
-    packed_residuals_size_ = total_embeddings * packed_dim;
-    packed_residuals_capacity_ = packed_residuals_size_;
+    if (!colbertsar_mode_) {
+        packed_residuals_ = std::move(merged_packed);
+        packed_residuals_size_ = total_embeddings * packed_dim;
+        packed_residuals_capacity_ = packed_residuals_size_;
+    }
     ivf_lists_ = std::move(merged_ivf_lists);
 
     LOG_INFO(fmt::format("PlaidIndex::MergeChunks: Merged successfully. Total docs: {}, embeddings: {}, IVF entries: {}",
@@ -1816,30 +1924,29 @@ void PlaidIndex::MergeOneChunk(const PlaidIndex *chunk, u32 doc_offset) {
     auto chunk_centroid_ids = chunk->centroid_ids();
     owned_centroid_ids_.insert(owned_centroid_ids_.end(), chunk_centroid_ids.begin(), chunk_centroid_ids.end());
 
-    // Extend packed_residuals_ with amortized O(1) reallocation (2x growth strategy)
-    const u8 *chunk_residuals = chunk->packed_residuals();
-    size_t chunk_residuals_size = chunk->packed_residuals_size();
-    if (chunk_residuals && chunk_residuals_size > 0) {
-        const size_t new_size = packed_residuals_size_ + chunk_residuals_size;
+    // Extend packed_residuals_ (PLAID mode only)
+    if (!colbertsar_mode_) {
+        const u8 *chunk_residuals = chunk->packed_residuals();
+        size_t chunk_residuals_size = chunk->packed_residuals_size();
+        if (chunk_residuals && chunk_residuals_size > 0) {
+            const size_t new_size = packed_residuals_size_ + chunk_residuals_size;
 
-        if (new_size <= packed_residuals_capacity_) {
-            // Existing buffer has enough capacity — just append in place
-            std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get() + packed_residuals_size_);
-        } else if (packed_residuals_ && packed_residuals_size_ > 0) {
-            // Need to grow: allocate max(new_size, capacity * 2) to amortize reallocation
-            const size_t alloc_size = std::max(new_size, packed_residuals_capacity_ * 2);
-            auto new_packed = std::make_unique<u8[]>(alloc_size);
-            std::copy_n(packed_residuals_.get(), packed_residuals_size_, new_packed.get());
-            std::copy_n(chunk_residuals, chunk_residuals_size, new_packed.get() + packed_residuals_size_);
-            packed_residuals_ = std::move(new_packed);
-            packed_residuals_capacity_ = alloc_size;
-        } else {
-            // First allocation
-            packed_residuals_ = std::make_unique<u8[]>(new_size);
-            std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get());
-            packed_residuals_capacity_ = new_size;
+            if (new_size <= packed_residuals_capacity_) {
+                std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get() + packed_residuals_size_);
+            } else if (packed_residuals_ && packed_residuals_size_ > 0) {
+                const size_t alloc_size = std::max(new_size, packed_residuals_capacity_ * 2);
+                auto new_packed = std::make_unique<u8[]>(alloc_size);
+                std::copy_n(packed_residuals_.get(), packed_residuals_size_, new_packed.get());
+                std::copy_n(chunk_residuals, chunk_residuals_size, new_packed.get() + packed_residuals_size_);
+                packed_residuals_ = std::move(new_packed);
+                packed_residuals_capacity_ = alloc_size;
+            } else {
+                packed_residuals_ = std::make_unique<u8[]>(new_size);
+                std::copy_n(chunk_residuals, chunk_residuals_size, packed_residuals_.get());
+                packed_residuals_capacity_ = new_size;
+            }
+            packed_residuals_size_ = new_size;
         }
-        packed_residuals_size_ = new_size;
     }
 
     // Update IVF lists for this chunk
@@ -2169,12 +2276,14 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
                                        total_embeddings));
     }
 
-    // Validate packed_residuals_size matches expected size
-    size_t expected_packed_size = total_embeddings * ((embedding_dimension_ * nbits_ + 7) / 8);
-    if (packed_residuals_size != expected_packed_size) {
-        UnrecoverableError(fmt::format("PlaidIndex::AcceptMergedData: packed_residuals_size {} doesn't match expected {}",
-                                       packed_residuals_size,
-                                       expected_packed_size));
+    if (!colbertsar_mode_) {
+        // Validate packed_residuals_size matches expected size
+        size_t expected_packed_size = total_embeddings * ((embedding_dimension_ * nbits_ + 7) / 8);
+        if (packed_residuals_size != expected_packed_size) {
+            UnrecoverableError(fmt::format("PlaidIndex::AcceptMergedData: packed_residuals_size {} doesn't match expected {}",
+                                           packed_residuals_size,
+                                           expected_packed_size));
+        }
     }
 
     // Move all data efficiently — AcceptMergedData always receives owned data
@@ -2182,9 +2291,11 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
     doc_lens_ = std::move(doc_lens);
     doc_offsets_ = std::move(doc_offsets);
     owned_centroid_ids_ = std::move(centroid_ids);
-    packed_residuals_ = std::move(packed_residuals);
-    packed_residuals_size_ = packed_residuals_size;
-    packed_residuals_capacity_ = packed_residuals_size_;
+    if (!colbertsar_mode_) {
+        packed_residuals_ = std::move(packed_residuals);
+        packed_residuals_size_ = packed_residuals_size;
+        packed_residuals_capacity_ = packed_residuals_size_;
+    }
     ivf_lists_ = std::move(ivf_lists);
     // AcceptMergedData receives nested ivf_lists, so clear flattened state
     ivf_data_.clear();
@@ -2205,8 +2316,10 @@ void PlaidIndex::AcceptMergedData(std::vector<u32> &&doc_lens,
         centroids_data_ = global_centroids_data;
         centroid_norms_neg_half_ = global_norms;
 
-        // Copy quantizer
-        quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+        // Copy quantizer if available
+        if (quantizer_ && global_centroids_ref_->quantizer()) {
+            quantizer_->CopyFrom(*global_centroids_ref_->quantizer());
+        }
 
         // Clear global centroids reference since we now have local copies
         // This makes the index self-contained and safe for mmap

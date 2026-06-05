@@ -31,9 +31,10 @@ public:
                const std::string &file_name,
                std::vector<std::string> column_names,
                const u32 nbits,
-               const u32 n_centroids)
+               const u32 n_centroids,
+               const bool colbertsar_mode = false)
         : IndexBase(IndexType::kPLAID, std::move(index_name), index_comment, file_name, std::move(column_names)), nbits_(nbits),
-          n_centroids_(n_centroids) {}
+          n_centroids_(n_centroids), colbertsar_mode_(colbertsar_mode) {}
 
     static std::shared_ptr<IndexBase> Make(std::shared_ptr<std::string> index_name,
                                            std::shared_ptr<std::string> index_comment,
@@ -55,8 +56,9 @@ public:
 
     nlohmann::json Serialize() const override;
 
-    const u32 nbits_ = 4;       // Quantization bits (2 or 4)
-    const u32 n_centroids_ = 0; // Number of centroids (0 = auto: sqrt(N))
+    const u32 nbits_ = 4;                // Quantization bits (2 or 4)
+    const u32 n_centroids_ = 0;          // Number of centroids (0 = auto: sqrt(N))
+    const bool colbertsar_mode_ = false; // true: residual-free ColBERTSaR mode
 };
 
 } // namespace infinity

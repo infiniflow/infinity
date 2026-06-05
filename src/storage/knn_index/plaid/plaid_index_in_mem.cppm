@@ -62,6 +62,9 @@ export class PlaidIndexInMem : public BaseMemIndex {
     // Updated after each dump to point to the next new row
     RowID current_begin_row_id_ = {};
 
+    // ColBERTSaR mode flag
+    bool colbertsar_mode_ = false;
+
     // Global centroids shared across all chunks in the segment
     // If null, will train new centroids on first build
     std::shared_ptr<PlaidGlobalCentroids> global_centroids_;
@@ -80,7 +83,12 @@ public:
                                                                             RowID begin_row_id,
                                                                             std::shared_ptr<PlaidGlobalCentroids> global_centroids);
 
-    PlaidIndexInMem(u32 nbits, u32 n_centroids, u32 embedding_dimension, RowID begin_row_id, std::shared_ptr<ColumnDef> column_def);
+    PlaidIndexInMem(u32 nbits,
+                    u32 n_centroids,
+                    u32 embedding_dimension,
+                    RowID begin_row_id,
+                    std::shared_ptr<ColumnDef> column_def,
+                    bool colbertsar_mode = false);
 
     // Constructor with global centroids
     PlaidIndexInMem(u32 nbits,
@@ -88,7 +96,8 @@ public:
                     u32 embedding_dimension,
                     RowID begin_row_id,
                     std::shared_ptr<ColumnDef> column_def,
-                    std::shared_ptr<PlaidGlobalCentroids> global_centroids);
+                    std::shared_ptr<PlaidGlobalCentroids> global_centroids,
+                    bool colbertsar_mode = false);
 
     ~PlaidIndexInMem() override;
 

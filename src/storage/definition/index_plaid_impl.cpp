@@ -52,7 +52,12 @@ void IndexPLAID::ValidateColumnDataType(const std::shared_ptr<BaseTableRef> &bas
     }
 }
 
-std::string IndexPLAID::BuildOtherParamsString() const { return fmt::format("nbits = {}, n_centroids = {}.", nbits_, n_centroids_); }
+std::string IndexPLAID::BuildOtherParamsString() const {
+    if (colbertsar_mode_) {
+        return fmt::format("colbertsar_mode = true, n_centroids = {}.", n_centroids_);
+    }
+    return fmt::format("nbits = {}, n_centroids = {}.", nbits_, n_centroids_);
+}
 
 constexpr std::array<u32, 2> acceptable_nbits = {2, 4};
 
@@ -63,6 +68,7 @@ std::shared_ptr<IndexBase> IndexPLAID::Make(std::shared_ptr<std::string> index_n
                                             const std::vector<InitParameter *> &index_param_list) {
     u32 nbits = 4;       // default: 4-bit quantization
     u32 n_centroids = 0; // default: auto (sqrt(N))
+    bool colbertsar_mode = false;
 
     for (auto para : index_param_list) {
         if (para->param_name_ == "nbits") {
@@ -79,24 +85,35 @@ std::shared_ptr<IndexBase> IndexPLAID::Make(std::shared_ptr<std::string> index_n
                 RecoverableError(status);
             }
             n_centroids = u32(val);
+        } else if (para->param_name_ == "colbertsar_mode") {
+            const std::string val = para->param_value_;
+            if (val == "true" || val == "1") {
+                colbertsar_mode = true;
+            } else if (val == "false" || val == "0") {
+                colbertsar_mode = false;
+            } else {
+                Status status = Status::InvalidIndexParam("colbertsar_mode must be 'true' or 'false'");
+                RecoverableError(status);
+            }
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
             RecoverableError(status);
         }
     }
 
-    if (std::find(acceptable_nbits.begin(), acceptable_nbits.end(), nbits) == acceptable_nbits.end()) {
+    if (!colbertsar_mode && std::find(acceptable_nbits.begin(), acceptable_nbits.end(), nbits) == acceptable_nbits.end()) {
         Status status = Status::InvalidIndexParam("nbits must be 2 or 4");
         RecoverableError(status);
     }
 
-    return std::make_shared<IndexPLAID>(index_name, index_comment, file_name, std::move(column_names), nbits, n_centroids);
+    return std::make_shared<IndexPLAID>(index_name, index_comment, file_name, std::move(column_names), nbits, n_centroids, colbertsar_mode);
 }
 
 i32 IndexPLAID::GetSizeInBytes() const {
     size_t size = IndexBase::GetSizeInBytes();
     size += sizeof(nbits_);
     size += sizeof(n_centroids_);
+    size += sizeof(colbertsar_mode_);
     return size;
 }
 
@@ -104,6 +121,7 @@ void IndexPLAID::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
     WriteBufAdv(ptr, nbits_);
     WriteBufAdv(ptr, n_centroids_);
+    WriteBufAdv(ptr, colbertsar_mode_);
 }
 
 std::string IndexPLAID::ToString() const {
@@ -116,6 +134,7 @@ nlohmann::json IndexPLAID::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
     res["nbits"] = nbits_;
     res["n_centroids"] = n_centroids_;
+    res["colbertsar_mode"] = colbertsar_mode_;
     return res;
 }
 

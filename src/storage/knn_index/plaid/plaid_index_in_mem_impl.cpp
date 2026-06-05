@@ -38,8 +38,14 @@ std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMem(const std::
     const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
     const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
     const u32 embedding_dimension = embedding_info->Dimension();
-    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMem: embedding_dimension={}", embedding_dimension));
-    return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_, index_plaid->n_centroids_, embedding_dimension, begin_row_id, column_def);
+    const bool colbertsar_mode = index_plaid->colbertsar_mode_;
+    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMem: embedding_dimension={}, colbertsar_mode={}", embedding_dimension, colbertsar_mode));
+    return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_,
+                                             index_plaid->n_centroids_,
+                                             embedding_dimension,
+                                             begin_row_id,
+                                             column_def,
+                                             colbertsar_mode);
 }
 
 std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMemWithCentroids(const std::shared_ptr<IndexBase> &index_base,
@@ -49,24 +55,28 @@ std::shared_ptr<PlaidIndexInMem> PlaidIndexInMem::NewPlaidIndexInMemWithCentroid
     const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
     const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def->type()->type_info().get());
     const u32 embedding_dimension = embedding_info->Dimension();
-    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMemWithCentroids: embedding_dimension={}, has_centroids={}",
+    const bool colbertsar_mode = index_plaid->colbertsar_mode_;
+    LOG_INFO(fmt::format("PlaidIndexInMem::NewPlaidIndexInMemWithCentroids: embedding_dimension={}, has_centroids={}, colbertsar_mode={}",
                          embedding_dimension,
-                         global_centroids != nullptr));
+                         global_centroids != nullptr,
+                         colbertsar_mode));
     return std::make_shared<PlaidIndexInMem>(index_plaid->nbits_,
                                              index_plaid->n_centroids_,
                                              embedding_dimension,
                                              begin_row_id,
                                              column_def,
-                                             std::move(global_centroids));
+                                             std::move(global_centroids),
+                                             colbertsar_mode);
 }
 
 PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
                                  const u32 n_centroids,
                                  const u32 embedding_dimension,
                                  const RowID begin_row_id,
-                                 std::shared_ptr<ColumnDef> column_def)
+                                 std::shared_ptr<ColumnDef> column_def,
+                                 const bool colbertsar_mode)
     : nbits_(nbits), requested_n_centroids_(n_centroids), embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id),
-      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id) {
+      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id), colbertsar_mode_(colbertsar_mode) {
     // Threshold for building index: at least enough for k-means
     build_index_threshold_ = std::max(256u, n_centroids * 32);
     // Incremental threshold: smaller batch for frequent updates
@@ -78,9 +88,11 @@ PlaidIndexInMem::PlaidIndexInMem(const u32 nbits,
                                  const u32 embedding_dimension,
                                  const RowID begin_row_id,
                                  std::shared_ptr<ColumnDef> column_def,
-                                 std::shared_ptr<PlaidGlobalCentroids> global_centroids)
+                                 std::shared_ptr<PlaidGlobalCentroids> global_centroids,
+                                 const bool colbertsar_mode)
     : nbits_(nbits), requested_n_centroids_(n_centroids), embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id),
-      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id), global_centroids_(std::move(global_centroids)) {
+      column_def_(std::move(column_def)), current_begin_row_id_(begin_row_id), colbertsar_mode_(colbertsar_mode),
+      global_centroids_(std::move(global_centroids)) {
     // Threshold for building index: at least enough for k-means
     build_index_threshold_ = std::max(256u, n_centroids * 32);
     // Incremental threshold: smaller batch for frequent updates
@@ -221,7 +233,7 @@ bool PlaidIndexInMem::BuildIndexFromScratch() {
     const auto time_0 = std::chrono::high_resolution_clock::now();
 
     // Create and train global centroids first
-    global_centroids_ = std::make_shared<PlaidGlobalCentroids>(local_embedding_dim, local_nbits);
+    global_centroids_ = std::make_shared<PlaidGlobalCentroids>(local_embedding_dim, local_nbits, colbertsar_mode_);
     global_centroids_->Train(n_centroids, all_embeddings.get(), local_embedding_count, 4);
 
     const auto time_1 = std::chrono::high_resolution_clock::now();
@@ -229,7 +241,7 @@ bool PlaidIndexInMem::BuildIndexFromScratch() {
     LOG_INFO(fmt::format("PlaidIndexInMem::BuildIndexFromScratch: Training took {} ms", train_ms));
 
     // Create index with global centroids
-    auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids);
+    auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids, colbertsar_mode_);
 
     // Copy centroids and quantizer from global_centroids_ to the index
     temp_index->CopyCentroidsFrom(global_centroids_->centroids_data(),
@@ -316,18 +328,16 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     auto centroid_ids = std::make_unique<u32[]>(local_embedding_count);
     global_centroids_->FindNearestCentroids(all_embeddings.get(), local_embedding_count, centroid_ids.get());
 
-    // Compute residuals and quantize in-place to save memory
-    // Instead of allocating a separate residuals array, we reuse all_embeddings
-    global_centroids_->ComputeResiduals(all_embeddings.get(), local_embedding_count, centroid_ids.get(), all_embeddings.get());
-
-    // Quantize residuals (now stored in all_embeddings) using global quantizer
+    std::unique_ptr<u8[]> packed_residuals;
     u32 packed_dim = 0;
-    auto packed_residuals = global_centroids_->quantizer()->Quantize(all_embeddings.get(), local_embedding_count, packed_dim);
+
+    if (!colbertsar_mode_) {
+        // PLAID: Compute residuals and quantize in-place
+        global_centroids_->ComputeResiduals(all_embeddings.get(), local_embedding_count, centroid_ids.get(), all_embeddings.get());
+        packed_residuals = global_centroids_->quantizer()->Quantize(all_embeddings.get(), local_embedding_count, packed_dim);
+    }
 
     // Release all_embeddings early to free memory
-    // Note: all_embeddings is no longer needed after quantization.
-    // AddMultipleDocsEmbeddingsWithCentroids uses pre-computed centroid_ids and packed_residuals,
-    // not the raw embedding_data parameter (which is unused in that code path).
     all_embeddings.reset();
 
     const auto time_3 = std::chrono::high_resolution_clock::now();
@@ -335,12 +345,12 @@ bool PlaidIndexInMem::BuildIndexWithGlobalCentroids() {
     // Create or update PlaidIndex
     if (!is_built_.test() || plaid_index_ == nullptr) {
         // Create new index
-        auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids);
+        auto temp_index = std::make_unique<PlaidIndex>(local_start_segment_offset, local_embedding_dim, local_nbits, n_centroids, colbertsar_mode_);
 
         // Share global centroids (avoids copying, saves memory)
         temp_index->ShareGlobalCentroids(global_centroids_);
 
-        // Add documents with pre-computed centroid IDs and packed residuals
+        // Add documents with pre-computed centroid IDs and (optionally) packed residuals
         temp_index->AddMultipleDocsEmbeddingsWithCentroids(nullptr, local_doc_lens, centroid_ids.get(), packed_residuals.get(), packed_dim);
 
         // Re-acquire lock

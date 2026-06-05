@@ -29,8 +29,9 @@ import std.compat;
 
 namespace infinity {
 
-PlaidGlobalCentroids::PlaidGlobalCentroids(const u32 embedding_dimension, const u32 nbits)
-    : embedding_dimension_(embedding_dimension), nbits_(nbits), quantizer_(std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)) {}
+PlaidGlobalCentroids::PlaidGlobalCentroids(const u32 embedding_dimension, const u32 nbits, const bool colbertsar_mode)
+    : embedding_dimension_(embedding_dimension), nbits_(nbits),
+      quantizer_(colbertsar_mode ? nullptr : std::make_unique<PlaidQuantizer>(nbits, embedding_dimension)) {}
 
 PlaidGlobalCentroids::~PlaidGlobalCentroids() = default;
 
@@ -123,6 +124,12 @@ void PlaidGlobalCentroids::Train(const u32 n_centroids, const f32 *embedding_dat
     ComputeCentroidNorms();
 
     LOG_INFO(fmt::format("PlaidGlobalCentroids::Train: Trained {} centroids from {} samples", n_centroids_, training_num));
+
+    if (quantizer_ == nullptr) {
+        // ColBERTSaR mode: skip quantizer training
+        LOG_INFO("PlaidGlobalCentroids::Train: ColBERTSaR mode, skipping quantizer training.");
+        return;
+    }
 
     // Sample residuals for quantizer training
     constexpr u64 MAX_SAMPLE_FOR_QUANTIZER = 50000;
@@ -325,8 +332,10 @@ void PlaidGlobalCentroids::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
     file_handle.Append(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
 
-    // Quantizer
-    quantizer_->Save(file_handle);
+    // Quantizer (not saved in ColBERTSaR mode)
+    if (quantizer_) {
+        quantizer_->Save(file_handle);
+    }
 }
 
 void PlaidGlobalCentroids::Load(LocalFileHandle &file_handle) {
@@ -349,8 +358,10 @@ void PlaidGlobalCentroids::Load(LocalFileHandle &file_handle) {
     file_handle.Read(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
     file_handle.Read(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
 
-    // Read quantizer
-    quantizer_->Load(file_handle);
+    // Read quantizer (not saved in ColBERTSaR mode)
+    if (quantizer_) {
+        quantizer_->Load(file_handle);
+    }
 }
 
 size_t PlaidGlobalCentroids::MemUsage() const {
@@ -359,7 +370,9 @@ size_t PlaidGlobalCentroids::MemUsage() const {
     size_t size = sizeof(PlaidGlobalCentroids);
     size += centroids_data_.size() * sizeof(f32);
     size += centroid_norms_neg_half_.size() * sizeof(f32);
-    size += quantizer_->MemUsage();
+    if (quantizer_) {
+        size += quantizer_->MemUsage();
+    }
 
     return size;
 }

@@ -37,10 +37,16 @@ using PlaidQueryResultType = std::tuple<u32, std::unique_ptr<f32[]>, std::unique
 export class PlaidIndex {
 public:
     // Constructor for memory-based index
-    PlaidIndex(u32 start_segment_offset, u32 embedding_dimension, u32 nbits, u32 n_centroids = 0);
+    PlaidIndex(u32 start_segment_offset, u32 embedding_dimension, u32 nbits, u32 n_centroids = 0, bool colbertsar_mode = false);
 
     // Constructor for mmap-based index
-    PlaidIndex(u32 start_segment_offset, u32 embedding_dimension, u32 nbits, u32 n_centroids, void *mmap_addr, size_t mmap_size);
+    PlaidIndex(u32 start_segment_offset,
+               u32 embedding_dimension,
+               u32 nbits,
+               u32 n_centroids,
+               void *mmap_addr,
+               size_t mmap_size,
+               bool colbertsar_mode = false);
 
     ~PlaidIndex();
 
@@ -110,6 +116,7 @@ public:
     u32 GetNCentroids() const { return n_centroids_; }
     u32 GetEmbeddingDimension() const { return embedding_dimension_; }
     bool IsMmap() const { return is_mmap_; }
+    bool IsColBERTSaRMode() const { return colbertsar_mode_; }
 
     // Access centroids (for global centroids sharing)
     const std::vector<f32> &centroids_data() const { return global_centroids_ref_ ? global_centroids_ref_->centroids_data() : centroids_data_; }
@@ -233,6 +240,9 @@ public:
 
     // Quantizer
     std::unique_ptr<PlaidQuantizer> quantizer_;
+
+    // ColBERTSaR mode (residual-free)
+    bool colbertsar_mode_ = false;
 
     // Mmap support
     void *mmap_addr_ = nullptr;
