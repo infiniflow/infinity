@@ -514,13 +514,14 @@ void PlaidIndex::AddMultipleDocsEmbeddings(const f32 *embedding_data, const std:
                                                            dist_table_chunk.get());
 
             for (u32 i = 0; i < chunk_count; ++i) {
-                f32 max_neg_distance = std::numeric_limits<f32>::lowest();
+                f32 max_dot = std::numeric_limits<f32>::lowest();
                 u32 max_id = 0;
                 const f32 *dist_ptr = dist_table_chunk.get() + i * n_centroids_;
 
                 for (u32 k = 0; k < n_centroids_; ++k) {
-                    if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
-                        max_neg_distance = neg_distance;
+                    // ColBERTSaR: pure dot product (no L2 norm correction)
+                    if (dist_ptr[k] > max_dot) {
+                        max_dot = dist_ptr[k];
                         max_id = k;
                     }
                 }
@@ -1041,12 +1042,15 @@ std::unique_ptr<f32[]> PlaidIndex::ComputeQueryCentroidScores(const f32 *query_p
     const auto &norms = centroid_norms_neg_half();
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr, centroids.data(), n_query_tokens, n_centroids_, embedding_dimension_, sc);
 
-    // Add centroid_norms_neg_half for L2 distance computation
-    for (u32 i = 0; i < n_query_tokens; ++i) {
-        for (u32 j = 0; j < n_centroids_; ++j) {
-            sc[i * n_centroids_ + j] += norms[j];
+    if (!colbertsar_mode_) {
+        // PLAID: add centroid_norms_neg_half for L2 distance computation
+        for (u32 i = 0; i < n_query_tokens; ++i) {
+            for (u32 j = 0; j < n_centroids_; ++j) {
+                sc[i * n_centroids_ + j] += norms[j];
+            }
         }
     }
+    // ColBERTSaR: use pure dot product scores (no L2 norm correction)
 
     return scores;
 }
@@ -1143,8 +1147,8 @@ void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
         std::mt19937 gen_epoch(rd());
         std::shuffle(indices.begin(), indices.end(), gen_epoch);
 
-        f32 epoch_loss = 0.0f;
-        u32 n_batches = 0;
+        f64 epoch_loss = 0.0; // Use double for stable accumulation
+        u64 epoch_samples = 0;
 
         // Process data in mini-batches
         for (u64 offset = 0; offset < embedding_num; offset += batch_size) {
@@ -1192,21 +1196,29 @@ void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
             matrixA_multiply_transpose_matrixB_output_to_C(batch.get(), batch.get(), cur_batch, cur_batch, dim, qd.get());
 
             // 5. diff = qc - qd  [cur_batch, cur_batch]
-            //    Compute loss = mean_i(||diff[i,:]||) = mean_i(sqrt(sum_j diff[i][j]²))
+            //    Loss = mean_i(||diff[i,:]||)  where ||·|| is L2 norm
+            //    d(loss)/d(A_j) = mean_i(diff[i][j] * Q_i / N_i)   where N_i = ||diff[i,:]||
+            //    See: d/dx sqrt(sum x²) = x / sqrt(sum x²)
+            //    Store normalized diff^T: diff_T[j][i] = diff[i][j] / N_i
             f32 batch_loss = 0.0f;
-            auto diff_T = std::make_unique<f32[]>(cur_batch * cur_batch); // Stored as [cur_batch, cur_batch] but as diff^T layout
+            auto diff_T = std::make_unique<f32[]>(cur_batch * cur_batch);
             for (u32 i = 0; i < cur_batch; ++i) {
                 f32 norm_sq = 0.0f;
                 for (u32 j = 0; j < cur_batch; ++j) {
                     const f32 d = qc[i * cur_batch + j] - qd[i * cur_batch + j];
-                    // Store in diff^T layout: diff_T[j][i] = diff[i][j]
-                    diff_T[j * cur_batch + i] = d;
+                    diff_T[j * cur_batch + i] = d; // temporary, will normalize
                     norm_sq += d * d;
                 }
-                batch_loss += std::sqrt(norm_sq);
+                const f32 norm_i = std::sqrt(norm_sq);
+                batch_loss += norm_i;
+                // Normalize: gradient factor = 1/N_i, with epsilon for numerical stability
+                const f32 inv_norm = (norm_i > 1e-12f) ? (1.0f / norm_i) : 0.0f;
+                for (u32 j = 0; j < cur_batch; ++j) {
+                    diff_T[j * cur_batch + i] *= inv_norm;
+                }
             }
-            epoch_loss += batch_loss;
-            ++n_batches;
+            epoch_loss += static_cast<f64>(batch_loss);
+            epoch_samples += cur_batch;
 
             // 6. Compute gradient: grad_contrib = diff_T @ Q  [cur_batch, dim]
             //    diff_T is [cur_batch, cur_batch], Q = batch is [cur_batch, dim]
@@ -1232,8 +1244,9 @@ void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
             auto grad_contrib = std::make_unique<f32[]>(cur_batch * dim);
             matrixA_multiply_transpose_matrixB_output_to_C(diff_T.get(), batch_T.get(), cur_batch, dim, cur_batch, grad_contrib.get());
 
-            // Scale: 2/(Nq * B) where Nq = B = cur_batch (in-batch mode)
-            const f32 scale = 2.0f / (static_cast<f32>(cur_batch) * static_cast<f32>(cur_batch));
+            // Gradient scale: 1/Nq for mean over queries (Nq = cur_batch in in-batch mode)
+            // The diff is already divided by N_i in step 5, so only the 1/Nq factor remains
+            const f32 scale = 1.0f / static_cast<f32>(cur_batch);
 
             // 7. Scatter-add gradients to centroids
             for (u32 j = 0; j < cur_batch; ++j) {
@@ -1256,7 +1269,9 @@ void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
             centroid_norms_neg_half_[k] = -0.5f * L2NormSquare<f32, f32, u32>(centroids_data_.data() + k * dim, dim);
         }
 
-        const f32 avg_loss = (n_batches > 0) ? epoch_loss / static_cast<f32>(n_batches) : 0.0f;
+        // epoch_loss = sum over all queries of ||diff_i|| across all batches
+        // avg_loss = mean_i(||diff_i||) = epoch_loss / epoch_samples
+        const f32 avg_loss = (epoch_samples > 0) ? static_cast<f32>(epoch_loss / static_cast<f64>(epoch_samples)) : 0.0f;
         LOG_TRACE(fmt::format("TrainQueryAwareCentroids: Epoch {}/{} avg_loss={:.6f}", epoch + 1, n_epochs, avg_loss));
     }
 
@@ -1304,10 +1319,12 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
                                                        embedding_dimension_,
                                                        batch_scores.get());
 
-        // Add centroid_norms_neg_half for L2 distance computation
-        for (u32 i = 0; i < n_query_tokens; ++i) {
-            for (u32 j = 0; j < current_batch_size; ++j) {
-                batch_scores[i * current_batch_size + j] += norms[batch_start + j];
+        // Add centroid_norms_neg_half for L2 distance computation (PLAID only)
+        if (!colbertsar_mode_) {
+            for (u32 i = 0; i < n_query_tokens; ++i) {
+                for (u32 j = 0; j < current_batch_size; ++j) {
+                    batch_scores[i * current_batch_size + j] += norms[batch_start + j];
+                }
             }
         }
 
@@ -1396,11 +1413,15 @@ void PlaidIndex::BatchedIVFProbe(const f32 *query_ptr,
                                                        embedding_dimension_,
                                                        sparse_batch_scores.get());
 
-        // Add norms and store
+        // Add norms and store (PLAID only adds centroid norms; ColBERTSaR uses pure dot product)
         for (u32 q = 0; q < n_query_tokens; ++q) {
             for (u32 i = 0; i < current_batch; ++i) {
                 const u32 cid = probed_centroids[batch_start + i];
-                sparse_centroid_scores[(batch_start + i) * n_query_tokens + q] = sparse_batch_scores[q * current_batch + i] + norms[cid];
+                f32 val = sparse_batch_scores[q * current_batch + i];
+                if (!colbertsar_mode_) {
+                    val += norms[cid];
+                }
+                sparse_centroid_scores[(batch_start + i) * n_query_tokens + q] = val;
             }
         }
     }
