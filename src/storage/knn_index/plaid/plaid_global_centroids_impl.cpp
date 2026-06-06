@@ -327,13 +327,15 @@ void PlaidGlobalCentroids::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(&embedding_dimension_, sizeof(embedding_dimension_));
     file_handle.Append(&nbits_, sizeof(nbits_));
     file_handle.Append(&n_centroids_, sizeof(n_centroids_));
+    const bool has_quantizer = (quantizer_ != nullptr);
+    file_handle.Append(&has_quantizer, sizeof(has_quantizer));
 
     // Centroids data
     file_handle.Append(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
     file_handle.Append(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
 
     // Quantizer (not saved in ColBERTSaR mode)
-    if (quantizer_) {
+    if (has_quantizer) {
         quantizer_->Save(file_handle);
     }
 }
@@ -351,6 +353,8 @@ void PlaidGlobalCentroids::Load(LocalFileHandle &file_handle) {
     }
 
     file_handle.Read(&n_centroids_, sizeof(n_centroids_));
+    bool has_quantizer = false;
+    file_handle.Read(&has_quantizer, sizeof(has_quantizer));
 
     // Read centroids data
     centroids_data_.resize(n_centroids_ * embedding_dimension_);
@@ -358,8 +362,11 @@ void PlaidGlobalCentroids::Load(LocalFileHandle &file_handle) {
     file_handle.Read(centroids_data_.data(), centroids_data_.size() * sizeof(f32));
     file_handle.Read(centroid_norms_neg_half_.data(), centroid_norms_neg_half_.size() * sizeof(f32));
 
-    // Read quantizer (not saved in ColBERTSaR mode)
-    if (quantizer_) {
+    // Read quantizer (driven by file marker, not by instance state)
+    if (has_quantizer) {
+        if (!quantizer_) {
+            UnrecoverableError("PlaidGlobalCentroids::Load: file has quantizer but instance was created without one");
+        }
         quantizer_->Load(file_handle);
     }
 }

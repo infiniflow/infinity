@@ -434,7 +434,7 @@ TEST_F(PlaidIndexColBERTSaRTest, test_colbertsar_basic_search) {
     EXPECT_LE(result_count, top_k);
     if (result_count > 0) {
         for (u32 i = 0; i < result_count; ++i) {
-            EXPECT_LT(ids[i], n_docs_ + index.GetNCentroids()); // ids are offset by start_segment_offset (0)
+            EXPECT_LT(ids[i], n_docs_);
             EXPECT_TRUE(std::isfinite(scores[i]));
         }
     }

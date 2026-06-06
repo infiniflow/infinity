@@ -1141,11 +1141,13 @@ void PlaidIndex::TrainQueryAwareCentroids(const u32 n_centroids,
     // Gradient accumulation buffer for centroids (one per batch)
     auto grad_accum = std::make_unique<f32[]>(K * dim);
 
+    // Single RNG for all epochs (avoid recreating per iteration)
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
     for (u32 epoch = 0; epoch < n_epochs; ++epoch) {
         // Shuffle indices for this epoch
-        std::random_device rd;
-        std::mt19937 gen_epoch(rd());
-        std::shuffle(indices.begin(), indices.end(), gen_epoch);
+        std::shuffle(indices.begin(), indices.end(), gen);
 
         f64 epoch_loss = 0.0; // Use double for stable accumulation
         u64 epoch_samples = 0;
