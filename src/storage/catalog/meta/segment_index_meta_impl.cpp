@@ -434,9 +434,10 @@ Status SegmentIndexMeta::LoadPlaidGlobalCentroids() {
     // Get nbits from index base
     const auto *index_plaid = static_cast<const IndexPLAID *>(index_base.get());
     const u32 nbits = index_plaid->nbits_;
+    const bool colbertsar_mode = index_plaid->colbertsar_mode_;
 
     // Create and load centroids
-    plaid_global_centroids_ = std::make_shared<PlaidGlobalCentroids>(embedding_dimension, nbits);
+    plaid_global_centroids_ = std::make_shared<PlaidGlobalCentroids>(embedding_dimension, nbits, colbertsar_mode);
 
     auto [file_handle, status] = VirtualStore::Open(centroids_file, FileAccessMode::kRead);
     if (!status.ok()) {

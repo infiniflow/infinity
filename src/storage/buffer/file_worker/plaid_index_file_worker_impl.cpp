@@ -58,8 +58,9 @@ void PlaidIndexFileWorker::AllocateInMemory() {
     const auto *index_plaid = static_cast<IndexPLAID *>(index_base_.get());
     const auto nbits = index_plaid->nbits_;
     const auto n_centroids = index_plaid->n_centroids_;
+    const auto colbertsar_mode = index_plaid->colbertsar_mode_;
     // Allocate PlaidIndex object directly (like EMVB)
-    data_ = static_cast<void *>(new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids));
+    data_ = static_cast<void *>(new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids, colbertsar_mode));
 }
 
 void PlaidIndexFileWorker::FreeInMemory() {
@@ -98,7 +99,8 @@ void PlaidIndexFileWorker::ReadFromFileImpl(size_t file_size, bool from_spill) {
     const auto *index_plaid = static_cast<IndexPLAID *>(index_base_.get());
     const auto nbits = index_plaid->nbits_;
     const auto n_centroids = index_plaid->n_centroids_;
-    auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids);
+    const auto colbertsar_mode = index_plaid->colbertsar_mode_;
+    auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids, colbertsar_mode);
     data_ = static_cast<void *>(index);
     index->ReadIndexInner(*file_handle_);
 }
@@ -112,10 +114,12 @@ bool PlaidIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
     }
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();
 
-    // Read header from the mmap data (first 4 fields: start_segment_offset, embedding_dimension, nbits, n_centroids)
+    // Read header from the mmap data (format_version + 4 fields)
     const char *src = static_cast<const char *>(ptr);
-    u32 stored_start_segment_offset, stored_embedding_dimension, stored_nbits, stored_n_centroids;
+    u32 format_version, stored_start_segment_offset, stored_embedding_dimension, stored_nbits, stored_n_centroids;
     size_t offset = 0;
+    std::memcpy(&format_version, src + offset, sizeof(format_version));
+    offset += sizeof(format_version);
     std::memcpy(&stored_start_segment_offset, src + offset, sizeof(stored_start_segment_offset));
     offset += sizeof(stored_start_segment_offset);
     std::memcpy(&stored_embedding_dimension, src + offset, sizeof(stored_embedding_dimension));
@@ -143,7 +147,8 @@ bool PlaidIndexFileWorker::ReadFromMmapImpl(const void *ptr, size_t size) {
         stored_n_centroids));
 
     // Allocate PlaidIndex object with correct nbits from file
-    auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids);
+    const bool colbertsar_mode = (format_version == 2);
+    auto *index = new PlaidIndex(start_segment_offset_, column_embedding_dim, nbits, n_centroids, colbertsar_mode);
 
     LOG_INFO(fmt::format("PlaidIndexFileWorker::ReadFromMmapImpl: Created PlaidIndex with nbits={}, n_centroids={}", nbits, n_centroids));
 

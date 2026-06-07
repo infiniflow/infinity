@@ -31,7 +31,7 @@ class LocalFileHandle;
 // 3. Low memory footprint (chunks share centroids)
 export class PlaidGlobalCentroids {
 public:
-    PlaidGlobalCentroids(u32 embedding_dimension, u32 nbits);
+    PlaidGlobalCentroids(u32 embedding_dimension, u32 nbits, bool colbertsar_mode = false);
     ~PlaidGlobalCentroids();
 
     // Disable copy
