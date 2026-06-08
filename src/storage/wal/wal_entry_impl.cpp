@@ -450,13 +450,6 @@ std::shared_ptr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             cmd = std::make_shared<WalCmdDeleteV2>(db_name, db_id, table_name, table_id, row_ids);
             break;
         }
-        case WalCommandType::CHECKPOINT: {
-            i64 max_commit_ts = ReadBufAdv<i64>(ptr);
-            std::string catalog_path = ReadBufAdv<std::string>(ptr);
-            std::string catalog_name = ReadBufAdv<std::string>(ptr);
-            cmd = std::make_shared<WalCmdCheckpoint>(max_commit_ts, catalog_path, catalog_name);
-            break;
-        }
         case WalCommandType::CHECKPOINT_V2: {
             i64 max_commit_ts = ReadBufAdv<i64>(ptr);
             cmd = std::make_shared<WalCmdCheckpointV2>(max_commit_ts);
@@ -876,11 +869,6 @@ bool WalCmdDeleteV2::operator==(const WalCmd &other) const {
     return true;
 }
 
-bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
-    return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
-}
-
 bool WalCmdCheckpointV2::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpointV2 *>(&other);
     return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_;
@@ -1075,10 +1063,6 @@ i32 WalCmdAppendV2::GetSizeInBytes() const {
 i32 WalCmdDeleteV2::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_id_.size() + sizeof(i32) + this->table_name_.size() +
            sizeof(i32) + this->table_id_.size() + sizeof(i32) + row_ids_.size() * sizeof(RowID);
-}
-
-i32 WalCmdCheckpoint::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(max_commit_ts_) + sizeof(i32) + catalog_path_.size() + sizeof(i32) + catalog_name_.size();
 }
 
 i32 WalCmdCheckpointV2::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(max_commit_ts_); }
@@ -1372,14 +1356,6 @@ void WalCmdDeleteV2::WriteAdv(char *&buf) const {
     }
 }
 
-void WalCmdCheckpoint::WriteAdv(char *&buf) const {
-    assert(!std::filesystem::path(catalog_path_).is_absolute());
-    WriteBufAdv(buf, WalCommandType::CHECKPOINT);
-    WriteBufAdv(buf, this->max_commit_ts_);
-    WriteBufAdv(buf, this->catalog_path_);
-    WriteBufAdv(buf, this->catalog_name_);
-}
-
 void WalCmdCheckpointV2::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CHECKPOINT_V2);
     WriteBufAdv(buf, this->max_commit_ts_);
@@ -1607,14 +1583,6 @@ std::string WalCmdDeleteV2::ToString() const {
                        row_ids_.size());
 }
 
-std::string WalCmdCheckpoint::ToString() const {
-    std::stringstream ss;
-    ss << "Checkpoint: " << std::endl;
-    ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
-    ss << "max commit ts: " << max_commit_ts_ << std::endl;
-    return std::move(ss).str();
-}
-
 std::string WalCmdCheckpointV2::ToString() const {
     std::stringstream ss;
     ss << "Checkpoint: " << std::endl;
@@ -1822,13 +1790,6 @@ std::string WalCmdDeleteV2::CompactInfo() const {
                        table_name_,
                        table_id_,
                        row_ids_.size());
-}
-
-std::string WalCmdCheckpoint::CompactInfo() const {
-    return fmt::format("{}: path: {}, max_commit_ts: {},",
-                       WalCmd::WalCommandTypeToString(GetType()),
-                       fmt::format("{}/{}", catalog_path_, catalog_name_),
-                       max_commit_ts_);
 }
 
 std::string WalCmdCheckpointV2::CompactInfo() const {
@@ -2113,11 +2074,6 @@ std::vector<std::shared_ptr<EraseBaseCache>> WalCmdDeleteV2::ToCachedMeta(TxnTim
     return cache_items;
 }
 
-std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCheckpoint::ToCachedMeta(TxnTimeStamp commit_ts) const {
-    UnrecoverableError("WalCmdDummy::ToCachedMeta, unexpected");
-    return {};
-}
-
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCheckpointV2::ToCachedMeta(TxnTimeStamp commit_ts) const { return {}; }
 
 std::vector<std::shared_ptr<EraseBaseCache>> WalCmdCompactV2::ToCachedMeta(TxnTimeStamp commit_ts) const {
@@ -2306,22 +2262,6 @@ std::shared_ptr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
     return entry;
 }
 
-bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&last_checkpoint_cmd) const {
-    TxnTimeStamp max_commit_ts = 0;
-    bool found = false;
-    for (auto &cmd : cmds_) {
-        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-            auto checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
-            if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
-                max_commit_ts = checkpoint_cmd->max_commit_ts_;
-                last_checkpoint_cmd = checkpoint_cmd;
-                found = true;
-            }
-        }
-    }
-    return found;
-}
-
 bool WalEntry::IsCheckPoint(WalCmdCheckpointV2 *&last_checkpoint_cmd) const {
     TxnTimeStamp max_commit_ts = 0;
     bool found = false;
@@ -2331,25 +2271,6 @@ bool WalEntry::IsCheckPoint(WalCmdCheckpointV2 *&last_checkpoint_cmd) const {
             if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 last_checkpoint_cmd = checkpoint_cmd;
-                found = true;
-            }
-        }
-    }
-    return found;
-}
-
-bool WalEntry::IsCheckPoint(WalCmd *&cmd) const {
-    TxnTimeStamp max_commit_ts = 0;
-    bool found = false;
-    for (auto &command : cmds_) {
-        if (command->GetType() == WalCommandType::CLEANUP) {
-            LOG_INFO("CLEANUP command found");
-        }
-        if (command->GetType() == WalCommandType::CHECKPOINT_V2) {
-            auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(command.get());
-            if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
-                max_commit_ts = checkpoint_cmd->max_commit_ts_;
-                cmd = command.get();
                 found = true;
             }
         }
@@ -2445,9 +2366,6 @@ std::string WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::DELETE_V2:
             command = "DELETE_V2";
-            break;
-        case WalCommandType::CHECKPOINT:
-            command = "CHECKPOINT";
             break;
         case WalCommandType::CHECKPOINT_V2:
             command = "CHECKPOINT_V2";
@@ -2606,7 +2524,7 @@ void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint(const std::vector<std
         while (iter_->HasNext()) {
             auto entry = iter_->Next();
             if (entry.get() != nullptr) {
-                WalCmdCheckpoint *checkpoint_cmd = nullptr;
+                WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
                 if (entry->IsCheckPoint(checkpoint_cmd)) {
                     found_checkpoint = true;
                 }

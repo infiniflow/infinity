@@ -70,7 +70,6 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // Flush
     // -----------------------------
-    CHECKPOINT = 99,
     CHECKPOINT_V2 = 104,
     COMPACT_V2 = 105,
 
@@ -499,27 +498,6 @@ export struct WalCmdDeleteV2 final : public WalCmd {
     std::vector<RowID> row_ids_{};
 };
 
-export struct WalCmdCheckpoint final : public WalCmd {
-    WalCmdCheckpoint(i64 max_commit_ts, const std::string &catalog_path, const std::string &catalog_name)
-        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), catalog_path_(catalog_path), catalog_name_(catalog_name) {
-        assert(!std::filesystem::path(catalog_path_).is_absolute());
-    }
-
-    ~WalCmdCheckpoint() override = default;
-
-    virtual bool operator==(const WalCmd &other) const final;
-    virtual i32 GetSizeInBytes() const final;
-    void WriteAdv(char *&buf) const final;
-
-    [[nodiscard]] std::string ToString() const final;
-    [[nodiscard]] std::string CompactInfo() const final;
-    std::vector<std::shared_ptr<EraseBaseCache>> ToCachedMeta(TxnTimeStamp commit_ts) const final;
-
-    i64 max_commit_ts_{};
-    std::string catalog_path_{};
-    std::string catalog_name_{};
-};
-
 export struct WalCmdCheckpointV2 final : public WalCmd {
     WalCmdCheckpointV2(i64 max_commit_ts) : WalCmd(WalCommandType::CHECKPOINT_V2), max_commit_ts_(max_commit_ts) {}
 
@@ -936,9 +914,7 @@ export struct WalEntry : WalEntryHeader {
     std::vector<std::shared_ptr<WalCmd>> cmds_{};
 
     // Return if the entry is a checkpoint.
-    [[nodiscard]] bool IsCheckPoint(WalCmdCheckpoint *&checkpoint_cmd) const;
     [[nodiscard]] bool IsCheckPoint(WalCmdCheckpointV2 *&checkpoint_cmd) const;
-    [[nodiscard]] bool IsCheckPoint(WalCmd *&checkpoint_cmd) const;
 
     // Return if the entry is either a checkpoint or create snapshot (returns base WalCmd pointer)
     [[nodiscard]] bool IsCheckPointOrSnapshot(WalCmd *&cmd) const;
