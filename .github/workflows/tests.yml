@@ -107,26 +107,10 @@ jobs:
       - name: Push image to Docker Hub
         run: docker push infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }}
 
-      - name: Push as latest
-        if: github.event_name == 'push'
-        run: |
-          docker image tag infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }} infiniflow/${{ matrix.target }}:latest
-          docker push infiniflow/${{ matrix.target }}:latest
-
-      - name: Cleanup pr-* image
-        if: github.event_name == 'push'
-        run: |
-          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST https://hub.docker.com/v2/users/login/ -d "{\"username\": \"infiniflow\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" | jq -r .token)
-          TAGS=$(curl -s -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${{ matrix.target }}/tags/?page_size=100" | jq -r '.results[].name | select(startswith(\"pr-\"))')
-          for TAG in $TAGS; do
-            echo "Deleting tag: $TAG"
-            curl -s -X DELETE -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${{ matrix.target }}/tags/$TAG/"
-          done
-
   code_static_check:
     name: code_static_check
     needs: [ check_builder_changes, build_and_push_builder ]
-    if: always() && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')))
+    if: always() && needs.build_and_push_builder.result != 'failure' && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')))
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -2712,5 +2696,27 @@ jobs:
       - release_arm64_minio_parallel_test
     if: always()
     steps:
-      - name: Cleanup
-        run: echo "Workflow cleanup. Just a placeholder now."
+      - name: Cleanup old pr-* image tags
+        if: github.event_name == 'push' && needs.check_builder_changes.outputs.changed == 'true'
+        run: |
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST https://hub.docker.com/v2/users/login/ -d "{\"username\": \"infiniflow\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" | jq -r .token)
+          for TARGET in infinity-x64-arm64-builder infinity-x64-x64-v1-builder infinity-x64-x64-v2-builder infinity-x64-x64-v3-builder infinity-x64-x64-v4-builder; do
+            TAGS=$(curl -s -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/?page_size=100" | jq -r '.results[].name | select(startswith("pr-"))')
+            for TAG in $TAGS; do
+              echo "Deleting tag: ${TARGET}:$TAG"
+              curl -s -X DELETE -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/$TAG/"
+            done
+          done
+
+      - name: Delete failed PR image tags
+        if: github.event_name == 'pull_request' && needs.build_and_push_builder.result == 'failure' && needs.check_builder_changes.outputs.changed == 'true'
+        run: |
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST https://hub.docker.com/v2/users/login/ -d "{\"username\": \"infiniflow\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" | jq -r .token)
+          TAG="pr-${{ github.event.pull_request.number }}"
+          for TARGET in infinity-x64-arm64-builder infinity-x64-x64-v1-builder infinity-x64-x64-v2-builder infinity-x64-x64-v3-builder infinity-x64-x64-v4-builder; do
+            echo "Deleting failed tag: ${TARGET}:$TAG"
+            curl -s -X DELETE -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/$TAG/" || true
+          done
+
+      - name: Workflow done
+        run: echo "Workflow cleanup complete."
