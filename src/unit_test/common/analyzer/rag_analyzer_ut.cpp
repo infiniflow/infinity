@@ -271,12 +271,13 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
         if (line.empty())
             continue;
 
-        TermList term_list;
-        analyzer_->Analyze(line, term_list);
+        std::string coarse = analyzer_->Tokenize(line);
+        std::vector<std::string> term_list;
+        analyzer_->FineGrainedTokenize(coarse, term_list);
 
         std::string fine_grained_tokens =
-            std::accumulate(term_list.begin(), term_list.end(), std::string(""), [](const std::string &a, const Term &b) {
-                return a + (a.empty() ? "" : " ") + b.text_;
+            std::accumulate(term_list.begin(), term_list.end(), std::string(""), [](const std::string &a, const std::string &b) {
+                return a + (a.empty() ? "" : " ") + b;
             });
 
         std::cout << "Input text: " << std::endl << line << std::endl;
@@ -291,9 +292,8 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_consistency_with_python) {
         bool is_match = true;
         if (is_size_match) {
             for (size_t i = 0; i < term_list.size(); ++i) {
-                if (term_list[i].text_ != python_tokenize_result[i]) {
-                    std::cout << "MISMATCH at " << i << ": C++='" << term_list[i].text_ << "' Python='" << python_tokenize_result[i] << "'"
-                              << std::endl;
+                if (term_list[i] != python_tokenize_result[i]) {
+                    std::cout << "MISMATCH at " << i << ": C++='" << term_list[i] << "' Python='" << python_tokenize_result[i] << "'" << std::endl;
                     is_match = false;
                     break;
                 }
@@ -337,4 +337,59 @@ TEST_F(RAGAnalyzerTest, test_set_language_dutch) {
 
     EXPECT_TRUE(cxx_result.find("huiz") != std::string::npos);
     EXPECT_EQ(cxx_result, python_result);
+}
+
+TEST_F(RAGAnalyzerTest, test_chinese_stopword_filter) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+
+    // IsStopword is a static predicate over the canonical set.
+    EXPECT_TRUE(RAGAnalyzer::IsStopword("的"));
+    EXPECT_TRUE(RAGAnalyzer::IsStopword("是"));
+    EXPECT_TRUE(RAGAnalyzer::IsStopword("了"));
+    EXPECT_TRUE(RAGAnalyzer::IsStopword("什么"));
+    EXPECT_TRUE(RAGAnalyzer::IsStopword("怎么"));
+    EXPECT_FALSE(RAGAnalyzer::IsStopword("贡献"));
+    EXPECT_FALSE(RAGAnalyzer::IsStopword("最大"));
+    EXPECT_FALSE(RAGAnalyzer::IsStopword("谁"));
+
+    const std::string query = "谁的贡献最大";
+
+    // Path A: position disabled.
+    analyzer_->SetEnablePosition(false);
+    analyzer_->SetFineGrained(false);
+    {
+        TermList terms;
+        analyzer_->Analyze(query, terms);
+        std::cout << "[no-pos] ";
+        for (const auto &t : terms)
+            std::cout << "[" << t.text_ << "] ";
+        std::cout << std::endl;
+        for (const auto &t : terms) {
+            EXPECT_NE(t.text_, "的") << "Analyzer must drop 的 from token stream";
+        }
+    }
+
+    // Path B: position enabled (highlighter path).
+    analyzer_->SetEnablePosition(true);
+    {
+        TermList terms;
+        analyzer_->Analyze(query, terms);
+        std::cout << "[with-pos] ";
+        for (const auto &t : terms)
+            std::cout << "[" << t.text_ << "@" << t.word_offset_ << "," << t.end_offset_ << "] ";
+        std::cout << std::endl;
+        for (const auto &t : terms) {
+            EXPECT_NE(t.text_, "的") << "Position-enabled path must also drop 的";
+        }
+    }
+
+    // Path C: the raw Tokenize() string-level API is unaffected by the filter —
+    // stopword filtering lives at the AnalyzeImpl boundary so direct tokenizer
+    // callers (and unit tests of the tokenizer itself) see the unfiltered stream.
+    analyzer_->SetEnablePosition(false);
+    std::string raw = analyzer_->Tokenize(query);
+    std::cout << "[raw Tokenize] " << raw << std::endl;
+    EXPECT_NE(raw.find("的"), std::string::npos) << "Raw Tokenize() must still emit 的 (filter is only at AnalyzeImpl boundary)";
 }

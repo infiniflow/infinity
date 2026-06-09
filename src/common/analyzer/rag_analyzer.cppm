@@ -52,6 +52,11 @@ public:
 
     void SetEnablePosition(bool enable_position) { enable_position_ = enable_position; }
 
+    // True if the term is in the canonical RAGFlow Chinese stopword set
+    // (see rag/nlp/term_weight.py Dealer.stop_words). AnalyzeImpl drops
+    // these terms from the emitted token stream.
+    static bool IsStopword(const std::string &term);
+
     std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> TokenizeWithPosition(const std::string &line);
     std::string Tokenize(const std::string &line);
 
