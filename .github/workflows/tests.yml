@@ -98,11 +98,14 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: infiniflow
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build ${{ matrix.target }} image
         run: docker build -f ./scripts/Dockerfile_infinity_builder_ubuntu22 --target ${{ matrix.target }} -t infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }} .
-
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username infiniflow --password-stdin
 
       - name: Push image to Docker Hub
         run: docker push infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }}
