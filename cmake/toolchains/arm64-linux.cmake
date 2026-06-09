@@ -23,8 +23,3 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 set(CMAKE_EXE_LINKER_FLAGS_INIT "--gcc-toolchain=$ENV{GCC_TOOLCHAIN} -fuse-ld=lld-20")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "--gcc-toolchain=$ENV{GCC_TOOLCHAIN} -fuse-ld=lld-20")
 
-# CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY prevents check_library_exists
-# from actually linking, so it falsely detects libraries like libsocket.
-# Pre-set these to avoid false positives:
-set(HAVE_LIBSOCKET CACHE INTERNAL "0")
-

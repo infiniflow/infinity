@@ -21,9 +21,9 @@ RUN apt-get update \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-fast -y update \
     && apt-fast install -y \
-    git curl zip unzip build-essential \
-    autoconf automake pkg-config autoconf-archive \
-    postgresql-client perl flex bison \
+    git curl zip unzip build-essential pkg-config \
+    autoconf automake autoconf-archive libtool \
+    postgresql-client flex bison \
     && mkdir infinity_download && cd infinity_download \
     && printf '%s\n' \
     'https://github.com/Kitware/CMake/releases/download/v4.2.5/cmake-4.2.5-linux-x86_64.tar.gz' \
