@@ -22,13 +22,12 @@ target_link_libraries(
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
         thrift::thrift
         # thriftnb::thriftnb
-        ${STDCXX15EXP_STATIC}
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
@@ -51,6 +50,7 @@ target_link_libraries(
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
+        libstdc++exp.a
 )
 
 # add_definitions(-march=native)

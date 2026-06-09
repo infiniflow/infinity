@@ -11,7 +11,7 @@ target_link_libraries(infinity_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -42,7 +42,7 @@ target_link_libraries(infinity_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -68,7 +68,7 @@ target_link_libraries(knn_import_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -99,7 +99,7 @@ target_link_libraries(knn_import_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -123,7 +123,7 @@ target_link_libraries(knn_query_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -154,7 +154,7 @@ target_link_libraries(knn_query_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -179,7 +179,7 @@ target_link_libraries(fulltext_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -210,7 +210,7 @@ target_link_libraries(fulltext_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -233,7 +233,7 @@ target_link_libraries(sparse_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -260,7 +260,7 @@ target_link_libraries(sparse_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -282,7 +282,7 @@ target_link_libraries(bmp_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -313,7 +313,7 @@ target_link_libraries(bmp_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -335,7 +335,7 @@ target_link_libraries(hnsw_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -366,7 +366,7 @@ target_link_libraries(hnsw_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
