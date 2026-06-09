@@ -67,7 +67,7 @@ jobs:
           fi
 
   build_and_push_builder:
-    name: build_and_push_${{ matrix.target }}
+    name: ${{ matrix.target }}
     needs: check_builder_changes
     if: needs.check_builder_changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
