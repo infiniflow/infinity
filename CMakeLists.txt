@@ -118,7 +118,7 @@ find_package(roaring CONFIG REQUIRED)
 find_package(RocksDB CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-find_package(tomlplusplus CONFIG REQUIRED)
+# find_package(tomlplusplus CONFIG REQUIRED)
 #find_package(turbobase64 CONFIG REQUIRED)
 find_package(Thrift CONFIG REQUIRED)
 #find_package(unofficial-curlpp CONFIG REQUIRED) # for s3

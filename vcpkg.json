@@ -33,7 +33,6 @@
     "simdjson",
     "spdlog",
     "thrift",
-    "tomlplusplus",
     "zlib",
     "zstd",
     {

@@ -17,11 +17,12 @@ export module infinity_core:aggregate_utils;
 import :column_vector;
 import :aggregate_expression;
 import :data_block;
+import :parallel_hashmap;
 
 import std;
+
 import internal_types;
 import data_type;
-import third_party;
 
 namespace infinity {
 

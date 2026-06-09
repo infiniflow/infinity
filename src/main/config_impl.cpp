@@ -23,6 +23,7 @@ import :logger;
 import :infinity_exception;
 import :boost;
 import :utility;
+import :tomlplusplus;
 
 import std;
 

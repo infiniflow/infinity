@@ -21,6 +21,7 @@ import :term;
 import :analyzer;
 import :common_analyzer;
 import :status;
+import :parallel_hashmap;
 
 import third_party;
 

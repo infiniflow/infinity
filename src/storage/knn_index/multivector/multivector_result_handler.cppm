@@ -15,8 +15,7 @@
 export module infinity_core:multivector_result_handler;
 
 import :infinity_exception;
-
-import third_party;
+import :parallel_hashmap;
 
 import internal_types;
 

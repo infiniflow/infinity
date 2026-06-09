@@ -697,4 +697,6 @@ export import :fixed_dimensional_encoding;
 export import :rcu_multimap;
 export import :meta_cache;
 export import :infinity_type;
+export import :tomlplusplus;
+export import :parallel_hashmap;
 export import third_party;
