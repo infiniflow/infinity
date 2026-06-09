@@ -22,6 +22,7 @@ import :sparse_util;
 import :local_file_handle;
 import :bmp_util;
 import :knn_result_handler;
+import :simd_common_tools;
 
 import std;
 
@@ -48,8 +49,8 @@ public:
     }
 
     void Prefetch() const {
-        _mm_prefetch((const char *)block_ids_.data(), _MM_HINT_T0);
-        _mm_prefetch((const char *)max_scores_.data(), _MM_HINT_T0);
+        simd_prefetch<_MM_HINT_T0>((const char *)block_ids_.data());
+        simd_prefetch<_MM_HINT_T0>((const char *)max_scores_.data());
     }
 
     size_t GetSizeInBytes() const { return sizeof(size_t) + block_ids_.size() * sizeof(BMPBlockID) + max_scores_.size() * sizeof(DataType); }
@@ -139,8 +140,8 @@ public:
         : block_size_(block_size), block_ids_(block_ids), max_scores_(max_scores) {}
 
     void Prefetch() const {
-        _mm_prefetch((const char *)block_ids_, _MM_HINT_T0);
-        _mm_prefetch((const char *)max_scores_, _MM_HINT_T0);
+        simd_prefetch<_MM_HINT_T0>((const char *)block_ids_);
+        simd_prefetch<_MM_HINT_T0>((const char *)max_scores_);
     }
 
     static std::tuple<const size_t *, const BMPBlockID *, const DataType *> ReadFromPtr(const char *&p, size_t posting_num) {
@@ -177,7 +178,7 @@ public:
         max_scores_[block_id] = max_score;
     }
 
-    void Prefetch() const { _mm_prefetch((const char *)max_scores_.data(), _MM_HINT_T0); }
+    void Prefetch() const { simd_prefetch<_MM_HINT_T0>((const char *)max_scores_.data()); }
 
     size_t GetSizeInBytes() const { return sizeof(size_t) + max_scores_.size() * sizeof(DataType); }
 
@@ -244,7 +245,7 @@ struct BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse> {
 public:
     BlockData(size_t block_size, const DataType *max_scores) : block_size_(block_size), max_scores_(max_scores) {}
 
-    void Prefetch() const { _mm_prefetch((const char *)max_scores_, _MM_HINT_T0); }
+    void Prefetch() const { simd_prefetch<_MM_HINT_T0>((const char *)max_scores_); }
 
     static std::tuple<const size_t *, const DataType *> ReadFromPtr(const char *&p, size_t posting_num) {
         const size_t *block_data_prefix_sum = ReadBufVecAdvAligned<size_t>(p, posting_num + 1);
@@ -480,8 +481,8 @@ public:
     }
 
     void Prefetch(size_t term_id) const {
-        _mm_prefetch((const char *)(block_ids_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0);
-        _mm_prefetch((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0);
+        simd_prefetch<_MM_HINT_T0>((const char *)(block_ids_ + this->block_data_prefix_sum_[term_id]));
+        simd_prefetch<_MM_HINT_T0>((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id]));
     }
 
     static BMPIvt ReadFromPtr(const char *&p) {
@@ -510,7 +511,7 @@ public:
         return BlockPostings<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>(kth, kth_score, BlockData(block_data_size, max_scores));
     }
 
-    void Prefetch(size_t term_id) const { _mm_prefetch((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0); }
+    void Prefetch(size_t term_id) const { simd_prefetch<_MM_HINT_T0>((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id])); }
 
     static BMPIvt ReadFromPtr(const char *&p) {
         BMPIvt ret{};

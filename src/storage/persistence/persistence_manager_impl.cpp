@@ -52,7 +52,7 @@ void ObjAddr::Deserialize(std::string_view obj_str) {
     simdjson::padded_string obj_json(obj_str);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(obj_json);
-    obj_key_ = doc["obj_key"].get<std::string>();
+    obj_key_ = doc["obj_key"].get<std::string_view>().value();
     part_offset_ = doc["part_offset"].get<size_t>();
     part_size_ = doc["part_size"].get<size_t>();
 }

@@ -16,6 +16,7 @@ export module infinity_core:kv_store;
 
 import :status;
 
+import std;
 import third_party;
 
 namespace infinity {

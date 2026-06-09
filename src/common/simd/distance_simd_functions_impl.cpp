@@ -129,7 +129,7 @@ f32 HammingDistance_sse2(const u8 *x, const u8 *y, size_t d) {
 #endif // defined (__SSE2__)
 
 #if defined(__AVX2__)
-inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, size_t) {
+f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, size_t) {
     __m256 diff_1 = _mm256_sub_ps(_mm256_loadu_ps(vector1), _mm256_loadu_ps(vector2));
     __m256 diff_2 = _mm256_sub_ps(_mm256_loadu_ps(vector1 + 8), _mm256_loadu_ps(vector2 + 8));
     __m256 diff_3 = _mm256_sub_ps(_mm256_loadu_ps(vector1 + 16), _mm256_loadu_ps(vector2 + 16));
@@ -174,7 +174,7 @@ inline f32 L2Distance_avx2_128(const f32 *vector1, const f32 *vector2, size_t) {
     return hsum256_ps_avx(sum);
 }
 
-inline f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, const size_t dimension) {
+f32 L2Distance_avx2_16_multi(const f32 *vector1, const f32 *vector2, const size_t dimension) {
     if (dimension < 16) [[unlikely]] {
         return L2Distance_common(vector1, vector2, dimension);
     }

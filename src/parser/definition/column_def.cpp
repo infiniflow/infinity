@@ -254,7 +254,7 @@ std::shared_ptr<ColumnDef> ColumnDef::FromJson(std::string_view col_def_str) {
 
     auto column_type = DataType::Deserialize(doc["column_type"].raw_json());
     int64_t column_id = doc["column_id"].get<int64_t>();
-    std::string column_name = doc["column_name"].get<std::string>();
+    auto column_name = static_cast<std::string>(doc["column_name"].get<std::string_view>().value());
 
     std::set<ConstraintType> constraints;
     if (simdjson::array constraints_json; doc["constraints"].get(constraints_json) == simdjson::SUCCESS) {
@@ -265,8 +265,8 @@ std::shared_ptr<ColumnDef> ColumnDef::FromJson(std::string_view col_def_str) {
     }
 
     std::string column_comment;
-    if (std::string column_comment_json; doc["column_comment"].get<std::string>(column_comment_json) == simdjson::SUCCESS) {
-        column_comment = column_comment_json;
+    if (std::string_view column_comment_view; doc["column_comment"].get<std::string_view>(column_comment_view) == simdjson::SUCCESS) {
+        column_comment = column_comment_view;
     }
 
     std::shared_ptr<ParsedExpr> default_expr = nullptr;

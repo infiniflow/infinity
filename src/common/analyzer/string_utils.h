@@ -19,10 +19,7 @@
 #include <simde/x86/sse4.1.h>
 #endif
 
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <string>
+import std.compat;
 
 namespace infinity {
 

@@ -1,7 +1,5 @@
 module;
 
-#include <stdexcept>
-
 export module infinity_core:quick_sort_set;
 
 import :lexeme;

@@ -526,7 +526,7 @@ std::shared_ptr<MetaTree> MetaTree::MakeMetaTree(const std::vector<std::shared_p
                 simdjson::padded_string json(pm_path_key->value_);
                 simdjson::parser parser;
                 simdjson::document doc = parser.iterate(json);
-                std::string object_key = doc["obj_key"].get<std::string>();
+                std::string object_key(doc["obj_key"].get<std::string_view>().value());
                 if (object_key == "KEY_EMPTY") {
                     continue;
                 }

@@ -14,13 +14,8 @@
 
 module;
 
+#include "common/simd/simd_common_intrin_include.h"
 #include <cassert>
-
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <xmmintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/sse.h>
-#endif
 
 export module infinity_core:pq_flash_index;
 
@@ -28,6 +23,7 @@ import :logger;
 import :index_base;
 import :local_file_handle;
 import :status;
+import :simd_common_tools;
 import :infinity_exception;
 import :diskann_dist_func;
 import :diskann_utils;
@@ -312,7 +308,7 @@ public:
 
         // pointers to buffers for data
         VectorDataType *data_buf = query_scratch->coord_scratch_;
-        _mm_prefetch((char *)(data_buf), _MM_HINT_T1);
+        simd_prefetch<_MM_HINT_T1>((char *)(data_buf));
 
         // sector scratch
         char *sector_scratch = query_scratch->sector_scratch_;

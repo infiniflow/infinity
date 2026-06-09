@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "sql_parser.h"
-#include <iostream>
+import std;
 
 class test {
 public:

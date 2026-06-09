@@ -26,6 +26,13 @@ using U8MaskPtr = const u32 (*)[8];
 
 export U8MaskPtr GetU8MasksForAVX2();
 
+// Unified prefetch wrapper to resolve ambiguity with __builtin_prefetch across module boundaries
+// hint must be a compile-time constant (0-3): _MM_HINT_T0=3, _MM_HINT_T1=2, _MM_HINT_T2=1, _MM_HINT_NTA=0
+export template <int hint = 3>
+void simd_prefetch(const void *addr) {
+    __builtin_prefetch(addr, 0, hint);
+}
+
 #ifdef __SSE__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export float hsum_ps_sse1(__m128 v) {                            // v = [ D C | B A ]

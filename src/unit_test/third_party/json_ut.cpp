@@ -16,8 +16,6 @@ module;
 
 #include "unit_test/gtest_expand.h"
 
-// import <gtest/gtest.h>;
-
 module infinity_core:ut.json;
 
 import :ut.base_test;
@@ -65,7 +63,7 @@ TEST_F(JsonTest, simdjson_test) {
                     break;
                 }
                 case simdjson::json_type::string: {
-                    std::string res = doc.get<std::string>();
+                    std::string res{doc.get<std::string_view>().value()};
                     std::cout << res << std::endl;
                     break;
                 }
