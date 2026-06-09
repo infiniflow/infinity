@@ -200,8 +200,8 @@ jobs:
 
   debug_amd64_build:
     name: debug_amd64_build
-    needs: [ check_builder_changes, build_and_push_builder ]
-    if: always()
+    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
+    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -934,8 +934,8 @@ jobs:
 
   release_amd64_build:
     name: release_amd64_build
-    needs: [ check_builder_changes, build_and_push_builder ]
-    if: always()
+    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
+    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -1516,8 +1516,8 @@ jobs:
 
   debug_arm64_build:
     name: debug_arm64_build
-    needs: [ check_builder_changes, build_and_push_builder ]
-    if: always()
+    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
+    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -1985,8 +1985,8 @@ jobs:
 
   release_arm64_build:
     name: release_arm64_build
-    needs: [ check_builder_changes, build_and_push_builder ]
-    if: always()
+    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
+    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -2560,8 +2560,9 @@ jobs:
   # ============================================
   reldeb_amd64_benchmark_prepare:
     name: reldeb_amd64_benchmark_prepare
+    needs: code_static_check
+    if: always() && needs.code_static_check.result == 'success'
     runs-on: [ "self-hosted", "infinity-build" ]
-    # needs: code_static_check
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}

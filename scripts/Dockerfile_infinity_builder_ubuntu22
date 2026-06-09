@@ -2,7 +2,6 @@ FROM ubuntu:22.04 AS infinity-x64-builder-base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_ROOT=/opt/vcpkg
 SHELL ["/bin/bash", "-c"]
-COPY nltk_data /root/nltk_data
 COPY vcpkg.json /tmp
 COPY cmake /infinity/cmake
 COPY ports /infinity/ports
@@ -34,6 +33,9 @@ RUN apt-get update \
     'https://download.docker.com/linux/static/stable/x86_64/docker-29.5.2.tgz' \
     'https://astral.sh/uv/install.sh' \
     'https://apt.llvm.org/llvm.sh' \
+    'https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip' \
+    'https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip' \
+    'https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt_tab.zip' \
     > downloads.txt  \
     && aria2c -j 16 --min-split-size 1M -i downloads.txt \
     && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 && apt-fast install -y clang-format-20 clang-tidy-20 \
@@ -54,7 +56,11 @@ RUN apt-get update \
     && tar xzf docker-29.5.2.tgz \
     && cp docker/* /usr/bin \
     && chmod +x uv-installer.sh && ./uv-installer.sh \
-    && cd .. && rm -rf infinity_download
+    && mkdir -p /root/nltk_data/corpora /root/nltk_data/tokenizers \
+    && unzip wordnet.zip -d /root/nltk_data/corpora \
+    && unzip punkt.zip -d /root/nltk_data/tokenizers \
+    && unzip punkt_tab.zip -d /root/nltk_data/tokenizers \
+    && cd .. && rm -rf infinity_download \
 
 FROM infinity-x64-builder-base AS infinity-x64-x64-builder-base
 RUN aria2c -j 16 --min-split-size 1M https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz \
