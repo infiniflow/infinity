@@ -79,10 +79,10 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(X86_64 TRUE)
 endif ()
 
-#if(ARM64)
-#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
-#endif ()
+if(ARM64)
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSIMDE_ENABLE_NATIVE_ALIASES")
+endif ()
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 
@@ -289,8 +289,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)
-
 option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
 
 if (IS_CI_TEST_PIPELINE)
@@ -328,7 +326,6 @@ else ()
 endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-find_package(Python3 COMPONENTS Development)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)

@@ -21,17 +21,9 @@ RUN apt-get update \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-fast -y update \
     && apt-fast install -y \
-    git make curl vim file gettext \
-    libssl-dev unzip bzip2 libtool m4 tree \
-    autoconf automake pkg-config autoconf-archive libtool \
-    gnupg2 lsb-release \
-    build-essential zlib1g-dev libncurses5-dev libgdbm-dev \
-    libnss3-dev libreadline-dev libffi-dev libsqlite3-dev \
-    libbz2-dev libexpat1-dev liblzma-dev tk-dev uuid-dev \
-    postgresql-client graphviz sudo bridge-utils iptables \
-    libpcap-dev libpcre3-dev \
-    perl flex bison binutils zip rpm iproute2 \
-    python3.11-dev \
+    git curl zip unzip build-essential \
+    autoconf automake pkg-config autoconf-archive \
+    postgresql-client perl flex bison \
     && mkdir infinity_download && cd infinity_download \
     && printf '%s\n' \
     'https://github.com/Kitware/CMake/releases/download/v4.2.5/cmake-4.2.5-linux-x86_64.tar.gz' \
@@ -44,7 +36,7 @@ RUN apt-get update \
     'https://apt.llvm.org/llvm.sh' \
     > downloads.txt  \
     && aria2c -j 16 --min-split-size 1M -i downloads.txt \
-    && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 \
+    && chmod +x llvm.sh && sed -i 's|apt-get|apt-fast|g' llvm.sh && ./llvm.sh 20 && apt-fast install -y clang-format-20 clang-tidy-20 \
     && apt-get clean && apt-fast clean \
     && rm -rf /var/lib/apt/lists/* \
     && tar xf cmake-4.2.5-linux-x86_64.tar.gz \
@@ -62,8 +54,7 @@ RUN apt-get update \
     && tar xzf docker-29.5.2.tgz \
     && cp docker/* /usr/bin \
     && chmod +x uv-installer.sh && ./uv-installer.sh \
-    && cd .. && rm -rf infinity_download \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 311
+    && cd .. && rm -rf infinity_download
 
 FROM infinity-x64-builder-base AS infinity-x64-x64-builder-base
 RUN aria2c -j 16 --min-split-size 1M https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz \
