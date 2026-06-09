@@ -187,11 +187,11 @@ std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnT
             }
             LOG_INFO(wal_entry->ToString());
 
-            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
                 max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
-                catalog_dir = std::filesystem::path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                catalog_dir = std::filesystem::path(fmt::format("{}/{}", catalog_path, "catalog_name")).parent_path().string();
                 break;
             }
             log_entries.push_back(wal_entry);
@@ -629,12 +629,9 @@ std::tuple<TransactionID, TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntri
             }
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmd *cmd = nullptr;
-            if (wal_entry->IsCheckPoint(cmd)) {
-                if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
-                    auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
-                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
-                }
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 last_commit_ts = wal_entry->commit_ts_;
                 max_transaction_id = wal_entry->txn_id_;
                 break;
@@ -774,13 +771,10 @@ std::vector<std::shared_ptr<WalEntry>> WalManager::CollectWalEntries() const {
 
             LOG_TRACE(wal_entry->ToString());
 
-            WalCmd *cmd = nullptr;
             wal_entries.push_back(wal_entry);
-            if (wal_entry->IsCheckPoint(cmd)) {
-                if (cmd->GetType() == WalCommandType::CHECKPOINT_V2) {
-                    auto checkpoint_cmd = static_cast<WalCmdCheckpointV2 *>(cmd);
-                    max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
-                }
+            WalCmdCheckpointV2 *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
                 system_start_ts = wal_entry->commit_ts_;
                 break;
             }
