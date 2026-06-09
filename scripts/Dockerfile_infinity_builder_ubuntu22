@@ -60,7 +60,7 @@ RUN apt-get update \
     && unzip wordnet.zip -d /root/nltk_data/corpora \
     && unzip punkt.zip -d /root/nltk_data/tokenizers \
     && unzip punkt_tab.zip -d /root/nltk_data/tokenizers \
-    && cd .. && rm -rf infinity_download \
+    && cd .. && rm -rf infinity_download
 
 FROM infinity-x64-builder-base AS infinity-x64-x64-builder-base
 RUN aria2c -j 16 --min-split-size 1M https://github.com/tttapa/toolchains/releases/latest/download/x-tools-x86_64-focal-linux-gnu-gcc15.tar.xz \
