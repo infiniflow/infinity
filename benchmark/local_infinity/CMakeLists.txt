@@ -51,6 +51,7 @@ target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 # knn
@@ -108,6 +109,7 @@ target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_p
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -163,6 +165,7 @@ target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_pa
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 # fulltext
@@ -219,6 +222,7 @@ target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -269,6 +273,7 @@ target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 add_executable(bmp_benchmark
         ./sparse/bmp_benchmark.cpp
@@ -322,6 +327,7 @@ target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/mi
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 add_executable(hnsw_benchmark
         ./knn/hnsw_benchmark.cpp
@@ -375,6 +381,7 @@ target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/m
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

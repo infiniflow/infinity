@@ -13,6 +13,7 @@ target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 target_link_libraries(
         remote_query_benchmark
