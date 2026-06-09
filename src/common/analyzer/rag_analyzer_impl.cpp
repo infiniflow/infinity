@@ -2445,6 +2445,8 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         for (size_t i = 0; i < tokens.size(); ++i) {
             if (tokens[i].empty())
                 continue;
+            if (IsStopword(tokens[i]))
+                continue;
             const auto &[start_pos, end_pos] = positions[i];
             func(data, tokens[i].c_str(), tokens[i].size(), start_pos, end_pos, false, 0);
         }
@@ -2460,10 +2462,22 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         for (auto &t : tokens) {
             if (t.empty())
                 continue;
+            if (IsStopword(t))
+                continue;
             func(data, t.c_str(), t.size(), offset++, 0, false, 0);
         }
     }
     return 0;
+}
+
+bool RAGAnalyzer::IsStopword(const std::string &term) {
+    // Mirrors rag/nlp/term_weight.py Dealer.stop_words in RAGFlow.
+    // Kept hard-coded (not loaded from a resource file) for parity with RAGFlow.
+    static const std::unordered_set<std::string> kStopwords = {
+        "请问", "您", "你", "我", "他", "是", "的", "就", "有", "于",   "及",   "即",   "在",   "为", "最",
+        "从",   "以", "了", "将", "与", "吗", "吧", "中", "#",  "什么", "怎么", "哪个", "哪些", "啥", "相关",
+    };
+    return kStopwords.find(term) != kStopwords.end();
 }
 
 } // namespace infinity
