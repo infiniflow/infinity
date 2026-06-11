@@ -22,7 +22,6 @@ permissions:
   actions: read
   checks: write
   statuses: write
-  packages: write
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -30,112 +29,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_builder_changes:
-    name: check_builder_changes
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.check.outputs.changed }}
-      image_tag: ${{ steps.check.outputs.image_tag }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-
-      - name: Check if Dockerfile changed
-        id: check
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            IMAGE_TAG="latest"
-          else
-            BASE_SHA="${{ github.event.before }}"
-            HEAD_SHA="${{ github.event.after }}"
-            IMAGE_TAG="latest"
-          fi
-          if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
-            BASE_SHA=$(git rev-list --max-parents=0 HEAD)
-          fi
-          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -q 'scripts/Dockerfile_infinity_builder_ubuntu22'; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "image_tag=latest" >> $GITHUB_OUTPUT
-          fi
-
-  build_and_push_builder:
-    name: ${{ matrix.target }}
-    needs: check_builder_changes
-    if: needs.check_builder_changes.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - infinity-x64-arm64-builder
-          - infinity-x64-x64-v1-builder
-          - infinity-x64-x64-v2-builder
-          - infinity-x64-x64-v3-builder
-          - infinity-x64-x64-v4-builder
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Login to Docker Hub
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          username: infiniflow
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build ${{ matrix.target }} image
-        run: |
-          GITHUB_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
-          docker build \
-            --build-arg GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
-            --build-arg GITHUB_OWNER="${GITHUB_OWNER}" \
-            -f ./scripts/Dockerfile_infinity_builder_ubuntu22 \
-            --target ${{ matrix.target }} \
-            -t infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }} .
-
-      - name: Push image to Docker Hub
-        if: github.event_name == 'push'
-        run: docker push infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }}
-
   code_static_check:
     name: code_static_check
-    needs: [ check_builder_changes, build_and_push_builder ]
-    if: always() && needs.build_and_push_builder.result != 'failure' && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')))
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: true
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Check out code
         uses: actions/checkout@v6
@@ -153,7 +55,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v4-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v4-builder:latest
 
       - name: Check format of changed C/C++ files
         run: |
@@ -197,20 +99,13 @@ jobs:
 
   debug_amd64_build:
     name: debug_amd64_build
-    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
-    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
+    needs: code_static_check
     steps:
       - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: true
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Check out code
         uses: actions/checkout@v6
@@ -222,7 +117,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
@@ -257,7 +152,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -356,7 +251,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -445,7 +340,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -497,7 +392,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -580,7 +475,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -676,7 +571,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -759,7 +654,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -842,7 +737,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -931,9 +826,8 @@ jobs:
 
   release_amd64_build:
     name: release_amd64_build
-    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
-    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
+    needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -950,7 +844,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
@@ -985,7 +879,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1059,7 +953,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1123,7 +1017,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1224,7 +1118,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1295,7 +1189,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1513,9 +1407,8 @@ jobs:
 
   debug_arm64_build:
     name: debug_arm64_build
-    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
-    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
+    needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -1532,7 +1425,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json"
@@ -1568,7 +1461,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1696,7 +1589,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1748,7 +1641,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1806,7 +1699,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1877,7 +1770,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1935,7 +1828,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -1982,9 +1875,8 @@ jobs:
 
   release_arm64_build:
     name: release_arm64_build
-    needs: [ check_builder_changes, build_and_push_builder, code_static_check ]
-    if: always() && needs.code_static_check.result == 'success'
     runs-on: ubuntu-latest
+    needs: code_static_check
     steps:
       - name: Free disk space
         run: |
@@ -2001,7 +1893,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json"
@@ -2036,7 +1928,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -2164,7 +2056,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -2265,7 +2157,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -2336,7 +2228,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          docker-images: false
+          docker-images: true
           swap-storage: true
 
       - name: Check out code
@@ -2557,9 +2449,8 @@ jobs:
   # ============================================
   reldeb_amd64_benchmark_prepare:
     name: reldeb_amd64_benchmark_prepare
-    needs: code_static_check
-    if: always() && needs.code_static_check.result == 'success'
     runs-on: [ "self-hosted", "infinity-build" ]
+    needs: code_static_check
     steps:
       - name: Ensure workspace ownership
         run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
@@ -2582,8 +2473,7 @@ jobs:
   reldeb_amd64_benchmark_build:
     name: reldeb_benchmark_build
     runs-on: [ "self-hosted", "infinity-build" ]
-    needs: [ reldeb_amd64_benchmark_prepare, check_builder_changes, build_and_push_builder ]
-    if: always() && needs.reldeb_amd64_benchmark_prepare.result == 'success'
+    needs: reldeb_amd64_benchmark_prepare
     continue-on-error: true
     outputs:
       build_status: ${{ steps.build.outcome }}
@@ -2602,7 +2492,7 @@ jobs:
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity-x64-x64-v3-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity-x64-x64-v3-builder:latest
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
@@ -2672,8 +2562,6 @@ jobs:
     name: workflow_cleanup
     runs-on: ubuntu-slim
     needs:
-      - check_builder_changes
-      - build_and_push_builder
       - code_static_check
       - debug_amd64_build
       - debug_amd64_unit_test
@@ -2709,27 +2597,5 @@ jobs:
       - release_arm64_minio_parallel_test
     if: always()
     steps:
-      - name: Cleanup old pr-* image tags
-        if: github.event_name == 'push' && needs.check_builder_changes.outputs.changed == 'true'
-        run: |
-          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST https://hub.docker.com/v2/users/login/ -d "{\"username\": \"infiniflow\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" | jq -r .token)
-          for TARGET in infinity-x64-arm64-builder infinity-x64-x64-v1-builder infinity-x64-x64-v2-builder infinity-x64-x64-v3-builder infinity-x64-x64-v4-builder; do
-            TAGS=$(curl -s -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/?page_size=100" | jq -r '.results[].name | select(startswith("pr-"))')
-            for TAG in $TAGS; do
-              echo "Deleting tag: ${TARGET}:$TAG"
-              curl -s -X DELETE -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/$TAG/"
-            done
-          done
-
-      - name: Delete failed PR image tags
-        if: github.event_name == 'pull_request' && needs.build_and_push_builder.result == 'failure' && needs.check_builder_changes.outputs.changed == 'true'
-        run: |
-          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST https://hub.docker.com/v2/users/login/ -d "{\"username\": \"infiniflow\", \"password\": \"${{ secrets.DOCKERHUB_TOKEN }}\"}" | jq -r .token)
-          TAG="pr-${{ github.event.pull_request.number }}"
-          for TARGET in infinity-x64-arm64-builder infinity-x64-x64-v1-builder infinity-x64-x64-v2-builder infinity-x64-x64-v3-builder infinity-x64-x64-v4-builder; do
-            echo "Deleting failed tag: ${TARGET}:$TAG"
-            curl -s -X DELETE -H "Authorization: JWT $TOKEN" "https://hub.docker.com/v2/repositories/infiniflow/${TARGET}/tags/$TAG/" || true
-          done
-
-      - name: Workflow done
-        run: echo "Workflow cleanup complete."
+      - name: Cleanup
+        run: echo "Workflow cleanup. Just a placeholder now."
