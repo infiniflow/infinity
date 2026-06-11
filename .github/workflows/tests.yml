@@ -37,7 +37,6 @@ jobs:
     outputs:
       changed: ${{ steps.check.outputs.changed }}
       image_tag: ${{ steps.check.outputs.image_tag }}
-      image_prefix: ${{ steps.check.outputs.image_prefix }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -51,13 +50,11 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE_SHA="${{ github.event.pull_request.base.sha }}"
             HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-            IMAGE_TAG="pr-${{ github.event.pull_request.number }}"
-            IMAGE_PREFIX="ghcr.io/${{ github.repository_owner }}"
+            IMAGE_TAG="latest"
           else
             BASE_SHA="${{ github.event.before }}"
             HEAD_SHA="${{ github.event.after }}"
             IMAGE_TAG="latest"
-            IMAGE_PREFIX="infiniflow"
           fi
           if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
             BASE_SHA=$(git rev-list --max-parents=0 HEAD)
@@ -65,11 +62,9 @@ jobs:
           if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -q 'scripts/Dockerfile_infinity_builder_ubuntu22'; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-            echo "image_prefix=${IMAGE_PREFIX}" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "image_tag=latest" >> $GITHUB_OUTPUT
-            echo "image_prefix=infiniflow" >> $GITHUB_OUTPUT
           fi
 
   build_and_push_builder:
@@ -111,19 +106,19 @@ jobs:
           username: infiniflow
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GitHub Container Registry
-        if: github.event_name == 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build ${{ matrix.target }} image
-        run: docker build -f ./scripts/Dockerfile_infinity_builder_ubuntu22 --target ${{ matrix.target }} -t ${{ needs.check_builder_changes.outputs.image_prefix }}/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }} .
+        run: |
+          GITHUB_OWNER=$(echo "${{ github.repository }}" | cut -d '/' -f 1)
+          docker build \
+            --build-arg GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            --build-arg GITHUB_OWNER="${GITHUB_OWNER}" \
+            -f ./scripts/Dockerfile_infinity_builder_ubuntu22 \
+            --target ${{ matrix.target }} \
+            -t infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }} .
 
-      - name: Push image to registry
-        run: docker push ${{ needs.check_builder_changes.outputs.image_prefix }}/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }}
+      - name: Push image to Docker Hub
+        if: github.event_name == 'push'
+        run: docker push infiniflow/${{ matrix.target }}:${{ needs.check_builder_changes.outputs.image_tag }}
 
   code_static_check:
     name: code_static_check
@@ -156,17 +151,9 @@ jobs:
           version: ">=0.14.x"
           args: "check --exclude=**/remote_thrift/infinity_thrift_rpc/**"
 
-      - name: Login to GitHub Container Registry
-        if: needs.check_builder_changes.outputs.changed == 'true' && needs.check_builder_changes.outputs.image_prefix != 'infiniflow'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start builder container
         run: |
-          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-x64-v4-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v4-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Check format of changed C/C++ files
         run: |
@@ -233,17 +220,9 @@ jobs:
           fetch-tags: false
           submodules: recursive
 
-      - name: Login to GitHub Container Registry
-        if: needs.check_builder_changes.outputs.changed == 'true' && needs.check_builder_changes.outputs.image_prefix != 'infiniflow'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
@@ -969,17 +948,9 @@ jobs:
           fetch-tags: false
           submodules: recursive
 
-      - name: Login to GitHub Container Registry
-        if: needs.check_builder_changes.outputs.changed == 'true' && needs.check_builder_changes.outputs.image_prefix != 'infiniflow'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
@@ -1559,17 +1530,9 @@ jobs:
           fetch-tags: false
           submodules: recursive
 
-      - name: Login to GitHub Container Registry
-        if: needs.check_builder_changes.outputs.changed == 'true' && needs.check_builder_changes.outputs.image_prefix != 'infiniflow'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json"
@@ -2036,17 +1999,9 @@ jobs:
           fetch-tags: false
           submodules: recursive
 
-      - name: Login to GitHub Container Registry
-        if: needs.check_builder_changes.outputs.changed == 'true' && needs.check_builder_changes.outputs.image_prefix != 'infiniflow'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          docker run --privileged -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-arm64-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json"
@@ -2647,7 +2602,7 @@ jobs:
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
           TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
-          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity ${{ needs.check_builder_changes.outputs.image_prefix }}/infinity-x64-x64-v3-builder:${{ needs.check_builder_changes.outputs.image_tag }}
+          sudo docker run --privileged -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -v ${PWD}:/infinity infiniflow/infinity-x64-x64-v3-builder:${{ needs.check_builder_changes.outputs.image_tag }}
 
       - name: Create libstdc++ modules JSON for cross-compilation
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"

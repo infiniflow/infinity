@@ -1,4 +1,6 @@
 FROM ubuntu:22.04 AS infinity-x64-builder-base
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 ENV DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_ROOT=/opt/vcpkg
 SHELL ["/bin/bash", "-c"]
@@ -22,7 +24,7 @@ RUN apt-get update \
     && apt-fast install -y \
     git curl zip unzip build-essential pkg-config \
     autoconf automake autoconf-archive libtool \
-    postgresql-client flex bison \
+    postgresql-client flex bison mono-runtime \
     && mkdir infinity_download && cd infinity_download \
     && printf '%s\n' \
     'https://github.com/Kitware/CMake/releases/download/v4.2.5/cmake-4.2.5-linux-x86_64.tar.gz' \
@@ -85,6 +87,8 @@ RUN aria2c -j 16 --min-split-size 1M https://developer.arm.com/-/media/Files/dow
     && rm -rf arm-gnu-toolchain-15.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
 
 FROM infinity-x64-arm64-builder-base AS infinity-x64-arm64-builder
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
@@ -95,6 +99,18 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && if [ -n "$GITHUB_TOKEN" ]; then \
+      nuget_path=$(./vcpkg fetch nuget | tail -n 1); \
+      mono $nuget_path sources add \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json" \
+        -storepasswordincleartext \
+        -name "GitHub" \
+        -username "${GITHUB_OWNER}" \
+        -password "${GITHUB_TOKEN}"; \
+      mono $nuget_path setapikey "${GITHUB_TOKEN}" \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"; \
+      export VCPKG_BINARY_SOURCES='clear;nuget,GitHub,readwrite'; \
+    fi \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=arm64-linux \
@@ -103,6 +119,8 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
 
 FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v1-builder
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
@@ -113,6 +131,18 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && if [ -n "$GITHUB_TOKEN" ]; then \
+      nuget_path=$(./vcpkg fetch nuget | tail -n 1); \
+      mono $nuget_path sources add \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json" \
+        -storepasswordincleartext \
+        -name "GitHub" \
+        -username "${GITHUB_OWNER}" \
+        -password "${GITHUB_TOKEN}"; \
+      mono $nuget_path setapikey "${GITHUB_TOKEN}" \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"; \
+      export VCPKG_BINARY_SOURCES='clear;nuget,GitHub,readwrite'; \
+    fi \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v1 \
@@ -121,6 +151,8 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
 
 FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v2-builder
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
@@ -131,6 +163,18 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && if [ -n "$GITHUB_TOKEN" ]; then \
+      nuget_path=$(./vcpkg fetch nuget | tail -n 1); \
+      mono $nuget_path sources add \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json" \
+        -storepasswordincleartext \
+        -name "GitHub" \
+        -username "${GITHUB_OWNER}" \
+        -password "${GITHUB_TOKEN}"; \
+      mono $nuget_path setapikey "${GITHUB_TOKEN}" \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"; \
+      export VCPKG_BINARY_SOURCES='clear;nuget,GitHub,readwrite'; \
+    fi \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v2 \
@@ -139,6 +183,8 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
 
 FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v3-builder
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
@@ -149,6 +195,18 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && if [ -n "$GITHUB_TOKEN" ]; then \
+      nuget_path=$(./vcpkg fetch nuget | tail -n 1); \
+      mono $nuget_path sources add \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json" \
+        -storepasswordincleartext \
+        -name "GitHub" \
+        -username "${GITHUB_OWNER}" \
+        -password "${GITHUB_TOKEN}"; \
+      mono $nuget_path setapikey "${GITHUB_TOKEN}" \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"; \
+      export VCPKG_BINARY_SOURCES='clear;nuget,GitHub,readwrite'; \
+    fi \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v3 \
@@ -157,6 +215,8 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]
 
 FROM infinity-x64-x64-builder-base AS infinity-x64-x64-v4-builder
+ARG GITHUB_TOKEN=""
+ARG GITHUB_OWNER=""
 RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cd /opt/vcpkg \
     && git checkout $(grep '"builtin-baseline"' /tmp/vcpkg.json | cut -d '"' -f 4) \
@@ -167,6 +227,18 @@ RUN cd /opt && git clone https://github.com/microsoft/vcpkg.git \
     && cp -r /usr/include/rpcsvc ${SYS_ROOT}/usr/include/ \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libnsl.a \
     && llvm-ar-20 rc ${SYS_ROOT}/usr/lib/libtirpc.a \
+    && if [ -n "$GITHUB_TOKEN" ]; then \
+      nuget_path=$(./vcpkg fetch nuget | tail -n 1); \
+      mono $nuget_path sources add \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json" \
+        -storepasswordincleartext \
+        -name "GitHub" \
+        -username "${GITHUB_OWNER}" \
+        -password "${GITHUB_TOKEN}"; \
+      mono $nuget_path setapikey "${GITHUB_TOKEN}" \
+        -source "https://nuget.pkg.github.com/${GITHUB_OWNER}/index.json"; \
+      export VCPKG_BINARY_SOURCES='clear;nuget,GitHub,readwrite'; \
+    fi \
     && ./vcpkg install \
     --overlay-triplets=/infinity/cmake/triplets \
     --triplet=x64-linux-v4 \
