@@ -26,9 +26,16 @@ using U8MaskPtr = const u32 (*)[8];
 
 export U8MaskPtr GetU8MasksForAVX2();
 
+// Unified prefetch wrapper to resolve ambiguity with __builtin_prefetch across module boundaries
+// hint must be a compile-time constant (0-3): _MM_HINT_T0=3, _MM_HINT_T1=2, _MM_HINT_T2=1, _MM_HINT_NTA=0
+export template <int hint = 3>
+void simd_prefetch(const void *addr) {
+    __builtin_prefetch(addr, 0, hint);
+}
+
 #ifdef __SSE__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum_ps_sse1(__m128 v) {                     // v = [ D C | B A ]
+export float hsum_ps_sse1(__m128 v) {                            // v = [ D C | B A ]
     __m128 shuf = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)); // [ C D | A B ]
     __m128 sums = _mm_add_ps(v, shuf);                           // sums = [ D+C C+D | B+A A+B ]
     shuf = _mm_movehl_ps(shuf, sums);                            //  [   C   D | D+C C+D ]  // let the compiler avoid a mov by reusing shuf
@@ -39,7 +46,7 @@ export inline float hsum_ps_sse1(__m128 v) {                     // v = [ D C | 
 
 #ifdef __SSE3__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum_ps_sse3(__m128 v) {
+export float hsum_ps_sse3(__m128 v) {
     __m128 shuf = _mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
     __m128 sums = _mm_add_ps(v, shuf);
     shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
@@ -50,7 +57,7 @@ export inline float hsum_ps_sse3(__m128 v) {
 
 #ifdef __AVX__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum256_ps_avx(__m256 v) {
+export float hsum256_ps_avx(__m256 v) {
     __m128 vlow = _mm256_castps256_ps128(v);
     __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
     vlow = _mm_add_ps(vlow, vhigh);             // add the low 128
@@ -139,7 +146,7 @@ export int hsum_epi32_avx512(__m512i v) {
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export inline __m128i abs_sub_epu8_sse2(const __m128i a, const __m128i b) {
+export __m128i abs_sub_epu8_sse2(const __m128i a, const __m128i b) {
     const __m128i ab = _mm_subs_epu8(a, b);
     const __m128i ba = _mm_subs_epu8(b, a);
     return _mm_or_si128(ab, ba);
@@ -147,7 +154,7 @@ export inline __m128i abs_sub_epu8_sse2(const __m128i a, const __m128i b) {
 #endif
 
 #if defined(__AVX2__)
-export inline __m256i abs_sub_epu8_avx2(const __m256i a, const __m256i b) {
+export __m256i abs_sub_epu8_avx2(const __m256i a, const __m256i b) {
     const __m256i ab = _mm256_subs_epu8(a, b);
     const __m256i ba = _mm256_subs_epu8(b, a);
     return _mm256_or_si256(ab, ba);
@@ -155,7 +162,7 @@ export inline __m256i abs_sub_epu8_avx2(const __m256i a, const __m256i b) {
 #endif
 
 #if defined(__AVX512BW__)
-export inline __m512i abs_sub_epu8_avx512(const __m512i a, const __m512i b) {
+export __m512i abs_sub_epu8_avx512(const __m512i a, const __m512i b) {
     const __m512i ab = _mm512_subs_epu8(a, b);
     const __m512i ba = _mm512_subs_epu8(b, a);
     return _mm512_or_si512(ab, ba);
@@ -164,7 +171,7 @@ export inline __m512i abs_sub_epu8_avx512(const __m512i a, const __m512i b) {
 
 // https://github.com/WojciechMula/sse-popcount/blob/master/popcnt-avx2-harley-seal.cpp
 #if defined(__AVX2__)
-export inline int popcount_avx2(const __m256i v) {
+export int popcount_avx2(const __m256i v) {
     const __m256i m1 = _mm256_set1_epi8(0x55);
     const __m256i m2 = _mm256_set1_epi8(0x33);
     const __m256i m4 = _mm256_set1_epi8(0x0F);
@@ -186,7 +193,7 @@ export inline int popcount_avx2(const __m256i v) {
 
 // https://github.com/WojciechMula/sse-popcount/blob/master/popcnt-sse-harley-seal.cpp
 #if defined(__SSE2__)
-export inline int popcount_sse2(const __m128i x) {
+export int popcount_sse2(const __m128i x) {
     const __m128i m1 = _mm_set1_epi8(0x55);
     const __m128i m2 = _mm_set1_epi8(0x33);
     const __m128i m4 = _mm_set1_epi8(0x0F);

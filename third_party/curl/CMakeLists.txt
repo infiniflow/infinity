@@ -470,9 +470,12 @@ if(ENABLE_THREADED_RESOLVER)
 endif()
 
 # Check for all needed libraries
-check_library_exists("socket" "connect" "" HAVE_LIBSOCKET)
-if(HAVE_LIBSOCKET)
-  set(CURL_LIBS "socket;${CURL_LIBS}")
+# libsocket is only needed on Solaris/QNX; on Linux, socket functions are in libc
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  check_library_exists("socket" "connect" "" HAVE_LIBSOCKET)
+  if(HAVE_LIBSOCKET)
+    set(CURL_LIBS "socket;${CURL_LIBS}")
+  endif()
 endif()
 
 check_function_exists("gethostname" HAVE_GETHOSTNAME)

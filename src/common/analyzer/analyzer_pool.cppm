@@ -17,9 +17,9 @@ export module infinity_core:analyzer_pool;
 import :singleton;
 import :analyzer;
 import :status;
+import :parallel_hashmap;
 
 import std;
-import third_party;
 
 namespace infinity {
 

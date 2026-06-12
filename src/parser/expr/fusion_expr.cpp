@@ -81,8 +81,7 @@ std::shared_ptr<ConstantExpr> BuildConstantExprFromJson(std::string_view json_st
         }
         case simdjson::json_type::string: {
             auto res = std::make_shared<ConstantExpr>(LiteralType::kString);
-            auto str = doc.get<std::string>();
-            res->str_value_ = strdup(((std::string)doc.get<std::string>()).c_str());
+            res->str_value_ = strdup(static_cast<std::string>(doc.get<std::string_view>().value()).c_str());
             return res;
         }
         case simdjson::json_type::array: {

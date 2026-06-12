@@ -81,18 +81,14 @@ import std.compat;
 #include <nlohmann/json.hpp>
 #include <simdjson.h>
 
-#include "toml.hpp"
-
 #include <magic_enum/magic_enum.hpp>
 
 #include "pgm/pgm_index.hpp"
-#include <parallel_hashmap/phmap.h>
 
 #include <oatpp/network/Server.hpp>
 #include <oatpp/network/tcp/server/ConnectionProvider.hpp>
 #include <oatpp/web/server/HttpConnectionHandler.hpp>
 
-#include "Python.h"
 #include "miniocpp/client.h"
 #include <arrow/api.h>
 #include <arrow/io/file.h>
@@ -214,12 +210,6 @@ using ::CLI::RequiredError;
 using ::CLI::RequiresError;
 using ::CLI::ValidationError;
 } // namespace CLI
-
-export namespace toml {
-// Toml parser
-using ::toml::parse_file;
-using ::toml::table;
-} // namespace toml
 
 export namespace nlohmann {
 using nlohmann::json;
@@ -407,27 +397,6 @@ export void SetLogLevel(LogLevel log_level) {
     }
 }
 
-export template <class T>
-using HashDefaultHash = phmap::priv::hash_default_hash<T>;
-export template <class T>
-using HashDefaultEQ = phmap::priv::hash_default_eq<T>;
-export template <typename K, typename V>
-using PHPair = phmap::priv::Pair<const K, V>;
-export template <class T>
-using PHAlloc = phmap::priv::Allocator<T>;
-export template <class K,
-                 class V,
-                 class Hash = HashDefaultHash<K>,
-                 class Eq = HashDefaultEQ<K>,
-                 class Alloc = PHAlloc<PHPair<const K, V>>> // alias for std::allocator
-using FlatHashMap = phmap::flat_hash_map<K, V, Hash, Eq, Alloc>;
-
-export template <class T,
-                 class Hash = HashDefaultHash<T>,
-                 class Eq = HashDefaultEQ<T>,
-                 class Alloc = PHAlloc<T>> // alias for std::allocator
-using FlatHashSet = phmap::flat_hash_set<T, Hash, Eq, Alloc>;
-
 export template <typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
 using PGMIndex = pgm::PGMIndex<K, Epsilon, EpsilonRecursive, Floating>;
 
@@ -440,9 +409,6 @@ export using WebServer = oatpp::network::Server;
 export using WebEnvironment = oatpp::base::Environment;
 export using WebAddress = oatpp::network::Address;
 export using HTTPStatus = oatpp::web::protocol::http::Status;
-
-// Python
-export using PyObject = PyObject;
 
 export namespace rocksdb {
 using Options = ::ROCKSDB_NAMESPACE::Options;

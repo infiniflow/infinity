@@ -24,6 +24,7 @@ import :infinity_context;
 import :default_values;
 import :utility;
 
+import std;
 import third_party;
 
 namespace infinity {
@@ -204,7 +205,10 @@ public:
         db->GetLiveFiles(local_live_files, &manifest_file_size);
         std::flat_set<std::string> local_live_files_set{local_live_files};
 
-        for (auto &file : local_live_files | std::views::filter(std::not_fn(IsSstFile))) {
+        for (auto &file : local_live_files) {
+            if (IsSstFile(file)) {
+                continue;
+            }
             // upload to s3
             auto v = infinity::Partition(file, '/');
             auto &file1 = v.back();
@@ -252,7 +256,10 @@ public:
         VirtualStore::ListObjects(S3_DEFAULT_BUCKET, S3_META_PREFIX, remote_live_files);
         std::flat_set<std::string> remote_live_files_set{remote_live_files};
 
-        for (auto &file : local_live_files | std::views::filter(std::not_fn(IsSstFile))) {
+        for (auto &file : local_live_files) {
+            if (IsSstFile(file)) {
+                continue;
+            }
             // upload to s3
             auto v = infinity::Partition(file, '/');
             auto &file1 = v.back();

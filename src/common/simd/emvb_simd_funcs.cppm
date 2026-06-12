@@ -26,7 +26,7 @@ namespace infinity {
 
 // https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask/36951611#36951611
 // Uses 64bit pdep / pext to save a step in unpacking.
-export inline __m256i compress256i(__m256i src, u32 mask /* from movmskps */) {
+export __m256i compress256i(__m256i src, u32 mask /* from movmskps */) {
     u64 expanded_mask = _pdep_u64(mask, 0x0101010101010101); // unpack each bit to a byte
     expanded_mask *= 0xFF;                                   // mask |= mask<<1 | mask<<2 | ... | mask<<7;
     // ABC... -> AAAAAAAABBBBBBBBCCCCCCCC...: replicate each bit to fill its byte
@@ -64,7 +64,7 @@ export u32 *filter_scores_output_ids_avx2(u32 *output_id_ptr, const f32 threshol
 }
 
 export template <u32 FIXED_QUERY_TOKEN_NUM, u32 BEGIN_OFFSET>
-inline f32 GetMaxSim32Width(const f32 *centroid_distances, const u32 doclen) {
+f32 GetMaxSim32Width(const f32 *centroid_distances, const u32 doclen) {
     static_assert(BEGIN_OFFSET % 32 == 0);
     static_assert(FIXED_QUERY_TOKEN_NUM > 0 && FIXED_QUERY_TOKEN_NUM % 32 == 0);
     static_assert(BEGIN_OFFSET < FIXED_QUERY_TOKEN_NUM);

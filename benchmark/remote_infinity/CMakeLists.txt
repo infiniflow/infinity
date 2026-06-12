@@ -13,6 +13,7 @@ target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 target_link_libraries(
         remote_query_benchmark
@@ -22,13 +23,12 @@ target_link_libraries(
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
         thrift::thrift
         # thriftnb::thriftnb
-        ${STDCXX15EXP_STATIC}
         Parquet::parquet_static
         Arrow::arrow_static
         ${JEMALLOC_STATIC_LIB}
@@ -51,6 +51,7 @@ target_link_libraries(
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
+        libstdc++exp.a
 )
 
 # add_definitions(-march=native)

@@ -644,7 +644,7 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -792,7 +792,7 @@ QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const Admin
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -945,7 +945,7 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1103,7 +1103,7 @@ QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminSta
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1253,7 +1253,7 @@ QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const Admin
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1407,7 +1407,7 @@ QueryResult AdminExecutor::ShowSegment(QueryContext *query_context, const AdminS
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1554,7 +1554,7 @@ QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminSt
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1706,7 +1706,7 @@ QueryResult AdminExecutor::ShowBlock(QueryContext *query_context, const AdminSta
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -1852,7 +1852,7 @@ QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminS
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -2017,7 +2017,7 @@ QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminSt
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -2194,7 +2194,7 @@ QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminS
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -2362,7 +2362,7 @@ QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminSta
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -2529,7 +2529,7 @@ QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const 
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 
@@ -2699,7 +2699,7 @@ QueryResult AdminExecutor::ShowIndexSegment(QueryContext *query_context, const A
     std::unique_ptr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     output_block_ptr->Init(column_types);
 
-    rocksdb::DB *db{};
+    std::unique_ptr<rocksdb::DB> db;
     rocksdb::Options options;
     rocksdb::ReadOptions read_options;
 

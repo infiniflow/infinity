@@ -133,8 +133,8 @@ bool ProbabilisticDataFilter::LoadFromJsonFile(std::string_view json_sv) {
     simdjson::padded_string json_pad(json_sv);
     simdjson::parser parser;
     simdjson::document doc = parser.iterate(json_pad);
-    std::string filter_base64;
-    if (doc[JsonTag].get<std::string>(filter_base64) != simdjson::SUCCESS) {
+    std::string_view filter_base64;
+    if (doc[JsonTag].get<std::string_view>(filter_base64) != simdjson::SUCCESS) {
         LOG_ERROR("ProbabilisticDataFilter::LoadFromJsonFile(): found no data.");
         return false;
     }

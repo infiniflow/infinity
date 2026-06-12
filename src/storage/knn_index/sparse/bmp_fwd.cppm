@@ -23,6 +23,7 @@ import :local_file_handle;
 import :bmp_util;
 import :knn_result_handler;
 import :infinity_exception;
+import :simd_common_tools;
 
 import std;
 import third_party;
@@ -229,7 +230,7 @@ public:
 
     void Prefetch() const {
         const char *ptr = data_.get();
-        _mm_prefetch(ptr, _MM_HINT_T0);
+        simd_prefetch<_MM_HINT_T0>(ptr);
     }
 
 private:
@@ -256,10 +257,10 @@ public:
     }
 
     void Prefetch() const {
-        _mm_prefetch(reinterpret_cast<const char *>(block_size_prefix_sum_), _MM_HINT_T0);
-        _mm_prefetch(reinterpret_cast<const char *>(term_ids_), _MM_HINT_T0);
-        _mm_prefetch(reinterpret_cast<const char *>(block_offsets_), _MM_HINT_T0);
-        _mm_prefetch(reinterpret_cast<const char *>(values_), _MM_HINT_T0);
+        simd_prefetch<_MM_HINT_T0>(reinterpret_cast<const char *>(block_size_prefix_sum_));
+        simd_prefetch<_MM_HINT_T0>(reinterpret_cast<const char *>(term_ids_));
+        simd_prefetch<_MM_HINT_T0>(reinterpret_cast<const char *>(block_offsets_));
+        simd_prefetch<_MM_HINT_T0>(reinterpret_cast<const char *>(values_));
     }
 
 private:

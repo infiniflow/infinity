@@ -23,11 +23,11 @@ import :load_meta;
 import :knn_expression;
 import :common_query_filter;
 import :physical_filter_scan_base;
+import :value;
 
 import data_type;
 import logical_type;
 import internal_types;
-import :value;
 
 namespace infinity {
 

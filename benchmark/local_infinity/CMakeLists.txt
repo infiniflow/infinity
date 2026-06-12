@@ -11,7 +11,7 @@ target_link_libraries(infinity_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -42,7 +42,7 @@ target_link_libraries(infinity_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -51,6 +51,7 @@ target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 # knn
@@ -68,7 +69,7 @@ target_link_libraries(knn_import_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -99,7 +100,7 @@ target_link_libraries(knn_import_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -108,6 +109,7 @@ target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_p
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -123,7 +125,7 @@ target_link_libraries(knn_query_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -154,7 +156,7 @@ target_link_libraries(knn_query_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -163,6 +165,7 @@ target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_pa
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 # fulltext
@@ -179,7 +182,7 @@ target_link_libraries(fulltext_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -210,7 +213,7 @@ target_link_libraries(fulltext_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -219,6 +222,7 @@ target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_par
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -233,7 +237,7 @@ target_link_libraries(sparse_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -260,7 +264,7 @@ target_link_libraries(sparse_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -269,6 +273,7 @@ target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 add_executable(bmp_benchmark
         ./sparse/bmp_benchmark.cpp
@@ -282,7 +287,7 @@ target_link_libraries(bmp_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -313,7 +318,7 @@ target_link_libraries(bmp_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -322,6 +327,7 @@ target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/mi
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 add_executable(hnsw_benchmark
         ./knn/hnsw_benchmark.cpp
@@ -335,7 +341,7 @@ target_link_libraries(hnsw_benchmark
         onnxruntime_mlas
         zsv_parser
         newpfor
-        fastpfor
+        ${FASTPFOR_STATIC_LIB}
         jma
         opencc
         dl
@@ -366,7 +372,7 @@ target_link_libraries(hnsw_benchmark
         roaring::roaring
         spdlog::spdlog
         fmt::fmt
-#        ${STDCXX15EXP_STATIC}
+        ZLIB::ZLIB
         libstdc++exp.a
 )
 
@@ -375,6 +381,7 @@ target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/m
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curlpp/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/curl/")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

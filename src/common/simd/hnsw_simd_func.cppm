@@ -1396,7 +1396,7 @@ export i32 U8BinIPAVX512BWResidual(const u8 *pv, const u8 *pv_b, size_t dim) {
 #endif
 
 #if defined(__AVX2__)
-inline __m256i load_4u8_avx2(const u8 *pv) {
+__m256i load_4u8_avx2(const u8 *pv) {
     return _mm256_setr_epi8(pv[0],
                             pv[0],
                             pv[0],
@@ -1431,7 +1431,7 @@ inline __m256i load_4u8_avx2(const u8 *pv) {
                             pv[3]);
 }
 
-inline __m256i load_8x32_mask_avx2() {
+__m256i load_8x32_mask_avx2() {
     return _mm256_setr_epi8(0x01,
                             0x02,
                             0x04,
@@ -1495,11 +1495,11 @@ export i32 U8BinIPAVX2Residual(const u8 *pv, const u8 *pv_b, size_t dim) {
 #endif
 
 #if defined(__SSE2__)
-inline __m128i load_2u8_sse2(const u8 *pv) {
+__m128i load_2u8_sse2(const u8 *pv) {
     return _mm_setr_epi8(pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[0], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1], pv[1]);
 }
 
-inline __m128i load_8x16_mask_sse2() {
+__m128i load_8x16_mask_sse2() {
     return _mm_setr_epi8(0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80);
 }
 

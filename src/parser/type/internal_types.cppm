@@ -96,8 +96,8 @@ export using infinity::EmbeddingType;
 export using infinity::ToEmbeddingDataType;
 export using infinity::EmbeddingDataType;
 
-export constexpr uint64_t VARCHAR_PREFIX_LEN = VARCHAR_PREFIX_LENGTH;
-export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;
-export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
+export constexpr uint64_t VARCHAR_PREFIX_LEN = 5;
+export constexpr uint64_t VARCHAR_INLINE_LEN = 13;
+export constexpr uint64_t VARCHAR_LEN_LIMIT = 16UL * 1024UL * 1024UL - 1UL;
 
 } // namespace infinity

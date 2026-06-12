@@ -203,8 +203,10 @@ std::string TrimString(const std::string &s) {
 
 std::vector<std::string> SplitStrByComma(std::string str) {
     std::vector<std::string> tokens;
-    for (const auto &token : str | std::views::split(',')) {
-        tokens.emplace_back(token.begin(), token.end());
+    std::string token;
+    std::istringstream iss(str);
+    while (std::getline(iss, token, ',')) {
+        tokens.push_back(token);
     }
 
     for (auto &s : tokens) {
