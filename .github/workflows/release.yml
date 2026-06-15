@@ -64,10 +64,6 @@ jobs:
             builder_image: infiniflow/infinity-x64-arm64-builder:latest
     runs-on: ubuntu-latest
     steps:
-    - name: Ensure workspace ownership
-      run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && chown -R ${USER} ${GITHUB_WORKSPACE}
-
-    # https://github.com/actions/checkout/blob/v6/README.md
     - name: Check out code
       uses: actions/checkout@v6
       with:
@@ -298,9 +294,6 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure workspace ownership
-        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && chown -R ${USER} ${GITHUB_WORKSPACE}
-
       - name: Check out code
         uses: actions/checkout@v6
         with:
