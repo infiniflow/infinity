@@ -118,6 +118,9 @@ jobs:
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
+      - name: Fix sccache cache ownership
+        run: sudo chown -R $(id -u):$(id -g) /tmp/sccache-cache
+
       - name: Restore sccache cache
         id: sccache-cache
         uses: actions/cache@v4
