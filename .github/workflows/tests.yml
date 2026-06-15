@@ -132,6 +132,12 @@ jobs:
             -e ACTIONS_RUNTIME_TOKEN=${ACTIONS_RUNTIME_TOKEN} \
             infiniflow/infinity-x64-x64-v2-builder:latest
 
+      - name: Copy sccache binary into container
+        run: |
+          docker cp $(which sccache) infinity_builder:/usr/local/bin/sccache
+          docker exec infinity_builder chmod +x /usr/local/bin/sccache
+          docker exec infinity_builder sccache --version
+
       - name: Create libstdc++ modules JSON for cross-compilation
         run: docker exec infinity_builder bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json"
 
