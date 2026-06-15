@@ -134,14 +134,10 @@ jobs:
             ;;
         esac
 
-        docker exec ${BUILDER_CONTAINER} \
-          -e TRIPLET=${TRIPLET} \
-          -e SYS_ROOT=${SYS_ROOT} \
-          -e GCC_TOOLCHAIN=${GCC_TOOLCHAIN} \
-          bash -c "
+        docker exec ${BUILDER_CONTAINER} bash -c "
             git config --global safe.directory \"*\" && \
             cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && \
-            cmake -G Ninja \
+            SYS_ROOT=${SYS_ROOT} GCC_TOOLCHAIN=${GCC_TOOLCHAIN} cmake -G Ninja \
               -DCMAKE_C_COMPILER=clang-20 \
               -DCMAKE_CXX_COMPILER=clang++-20 \
               -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
