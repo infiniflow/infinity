@@ -55,7 +55,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
+          docker run --cap-add=NET_ADMIN -d --name infinity_builder -v ${PWD}:/infinity -v ${PWD}/resource:/usr/share/infinity/resource infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Check format of changed C/C++ files
         run: |
@@ -885,7 +885,7 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder \
+          docker run -d --name infinity_builder \
           -v ${PWD}:/infinity \
           -v ${PWD}/resource:/usr/share/infinity/resource \
           -v ${PWD}/.sccache-cache:/sccache-cache \
@@ -1990,9 +1990,9 @@ jobs:
 
       - name: Start builder container
         run: |
-          docker run --privileged -d --name infinity_builder \
+          docker run -d --name infinity_builder \
           -v ${PWD}:/infinity \
-          -v ${PWD}/resource:/usr/share/infinity/resource 
+          -v ${PWD}/resource:/usr/share/infinity/resource \
           -v ${PWD}/.sccache-cache:/sccache-cache \
           infiniflow/infinity-x64-arm64-builder:latest
 
