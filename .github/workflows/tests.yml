@@ -118,14 +118,11 @@ jobs:
       - name: Install sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Fix sccache cache ownership
-        run: sudo chown -R $(id -u):$(id -g) /tmp/sccache-cache
-
       - name: Restore sccache cache
         id: sccache-cache
         uses: actions/cache@v4
         with:
-          path: /tmp/sccache-cache
+          path: .sccache-cache
           key: sccache-debug-amd64-${{ github.sha }}
           restore-keys: |
             sccache-debug-amd64-
@@ -135,7 +132,7 @@ jobs:
           docker run --privileged -d --name infinity_builder \
             -v ${PWD}:/infinity \
             -v ${PWD}/resource:/usr/share/infinity/resource \
-            -v /tmp/sccache-cache:/sccache-cache \
+            -v ${PWD}/.sccache-cache:/sccache-cache \
             infiniflow/infinity-x64-x64-v2-builder:latest
 
       - name: Copy sccache binary into container
@@ -153,6 +150,10 @@ jobs:
       - name: Show sccache stats
         if: always()
         run: docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder sccache --show-stats || true
+
+      - name: Fix sccache cache permissions
+        if: always()
+        run: docker exec infinity_builder bash -c "chown -R $(stat -c %u /infinity):$(stat -c %g /infinity) /sccache-cache" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
