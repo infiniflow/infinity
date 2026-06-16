@@ -52,70 +52,175 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: ["self-hosted", "infinity-release"]
-            arch: amd64
-            builder_image: infiniflow/infinity_builder:ubuntu22_clang20
-          - runner: ["self-hosted", "infinity-release-arm"]
-            arch: arm64
-            builder_image: infiniflow/infinity_builder:ubuntu22_clang20
-    runs-on: ${{ matrix.runner }}
+          - target: x64-v1
+            builder_image: infiniflow/infinity-x64-x64-v1-builder:latest
+          - target: x64-v2
+            builder_image: infiniflow/infinity-x64-x64-v2-builder:latest
+          - target: x64-v3
+            builder_image: infiniflow/infinity-x64-x64-v3-builder:latest
+          - target: x64-v4
+            builder_image: infiniflow/infinity-x64-x64-v4-builder:latest
+          - target: arm64
+            builder_image: infiniflow/infinity-x64-arm64-builder:latest
+    runs-on: ubuntu-latest
     steps:
-    - name: Ensure workspace ownership
-      run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-
-    # https://github.com/actions/checkout/blob/v6/README.md
     - name: Check out code
       uses: actions/checkout@v6
       with:
-          submodules: recursive
+        submodules: recursive
 
     - name: Start builder container
       run: |
-        BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+        BUILDER_CONTAINER=infinity_builder
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple -v ${PWD}:/infinity ${{ matrix.builder_image }}
+        docker rm -f ${BUILDER_CONTAINER} && docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.org/simple/ -v ${PWD}:/infinity ${{ matrix.builder_image }}
+
+    - name: Create libstdc++ modules JSON for cross-compilation
+      run: |
+        case ${{ matrix.target }} in
+        x64-v1 | x64-v2 | x64-v3 | x64-v4) docker exec ${BUILDER_CONTAINER} bash -c "cp /infinity/.github/workflows/x64-x64-libstdc++.modules.json /x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json";;
+        arm64) docker exec ${BUILDER_CONTAINER} bash -c "cp /infinity/.github/workflows/x64-arm64-libstdc++.modules.json /x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json";;
+        esac
 
     - name: Build release version
       env:
         RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
       run: |
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${RELEASE_TAG}-${{ matrix.arch }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=${{ matrix.arch }} -S /infinity -B /infinity/cmake-build-reldeb && cmake --build /infinity/cmake-build-reldeb --target infinity && cd /infinity/cmake-build-reldeb && cpack"
+        case ${{ matrix.target }} in
+          x64-v1)
+            export TRIPLET=x64-linux-v1
+            export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
+            export GCC_TOOLCHAIN=/x86_64-linux-gnu/
+            export DEB_ARCH=amd64
+            export CHAINLOAD_TOOLCHAIN=x86_64-linux-v1.cmake
+            export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
+            ;;
+          x64-v2)
+            export TRIPLET=x64-linux-v2
+            export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
+            export GCC_TOOLCHAIN=/x86_64-linux-gnu/
+            export DEB_ARCH=amd64
+            export CHAINLOAD_TOOLCHAIN=x86_64-linux-v2.cmake
+            export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
+            ;;
+          x64-v3)
+            export TRIPLET=x64-linux-v3
+            export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
+            export GCC_TOOLCHAIN=/x86_64-linux-gnu/
+            export DEB_ARCH=amd64
+            export CHAINLOAD_TOOLCHAIN=x86_64-linux-v3.cmake
+            export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
+            ;;
+          x64-v4)
+            export TRIPLET=x64-linux-v4
+            export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
+            export GCC_TOOLCHAIN=/x86_64-linux-gnu/
+            export DEB_ARCH=amd64
+            export CHAINLOAD_TOOLCHAIN=x86_64-linux-v4.cmake
+            export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
+            ;;
+          arm64)
+            export TRIPLET=arm64-linux
+            export SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/
+            export GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/
+            export DEB_ARCH=arm64
+            export CHAINLOAD_TOOLCHAIN=arm64-linux.cmake
+            export STDLIB_MODULES_JSON=/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json
+            ;;
+        esac
+
+        docker exec ${BUILDER_CONTAINER} bash -c "
+            git config --global safe.directory \"*\" && \
+            cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && \
+            SYS_ROOT=${SYS_ROOT} GCC_TOOLCHAIN=${GCC_TOOLCHAIN} cmake -G Ninja \
+              -DCMAKE_C_COMPILER=clang-20 \
+              -DCMAKE_CXX_COMPILER=clang++-20 \
+              -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+              -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/${CHAINLOAD_TOOLCHAIN} \
+              -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets \
+              -DVCPKG_TARGET_TRIPLET=${TRIPLET} \
+              -DCMAKE_CXX_STDLIB_MODULES_JSON=${STDLIB_MODULES_JSON} \
+              -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+              -DCPACK_PACKAGE_VERSION=${RELEASE_TAG}-${{ matrix.target }} \
+              -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=${DEB_ARCH} \
+              -S /infinity -B /infinity/cmake-build-reldeb && \
+            cmake --build /infinity/cmake-build-reldeb --target infinity && \
+            cd /infinity/cmake-build-reldeb && cpack"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: release-${{ matrix.arch }}
+        name: release-${{ matrix.target }}
         path: |
           cmake-build-reldeb/infinity-*.deb
           cmake-build-reldeb/infinity-*.rpm
           cmake-build-reldeb/infinity-*.tar.gz
         retention-days: 1
 
+    - name: Set up QEMU
+      if: matrix.target == 'arm64'
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
+    - name: Set up Docker Buildx
+      if: matrix.target == 'arm64'
+      uses: docker/setup-buildx-action@v3
+
     - name: Build and push image
       env:
         RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
       run: |
-        sudo docker login --username infiniflow --password-stdin <<< ${{ secrets.DOCKERHUB_TOKEN }}
-        DOCKER_BUILDKIT=1 sudo docker build -t infiniflow/infinity:${RELEASE_TAG}-${{ matrix.arch }} -f scripts/Dockerfile_infinity .
-        sudo docker push infiniflow/infinity:${RELEASE_TAG}-${{ matrix.arch }}
+        docker login --username infiniflow --password-stdin <<< ${{ secrets.DOCKERHUB_TOKEN }}
+
+        if [[ "${{ matrix.target }}" == "arm64" ]]; then
+          docker buildx build \
+          --platform linux/arm64 \
+          -t infiniflow/infinity:${RELEASE_TAG}-arm64 \
+          -f scripts/Dockerfile_infinity \
+          --push .
+        else
+          docker build \
+          -t infiniflow/infinity:${RELEASE_TAG}-${{ matrix.target }} \
+          -f scripts/Dockerfile_infinity .
+          docker push infiniflow/infinity:${RELEASE_TAG}-${{ matrix.target }}
+        fi
 
     - name: Destroy builder container
       if: always()  # always run this step even if previous steps failed
       run: |
         if [ -n "${BUILDER_CONTAINER}" ]; then
-          sudo docker rm -f -v ${BUILDER_CONTAINER}
+          docker rm -f -v ${BUILDER_CONTAINER}
         fi
 
   release:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
-      - name: Download amd64 artifacts
+      - name: Download x64-v1 artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-amd64
-          path: artifacts/amd64
+          name: release-x64-v1
+          path: artifacts/x64-v1
+
+      - name: Download x64-v2 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-x64-v2
+          path: artifacts/x64-v2
+
+      - name: Download x64-v3 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-x64-v3
+          path: artifacts/x64-v3
+
+      - name: Download x64-v4 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-x64-v4
+          path: artifacts/x64-v4
 
       - name: Download arm64 artifacts
         uses: actions/download-artifact@v4
@@ -144,7 +249,10 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           body_path: release_body.md
           files: |
-            artifacts/amd64/*
+            artifacts/x64-v1/*
+            artifacts/x64-v2/*
+            artifacts/x64-v3/*
+            artifacts/x64-v4/*
             artifacts/arm64/*
 
   tag:
@@ -164,28 +272,28 @@ jobs:
           git tag -f ${RELEASE_TAG} ${GITHUB_SHA}
           git push -f origin ${RELEASE_TAG}:refs/tags/${RELEASE_TAG}
 
-  manifest:
-    needs: [prepare, build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create and push multi-arch manifest
-        env:
-          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
-        run: |
-          sudo docker login --username infiniflow --password-stdin <<< ${{ secrets.DOCKERHUB_TOKEN }}
-          sudo docker manifest create infiniflow/infinity:${RELEASE_TAG} \
-            infiniflow/infinity:${RELEASE_TAG}-amd64 \
-            infiniflow/infinity:${RELEASE_TAG}-arm64
-          sudo docker manifest push infiniflow/infinity:${RELEASE_TAG}
+  # manifest:
+  #   needs: [prepare, build]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Create and push multi-arch manifest
+  #       env:
+  #         RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+  #       run: |
+  #         docker login --username infiniflow --password-stdin <<< ${{ secrets.DOCKERHUB_TOKEN }}
+  #         docker manifest create infiniflow/infinity:${RELEASE_TAG} \
+  #           infiniflow/infinity:${RELEASE_TAG}-x64-v1 \
+  #           infiniflow/infinity:${RELEASE_TAG}-x64-v2 \
+  #           infiniflow/infinity:${RELEASE_TAG}-x64-v3 \
+  #           infiniflow/infinity:${RELEASE_TAG}-x64-v4 \
+  #           infiniflow/infinity:${RELEASE_TAG}-arm64
+  #         docker manifest push infiniflow/infinity:${RELEASE_TAG}
 
   infinity-sdk:
     needs: [prepare, release]
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ["self-hosted", "infinity-release"]
+    runs-on: ubuntu-latest
     steps:
-      - name: Ensure workspace ownership
-        run: echo "chown -R ${USER} ${GITHUB_WORKSPACE}" && sudo chown -R ${USER} ${GITHUB_WORKSPACE}
-
       - name: Check out code
         uses: actions/checkout@v6
         with:
