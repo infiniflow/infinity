@@ -151,10 +151,6 @@ jobs:
         if: always()
         run: docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder sccache --show-stats || true
 
-      - name: Fix sccache cache permissions
-        if: always()
-        run: docker exec infinity_builder bash -c "chown -R $(stat -c %u /infinity):$(stat -c %g /infinity) /sccache-cache" || true
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -165,9 +161,11 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-      - name: Remove build container
+      - name: Fix sccache cache permissions and remove container
         if: always()
-        run: docker rm -f infinity_builder || true
+        run: |
+          sudo chown -R $(id -u):$(id -g) .sccache-cache || true
+          docker rm -f infinity_builder || true
 
   debug_amd64_unit_test:
     name: debug_amd64_unit_test
