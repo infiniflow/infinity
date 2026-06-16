@@ -52,8 +52,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x64-v1
-            builder_image: infiniflow/infinity-x64-x64-v1-builder:latest
+          # - target: x64-v1
+          #   builder_image: infiniflow/infinity-x64-x64-v1-builder:latest
           - target: x64-v2
             builder_image: infiniflow/infinity-x64-x64-v2-builder:latest
           - target: x64-v3
@@ -198,11 +198,11 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
-      - name: Download x64-v1 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-x64-v1
-          path: artifacts/x64-v1
+      # - name: Download x64-v1 artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: release-x64-v1
+      #     path: artifacts/x64-v1
 
       - name: Download x64-v2 artifacts
         uses: actions/download-artifact@v4
@@ -249,7 +249,7 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           body_path: release_body.md
           files: |
-            artifacts/x64-v1/*
+            # artifacts/x64-v1/*
             artifacts/x64-v2/*
             artifacts/x64-v3/*
             artifacts/x64-v4/*
