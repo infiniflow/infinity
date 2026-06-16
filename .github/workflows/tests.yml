@@ -149,8 +149,7 @@ jobs:
         run: docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "
           git config --global safe.directory \"*\" &&
           cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug &&
-          SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu
-          cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+          SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
               -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
               -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
               -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/x86_64-linux-v2.cmake \
@@ -916,8 +915,7 @@ jobs:
           docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "
             git config --global safe.directory \"*\" &&
             cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb &&
-            SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu
-            cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+            SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/ GCC_TOOLCHAIN=/x86_64-linux-gnu cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
               -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
               -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
               -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/x86_64-linux-v2.cmake \
@@ -1537,8 +1535,7 @@ jobs:
           docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "
             git config --global safe.directory \"*\" &&
             cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug &&
-            SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/
-            cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+            SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake \
@@ -2044,8 +2041,7 @@ jobs:
           docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "
             git config --global safe.directory \"*\" &&
             cd /infinity && rm -rf cmake-build-reldeb && mkdir -p cmake-build-reldeb &&
-            SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/
-            cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+            SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake \
