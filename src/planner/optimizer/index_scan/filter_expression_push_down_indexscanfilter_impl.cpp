@@ -624,7 +624,7 @@ private:
                     // Build JSON term
                     std::string func_name = json_func_expr->ScalarFunctionName();
                     JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, json_path, raw_value, cmp_type);
-                    std::string term_str(term.data_, term.length_);
+                    std::string term_str = term;
                     value = Value::MakeVarchar(term_str);
                 };
 
@@ -663,7 +663,7 @@ private:
                             compare_type = FilterCompareType::kEqual;
                             // Build JSON term with the token value
                             JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, path, raw_value, compare_type);
-                            std::string term_str(term.data_, term.length_);
+                            std::string term_str = term;
                             value = Value::MakeVarchar(term_str);
                         }
                         // Handle 2-arg json_contains: json_contains(col, 'token')
@@ -672,7 +672,7 @@ private:
                             compare_type = FilterCompareType::kEqual;
                             // Build term with "$" path for top-level array contains (root array uses "$" as parent path)
                             JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, "$", value, compare_type);
-                            std::string term_str(term.data_, term.length_);
+                            std::string term_str = term;
                             value = Value::MakeVarchar(term_str);
                         }
                         // Handle json_exists_path: json_exists_path(col, '$.path')
@@ -687,7 +687,7 @@ private:
                             }
                             compare_type = FilterCompareType::kEqual;
                             JsonTermT term = FilterExpressionPushDownHelper::BuildJsonTerm(func_name, path, Value::MakeBool(true), compare_type);
-                            std::string term_str(term.data_, term.length_);
+                            std::string term_str = term;
                             value = Value::MakeVarchar(term_str);
                         }
                         // Fallback for other JSON functions
@@ -792,7 +792,7 @@ private:
                                 Value int_value = Value::MakeBigInt(int_val);
                                 JsonTermT int_term =
                                     FilterExpressionPushDownHelper::BuildJsonTerm("json_extract_int", json_path, int_value, int_cmp_type);
-                                std::string int_term_str(int_term.data_, int_term.length_);
+                                std::string int_term_str = int_term;
                                 JsonTermT int_term_key(int_term_str);
 
                                 if (compare_type == FilterCompareType::kEqual) {
