@@ -19,47 +19,29 @@
 
 namespace infinity {
 
-// JsonTermT is now just an alias for std::string.
-// It represents a flattened JSON term used for JSON index.
-// Term format: {path}:{type_tag}:{encoded_value}
-// The string is kept ordered (dictionary order = value order).
+/**
+ * @brief JsonTermT is an alias for std::string.
+ *
+ * It represents a flattened JSON term used for JSON index.
+ * Term format: {path}:{type_tag}:{encoded_value}
+ * The string is kept ordered (dictionary order = value order).
+ * Using std::string removes the arbitrary size limit.
+ */
 using JsonTermT = std::string;
 
-// Return a "min" term that sorts before all valid terms.
-inline JsonTermT JsonTermMin() { return ""; }
+/**
+ * @brief Return a "min" term that sorts before all valid terms.
+ * @return Empty string.
+ */
+constexpr JsonTermT JsonTermTMin() { return {}; }
 
-// Return a "max" term that sorts after all valid terms.
-// We use a single 0xFF byte, which is greater than any valid JSON term
-// (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
-inline JsonTermT JsonTermMax() { return std::string(1, '\xFF'); }
+/**
+ * @brief Return a "max" term that sorts after all valid terms.
+ *
+ * Uses a single 0xFF byte, which is greater than any valid JSON term
+ * (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
+ * @return String with a single 0xFF byte.
+ */
+constexpr JsonTermT JsonTermTMax() { return std::string(1, '\xFF'); }
 
 } // namespace infinity
-
-// Specialize std::numeric_limits for JsonTermT (as std::string)
-namespace std {
-
-template <>
-struct numeric_limits<infinity::JsonTermT> {
-    static constexpr bool is_specialized = true;
-
-    static infinity::JsonTermT min() { return infinity::JsonTermMin(); }
-
-    static infinity::JsonTermT max() { return infinity::JsonTermMax(); }
-
-    static infinity::JsonTermT lowest() { return min(); }
-
-    static constexpr int digits = 0;
-    static constexpr int digits10 = 0;
-    static constexpr bool is_signed = false;
-    static constexpr bool is_integer = false;
-    static constexpr bool is_exact = false;
-    static constexpr bool has_infinity = false;
-    static constexpr bool has_quiet_NaN = false;
-    static constexpr bool has_signaling_NaN = false;
-    static constexpr std::float_round_style round_style = std::round_toward_zero;
-    static constexpr bool is_iec559 = false;
-    static constexpr bool is_bounded = true;
-    static constexpr bool is_modulo = false;
-};
-
-} // namespace std

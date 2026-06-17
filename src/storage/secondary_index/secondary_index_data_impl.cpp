@@ -56,6 +56,8 @@ struct SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag> {
     u32 next_offset_ = 0;
     const void *key_ptr_ = nullptr;
     const SegmentOffset *offset_ptr_ = nullptr;
+    // For std::string, track byte position instead of element count
+    size_t next_byte_offset_ = 0;
     SecondaryIndexChunkDataReader(BufferObj *buffer_obj, u32 row_count) {
         handle_ = buffer_obj->Load();
         row_count_ = row_count;
@@ -67,7 +69,17 @@ struct SecondaryIndexChunkDataReader<RawValueType, HighCardinalityTag> {
         if (next_offset_ >= row_count_) {
             return false;
         }
-        std::memcpy(&key, static_cast<const char *>(key_ptr_) + next_offset_ * sizeof(OrderedKeyType), sizeof(key));
+        if constexpr (std::same_as<OrderedKeyType, std::string>) {
+            // Read string length
+            u32 str_len = 0;
+            std::memcpy(&str_len, static_cast<const char *>(key_ptr_) + next_byte_offset_, sizeof(u32));
+            // Resize the string and read the data
+            key.resize(str_len);
+            std::memcpy(key.data(), static_cast<const char *>(key_ptr_) + next_byte_offset_ + sizeof(u32), str_len);
+            next_byte_offset_ += sizeof(u32) + str_len;
+        } else {
+            std::memcpy(&key, static_cast<const char *>(key_ptr_) + next_offset_ * sizeof(OrderedKeyType), sizeof(key));
+        }
         std::memcpy(&offset, offset_ptr_ + next_offset_, sizeof(offset));
         ++next_offset_;
         return true;
@@ -232,13 +244,34 @@ public:
     }
 
     void SaveIndexInner(LocalFileHandle &file_handle) const override {
-        file_handle.Append(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        if constexpr (std::same_as<OrderedKeyType, std::string>) {
+            // Serialize string length + data explicitly
+            for (u32 i = 0; i < chunk_row_count_; ++i) {
+                const auto &str = static_cast<const std::string *>(key_ptr_)[i];
+                u32 str_size = str.size();
+                file_handle.Append(&str_size, sizeof(str_size));
+                file_handle.Append(str.data(), str_size);
+            }
+        } else {
+            file_handle.Append(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        }
         file_handle.Append(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
         pgm_index_->SaveIndex(file_handle);
     }
 
     void ReadIndexInner(LocalFileHandle &file_handle) override {
-        file_handle.Read(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        if constexpr (std::same_as<OrderedKeyType, std::string>) {
+            // Deserialize string length + data explicitly
+            for (u32 i = 0; i < chunk_row_count_; ++i) {
+                u32 str_size;
+                file_handle.Read(&str_size, sizeof(str_size));
+                auto &str = static_cast<std::string *>(key_ptr_)[i];
+                str.resize(str_size);
+                file_handle.Read(str.data(), str_size);
+            }
+        } else {
+            file_handle.Read(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        }
         file_handle.Read(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
         pgm_index_->LoadIndex(file_handle);
     }
@@ -311,7 +344,16 @@ public:
 
         // Save unique keys
         if (unique_key_count_ > 0) {
-            file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Serialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size = unique_keys_[i].size();
+                    file_handle.Append(&str_size, sizeof(str_size));
+                    file_handle.Append(unique_keys_[i].data(), str_size);
+                }
+            } else {
+                file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Save RoaringBitmaps
             for (const auto &bitmap : offset_bitmaps_) {
@@ -334,7 +376,17 @@ public:
         if (unique_key_count_ > 0) {
             // Read unique keys
             unique_keys_.resize(unique_key_count_);
-            file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Deserialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size;
+                    file_handle.Read(&str_size, sizeof(str_size));
+                    unique_keys_[i].resize(str_size);
+                    file_handle.Read(unique_keys_[i].data(), str_size);
+                }
+            } else {
+                file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
@@ -365,8 +417,19 @@ public:
         if (unique_key_count_ > 0) {
             // Read unique keys
             unique_keys_.resize(unique_key_count_);
-            std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
-            ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Deserialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size = *reinterpret_cast<const u32 *>(ptr);
+                    ptr += sizeof(str_size);
+                    unique_keys_[i].resize(str_size);
+                    std::memcpy(unique_keys_[i].data(), ptr, str_size);
+                    ptr += str_size;
+                }
+            } else {
+                std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
+                ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
@@ -534,7 +597,16 @@ public:
 
         // Save unique keys
         if (unique_key_count_ > 0) {
-            file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Serialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size = unique_keys_[i].size();
+                    file_handle.Append(&str_size, sizeof(str_size));
+                    file_handle.Append(unique_keys_[i].data(), str_size);
+                }
+            } else {
+                file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Save RoaringBitmaps
             for (const auto &bitmap : offset_bitmaps_) {
@@ -557,7 +629,17 @@ public:
         if (unique_key_count_ > 0) {
             // Read unique keys
             unique_keys_.resize(unique_key_count_);
-            file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Deserialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size;
+                    file_handle.Read(&str_size, sizeof(str_size));
+                    unique_keys_[i].resize(str_size);
+                    file_handle.Read(unique_keys_[i].data(), str_size);
+                }
+            } else {
+                file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
@@ -588,8 +670,19 @@ public:
         if (unique_key_count_ > 0) {
             // Read unique keys
             unique_keys_.resize(unique_key_count_);
-            std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
-            ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            if constexpr (std::same_as<OrderedKeyType, std::string>) {
+                // Deserialize string length + data explicitly
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 str_size = *reinterpret_cast<const u32 *>(ptr);
+                    ptr += sizeof(str_size);
+                    unique_keys_[i].resize(str_size);
+                    std::memcpy(unique_keys_[i].data(), ptr, str_size);
+                    ptr += str_size;
+                }
+            } else {
+                std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
+                ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
