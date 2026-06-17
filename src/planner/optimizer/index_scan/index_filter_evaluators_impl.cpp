@@ -440,7 +440,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
             }
             case FilterCompareType::kGreaterEqual: {
                 if constexpr (std::is_same_v<ColumnValueT, JsonTermT>) {
-                    std::string val_str = val_ordered.ToString();
+                    std::string val_str = val_ordered;
                     size_t type_tag_pos = FindJsonTypeTagPos(val_str);
                     JsonTermT end_key;
                     if (type_tag_pos != std::string::npos && type_tag_pos >= 2) {
@@ -450,7 +450,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                         std::string path_with_type = val_str.substr(0, type_tag_pos);
                         end_key = JsonTermT(path_with_type + ";");
                     } else {
-                        end_key = std::numeric_limits<SecondaryIndexOrderedT>::max();
+                        end_key = JsonTermTMax();
                     }
                     result->secondary_index_start_end_pairs_.emplace_back(val_ordered, end_key);
                 } else {
@@ -460,7 +460,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
             }
             case FilterCompareType::kLessEqual: {
                 if constexpr (std::is_same_v<ColumnValueT, JsonTermT>) {
-                    std::string val_str = val_ordered.ToString();
+                    std::string val_str = val_ordered;
                     size_t type_tag_pos = FindJsonTypeTagPos(val_str);
                     JsonTermT begin_key;
                     if (type_tag_pos != std::string::npos && type_tag_pos >= 2) {
@@ -848,7 +848,16 @@ struct TrunkReaderT<ColumnValueType, HighCardinalityTag> final : TrunkReader<Col
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         auto index_key_ptr = [key_ptr](const u32 i) -> KeyType {
             KeyType key{};
-            std::memcpy(&key, static_cast<const char *>(key_ptr) + i * sizeof(KeyType), sizeof(KeyType));
+            if constexpr (std::same_as<KeyType, std::string>) {
+                // For std::string, deserialize from serialized format (length + data)
+                // This requires tracking byte offset, not element offset
+                // Note: This is a simplified fix - the proper solution would require
+                // tracking byte positions like in SecondaryIndexChunkDataReader
+                // For now, we use reinterpret_cast as a direct fix
+                key = *reinterpret_cast<const KeyType*>(static_cast<const char *>(key_ptr) + i * sizeof(KeyType));
+            } else {
+                std::memcpy(&key, static_cast<const char *>(key_ptr) + i * sizeof(KeyType), sizeof(KeyType));
+            }
             return key;
         };
         // 2. find the exact range
