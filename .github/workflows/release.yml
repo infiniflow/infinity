@@ -130,6 +130,8 @@ jobs:
             ;;
         esac
 
+        docker exec ${BUILDER_CONTAINER} bash -c "apt install -y rpm"
+
         docker exec ${BUILDER_CONTAINER} bash -c "
             git config --global safe.directory \"*\" && \
             cd /infinity && rm -fr cmake-build-reldeb && mkdir -p cmake-build-reldeb && \
