@@ -14,78 +14,37 @@
 
 #pragma once
 
-#include <compare>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <stdexcept>
 #include <string>
+#include <limits>
 
 namespace infinity {
 
-// JsonTermT represents a flattened JSON term used for JSON index.
+// JsonTermT is now just an alias for std::string.
+// It represents a flattened JSON term used for JSON index.
 // Term format: {path}:{type_tag}:{encoded_value}
 // The string is kept ordered (dictionary order = value order).
-// Uses std::string for dynamic storage; no arbitrary length limit.
-struct JsonTermT {
-    std::string term_;
+using JsonTermT = std::string;
 
-    JsonTermT() = default;
+// Return a "min" term that sorts before all valid terms.
+inline JsonTermT JsonTermMin() { return ""; }
 
-    explicit JsonTermT(const std::string &term) { term_ = term; }
-
-    bool operator==(const JsonTermT &other) const {
-        return term_ == other.term_;
-    }
-
-    auto operator<=>(const JsonTermT &other) const {
-        return term_ <=> other.term_;
-    }
-
-    std::string ToString() const {
-        return term_;
-    }
-
-    void Reset() {
-        term_.clear();
-    }
-
-    void Append(const char *src, size_t len) {
-        term_.append(src, len);
-    }
-
-    // Return a "max" term that sorts after all valid terms.
-    // We use a single 0xFF byte, which is greater than any valid JSON term
-    // (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
-    static JsonTermT Max() {
-        JsonTermT result;
-        result.term_ = std::string(1, '\xFF');
-        return result;
-    }
-
-    // Return a "min" term that sorts before all valid terms.
-    static JsonTermT Min() {
-        return JsonTermT();
-    }
-
-private:
-    void Assign(const char *src, size_t len) {
-        term_.assign(src, len);
-    }
-};
+// Return a "max" term that sorts after all valid terms.
+// We use a single 0xFF byte, which is greater than any valid JSON term
+// (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
+inline JsonTermT JsonTermMax() { return std::string(1, '\xFF'); }
 
 } // namespace infinity
 
-// Specialize std::numeric_limits for JsonTermT
+// Specialize std::numeric_limits for JsonTermT (as std::string)
 namespace std {
 
 template <>
 struct numeric_limits<infinity::JsonTermT> {
     static constexpr bool is_specialized = true;
 
-    static infinity::JsonTermT min() { return infinity::JsonTermT::Min(); }
+    static infinity::JsonTermT min() { return infinity::JsonTermMin(); }
 
-    static infinity::JsonTermT max() { return infinity::JsonTermT::Max(); }
+    static infinity::JsonTermT max() { return infinity::JsonTermMax(); }
 
     static infinity::JsonTermT lowest() { return min(); }
 
