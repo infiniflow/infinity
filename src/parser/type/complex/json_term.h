@@ -14,34 +14,25 @@
 
 #pragma once
 
-#include <string>
-#include <limits>
+import std.compat;
 
 namespace infinity {
 
-/**
- * @brief JsonTermT is an alias for std::string.
- *
- * It represents a flattened JSON term used for JSON index.
- * Term format: {path}:{type_tag}:{encoded_value}
- * The string is kept ordered (dictionary order = value order).
- * Using std::string removes the arbitrary size limit.
- */
+/// JsonTermT is an alias for std::string.
+/// It represents a flattened JSON term used for JSON index.
+/// Term format: {path}:{type_tag}:{encoded_value}
+/// The string is kept ordered (dictionary order = value order).
+/// Using std::string removes the arbitrary size limit.
 using JsonTermT = std::string;
 
-/**
- * @brief Return a "min" term that sorts before all valid terms.
- * @return Empty string.
- */
+/// Returns a "min" term that sorts before all valid terms.
+/// @return Empty string.
 constexpr JsonTermT JsonTermTMin() { return {}; }
 
-/**
- * @brief Return a "max" term that sorts after all valid terms.
- *
- * Uses a single 0xFF byte, which is greater than any valid JSON term
- * (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
- * @return String with a single 0xFF byte.
- */
+/// Returns a "max" term that sorts after all valid terms.
+/// Uses a single 0xFF byte, which is greater than any valid JSON term
+/// (valid terms are ASCII / UTF‑8, where bytes < 0xFF).
+/// @return String with a single 0xFF byte.
 constexpr JsonTermT JsonTermTMax() { return std::string(1, '\xFF'); }
 
 } // namespace infinity
