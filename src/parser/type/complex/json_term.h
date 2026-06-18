@@ -14,7 +14,8 @@
 
 #pragma once
 
-import std.compat;
+#include <string>
+#include <limits>
 
 namespace infinity {
 
