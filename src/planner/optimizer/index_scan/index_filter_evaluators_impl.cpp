@@ -370,8 +370,13 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                 }
             }
             // final element
-            const auto full_range_v = std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT>{std::numeric_limits<SecondaryIndexOrderedT>::lowest(),
-                                                                                                std::numeric_limits<SecondaryIndexOrderedT>::max()};
+            const auto full_range_v = []() -> std::pair<SecondaryIndexOrderedT, SecondaryIndexOrderedT> {
+                if constexpr (std::is_same_v<SecondaryIndexOrderedT, std::string>) {
+                    return {JsonTermTMin(), JsonTermTMax()};
+                } else {
+                    return {std::numeric_limits<SecondaryIndexOrderedT>::lowest(), std::numeric_limits<SecondaryIndexOrderedT>::max()};
+                }
+            }();
             if (back_v != full_range_v) {
                 new_start_end_pairs.push_back(back_v);
             }
