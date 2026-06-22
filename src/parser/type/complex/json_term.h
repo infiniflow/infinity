@@ -24,8 +24,6 @@
 // The string is kept ordered (dictionary order = value order).
 // Uses std::string for variable-length storage.
 
-constexpr size_t JSON_TERM_MAX_LENGTH = 512;
-
 namespace infinity {
 
 struct JsonTermT {
@@ -43,7 +41,7 @@ struct JsonTermT {
     // Return a "max" term that sorts after all valid terms
     static JsonTermT Max() {
         JsonTermT result;
-        result.data_.assign(JSON_TERM_MAX_LENGTH, '\xFF');
+        result.data_ = "\xFF";
         return result;
     }
 

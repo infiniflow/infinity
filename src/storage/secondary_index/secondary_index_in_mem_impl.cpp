@@ -53,6 +53,7 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
     RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
+    size_t json_key_bytes_ = 0;
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
@@ -70,7 +71,13 @@ public:
         : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) {
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
-    ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
+    ~SecondaryIndexInMemT() override {
+        if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+            DecreaseMemoryUsageBase(MemoryCostOfThis() + json_key_bytes_ + static_cast<size_t>(GetRowCount()) * sizeof(u32));
+        } else {
+            DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
+        }
+    }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
         // RcuMultiMap is thread-safe, no lock needed
@@ -101,13 +108,14 @@ public:
                 auto terms = JsonFlattener::FlattenDocument(json_info->bson_elements_.data(), json_info->bson_elements_.size());
                 for (const auto &term : terms) {
                     JsonTermT key(term.term_);
-                    key_bytes += sizeof(JsonTermT) + key.ToString().capacity();
+                    key_bytes += sizeof(JsonTermT) + key.ToString().size();
                     in_mem_secondary_index_.Insert(key, block_offset + offset + i);
                     ++inserted_count;
                 }
             }
         }
-        IncreaseMemoryUsageBase(key_bytes + inserted_count * sizeof(u32));
+        json_key_bytes_ += key_bytes;
+        IncreaseMemoryUsageBase(key_bytes + static_cast<size_t>(inserted_count) * sizeof(u32));
     }
 
     void Dump(BufferObj *buffer_obj) const override {

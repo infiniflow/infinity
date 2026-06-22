@@ -1080,6 +1080,8 @@ Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID s
                 result.MergeOr(part_result);
                 continue;
             }
+        } else if (cardinality == SecondaryIndexCardinality::kHighCardinality) {
+            UnrecoverableError("High-cardinality secondary indexes require trivially copyable ordered keys.");
         }
         part_result = ExecuteSingleRangeLowCardinalityT<ColumnValueT>(rng, &*index_meta, segment_row_count);
         result.MergeOr(part_result);
