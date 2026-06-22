@@ -130,7 +130,7 @@ jobs:
             ;;
         esac
 
-        docker exec ${BUILDER_CONTAINER} bash -c "apt install -y rpm"
+        docker exec ${BUILDER_CONTAINER} bash -c "apt-fast -y update && apt-fast install -y rpm"
 
         docker exec ${BUILDER_CONTAINER} bash -c "
             git config --global safe.directory \"*\" && \
