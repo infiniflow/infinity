@@ -66,7 +66,7 @@ export float hsum256_ps_avx(__m256 v) {
 }
 
 // Horizontal max across 8 packed f32 values
-export inline float hmax256_ps_avx(__m256 v) {
+export float hmax256_ps_avx(__m256 v) {
     __m128 vlow = _mm256_castps256_ps128(v);
     __m128 vhigh = _mm256_extractf128_ps(v, 1);
     __m128 max128 = _mm_max_ps(vlow, vhigh);

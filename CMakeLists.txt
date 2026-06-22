@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0.3...4.2.5)
+cmake_minimum_required(VERSION 4.0.3...4.3.4)
 
 cmake_policy(SET CMP0167 OLD)
 
@@ -6,6 +6,10 @@ set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
 if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.5)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+else (CMAKE_VERSION GREATER 4.2.5 AND CMAKE_VERSION LESS_EQUAL 4.3.4)
+    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
+    # we use clang
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-reserved-module-identifier")
 endif ()
 
 # Auto-detect and set vcpkg toolchain if not already set
@@ -28,7 +32,7 @@ set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/ports")
 
 project(infinity VERSION 0.7.0)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_CXX_MODULE_STD ON)

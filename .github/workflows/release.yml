@@ -74,7 +74,7 @@ jobs:
         BUILDER_CONTAINER=infinity_builder
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> ${GITHUB_ENV}
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        docker rm -f ${BUILDER_CONTAINER} && docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.org/simple/ -v ${PWD}:/infinity ${{ matrix.builder_image }}
+        docker run -d --name ${BUILDER_CONTAINER} -e TZ=${TZ} -e UV_INDEX=https://pypi.org/simple/ -v ${PWD}:/infinity ${{ matrix.builder_image }}
 
     - name: Create libstdc++ modules JSON for cross-compilation
       run: |
