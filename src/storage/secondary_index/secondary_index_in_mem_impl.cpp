@@ -14,6 +14,7 @@
 
 module;
 
+#include <atomic>
 #include <cassert>
 
 module infinity_core:secondary_index_in_mem.impl;
@@ -53,7 +54,7 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
     RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
-    size_t json_key_bytes_ = 0;
+    std::atomic_size_t json_key_bytes_{0};
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
@@ -73,7 +74,8 @@ public:
     }
     ~SecondaryIndexInMemT() override {
         if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
-            DecreaseMemoryUsageBase(MemoryCostOfThis() + json_key_bytes_ + static_cast<size_t>(GetRowCount()) * sizeof(u32));
+            DecreaseMemoryUsageBase(MemoryCostOfThis() + json_key_bytes_.load(std::memory_order_relaxed) +
+                                    static_cast<size_t>(GetRowCount()) * sizeof(u32));
         } else {
             DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
         }
@@ -114,7 +116,7 @@ public:
                 }
             }
         }
-        json_key_bytes_ += key_bytes;
+        json_key_bytes_.fetch_add(key_bytes, std::memory_order_relaxed);
         IncreaseMemoryUsageBase(key_bytes + static_cast<size_t>(inserted_count) * sizeof(u32));
     }
 
