@@ -753,10 +753,22 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  debug_amd64_upload_codecov:
-    name: debug_amd64_upload_codecov
+  debug_upload_codecov:
+    name: debug_upload_codecov
     runs-on: ubuntu-latest
-    needs: [ debug_amd64_unit_test, debug_amd64_sqllogical_test, debug_amd64_pysdk_test, debug_amd64_go_test, debug_amd64_http_test, debug_amd64_pysdk_parallel_test ]
+    needs:
+      - debug_amd64_unit_test
+      - debug_amd64_sqllogical_test
+      - debug_amd64_pysdk_test
+      - debug_amd64_go_test
+      - debug_amd64_http_test
+      - debug_amd64_pysdk_parallel_test
+      - debug_arm64_unit_test
+      - debug_arm64_sqllogical_test
+      - debug_arm64_pysdk_test
+      - debug_arm64_go_test
+      - debug_arm64_http_test
+      - debug_arm64_pysdk_parallel_test
     steps:
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
@@ -776,63 +788,109 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Download unit test coverage
+      # AMD64 coverage artifacts
+      - name: Download amd64 unit test coverage
         if: needs.debug_amd64_unit_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-unit-test-amd64
-          path: coverage/unit_test
+          path: coverage/amd64/unit_test
 
-      - name: Download sqllogical test coverage
+      - name: Download amd64 sqllogical test coverage
         if: needs.debug_amd64_sqllogical_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-sqllogical-test-amd64
-          path: coverage/sqllogical_test
+          path: coverage/amd64/sqllogical_test
 
-      - name: Download pysdk test coverage
+      - name: Download amd64 pysdk test coverage
         if: needs.debug_amd64_pysdk_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-pysdk-test-amd64
-          path: coverage/pysdk_test
+          path: coverage/amd64/pysdk_test
 
-      - name: Download go test coverage
+      - name: Download amd64 go test coverage
         if: needs.debug_amd64_go_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-go-test-amd64
-          path: coverage/go_test
+          path: coverage/amd64/go_test
 
-      - name: Download http test coverage
+      - name: Download amd64 http test coverage
         if: needs.debug_amd64_http_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-http-test-amd64
-          path: coverage/http_test
+          path: coverage/amd64/http_test
 
-      - name: Download pysdk parallel test coverage
+      - name: Download amd64 pysdk parallel test coverage
         if: needs.debug_amd64_pysdk_parallel_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-pysdk-parallel-test-amd64
-          path: coverage/pysdk_parallel_test
+          path: coverage/amd64/pysdk_parallel_test
+
+      # ARM64 coverage artifacts
+      - name: Download arm64 unit test coverage
+        if: needs.debug_arm64_unit_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-unit-test-arm64
+          path: coverage/arm64/unit_test
+
+      - name: Download arm64 sqllogical test coverage
+        if: needs.debug_arm64_sqllogical_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-sqllogical-test-arm64
+          path: coverage/arm64/sqllogical_test
+
+      - name: Download arm64 pysdk test coverage
+        if: needs.debug_arm64_pysdk_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-pysdk-test-arm64
+          path: coverage/arm64/pysdk_test
+
+      - name: Download arm64 go test coverage
+        if: needs.debug_arm64_go_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-go-test-arm64
+          path: coverage/arm64/go_test
+
+      - name: Download arm64 http test coverage
+        if: needs.debug_arm64_http_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-http-test-arm64
+          path: coverage/arm64/http_test
+
+      - name: Download arm64 pysdk parallel test coverage
+        if: needs.debug_arm64_pysdk_parallel_test.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-debug-pysdk-parallel-test-arm64
+          path: coverage/arm64/pysdk_parallel_test
 
       - name: Merge coverage reports
         run: |
           mkdir -p merged_coverage
-          if [ -f coverage/unit_test/coverage.lcov ]; then
-            cat coverage/unit_test/coverage.lcov > merged_coverage/coverage.lcov
-          fi
-          for dir in coverage/sqllogical_test coverage/pysdk_test coverage/go_test coverage/http_test coverage/pysdk_parallel_test; do
-            if [ -f "$dir/coverage.lcov" ]; then
-              if [ -f merged_coverage/coverage.lcov ]; then
-                echo "" >> merged_coverage/coverage.lcov
-                grep -v "^TN:" "$dir/coverage.lcov" >> merged_coverage/coverage.lcov || true
-              else
-                cat "$dir/coverage.lcov" > merged_coverage/coverage.lcov
+          FIRST_FILE=1
+          for arch in amd64 arm64; do
+            for test_type in unit_test sqllogical_test pysdk_test go_test http_test pysdk_parallel_test; do
+              file="coverage/$arch/$test_type/coverage.lcov"
+              if [ -f "$file" ]; then
+                if [ $FIRST_FILE -eq 1 ]; then
+                  cat "$file" > merged_coverage/coverage.lcov
+                  FIRST_FILE=0
+                else
+                  echo "" >> merged_coverage/coverage.lcov
+                  grep -v "^TN:" "$file" >> merged_coverage/coverage.lcov || true
+                fi
               fi
-            fi
+            done
           done
           if [ -f merged_coverage/coverage.lcov ]; then
             echo "Merged coverage file lines: $(wc -l < merged_coverage/coverage.lcov)"
@@ -847,11 +905,10 @@ jobs:
           chmod +x codecov
           ./codecov -t ${{ secrets.CODECOV_TOKEN }} \
             -f merged_coverage/coverage.lcov \
-            -F "debug_amd64" \
+            -F "debug_amd64,debug_arm64" \
             -C ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }} \
             -B ${{ github.ref_name }} \
-            -n "debug_amd64_coverage"
-
+            -n "debug_coverage"
 
   release_amd64_build:
     name: release_amd64_build
@@ -2109,105 +2166,6 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  debug_arm64_upload_codecov:
-    name: debug_arm64_upload_codecov
-    runs-on: ubuntu-latest
-    needs: [ debug_arm64_unit_test, debug_arm64_sqllogical_test, debug_arm64_pysdk_test, debug_arm64_go_test, debug_arm64_http_test, debug_arm64_pysdk_parallel_test ]
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Check out code
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Download unit test coverage
-        if: needs.debug_arm64_unit_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-unit-test-arm64
-          path: coverage/unit_test
-
-      - name: Download sqllogical test coverage
-        if: needs.debug_arm64_sqllogical_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-sqllogical-test-arm64
-          path: coverage/sqllogical_test
-
-      - name: Download pysdk test coverage
-        if: needs.debug_arm64_pysdk_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-test-arm64
-          path: coverage/pysdk_test
-
-      - name: Download go test coverage
-        if: needs.debug_arm64_go_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-go-test-arm64
-          path: coverage/go_test
-
-      - name: Download http test coverage
-        if: needs.debug_arm64_http_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-http-test-arm64
-          path: coverage/http_test
-
-      - name: Download pysdk parallel test coverage
-        if: needs.debug_arm64_pysdk_parallel_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-parallel-test-arm64
-          path: coverage/pysdk_parallel_test
-
-      - name: Merge coverage reports
-        run: |
-          mkdir -p merged_coverage
-          if [ -f coverage/unit_test/coverage.lcov ]; then
-            cat coverage/unit_test/coverage.lcov > merged_coverage/coverage.lcov
-          fi
-          for dir in coverage/sqllogical_test coverage/pysdk_test coverage/go_test coverage/http_test coverage/pysdk_parallel_test; do
-            if [ -f "$dir/coverage.lcov" ]; then
-              if [ -f merged_coverage/coverage.lcov ]; then
-                echo "" >> merged_coverage/coverage.lcov
-                grep -v "^TN:" "$dir/coverage.lcov" >> merged_coverage/coverage.lcov || true
-              else
-                cat "$dir/coverage.lcov" > merged_coverage/coverage.lcov
-              fi
-            fi
-          done
-          if [ -f merged_coverage/coverage.lcov ]; then
-            echo "Merged coverage file lines: $(wc -l < merged_coverage/coverage.lcov)"
-          else
-            echo "No coverage files found"
-            exit 1
-          fi
-
-      - name: Upload coverage to Codecov
-        run: |
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          ./codecov -t ${{ secrets.CODECOV_TOKEN }} \
-            -f merged_coverage/coverage.lcov \
-            -F "debug_arm64" \
-            -C ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }} \
-            -B ${{ github.ref_name }} \
-            -n "debug_arm64_coverage"
-
   release_arm64_build:
     name: release_arm64_build
     runs-on: ubuntu-latest
@@ -2935,7 +2893,7 @@ jobs:
       - debug_amd64_go_test
       - debug_amd64_http_test
       - debug_amd64_pysdk_parallel_test
-      - debug_amd64_upload_codecov
+      - debug_upload_codecov
       - release_amd64_build
       - release_amd64_unit_test
       - release_amd64_sqllogical_test
@@ -2952,7 +2910,6 @@ jobs:
       - debug_arm64_go_test
       - debug_arm64_http_test
       - debug_arm64_pysdk_parallel_test
-      - debug_arm64_upload_codecov
       - release_arm64_build
       - release_arm64_unit_test
       - release_arm64_sqllogical_test
