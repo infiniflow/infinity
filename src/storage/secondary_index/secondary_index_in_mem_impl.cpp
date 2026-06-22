@@ -56,7 +56,13 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
-    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
+    u32 MemoryCostOfEachRow() const override {
+        if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+            return map_memory_bloat_factor * (sizeof(KeyType) + 64 + sizeof(u32));
+        } else {
+            return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32));
+        }
+    }
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
@@ -84,9 +90,8 @@ public:
 
     // Special insertion for JSON: flatten each JSON document and insert multiple terms per row
     void InsertBlockDataJson(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
-        // This method inserts multiple terms per JSON document
-        // For each row, we flatten the JSON and insert each term
         u32 inserted_count = 0;
+        size_t key_bytes = 0;
         for (BlockOffset i = 0; i < row_count; ++i) {
             // Get the JSON value at position offset + i
             Value value = col.GetValueByIndex(offset + i);
@@ -96,12 +101,13 @@ public:
                 auto terms = JsonFlattener::FlattenDocument(json_info->bson_elements_.data(), json_info->bson_elements_.size());
                 for (const auto &term : terms) {
                     JsonTermT key(term.term_);
+                    key_bytes += sizeof(JsonTermT) + key.ToString().capacity();
                     in_mem_secondary_index_.Insert(key, block_offset + offset + i);
                     ++inserted_count;
                 }
             }
         }
-        IncreaseMemoryUsageBase(inserted_count * MemoryCostOfEachRow());
+        IncreaseMemoryUsageBase(key_bytes + inserted_count * sizeof(u32));
     }
 
     void Dump(BufferObj *buffer_obj) const override {
