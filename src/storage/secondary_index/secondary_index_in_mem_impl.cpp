@@ -14,6 +14,7 @@
 
 module;
 
+#include <atomic>
 #include <cassert>
 
 module infinity_core:secondary_index_in_mem.impl;
@@ -53,10 +54,17 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
     RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
+    std::atomic_size_t json_key_bytes_{0};
 
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
-    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
+    u32 MemoryCostOfEachRow() const override {
+        if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+            return map_memory_bloat_factor * (sizeof(KeyType) + 64 + sizeof(u32));
+        } else {
+            return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32));
+        }
+    }
     u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
@@ -64,7 +72,14 @@ public:
         : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) {
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
-    ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
+    ~SecondaryIndexInMemT() override {
+        if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+            DecreaseMemoryUsageBase(MemoryCostOfThis() + json_key_bytes_.load(std::memory_order_relaxed) +
+                                    static_cast<size_t>(GetRowCount()) * sizeof(u32));
+        } else {
+            DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
+        }
+    }
     virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
         // RcuMultiMap is thread-safe, no lock needed
@@ -84,9 +99,8 @@ public:
 
     // Special insertion for JSON: flatten each JSON document and insert multiple terms per row
     void InsertBlockDataJson(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
-        // This method inserts multiple terms per JSON document
-        // For each row, we flatten the JSON and insert each term
         u32 inserted_count = 0;
+        size_t key_bytes = 0;
         for (BlockOffset i = 0; i < row_count; ++i) {
             // Get the JSON value at position offset + i
             Value value = col.GetValueByIndex(offset + i);
@@ -96,12 +110,14 @@ public:
                 auto terms = JsonFlattener::FlattenDocument(json_info->bson_elements_.data(), json_info->bson_elements_.size());
                 for (const auto &term : terms) {
                     JsonTermT key(term.term_);
+                    key_bytes += sizeof(JsonTermT) + key.ToString().size();
                     in_mem_secondary_index_.Insert(key, block_offset + offset + i);
                     ++inserted_count;
                 }
             }
         }
-        IncreaseMemoryUsageBase(inserted_count * MemoryCostOfEachRow());
+        json_key_bytes_.fetch_add(key_bytes, std::memory_order_relaxed);
+        IncreaseMemoryUsageBase(key_bytes + static_cast<size_t>(inserted_count) * sizeof(u32));
     }
 
     void Dump(BufferObj *buffer_obj) const override {

@@ -16,83 +16,37 @@
 
 #include <compare>
 #include <cstdint>
-#include <cstring>
 #include <limits>
-#include <stdexcept>
 #include <string>
 
 // JsonTermT represents a flattened JSON term used for JSON index.
 // Term format: {path}:{type_tag}:{encoded_value}
 // The string is kept ordered (dictionary order = value order).
-// Uses fixed-size storage for trivially copyable serialization.
-
-constexpr size_t JSON_TERM_MAX_LENGTH = 512;
+// Uses std::string for variable-length storage.
 
 namespace infinity {
 
 struct JsonTermT {
-    uint32_t length_{0};
-    char data_[JSON_TERM_MAX_LENGTH]{};
+    std::string data_;
 
     JsonTermT() = default;
+    explicit JsonTermT(std::string_view term) : data_(term) {}
 
-    explicit JsonTermT(const std::string &term) { Assign(term.data(), term.size()); }
+    bool operator==(const JsonTermT &other) const = default;
+    auto operator<=>(const JsonTermT &other) const = default;
 
-    bool operator==(const JsonTermT &other) const {
-        const auto this_len = std::min<size_t>(length_, JSON_TERM_MAX_LENGTH);
-        const auto other_len = std::min<size_t>(other.length_, JSON_TERM_MAX_LENGTH);
-        if (this_len != other_len)
-            return false;
-        return std::memcmp(data_, other.data_, this_len) == 0;
-    }
-
-    auto operator<=>(const JsonTermT &other) const {
-        // Defensive: ensure valid lengths
-        auto this_len = std::min<size_t>(length_, JSON_TERM_MAX_LENGTH);
-        auto other_len = std::min<size_t>(other.length_, JSON_TERM_MAX_LENGTH);
-        auto cmp = std::memcmp(data_, other.data_, std::min(this_len, other_len));
-        if (cmp != 0)
-            return cmp < 0 ? std::strong_ordering::less : std::strong_ordering::greater;
-        return this_len <=> other_len;
-    }
-
-    std::string ToString() const { return std::string(data_, std::min<size_t>(length_, JSON_TERM_MAX_LENGTH)); }
-
-    void Reset() { length_ = 0; }
-
-    void Append(const char *src, size_t len) {
-        const auto current_len = std::min<size_t>(length_, JSON_TERM_MAX_LENGTH);
-        if (current_len + len > JSON_TERM_MAX_LENGTH) {
-            throw std::length_error("JsonTermT overflow: JSON index term exceeds JSON_TERM_MAX_LENGTH");
-        }
-        std::memcpy(data_ + current_len, src, len);
-        length_ = static_cast<uint32_t>(current_len + len);
-    }
+    const std::string &ToString() const { return data_; }
+    uint32_t size() const { return static_cast<uint32_t>(data_.size()); }
 
     // Return a "max" term that sorts after all valid terms
     static JsonTermT Max() {
         JsonTermT result;
-        result.length_ = JSON_TERM_MAX_LENGTH;
-        memset(result.data_, 0xFF, JSON_TERM_MAX_LENGTH);
+        result.data_ = "\xFF";
         return result;
     }
 
     // Return a "min" term that sorts before all valid terms
-    static JsonTermT Min() {
-        JsonTermT result;
-        result.length_ = 0;
-        memset(result.data_, 0, JSON_TERM_MAX_LENGTH);
-        return result;
-    }
-
-private:
-    void Assign(const char *src, size_t len) {
-        if (len > JSON_TERM_MAX_LENGTH) {
-            throw std::length_error("JsonTermT overflow: JSON index term exceeds JSON_TERM_MAX_LENGTH");
-        }
-        std::memcpy(data_, src, len);
-        length_ = static_cast<uint32_t>(len);
-    }
+    static JsonTermT Min() { return JsonTermT(); }
 };
 
 } // namespace infinity

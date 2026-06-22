@@ -311,7 +311,17 @@ public:
 
         // Save unique keys
         if (unique_key_count_ > 0) {
-            file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+                for (const auto &key : unique_keys_) {
+                    u32 len = key.size();
+                    file_handle.Append(&len, sizeof(len));
+                    if (len > 0) {
+                        file_handle.Append(key.ToString().data(), len);
+                    }
+                }
+            } else {
+                file_handle.Append(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Save RoaringBitmaps
             for (const auto &bitmap : offset_bitmaps_) {
@@ -333,8 +343,22 @@ public:
 
         if (unique_key_count_ > 0) {
             // Read unique keys
-            unique_keys_.resize(unique_key_count_);
-            file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+                unique_keys_.clear();
+                unique_keys_.reserve(unique_key_count_);
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 len = 0;
+                    file_handle.Read(&len, sizeof(len));
+                    std::string key_data(len, '\0');
+                    if (len > 0) {
+                        file_handle.Read(key_data.data(), len);
+                    }
+                    unique_keys_.emplace_back(std::move(key_data));
+                }
+            } else {
+                unique_keys_.resize(unique_key_count_);
+                file_handle.Read(unique_keys_.data(), unique_key_count_ * sizeof(OrderedKeyType));
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
@@ -364,9 +388,20 @@ public:
 
         if (unique_key_count_ > 0) {
             // Read unique keys
-            unique_keys_.resize(unique_key_count_);
-            std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
-            ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
+                unique_keys_.clear();
+                unique_keys_.reserve(unique_key_count_);
+                for (u32 i = 0; i < unique_key_count_; ++i) {
+                    u32 len = *reinterpret_cast<const u32 *>(ptr);
+                    ptr += sizeof(u32);
+                    unique_keys_.emplace_back(std::string_view(ptr, len));
+                    ptr += len;
+                }
+            } else {
+                unique_keys_.resize(unique_key_count_);
+                std::memcpy(unique_keys_.data(), ptr, unique_key_count_ * sizeof(OrderedKeyType));
+                ptr += unique_key_count_ * sizeof(OrderedKeyType);
+            }
 
             // Read RoaringBitmaps
             offset_bitmaps_.clear();
