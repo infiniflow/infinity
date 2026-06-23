@@ -93,6 +93,7 @@ jobs:
             export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
             export GCC_TOOLCHAIN=/x86_64-linux-gnu/
             export DEB_ARCH=amd64
+            export RPM_ARCH=amd64
             export CHAINLOAD_TOOLCHAIN=x86_64-linux-v1.cmake
             export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
             ;;
@@ -101,6 +102,7 @@ jobs:
             export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
             export GCC_TOOLCHAIN=/x86_64-linux-gnu/
             export DEB_ARCH=amd64
+            export RPM_ARCH=amd64
             export CHAINLOAD_TOOLCHAIN=x86_64-linux-v2.cmake
             export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
             ;;
@@ -109,6 +111,7 @@ jobs:
             export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
             export GCC_TOOLCHAIN=/x86_64-linux-gnu/
             export DEB_ARCH=amd64
+            export RPM_ARCH=amd64
             export CHAINLOAD_TOOLCHAIN=x86_64-linux-v3.cmake
             export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
             ;;
@@ -117,6 +120,7 @@ jobs:
             export SYS_ROOT=/x86_64-linux-gnu/x86_64-linux-gnu/sysroot/
             export GCC_TOOLCHAIN=/x86_64-linux-gnu/
             export DEB_ARCH=amd64
+            export RPM_ARCH=amd64
             export CHAINLOAD_TOOLCHAIN=x86_64-linux-v4.cmake
             export STDLIB_MODULES_JSON=/x86_64-linux-gnu/lib/gcc/x86_64-linux-gnu/15.2.0/libstdc++.modules.json
             ;;
@@ -125,6 +129,7 @@ jobs:
             export SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/
             export GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/
             export DEB_ARCH=arm64
+            export RPM_ARCH=arm64
             export CHAINLOAD_TOOLCHAIN=arm64-linux.cmake
             export STDLIB_MODULES_JSON=/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json
             ;;
@@ -146,6 +151,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=RelWithDebInfo \
               -DCPACK_PACKAGE_VERSION=${RELEASE_TAG}-${{ matrix.target }} \
               -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=${DEB_ARCH} \
+              -DCPACK_RPM_PACKAGE_ARCHITECTURE=${RPM_ARCH} \
               -S /infinity -B /infinity/cmake-build-reldeb && \
             cmake --build /infinity/cmake-build-reldeb --target infinity && \
             cd /infinity/cmake-build-reldeb && cpack"
