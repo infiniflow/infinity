@@ -753,22 +753,10 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  debug_upload_codecov:
-    name: debug_upload_codecov
+  debug_amd64_upload_codecov:
+    name: debug_amd64_upload_codecov
     runs-on: ubuntu-latest
-    needs:
-      - debug_amd64_unit_test
-      - debug_amd64_sqllogical_test
-      - debug_amd64_pysdk_test
-      - debug_amd64_go_test
-      - debug_amd64_http_test
-      - debug_amd64_pysdk_parallel_test
-      - debug_arm64_unit_test
-      - debug_arm64_sqllogical_test
-      - debug_arm64_pysdk_test
-      - debug_arm64_go_test
-      - debug_arm64_http_test
-      - debug_arm64_pysdk_parallel_test
+    needs: [ debug_amd64_unit_test, debug_amd64_sqllogical_test, debug_amd64_pysdk_test, debug_amd64_go_test, debug_amd64_http_test, debug_amd64_pysdk_parallel_test ]
     steps:
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
@@ -788,109 +776,63 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      # AMD64 coverage artifacts
-      - name: Download amd64 unit test coverage
+      - name: Download unit test coverage
         if: needs.debug_amd64_unit_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-unit-test-amd64
-          path: coverage/amd64/unit_test
+          path: coverage/unit_test
 
-      - name: Download amd64 sqllogical test coverage
+      - name: Download sqllogical test coverage
         if: needs.debug_amd64_sqllogical_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-sqllogical-test-amd64
-          path: coverage/amd64/sqllogical_test
+          path: coverage/sqllogical_test
 
-      - name: Download amd64 pysdk test coverage
+      - name: Download pysdk test coverage
         if: needs.debug_amd64_pysdk_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-pysdk-test-amd64
-          path: coverage/amd64/pysdk_test
+          path: coverage/pysdk_test
 
-      - name: Download amd64 go test coverage
+      - name: Download go test coverage
         if: needs.debug_amd64_go_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-go-test-amd64
-          path: coverage/amd64/go_test
+          path: coverage/go_test
 
-      - name: Download amd64 http test coverage
+      - name: Download http test coverage
         if: needs.debug_amd64_http_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-http-test-amd64
-          path: coverage/amd64/http_test
+          path: coverage/http_test
 
-      - name: Download amd64 pysdk parallel test coverage
+      - name: Download pysdk parallel test coverage
         if: needs.debug_amd64_pysdk_parallel_test.result == 'success'
         uses: actions/download-artifact@v8
         with:
           name: coverage-debug-pysdk-parallel-test-amd64
-          path: coverage/amd64/pysdk_parallel_test
-
-      # ARM64 coverage artifacts
-      - name: Download arm64 unit test coverage
-        if: needs.debug_arm64_unit_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-unit-test-arm64
-          path: coverage/arm64/unit_test
-
-      - name: Download arm64 sqllogical test coverage
-        if: needs.debug_arm64_sqllogical_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-sqllogical-test-arm64
-          path: coverage/arm64/sqllogical_test
-
-      - name: Download arm64 pysdk test coverage
-        if: needs.debug_arm64_pysdk_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-test-arm64
-          path: coverage/arm64/pysdk_test
-
-      - name: Download arm64 go test coverage
-        if: needs.debug_arm64_go_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-go-test-arm64
-          path: coverage/arm64/go_test
-
-      - name: Download arm64 http test coverage
-        if: needs.debug_arm64_http_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-http-test-arm64
-          path: coverage/arm64/http_test
-
-      - name: Download arm64 pysdk parallel test coverage
-        if: needs.debug_arm64_pysdk_parallel_test.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          name: coverage-debug-pysdk-parallel-test-arm64
-          path: coverage/arm64/pysdk_parallel_test
+          path: coverage/pysdk_parallel_test
 
       - name: Merge coverage reports
         run: |
           mkdir -p merged_coverage
-          FIRST_FILE=1
-          for arch in amd64 arm64; do
-            for test_type in unit_test sqllogical_test pysdk_test go_test http_test pysdk_parallel_test; do
-              file="coverage/$arch/$test_type/coverage.lcov"
-              if [ -f "$file" ]; then
-                if [ $FIRST_FILE -eq 1 ]; then
-                  cat "$file" > merged_coverage/coverage.lcov
-                  FIRST_FILE=0
-                else
-                  echo "" >> merged_coverage/coverage.lcov
-                  grep -v "^TN:" "$file" >> merged_coverage/coverage.lcov || true
-                fi
+          if [ -f coverage/unit_test/coverage.lcov ]; then
+            cat coverage/unit_test/coverage.lcov > merged_coverage/coverage.lcov
+          fi
+          for dir in coverage/sqllogical_test coverage/pysdk_test coverage/go_test coverage/http_test coverage/pysdk_parallel_test; do
+            if [ -f "$dir/coverage.lcov" ]; then
+              if [ -f merged_coverage/coverage.lcov ]; then
+                echo "" >> merged_coverage/coverage.lcov
+                grep -v "^TN:" "$dir/coverage.lcov" >> merged_coverage/coverage.lcov || true
+              else
+                cat "$dir/coverage.lcov" > merged_coverage/coverage.lcov
               fi
-            done
+            fi
           done
           if [ -f merged_coverage/coverage.lcov ]; then
             echo "Merged coverage file lines: $(wc -l < merged_coverage/coverage.lcov)"
@@ -905,10 +847,11 @@ jobs:
           chmod +x codecov
           ./codecov -t ${{ secrets.CODECOV_TOKEN }} \
             -f merged_coverage/coverage.lcov \
-            -F "debug_amd64,debug_arm64" \
+            -F "debug_amd64" \
             -C ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.sha }} \
             -B ${{ github.ref_name }} \
-            -n "debug_coverage"
+            -n "debug_amd64_coverage"
+
 
   release_amd64_build:
     name: release_amd64_build
@@ -1569,7 +1512,7 @@ jobs:
 
       - name: Build debug version
         run: |
-          docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux -DCMAKE_CXX_STDLIB_MODULES_JSON=/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json -DCMAKE_BUILD_TYPE=Debug -DCODE_COVERAGE=ON -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
+          docker exec -e SCCACHE_DIR=/sccache-cache infinity_builder bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -rf cmake-build-debug && mkdir -p cmake-build-debug && SYS_ROOT=/x86_64-aarch64-none-linux-gnu-15.2.1/aarch64-none-linux-gnu/libc/ GCC_TOOLCHAIN=/x86_64-aarch64-none-linux-gnu-15.2.1/ cmake -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=\$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=\$PWD/cmake/toolchains/arm64-linux.cmake -DVCPKG_OVERLAY_TRIPLETS=\$PWD/cmake/triplets -DVCPKG_TARGET_TRIPLET=arm64-linux -DCMAKE_CXX_STDLIB_MODULES_JSON=/x86_64-aarch64-none-linux-gnu-15.2.1/lib/gcc/aarch64-none-linux-gnu/15.2.1/libstdc++.modules.json -DCMAKE_BUILD_TYPE=Debug -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug -j --target infinity test_main"
 
       - name: Show sccache stats
         if: always()
@@ -1649,17 +1592,9 @@ jobs:
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
 
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
       - name: Wait for minio and run unit test
         env:
           NLTK_DATA: ${{ github.workspace }}/nltk_data
-          LLVM_PROFILE_FILE: "infinity-%p.profraw"
         run: |
           ./scripts/wait_for_minio.sh
           ASAN_OPTIONS=detect_leaks=0 ./test_main --gtest_filter=-*SLOW_* > debug_arm64_unit_test_stdout.log 2> debug_arm64_unit_test_stderr.log
@@ -1668,23 +1603,6 @@ jobs:
         if: always()
         run: |
           echo "debug arm64 unit test log" && tail -n 1000 debug_arm64_unit_test*.log || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./test_main -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-unit-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
       - name: Remove minio container
         if: always()
@@ -1716,7 +1634,6 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install sqllogictest
@@ -1731,13 +1648,6 @@ jobs:
       #          enable-cache: true
       - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
       - name: Wait for infinity and run sqllogictest
         run: |
           ./scripts/wait_for_infinity.sh
@@ -1751,23 +1661,6 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-sqllogical-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
   debug_arm64_restart_test:
     name: debug_arm64_restart_test
@@ -1857,7 +1750,6 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
@@ -1865,13 +1757,6 @@ jobs:
       #        with:
       #          enable-cache: true
       - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
@@ -1886,23 +1771,6 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-pysdk-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
   debug_arm64_go_test:
     name: debug_arm64_go_test
@@ -1940,7 +1808,6 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Setup Go
@@ -1960,13 +1827,6 @@ jobs:
       #          enable-cache: true
       - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
 
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
       - name: Wait for infinity and run Go tests
         run: |
           ./scripts/wait_for_infinity.sh
@@ -1982,23 +1842,6 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-go-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
   debug_arm64_http_test:
     name: debug_arm64_http_test
@@ -2036,7 +1879,6 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
@@ -2044,13 +1886,6 @@ jobs:
       #        with:
       #          enable-cache: true
       - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run http test
         run: |
@@ -2065,23 +1900,6 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-http-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
   debug_arm64_pysdk_parallel_test:
     name: debug_arm64_pysdk_parallel_test
@@ -2119,7 +1937,6 @@ jobs:
           sudo chown -R ${USER} /usr/share/infinity
           sudo mkdir -p /var/infinity
           sudo chown -R ${USER} /var/infinity
-          export LLVM_PROFILE_FILE="infinity-%p.profraw"
           nohup ./infinity --config=conf/pytest_parallel_infinity_conf.toml > infinity.log 2>&1 &
 
       - name: Install Python SDK
@@ -2127,13 +1944,6 @@ jobs:
       #        with:
       #          enable-cache: true
       - run: uv sync --python 3.11 --extra test --index-url https://pypi.org/simple/
-
-      - name: Install LLVM 20
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-          echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
 
       - name: Wait for infinity and run pysdk test
         run: |
@@ -2148,23 +1958,6 @@ jobs:
       - name: Stop infinity server
         if: always()
         run: pkill -f infinity || true
-
-      - name: Generate LCOV report
-        if: always()
-        run: |
-          llvm-profdata merge -sparse infinity-*.profraw -o coverage.profdata
-          llvm-cov export ./infinity -instr-profile=coverage.profdata -format=lcov -ignore-filename-regex='.*unit_test.*|.*third_party.*|.*cmake-build-debug.*|.*cppm.*' > coverage.lcov
-          head -10 coverage.lcov
-          echo "LCOV file lines: $(wc -l < coverage.lcov)"
-
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-debug-pysdk-parallel-test-arm64
-          path: coverage.lcov
-          retention-days: 1
-          if-no-files-found: warn
 
   release_arm64_build:
     name: release_arm64_build
@@ -2893,7 +2686,6 @@ jobs:
       - debug_amd64_go_test
       - debug_amd64_http_test
       - debug_amd64_pysdk_parallel_test
-      - debug_upload_codecov
       - release_amd64_build
       - release_amd64_unit_test
       - release_amd64_sqllogical_test

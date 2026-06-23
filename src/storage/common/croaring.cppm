@@ -14,8 +14,14 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-W#pragma-messages"
+#pragma clang diagnostic ignored "-Wall"
+
 #include "roaring/roaring.hh"
 #include "roaring/roaring64map.hh"
+
+#pragma clang diagnostic pop
 
 export module infinity_core:croaring;
 

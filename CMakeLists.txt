@@ -242,8 +242,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
 
     if ("${CODE_COVERAGE}" STREQUAL "ON")
-        add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
-        add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+            add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+            add_link_options(-fprofile-instr-generate -fcoverage-mapping)
     else ()
         set(CODE_COVERAGE "OFF")
     endif ()
@@ -293,20 +293,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
-
-if (IS_CI_TEST_PIPELINE)
-    if (X86_64)
-        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "cmake/toolchains/x86_64-v2.cmake")
-    elseif (ARM64)
-        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "cmake/toolchains/arm64-linux.cmake")
-    else ()
-        message(FATAL_ERROR "Not support your arch yet.")
-    endif ()
-else ()
-    if (NOT CMAKE_CROSSCOMPILING)
-        add_compile_options(-march=native)
-    endif ()
+if (NOT CMAKE_CROSSCOMPILING)
+    add_compile_options(-march=native)
 endif ()
 
 execute_process(
