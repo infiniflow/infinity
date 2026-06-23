@@ -383,6 +383,9 @@ install(FILES conf/infinity_conf.toml DESTINATION etc)
 # CPackRPM needs the absolute path of the file as CPack does not know that script is relative to source tree.
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
 
+find_program(LLVM_STRIP_EXECUTABLE llvm-strip-20 REQUIRED) # i hate hard code. But now i dont care about it.
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global __strip ${LLVM_STRIP_EXECUTABLE}")
+
 # https://cmake.org/cmake/help/latest/cpack_gen/deb.html
 # Add custom script to the control.tar.gz. Typical usage is for conffiles, postinst, postrm, prerm.
 # Note: DEB requires the file name be one of postinst, postrm, prerm and the "+x" permission, while rpm doesn't require that.
