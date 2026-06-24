@@ -344,48 +344,4 @@ if (SKBUILD)
     return()
 endif ()
 
-# CPack settings
-set(CPACK_PACKAGE_NAME "infinity")
-# dpkg requires version to be starting with number
-if (DEFINED CPACK_PACKAGE_VERSION)
-    string(REGEX REPLACE "^[^0-9]+" "" CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
-    string(REPLACE "-" "." CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
-endif ()
-if (NOT DEFINED CPACK_PACKAGE_VERSION OR CPACK_PACKAGE_VERSION STREQUAL "")
-    set(CPACK_PACKAGE_VERSION "${GIT_COMMIT_ID}")
-endif ()
-set(CPACK_PACKAGE_RELEASE 1)
-set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")
-set(CPACK_PACKAGE_VENDOR "infiniflow")
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_HOST_SYSTEM_PROCESSOR}")
-
-# https://cmake.org/cmake/help/latest/command/install.html
-# Install target
-# WANNING: If an absolute path is given, cpack will install the specific files on the host system (requires root permission) and then included in the package.
-# If an relative path (interpreted relative to the value of the CMAKE_INSTALL_PREFIX variable) is given, cpack include specific files in the package without actually installing them on the host system.
-# CMAKE_INSTALL_PREFIX defaults to "/usr/local"
-set(CMAKE_INSTALL_PREFIX /usr)
-install(TARGETS infinity DESTINATION bin)
-install(FILES conf/infinity.service DESTINATION lib/systemd/system)
-install(FILES conf/infinity_conf.toml DESTINATION etc)
-
-# https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
-# Specify the post-install script for RPM
-# CPackRPM needs the absolute path of the file as CPack does not know that script is relative to source tree.
-set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
-
-# https://cmake.org/cmake/help/latest/cpack_gen/deb.html
-# Add custom script to the control.tar.gz. Typical usage is for conffiles, postinst, postrm, prerm.
-# Note: DEB requires the file name be one of postinst, postrm, prerm and the "+x" permission, while rpm doesn't require that.
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/conf/postinst")
-
-# Specify the package generators
-set(CPACK_GENERATOR "RPM;DEB;TGZ")
-
-# Enable CPack debug output
-set(CPACK_PACKAGE_DEBUG True)
-
-# https://cmake.org/cmake/help/latest/variable/CPACK_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION.html
-set(CPACK_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION "ON")
-include(CPack)
+include(Packaging)
