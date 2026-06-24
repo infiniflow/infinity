@@ -30,7 +30,7 @@ endif ()
 # Overlay ports for patches not yet upstreamed in vcpkg
 set(VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/ports")
 
-project(infinity VERSION 0.7.0)
+project(infinity VERSION 0.7.1)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
