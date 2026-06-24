@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0.3...4.2.5)
+cmake_minimum_required(VERSION 4.0.3...4.3.4)
 
 cmake_policy(SET CMP0167 OLD)
 
@@ -6,6 +6,10 @@ set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE)
 
 if (CMAKE_VERSION GREATER_EQUAL 4.0.3 AND CMAKE_VERSION LESS_EQUAL 4.2.5)
     set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+else (CMAKE_VERSION GREATER 4.2.5 AND CMAKE_VERSION LESS_EQUAL 4.3.4)
+    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
+    # we use clang
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-reserved-module-identifier")
 endif ()
 
 # Auto-detect and set vcpkg toolchain if not already set
@@ -289,20 +293,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -W
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
 
-option(IS_CI_TEST_PIPELINE "is ci test pipeline: " OFF)
-
-if (IS_CI_TEST_PIPELINE)
-    if (X86_64)
-        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "cmake/toolchains/x86_64-v2.cmake")
-    elseif (ARM64)
-        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "cmake/toolchains/arm64-linux.cmake")
-    else ()
-        message(FATAL_ERROR "Not support your arch yet.")
-    endif ()
-else ()
-    if (NOT CMAKE_CROSSCOMPILING)
-        add_compile_options(-march=native)
-    endif ()
+if (NOT CMAKE_CROSSCOMPILING)
+    add_compile_options(-march=native)
 endif ()
 
 execute_process(

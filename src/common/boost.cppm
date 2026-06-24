@@ -14,6 +14,10 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-W#pragma-messages"
+#pragma clang diagnostic ignored "-Wall"
+
 #define BOOST_NO_AUTO_PTR ;
 
 #include <boost/asio/io_context.hpp>
@@ -32,6 +36,8 @@ module;
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/interprocess_sharable_mutex.hpp>
 #include <boost/thread.hpp>
+
+#pragma clang diagnostic pop
 
 export module infinity_core:boost;
 
