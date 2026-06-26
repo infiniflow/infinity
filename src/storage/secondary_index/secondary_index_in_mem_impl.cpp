@@ -54,36 +54,51 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
     const RowID begin_row_id_;
     // Replaced std::multimap + mutex with RcuMultiMap for better concurrent performance
     RcuMultiMap<KeyType, u32> in_mem_secondary_index_;
-    std::atomic_size_t json_key_bytes_{0};
+    std::atomic<size_t> json_key_bytes_{0};
+
+    // Track the number of data rows for JSON index only (one row → many entries).
+    // Non-JSON uses in_mem_secondary_index_.size() instead (one entry per row).
+    std::atomic<u32> row_count_{0};
 
 protected:
-    u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
-    u32 MemoryCostOfEachRow() const override {
+    // Memory cost per row for non-JSON indexes (1 row = 1 entry).
+    // JSON indexes track exact memory via json_key_bytes_, not this.
+    u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
+
+    u32 MemoryCostOfThis() const override { return sizeof(*this); }
+
+    size_t GetMemUsed() const override {
         if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
-            return map_memory_bloat_factor * (sizeof(KeyType) + 64 + sizeof(u32));
+            return json_key_bytes_.load(std::memory_order_relaxed) + GetEntryCount() * sizeof(u32);
         } else {
-            return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32));
+            return GetRowCount() * MemoryCostOfEachRow();
         }
     }
-    u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
     explicit SecondaryIndexInMemT(const RowID begin_row_id, SecondaryIndexCardinality cardinality)
         : SecondaryIndexInMem(cardinality), begin_row_id_(begin_row_id) {
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
-    ~SecondaryIndexInMemT() override {
+    ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetMemUsed()); }
+    virtual RowID GetBeginRowID() const override { return begin_row_id_; }
+
+    u32 GetRowCount() const override {
+        // Returns the number of data rows inserted into this index.
         if constexpr (std::is_same_v<RawValueType, JsonTermT>) {
-            DecreaseMemoryUsageBase(MemoryCostOfThis() + json_key_bytes_.load(std::memory_order_relaxed) +
-                                    static_cast<size_t>(GetRowCount()) * sizeof(u32));
+            // For JSON: one data row → many entries, need to track separately.
+            return row_count_;
         } else {
-            DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
+            // For non-JSON: one entry per row, no separate counter needed.
+            return static_cast<u32>(in_mem_secondary_index_.size());
         }
     }
-    virtual RowID GetBeginRowID() const override { return begin_row_id_; }
-    u32 GetRowCount() const override {
+
+    u32 GetEntryCount() const override {
+        // Returns the number of index entries in the multimap.
         // RcuMultiMap is thread-safe, no lock needed
-        return in_mem_secondary_index_.size();
+        // For JSON: one data row → many entries (entry count ≥ row count).
+        return static_cast<u32>(in_mem_secondary_index_.size());
     }
 
     void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) override {
@@ -118,6 +133,7 @@ public:
         }
         json_key_bytes_.fetch_add(key_bytes, std::memory_order_relaxed);
         IncreaseMemoryUsageBase(key_bytes + static_cast<size_t>(inserted_count) * sizeof(u32));
+        row_count_.fetch_add(row_count, std::memory_order_relaxed);
     }
 
     void Dump(BufferObj *buffer_obj) const override {
@@ -219,9 +235,9 @@ private:
 };
 
 MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
-    const auto row_cnt = GetRowCount();
-    const auto mem = MemoryCostOfThis() + row_cnt * MemoryCostOfEachRow();
-    return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, row_cnt);
+    const auto entry_cnt = GetEntryCount();
+    const auto mem = MemoryCostOfThis() + GetMemUsed();
+    return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, entry_cnt);
 }
 
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }

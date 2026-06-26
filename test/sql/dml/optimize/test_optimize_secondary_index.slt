@@ -1,0 +1,89 @@
+# Test OPTIMIZE on a table with secondary index
+
+statement ok
+DROP TABLE IF EXISTS test_optimize_secondary_index;
+
+statement ok
+CREATE TABLE test_optimize_secondary_index (
+    id integer,
+    c1 integer,
+    c2 varchar
+);
+
+statement ok
+CREATE INDEX idx_c1 ON test_optimize_secondary_index (c1) USING SECONDARY;
+
+statement ok
+INSERT INTO test_optimize_secondary_index (id, c1, c2) VALUES (1, 10, 'apple'), (2, 20, 'banana'), (3, 30, 'cherry'), (4, 10, 'date'), (5, 20, 'elderberry'), (6, 40, 'fig');
+
+statement ok
+DUMP INDEX idx_c1 ON test_optimize_secondary_index;
+
+statement ok
+INSERT INTO test_optimize_secondary_index (id, c1, c2) VALUES (7, 10, 'grape'), (8, 50, 'honeydew'), (9, 20, 'kiwi'), (10, 30, 'lemon'), (11, 10, 'mango'), (12, 60, 'nectarine');
+
+statement ok
+DUMP INDEX idx_c1 ON test_optimize_secondary_index;
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 = 10;
+----
+1
+4
+7
+11
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 <= 20;
+----
+1
+2
+4
+5
+7
+9
+11
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 > 25;
+----
+3
+6
+8
+10
+12
+
+# OPTIMIZE: merge 2 chunks
+statement ok
+OPTIMIZE test_optimize_secondary_index;
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 = 10;
+----
+1
+4
+7
+11
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 <= 20;
+----
+1
+2
+4
+5
+7
+9
+11
+
+query I
+SELECT id FROM test_optimize_secondary_index WHERE c1 > 25;
+----
+3
+6
+8
+10
+12
+
+statement ok
+DROP TABLE test_optimize_secondary_index;

@@ -599,7 +599,8 @@ private:
                            RowID &base_rowid,
                            u32 &row_cnt,
                            u32 &term_cnt,
-                           std::string &base_name);
+                           std::string &base_name,
+                           std::vector<ChunkID> &deprecate_ids);
 
     Status OptimizeVecIndex(std::shared_ptr<IndexBase> index_base,
                             std::shared_ptr<ColumnDef> column_def,
