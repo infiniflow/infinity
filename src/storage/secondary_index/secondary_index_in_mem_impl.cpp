@@ -235,9 +235,9 @@ private:
 };
 
 MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
-    const auto entry_cnt = GetEntryCount();
+    const auto row_cnt = GetRowCount();
     const auto mem = MemoryCostOfThis() + GetMemUsed();
-    return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, entry_cnt);
+    return MemIndexTracerInfo(nullptr, nullptr, nullptr, mem, row_cnt);
 }
 
 const ChunkIndexMetaInfo SecondaryIndexInMem::GetChunkIndexMetaInfo() const { return ChunkIndexMetaInfo{"", GetBeginRowID(), GetRowCount(), 0, 0}; }
