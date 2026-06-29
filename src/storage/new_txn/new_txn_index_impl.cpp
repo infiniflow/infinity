@@ -350,6 +350,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
     u32 row_cnt = 0;
     u32 term_cnt = 0;
     std::vector<size_t> row_cnts;
+    std::vector<ChunkID> deprecate_ids;
 
     std::string base_name;
 
@@ -358,7 +359,7 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         return index_status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        status = OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, term_cnt, base_name);
+        status = OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, term_cnt, base_name, deprecate_ids);
         if (!status.ok()) {
             return status;
         }
@@ -368,11 +369,9 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
         for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
             ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
-            {
-                status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
-                if (!status.ok()) {
-                    return status;
-                }
+            status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
+            if (!status.ok()) {
+                return status;
             }
             if (last_rowid != chunk_info_ptr->base_row_id_) {
                 UnrecoverableError("OptimizeIndex: base_row_id is not continuous");
@@ -381,8 +380,8 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
             row_cnt += chunk_info_ptr->row_cnt_;
             row_cnts.push_back(chunk_info_ptr->row_cnt_);
         }
+        deprecate_ids = *old_chunk_ids_ptr;
     }
-    std::vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
     ChunkID chunk_id = 0;
     std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
     if (!status.ok()) {
@@ -2144,7 +2143,8 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
                                RowID &base_rowid_out,
                                u32 &row_cnt_out,
                                u32 &term_cnt_out,
-                               std::string &base_name_out) {
+                               std::string &base_name_out,
+                               std::vector<ChunkID> &deprecate_ids) {
     const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
 
     std::vector<ChunkID> chunk_ids;
@@ -2220,6 +2220,7 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
         row_cnt_out = total_row_count;
         term_cnt_out = total_term_count;
         base_name_out = dst_base_name;
+        deprecate_ids = std::move(chunk_ids);
     }
 
     LOG_INFO(fmt::format("finish merging {} {}", *index_fulltext->index_name_, dst_base_name));
@@ -2812,8 +2813,6 @@ Status NewTxn::RecoverMemIndex(TableIndexMeta &table_index_meta) {
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta);
         if (!index_segment_ids_set.contains(segment_id)) {
-            //            std::shared_ptr<std::string> error_msg = std::make_shared<std::string>(fmt::format("Segment {} not in index {}",
-            //            segment_id, table_index_meta.index_id_str())); LOG_WARN(*error_msg); UnrecoverableError(*error_msg);//
             std::optional<SegmentIndexMeta> segment_index_meta;
             status = NewCatalog::AddNewSegmentIndex1(table_index_meta, this, segment_id, segment_index_meta);
             if (!status.ok()) {

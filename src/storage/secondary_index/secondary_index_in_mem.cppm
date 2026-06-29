@@ -33,8 +33,6 @@ export class SecondaryIndexInMem : public BaseMemIndex {
 protected:
     explicit SecondaryIndexInMem(SecondaryIndexCardinality cardinality) : cardinality_(cardinality) {}
 
-    virtual u32 GetRowCountNoLock() const = 0;
-
     virtual u32 MemoryCostOfEachRow() const = 0;
 
     virtual u32 MemoryCostOfThis() const = 0;
@@ -46,9 +44,13 @@ public:
 
     const ChunkIndexMetaInfo GetChunkIndexMetaInfo() const override;
 
+    virtual size_t GetMemUsed() const = 0;
+
     virtual RowID GetBeginRowID() const override = 0;
 
     virtual u32 GetRowCount() const = 0;
+
+    virtual u32 GetEntryCount() const = 0;
 
     virtual void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) = 0;
 

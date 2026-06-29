@@ -1,0 +1,135 @@
+# Test OPTIMIZE on a table with JSON secondary index
+
+statement ok
+DROP TABLE IF EXISTS test_optimize_json_index;
+
+statement ok
+CREATE TABLE test_optimize_json_index (
+    id integer,
+    meta json
+);
+
+statement ok
+CREATE INDEX idx_meta ON test_optimize_json_index (meta) USING SECONDARY;
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (1, '{"year": 2020, "character": ["value1", "value2"], "score": 1, "author": "Alice"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (2, '{"year": 2021, "character": ["value3"], "score": 2, "author": "Bob"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (3, '{"year": 2019, "character": ["value1", "value4"], "score": 2.5, "author": "Alice"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (4, '{"year": 2022, "name": "test", "score": 3.0, "author": "Charlie"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (5, '{"year": 2020, "author": "Alice"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (6, '{"data": {"inner": 50, "outer": 100}}');
+
+statement ok
+DUMP INDEX idx_meta ON test_optimize_json_index;
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (7, '{"year": 2018, "score": 0.5, "author": "Eve"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (8, '{"year": 2023, "character": ["value6"], "score": 3.5, "author": "Frank"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (9, '{"year": 2021, "score": 1.5}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (10, '{"year": 2020, "character": ["value7", "value8"], "author": "Grace"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (11, '{"year": 2024, "score": 6.0, "author": "Hank"}');
+
+statement ok
+INSERT INTO test_optimize_json_index (id, meta) VALUES (12, '{"year": 2017, "character": ["value9"], "score": -1.0, "author": "Ivy"}');
+
+statement ok
+DUMP INDEX idx_meta ON test_optimize_json_index;
+
+# Query before OPTIMIZE — data from both chunks
+query I
+SELECT id FROM test_optimize_json_index WHERE json_extract_int(meta, '$.year') = 2020;
+----
+1
+5
+10
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_extract_double(meta, '$.score') > 2;
+----
+3
+4
+8
+11
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_contains(meta, '$.character', 'value1');
+----
+1
+3
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_exists_path(meta, '$.character');
+----
+1
+2
+3
+8
+10
+12
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_contains(meta, '$.data.inner', 50);
+----
+6
+
+# OPTIMIZE: merge 2 chunks
+statement ok
+OPTIMIZE test_optimize_json_index;
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_extract_int(meta, '$.year') = 2020;
+----
+1
+5
+10
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_extract_double(meta, '$.score') > 2;
+----
+3
+4
+8
+11
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_contains(meta, '$.character', 'value1');
+----
+1
+3
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_exists_path(meta, '$.character');
+----
+1
+2
+3
+8
+10
+12
+
+query I
+SELECT id FROM test_optimize_json_index WHERE json_contains(meta, '$.data.inner', 50);
+----
+6
+
+statement ok
+DROP TABLE test_optimize_json_index;

@@ -83,6 +83,9 @@ void JsonFlattener::FlattenRecursive(const JsonTypeDef &json_value, const std::s
             std::string child_path = current_path.empty() ? std::string("$") + "." + item.key() : current_path + "." + item.key();
             FlattenRecursive(item.value(), child_path, terms);
         }
+        // Emit path exists term for json_exists_path support
+        std::string object_path = current_path.empty() ? "$" : current_path;
+        terms.push_back({object_path + ":p:"});
     } else if (json_value.is_array()) {
         size_t idx = 0;
         for (const auto &val : json_value) {
@@ -97,6 +100,8 @@ void JsonFlattener::FlattenRecursive(const JsonTypeDef &json_value, const std::s
         for (const auto &val : json_value) {
             AddScalarTerm(val, parent_path);
         }
+        // Emit path exists term for json_exists_path support
+        terms.push_back({parent_path + ":p:"});
     } else {
         AddScalarTerm(json_value, current_path);
         // Emit path exists term for json_exists_path support (for non-null scalar values)

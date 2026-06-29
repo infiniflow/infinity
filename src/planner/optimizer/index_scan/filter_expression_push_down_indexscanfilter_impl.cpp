@@ -594,6 +594,7 @@ private:
                 Value value = Value::MakeNull();
                 std::optional<Value> raw_value_for_double;
                 FilterCompareType compare_type;
+                FilterCompareType original_compare_type;
                 std::shared_ptr<TableIndexMeta> table_index_meta;
                 std::string json_path;
 
@@ -735,6 +736,8 @@ private:
                         auto *json_func_expr = static_cast<FunctionExpression *>(function_expression->arguments()[0].get());
                         raw_value_for_double = FilterExpressionPushDownHelper::CalcValueResult(function_expression->arguments()[1]);
                         compare_type = PossibleCompareTypes[std::distance(PossibleFunctionNames.begin(), it)];
+                        // Save original compare_type before HandleJsonComparison mutates it (kGreater→kGreaterEqual, etc.)
+                        original_compare_type = compare_type;
                         HandleJsonComparison(json_func_expr, *raw_value_for_double, compare_type);
                         break;
                     }
@@ -744,6 +747,8 @@ private:
                         auto *json_func_expr = static_cast<FunctionExpression *>(function_expression->arguments()[1].get());
                         raw_value_for_double = FilterExpressionPushDownHelper::CalcValueResult(function_expression->arguments()[0]);
                         compare_type = PossibleReverseCompareTypes[std::distance(PossibleFunctionNames.begin(), it)];
+                        // Save original compare_type before HandleJsonComparison mutates it (kGreater→kGreaterEqual, etc.)
+                        original_compare_type = compare_type;
                         HandleJsonComparison(json_func_expr, *raw_value_for_double, compare_type);
                         break;
                     }
@@ -778,14 +783,18 @@ private:
                                 FilterCompareType int_cmp_type = FilterCompareType::kEqual;
                                 int64_t int_val = int_val_for_eq;
 
-                                if (compare_type == FilterCompareType::kGreater || compare_type == FilterCompareType::kGreaterEqual) {
+                                const bool is_integral_boundary = std::floor(double_val) == double_val;
+                                if (original_compare_type == FilterCompareType::kGreater) {
                                     int_val = static_cast<int64_t>(std::ceil(double_val));
-                                    // For int >= ceil(X), we use kGreaterEqual with int_val - 1
-                                    // because BuildJsonTerm does int_val + 1 for kGreater
+                                    int_cmp_type = is_integral_boundary ? FilterCompareType::kGreater : FilterCompareType::kGreaterEqual;
+                                } else if (original_compare_type == FilterCompareType::kGreaterEqual) {
+                                    int_val = static_cast<int64_t>(std::ceil(double_val));
                                     int_cmp_type = FilterCompareType::kGreaterEqual;
-                                } else if (compare_type == FilterCompareType::kLess || compare_type == FilterCompareType::kLessEqual) {
+                                } else if (original_compare_type == FilterCompareType::kLess) {
                                     int_val = static_cast<int64_t>(std::floor(double_val));
-                                    // For int <= floor(X), we use kLessEqual with the floor value directly
+                                    int_cmp_type = is_integral_boundary ? FilterCompareType::kLess : FilterCompareType::kLessEqual;
+                                } else if (original_compare_type == FilterCompareType::kLessEqual) {
+                                    int_val = static_cast<int64_t>(std::floor(double_val));
                                     int_cmp_type = FilterCompareType::kLessEqual;
                                 }
 
@@ -795,10 +804,11 @@ private:
                                 std::string int_term_str = int_term.ToString();
                                 JsonTermT int_term_key(int_term_str);
 
-                                if (compare_type == FilterCompareType::kEqual) {
+                                if (original_compare_type == FilterCompareType::kEqual) {
                                     // For equality, just add the int term as an additional exact match
                                     evaluator->AddRange(std::make_pair(int_term_key, int_term_key));
-                                } else if (compare_type == FilterCompareType::kGreater || compare_type == FilterCompareType::kGreaterEqual) {
+                                } else if (original_compare_type == FilterCompareType::kGreater ||
+                                           original_compare_type == FilterCompareType::kGreaterEqual) {
                                     // For > and >=, int range is [int_lower_bound, +inf)
                                     std::string path_prefix = json_path + ":i:";
                                     evaluator->AddRange(std::make_pair(int_term_key, JsonTermT(path_prefix + "~")));
