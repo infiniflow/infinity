@@ -238,6 +238,8 @@ std::string KeyEncode::PMObjectKey(const std::string &key) { return fmt::format(
 
 std::string KeyEncode::PMObjectStatKey(const std::string &key) { return fmt::format("pm|object_stat|{}", key); }
 
+std::string KeyEncode::MetaVersionKey() { return "meta|version"; }
+
 std::string KeyEncode::DropDBKey(const std::string &db_name, const TxnTimeStamp &commit_ts, const std::string &db_id_str) {
     return fmt::format("drop|db|{}/{}/{}", db_name, commit_ts, db_id_str);
 }

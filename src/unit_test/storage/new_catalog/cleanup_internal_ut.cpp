@@ -87,7 +87,7 @@ public:
         new_txn_mgr_->PrintAllKeyValue();
 
         size_t kv_num = new_txn_mgr_->KeyValueNum();
-        EXPECT_EQ(kv_num, 3);
+        EXPECT_EQ(kv_num, 4);
 
         new_txn_mgr_ = nullptr;
         BaseTestParamStr::TearDown();

@@ -210,6 +210,10 @@ public:
 
     static std::string PMObjectStatKey(const std::string &key);
 
+    static std::string MetaVersionKey();
+
+    static constexpr std::string kMetaVersionHeader = "meta|version";
+
     static constexpr std::string kDropDbHeader = "drop|db|";
 
     static std::string DropDBKey(const std::string &db_name, const TxnTimeStamp &commit_ts, const std::string &db_id_str);
