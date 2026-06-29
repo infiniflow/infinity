@@ -24,7 +24,11 @@ import :new_txn_manager;
 import :builtin_functions;
 import :logger;
 import :kv_store;
+import :kv_code;
 import :new_txn;
+import :chunk_index_meta;
+import :utility;
+import :virtual_store;
 import :infinity_exception;
 import :status;
 import :background_process;
@@ -39,6 +43,7 @@ import :log_file;
 import :infinity_context;
 import :memindex_tracer;
 import :persistence_manager;
+import :utility;
 import :virtual_store;
 import :result_cache_manager;
 import :txn_state;
@@ -47,10 +52,22 @@ import :catalog_cache;
 import :meta_cache;
 import :wal_entry;
 import :object_stats;
+import :catalog_meta;
+import :db_meta;
+import :table_index_meta;
+import :segment_index_meta;
+import :segment_meta;
+import :index_base;
+import :index_secondary;
+import :secondary_index_in_mem;
+import :column_meta;
+import :block_meta;
 
 import std;
 import third_party;
 
+import row_id;
+import column_def;
 import extra_ddl_info;
 import global_resource_usage;
 
@@ -339,6 +356,43 @@ Status Storage::AdminToWriter() {
     }
     dump_index_processor_ = std::make_unique<DumpIndexProcessor>();
     dump_index_processor_->Start();
+
+    // From 0.7.1, Infinity uses variable-length storage for JsonTermT, convert JSON secondary
+    // index format if we upgrade from earlier version.
+    auto kv_instance = kv_store_->GetInstance();
+    std::string stored_version_str;
+    Status version_status = kv_instance->Get(KeyEncode::MetaVersionKey(), stored_version_str);
+
+    auto parse_version = [](const std::string &v) -> std::optional<std::tuple<int, int, int>> {
+        int major = 0, minor = 0, patch = 0;
+        char dot1 = 0, dot2 = 0;
+        std::istringstream is(v);
+        if (!(is >> major >> dot1 >> minor >> dot2 >> patch) || dot1 != '.' || dot2 != '.') {
+            return std::nullopt;
+        }
+        return std::tuple{major, minor, patch};
+    };
+    const auto convert_version = std::tuple{0, 7, 1};
+    const bool missing_version = (version_status.code_ == ErrorCode::kNotFound);
+    if (!version_status.ok() && !missing_version) {
+        WriterToAdmin();
+        return version_status;
+    }
+    const auto stored_version = missing_version ? std::optional<std::tuple<int, int, int>>{} : parse_version(stored_version_str);
+    if (!missing_version && !stored_version.has_value()) {
+        WriterToAdmin();
+        return Status::UnexpectedError(fmt::format("Invalid stored data format version: {}", stored_version_str));
+    }
+
+    if (missing_version || *stored_version < convert_version) {
+        LOG_INFO(fmt::format("Data format version changed: '{}' -> '{}', rebuilding JSON secondary indexes...",
+                             missing_version ? "pre-0.7.0" : stored_version_str,
+                             config_ptr_->Version()));
+        if (!ConvertJsonIndexFormat()) {
+            WriterToAdmin();
+            return Status::UnexpectedError("Failed to convert JSON index format");
+        }
+    }
 
     this->RecoverMemIndex();
 
@@ -908,6 +962,294 @@ void Storage::CreateDefaultDB() {
     if (!status.ok()) {
         UnrecoverableError("Can't commit txn for 'default_db'");
     }
+}
+
+// Converts all JSON secondary indexes from the old fixed-size format (pre-0.7.1)
+// to the new variable-length format. Called during startup when the stored data
+// format version is older than convert_version.
+//
+// For each active segment, chunks are sorted by base_row_id to determine row
+// ranges. Column data for each chunk's row range is read to rebuild the index
+// in the new variable-length format via InitSet + Dump + Save. The original
+// chunk ID and chunk count are preserved. Old chunk buffers are cleaned from
+// BufferManager before rewriting.
+//
+// Dropped chunks are left untouched.
+//
+// Runs inside a recovery transaction (writes directly to KV, no WAL).
+// On success, writes the current version marker so conversion doesn't re-run.
+bool Storage::ConvertJsonIndexFormat() const {
+    std::unique_ptr<NewTxn> recovery_txn = new_txn_mgr_->BeginRecoveryTxn();
+    NewTxn *txn = recovery_txn.get();
+    Status status;
+
+    CatalogMeta catalog_meta(txn);
+    std::vector<std::string> *db_id_strs = nullptr;
+    std::vector<std::string> *db_names = nullptr;
+    status = catalog_meta.GetDBIDs(db_id_strs, &db_names);
+    if (!status.ok()) {
+        LOG_WARN(fmt::format("Failed to enumerate databases during conversion: {}", status.message()));
+        return false;
+    }
+
+    for (size_t i = 0; i < db_id_strs->size(); ++i) {
+        const std::string &db_id_str = (*db_id_strs)[i];
+        const std::string &db_name = (*db_names)[i];
+
+        DBMeta db_meta(db_id_str, db_name, txn);
+        std::vector<std::string> *table_id_strs = nullptr;
+        std::vector<std::string> *table_names = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs, &table_names);
+        if (!status.ok()) {
+            LOG_WARN(fmt::format("Failed to enumerate tables for database '{}' during conversion: {}", db_name, status.message()));
+            return false;
+        }
+
+        for (size_t j = 0; j < table_id_strs->size(); ++j) {
+            const std::string &table_id_str = (*table_id_strs)[j];
+            const std::string &table_name = (*table_names)[j];
+
+            TableMeta table_meta(db_id_str, table_id_str, table_name, txn);
+
+            std::vector<std::string> *index_id_strs = nullptr;
+            std::vector<std::string> *index_names = nullptr;
+            status = table_meta.GetIndexIDs(index_id_strs, &index_names);
+            if (!status.ok()) {
+                LOG_WARN(fmt::format("Failed to get index IDs for '{}.{}' during conversion: {}", db_name, table_name, status.message()));
+                return false;
+            }
+
+            for (size_t k = 0; k < index_id_strs->size(); ++k) {
+                const std::string &index_id_str = (*index_id_strs)[k];
+                const std::string &index_name = (*index_names)[k];
+
+                TableIndexMeta table_index_meta(index_id_str, index_name, table_meta);
+                auto [index_base, get_status] = table_index_meta.GetIndexBase();
+                if (!get_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to get index base for '{}' during JSON conversion: {}", index_name, get_status.message()));
+                    return false;
+                }
+
+                // Only convert JSON secondary indexes
+                if (index_base->index_type_ != IndexType::kSecondary) {
+                    continue;
+                }
+                auto *secondary_index = static_cast<const IndexSecondary *>(index_base.get());
+                if (!secondary_index->IsJsonIndex()) {
+                    continue;
+                }
+
+                LOG_INFO(fmt::format("Converting JSON secondary index data for: {}.{}.{}", db_name, table_name, index_name));
+
+                auto cardinality = secondary_index->GetSecondaryIndexCardinality();
+
+                auto [column_def, col_status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name());
+                if (!col_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to get column def for index {}.{}.{}: {}", db_name, table_name, index_name, col_status.message()));
+                    return false;
+                }
+                ColumnID column_id = column_def->id();
+                DataType index_data_type = *column_def->type();
+
+                auto [active_seg_ids, seg_status] = table_index_meta.GetSegmentIndexIDs1();
+                if (!seg_status.ok()) {
+                    LOG_WARN(fmt::format("Failed to get segment IDs for index {}.{}.{}: {}", db_name, table_name, index_name, seg_status.message()));
+                    return false;
+                }
+
+                for (SegmentID seg_id : *active_seg_ids) {
+                    SegmentMeta segment_meta(seg_id, table_meta);
+                    size_t segment_row_cnt = 0;
+                    std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
+                    if (!status.ok()) {
+                        LOG_WARN(fmt::format("Failed to get row count for segment {} in {}.{}: {}", seg_id, db_name, table_name, status.message()));
+                        return false;
+                    }
+                    if (segment_row_cnt == 0) {
+                        continue;
+                    }
+
+                    SegmentIndexMeta seg_idx_meta(seg_id, table_index_meta);
+                    auto [chunk_ids, chunk_status] = seg_idx_meta.GetChunkIDs1();
+                    if (!chunk_status.ok()) {
+                        LOG_WARN(fmt::format("Failed to get chunk IDs for segment {} in {}.{}.{}: {}",
+                                             seg_id,
+                                             db_name,
+                                             table_name,
+                                             index_name,
+                                             chunk_status.message()));
+                        return false;
+                    }
+                    if (chunk_ids->empty()) {
+                        continue;
+                    }
+
+                    // Collect chunk info sorted by base_row_id to determine row ranges.
+                    struct ChunkInfo {
+                        ChunkID chunk_id;
+                        RowID base_row_id;
+                    };
+                    std::vector<ChunkInfo> sorted_chunks;
+                    sorted_chunks.reserve(chunk_ids->size());
+                    for (ChunkID chunk_id : *chunk_ids) {
+                        ChunkIndexMeta chunk_meta(chunk_id, seg_idx_meta);
+                        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+                        status = chunk_meta.GetChunkInfo(chunk_info_ptr);
+                        if (!status.ok()) {
+                            LOG_WARN(fmt::format("Failed to get chunk info for chunk {} in segment {} of {}.{}.{}: {}",
+                                                 chunk_id,
+                                                 seg_id,
+                                                 db_name,
+                                                 table_name,
+                                                 index_name,
+                                                 status.message()));
+                            return false;
+                        }
+                        sorted_chunks.push_back({chunk_id, chunk_info_ptr->base_row_id_});
+                    }
+                    std::sort(sorted_chunks.begin(), sorted_chunks.end(), [](const ChunkInfo &a, const ChunkInfo &b) {
+                        return a.base_row_id.segment_offset_ < b.base_row_id.segment_offset_;
+                    });
+
+                    auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
+                    if (!block_status.ok()) {
+                        LOG_WARN(
+                            fmt::format("Failed to get block IDs for segment {} in {}.{}: {}", seg_id, db_name, table_name, block_status.message()));
+                        return false;
+                    }
+
+                    const size_t block_capacity = DEFAULT_BLOCK_CAPACITY;
+                    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+                    std::shared_ptr<std::string> seg_index_dir = seg_idx_meta.GetSegmentIndexDir();
+                    const std::string data_dir = InfinityContext::instance().config()->DataDir();
+
+                    // Read column data for each chunk's row range and rebuild in new format.
+                    for (size_t chunk_idx = 0; chunk_idx < sorted_chunks.size(); ++chunk_idx) {
+                        ChunkID chunk_id = sorted_chunks[chunk_idx].chunk_id;
+                        SegmentOffset chunk_start = sorted_chunks[chunk_idx].base_row_id.segment_offset_;
+                        SegmentOffset chunk_end = (chunk_idx + 1 < sorted_chunks.size()) ? sorted_chunks[chunk_idx + 1].base_row_id.segment_offset_
+                                                                                         : static_cast<SegmentOffset>(segment_row_cnt);
+
+                        if (chunk_end <= chunk_start) {
+                            continue;
+                        }
+
+                        RowID begin_row_id(seg_id, chunk_start);
+                        auto memory_secondary_index = SecondaryIndexInMem::NewSecondaryIndexInMem(index_data_type, begin_row_id, cardinality);
+                        if (!memory_secondary_index) {
+                            LOG_WARN(fmt::format("Failed to create SecondaryIndexInMem for chunk {} in {}.{}.{}",
+                                                 chunk_id,
+                                                 db_name,
+                                                 table_name,
+                                                 index_name));
+                            return false;
+                        }
+
+                        for (BlockID block_id : *block_ids) {
+                            SegmentOffset block_start = block_id * block_capacity;
+                            SegmentOffset block_end = block_start + block_capacity;
+
+                            if (block_end <= chunk_start || block_start >= chunk_end) {
+                                continue;
+                            }
+
+                            SegmentOffset overlap_start = std::max(block_start, chunk_start);
+                            SegmentOffset overlap_end = std::min(block_end, chunk_end);
+
+                            BlockOffset offset_in_block = overlap_start - block_start;
+                            BlockOffset row_cnt_in_block = overlap_end - overlap_start;
+
+                            BlockMeta block_meta(block_id, segment_meta);
+                            ColumnMeta column_meta(column_id, block_meta);
+
+                            size_t block_row_cnt =
+                                (block_id == block_ids->back()) ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
+
+                            ColumnVector col;
+                            status = NewCatalog::GetColumnVector(column_meta,
+                                                                 column_meta.get_column_def(),
+                                                                 block_row_cnt,
+                                                                 ColumnVectorMode::kReadOnly,
+                                                                 col);
+                            if (!status.ok()) {
+                                LOG_WARN(fmt::format("Failed to read column data for block {} in segment {} of {}.{}: {}",
+                                                     block_id,
+                                                     seg_id,
+                                                     db_name,
+                                                     table_name,
+                                                     status.message()));
+                                return false;
+                            }
+
+                            memory_secondary_index->InsertBlockData(block_start, col, offset_in_block, row_cnt_in_block);
+                        }
+
+                        if (memory_secondary_index->GetRowCount() == 0) {
+                            continue;
+                        }
+
+                        ChunkIndexMeta chunk_meta(chunk_id, seg_idx_meta);
+                        ChunkIndexMetaInfo new_chunk_info = memory_secondary_index->GetChunkIndexMetaInfo();
+
+                        // Clean old buffer from BufferManager so InitSet can allocate a new one.
+                        std::string chunk_file_path = fmt::format("{}/{}/chunk_{}.idx", data_dir, *seg_index_dir, chunk_id);
+                        if (BufferObj *existing = buffer_mgr->GetBufferObject(chunk_file_path)) {
+                            existing->PickForCleanup();
+                            buffer_mgr->RemoveClean(nullptr);
+                        }
+
+                        // InitSet writes new-format KV metadata and allocates new-format buffer.
+                        status = chunk_meta.InitSet(new_chunk_info);
+                        if (!status.ok()) {
+                            LOG_WARN(fmt::format("Failed to init chunk {} in segment {} of {}.{}.{}: {}",
+                                                 chunk_id,
+                                                 seg_id,
+                                                 db_name,
+                                                 table_name,
+                                                 index_name,
+                                                 status.message()));
+                            return false;
+                        }
+
+                        BufferObj *buffer_obj = nullptr;
+                        status = chunk_meta.GetIndexBuffer(buffer_obj);
+                        if (!status.ok() || !buffer_obj) {
+                            LOG_WARN(fmt::format("Failed to get index buffer for chunk {} in segment {} of {}.{}.{}: {}",
+                                                 chunk_id,
+                                                 seg_id,
+                                                 db_name,
+                                                 table_name,
+                                                 index_name,
+                                                 status.message()));
+                            return false;
+                        }
+
+                        memory_secondary_index->Dump(buffer_obj);
+                        buffer_obj->Save();
+                    }
+                }
+
+                LOG_INFO(fmt::format("Successfully converted JSON secondary index: {}.{}.{}", db_name, table_name, index_name));
+            }
+        }
+    }
+
+    // Commit the recovery txn. Recovery txns write directly to KV without WAL.
+    status = recovery_txn->CommitRecovery();
+    if (!status.ok()) {
+        LOG_WARN(fmt::format("Failed to commit data format conversion: {}", status.message()));
+        return false;
+    }
+
+    // Write the current version to KV to record that conversion is done.
+    status = kv_store_->Put(KeyEncode::MetaVersionKey(), config_ptr_->Version(), false);
+    if (!status.ok()) {
+        LOG_WARN(fmt::format("Failed to write version key: {}", status.message()));
+        return false;
+    }
+
+    LOG_INFO(fmt::format("Data format conversion completed. Version: {}", config_ptr_->Version()));
+    return true;
 }
 
 } // namespace infinity

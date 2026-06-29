@@ -115,6 +115,8 @@ public:
 
     void CreateDefaultDB();
 
+    bool ConvertJsonIndexFormat() const;
+
 private:
     Config *config_ptr_{};
     std::unique_ptr<WalManager> wal_mgr_{};
