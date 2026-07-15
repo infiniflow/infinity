@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 RUN apt update && \
     apt --no-install-recommends install -y ca-certificates && \
     apt update && \
-    apt install -y curl, libatomic1
+    apt install -y curl libatomic1
 
 # https://docs.docker.com/reference/dockerfile/#copy
 # If <src> is a directory, the entire contents of the directory are copied, including filesystem metadata.
