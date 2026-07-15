@@ -306,6 +306,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Build and push infinity-sdk
         run: |
           uv run --python 3.11 python/infinity_sdk/prepare_huqie.py && uv build && uv publish --token ${{ secrets.PYPI_API_TOKEN }}
