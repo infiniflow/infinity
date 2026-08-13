@@ -113,7 +113,7 @@ ClientVersions::ClientVersions() {
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
     auto iter = client_version_map_.find(version_index);
     if (iter == client_version_map_.end()) {
-        return {nullptr, Status::UnsupportedVersionIndex(version_index)};
+        return {nullptr, Status::UnsupportedVersionIndex(version_index, 37)}; // Index for 0.7.3
     }
     return {iter->second.c_str(), Status::OK()};
 }

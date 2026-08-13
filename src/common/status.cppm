@@ -241,7 +241,7 @@ public:
     // 2. Auth error
     static Status WrongPasswd(const std::string &user_name);
     static Status InsufficientPrivilege(const std::string &user_name, const std::string &detailed_error);
-    static Status UnsupportedVersionIndex(i64 given_index);
+    static Status UnsupportedVersionIndex(i64 given_index, i64 max_index);
     static Status ClientVersionMismatch(const char *expected_version, const char *given_version);
     static Status AdminOnlySupportInMaintenanceMode();
     static Status NotSupportInMaintenanceMode();

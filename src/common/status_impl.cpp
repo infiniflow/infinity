@@ -121,12 +121,12 @@ Status Status::InsufficientPrivilege(const std::string &user_name, const std::st
                   std::make_unique<std::string>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
 }
 
-Status Status::UnsupportedVersionIndex(i64 given_index) {
-    return Status(
-        ErrorCode::kUnsupportedVersionIndex,
-        std::make_unique<std::string>(fmt::format(
-            "Index: {} isn't supported, you are using a deprecated version of Python SDK. Please install the corresponding version Python SDK.",
-            given_index)));
+Status Status::UnsupportedVersionIndex(i64 given_index, i64 max_index) {
+    return Status(ErrorCode::kUnsupportedVersionIndex,
+                  std::make_unique<std::string>(fmt::format(
+                      "Client version inndex: {} isn't supported, current max SDK version index is {}. Please install the corresponding version SDK.",
+                      given_index,
+                      max_index)));
 }
 
 Status Status::ClientVersionMismatch(const char *expected_version, const char *given_version) {
