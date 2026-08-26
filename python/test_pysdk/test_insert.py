@@ -297,6 +297,43 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_embedding_4" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_insert_embedding_numpy(self, suffix):
+        """
+        target: test insert embedding column with numpy array values (#1253)
+        method: insert a raw np.ndarray, and a plain list of numpy scalars
+                (e.g. list(embedding_array), which isn't itself an ndarray)
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+
+        db_obj.drop_table("test_insert_embedding_numpy_int" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_insert_embedding_numpy_int" + suffix, {"c1": {"type": "vector,3,int"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": np.array([1, 2, 3], dtype=np.int64)}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": list(np.array([4, 5, 6], dtype=np.int64))}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6])}))
+        res = db_obj.drop_table("test_insert_embedding_numpy_int" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_embedding_numpy_float" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_insert_embedding_numpy_float" + suffix, {"c1": {"type": "vector,3,float"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": np.array([1.1, 2.2, 3.3], dtype=np.float32)}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": list(np.array([4.4, 5.5, 6.6], dtype=np.float32))}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (np.array([1.1, 2.2, 3.3], dtype=np.float32).tolist(),
+                    np.array([4.4, 5.5, 6.6], dtype=np.float32).tolist())}))
+        res = db_obj.drop_table("test_insert_embedding_numpy_float" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_insert_big_embedding(self, suffix):
         """
         target: test insert embedding with big dimension
@@ -816,6 +853,7 @@ class TestInfinity:
         self._test_insert_varchar(suffix)
         self._test_insert_big_varchar(suffix)
         self._test_insert_embedding(suffix)
+        self._test_insert_embedding_numpy(suffix)
         self._test_insert_big_embedding(suffix)
         self._test_insert_big_embedding_float(suffix)
         self._test_insert_exceed_block_size(suffix)

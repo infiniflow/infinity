@@ -718,6 +718,8 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                     f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+    elif isinstance(value, list) and isinstance(value[0], (np.integer, np.floating)):
+        value = [x.item() for x in value]
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
             value = value.tolist()

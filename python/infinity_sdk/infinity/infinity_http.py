@@ -794,6 +794,8 @@ class table_http:
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
+                            elif isinstance(value[key][idx], (np.integer, np.floating)):
+                                value[key][idx] = value[key][idx].item()
                     elif isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
 
