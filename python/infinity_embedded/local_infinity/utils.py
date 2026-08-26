@@ -321,8 +321,9 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                     f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
-    elif isinstance(value, list) and isinstance(value[0], (np.integer, np.floating)):
-        value = [x.item() for x in value]
+    elif isinstance(value, list) and len(value) > 0:
+        # Normalize numpy scalars in list to native Python types (element-wise check)
+        value = [x.item() if isinstance(x, (np.integer, np.floating, np.longdouble)) else x for x in value]
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
             value = value.tolist()
