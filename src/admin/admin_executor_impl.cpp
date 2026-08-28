@@ -650,7 +650,13 @@ QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const Admi
 
     auto catalog_dir = InfinityContext::instance().config()->CatalogDir();
 
-    rocksdb::TransactionDB::OpenForReadOnly(options, catalog_dir, &db);
+    auto status = rocksdb::TransactionDB::OpenForReadOnly(options, catalog_dir, &db);
+    if (!status.ok()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ =
+            Status::RocksDBError(status, fmt::format("Failed to open catalog directory: {}", catalog_dir));
+        return query_result;
+    }
 
     struct db_output_obj {
         std::string name_;

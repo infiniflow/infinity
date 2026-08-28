@@ -20,7 +20,9 @@ module infinity_core:ut.infinity;
 
 import :ut.base_test;
 import :infinity;
+import :infinity_context;
 import :query_result;
+import :status;
 import :data_block;
 import :value;
 import :query_options;
@@ -253,6 +255,24 @@ TEST_F(InfinityTest, test1) {
     }
     infinity->LocalDisconnect();
 
+    Infinity::LocalUnInit();
+}
+
+TEST_F(InfinityTest, admin_show_databases_reports_missing_catalog) {
+    Infinity::LocalUnInit();
+    RemoveDbDirs();
+
+    std::shared_ptr<std::string> config_path = nullptr;
+    InfinityContext::instance().InitPhase1(config_path);
+    InfinityContext::instance().InitPhase2(true);
+
+    std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
+    QueryResult result = infinity->Query("admin show databases;");
+
+    EXPECT_FALSE(result.IsOk());
+    EXPECT_EQ(result.ErrorCode(), ErrorCode::kRocksDBError);
+
+    infinity->LocalDisconnect();
     Infinity::LocalUnInit();
 }
 
