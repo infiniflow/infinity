@@ -1020,7 +1020,7 @@ Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta, Usage
     }
     for (ChunkID chunk_id : *chunk_ids_ptr) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
-        status = NewCatalog::CleanChunkIndex(chunk_index_meta, usage_flag);
+        status = NewCatalog::CleanChunkIndex(chunk_index_meta, usage_flag, /*invalidate_ft_cache=*/false);
         if (!status.ok()) {
             return status;
         }
@@ -1132,12 +1132,29 @@ Status NewCatalog::LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, 
     return Status::OK();
 }
 
-Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag) {
+Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag, bool invalidate_ft_cache) {
     LOG_TRACE(fmt::format("CleanChunkIndex: cleaning table id: {}, segment_id: {}, index_id: {}, chunk_id: {}",
                           chunk_index_meta.segment_index_meta().table_index_meta().table_meta().table_id_str(),
                           chunk_index_meta.segment_index_meta().segment_id(),
                           chunk_index_meta.segment_index_meta().table_index_meta().index_id_str(),
                           chunk_index_meta.chunk_id()));
+    if (usage_flag != UsageFlag::kTransform && invalidate_ft_cache) {
+        // Invalidate the fulltext index reader cache before the chunk's data
+        // (posting/dictionary files, column-length buffer) is physically
+        // destroyed below. Chunk-level cleanups (the normal path for
+        // merged-away fulltext chunks) did not do this:
+        // TableIndexReaderCache::GetIndexReader would keep serving cached
+        // DiskIndexSegmentReaders and raw BufferObj pointers over freed data,
+        // and the first fulltext query after the cleanup commit crashed the
+        // server in the posting decoder (see issue #3418).
+        // CleanSegmentIndex invalidates once for the whole segment and passes
+        // invalidate_ft_cache = false to skip the redundant per-chunk calls.
+        TableMeta &table_meta = chunk_index_meta.segment_index_meta().table_index_meta().table_meta();
+        Status invalidate_status = table_meta.InvalidateFtIndexCache();
+        if (!invalidate_status.ok()) {
+            return invalidate_status;
+        }
+    }
     chunk_index_meta.RestoreSet();
     Status status;
 
