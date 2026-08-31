@@ -36,6 +36,7 @@ import :block_meta;
 import :segment_meta;
 import :table_meta;
 import :table_index_meta;
+import :index_base;
 import :segment_index_meta;
 import :new_catalog;
 import :meta_key;
@@ -67,6 +68,7 @@ import third_party;
 import column_def;
 import row_id;
 import constant_expr;
+import create_index_info;
 import data_type;
 
 namespace infinity {
@@ -1737,6 +1739,34 @@ Status NewTxn::PrepareCommitImport(WalCmdImportV2 *import_cmd) {
 
     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(&segment_meta);
 
+    {
+        // The imported segment's fulltext index chunks are carried by the import txn store,
+        // not by a WalCmdDumpIndexV2, so the invalidation in PrepareCommitDumpIndex never
+        // fires here: without this, cached readers keep serving a chunk list that misses
+        // the imported segment.
+        std::vector<std::string> *index_id_strs_ptr = nullptr;
+        std::vector<std::string> *index_name_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        size_t index_count = index_id_strs_ptr->size();
+        for (size_t idx = 0; idx < index_count; ++idx) {
+            TableIndexMeta table_index_meta(index_id_strs_ptr->at(idx), index_name_strs_ptr->at(idx), table_meta);
+            auto [index_base, index_status] = table_index_meta.GetIndexBase();
+            if (!index_status.ok()) {
+                return index_status;
+            }
+            if (index_base->index_type_ == IndexType::kFullText) {
+                status = table_meta.InvalidateFtIndexCache();
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+        }
+    }
+
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
         // When all data and index is write to disk, try to finalize the
@@ -2058,12 +2088,30 @@ Status NewTxn::PrepareCommitCompact(WalCmdCompactV2 *compact_cmd) {
         if (!status.ok()) {
             return status;
         }
+        bool ft_index_cache_invalidated = false;
         size_t index_count = index_id_strs_ptr->size();
         for (size_t idx = 0; idx < index_count; ++idx) {
             const std::string &index_id_str = index_id_strs_ptr->at(idx);
             const std::string &index_name_str = index_name_strs_ptr->at(idx);
 
             TableIndexMeta table_index_meta(index_id_str, index_name_str, table_meta);
+
+            auto [index_base, index_status] = table_index_meta.GetIndexBase();
+            if (!index_status.ok()) {
+                return index_status;
+            }
+            if (index_base->index_type_ == IndexType::kFullText && !ft_index_cache_invalidated) {
+                // The compacted segment's fulltext index chunks are carried by the compact txn
+                // store, not by a WalCmdDumpIndexV2, so the invalidation in
+                // PrepareCommitDumpIndex never fires here: without this, cached readers keep
+                // serving the deprecated segments and never see the compacted one.
+                status = table_meta.InvalidateFtIndexCache();
+                if (!status.ok()) {
+                    return status;
+                }
+                ft_index_cache_invalidated = true;
+            }
+
             std::vector<SegmentID> *segment_ids_ptr = nullptr;
             std::tie(segment_ids_ptr, status) = table_index_meta.GetSegmentIndexIDs1();
             if (!status.ok()) {
