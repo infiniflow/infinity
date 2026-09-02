@@ -15,7 +15,7 @@ import (
 
 	thrift "github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/infiniflow/infinity-goinfinity"
+	infinity "github.com/infiniflow/infinity-go-sdk/internal/thrift"
 )
 
 var _ = infinity.GoUnusedProtection__
