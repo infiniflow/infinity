@@ -1396,11 +1396,6 @@ func (p *Property) GetValue() string {
 }
 
 func (p *Property) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -1467,11 +1462,6 @@ func (p *Property) ReadField2(ctx context.Context, iprot thrift.TProtocol) error
 }
 
 func (p *Property) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Property"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -1580,11 +1570,6 @@ func (p *CreateOption) GetProperties() []*Property {
 }
 
 func (p *CreateOption) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -1663,11 +1648,6 @@ func (p *CreateOption) ReadField2(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *CreateOption) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateOption"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -1782,11 +1762,6 @@ func (p *DropOption) GetConflictType() DropConflict {
 }
 
 func (p *DropOption) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -1835,11 +1810,6 @@ func (p *DropOption) ReadField1(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *DropOption) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropOption"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -1914,11 +1884,6 @@ func NewNumberType() *NumberType {
 }
 
 func (p *NumberType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -1944,11 +1909,6 @@ func (p *NumberType) Read(ctx context.Context, iprot thrift.TProtocol) error {
 }
 
 func (p *NumberType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "NumberType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -2004,11 +1964,6 @@ func NewVarcharType() *VarcharType {
 }
 
 func (p *VarcharType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -2034,11 +1989,6 @@ func (p *VarcharType) Read(ctx context.Context, iprot thrift.TProtocol) error {
 }
 
 func (p *VarcharType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "VarcharType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -2107,11 +2057,6 @@ func (p *EmbeddingType) GetElementType() ElementType {
 }
 
 func (p *EmbeddingType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -2179,11 +2124,6 @@ func (p *EmbeddingType) ReadField2(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *EmbeddingType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "EmbeddingType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -2296,11 +2236,6 @@ func (p *SparseType) GetIndexType() ElementType {
 }
 
 func (p *SparseType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -2388,11 +2323,6 @@ func (p *SparseType) ReadField3(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *SparseType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SparseType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -2521,11 +2451,6 @@ func (p *ArrayType) IsSetElementDataType() bool {
 }
 
 func (p *ArrayType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -2572,11 +2497,6 @@ func (p *ArrayType) ReadField1(ctx context.Context, iprot thrift.TProtocol) erro
 }
 
 func (p *ArrayType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ArrayType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -2748,11 +2668,6 @@ func (p *PhysicalType) IsSetArrayType() bool {
 }
 
 func (p *PhysicalType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -2871,11 +2786,6 @@ func (p *PhysicalType) ReadField5(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *PhysicalType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if c := p.CountSetFieldsPhysicalType(); c != 1 {
 		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("%T write union: exactly one field must be set (%d set)", p, c))
 	}
@@ -3061,11 +2971,6 @@ func (p *DataType) IsSetPhysicalType() bool {
 }
 
 func (p *DataType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -3132,11 +3037,6 @@ func (p *DataType) ReadField2(ctx context.Context, iprot thrift.TProtocol) error
 }
 
 func (p *DataType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DataType"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -3453,11 +3353,6 @@ func (p *ParsedExprType) IsSetCastExpr() bool {
 }
 
 func (p *ParsedExprType) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -3708,11 +3603,6 @@ func (p *ParsedExprType) ReadField12(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *ParsedExprType) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if c := p.CountSetFieldsParsedExprType(); c != 1 {
 		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("%T write union: exactly one field must be set (%d set)", p, c))
 	}
@@ -4045,11 +3935,6 @@ func (p *ParsedExpr) IsSetType() bool {
 }
 
 func (p *ParsedExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -4115,11 +4000,6 @@ func (p *ParsedExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *ParsedExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ParsedExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -4228,11 +4108,6 @@ func (p *ColumnExpr) GetStar() bool {
 }
 
 func (p *ColumnExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -4312,11 +4187,6 @@ func (p *ColumnExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *ColumnExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ColumnExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -4581,11 +4451,6 @@ func (p *EmbeddingData) IsSetBf16ArrayValue() bool {
 }
 
 func (p *EmbeddingData) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -4934,11 +4799,6 @@ func (p *EmbeddingData) ReadField10(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *EmbeddingData) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if c := p.CountSetFieldsEmbeddingData(); c != 1 {
 		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("%T write union: exactly one field must be set (%d set)", p, c))
 	}
@@ -5360,11 +5220,6 @@ func (p *InitParameter) GetParamValue() string {
 }
 
 func (p *InitParameter) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -5431,11 +5286,6 @@ func (p *InitParameter) ReadField2(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *InitParameter) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "InitParameter"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -5692,11 +5542,6 @@ func (p *ConstantExpr) IsSetCurlyBracketsArray() bool {
 }
 
 func (p *ConstantExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -6147,11 +5992,6 @@ func (p *ConstantExpr) ReadField13(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *ConstantExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ConstantExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -6707,11 +6547,6 @@ func (p *FunctionExpr) GetArguments() []*ParsedExpr {
 }
 
 func (p *FunctionExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -6789,11 +6624,6 @@ func (p *FunctionExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *FunctionExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "FunctionExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -6988,11 +6818,6 @@ func (p *KnnExpr) IsSetQueryEmbeddingExpr() bool {
 }
 
 func (p *KnnExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -7184,11 +7009,6 @@ func (p *KnnExpr) ReadField8(ctx context.Context, iprot thrift.TProtocol) error 
 }
 
 func (p *KnnExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "KnnExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -7480,11 +7300,6 @@ func (p *MatchSparseExpr) IsSetFilterExpr() bool {
 }
 
 func (p *MatchSparseExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -7637,11 +7452,6 @@ func (p *MatchSparseExpr) ReadField6(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *MatchSparseExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "MatchSparseExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -7891,11 +7701,6 @@ func (p *MatchTensorExpr) IsSetFilterExpr() bool {
 }
 
 func (p *MatchTensorExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -8038,11 +7843,6 @@ func (p *MatchTensorExpr) ReadField6(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *MatchTensorExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "MatchTensorExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -8248,11 +8048,6 @@ func (p *MatchExpr) IsSetFilterExpr() bool {
 }
 
 func (p *MatchExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -8356,11 +8151,6 @@ func (p *MatchExpr) ReadField4(ctx context.Context, iprot thrift.TProtocol) erro
 }
 
 func (p *MatchExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "MatchExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -8573,11 +8363,6 @@ func (p *GenericMatchExpr) IsSetMatchTextExpr() bool {
 }
 
 func (p *GenericMatchExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -8682,11 +8467,6 @@ func (p *GenericMatchExpr) ReadField4(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *GenericMatchExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if c := p.CountSetFieldsGenericMatchExpr(); c != 1 {
 		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("%T write union: exactly one field must be set (%d set)", p, c))
 	}
@@ -8857,11 +8637,6 @@ func (p *FusionExpr) IsSetOptionalMatchTensorExpr() bool {
 }
 
 func (p *FusionExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -8946,11 +8721,6 @@ func (p *FusionExpr) ReadField3(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *FusionExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "FusionExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -9090,11 +8860,6 @@ func (p *SearchExpr) IsSetFusionExprs() bool {
 }
 
 func (p *SearchExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -9183,11 +8948,6 @@ func (p *SearchExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *SearchExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SearchExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -9359,11 +9119,6 @@ func (p *BetweenExpr) IsSetLowerBound() bool {
 }
 
 func (p *BetweenExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -9446,11 +9201,6 @@ func (p *BetweenExpr) ReadField3(ctx context.Context, iprot thrift.TProtocol) er
 }
 
 func (p *BetweenExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "BetweenExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -9585,11 +9335,6 @@ func (p *UpdateExpr) IsSetValue() bool {
 }
 
 func (p *UpdateExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -9655,11 +9400,6 @@ func (p *UpdateExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) err
 }
 
 func (p *UpdateExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "UpdateExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -9775,11 +9515,6 @@ func (p *OrderByExpr) IsSetExpr() bool {
 }
 
 func (p *OrderByExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -9845,11 +9580,6 @@ func (p *OrderByExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) er
 }
 
 func (p *OrderByExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "OrderByExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -9971,11 +9701,6 @@ func (p *InExpr) IsSetLeftOperand() bool {
 }
 
 func (p *InExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -10071,11 +9796,6 @@ func (p *InExpr) ReadField3(ctx context.Context, iprot thrift.TProtocol) error {
 }
 
 func (p *InExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "InExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -10233,11 +9953,6 @@ func (p *CastExpr) IsSetDataType() bool {
 }
 
 func (p *CastExpr) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -10302,11 +10017,6 @@ func (p *CastExpr) ReadField2(ctx context.Context, iprot thrift.TProtocol) error
 }
 
 func (p *CastExpr) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CastExpr"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -10457,11 +10167,6 @@ func (p *ColumnDef) IsSetConstantExpr() bool {
 }
 
 func (p *ColumnDef) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -10616,11 +10321,6 @@ func (p *ColumnDef) ReadField6(ctx context.Context, iprot thrift.TProtocol) erro
 }
 
 func (p *ColumnDef) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ColumnDef"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -10820,11 +10520,6 @@ func (p *Field) GetParseExprs() []*ParsedExpr {
 }
 
 func (p *Field) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -10915,11 +10610,6 @@ func (p *Field) ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
 }
 
 func (p *Field) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Field"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -11069,11 +10759,6 @@ func (p *ColumnField) GetBitmasks() []bool {
 }
 
 func (p *ColumnField) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -11205,11 +10890,6 @@ func (p *ColumnField) ReadField4(ctx context.Context, iprot thrift.TProtocol) er
 }
 
 func (p *ColumnField) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ColumnField"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -11388,11 +11068,6 @@ func (p *ImportOption) GetCopyFileType() CopyFileType {
 }
 
 func (p *ImportOption) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -11479,11 +11154,6 @@ func (p *ImportOption) ReadField3(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *ImportOption) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ImportOption"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -11633,11 +11303,6 @@ func (p *ExportOption) GetRowLimit() int64 {
 }
 
 func (p *ExportOption) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -11781,11 +11446,6 @@ func (p *ExportOption) ReadField6(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *ExportOption) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ExportOption"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -11970,11 +11630,6 @@ func (p *AlterIndexOptions) GetOptParams() []*InitParameter {
 }
 
 func (p *AlterIndexOptions) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -12052,11 +11707,6 @@ func (p *AlterIndexOptions) ReadField2(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *AlterIndexOptions) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AlterIndexOptions"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -12171,11 +11821,6 @@ func (p *ConnectRequest) GetClientVersion() int64 {
 }
 
 func (p *ConnectRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -12223,11 +11868,6 @@ func (p *ConnectRequest) ReadField1(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *ConnectRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ConnectRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -12309,11 +11949,6 @@ func (p *CommonRequest) GetSessionID() int64 {
 }
 
 func (p *CommonRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -12361,11 +11996,6 @@ func (p *CommonRequest) ReadField1(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *CommonRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CommonRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -12459,11 +12089,6 @@ func (p *CommonResponse) GetSessionID() int64 {
 }
 
 func (p *CommonResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -12549,11 +12174,6 @@ func (p *CommonResponse) ReadField3(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *CommonResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CommonResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -12673,11 +12293,6 @@ func (p *ListDatabaseRequest) GetSessionID() int64 {
 }
 
 func (p *ListDatabaseRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -12725,11 +12340,6 @@ func (p *ListDatabaseRequest) ReadField1(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *ListDatabaseRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListDatabaseRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -12839,11 +12449,6 @@ func (p *ListDatabaseResponse) GetDbComments() []string {
 }
 
 func (p *ListDatabaseResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -13006,11 +12611,6 @@ func (p *ListDatabaseResponse) ReadField5(ctx context.Context, iprot thrift.TPro
 }
 
 func (p *ListDatabaseResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListDatabaseResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -13216,11 +12816,6 @@ func (p *ListTableRequest) GetSessionID() int64 {
 }
 
 func (p *ListTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -13287,11 +12882,6 @@ func (p *ListTableRequest) ReadField2(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *ListTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -13406,11 +12996,6 @@ func (p *ListTableResponse) GetTableNames() []string {
 }
 
 func (p *ListTableResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -13509,11 +13094,6 @@ func (p *ListTableResponse) ReadField3(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ListTableResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListTableResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -13659,11 +13239,6 @@ func (p *ListIndexRequest) GetSessionID() int64 {
 }
 
 func (p *ListIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -13749,11 +13324,6 @@ func (p *ListIndexRequest) ReadField3(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *ListIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -13887,11 +13457,6 @@ func (p *ListIndexResponse) GetIndexNames() []string {
 }
 
 func (p *ListIndexResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -13990,11 +13555,6 @@ func (p *ListIndexResponse) ReadField3(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ListIndexResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListIndexResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -14134,11 +13694,6 @@ func (p *ShowDatabaseRequest) GetSessionID() int64 {
 }
 
 func (p *ShowDatabaseRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -14205,11 +13760,6 @@ func (p *ShowDatabaseRequest) ReadField2(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *ShowDatabaseRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowDatabaseRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -14340,11 +13890,6 @@ func (p *ShowDatabaseResponse) GetComment() string {
 }
 
 func (p *ShowDatabaseResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -14487,11 +14032,6 @@ func (p *ShowDatabaseResponse) ReadField6(ctx context.Context, iprot thrift.TPro
 }
 
 func (p *ShowDatabaseResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowDatabaseResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -14680,11 +14220,6 @@ func (p *ShowTableRequest) GetSessionID() int64 {
 }
 
 func (p *ShowTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -14770,11 +14305,6 @@ func (p *ShowTableRequest) ReadField3(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *ShowTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -14936,11 +14466,6 @@ func (p *ShowTableResponse) GetRowCount() int64 {
 }
 
 func (p *ShowTableResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -15121,11 +14646,6 @@ func (p *ShowTableResponse) ReadField8(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ShowTableResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowTableResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -15352,11 +14872,6 @@ func (p *ShowColumnsRequest) GetSessionID() int64 {
 }
 
 func (p *ShowColumnsRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -15442,11 +14957,6 @@ func (p *ShowColumnsRequest) ReadField3(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *ShowColumnsRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowColumnsRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -15578,11 +15088,6 @@ func (p *GetTableRequest) GetSessionID() int64 {
 }
 
 func (p *GetTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -15668,11 +15173,6 @@ func (p *GetTableRequest) ReadField3(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *GetTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -15821,11 +15321,6 @@ func (p *IndexInfo) IsSetFunctionExpr() bool {
 }
 
 func (p *IndexInfo) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -15941,11 +15436,6 @@ func (p *IndexInfo) ReadField4(ctx context.Context, iprot thrift.TProtocol) erro
 }
 
 func (p *IndexInfo) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "IndexInfo"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -16152,11 +15642,6 @@ func (p *CreateIndexRequest) IsSetCreateOption() bool {
 }
 
 func (p *CreateIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -16320,11 +15805,6 @@ func (p *CreateIndexRequest) ReadField7(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *CreateIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -16553,11 +16033,6 @@ func (p *DropIndexRequest) IsSetDropOption() bool {
 }
 
 func (p *DropIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -16680,11 +16155,6 @@ func (p *DropIndexRequest) ReadField5(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *DropIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -16860,11 +16330,6 @@ func (p *ShowIndexRequest) GetSessionID() int64 {
 }
 
 func (p *ShowIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -16969,11 +16434,6 @@ func (p *ShowIndexRequest) ReadField4(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *ShowIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -17184,11 +16644,6 @@ func (p *ShowIndexResponse) GetSegmentIndexCount() string {
 }
 
 func (p *ShowIndexResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -17464,11 +16919,6 @@ func (p *ShowIndexResponse) ReadField13(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *ShowIndexResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowIndexResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -17790,11 +17240,6 @@ func (p *OptimizeRequest) GetSessionID() int64 {
 }
 
 func (p *OptimizeRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -17880,11 +17325,6 @@ func (p *OptimizeRequest) ReadField3(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *OptimizeRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "OptimizeRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -18031,11 +17471,6 @@ func (p *AlterIndexRequest) IsSetAlterIndexOptions() bool {
 }
 
 func (p *AlterIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -18141,11 +17576,6 @@ func (p *AlterIndexRequest) ReadField4(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *AlterIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AlterIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -18290,11 +17720,6 @@ func (p *GetDatabaseRequest) GetSessionID() int64 {
 }
 
 func (p *GetDatabaseRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -18361,11 +17786,6 @@ func (p *GetDatabaseRequest) ReadField2(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *GetDatabaseRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetDatabaseRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -18493,11 +17913,6 @@ func (p *CreateDatabaseRequest) IsSetCreateOption() bool {
 }
 
 func (p *CreateDatabaseRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -18603,11 +18018,6 @@ func (p *CreateDatabaseRequest) ReadField4(ctx context.Context, iprot thrift.TPr
 }
 
 func (p *CreateDatabaseRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabaseRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -18767,11 +18177,6 @@ func (p *DropDatabaseRequest) IsSetDropOption() bool {
 }
 
 func (p *DropDatabaseRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -18856,11 +18261,6 @@ func (p *DropDatabaseRequest) ReadField3(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *DropDatabaseRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropDatabaseRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -19016,11 +18416,6 @@ func (p *CreateTableRequest) IsSetCreateOption() bool {
 }
 
 func (p *CreateTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -19158,11 +18553,6 @@ func (p *CreateTableRequest) ReadField7(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *CreateTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -19361,11 +18751,6 @@ func (p *DropTableRequest) IsSetDropOption() bool {
 }
 
 func (p *DropTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -19469,11 +18854,6 @@ func (p *DropTableRequest) ReadField4(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *DropTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -19630,11 +19010,6 @@ func (p *RenameTableRequest) GetSessionID() int64 {
 }
 
 func (p *RenameTableRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -19739,11 +19114,6 @@ func (p *RenameTableRequest) ReadField4(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *RenameTableRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RenameTableRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -19902,11 +19272,6 @@ func (p *InsertRequest) GetSessionID() int64 {
 }
 
 func (p *InsertRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -20025,11 +19390,6 @@ func (p *InsertRequest) ReadField4(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *InsertRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "InsertRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -20215,11 +19575,6 @@ func (p *ImportRequest) IsSetImportOption() bool {
 }
 
 func (p *ImportRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -20342,11 +19697,6 @@ func (p *ImportRequest) ReadField5(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *ImportRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ImportRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -20543,11 +19893,6 @@ func (p *ExportRequest) IsSetExportOption() bool {
 }
 
 func (p *ExportRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -20702,11 +20047,6 @@ func (p *ExportRequest) ReadField6(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *ExportRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ExportRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -21043,11 +20383,6 @@ func (p *ExplainRequest) IsSetOrderByList() bool {
 }
 
 func (p *ExplainRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -21363,11 +20698,6 @@ func (p *ExplainRequest) ReadField13(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *ExplainRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ExplainRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -21785,11 +21115,6 @@ func (p *ExplainResponse) GetColumnFields() []*ColumnField {
 }
 
 func (p *ExplainResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -21921,11 +21246,6 @@ func (p *ExplainResponse) ReadField4(ctx context.Context, iprot thrift.TProtocol
 }
 
 func (p *ExplainResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ExplainResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -22247,11 +21567,6 @@ func (p *SelectRequest) IsSetTotalHitsCount() bool {
 }
 
 func (p *SelectRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -22566,11 +21881,6 @@ func (p *SelectRequest) ReadField13(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *SelectRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SelectRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -23001,11 +22311,6 @@ func (p *SelectResponse) GetExtraResult_() string {
 }
 
 func (p *SelectResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -23156,11 +22461,6 @@ func (p *SelectResponse) ReadField5(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *SelectResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SelectResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -23373,11 +22673,6 @@ func (p *DeleteRequest) IsSetWhereExpr() bool {
 }
 
 func (p *DeleteRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -23481,11 +22776,6 @@ func (p *DeleteRequest) ReadField4(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *DeleteRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DeleteRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -23636,11 +22926,6 @@ func (p *DeleteResponse) GetDeletedRows() int64 {
 }
 
 func (p *DeleteResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -23726,11 +23011,6 @@ func (p *DeleteResponse) ReadField3(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *DeleteResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DeleteResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -23885,11 +23165,6 @@ func (p *UpdateRequest) IsSetWhereExpr() bool {
 }
 
 func (p *UpdateRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -24023,11 +23298,6 @@ func (p *UpdateRequest) ReadField5(ctx context.Context, iprot thrift.TProtocol) 
 }
 
 func (p *UpdateRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "UpdateRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -24219,11 +23489,6 @@ func (p *AddColumnsRequest) GetSessionID() int64 {
 }
 
 func (p *AddColumnsRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -24341,11 +23606,6 @@ func (p *AddColumnsRequest) ReadField4(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *AddColumnsRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AddColumnsRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -24518,11 +23778,6 @@ func (p *DropColumnsRequest) GetSessionID() int64 {
 }
 
 func (p *DropColumnsRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -24640,11 +23895,6 @@ func (p *DropColumnsRequest) ReadField4(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *DropColumnsRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropColumnsRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -24815,11 +24065,6 @@ func (p *DumpIndexRequest) GetSessionID() int64 {
 }
 
 func (p *DumpIndexRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -24924,11 +24169,6 @@ func (p *DumpIndexRequest) ReadField4(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *DumpIndexRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DumpIndexRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -25079,11 +24319,6 @@ func (p *ShowSegmentsRequest) GetTableName() string {
 }
 
 func (p *ShowSegmentsRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -25169,11 +24404,6 @@ func (p *ShowSegmentsRequest) ReadField3(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *ShowSegmentsRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegmentsRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -25311,11 +24541,6 @@ func (p *ShowSegmentRequest) GetSegmentID() int64 {
 }
 
 func (p *ShowSegmentRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -25420,11 +24645,6 @@ func (p *ShowSegmentRequest) ReadField4(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *ShowSegmentRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegmentRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -25623,11 +24843,6 @@ func (p *ShowSegmentResponse) GetColumnCount() int64 {
 }
 
 func (p *ShowSegmentResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -25865,11 +25080,6 @@ func (p *ShowSegmentResponse) ReadField11(ctx context.Context, iprot thrift.TPro
 }
 
 func (p *ShowSegmentResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegmentResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -26159,11 +25369,6 @@ func (p *ShowBlocksRequest) GetSegmentID() int64 {
 }
 
 func (p *ShowBlocksRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -26268,11 +25473,6 @@ func (p *ShowBlocksRequest) ReadField4(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ShowBlocksRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlocksRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -26435,11 +25635,6 @@ func (p *ShowBlockRequest) GetBlockID() int64 {
 }
 
 func (p *ShowBlockRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -26563,11 +25758,6 @@ func (p *ShowBlockRequest) ReadField5(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *ShowBlockRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -26767,11 +25957,6 @@ func (p *ShowBlockResponse) GetColumnCount() int64 {
 }
 
 func (p *ShowBlockResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -26952,11 +26137,6 @@ func (p *ShowBlockResponse) ReadField8(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ShowBlockResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -27201,11 +26381,6 @@ func (p *ShowBlockColumnRequest) GetColumnID() int64 {
 }
 
 func (p *ShowBlockColumnRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -27348,11 +26523,6 @@ func (p *ShowBlockColumnRequest) ReadField6(ctx context.Context, iprot thrift.TP
 }
 
 func (p *ShowBlockColumnRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockColumnRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -27571,11 +26741,6 @@ func (p *ShowBlockColumnResponse) GetExtraFileNames() string {
 }
 
 func (p *ShowBlockColumnResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -27756,11 +26921,6 @@ func (p *ShowBlockColumnResponse) ReadField8(ctx context.Context, iprot thrift.T
 }
 
 func (p *ShowBlockColumnResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockColumnResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -27975,11 +27135,6 @@ func (p *ShowCurrentNodeRequest) GetSessionID() int64 {
 }
 
 func (p *ShowCurrentNodeRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -28027,11 +27182,6 @@ func (p *ShowCurrentNodeRequest) ReadField1(ctx context.Context, iprot thrift.TP
 }
 
 func (p *ShowCurrentNodeRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowCurrentNodeRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -28131,11 +27281,6 @@ func (p *ShowCurrentNodeResponse) GetServerStatus() string {
 }
 
 func (p *ShowCurrentNodeResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -28240,11 +27385,6 @@ func (p *ShowCurrentNodeResponse) ReadField4(ctx context.Context, iprot thrift.T
 }
 
 func (p *ShowCurrentNodeResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowCurrentNodeResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -28395,11 +27535,6 @@ func (p *CommandRequest) GetTestCommandContent() string {
 }
 
 func (p *CommandRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -28485,11 +27620,6 @@ func (p *CommandRequest) ReadField3(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *CommandRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CommandRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -28615,11 +27745,6 @@ func (p *FlushRequest) GetFlushType() string {
 }
 
 func (p *FlushRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -28686,11 +27811,6 @@ func (p *FlushRequest) ReadField2(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *FlushRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "FlushRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -28803,11 +27923,6 @@ func (p *CompactRequest) GetTableName() string {
 }
 
 func (p *CompactRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -28893,11 +28008,6 @@ func (p *CompactRequest) ReadField3(ctx context.Context, iprot thrift.TProtocol)
 }
 
 func (p *CompactRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CompactRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -29035,11 +28145,6 @@ func (p *CreateTableSnapshotRequest) GetSnapshotName() string {
 }
 
 func (p *CreateTableSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -29144,11 +28249,6 @@ func (p *CreateTableSnapshotRequest) ReadField4(ctx context.Context, iprot thrif
 }
 
 func (p *CreateTableSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTableSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -29299,11 +28399,6 @@ func (p *CreateDatabaseSnapshotRequest) GetSnapshotName() string {
 }
 
 func (p *CreateDatabaseSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -29389,11 +28484,6 @@ func (p *CreateDatabaseSnapshotRequest) ReadField3(ctx context.Context, iprot th
 }
 
 func (p *CreateDatabaseSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabaseSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -29519,11 +28609,6 @@ func (p *CreateSystemSnapshotRequest) GetSnapshotName() string {
 }
 
 func (p *CreateSystemSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -29590,11 +28675,6 @@ func (p *CreateSystemSnapshotRequest) ReadField2(ctx context.Context, iprot thri
 }
 
 func (p *CreateSystemSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateSystemSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -29707,11 +28787,6 @@ func (p *RestoreSnapshotRequest) GetScope() string {
 }
 
 func (p *RestoreSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -29797,11 +28872,6 @@ func (p *RestoreSnapshotRequest) ReadField3(ctx context.Context, iprot thrift.TP
 }
 
 func (p *RestoreSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RestoreSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -29945,11 +29015,6 @@ func (p *SnapshotInfo) GetSize() string {
 }
 
 func (p *SnapshotInfo) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -30073,11 +29138,6 @@ func (p *SnapshotInfo) ReadField5(ctx context.Context, iprot thrift.TProtocol) e
 }
 
 func (p *SnapshotInfo) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SnapshotInfo"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -30241,11 +29301,6 @@ func (p *ShowSnapshotRequest) GetSnapshotName() string {
 }
 
 func (p *ShowSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -30312,11 +29367,6 @@ func (p *ShowSnapshotRequest) ReadField2(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *ShowSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -30438,11 +29488,6 @@ func (p *ShowSnapshotResponse) IsSetSnapshot() bool {
 }
 
 func (p *ShowSnapshotResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -30527,11 +29572,6 @@ func (p *ShowSnapshotResponse) ReadField3(ctx context.Context, iprot thrift.TPro
 }
 
 func (p *ShowSnapshotResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSnapshotResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -30651,11 +29691,6 @@ func (p *ListSnapshotsRequest) GetSessionID() int64 {
 }
 
 func (p *ListSnapshotsRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -30703,11 +29738,6 @@ func (p *ListSnapshotsRequest) ReadField1(ctx context.Context, iprot thrift.TPro
 }
 
 func (p *ListSnapshotsRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListSnapshotsRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -30803,11 +29833,6 @@ func (p *ListSnapshotsResponse) GetSnapshots() []*SnapshotInfo {
 }
 
 func (p *ListSnapshotsResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -30904,11 +29929,6 @@ func (p *ListSnapshotsResponse) ReadField3(ctx context.Context, iprot thrift.TPr
 }
 
 func (p *ListSnapshotsResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListSnapshotsResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -31048,11 +30068,6 @@ func (p *DropSnapshotRequest) GetSnapshotName() string {
 }
 
 func (p *DropSnapshotRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -31119,11 +30134,6 @@ func (p *DropSnapshotRequest) ReadField2(ctx context.Context, iprot thrift.TProt
 }
 
 func (p *DropSnapshotRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropSnapshotRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -31296,11 +30306,6 @@ func (p *ConfigValue) IsSetDoubleValue() bool {
 }
 
 func (p *ConfigValue) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -31405,11 +30410,6 @@ func (p *ConfigValue) ReadField4(ctx context.Context, iprot thrift.TProtocol) er
 }
 
 func (p *ConfigValue) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if c := p.CountSetFieldsConfigValue(); c != 1 {
 		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("%T write union: exactly one field must be set (%d set)", p, c))
 	}
@@ -31600,11 +30600,6 @@ func (p *SetConfigRequest) IsSetConfigValue() bool {
 }
 
 func (p *SetConfigRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -31689,11 +30684,6 @@ func (p *SetConfigRequest) ReadField3(ctx context.Context, iprot thrift.TProtoco
 }
 
 func (p *SetConfigRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SetConfigRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -31819,11 +30809,6 @@ func (p *ShowConfigRequest) GetConfigName() string {
 }
 
 func (p *ShowConfigRequest) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -31890,11 +30875,6 @@ func (p *ShowConfigRequest) ReadField2(ctx context.Context, iprot thrift.TProtoc
 }
 
 func (p *ShowConfigRequest) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowConfigRequest"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -32022,11 +31002,6 @@ func (p *ShowConfigResponse) IsSetConfigValue() bool {
 }
 
 func (p *ShowConfigResponse) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -32130,11 +31105,6 @@ func (p *ShowConfigResponse) ReadField4(ctx context.Context, iprot thrift.TProto
 }
 
 func (p *ShowConfigResponse) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowConfigResponse"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -38685,11 +37655,6 @@ func (p *InfinityServiceConnectArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceConnectArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -38736,11 +37701,6 @@ func (p *InfinityServiceConnectArgs) ReadField1(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceConnectArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Connect_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -38815,11 +37775,6 @@ func (p *InfinityServiceConnectResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceConnectResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -38866,11 +37821,6 @@ func (p *InfinityServiceConnectResult) ReadField0(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceConnectResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Connect_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -38947,11 +37897,6 @@ func (p *InfinityServiceDisconnectArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDisconnectArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -38998,11 +37943,6 @@ func (p *InfinityServiceDisconnectArgs) ReadField1(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceDisconnectArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Disconnect_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39077,11 +38017,6 @@ func (p *InfinityServiceDisconnectResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDisconnectResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39128,11 +38063,6 @@ func (p *InfinityServiceDisconnectResult) ReadField0(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceDisconnectResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Disconnect_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39209,11 +38139,6 @@ func (p *InfinityServiceCreateDatabaseArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateDatabaseArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39260,11 +38185,6 @@ func (p *InfinityServiceCreateDatabaseArgs) ReadField1(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceCreateDatabaseArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabase_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39339,11 +38259,6 @@ func (p *InfinityServiceCreateDatabaseResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateDatabaseResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39390,11 +38305,6 @@ func (p *InfinityServiceCreateDatabaseResult) ReadField0(ctx context.Context, ip
 }
 
 func (p *InfinityServiceCreateDatabaseResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabase_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39471,11 +38381,6 @@ func (p *InfinityServiceDropDatabaseArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDropDatabaseArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39522,11 +38427,6 @@ func (p *InfinityServiceDropDatabaseArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceDropDatabaseArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropDatabase_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39601,11 +38501,6 @@ func (p *InfinityServiceDropDatabaseResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDropDatabaseResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39652,11 +38547,6 @@ func (p *InfinityServiceDropDatabaseResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceDropDatabaseResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropDatabase_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39733,11 +38623,6 @@ func (p *InfinityServiceCreateTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39786,11 +38671,6 @@ func (p *InfinityServiceCreateTableArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceCreateTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39865,11 +38745,6 @@ func (p *InfinityServiceCreateTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -39916,11 +38791,6 @@ func (p *InfinityServiceCreateTableResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceCreateTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -39997,11 +38867,6 @@ func (p *InfinityServiceDropTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDropTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40048,11 +38913,6 @@ func (p *InfinityServiceDropTableArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceDropTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40127,11 +38987,6 @@ func (p *InfinityServiceDropTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDropTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40178,11 +39033,6 @@ func (p *InfinityServiceDropTableResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceDropTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40259,11 +39109,6 @@ func (p *InfinityServiceRenameTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceRenameTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40310,11 +39155,6 @@ func (p *InfinityServiceRenameTableArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceRenameTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RenameTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40389,11 +39229,6 @@ func (p *InfinityServiceRenameTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceRenameTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40440,11 +39275,6 @@ func (p *InfinityServiceRenameTableResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceRenameTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RenameTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40521,11 +39351,6 @@ func (p *InfinityServiceInsertArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceInsertArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40574,11 +39399,6 @@ func (p *InfinityServiceInsertArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceInsertArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Insert_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40653,11 +39473,6 @@ func (p *InfinityServiceInsertResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceInsertResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40704,11 +39519,6 @@ func (p *InfinityServiceInsertResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceInsertResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Insert_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40785,11 +39595,6 @@ func (p *InfinityServiceImportArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceImportArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40836,11 +39641,6 @@ func (p *InfinityServiceImportArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceImportArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Import_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -40915,11 +39715,6 @@ func (p *InfinityServiceImportResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceImportResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -40966,11 +39761,6 @@ func (p *InfinityServiceImportResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceImportResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Import_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41047,11 +39837,6 @@ func (p *InfinityServiceExportArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceExportArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41098,11 +39883,6 @@ func (p *InfinityServiceExportArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceExportArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Export_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41177,11 +39957,6 @@ func (p *InfinityServiceExportResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceExportResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41228,11 +40003,6 @@ func (p *InfinityServiceExportResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceExportResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Export_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41309,11 +40079,6 @@ func (p *InfinityServiceSelectArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceSelectArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41362,11 +40127,6 @@ func (p *InfinityServiceSelectArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceSelectArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Select_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41441,11 +40201,6 @@ func (p *InfinityServiceSelectResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceSelectResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41495,11 +40250,6 @@ func (p *InfinityServiceSelectResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceSelectResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Select_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41576,11 +40326,6 @@ func (p *InfinityServiceExplainArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceExplainArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41629,11 +40374,6 @@ func (p *InfinityServiceExplainArgs) ReadField1(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceExplainArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Explain_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41708,11 +40448,6 @@ func (p *InfinityServiceExplainResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceExplainResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41762,11 +40497,6 @@ func (p *InfinityServiceExplainResult) ReadField0(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceExplainResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Explain_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41843,11 +40573,6 @@ func (p *InfinityServiceDeleteArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDeleteArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -41894,11 +40619,6 @@ func (p *InfinityServiceDeleteArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceDeleteArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Delete_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -41973,11 +40693,6 @@ func (p *InfinityServiceDeleteResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDeleteResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42024,11 +40739,6 @@ func (p *InfinityServiceDeleteResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceDeleteResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Delete_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42105,11 +40815,6 @@ func (p *InfinityServiceUpdateArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceUpdateArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42158,11 +40863,6 @@ func (p *InfinityServiceUpdateArgs) ReadField1(ctx context.Context, iprot thrift
 }
 
 func (p *InfinityServiceUpdateArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Update_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42237,11 +40937,6 @@ func (p *InfinityServiceUpdateResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceUpdateResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42288,11 +40983,6 @@ func (p *InfinityServiceUpdateResult) ReadField0(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceUpdateResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Update_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42369,11 +41059,6 @@ func (p *InfinityServiceListDatabaseArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceListDatabaseArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42420,11 +41105,6 @@ func (p *InfinityServiceListDatabaseArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceListDatabaseArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListDatabase_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42499,11 +41179,6 @@ func (p *InfinityServiceListDatabaseResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceListDatabaseResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42554,11 +41229,6 @@ func (p *InfinityServiceListDatabaseResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceListDatabaseResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListDatabase_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42635,11 +41305,6 @@ func (p *InfinityServiceListTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceListTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42686,11 +41351,6 @@ func (p *InfinityServiceListTableArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceListTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42765,11 +41425,6 @@ func (p *InfinityServiceListTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceListTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42818,11 +41473,6 @@ func (p *InfinityServiceListTableResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceListTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -42899,11 +41549,6 @@ func (p *InfinityServiceListIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceListIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -42950,11 +41595,6 @@ func (p *InfinityServiceListIndexArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceListIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43029,11 +41669,6 @@ func (p *InfinityServiceListIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceListIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43082,11 +41717,6 @@ func (p *InfinityServiceListIndexResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceListIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43163,11 +41793,6 @@ func (p *InfinityServiceShowTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43214,11 +41839,6 @@ func (p *InfinityServiceShowTableArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceShowTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43293,11 +41913,6 @@ func (p *InfinityServiceShowTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43344,11 +41959,6 @@ func (p *InfinityServiceShowTableResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceShowTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43425,11 +42035,6 @@ func (p *InfinityServiceShowColumnsArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowColumnsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43476,11 +42081,6 @@ func (p *InfinityServiceShowColumnsArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceShowColumnsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowColumns_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43555,11 +42155,6 @@ func (p *InfinityServiceShowColumnsResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowColumnsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43609,11 +42204,6 @@ func (p *InfinityServiceShowColumnsResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceShowColumnsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowColumns_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43690,11 +42280,6 @@ func (p *InfinityServiceShowDatabaseArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowDatabaseArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43741,11 +42326,6 @@ func (p *InfinityServiceShowDatabaseArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceShowDatabaseArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowDatabase_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43820,11 +42400,6 @@ func (p *InfinityServiceShowDatabaseResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowDatabaseResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -43871,11 +42446,6 @@ func (p *InfinityServiceShowDatabaseResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceShowDatabaseResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowDatabase_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -43952,11 +42522,6 @@ func (p *InfinityServiceShowSegmentsArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowSegmentsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44003,11 +42568,6 @@ func (p *InfinityServiceShowSegmentsArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceShowSegmentsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegments_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44082,11 +42642,6 @@ func (p *InfinityServiceShowSegmentsResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowSegmentsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44136,11 +42691,6 @@ func (p *InfinityServiceShowSegmentsResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceShowSegmentsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegments_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44217,11 +42767,6 @@ func (p *InfinityServiceShowSegmentArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowSegmentArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44268,11 +42813,6 @@ func (p *InfinityServiceShowSegmentArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceShowSegmentArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegment_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44347,11 +42887,6 @@ func (p *InfinityServiceShowSegmentResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowSegmentResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44398,11 +42933,6 @@ func (p *InfinityServiceShowSegmentResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceShowSegmentResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSegment_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44479,11 +43009,6 @@ func (p *InfinityServiceShowBlocksArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowBlocksArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44530,11 +43055,6 @@ func (p *InfinityServiceShowBlocksArgs) ReadField1(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceShowBlocksArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlocks_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44609,11 +43129,6 @@ func (p *InfinityServiceShowBlocksResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowBlocksResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44663,11 +43178,6 @@ func (p *InfinityServiceShowBlocksResult) ReadField0(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceShowBlocksResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlocks_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44744,11 +43254,6 @@ func (p *InfinityServiceShowBlockArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowBlockArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44795,11 +43300,6 @@ func (p *InfinityServiceShowBlockArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceShowBlockArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlock_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -44874,11 +43374,6 @@ func (p *InfinityServiceShowBlockResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowBlockResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -44925,11 +43420,6 @@ func (p *InfinityServiceShowBlockResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceShowBlockResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlock_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45006,11 +43496,6 @@ func (p *InfinityServiceShowBlockColumnArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowBlockColumnArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45057,11 +43542,6 @@ func (p *InfinityServiceShowBlockColumnArgs) ReadField1(ctx context.Context, ipr
 }
 
 func (p *InfinityServiceShowBlockColumnArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockColumn_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45136,11 +43616,6 @@ func (p *InfinityServiceShowBlockColumnResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowBlockColumnResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45187,11 +43662,6 @@ func (p *InfinityServiceShowBlockColumnResult) ReadField0(ctx context.Context, i
 }
 
 func (p *InfinityServiceShowBlockColumnResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowBlockColumn_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45268,11 +43738,6 @@ func (p *InfinityServiceShowCurrentNodeArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowCurrentNodeArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45319,11 +43784,6 @@ func (p *InfinityServiceShowCurrentNodeArgs) ReadField1(ctx context.Context, ipr
 }
 
 func (p *InfinityServiceShowCurrentNodeArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowCurrentNode_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45398,11 +43858,6 @@ func (p *InfinityServiceShowCurrentNodeResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowCurrentNodeResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45449,11 +43904,6 @@ func (p *InfinityServiceShowCurrentNodeResult) ReadField0(ctx context.Context, i
 }
 
 func (p *InfinityServiceShowCurrentNodeResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowCurrentNode_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45530,11 +43980,6 @@ func (p *InfinityServiceGetDatabaseArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceGetDatabaseArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45581,11 +44026,6 @@ func (p *InfinityServiceGetDatabaseArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceGetDatabaseArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetDatabase_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45660,11 +44100,6 @@ func (p *InfinityServiceGetDatabaseResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceGetDatabaseResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45711,11 +44146,6 @@ func (p *InfinityServiceGetDatabaseResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceGetDatabaseResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetDatabase_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45792,11 +44222,6 @@ func (p *InfinityServiceGetTableArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceGetTableArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45843,11 +44268,6 @@ func (p *InfinityServiceGetTableArgs) ReadField1(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceGetTableArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetTable_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -45922,11 +44342,6 @@ func (p *InfinityServiceGetTableResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceGetTableResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -45973,11 +44388,6 @@ func (p *InfinityServiceGetTableResult) ReadField0(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceGetTableResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "GetTable_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46054,11 +44464,6 @@ func (p *InfinityServiceCreateIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46105,11 +44510,6 @@ func (p *InfinityServiceCreateIndexArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceCreateIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46184,11 +44584,6 @@ func (p *InfinityServiceCreateIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46235,11 +44630,6 @@ func (p *InfinityServiceCreateIndexResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceCreateIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46316,11 +44706,6 @@ func (p *InfinityServiceDropIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDropIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46367,11 +44752,6 @@ func (p *InfinityServiceDropIndexArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceDropIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46446,11 +44826,6 @@ func (p *InfinityServiceDropIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDropIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46497,11 +44872,6 @@ func (p *InfinityServiceDropIndexResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceDropIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46578,11 +44948,6 @@ func (p *InfinityServiceShowIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46629,11 +44994,6 @@ func (p *InfinityServiceShowIndexArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceShowIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46708,11 +45068,6 @@ func (p *InfinityServiceShowIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46759,11 +45114,6 @@ func (p *InfinityServiceShowIndexResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceShowIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46840,11 +45190,6 @@ func (p *InfinityServiceOptimizeArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceOptimizeArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -46891,11 +45236,6 @@ func (p *InfinityServiceOptimizeArgs) ReadField1(ctx context.Context, iprot thri
 }
 
 func (p *InfinityServiceOptimizeArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Optimize_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -46970,11 +45310,6 @@ func (p *InfinityServiceOptimizeResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceOptimizeResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47021,11 +45356,6 @@ func (p *InfinityServiceOptimizeResult) ReadField0(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceOptimizeResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Optimize_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47102,11 +45432,6 @@ func (p *InfinityServiceAlterIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceAlterIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47153,11 +45478,6 @@ func (p *InfinityServiceAlterIndexArgs) ReadField1(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceAlterIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AlterIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47232,11 +45552,6 @@ func (p *InfinityServiceAlterIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceAlterIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47283,11 +45598,6 @@ func (p *InfinityServiceAlterIndexResult) ReadField0(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceAlterIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AlterIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47364,11 +45674,6 @@ func (p *InfinityServiceAddColumnsArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceAddColumnsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47417,11 +45722,6 @@ func (p *InfinityServiceAddColumnsArgs) ReadField1(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceAddColumnsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AddColumns_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47496,11 +45796,6 @@ func (p *InfinityServiceAddColumnsResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceAddColumnsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47547,11 +45842,6 @@ func (p *InfinityServiceAddColumnsResult) ReadField0(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceAddColumnsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "AddColumns_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47628,11 +45918,6 @@ func (p *InfinityServiceDropColumnsArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDropColumnsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47681,11 +45966,6 @@ func (p *InfinityServiceDropColumnsArgs) ReadField1(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceDropColumnsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropColumns_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47760,11 +46040,6 @@ func (p *InfinityServiceDropColumnsResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDropColumnsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47811,11 +46086,6 @@ func (p *InfinityServiceDropColumnsResult) ReadField0(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceDropColumnsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropColumns_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -47892,11 +46162,6 @@ func (p *InfinityServiceCleanupArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCleanupArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -47943,11 +46208,6 @@ func (p *InfinityServiceCleanupArgs) ReadField1(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceCleanupArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Cleanup_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48022,11 +46282,6 @@ func (p *InfinityServiceCleanupResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCleanupResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48073,11 +46328,6 @@ func (p *InfinityServiceCleanupResult) ReadField0(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceCleanupResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Cleanup_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48154,11 +46404,6 @@ func (p *InfinityServiceDumpIndexArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDumpIndexArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48205,11 +46450,6 @@ func (p *InfinityServiceDumpIndexArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceDumpIndexArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DumpIndex_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48284,11 +46524,6 @@ func (p *InfinityServiceDumpIndexResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDumpIndexResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48335,11 +46570,6 @@ func (p *InfinityServiceDumpIndexResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceDumpIndexResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DumpIndex_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48416,11 +46646,6 @@ func (p *InfinityServiceCommandArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCommandArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48467,11 +46692,6 @@ func (p *InfinityServiceCommandArgs) ReadField1(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceCommandArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Command_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48546,11 +46766,6 @@ func (p *InfinityServiceCommandResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCommandResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48597,11 +46812,6 @@ func (p *InfinityServiceCommandResult) ReadField0(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceCommandResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Command_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48678,11 +46888,6 @@ func (p *InfinityServiceFlushArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceFlushArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48729,11 +46934,6 @@ func (p *InfinityServiceFlushArgs) ReadField1(ctx context.Context, iprot thrift.
 }
 
 func (p *InfinityServiceFlushArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Flush_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48808,11 +47008,6 @@ func (p *InfinityServiceFlushResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceFlushResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48859,11 +47054,6 @@ func (p *InfinityServiceFlushResult) ReadField0(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceFlushResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Flush_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -48940,11 +47130,6 @@ func (p *InfinityServiceCompactArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCompactArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -48991,11 +47176,6 @@ func (p *InfinityServiceCompactArgs) ReadField1(ctx context.Context, iprot thrif
 }
 
 func (p *InfinityServiceCompactArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Compact_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49070,11 +47250,6 @@ func (p *InfinityServiceCompactResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCompactResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49121,11 +47296,6 @@ func (p *InfinityServiceCompactResult) ReadField0(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceCompactResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "Compact_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49202,11 +47372,6 @@ func (p *InfinityServiceCreateTableSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateTableSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49253,11 +47418,6 @@ func (p *InfinityServiceCreateTableSnapshotArgs) ReadField1(ctx context.Context,
 }
 
 func (p *InfinityServiceCreateTableSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTableSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49332,11 +47492,6 @@ func (p *InfinityServiceCreateTableSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateTableSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49383,11 +47538,6 @@ func (p *InfinityServiceCreateTableSnapshotResult) ReadField0(ctx context.Contex
 }
 
 func (p *InfinityServiceCreateTableSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateTableSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49464,11 +47614,6 @@ func (p *InfinityServiceCreateDatabaseSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateDatabaseSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49515,11 +47660,6 @@ func (p *InfinityServiceCreateDatabaseSnapshotArgs) ReadField1(ctx context.Conte
 }
 
 func (p *InfinityServiceCreateDatabaseSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabaseSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49594,11 +47734,6 @@ func (p *InfinityServiceCreateDatabaseSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateDatabaseSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49645,11 +47780,6 @@ func (p *InfinityServiceCreateDatabaseSnapshotResult) ReadField0(ctx context.Con
 }
 
 func (p *InfinityServiceCreateDatabaseSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateDatabaseSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49726,11 +47856,6 @@ func (p *InfinityServiceCreateSystemSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceCreateSystemSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49777,11 +47902,6 @@ func (p *InfinityServiceCreateSystemSnapshotArgs) ReadField1(ctx context.Context
 }
 
 func (p *InfinityServiceCreateSystemSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateSystemSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49856,11 +47976,6 @@ func (p *InfinityServiceCreateSystemSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceCreateSystemSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -49907,11 +48022,6 @@ func (p *InfinityServiceCreateSystemSnapshotResult) ReadField0(ctx context.Conte
 }
 
 func (p *InfinityServiceCreateSystemSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "CreateSystemSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -49988,11 +48098,6 @@ func (p *InfinityServiceRestoreSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceRestoreSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50039,11 +48144,6 @@ func (p *InfinityServiceRestoreSnapshotArgs) ReadField1(ctx context.Context, ipr
 }
 
 func (p *InfinityServiceRestoreSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RestoreSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50118,11 +48218,6 @@ func (p *InfinityServiceRestoreSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceRestoreSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50169,11 +48264,6 @@ func (p *InfinityServiceRestoreSnapshotResult) ReadField0(ctx context.Context, i
 }
 
 func (p *InfinityServiceRestoreSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "RestoreSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50250,11 +48340,6 @@ func (p *InfinityServiceShowSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50301,11 +48386,6 @@ func (p *InfinityServiceShowSnapshotArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceShowSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50380,11 +48460,6 @@ func (p *InfinityServiceShowSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50431,11 +48506,6 @@ func (p *InfinityServiceShowSnapshotResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceShowSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50512,11 +48582,6 @@ func (p *InfinityServiceListSnapshotsArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceListSnapshotsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50563,11 +48628,6 @@ func (p *InfinityServiceListSnapshotsArgs) ReadField1(ctx context.Context, iprot
 }
 
 func (p *InfinityServiceListSnapshotsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListSnapshots_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50642,11 +48702,6 @@ func (p *InfinityServiceListSnapshotsResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceListSnapshotsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50695,11 +48750,6 @@ func (p *InfinityServiceListSnapshotsResult) ReadField0(ctx context.Context, ipr
 }
 
 func (p *InfinityServiceListSnapshotsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ListSnapshots_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50776,11 +48826,6 @@ func (p *InfinityServiceDropSnapshotArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceDropSnapshotArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50827,11 +48872,6 @@ func (p *InfinityServiceDropSnapshotArgs) ReadField1(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceDropSnapshotArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropSnapshot_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -50906,11 +48946,6 @@ func (p *InfinityServiceDropSnapshotResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceDropSnapshotResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -50957,11 +48992,6 @@ func (p *InfinityServiceDropSnapshotResult) ReadField0(ctx context.Context, ipro
 }
 
 func (p *InfinityServiceDropSnapshotResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "DropSnapshot_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -51038,11 +49068,6 @@ func (p *InfinityServiceSetConfigArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceSetConfigArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -51089,11 +49114,6 @@ func (p *InfinityServiceSetConfigArgs) ReadField1(ctx context.Context, iprot thr
 }
 
 func (p *InfinityServiceSetConfigArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SetConfig_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -51168,11 +49188,6 @@ func (p *InfinityServiceSetConfigResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceSetConfigResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -51219,11 +49234,6 @@ func (p *InfinityServiceSetConfigResult) ReadField0(ctx context.Context, iprot t
 }
 
 func (p *InfinityServiceSetConfigResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "SetConfig_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -51300,11 +49310,6 @@ func (p *InfinityServiceShowConfigArgs) IsSetRequest() bool {
 }
 
 func (p *InfinityServiceShowConfigArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -51351,11 +49356,6 @@ func (p *InfinityServiceShowConfigArgs) ReadField1(ctx context.Context, iprot th
 }
 
 func (p *InfinityServiceShowConfigArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowConfig_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
@@ -51430,11 +49430,6 @@ func (p *InfinityServiceShowConfigResult) IsSetSuccess() bool {
 }
 
 func (p *InfinityServiceShowConfigResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if _, err := iprot.ReadStructBegin(ctx); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -51481,11 +49476,6 @@ func (p *InfinityServiceShowConfigResult) ReadField0(ctx context.Context, iprot 
 }
 
 func (p *InfinityServiceShowConfigResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
-	ctx, err := thrift.CheckRecursionDepth(ctx)
-	if err != nil {
-		return err
-	}
-	defer thrift.DecrementRecursionDepth(ctx)
 	if err := oprot.WriteStructBegin(ctx, "ShowConfig_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
