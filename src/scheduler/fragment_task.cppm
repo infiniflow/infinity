@@ -95,6 +95,11 @@ public:
     // for test.
     [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
 
+    inline void SetErrorStatus() {
+        std::unique_lock lock(mutex_);
+        status_ = FragmentTaskStatus::kError;
+    }
+
     FragmentContext *fragment_context() const;
 
 public:

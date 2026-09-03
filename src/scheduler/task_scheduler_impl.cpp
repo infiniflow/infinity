@@ -251,7 +251,19 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         if (!fragment_ctx->notifier()->StartTask()) {
             error = true;
         } else {
-            fragment_task->OnExecute();
+            try {
+                fragment_task->OnExecute();
+            } catch (std::exception &e) {
+                // WorkerLoop is a thread entry point: an exception unwinding past this
+                // frame calls std::terminate and kills the whole server. Fail the fragment.
+                LOG_CRITICAL(fmt::format("Worker {}: exception escaped fragment task execution: {}", worker_id, e.what()));
+                fragment_task->SetErrorStatus();
+                error = true;
+            } catch (...) {
+                LOG_CRITICAL(fmt::format("Worker {}: unknown exception escaped fragment task execution", worker_id));
+                fragment_task->SetErrorStatus();
+                error = true;
+            }
             fragment_task->SetLastWorkID(worker_id);
             if (fragment_task->status() == FragmentTaskStatus::kError) {
                 error = true;

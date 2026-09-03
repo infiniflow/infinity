@@ -66,9 +66,20 @@ void FragmentTask::OnExecute() {
     }
 
     bool execute_success{false};
-    source_op->Execute(query_context, source_state_.get());
     Status operator_status{};
-    if (source_state_->status_.ok()) {
+    try {
+        source_op->Execute(query_context, source_state_.get());
+    } catch (RecoverableException &e) {
+        LOG_ERROR(e.what());
+        operator_status = Status(e.ErrorCode(), e.what());
+    } catch (std::exception &e) {
+        LOG_CRITICAL(e.what());
+        operator_status = Status::UnexpectedError(e.what());
+    } catch (...) {
+        LOG_CRITICAL("Unknown exception in source operator");
+        operator_status = Status::UnexpectedError("Unknown exception in source operator");
+    }
+    if (operator_status.ok() && source_state_->status_.ok()) {
         // No source error
         std::vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -100,7 +111,13 @@ void FragmentTask::OnExecute() {
             operator_status = Status::ParserError(e.what());
         } catch (UnrecoverableException &e) {
             LOG_CRITICAL(e.what());
-            throw e;
+            operator_status = Status::UnexpectedError(e.what());
+        } catch (std::exception &e) {
+            LOG_CRITICAL(e.what());
+            operator_status = Status::UnexpectedError(e.what());
+        } catch (...) {
+            LOG_CRITICAL("Unknown exception during operator execution");
+            operator_status = Status::UnexpectedError("Unknown exception during operator execution");
         }
 
         profiler.End();
@@ -112,7 +129,21 @@ void FragmentTask::OnExecute() {
         status_ = FragmentTaskStatus::kError;
     } else if (execute_success) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-        sink_op->Execute(query_context, fragment_context, sink_state_.get());
+        try {
+            sink_op->Execute(query_context, fragment_context, sink_state_.get());
+        } catch (RecoverableException &e) {
+            LOG_ERROR(e.what());
+            sink_state_->status_ = Status(e.ErrorCode(), e.what());
+            status_ = FragmentTaskStatus::kError;
+        } catch (std::exception &e) {
+            LOG_CRITICAL(e.what());
+            sink_state_->status_ = Status::UnexpectedError(e.what());
+            status_ = FragmentTaskStatus::kError;
+        } catch (...) {
+            LOG_CRITICAL("Unknown exception in sink operator");
+            sink_state_->status_ = Status::UnexpectedError("Unknown exception in sink operator");
+            status_ = FragmentTaskStatus::kError;
+        }
     }
 }
 
