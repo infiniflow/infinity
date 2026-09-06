@@ -67,6 +67,8 @@ This analyzer offers better recall for Chinese than the [Jieba](https://github.c
 
 Use `"rag"` to select the RAG analyzer or `"rag-fine"` for fine-grained mode, which outputs tokenization results with the second highest score.
 
+Append a language name to select language-specific processing of Latin text, e.g. `"rag-dutch"` (Snowball stemmer) or `"rag-slovak"` / `"rag-czech"`, which fold diacritics to ASCII and skip stemming so that queries typed with or without accents match the same tokens. Suffixes combine in any order: `"rag-czech-fine"`.
+
 :::note
 Both RAG tokenization and fine-grained RAG tokenization are used in RAGFlow to ensure high recall.
 :::
