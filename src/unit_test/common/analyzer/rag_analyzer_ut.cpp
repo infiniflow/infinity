@@ -423,9 +423,54 @@ TEST_F(RAGAnalyzerTest, test_diacritics_folding_table) {
     EXPECT_EQ(RAGAnalyzer::FoldDiacritics("Škola Daňové"), "Skola Danove");
     // Letters without a single-ASCII-letter NFD decomposition pass through.
     EXPECT_EQ(RAGAnalyzer::FoldDiacritics("æœßøłđÆŒØŁĐ"), "æœßøłđÆŒØŁĐ");
+    // Folding is deliberately limited to U+00C0-U+017F. Decomposable letters
+    // outside that range (Latin Extended Additional, precomposed Hangul, …)
+    // are left alone so the table stays in step with rag_tokenizer.py, which
+    // applies the same range guard before consulting unicodedata.
+    EXPECT_EQ(RAGAnalyzer::FoldDiacritics("ḍṣṭḥ ḌỊ"), "ḍṣṭḥ ḌỊ");
+    EXPECT_EQ(RAGAnalyzer::FoldDiacritics("한국어"), "한국어");
+    // Combining marks are not stripped either: an already-decomposed "š"
+    // (s + U+030C) keeps both code points on both sides.
+    EXPECT_EQ(RAGAnalyzer::FoldDiacritics("s\u030Ckola"), "s\u030Ckola");
     // ASCII and non-Latin text is untouched.
     EXPECT_EQ(RAGAnalyzer::FoldDiacritics("hello world 123"), "hello world 123");
     EXPECT_EQ(RAGAnalyzer::FoldDiacritics("中文测试"), "中文测试");
+}
+
+TEST_F(RAGAnalyzerTest, test_out_of_range_diacritics_parity_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // The C++ fold table covers U+00C0-U+017F only; rag_tokenizer.py applies
+    // the same range guard before NFD. Characters that decompose but sit
+    // outside the range (ḍ, ṣṭḥ) and precomposed Hangul must therefore survive
+    // identically on both sides - this is what keeps the hard-coded table and
+    // the runtime unicodedata lookup from drifting apart.
+    const std::string input = "škola ḍamage 한국어 ṣṭḥ";
+    std::string python_cmd = "uv run " + rag_tokenizer_path_ + "/rag_tokenizer.py " + "-l slovak \"" + input + "\"";
+    std::cout << "Call Python tokenizer: " << python_cmd << std::endl;
+
+    FILE *pipe = popen(python_cmd.c_str(), "r");
+    std::string python_result;
+    char buffer[128];
+    if (pipe) {
+        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+            python_result += buffer;
+        }
+        pclose(pipe);
+    }
+    python_result.erase(python_result.find_last_not_of(" \n\r\t") + 1);
+    std::cout << "Python tokenized (Slovak): " << python_result << std::endl;
+
+    analyzer_->SetLanguage("slovak");
+    std::string cxx_result = analyzer_->Tokenize(input);
+    std::cout << "C++ tokenized (Slovak): " << cxx_result << std::endl;
+
+    // In-range diacritics fold, out-of-range ones are carried through as-is.
+    EXPECT_TRUE(cxx_result.find("skola") != std::string::npos);
+    EXPECT_TRUE(cxx_result.find("한국어") != std::string::npos);
+    EXPECT_TRUE(cxx_result.find("ṣṭḥ") != std::string::npos);
+    EXPECT_EQ(cxx_result, python_result);
 }
 
 TEST_F(RAGAnalyzerTest, test_slovak_tokenize_with_position) {
