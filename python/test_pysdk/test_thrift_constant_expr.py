@@ -28,14 +28,22 @@ def test_empty_list_constant_is_invalid_expression():
 
 
 @pytest.mark.parametrize(
-    ("value", "literal_type"),
+    ("value", "literal_type", "payload_field", "payload_value"),
     [
-        ([1], ttypes.LiteralType.IntegerArray),
-        (np.array([1]), ttypes.LiteralType.IntegerArray),
-        ([np.array([1, 2])], ttypes.LiteralType.IntegerTensor),
+        ([1], ttypes.LiteralType.IntegerArray, "i64_array_value", [1]),
+        (np.array([1]), ttypes.LiteralType.IntegerArray, "i64_array_value", [1]),
+        (
+            [np.array([1, 2])],
+            ttypes.LiteralType.IntegerTensor,
+            "i64_tensor_value",
+            [[1, 2]],
+        ),
     ],
 )
-def test_non_empty_array_constants_remain_supported(value, literal_type):
+def test_non_empty_array_constants_remain_supported(
+    value, literal_type, payload_field, payload_value
+):
     constant_expression = get_remote_constant_expr_from_python_value(value)
 
     assert constant_expression.literal_type == literal_type
+    assert getattr(constant_expression, payload_field) == payload_value
