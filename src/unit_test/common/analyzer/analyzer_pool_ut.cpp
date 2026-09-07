@@ -36,6 +36,9 @@ namespace fs = std::filesystem;
 // translated into the right SetLanguage() / SetFineGrained() calls.
 class AnalyzerPoolTest : public BaseTest {
 public:
+    // A missing resource directory is a hard failure rather than a GTEST_SKIP,
+    // matching RAGAnalyzerTest and HighlighterTest: CI always mounts it, so
+    // skipping would turn a broken resource setup into a green run.
     void SetUp() override {
         BaseTest::SetUp();
         fs::path resource_dir = "/usr/share/infinity/resource";
@@ -84,7 +87,7 @@ public:
 
 TEST_F(AnalyzerPoolTest, test_rag_default_is_english_and_coarse) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     auto analyzer = GetRAGAnalyzer("rag");
     ASSERT_NE(analyzer, nullptr);
@@ -100,7 +103,7 @@ TEST_F(AnalyzerPoolTest, test_rag_default_is_english_and_coarse) {
 
 TEST_F(AnalyzerPoolTest, test_rag_fine_keeps_english_stemming) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     auto analyzer = GetRAGAnalyzer("rag-fine");
     ASSERT_NE(analyzer, nullptr);
@@ -111,7 +114,7 @@ TEST_F(AnalyzerPoolTest, test_rag_fine_keeps_english_stemming) {
 
 TEST_F(AnalyzerPoolTest, test_rag_slovak_folds_and_disables_stemming) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     auto analyzer = GetRAGAnalyzer("rag-slovak");
     ASSERT_NE(analyzer, nullptr);
@@ -126,7 +129,7 @@ TEST_F(AnalyzerPoolTest, test_rag_slovak_folds_and_disables_stemming) {
 
 TEST_F(AnalyzerPoolTest, test_rag_czech_folds_and_disables_stemming) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     auto analyzer = GetRAGAnalyzer("rag-czech");
     ASSERT_NE(analyzer, nullptr);
@@ -139,7 +142,7 @@ TEST_F(AnalyzerPoolTest, test_rag_czech_folds_and_disables_stemming) {
 
 TEST_F(AnalyzerPoolTest, test_rag_language_and_fine_in_both_orders) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     const std::vector<std::string> expected{"skola", "中华", "人民共和国"};
     for (const std::string &name : {"rag-czech-fine", "rag-fine-czech", "rag-slovak-fine", "rag-fine-slovak"}) {
@@ -153,7 +156,7 @@ TEST_F(AnalyzerPoolTest, test_rag_language_and_fine_in_both_orders) {
 
 TEST_F(AnalyzerPoolTest, test_rag_unknown_segment_falls_back_to_legacy) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     // Unknown languages, an empty segment and a stray trailing '-' must not
     // crash and must leave the legacy English/coarse behaviour in place.
@@ -174,7 +177,7 @@ TEST_F(AnalyzerPoolTest, test_rag_unknown_segment_falls_back_to_legacy) {
 
 TEST_F(AnalyzerPoolTest, test_rag_analyzers_are_independent) {
     if (!resource_available_) {
-        FAIL() << "Resource directory not available, skipping test";
+        FAIL() << "Resource directory /usr/share/infinity/resource not available; the analyzer cannot be loaded";
     }
     // Every GetAnalyzer() call copies the cached prototype; a language-specific
     // instance must not leak its settings into the next one handed out.
