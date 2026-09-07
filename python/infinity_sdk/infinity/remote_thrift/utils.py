@@ -712,7 +712,7 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         value = int(value)
     elif isinstance(value, np.floating):
         value = float(value)
-    elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+    elif isinstance(value, list) and value and isinstance(value[0], np.ndarray):
         if value[0].ndim <= 2:
             value = [x.tolist() for x in value]
         else:
