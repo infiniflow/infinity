@@ -146,6 +146,8 @@ def traverse_conditions(cons, fn=None):
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
+        if fn:
+            return fn(cons.this)
         return traverse_conditions(cons.this)
 
     elif isinstance(cons, exp.Neg):

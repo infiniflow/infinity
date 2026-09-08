@@ -61,8 +61,16 @@ class TestInfinity:
             "-8 < c1 and c1 <= -7",
             "(-7 < c1 or 9 <= c1) and (c1 = 3)",
             "!(9 <= c1)",
+            "c1 IN (1,2,3)",
+            "c1 NOT IN (1,2,3)",
         ]:
             res = embedded_traverse(condition(cond_str))
             print(cond_str)
             print(res)
             assert res
+
+        # operand order must be stable: column first, literal second
+        res = embedded_traverse(condition("c1 > 1"))
+        args = res.function_expr.arguments
+        assert getattr(args[0], "column_expr", None) is not None
+        assert getattr(args[1], "constant_expr", None) is not None
