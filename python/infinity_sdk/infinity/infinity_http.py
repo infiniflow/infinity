@@ -1202,14 +1202,24 @@ class table_http_result:
                 if len(tup) == line_i + 1:
                     continue
 
+                declared_type = col_types.get(col_name)
                 if v is None or isinstance(v, (int, float)):
                     new_tup = tup + (v,)
-                elif is_list(v) and not is_json_function(col_name):
+                elif (is_list(v) and not is_json_function(col_name)
+                      and (declared_type is None
+                           or declared_type.lower().startswith(
+                               ("embedding", "tensor", "multivector", "array", "emptyarray")))):
+                    # Only parse stringified lists for vector/array columns (or
+                    # expression columns with no declared type); a varchar cell
+                    # that happens to contain "[1, 2]" must stay a string.
                     # Don't parse lists for JSON extraction functions - keep them as strings
                     new_tup = tup + (ast.literal_eval(v),)
                 elif is_date(v) or is_time(v) or is_datetime(v):
                     new_tup = tup + (v,)
-                elif is_sparse(v):  # sparse vector
+                elif (is_sparse(v)
+                      and (declared_type is None or declared_type.lower().startswith("sparse"))):
+                    # sparse vector - only parse when the column is declared
+                    # sparse (or untyped); a varchar like "12:30" is not sparse
                     sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
