@@ -2491,3 +2491,29 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_varchar_bool_like_strings(self, suffix):
+        """
+        Regression test (HTTP SDK): varchar cells containing "true"/"false"/"None"
+        must come back verbatim. The HTTP client used to coerce any string value
+        that looked like a boolean into True/False/None regardless of the column's
+        declared type, corrupting varchar data ("true" -> True -> "True" in the
+        output DataFrame, "None" -> null). The coercion is meant for actual boolean
+        columns, which the HTTP server serializes as the strings "true"/"false".
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_varchar_bool_like"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_varchar_bool_like"+suffix, {
+            "c1": {"type": "varchar"},
+            "c2": {"type": "bool"}}, ConflictType.Error)
+        assert table
+
+        table.insert([{"c1": "true", "c2": True},
+                      {"c1": "None", "c2": False},
+                      {"c1": "false", "c2": True}])
+
+        res, extra_result = table.output(["c1", "c2"]).sort([["c1", SortType.Asc]]).to_df()
+        assert res["c1"].tolist() == ["None", "false", "true"]
+        assert res["c2"].tolist() == [False, True, True]
+
+        db_obj.drop_table("test_varchar_bool_like"+suffix, ConflictType.Error)

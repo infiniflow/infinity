@@ -1213,12 +1213,18 @@ class table_http_result:
                     sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
-                    if v.lower() == 'true':
-                        v = True
-                    elif v.lower() == 'false':
-                        v = False
-                    elif v.lower() == 'none':  # Convert string "None" to Python None
-                        v = None
+                    # The HTTP server serializes boolean columns as the strings
+                    # "true"/"false". Only coerce when the column is actually boolean
+                    # (or has no declared type, e.g. an expression), so varchar cells
+                    # that happen to contain "true"/"false"/"None" are not corrupted.
+                    col_type = col_types.get(col_name)
+                    if col_type is None or col_type.lower() in ("bool", "boolean"):
+                        if v.lower() == 'true':
+                            v = True
+                        elif v.lower() == 'false':
+                            v = False
+                        elif v.lower() == 'none':  # Convert string "None" to Python None
+                            v = None
                     new_tup = tup + (v,)
                 df_dict[col_name] = new_tup
             line_i += 1
