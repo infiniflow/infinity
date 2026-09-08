@@ -72,3 +72,43 @@ class TestInfinity:
             print(res)
 
         db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)
+
+def test_parsed_expression_to_string_constants():
+    """
+    Regression test: parsed_expression_to_string() read constant values from
+    expr_type (ParsedExprType) instead of expr_type.constant_expr, so every
+    constant literal except Boolean crashed with AttributeError when an
+    explain result with a limit/offset/filter was rendered (thrift SDK).
+    Two tensor-array branches also used stale field names without the _value
+    suffix.
+    """
+    from infinity.remote_thrift.utils import parsed_expression_to_string
+    from infinity.remote_thrift.infinity_thrift_rpc import ttypes
+
+    def mk(literal_type, **kw):
+        constant_expr = ttypes.ConstantExpr(literal_type=literal_type, **kw)
+        expr_type = ttypes.ParsedExprType()
+        expr_type.constant_expr = constant_expr
+        expr = ttypes.ParsedExpr()
+        expr.type = expr_type
+        return expr
+
+    assert parsed_expression_to_string(mk(ttypes.LiteralType.Int64, i64_value=10)) == "10"
+    assert parsed_expression_to_string(mk(ttypes.LiteralType.Double, f64_value=1.5)) == "1.5"
+    assert parsed_expression_to_string(mk(ttypes.LiteralType.String, str_value="abc")) == "abc"
+    assert parsed_expression_to_string(mk(ttypes.LiteralType.Boolean, bool_value=True)) == "True"
+    assert parsed_expression_to_string(mk(ttypes.LiteralType.IntegerArray, i64_array_value=[1, 2])) == "[1, 2]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.DoubleTensor, f64_tensor_value=[[1.0, 2.0]])) == "[[1.0, 2.0]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.IntegerTensorArray,
+           i64_tensor_array_value=[[[1, 2], [3, 4]]])) == "[[[1, 2], [3, 4]]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.DoubleArray, f64_array_value=[1.5, 2.5])) == "[1.5, 2.5]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.IntegerTensor, i64_tensor_value=[[1, 2]])) == "[[1, 2]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.DoubleTensorArray,
+           f64_tensor_array_value=[[[1.5]]])) == "[[[1.5]]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.SparseIntegerArray, i64_array_idx=[0, 3])) == "[0, 3]"
