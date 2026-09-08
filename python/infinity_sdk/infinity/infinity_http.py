@@ -61,7 +61,7 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
     if not cast_expr.lower().startswith("cast("):
         return None
 
-    match = re.search(r'\)\s*AS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
+    match = re.search(r'\bAS\s+(\w+)\s*\)$', cast_expr, re.IGNORECASE)
     if not match:
         return None
 
@@ -1218,7 +1218,16 @@ class table_http_result:
                     # (or has no declared type, e.g. an expression), so varchar cells
                     # that happen to contain "true"/"false"/"None" are not corrupted.
                     col_type = col_types.get(col_name)
-                    if col_type is None or col_type.lower() in ("bool", "boolean"):
+                    if col_type is None:
+                        # No declared type: an expression column. An explicit
+                        # CAST pins the result type (e.g. CAST(c1 AS VARCHAR)
+                        # must stay a string), so only coerce when the cast
+                        # target is boolean or there is no cast at all.
+                        cast_dtype = _parse_cast_target_type(col_name)
+                        coerce_bool = cast_dtype is None or cast_dtype == "boolean"
+                    else:
+                        coerce_bool = col_type.lower() in ("bool", "boolean")
+                    if coerce_bool:
                         if v.lower() == 'true':
                             v = True
                         elif v.lower() == 'false':

@@ -2516,4 +2516,9 @@ class TestInfinity:
         assert res["c1"].tolist() == ["None", "false", "true"]
         assert res["c2"].tolist() == [False, True, True]
 
+        # an explicit CAST pins the result type: CAST(c2 AS VARCHAR) must stay
+        # a string and must not be bool-coerced
+        res, extra_result = table.output(["cast(c2 as varchar)"]).sort([["cast(c2 as varchar)", SortType.Asc]]).to_df()
+        assert res["cast(c2 as varchar)"].tolist() == ["false", "true", "true"]
+
         db_obj.drop_table("test_varchar_bool_like"+suffix, ConflictType.Error)
