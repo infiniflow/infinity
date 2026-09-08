@@ -110,9 +110,9 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
             case ttypes.LiteralType.DoubleTensor:
                 return str(constant.f64_tensor_value)
             case ttypes.LiteralType.IntegerTensorArray:
-                return str(constant.i64_tensor_array)
+                return str(constant.i64_tensor_array_value)
             case ttypes.LiteralType.DoubleTensorArray:
-                return str(constant.f64_tensor_array)
+                return str(constant.f64_tensor_array_value)
             case ttypes.LiteralType.SparseIntegerArray:
                 return str(constant.i64_array_idx)
 
