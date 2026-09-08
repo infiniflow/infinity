@@ -103,3 +103,12 @@ def test_parsed_expression_to_string_constants():
     assert parsed_expression_to_string(
         mk(ttypes.LiteralType.IntegerTensorArray,
            i64_tensor_array_value=[[[1, 2], [3, 4]]])) == "[[[1, 2], [3, 4]]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.DoubleArray, f64_array_value=[1.5, 2.5])) == "[1.5, 2.5]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.IntegerTensor, i64_tensor_value=[[1, 2]])) == "[[1, 2]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.DoubleTensorArray,
+           f64_tensor_array_value=[[[1.5]]])) == "[[[1.5]]]"
+    assert parsed_expression_to_string(
+        mk(ttypes.LiteralType.SparseIntegerArray, i64_array_idx=[0, 3])) == "[0, 3]"
