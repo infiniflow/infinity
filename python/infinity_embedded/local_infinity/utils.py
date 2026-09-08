@@ -201,6 +201,13 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.function_expr = func_expr
         return parsed_expr
     # in
+    elif isinstance(cons, exp.Between):
+        # the query wire format has no between expression for where clauses, so
+        # rewrite "x BETWEEN a AND b" as "x >= a AND x <= b" (NOT BETWEEN is
+        # handled by the exp.Not arm above, which recurses into this one)
+        gte = exp.GTE(this=cons.this.copy(), expression=cons.args["low"].copy())
+        lte = exp.LTE(this=cons.this.copy(), expression=cons.args["high"].copy())
+        return traverse_conditions(exp.And(this=gte, expression=lte))
     elif isinstance(cons, exp.In):
         left_operand = parse_expr(cons.args['this'])
         arguments = []
