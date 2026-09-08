@@ -72,3 +72,24 @@ class TestInfinity:
             print(res)
 
         db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)
+    def test_explain_with_match_dense(self, suffix):
+        """
+        Regression test: explain() must send the search expression to the server.
+        The HTTP client used to build the explain request from stale fields
+        (_knn/_match/_match_tensor/_match_sparse/_fusion) that were never
+        populated, so every match_*/fusion clause was silently dropped and
+        the server explained a plain table scan instead of the search query.
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_explain_match_dense"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_explain_match_dense"+suffix, {
+            "c1": {"type": "varchar", "constraints": ["primary key"]},
+            "vec": {"type": "vector,4,float"}}, ConflictType.Error)
+        assert table
+
+        res = table.output(["c1"]).match_dense("vec", [0.1, 0.2, 0.3, 0.4], "float", "l2", 10) \
+            .explain(ExplainType.Physical)
+        # the physical plan of a match_dense query must contain a KNN SCAN operator
+        assert "KNN SCAN" in str(res)
+
+        db_obj.drop_table("test_explain_match_dense"+suffix, ConflictType.Error)

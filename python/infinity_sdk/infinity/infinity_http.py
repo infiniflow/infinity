@@ -925,11 +925,6 @@ class table_http_result:
         self._output = output
         self._highlight = []
         self._filter = ""
-        self._fusion = []
-        self._knn = []
-        self._match = []
-        self._match_tensor = []
-        self._match_sparse = []
         self._search_exprs = []
         self._sort = []
         self._group_by = []
@@ -1011,16 +1006,8 @@ class table_http_result:
         tmp = {}
         if len(self._filter):
             tmp["filter"] = self._filter
-        if len(self._fusion):
-            tmp["fusion"] = self._fusion
-        if len(self._knn):
-            tmp["knn"] = self._knn
-        if len(self._match):
-            tmp["match"] = self._match
-        if len(self._match_tensor):
-            tmp["match_tensor"] = self._match_tensor
-        if len(self._match_sparse):
-            tmp["match_sparse"] = self._match_sparse
+        if len(self._search_exprs):
+            tmp["search"] = self._search_exprs
         if len(self._output):
             tmp["output"] = self._output
         if len(self._highlight):
