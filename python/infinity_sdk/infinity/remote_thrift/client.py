@@ -505,6 +505,7 @@ class ThriftInfinityClient:
         offset_expr,
         sort_list,
         explain_type,
+        having_expr=None,
     ):
         return self.client.Explain(
             ExplainRequest(
@@ -516,6 +517,7 @@ class ThriftInfinityClient:
                 search_expr=search_expr,
                 where_expr=where_expr,
                 group_by_list=group_by_list,
+                having_expr=having_expr,
                 limit_expr=limit_expr,
                 offset_expr=offset_expr,
                 order_by_list=sort_list,
