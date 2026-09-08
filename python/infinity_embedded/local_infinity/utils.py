@@ -58,7 +58,7 @@ def traverse_conditions(cons, fn=None):
             cons.key.lower())  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
-        for value in cons.hashable_args:
+        for value in (cons.this, cons.expression):
             if fn:
                 expr = fn(value)
             else:
@@ -91,7 +91,7 @@ def traverse_conditions(cons, fn=None):
         function_expr = WrapFunctionExpr()
         function_expr.func_name = "not"
         arguments = []
-        for value in cons.hashable_args:
+        for value in (cons.this,):
             if fn:
                 expr = fn(value)
             else:
@@ -146,13 +146,14 @@ def traverse_conditions(cons, fn=None):
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
-        for value in cons.hashable_args:
-            return traverse_conditions(value)
+        if fn:
+            return fn(cons.this)
+        return traverse_conditions(cons.this)
 
     elif isinstance(cons, exp.Neg):
         func_expr = WrapFunctionExpr()
         func_expr.func_name = '-'
-        func_expr.arguments = [parse_expr(cons.hashable_args[0])]
+        func_expr.arguments = [parse_expr(cons.args['this'])]
         parsed_expr = WrapParsedExpr()
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = func_expr
