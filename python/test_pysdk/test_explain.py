@@ -93,4 +93,12 @@ class TestInfinity:
             # forwarding group by the plan is a plain projection
             assert "Aggregate" in plan
 
+            # having must reach the explained query as well: if having_expr
+            # were dropped again, the plan would be identical to the
+            # group-by-only explain
+            res_no_having = table.output(["c1", "sum(c2)"]).group_by(["c1"]).explain(ExplainType.Physical)
+            plan_no_having = str(res_no_having)
+            print(plan_no_having)
+            assert plan != plan_no_having
+
         db_obj.drop_table("test_explain_group_by_having"+suffix, ConflictType.Error)
