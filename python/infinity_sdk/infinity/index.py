@@ -97,7 +97,8 @@ class IndexInfo:
         return self.target_name == other.target_name and self.index_type == other.index_type and self.params == other.params
 
     def __hash__(self):
-        return hash((self.target_name, self.index_type, self.params))
+        params = tuple(sorted(self.params.items())) if self.params else None
+        return hash((self.target_name, self.index_type, params))
 
     def to_ttype(self):
         init_params_list = []
