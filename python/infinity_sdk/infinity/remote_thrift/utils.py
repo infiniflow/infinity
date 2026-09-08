@@ -95,25 +95,25 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
             case ttypes.LiteralType.Boolean:
                 return str(expr_type.constant_expr.bool_value)
             case ttypes.LiteralType.Int64:
-                return str(expr_type.i64_value)
+                return str(expr_type.constant_expr.i64_value)
             case ttypes.LiteralType.Double:
-                return str(expr_type.f64_value)
+                return str(expr_type.constant_expr.f64_value)
             case ttypes.LiteralType.String:
-                return expr_type.str_value
+                return expr_type.constant_expr.str_value
             case ttypes.LiteralType.IntegerArray:
-                return str(expr_type.i64_array_value)
+                return str(expr_type.constant_expr.i64_array_value)
             case ttypes.LiteralType.DoubleArray:
-                return str(expr_type.f64_array_value)
+                return str(expr_type.constant_expr.f64_array_value)
             case ttypes.LiteralType.IntegerTensor:
-                return str(expr_type.i64_tensor_value)
+                return str(expr_type.constant_expr.i64_tensor_value)
             case ttypes.LiteralType.DoubleTensor:
-                return str(expr_type.f64_tensor_value)
+                return str(expr_type.constant_expr.f64_tensor_value)
             case ttypes.LiteralType.IntegerTensorArray:
-                return str(expr_type.i64_tensor_array)
+                return str(expr_type.constant_expr.i64_tensor_array_value)
             case ttypes.LiteralType.DoubleTensorArray:
-                return str(expr_type.f64_tensor_array)
+                return str(expr_type.constant_expr.f64_tensor_array_value)
             case ttypes.LiteralType.SparseIntegerArray:
-                return str(expr_type.i64_array_idx)
+                return str(expr_type.constant_expr.i64_array_idx)
 
     if expr_type.column_expr:
         if expr_type.column_expr.column_name:
