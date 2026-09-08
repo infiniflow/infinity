@@ -38,6 +38,7 @@ class TestInfinity:
             "c1 BETWEEN 1 AND 3",
             "c1 NOT BETWEEN 1 AND 3",
             "c1 BETWEEN 1 AND 3 AND c2 < 2",
+            "c1 BETWEEN SYMMETRIC 3 AND 1",
             "c1 LIKE '%test%'",
             "c1 NOT LIKE '%test%'",
             "c1 LIKE '%test%' ESCAPE '!'",
