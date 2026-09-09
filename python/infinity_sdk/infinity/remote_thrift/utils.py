@@ -251,7 +251,10 @@ def _parse_like(like_node, escape_char=None):
     """Parse a Like node into a ParsedExpr."""
     parsed_expr = ttypes.ParsedExpr()
     function_expr = ttypes.FunctionExpr()
-    function_expr.function_name = binary_exp_to_paser_exp('like')
+    # sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True instead
+    # of wrapping it in a Not node, so the negation must be read off the node.
+    function_expr.function_name = binary_exp_to_paser_exp(
+        'notlike' if like_node.args.get('negate') else 'like')
 
     left_expr = parse_expr(like_node.args['this'])
     pattern_expr = parse_expr(like_node.args['expression'])
