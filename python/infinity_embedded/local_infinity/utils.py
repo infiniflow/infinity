@@ -45,13 +45,52 @@ from infinity_embedded.local_infinity.types import build_result, logic_type_to_d
 from infinity_embedded.utils import binary_exp_to_paser_exp
 
 
+def _make_escape_expr(escape_char=None):
+    """Create escape expression, using explicit escape char if provided."""
+    escape_constant = WrapConstantExpr()
+    escape_constant.literal_type = LiteralType.kString
+    # escape_char may be a sqlglot Literal or a plain string
+    if escape_char is not None:
+        if hasattr(escape_char, 'output_name'):
+            escape_value = escape_char.output_name
+        else:
+            escape_value = str(escape_char)
+    else:
+        escape_value = "\\"
+    escape_constant.str_value = escape_value
+    escape_expr = WrapParsedExpr(ParsedExprType.kConstant)
+    escape_expr.constant_expr = escape_constant
+    return escape_expr
+
+
+def _parse_like(like_node, escape_char=None, force_not=False):
+    """Parse a Like node into a ParsedExpr.
+
+    sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True instead
+    of wrapping it in a Not node, so the negation must be read off the node.
+    """
+    negate = force_not or bool(like_node.args.get('negate'))
+    func_expr = WrapFunctionExpr()
+    func_expr.func_name = binary_exp_to_paser_exp('notlike' if negate else 'like')
+
+    left_expr = parse_expr(like_node.args['this'])
+    pattern_expr = parse_expr(like_node.args['expression'])
+
+    func_expr.arguments = [left_expr, pattern_expr, _make_escape_expr(escape_char)]
+    parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+    parsed_expr.function_expr = func_expr
+    return parsed_expr
+
+
 def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Alias):
         expr = traverse_conditions(cons.args['this'])
         expr.alias_name = cons.alias
         return expr
 
-    if isinstance(cons, exp.Binary):
+    # Like/Escape are Binary subclasses but need their dedicated arms below
+    # (they carry a third escape argument and a negate flag).
+    if isinstance(cons, exp.Binary) and not isinstance(cons, (exp.Like, exp.Escape)):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
         function_expr.func_name = binary_exp_to_paser_exp(
@@ -237,6 +276,20 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.in_expr = in_expr
 
         return parsed_expr
+    elif isinstance(cons, exp.Escape):
+        # LIKE 'pattern' ESCAPE '!' (NOT included via Like's negate flag)
+        like_node = cons.args['this']
+        escape_char = cons.args.get('expression')
+        return _parse_like(like_node, escape_char)
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Escape):
+        # NOT LIKE 'pattern' ESCAPE '!' on older sqlglot (Not wrapper)
+        raw_escape = cons.args['this']
+        return _parse_like(raw_escape.args['this'], raw_escape.args.get('expression'), force_not=True)
+    elif isinstance(cons, exp.Like):
+        return _parse_like(cons, None)
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Like):
+        # NOT LIKE on older sqlglot (Not wrapper)
+        return _parse_like(cons.args['this'], None, force_not=True)
     else:
         raise Exception(f"unknown condition type: {cons}")
 
