@@ -51,6 +51,28 @@ def traverse_conditions(cons, fn=None):
         expr.alias_name = cons.alias
         return expr
 
+    elif isinstance(cons, (exp.JSONExtract, exp.JSONExtractScalar)):
+        # JSON operators -> and ->>. sqlglot parses the right side as a
+        # JSONPath node; the server functions take the path as a string.
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = (
+            'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
+
+        json_expr = parse_expr(cons.args['this'])
+        path_sql = cons.args['expression'].sql()
+        if len(path_sql) >= 2 and path_sql.startswith("'") and path_sql.endswith("'"):
+            path_sql = path_sql[1:-1]
+        path_constant = WrapConstantExpr()
+        path_constant.literal_type = LiteralType.kString
+        path_constant.str_value = path_sql
+        path_expr = WrapParsedExpr(ParsedExprType.kConstant)
+        path_expr.constant_expr = path_constant
+
+        func_expr.arguments = [json_expr, path_expr]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
+
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
