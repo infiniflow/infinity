@@ -1104,6 +1104,39 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_multiple_fusion" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_fusion_match_tensor_reused_params(self, check_data, suffix):
+        # HTTP fusion(match_tensor) must not consume the caller's fusion_params
+        # dict: it used to pop "field"/"query_tensor"/"element_type" out of it,
+        # so reusing the same dict for a second query raised KeyError.
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_fusion_match_tensor_reused_params" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_fusion_match_tensor_reused_params" + suffix,
+                                        {"num": {"type": "int"},
+                                         "t": {"type": "tensor, 4, float"},
+                                         "body": {"type": "varchar"}})
+        table_obj.create_index("ft_index",
+                               index.IndexInfo("body",
+                                               index.IndexType.FullText,
+                                               {"ANALYZER": "standard"}),
+                               ConflictType.Error)
+        table_obj.insert([{"num": 1, "t": [[1.0, 0.0, 0.0, 0.0]], "body": "off"}])
+
+        fusion_params = {"field": "t", "element_type": "float",
+                         "query_tensor": [[0.0, -10.0, 0.0, 0.7]]}
+        for _ in range(2):
+            res, extra_result = (table_obj
+                                 .output(["num"])
+                                 .match_text("body", "off", 4)
+                                 .match_tensor("t", [[1.0, 0.0, 0.0, 0.0]], "float", 2)
+                                 .fusion(method="rrf", topn=10)
+                                 .fusion(method="match_tensor", topn=2, fusion_params=fusion_params)
+                                 .to_pl())
+            assert fusion_params == {"field": "t", "element_type": "float",
+                                     "query_tensor": [[0.0, -10.0, 0.0, 0.7]]}
+
+        res = db_obj.drop_table("test_fusion_match_tensor_reused_params" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])
