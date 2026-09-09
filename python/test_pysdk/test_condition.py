@@ -46,3 +46,20 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_output_embedded_count(self, request):
+        # embedded SDK must parse count(*) / count(c1) in output columns: the
+        # generic Func arm fed sqlglot's Count.big_int flag (a plain bool) into
+        # parse_expr and crashed with "unknown expression type: True".
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from sqlglot import parse_one
+        from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse
+        res = embedded_parse(parse_one("count(*)"))
+        assert res.function_expr.func_name == "count"
+        assert len(res.function_expr.arguments) == 1
+        assert res.function_expr.arguments[0].column_expr.star
+        res = embedded_parse(parse_one("count(c1)"))
+        assert res.function_expr.func_name == "count"
+        assert len(res.function_expr.arguments) == 1
+        assert res.function_expr.arguments[0].column_expr.names == ["c1"]
