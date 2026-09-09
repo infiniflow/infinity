@@ -1104,7 +1104,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_multiple_fusion" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_fusion_match_tensor_reused_params(self, check_data, suffix):
+    def test_fusion_match_tensor_reused_params(self, suffix):
         # HTTP fusion(match_tensor) must not consume the caller's fusion_params
         # dict: it used to pop "field"/"query_tensor"/"element_type" out of it,
         # so reusing the same dict for a second query raised KeyError.
