@@ -349,6 +349,31 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parser_expr_type.function_expr = function_expr
         parsed_expr.type = parser_expr_type
         return parsed_expr
+    elif isinstance(cons, (exp.JSONExtract, exp.JSONExtractScalar)):
+        # JSON operators -> and ->>. sqlglot parses the right side as a
+        # JSONPath node; the server functions take the path as a string.
+        function_expr = ttypes.FunctionExpr()
+        function_expr.function_name = (
+            'json_extract_string' if isinstance(cons, exp.JSONExtractScalar) else 'json_extract')
+
+        json_expr = parse_expr(cons.args['this'])
+        path_sql = cons.args['expression'].sql()
+        if len(path_sql) >= 2 and path_sql.startswith("'") and path_sql.endswith("'"):
+            path_sql = path_sql[1:-1]
+        path_expr = ttypes.ParsedExpr()
+        path_constant = ttypes.ConstantExpr()
+        path_constant.literal_type = ttypes.LiteralType.String
+        path_constant.str_value = path_sql
+        path_expr_type = ttypes.ParsedExprType()
+        path_expr_type.constant_expr = path_constant
+        path_expr.type = path_expr_type
+
+        function_expr.arguments = [json_expr, path_expr]
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
+        parsed_expr = ttypes.ParsedExpr()
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
     elif isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
