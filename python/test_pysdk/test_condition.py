@@ -46,3 +46,24 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_output_preserves_string_literal_case(self, request):
+        # output() used to lowercase the whole column expression before parsing
+        # it, silently corrupting string literals: output(["'ACTIVE'"]) selected
+        # 'active', and json_extract(data, '$.UserName') would query key
+        # '$.username'. Only the special output tokens (*, _row_id, _score, ...)
+        # are meant to be matched case-insensitively.
+        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+        qb = InfinityThriftQueryBuilder(None)
+        qb.output(["'ACTIVE'"])
+        assert qb._columns[0].type.constant_expr.str_value == "ACTIVE"
+        qb = InfinityThriftQueryBuilder(None)
+        qb.output(["_SCORE"])
+        assert qb._columns[0].type.function_expr.function_name == "score"
+
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded part needs the embedded engine")
+        from infinity_embedded.local_infinity.query_builder import InfinityLocalQueryBuilder
+        qb = InfinityLocalQueryBuilder(None)
+        qb.output(["'ACTIVE'"])
+        assert qb._columns[0].constant_expr.str_value == "ACTIVE"
