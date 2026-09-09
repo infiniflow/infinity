@@ -596,6 +596,18 @@ def traverse_conditions(cons: exp.Condition, fn=None) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     # in
+    elif isinstance(cons, exp.Between):
+        # the query wire format has no between expression for where clauses, so
+        # rewrite "x BETWEEN a AND b" as "x >= a AND x <= b" (NOT BETWEEN is
+        # handled by the exp.Not arm above, which recurses into this one);
+        # BETWEEN SYMMETRIC accepts the bounds in either order
+        def within(low, high):
+            return exp.And(this=exp.GTE(this=cons.this.copy(), expression=low.copy()),
+                           expression=exp.LTE(this=cons.this.copy(), expression=high.copy()))
+        if cons.args.get("symmetric"):
+            return traverse_conditions(exp.Or(this=within(cons.args["low"], cons.args["high"]),
+                                              expression=within(cons.args["high"], cons.args["low"])))
+        return traverse_conditions(within(cons.args["low"], cons.args["high"]))
     elif isinstance(cons, exp.In):
         left_operand = parse_expr(cons.args['this'])
         arguments = []
