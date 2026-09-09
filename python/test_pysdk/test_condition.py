@@ -46,3 +46,22 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_output_trim_embedded(self, request):
+        # embedded SDK output traversal crashed on TRIM variants carrying a
+        # position/character ("unknown expression type: TRIM(name, ' ')");
+        # sqlglot also folds LTRIM/RTRIM into Trim with a position flag.
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from sqlglot import parse_one
+        from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
+        for output_str, expected_func in [
+            ("trim(name)", "trim"),
+            ("trim(both ' ' from name)", "trim"),
+            ("trim(leading 'x' from name)", "ltrim"),
+            ("trim(trailing from name)", "rtrim"),
+            ("ltrim(name)", "ltrim"),
+            ("rtrim(name)", "rtrim"),
+        ]:
+            res = embedded_parse_expr(parse_one(output_str))
+            assert res.function_expr.func_name == expected_func, f"{output_str}: got {res.function_expr.func_name}"
