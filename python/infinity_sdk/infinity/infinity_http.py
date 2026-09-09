@@ -1182,10 +1182,23 @@ class table_http_result:
         topn: int,
         opt_params: dict | None = None,
     ):
+        if isinstance(sparse_data, SparseVector):
+            sparse_dict = sparse_data.to_dict()
+        elif isinstance(sparse_data, dict):
+            if len(sparse_data) == 0:
+                raise InfinityException(
+                    ErrorCode.INVALID_EXPRESSION, "Empty sparse vector"
+                )
+            sparse_dict = sparse_data
+        else:
+            raise InfinityException(
+                ErrorCode.INVALID_CONSTANT_TYPE,
+                f"Invalid sparse data type {type(sparse_data)}",
+            )
         tmp_match_sparse = {
             "match_method": "sparse",
             "fields": vector_column_name,
-            "query_vector": sparse_data.to_dict(),
+            "query_vector": sparse_dict,
             "metric_type": distance_type,
             "topn": topn,
         }
