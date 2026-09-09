@@ -55,6 +55,11 @@ class TestInfinity:
             pytest.skip("embedded-only regression test")
         from sqlglot import parse_one
         from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse
-        for expr in ("count(*)", "count(c1)"):
-            res = embedded_parse(parse_one(expr))
-            assert res.function_expr.func_name == "count"
+        res = embedded_parse(parse_one("count(*)"))
+        assert res.function_expr.func_name == "count"
+        assert len(res.function_expr.arguments) == 1
+        assert res.function_expr.arguments[0].column_expr.star
+        res = embedded_parse(parse_one("count(c1)"))
+        assert res.function_expr.func_name == "count"
+        assert len(res.function_expr.arguments) == 1
+        assert res.function_expr.arguments[0].column_expr.names == ["c1"]
