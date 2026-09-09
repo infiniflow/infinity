@@ -1153,11 +1153,9 @@ class table_http_result:
         if method == "match_tensor":
             tmp_new_params = {"field": fusion_params["field"], "query_tensor": fusion_params["query_tensor"],
                               "element_type": fusion_params["element_type"]}
-            # handle left params
-            fusion_params.pop("field")
-            fusion_params.pop("query_tensor")
-            fusion_params.pop("element_type")
-            tmp_new_params.update(fusion_params)
+            # handle left params without mutating the caller's dict
+            tmp_new_params.update({k: v for k, v in fusion_params.items()
+                                   if k not in ("field", "query_tensor", "element_type")})
             tmp_fusion_expr["params"] = tmp_new_params
         else:
             if fusion_params is not None:
