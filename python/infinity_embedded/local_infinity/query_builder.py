@@ -218,7 +218,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if knn_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(knn_params)
+            optional_filter, knn_params = get_search_optional_filter_from_opt_params(knn_params)
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
@@ -268,7 +268,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if opt_params is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(opt_params)
+            optional_filter, opt_params = get_search_optional_filter_from_opt_params(opt_params)
             for k, v in opt_params.items():
                 params = InitParameter()
                 params.param_name = k
@@ -336,7 +336,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_options is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_options)
+            optional_filter, extra_options = get_search_optional_filter_from_opt_params(extra_options)
             for k, v in extra_options.items():
                 options_text += f";{k}={v}"
         match_expr.options_text = options_text
@@ -364,7 +364,7 @@ class InfinityLocalQueryBuilder(ABC):
         optional_filter = None
         if extra_option is not None:
             # check if there is a filter
-            optional_filter = get_search_optional_filter_from_opt_params(extra_option)
+            optional_filter, extra_option = get_search_optional_filter_from_opt_params(extra_option)
             for k, v in extra_option.items():
                 option_str += f";{k}={v}"
         match_tensor_expr = WrapParsedExpr(ParsedExprType.kMatchTensor)
