@@ -739,51 +739,59 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=value)
         case float():
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double, f64_value=value)
-        case [int(), *_]:
+        case [int(), *_] if all(isinstance(x, int) for x in value):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
                                                       i64_array_value=value)
-        case [float(), *_]:
+        case [_, *_] if all(isinstance(x, (int, float)) for x in value):
+            # Any float in the list: store as a double array. Dispatching on
+            # the first element alone would label [1, 2.5] an integer array
+            # and lose the fractional part.
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                      f64_array_value=value)
-        case [[int(), *_], *_]:
+                                                      f64_array_value=[float(x) for x in value])
+        case [[int(), *_], *_] if all(isinstance(x, int) for row in value for x in row):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensor,
                                                       i64_tensor_value=value)
-        case [[float(), *_], *_]:
+        case [[_, *_], *_] if all(isinstance(x, (int, float)) for row in value for x in row):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensor,
-                                                      f64_tensor_value=value)
-        case [[[int(), *_], *_], *_]:
+                                                      f64_tensor_value=[[float(x) for x in row] for row in value])
+        case [[[int(), *_], *_], *_] if all(isinstance(x, int) for row in value for tensor in row for x in tensor):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensorArray,
                                                       i64_tensor_array_value=value)
-        case [[[float(), *_], *_], *_]:
+        case [[[_, *_], *_], *_] if all(isinstance(x, (int, float)) for row in value for tensor in row for x in tensor):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensorArray,
-                                                      f64_tensor_array_value=value)
-        case SparseVector([int(), *_] as indices, [int(), *_] as values):
+                                                      f64_tensor_array_value=[[[float(x) for x in tensor] for tensor in row]
+                                                                              for row in value])
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, int) for v in values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseIntegerArray,
                 i64_array_idx=indices,
                 i64_array_value=values)
-        case SparseVector([int(), *_] as indices, [float(), *_] as values):
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, (int, float)) for v in values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseDoubleArray,
                 i64_array_idx=indices,
-                f64_array_value=values)
+                f64_array_value=[float(v) for v in values])
         case dict():
             if len(value) == 0:
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
-            match next(iter(value.values())):
-                case int():
-                    constant_expression = ttypes.ConstantExpr(
-                        literal_type=ttypes.LiteralType.SparseIntegerArray,
-                        i64_array_idx=[int(k) for k in value.keys()],
-                        i64_array_value=[int(v) for v in value.values()])
-                case float():
-                    constant_expression = ttypes.ConstantExpr(
-                        literal_type=ttypes.LiteralType.SparseDoubleArray,
-                        i64_array_idx=[int(k) for k in value.keys()],
-                        f64_array_value=[float(v) for v in value.values()])
-                case _:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+            dict_values = list(value.values())
+            if all(isinstance(v, int) for v in dict_values):
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseIntegerArray,
+                    i64_array_idx=[int(k) for k in value.keys()],
+                    i64_array_value=[int(v) for v in dict_values])
+            elif all(isinstance(v, (int, float)) for v in dict_values):
+                # Any float among the values: store as a double sparse array.
+                # Dispatching on the first value alone truncated floats via int(v).
+                constant_expression = ttypes.ConstantExpr(
+                    literal_type=ttypes.LiteralType.SparseDoubleArray,
+                    i64_array_idx=[int(k) for k in value.keys()],
+                    f64_array_value=[float(v) for v in dict_values])
+            else:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
         case Array():
             children_list = [get_remote_constant_expr_from_python_value(child) for child in value.elements]
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.CurlyBracketsArray,
