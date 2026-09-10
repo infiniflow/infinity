@@ -354,18 +354,19 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
             # and lose the fractional part.
             constant_expression.literal_type = LiteralType.kDoubleArray
             constant_expression.f64_array_value = [float(x) for x in value]
-        case [[int(), *_], *_]:
+        case [[int(), *_], *_] if all(isinstance(x, int) for row in value for x in row):
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.i64_tensor_value = value
-        case [[float(), *_], *_]:
+        case [[_, *_], *_] if all(isinstance(x, (int, float)) for row in value for x in row):
             constant_expression.literal_type = LiteralType.kSubArrayArray
-            constant_expression.f64_tensor_value = value
-        case [[[int(), *_], *_], *_]:
+            constant_expression.f64_tensor_value = [[float(x) for x in row] for row in value]
+        case [[[int(), *_], *_], *_] if all(isinstance(x, int) for row in value for tensor in row for x in tensor):
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.i64_tensor_array_value = value
-        case [[[float(), *_], *_], *_]:
+        case [[[_, *_], *_], *_] if all(isinstance(x, (int, float)) for row in value for tensor in row for x in tensor):
             constant_expression.literal_type = LiteralType.kSubArrayArray
-            constant_expression.f64_tensor_array_value = value
+            constant_expression.f64_tensor_array_value = [[[float(x) for x in tensor] for tensor in row]
+                                                          for row in value]
         case SparseVector([int(), *_] as indices, [*values]) if values and all(
                 isinstance(v, int) for v in values):
             constant_expression.literal_type = LiteralType.kLongSparseArray

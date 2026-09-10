@@ -69,6 +69,19 @@ class TestInfinity:
         assert res.literal_type == LiteralType.kIntegerArray
         assert res.i64_array_value == [1, 2]
 
+        # tensors get the same all-elements dispatch
+        res = get_local_constant_expr_from_python_value([[1, 2.5]])
+        assert res.literal_type == LiteralType.kSubArrayArray
+        assert res.f64_tensor_value == [[1.0, 2.5]]
+
+        res = get_local_constant_expr_from_python_value([[[1, 2.5]]])
+        assert res.literal_type == LiteralType.kSubArrayArray
+        assert res.f64_tensor_array_value == [[[1.0, 2.5]]]
+
+        res = get_local_constant_expr_from_python_value([[1, 2]])
+        assert res.literal_type == LiteralType.kSubArrayArray
+        assert res.i64_tensor_value == [[1, 2]]
+
         res = get_local_constant_expr_from_python_value({1: 5, 2: 0.5})
         assert res.literal_type == LiteralType.kDoubleSparseArray
         assert res.i64_array_idx == [1, 2]
