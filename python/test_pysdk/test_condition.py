@@ -60,5 +60,6 @@ class TestInfinity:
             "c1[1] = 5",
             "c1 = any (1)",
         ]:
-            with pytest.raises(InfinityException, match="unknown expression type"):
+            with pytest.raises(InfinityException, match="unknown expression type") as exc_info:
                 traverse_conditions(condition(cond_str))
+            assert exc_info.value.error_code == ErrorCode.INVALID_EXPRESSION
