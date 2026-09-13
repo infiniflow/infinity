@@ -2515,4 +2515,7 @@ class TestInfinity:
         res = table.output(["c1"]).filter("c1 in (c2, c3)").to_string()
         assert '"filter": "c1 IN (c2, c3)"' in res
 
+        res = table.output(["c1"]).filter("c1 not in (c2, c3)").to_string()
+        assert '"filter": "c1 NOT IN (c2, c3)"' in res
+
         db_obj.drop_table("test_to_string_expr_rendering" + suffix, ConflictType.Error)
