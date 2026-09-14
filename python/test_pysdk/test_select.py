@@ -2491,3 +2491,26 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_to_string(self, suffix):
+        """
+        Regression test: RemoteTable.to_string() must not crash on queries
+        carrying literal expressions. parsed_expression_to_string() used to
+        read literal values from the wrong object (expr_type.i64_value
+        instead of expr_type.constant_expr.i64_value), so any query with a
+        limit, an offset, or a literal in the filter raised AttributeError.
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_to_string"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_to_string"+suffix, {
+            "c1": {"type": "int", "constraints": ["primary key"]},
+            "c2": {"type": "int"}}, ConflictType.Error)
+        assert table
+
+        res = table.output(["c1"]).filter("c2 > 3").limit(10).offset(5).to_string()
+        assert '"limit": "10"' in res
+        assert '"offset": "5"' in res
+        assert '"filter": ">(c2, 3)"' in res
+
+        db_obj.drop_table("test_to_string"+suffix, ConflictType.Error)
