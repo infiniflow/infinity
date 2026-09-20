@@ -92,3 +92,10 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+def test_query_builder_limit_and_offset_none_clear_clause():
+    query_builder = InfinityThriftQueryBuilder(None)
+
+    assert query_builder.limit(3).limit(None)._limit is None
+    assert query_builder.offset(2).offset(None)._offset is None
