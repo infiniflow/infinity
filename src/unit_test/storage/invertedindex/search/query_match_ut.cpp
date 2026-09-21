@@ -34,6 +34,7 @@ import :txn_state;
 import :new_txn_manager;
 import :new_txn;
 import :data_block;
+import :fulltext_score_result_heap;
 
 import logical_type;
 import column_def;
@@ -156,6 +157,55 @@ TEST_P(QueryMatchTest, phrase) {
             QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
         }
     }
+}
+
+TEST_P(QueryMatchTest, bmw_many_terms) {
+    CreateDBAndTable(db_name_, table_name_);
+    CreateIndex(db_name_, table_name_, index_name_, "standard");
+    std::mt19937 rng(42);
+    auto pick = [&rng] { return fmt::format("term{:03d} ", rng() % (1 + rng() % 300)); };
+    auto words = [&pick](u32 n) {
+        std::string s;
+        for (u32 i = 0; i < n; ++i) {
+            s += pick();
+        }
+        return s;
+    };
+    for (u32 seg = 0; seg < 4; ++seg) {
+        datas_.clear();
+        for (u32 i = 0; i < 1500; ++i) {
+            datas_.push_back({std::to_string(seg * 1500 + i), "title", words(40)});
+        }
+        InsertData(db_name_, table_name_);
+    }
+
+    NewTxnManager *txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("query match"), TransactionType::kRead);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, table_name_);
+    std::shared_ptr<IndexReader> index_reader;
+    status = txn->GetFullTextIndexReader(db_name_, table_name_, index_reader);
+    EXPECT_TRUE(status.ok());
+    QueryBuilder query_builder(table_info);
+    query_builder.Init(index_reader);
+    SearchDriver driver(query_builder.GetColumn2Analyzer(), "text");
+
+    constexpr u32 topn = 10;
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, topn);
+    context.early_term_algo_ = EarlyTermAlgo::kBMW;
+    context.query_tree_ = driver.ParseSingleWithFields("text", words(200));
+    std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(context);
+    ASSERT_EQ(doc_iterator->GetType(), DocIteratorType::kBMWIterator);
+
+    float scores[topn];
+    RowID row_ids[topn];
+    FullTextScoreResultHeap result_heap(topn, scores, row_ids);
+    while (doc_iterator->Next()) {
+        if (result_heap.AddResult(doc_iterator->Score(), doc_iterator->DocID())) {
+            doc_iterator->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+        }
+    }
+    EXPECT_EQ(result_heap.GetResultSize(), topn);
+    EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
 }
 
 void QueryMatchTest::CreateDBAndTable(const std::string &db_name, const std::string &table_name) {
