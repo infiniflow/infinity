@@ -107,13 +107,13 @@ ClientVersions::ClientVersions() {
     client_version_map_[34] = std::string("0.6.13");
     client_version_map_[35] = std::string("0.6.15");
     client_version_map_[36] = std::string("0.7.2");
-    client_version_map_[37] = std::string("0.7.3");
+    client_version_map_[37] = std::string("0.7.4");
 }
 
 std::pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
     auto iter = client_version_map_.find(version_index);
     if (iter == client_version_map_.end()) {
-        return {nullptr, Status::UnsupportedVersionIndex(version_index, 37)}; // Index for 0.7.3
+        return {nullptr, Status::UnsupportedVersionIndex(version_index, 37)}; // Index for 0.7.4
     }
     return {iter->second.c_str(), Status::OK()};
 }
