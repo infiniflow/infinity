@@ -14,6 +14,8 @@
 
 module;
 
+#include "common/utility/sparse_gram.h"
+
 module infinity_core:analyzer_pool.impl;
 
 import :analyzer_pool;
@@ -32,6 +34,7 @@ import :rag_analyzer;
 import :whitespace_analyzer;
 import :ik_analyzer;
 import :rank_features_analyzer;
+import :sparsegram_analyzer;
 
 import std.compat;
 
@@ -345,6 +348,15 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
         }
         case Str2Int(RANKFEATURES.data()): {
             return {std::make_unique<RankFeaturesAnalyzer>(), Status::OK()};
+        }
+        case Str2Int(SPARSEGRAM.data()): {
+            // sparsegram[-<min>[-<max>]][-fold]
+            SparseGramParams params;
+            if (!ParseSparseGramAnalyzerName(name, params)) {
+                return {nullptr,
+                        Status::InvalidAnalyzerName(fmt::format("SPARSEGRAM[-min[-max]][-fold], but it is {}.", name))};
+            }
+            return {std::make_unique<SparsegramAnalyzer>(params.min_n, params.max_n, params.fold), Status::OK()};
         }
         default: {
             if (std::filesystem::is_regular_file(name)) {

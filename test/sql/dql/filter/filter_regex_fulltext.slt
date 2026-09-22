@@ -1,0 +1,152 @@
+# Regular expression search answered by a sparse gram full-text index.
+#
+# `regex(column, pattern)` is a plain scalar function, and stays correct on its
+# own. When the column has a full-text index built with a sparse gram analyzer,
+# the optimizer additionally narrows the rows with the literals the pattern
+# proves mandatory: for every such run it adds
+# `filter_fulltext(column, '<run>', 'operator=and;similarity=boolean')`, which
+# becomes an index scan over the grams of that run. The original `regex()` call
+# is kept in the conjunction and verifies the survivors, so the narrowing can
+# only ever remove rows the pattern cannot match.
+
+statement ok
+DROP TABLE IF EXISTS regex_ft;
+
+statement ok
+CREATE TABLE regex_ft (id INT, doc VARCHAR);
+
+statement ok
+INSERT INTO regex_ft VALUES (1, 'the colour of the sky is blue'), (2, 'color of the sea'), (3, 'an error reading file happened'), (4, 'an error writing file happened'), (5, '数据模型的训练需要大量语料'), (6, 'The Nobel Prize in Physics'), (7, 'nothing relevant here'), (8, 'fn main() { return 0; }'), (9, 'ab cd');
+
+statement ok
+CREATE INDEX regex_ft_idx ON regex_ft(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');
+
+# An optional character splits the run, and only the taken branch of the
+# alternation can be required; the regex verifies both.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'colou?r of the (sky|sea)');
+----
+1
+2
+
+# Literals on both sides of an alternation group.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'error (reading|writing) file');
+----
+3
+4
+
+# CJK: the analyzer's floors are one and two characters, so a two character
+# word still narrows.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '数据模型');
+----
+5
+
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '语料');
+----
+5
+
+# Classes and escapes interrupt a run without removing the literals around them.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'fn\s+main');
+----
+8
+
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'fn\s+worker');
+----
+
+# A pattern that requires nothing keeps working, by scanning.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '[0-9]+');
+----
+8
+
+# A two character literal is below the analyzer floor, so there is no gram to
+# push down. Falling back to the scan is the only correct answer; it must still
+# find the row.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'ab');
+----
+9
+
+# This index has no ASCII folding, so a case insensitive pattern cannot use it
+# and falls back to the scan. Results stay correct.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '(?i)nobel prize');
+----
+6
+
+# The plan: both literal runs are pushed into the index scan, and the regex
+# stays above it as the residual filter that verifies the candidates.
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, 'colou?r of the (sky|sea)');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex colou?r of the (sky|sea)
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc', 'r of the ', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc', 'colo', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
+
+# Without a usable literal the plan keeps the scan it would have had.
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, '[0-9]+');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex [0-9]+
+   - output columns: [doc, __rowid]
+  -> TABLE SCAN (2)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - output_columns: [doc, __rowid]
+
+statement ok
+DROP TABLE IF EXISTS regex_ft;
+
+# ASCII case folding: an index built with `-fold` stores the lowercased form of
+# every gram as well, which is what a case insensitive pattern requires.
+statement ok
+DROP TABLE IF EXISTS regex_ft_ci;
+
+statement ok
+CREATE TABLE regex_ft_ci (id INT, doc VARCHAR);
+
+statement ok
+INSERT INTO regex_ft_ci VALUES (1, 'The Nobel Prize in Physics'), (2, 'ÜBER ALLES'), (3, 'über alles'), (4, 'nothing here');
+
+statement ok
+CREATE INDEX regex_ft_ci_idx ON regex_ft_ci(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12-fold');
+
+query I rowsort
+SELECT id FROM regex_ft_ci WHERE regex(doc, '(?i)nobel prize');
+----
+1
+
+# A cased non-ASCII letter cannot be folded by the index, so it cuts the run
+# instead of being required; the remaining ASCII part still narrows, and the
+# regex decides the result.
+query I rowsort
+SELECT id FROM regex_ft_ci WHERE regex(doc, '(?i)ÜBER alles');
+----
+2
+3
+
+# A case sensitive pattern uses the exact bytes and also narrows.
+query I rowsort
+SELECT id FROM regex_ft_ci WHERE regex(doc, 'ÜBER ALLES');
+----
+2
+
+statement ok
+DROP TABLE IF EXISTS regex_ft_ci;
