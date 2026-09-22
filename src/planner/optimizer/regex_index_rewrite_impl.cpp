@@ -56,6 +56,11 @@ struct RewriteContext {
     // Only columns whose full-text index was built with a sparse gram analyzer,
     // mapped to the parameters that analyzer was built with.
     std::unordered_map<std::string, SparseGramParams> column_params_;
+    // The index each of those columns has to be searched through. A column may
+    // carry a second, regular full-text index at the same time, and the grams
+    // only exist in this one, so the generated filter names it instead of
+    // leaving the choice to the default index rule.
+    std::unordered_map<std::string, std::string> column_index_;
 };
 
 std::shared_ptr<BaseExpression> UnwrapCast(const std::shared_ptr<BaseExpression> &expression) {
@@ -87,6 +92,16 @@ std::shared_ptr<BaseExpression> MakeFilterFulltext(const std::string &column_nam
     return std::make_shared<FilterFulltextExpression>(column_name, run, "operator=and;similarity=boolean");
 }
 
+/// The field a generated filter searches. `column@index` names the gram index
+/// explicitly: the query text is then analyzed by that index's analyzer as well,
+/// which is what makes the grams of a run line up with the ones the index holds.
+std::string FulltextField(const std::string &column_name, const std::string &index_name) {
+    if (index_name.empty()) {
+        return column_name;
+    }
+    return column_name + "@" + index_name;
+}
+
 /// Rewrite a `regex()` predicate, or return nullptr when there is nothing to do.
 std::shared_ptr<BaseExpression> TryRewriteRegex(RewriteContext &context, const std::shared_ptr<BaseExpression> &expression) {
     if (expression->type() != ExpressionType::kFunction) {
@@ -106,6 +121,8 @@ std::shared_ptr<BaseExpression> TryRewriteRegex(RewriteContext &context, const s
         return nullptr;
     }
     const SparseGramParams &params = params_it->second;
+    const auto index_it = context.column_index_.find(column_name);
+    const std::string index_name = index_it == context.column_index_.end() ? std::string() : index_it->second;
 
     // The pattern has to be a constant: a column-supplied pattern says nothing
     // about the rows it will be evaluated against.
@@ -156,8 +173,9 @@ std::shared_ptr<BaseExpression> TryRewriteRegex(RewriteContext &context, const s
 
     std::vector<std::shared_ptr<BaseExpression>> conjuncts;
     conjuncts.reserve(usable.size() + 1);
+    const std::string field = FulltextField(column_name, index_name);
     for (const auto *run : usable) {
-        conjuncts.push_back(MakeFilterFulltext(column_name, run->text));
+        conjuncts.push_back(MakeFilterFulltext(field, run->text));
     }
     // The predicate itself stays, as the residual filter that verifies the
     // candidates the grams let through.
@@ -231,6 +249,7 @@ RegexIndexRewrite::Rewrite(QueryContext *query_context, const BaseTableRef *base
                 continue;
             }
             context.column_params_[column_name] = params;
+            context.column_index_[column_name] = index_name;
             break;
         }
     }

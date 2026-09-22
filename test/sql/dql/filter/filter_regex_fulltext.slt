@@ -58,7 +58,7 @@ PROJECT (4)
   -> INDEX SCAN (6)
      - table name: regex_ft(default_db.regex_ft)
      - table index: #1
-     - filter: FILTER_FULLTEXT('doc', 'main', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc', 'fn ', 'operator=and;similarity=boolean')
+     - filter: FILTER_FULLTEXT('doc@regex_ft_idx', 'main', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc@regex_ft_idx', 'fn ', 'operator=and;similarity=boolean')
      - output_columns: [__rowid]
 
 
@@ -133,7 +133,7 @@ PROJECT (4)
   -> INDEX SCAN (6)
      - table name: regex_ft(default_db.regex_ft)
      - table index: #1
-     - filter: FILTER_FULLTEXT('doc', 'r of the ', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc', 'colo', 'operator=and;similarity=boolean')
+     - filter: FILTER_FULLTEXT('doc@regex_ft_idx', 'r of the ', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc@regex_ft_idx', 'colo', 'operator=and;similarity=boolean')
      - output_columns: [__rowid]
 
 # Without a usable literal the plan keeps the scan it would have had.
