@@ -90,9 +90,7 @@ inline bool IsDenseCodePoint(uint32_t cp) {
 /// term for a window its own lowercased form would not have selected, and a
 /// case-insensitive query requiring that term would lose the row.
 inline uint64_t SparseGramBigramWeight(uint32_t first, uint32_t second) {
-    const auto fold = [](uint32_t code_point) -> uint32_t {
-        return (code_point >= 'A' && code_point <= 'Z') ? code_point - 'A' + 'a' : code_point;
-    };
+    const auto fold = [](uint32_t code_point) -> uint32_t { return (code_point >= 'A' && code_point <= 'Z') ? code_point - 'A' + 'a' : code_point; };
     uint64_t x = (static_cast<uint64_t>(fold(first)) << 32) | static_cast<uint64_t>(fold(second));
     x += 0x9E3779B97F4A7C15ull;
     x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;

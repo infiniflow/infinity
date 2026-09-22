@@ -353,8 +353,7 @@ std::tuple<std::unique_ptr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const st
             // sparsegram[-<min>[-<max>]][-fold]
             SparseGramParams params;
             if (!ParseSparseGramAnalyzerName(name, params)) {
-                return {nullptr,
-                        Status::InvalidAnalyzerName(fmt::format("SPARSEGRAM[-min[-max]][-fold], but it is {}.", name))};
+                return {nullptr, Status::InvalidAnalyzerName(fmt::format("SPARSEGRAM[-min[-max]][-fold], but it is {}.", name))};
             }
             return {std::make_unique<SparsegramAnalyzer>(params.min_n, params.max_n, params.fold), Status::OK()};
         }
