@@ -38,6 +38,37 @@ func TestRegexFilterShape(t *testing.T) {
 	}
 }
 
+// TestSparsegramAnalyzerNames checks the analyzer name built for the index.
+func TestSparsegramAnalyzerNames(t *testing.T) {
+	name, err := infinity.SparsegramAnalyzer(3, 12, false)
+	if err != nil || name != "sparsegram-3-12" {
+		t.Errorf("SparsegramAnalyzer(3, 12, false) = %q, %v", name, err)
+	}
+	name, err = infinity.SparsegramAnalyzer(1, 8, true)
+	if err != nil || name != "sparsegram-1-8-fold" {
+		t.Errorf("SparsegramAnalyzer(1, 8, true) = %q, %v", name, err)
+	}
+	for _, c := range [][2]int{{9, 3}, {0, 12}} {
+		if _, err := infinity.SparsegramAnalyzer(c[0], c[1], false); err == nil {
+			t.Errorf("SparsegramAnalyzer(%d, %d) should fail", c[0], c[1])
+		}
+	}
+}
+
+// TestNewSparsegramIndexInfo checks the full-text index it configures.
+func TestNewSparsegramIndexInfo(t *testing.T) {
+	info, err := infinity.NewSparsegramIndexInfo("doc", 3, 12, true)
+	if err != nil {
+		t.Fatalf("NewSparsegramIndexInfo failed: %v", err)
+	}
+	if info.TargetName != "doc" || info.IndexType != infinity.IndexTypeFullText {
+		t.Errorf("unexpected index info: %+v", info)
+	}
+	if info.Params["analyzer"] != "sparsegram-3-12-fold" {
+		t.Errorf("unexpected analyzer: %q", info.Params["analyzer"])
+	}
+}
+
 // TestQuoteStringLiteralEscapesQuote pins the only escaping a filter needs:
 // a backslash stays as it is, because a regular expression is built from them.
 func TestQuoteStringLiteralEscapesQuote(t *testing.T) {

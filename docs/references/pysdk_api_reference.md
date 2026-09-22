@@ -1169,6 +1169,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"korean"`: Korean.
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram).
       - `"keyword"`: "noop" analyzer used for columns containing keywords only.
+      - `"sparsegram[-min[-max]][-fold]"`: Content-defined sparse n-grams of the whole value, indexed for regular expression search. `min` defaults to `3` and `max` to `12`; `fold` additionally stores the ASCII-lowercased form of every gram, which a case insensitive pattern needs. Chinese, Japanese and Korean values also get one and two character grams, so a single character or a two character word narrows as well. Build the index with `IndexInfo.sparsegram()`.
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
   - Parameter settings for a BMP index:
@@ -1176,6 +1177,20 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"compress_type"`: *Optional*  
       - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
       - `"raw"`: Store the block-max index without compression.
+
+:::tip Regular expression search
+A full-text index built with the `sparsegram` analyzer makes `regex(column, pattern)` filters use the index: the literals the pattern proves mandatory are turned into gram lookups first, and the regular expression then verifies the candidates that survive, so a pattern with literals only reads a fraction of the table. The predicate is written exactly as before.
+
+```python
+from infinity.index import IndexInfo
+from infinity.filter_utils import regex_filter
+
+table_object.create_index("idx", IndexInfo.sparsegram("doc", fold_case=True))
+table_object.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).output(["id", "doc"]).to_pl()
+```
+
+A column without such an index keeps a plain scan, and a pattern that requires no literal (for example `[0-9]+`) does too. `fold_case=True` is what lets a pattern such as `(?i)nobel prize` use the index; a case sensitive pattern works either way.
+:::
 
 :::tip NOTE
 Import the `infinity.index` package to set `IndexInfo`, and `IndexType`.
