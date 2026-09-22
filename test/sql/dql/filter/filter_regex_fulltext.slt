@@ -36,6 +36,32 @@ SELECT id FROM regex_ft WHERE regex(doc, 'error (reading|writing) file');
 3
 4
 
+# A non-capturing group is a plain group for literal purposes: the literal it
+# holds is still required, and the opener itself contributes nothing. Reading
+# `?:` as literal text would require characters no row contains.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'fn (?:main)');
+----
+8
+
+# The plan shows the runs coming from inside the group -- neither `?:` nor the
+# group itself becomes a term.
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, 'fn (?:main)');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex fn (?:main)
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc', 'main', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc', 'fn ', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
+
+
 # CJK: the analyzer's floors are one and two characters, so a two character
 # word still narrows.
 query I rowsort
@@ -45,6 +71,20 @@ SELECT id FROM regex_ft WHERE regex(doc, '数据模型');
 
 query I rowsort
 SELECT id FROM regex_ft WHERE regex(doc, '语料');
+----
+5
+
+# A quantifier applies to a whole code point, so an optional `型` may only drop
+# `型` itself: the surviving `数据模` still narrows and row 5 stays. Dropping one
+# byte instead would leave a run of bytes the index never saw.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '数据模型?');
+----
+5
+
+# A repetition with a non-zero minimum keeps the atom, code point included.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '语料{1}');
 ----
 5
 
@@ -113,6 +153,31 @@ PROJECT (4)
 
 statement ok
 DROP TABLE IF EXISTS regex_ft;
+
+# An optional group is not mandatory: a row that matches without it must still
+# be found, so everything the group collected has to be dropped when the `?` is
+# read. Requiring `error ` would hide the rows that do not contain it.
+statement ok
+DROP TABLE IF EXISTS regex_opt;
+
+statement ok
+CREATE TABLE regex_opt (id INT, doc VARCHAR);
+
+statement ok
+INSERT INTO regex_opt VALUES (1, 'error reading file'), (2, 'plain file'), (3, 'writing file');
+
+statement ok
+CREATE INDEX regex_opt_idx ON regex_opt(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');
+
+query I rowsort
+SELECT id FROM regex_opt WHERE regex(doc, '(error )?file');
+----
+1
+2
+3
+
+statement ok
+DROP TABLE IF EXISTS regex_opt;
 
 # ASCII case folding: an index built with `-fold` stores the lowercased form of
 # every gram as well, which is what a case insensitive pattern requires.

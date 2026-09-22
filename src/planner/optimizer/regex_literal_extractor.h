@@ -158,6 +158,13 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
     // drop it again: `colou?r` must be planned as "colo" plus "r".
     size_t last_atom_len = 0;
     bool run_open = false;
+    // Whether the most recent atom was a group, and where that group's entries
+    // start in `collected`. A group contributes to `collected` rather than to
+    // `run`, so `(?:abc)?` needs the treatment `colou?r` gives the `u` applied
+    // to the group's entries: once the group closes it is the atom a following
+    // quantifier can drop, and nothing else may claim that position.
+    bool last_atom_is_group = false;
+    size_t last_group_runs_begin = 0;
     // True right after a quantifier, where a following `?` is a laziness
     // modifier and a following `+` is a possessive modifier.
     bool after_quantifier = false;
@@ -198,8 +205,11 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             }
             run.clear();
         }
+        // A flush ends the pending atom: the run was pushed or dropped and the
+        // text that ended it cannot be rewound by a following quantifier.
         run_open = false;
         last_atom_len = 0;
+        last_atom_is_group = false;
     };
 
     const auto bail = [&]() {
@@ -252,6 +262,7 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                         run.push_back(static_cast<char>(hi * 16 + lo));
                         last_atom_len = 1;
                         run_open = true;
+                        last_atom_is_group = false;
                         i += 4;
                         after_quantifier = false;
                         continue;
@@ -269,6 +280,7 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                 run.push_back(value);
                 last_atom_len = 1;
                 run_open = true;
+                last_atom_is_group = false;
             };
             switch (next) {
                 case 'n': {
@@ -304,6 +316,7 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                     run.push_back(next);
                     last_atom_len = 1;
                     run_open = true;
+                    last_atom_is_group = false;
                     ++i;
                     break;
                 }
@@ -325,6 +338,9 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
         }
 
         if (ch == '(') {
+            // Bytes the opener occupies: `(` alone, or the three of `(?:` and
+            // `(?>` which share the plain-group frame setup below.
+            size_t group_open_len = 1;
             // Classify the group.
             if (i + 1 < pattern.size() && pattern[i + 1] == '?') {
                 if (i + 2 >= pattern.size()) {
@@ -391,9 +407,20 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                         after_quantifier = false;
                         continue;
                     }
-                } else if (kind == '>') {
-                    // Atomic group: matches a subset of a plain group, so its
-                    // content is safe to read as a plain group.
+                    // `(?<name>...)` holds literals the way a plain group does,
+                    // but this scanner would have to read the name to skip it
+                    // and reading it as literal text would require characters
+                    // the pattern never contains.
+                    return bail();
+                }
+                if (kind == ':' || kind == '>') {
+                    // Non-capturing and atomic groups contribute literals
+                    // exactly like a plain group, so they share its frame setup
+                    // and only skip past the longer opener. An atomic group
+                    // matches a subset of what the same plain group matches, so
+                    // a literal every plain-group match contains stays
+                    // mandatory.
+                    group_open_len = 3;
                 } else if (kind == '(') {
                     return bail(); // conditional
                 } else if (kind == '#') {
@@ -444,6 +471,11 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                     i = j + 1;
                     after_quantifier = false;
                     continue;
+                } else {
+                    // `(?P<name>...)`, `(?1)`, `(?&name)` and anything else this
+                    // scanner does not know: reading the opener as literal text
+                    // would require characters the pattern never contains.
+                    return bail();
                 }
             }
             flush();
@@ -451,7 +483,7 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             // above must already have happened so a run ending at the group
             // boundary is not attributed to the group.
             frames.push_back(GroupFrame{collected.size(), false, ci});
-            ++i;
+            i += group_open_len;
             after_quantifier = false;
             continue;
         }
@@ -465,6 +497,11 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                 if (frame.has_alternation) {
                     collected.resize(frame.runs_begin);
                 }
+                // The closed group is the most recent atom now. A quantifier
+                // directly after it drops everything the group collected, and
+                // `frame.runs_begin` is exactly where those entries start.
+                last_atom_is_group = true;
+                last_group_runs_begin = frame.runs_begin;
             }
             ++i;
             after_quantifier = false;
@@ -502,6 +539,7 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                     run.push_back('{');
                     last_atom_len = 1;
                     run_open = true;
+                    last_atom_is_group = false;
                     ++i;
                     after_quantifier = false;
                     continue;
@@ -511,9 +549,17 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             if (ch == '*' || ch == '?') {
                 min_repeat = 0;
             }
-            if (min_repeat == 0 && run_open && last_atom_len > 0) {
-                // The quantified atom may be absent, so it cannot be required.
-                run.resize(run.size() - std::min(last_atom_len, run.size()));
+            if (min_repeat == 0) {
+                if (last_atom_is_group) {
+                    // The group may be absent, so nothing it collected can be
+                    // required: `(?:abc)?d` has to plan on `d` alone.
+                    if (collected.size() > last_group_runs_begin) {
+                        collected.resize(last_group_runs_begin);
+                    }
+                } else if (run_open && last_atom_len > 0) {
+                    // The quantified atom may be absent, so it cannot be required.
+                    run.resize(run.size() - std::min(last_atom_len, run.size()));
+                }
             }
             // Either way the run ends here: further copies may follow, or the
             // atom may be missing, so the text after the quantifier is not
@@ -535,15 +581,22 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             run.push_back(ch);
             last_atom_len = 1;
             run_open = true;
+            last_atom_is_group = false;
             ++i;
             after_quantifier = false;
             continue;
         }
 
-        run.push_back(ch);
-        last_atom_len = 1;
+        // A literal code point. A quantifier applies to the whole code point, so
+        // the run advances by the full UTF-8 sequence: `数据模型?` may only drop
+        // `型`, and a lone trailing byte would be a run the index never saw.
+        uint32_t width = 1;
+        SparseGramDecodeUtf8(pattern.data() + i, static_cast<uint32_t>(pattern.size() - i), width);
+        run.append(pattern.data() + i, width);
+        last_atom_len = width;
         run_open = true;
-        ++i;
+        last_atom_is_group = false;
+        i += width;
         after_quantifier = false;
     }
 
