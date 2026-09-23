@@ -91,29 +91,31 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
 
     expr_type = expr.type
     if expr_type.constant_expr:
-        match expr_type.constant_expr.literal_type:
+        # The value lives on the constant expression, not on the expression type.
+        constant = expr_type.constant_expr
+        match constant.literal_type:
             case ttypes.LiteralType.Boolean:
-                return str(expr_type.constant_expr.bool_value)
+                return str(constant.bool_value)
             case ttypes.LiteralType.Int64:
-                return str(expr_type.i64_value)
+                return str(constant.i64_value)
             case ttypes.LiteralType.Double:
-                return str(expr_type.f64_value)
+                return str(constant.f64_value)
             case ttypes.LiteralType.String:
-                return expr_type.str_value
+                return constant.str_value
             case ttypes.LiteralType.IntegerArray:
-                return str(expr_type.i64_array_value)
+                return str(constant.i64_array_value)
             case ttypes.LiteralType.DoubleArray:
-                return str(expr_type.f64_array_value)
+                return str(constant.f64_array_value)
             case ttypes.LiteralType.IntegerTensor:
-                return str(expr_type.i64_tensor_value)
+                return str(constant.i64_tensor_value)
             case ttypes.LiteralType.DoubleTensor:
-                return str(expr_type.f64_tensor_value)
+                return str(constant.f64_tensor_value)
             case ttypes.LiteralType.IntegerTensorArray:
-                return str(expr_type.i64_tensor_array)
+                return str(constant.i64_tensor_array)
             case ttypes.LiteralType.DoubleTensorArray:
-                return str(expr_type.f64_tensor_array)
+                return str(constant.f64_tensor_array)
             case ttypes.LiteralType.SparseIntegerArray:
-                return str(expr_type.i64_array_idx)
+                return str(constant.i64_array_idx)
 
     if expr_type.column_expr:
         if expr_type.column_expr.column_name:

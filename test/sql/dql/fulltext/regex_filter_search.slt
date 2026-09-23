@@ -1,0 +1,88 @@
+# Retrieval with a `regex()` filter, and the result modifiers that are allowed
+# around a retrieval.
+
+statement ok
+DROP TABLE IF EXISTS regex_search;
+
+statement ok
+CREATE TABLE regex_search (id INT, doc VARCHAR);
+
+statement ok
+INSERT INTO regex_search VALUES (1, 'harmful chemical reaction'), (2, 'chemical processes are harmful'), (3, 'nothing here');
+
+statement ok
+CREATE INDEX regex_search_sg ON regex_search(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');
+
+statement ok
+CREATE INDEX regex_search_std ON regex_search(doc) USING FULLTEXT WITH (analyzer='standard');
+
+# The retrieval searches the column's regular index, so the query is read as the
+# two words and row 2 qualifies with them apart. Under the gram index only row 1
+# carries the grams of `harmful chemical`, so both rows coming back is what shows
+# the regular index answered. Rows arrive in score order.
+query I
+SELECT id FROM regex_search SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5');
+----
+1
+2
+
+# A `regex()` filter is evaluated on the retrieved rows: only the row that also
+# matches the pattern survives.
+query I
+SELECT id FROM regex_search SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5') WHERE regex(doc, 'reaction');
+----
+1
+
+# ORDER BY is a result modifier of the retrieval's output, so it is written
+# around the search rather than inside it: the parser rejects the two in one
+# SELECT.
+query I
+SELECT id FROM (SELECT id FROM regex_search SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5')) ORDER BY id DESC;
+----
+2
+1
+
+# A regex filter with ORDER BY and LIMIT: the narrowing happens in the index
+# scan, the sort above it decides which row the limit keeps.
+query I
+SELECT id FROM regex_search WHERE regex(doc, 'chemical') ORDER BY id DESC LIMIT 1;
+----
+2
+
+query T
+EXPLAIN SELECT id FROM regex_search WHERE regex(doc, 'chemical') ORDER BY id DESC LIMIT 1;
+----
+PROJECT (5)
+ - table index: #4
+ - expressions: [id (#1)]
+-> TOP (4)
+   - sort expressions: [id (#1) DESC]
+   - limit: 1
+   - output columns: [doc, id, __rowid]
+  -> FILTER (3)
+     - filter: doc (#0) regex chemical
+     - output columns: [doc, __rowid]
+    -> INDEX SCAN (7)
+       - table name: regex_search(default_db.regex_search)
+       - table index: #1
+       - filter: FILTER_FULLTEXT('doc@regex_search_sg', 'chemical', 'operator=and;similarity=boolean')
+       - output_columns: [__rowid]
+
+# The retrieval's own filter slot is where the regex runs, so the plan shows it as
+# the leftover filter of the match rather than as an index narrowing.
+query T
+EXPLAIN SELECT id FROM regex_search SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5') WHERE regex(doc, 'reaction');
+----
+PROJECT (3)
+ - table index: #4
+ - expressions: [id (#1)]
+-> MATCH (2)
+   - table name: regex_search(default_db.regex_search)
+   - table index: #1
+   - match expression: MATCH TEXT ('doc', 'harmful chemical', 'topn=5')
+   - index filter: None
+   - leftover filter: doc (#0) regex reaction
+   - output columns: [doc, id, __score, __rowid]
+
+statement ok
+DROP TABLE IF EXISTS regex_search;

@@ -1169,6 +1169,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"korean"`: Korean.
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram).
       - `"keyword"`: "noop" analyzer used for columns containing keywords only.
+      - `"sparsegram[-min[-max]][-fold]"`: Content-defined sparse n-grams of the whole value, indexed for regular expression search. `min` defaults to `3` and `max` to `12`; `fold` additionally stores the ASCII-lowercased form of every gram, which a case insensitive pattern needs. Chinese, Japanese and Korean values also get one and two character grams, so a single character or a two character word narrows as well. Build the index with `IndexInfo.sparsegram()`.
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
   - Parameter settings for a BMP index:
@@ -1176,6 +1177,29 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"compress_type"`: *Optional*  
       - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
       - `"raw"`: Store the block-max index without compression.
+
+:::tip Regular expression search
+A full-text index built with the `sparsegram` analyzer makes `regex(column, pattern)` filters use the index: the literals the pattern proves mandatory are turned into gram lookups first, and the regular expression then verifies the candidates that survive, so a pattern with literals only reads a fraction of the table. The predicate is written exactly as before.
+
+```python
+from infinity import index
+from infinity.filter_utils import regex_filter
+
+# A full-text index only sees the rows that exist when it is built, so insert
+# first. A regular analyzer serves keyword search, the sparse gram one `regex()`.
+table_object.insert([{"id": 1, "doc": "harmful chemical reaction"}])
+table_object.create_index("idx_doc", index.IndexInfo("doc", index.IndexType.FullText, {"analyzer": "standard"}))
+table_object.create_index("idx_doc_sg", index.IndexInfo.sparsegram("doc", fold_case=True))
+
+table_object.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).output(["id", "doc"]).to_pl()
+```
+
+A column without such an index keeps a plain scan, and a pattern that requires no literal (for example `[0-9]+`) does too. `fold_case=True` is what lets a pattern such as `(?i)nobel prize` use the index; a case sensitive pattern works either way.
+
+When a column carries more than one full-text index, the choice is made per predicate: a `filter_fulltext` or a `MATCH TEXT` that names no index uses the column's regular analyzer index, while the narrowing added for `regex()` goes to the sparse gram index. An index can be named explicitly too, as in `filter_fulltext('doc@idx_doc_sg', 'harmful chemical', 'operator=and')`.
+
+In a `SEARCH` statement the regular expression is evaluated as the search's own filter. `ORDER BY` is a modifier of a search result and cannot appear in the same `SELECT` as `SEARCH`, so a sorted search has to be written as a subquery.
+:::
 
 :::tip NOTE
 Import the `infinity.index` package to set `IndexInfo`, and `IndexType`.
@@ -2147,6 +2171,11 @@ A non-empty string representing the filter condition. It comprises one or multip
         Otherwise, we find the biggest `V` which is less than the total clause count and apply the correspondent `V`.
     - **'default_field'**
       - If `"fields"` is an empty string, this parameter specifies the default field to search on.
+* `regex` expression
+  - Matches a regular expression (RE2 syntax) against a full-text column.
+    Usage: 'regex(column, pattern)'
+  - When the column has a full-text index built with the `sparsegram` analyzer, the server narrows the rows with the literals the pattern proves mandatory before the regular expression runs, and the regular expression then verifies the candidates. A column without such an index is scanned instead, and the result is the same either way.
+  - `regex_filter()` from `infinity.filter_utils` builds the expression and quotes the pattern for you.
 
 ##### Returns
 
@@ -2172,6 +2201,14 @@ table_object.output(["*"]).filter("c1 not in (1, 2, 3) and (c2 + 1) in (1, 2, 3)
 
 ```python
 table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minimum_should_match=99%') and not num = 2").to_pl()
+```
+
+```python
+from infinity.filter_utils import regex_filter
+# `filter_fulltext` above and `regex` below may use different indexes of the
+# same column: an unqualified full-text filter uses the regular analyzer index,
+# and the narrowing `regex` adds uses the sparse gram one.
+table_object.output(["*"]).filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)")).to_pl()
 ```
 
 ---

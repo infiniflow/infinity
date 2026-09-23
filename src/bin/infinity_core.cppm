@@ -388,6 +388,7 @@ export import :boost;
 export import :byte_slice;
 export import :memory_chunk;
 export import :ngram_analyzer;
+export import :sparsegram_analyzer;
 export import :standard_analyzer;
 export import :term;
 export import :darts_trie;

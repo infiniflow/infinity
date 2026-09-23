@@ -19,6 +19,7 @@ module;
 module infinity_core:index_scan_builder.impl;
 
 import :index_scan_builder;
+import :regex_index_rewrite;
 import :logical_node;
 import :logical_node_type;
 import :logical_filter;
@@ -65,6 +66,12 @@ public:
                     auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
                     auto &base_table_ref_ptr = table_scan.base_table_ref_;
                     auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
+                    // A regex over a column with a sparse gram full-text index
+                    // becomes the same regex conjoined with a full-text filter
+                    // over the literals the pattern requires. The push-down below
+                    // then turns that filter into an index scan and keeps the
+                    // regex as the residual filter.
+                    filter_expression = RegexIndexRewrite::Rewrite(query_context_, base_table_ref_ptr.get(), filter_expression);
                     // check if the filter can be pushed down to the table scan
                     auto [index_filter, leftover_filter, index_filter_evaluator] =
                         FilterExpressionPushDown::PushDownToIndexScan(query_context_, base_table_ref_ptr.get(), filter_expression, &match_cache_);
