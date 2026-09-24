@@ -790,6 +790,9 @@ class table_http:
                     elif isinstance(value[key],
                                     np.ndarray):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
+                    elif isinstance(value[key], (np.integer, np.floating, np.longdouble)):
+                        # numpy scalars (e.g. from a DataFrame row) are not JSON serializable
+                        value[key] = value[key].item()
                     elif isinstance(value[key], list):
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
