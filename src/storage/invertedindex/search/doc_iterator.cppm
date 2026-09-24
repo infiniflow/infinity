@@ -21,11 +21,12 @@ import internal_types;
 namespace infinity {
 
 export enum class EarlyTermAlgo {
-    kAuto,    // choose between kNaive, kBatch, kBMW
-    kNaive,   // naive or
-    kBatch,   // use batch_or if (sum_of_df > total_doc_num / 4) and term nodes under or node achieve a certain number
-    kBMW,     // use bmw if it is "or iterator" on the top level and has only term children
-    kCompare, // compare bmw, batch, naive
+    kAuto,         // choose between kNaive, kBatch, kBMW, kBlockAtATime
+    kNaive,        // naive or
+    kBatch,        // use batch_or if (sum_of_df > total_doc_num / 4) and term nodes under or node achieve a certain number
+    kBMW,          // use bmw if it is "or iterator" on the top level and has only term children
+    kBlockAtATime, // use block-at-a-time for long queries (>= 8 terms with high DF)
+    kCompare,      // compare bmw, batch, naive
 };
 
 export enum class DocIteratorType : u8 {
@@ -37,6 +38,7 @@ export enum class DocIteratorType : u8 {
     kMinimumShouldMatchIterator,
     kBatchOrIterator,
     kBMWIterator,
+    kBlockAtATimeIterator,
     kFilterIterator,
     kScoreThresholdIterator,
     kKeywordIterator,
