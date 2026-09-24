@@ -168,6 +168,8 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
     // True right after a quantifier, where a following `?` is a laziness
     // modifier and a following `+` is a possessive modifier.
     bool after_quantifier = false;
+    // A top-level `|` makes every branch optional, including the last one.
+    bool top_level_alternation = false;
 
     const auto flush = [&]() {
         if (!run.empty()) {
@@ -270,6 +272,18 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                 }
                 return bail();
             }
+            if (next == 'C') {
+                // \C matches any single byte, like `.`.
+                flush();
+                i += 2;
+                after_quantifier = false;
+                continue;
+            }
+            if (next == 'Q' || next == 'E') {
+                // \Q...\E quotes literal text. Reading it here would need a
+                // second lexer, and treating Q or E as letters is wrong.
+                return bail();
+            }
             if (next == 'u' || next == 'p' || next == 'P') {
                 // \uHHHH, \p{...}: the escape spellings and the following
                 // characters are not literal text this scanner can read.
@@ -305,6 +319,11 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
                 }
                 case 'v': {
                     push_escaped_char('\v');
+                    ++i;
+                    break;
+                }
+                case 'a': {
+                    push_escaped_char('\a'); // RE2 reads \a as bell (\007)
                     ++i;
                     break;
                 }
@@ -492,8 +511,10 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             if (!frames.empty()) {
                 const GroupFrame frame = frames.back();
                 frames.pop_back();
-                ci = frame.case_insensitive;
+                // Flush with the group's own case mode before restoring the
+                // outer one: `(?i:ABC)` must store its last run as folded.
                 flush();
+                ci = frame.case_insensitive;
                 if (frame.has_alternation) {
                     collected.resize(frame.runs_begin);
                 }
@@ -513,9 +534,10 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
             if (!frames.empty()) {
                 frames.back().has_alternation = true;
             } else {
-                // A top level alternation makes every run collected so far
-                // optional.
+                // A top level alternation makes every branch optional: the
+                // runs before it and the runs of every later branch.
                 collected.clear();
+                top_level_alternation = true;
             }
             ++i;
             after_quantifier = false;
@@ -604,6 +626,9 @@ inline RegexExtractionResult ExtractRegexLiteralRuns(std::string_view pattern, b
         return bail(); // unbalanced
     }
     flush();
+    if (top_level_alternation) {
+        return bail();
+    }
 
     for (auto &item : collected) {
         if (!item.text.empty()) {
