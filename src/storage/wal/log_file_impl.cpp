@@ -63,9 +63,12 @@ std::pair<std::optional<TempWalFileInfo>, std::vector<WalFileInfo>> WalFile::Par
                 continue;
             }
             TxnTimeStamp checkpoint_ts;
-            try {
-                checkpoint_ts = std::stoll(filename.substr(dot_pos + 1));
-            } catch (...) {
+            const std::string suffix = filename.substr(dot_pos + 1);
+            // Use from_chars instead of stoll: stoll silently accepts a numeric prefix
+            // (e.g. "120junk" -> 120), which would let a malformed/corrupted filename be
+            // treated as a valid, and now deletable, wal file with a wrong timestamp.
+            auto [ptr, ec] = std::from_chars(suffix.data(), suffix.data() + suffix.size(), checkpoint_ts);
+            if (ec != std::errc{} || ptr != suffix.data() + suffix.size()) {
                 LOG_WARN(fmt::format("Wal file {} has wrong file name", entry->path().string()));
                 continue;
             }
