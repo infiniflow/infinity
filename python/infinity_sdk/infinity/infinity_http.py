@@ -1316,7 +1316,10 @@ class table_http_result:
                 if len(tup) == line_i + 1:
                     continue
 
-                if v is None or isinstance(v, (int, float)):
+                # A varchar cell is stored text: never parse it as a list or a sparse vector,
+                # whatever it looks like.
+                is_varchar = col_types.get(col_name, "").lower() == "varchar"
+                if v is None or isinstance(v, (int, float)) or is_varchar:
                     new_tup = tup + (v,)
                 elif is_bit_embedding_type(col_types.get(col_name)) and v.startswith("[") and v.endswith("]"):
                     # "[01000000]" is a bit string, not a number; keep it like the thrift client does
