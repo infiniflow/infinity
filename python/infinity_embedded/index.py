@@ -90,10 +90,11 @@ class IndexInfo:
         return self.__str__()
 
     def __eq__(self, other):
-        return self.column_name == other.index_name and self.index_type == other.index_type and self.params == other.params
+        return self.column_name == other.column_name and self.index_type == other.index_type and self.params == other.params
 
     def __hash__(self):
-        return hash((self.column_name, self.index_type, self.params))
+        params = tuple(sorted(self.params.items())) if self.params else None
+        return hash((self.column_name, self.index_type, params))
 
     def to_local_type(self):
         index_info_to_use = WrapIndexInfo()
