@@ -39,6 +39,8 @@ class TestInfinity:
             "c1 NOT LIKE '%test%'",
             "c1 LIKE '%test%' ESCAPE '!'",
             "c1 NOT LIKE '%test%' ESCAPE '!'",
+            "c3->'a' = 'x'",
+            "c3->>'a' = 'x'",
         ]:
             print(cond_str)
             cond = condition(cond_str)
@@ -46,3 +48,34 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_json_operators(self):
+        # -> and ->> must map to the json_extract / json_extract_string
+        # server functions with the JSON path passed as a string constant;
+        # previously -> recursed until RecursionError and ->> raised
+        # "unknown binary expression: jsonextractscalar".
+        for cond_str, expected_func in [
+            ("c3->'a' = 'x'", "json_extract"),
+            ("c3->>'a' = 'x'", "json_extract_string"),
+        ]:
+            res = traverse_conditions(condition(cond_str))
+            args = res.type.function_expr.arguments
+            inner = args[0].type.function_expr
+            assert inner.function_name == expected_func, f"{cond_str}: got {inner.function_name}"
+            path_const = inner.arguments[1].type.constant_expr
+            assert path_const.str_value == "$.a", f"{cond_str}: got path {path_const.str_value}"
+
+    def test_json_operators_embedded(self, request):
+        # embedded SDK output traversal must support the JSON operators too
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from sqlglot import parse_one
+        from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
+        for output_str, expected_func in [
+            ("c3->'a'", "json_extract"),
+            ("c3->>'a'", "json_extract_string"),
+            ("c3->'a'->>'b'", "json_extract_string"),
+        ]:
+            res = embedded_parse_expr(parse_one(output_str))
+            assert res.function_expr.func_name == expected_func, f"{output_str}: got {res.function_expr.func_name}"
+            assert res.function_expr.arguments[1].constant_expr.str_value.endswith("b" if output_str.endswith("b'") else "a")
