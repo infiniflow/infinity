@@ -345,47 +345,55 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
         case float():
             constant_expression.literal_type = LiteralType.kDouble
             constant_expression.f64_value = value
-        case [int(), *_]:
+        case [int(), *_] if all(isinstance(x, int) for x in value):
             constant_expression.literal_type = LiteralType.kIntegerArray
             constant_expression.i64_array_value = value
-        case [float(), *_]:
+        case [_, *_] if all(isinstance(x, (int, float)) for x in value):
+            # Any float in the list: store as a double array. Dispatching on
+            # the first element alone would label [1, 2.5] an integer array
+            # and lose the fractional part.
             constant_expression.literal_type = LiteralType.kDoubleArray
-            constant_expression.f64_array_value = value
-        case [[int(), *_], *_]:
+            constant_expression.f64_array_value = [float(x) for x in value]
+        case [[int(), *_], *_] if all(isinstance(x, int) for row in value for x in row):
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.i64_tensor_value = value
-        case [[float(), *_], *_]:
+        case [[_, *_], *_] if all(isinstance(x, (int, float)) for row in value for x in row):
             constant_expression.literal_type = LiteralType.kSubArrayArray
-            constant_expression.f64_tensor_value = value
-        case [[[int(), *_], *_], *_]:
+            constant_expression.f64_tensor_value = [[float(x) for x in row] for row in value]
+        case [[[int(), *_], *_], *_] if all(isinstance(x, int) for row in value for tensor in row for x in tensor):
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.i64_tensor_array_value = value
-        case [[[float(), *_], *_], *_]:
+        case [[[_, *_], *_], *_] if all(isinstance(x, (int, float)) for row in value for tensor in row for x in tensor):
             constant_expression.literal_type = LiteralType.kSubArrayArray
-            constant_expression.f64_tensor_array_value = value
-        case SparseVector([int(), *_] as indices, [int(), *_] as values):
+            constant_expression.f64_tensor_array_value = [[[float(x) for x in tensor] for tensor in row]
+                                                          for row in value]
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, int) for v in values):
             constant_expression.literal_type = LiteralType.kLongSparseArray
             constant_expression.i64_array_idx = indices
             constant_expression.i64_array_value = values
-        case SparseVector([int(), *_] as indices, [float(), *_] as values):
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, (int, float)) for v in values):
             constant_expression.literal_type = LiteralType.kDoubleSparseArray
             constant_expression.i64_array_idx = indices
-            constant_expression.f64_array_value = values
+            constant_expression.f64_array_value = [float(v) for v in values]
         case dict():
             if len(value) == 0:
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
-            match next(iter(value.values())):
-                case int():
-                    constant_expression.literal_type = LiteralType.kLongSparseArray
-                    constant_expression.i64_array_idx = [int(k) for k in value.keys()]
-                    constant_expression.i64_array_value = [int(v) for v in value.values()]
-                case float():
-                    constant_expression.literal_type = LiteralType.kDoubleSparseArray
-                    constant_expression.i64_array_idx = [int(k) for k in value.keys()]
-                    constant_expression.f64_array_value = [float(v) for v in value.values()]
-                case _:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
+            dict_values = list(value.values())
+            if all(isinstance(v, int) for v in dict_values):
+                constant_expression.literal_type = LiteralType.kLongSparseArray
+                constant_expression.i64_array_idx = [int(k) for k in value.keys()]
+                constant_expression.i64_array_value = [int(v) for v in dict_values]
+            elif all(isinstance(v, (int, float)) for v in dict_values):
+                # Any float among the values: store as a double sparse array.
+                # Dispatching on the first value alone truncated floats via int(v).
+                constant_expression.literal_type = LiteralType.kDoubleSparseArray
+                constant_expression.i64_array_idx = [int(k) for k in value.keys()]
+                constant_expression.f64_array_value = [float(v) for v in dict_values]
+            else:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
         case Array():
             constant_expression.literal_type = LiteralType.kCurlyBracketsArray
             constant_expression.curly_brackets_array = [get_local_constant_expr_from_python_value(child) for child in
