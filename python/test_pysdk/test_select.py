@@ -2491,3 +2491,31 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_to_string_expr_rendering(self, suffix):
+        """
+        Regression test: RemoteTable.to_string() must render function and IN
+        expressions faithfully. Zero-argument functions used to render as
+        "row_id(<class 'str'>)" because arguments_str was initialised to the
+        str builtin, and IN/BETWEEN filters got a stray "f" prefix
+        ("c1 IN (fc2, c3)").
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_to_string_expr_rendering" + suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_to_string_expr_rendering" + suffix, {
+            "c1": {"type": "int", "constraints": ["primary key"]},
+            "c2": {"type": "int"},
+            "c3": {"type": "int"}}, ConflictType.Error)
+        assert table
+
+        res = table.output(["c1"]).filter("row_id() = c2").to_string()
+        assert '"filter": "=(row_id(), c2)"' in res
+
+        res = table.output(["c1"]).filter("c1 in (c2, c3)").to_string()
+        assert '"filter": "c1 IN (c2, c3)"' in res
+
+        res = table.output(["c1"]).filter("c1 not in (c2, c3)").to_string()
+        assert '"filter": "c1 NOT IN (c2, c3)"' in res
+
+        db_obj.drop_table("test_to_string_expr_rendering" + suffix, ConflictType.Error)

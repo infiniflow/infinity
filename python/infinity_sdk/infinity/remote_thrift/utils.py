@@ -125,20 +125,17 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
 
     if expr_type.function_expr:
         function_name = expr_type.function_expr.function_name
-        arguments_str = str
-        for index, argument in enumerate(expr_type.function_expr.arguments):
-            arg_str = parsed_expression_to_string(argument)
-            if index == 0:
-                arguments_str = arg_str
-            else:
-                arguments_str = f"{arguments_str}, {arg_str}"
+        arguments_str = ", ".join(
+            parsed_expression_to_string(argument)
+            for argument in expr_type.function_expr.arguments
+        )
         return f"{function_name}({arguments_str})"
 
     if expr_type.between_expr:
         value_str = parsed_expression_to_string(expr_type.between_expr.value)
         upper_bound_str = parsed_expression_to_string(expr_type.between_expr.upper_bound)
         lower_bound_str = parsed_expression_to_string(expr_type.between_expr.lower_bound)
-        return f"between(f{value_str}, f{upper_bound_str}, f{lower_bound_str})"
+        return f"between({value_str}, {lower_bound_str}, {upper_bound_str})"
 
     if expr_type.knn_expr:
         column_expr_str = column_expr_to_string(expr_type.knn_expr.column_expr)
@@ -163,19 +160,16 @@ def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
         return "search()"
 
     if expr_type.in_expr:
-        arguments_str = str
-        for index, argument in enumerate(expr_type.in_expr.arguments):
-            arg_str = parsed_expression_to_string(argument)
-            if index == 0:
-                arguments_str = arg_str
-            else:
-                arguments_str = f"{arguments_str}, {arg_str}"
+        arguments_str = ", ".join(
+            parsed_expression_to_string(argument)
+            for argument in expr_type.in_expr.arguments
+        )
 
         left_expr_str = parsed_expression_to_string(expr_type.in_expr.left_operand)
         if expr_type.in_expr.in_type:
-            return f"{left_expr_str} IN (f{arguments_str})"
+            return f"{left_expr_str} IN ({arguments_str})"
         else:
-            return f"{left_expr_str} NOT IN (f{arguments_str})"
+            return f"{left_expr_str} NOT IN ({arguments_str})"
 
     return ""
 
