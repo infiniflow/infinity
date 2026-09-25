@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from common.utils import copy_data
 from infinity import index
-from infinity.common import ConflictType, SortType
+from infinity.common import ConflictType, SortType, SparseVector
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
@@ -2491,3 +2491,29 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_unnest_json_nested" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_varchar_list_and_sparse_like_strings(self, suffix):
+        """
+        Regression test (HTTP SDK): varchar cells containing strings that look
+        like lists ("[1, 2]") or sparse vectors ("12:30") must come back
+        verbatim. The HTTP client used to ast.literal_eval any list-looking
+        string and str2sparse any "idx:value" string regardless of the column's
+        declared type, corrupting varchar data. Those conversions are meant for
+        vector/array and sparse columns, which the HTTP server serializes as
+        strings.
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_varchar_list_sparse"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_varchar_list_sparse"+suffix, {
+            "c1": {"type": "varchar"},
+            "c2": {"type": "sparse,100,float,int"}}, ConflictType.Error)
+        assert table
+
+        table.insert([{"c1": "[1, 2]", "c2": SparseVector([3, 7], [1.5, 2.5])},
+                      {"c1": "12:30", "c2": SparseVector([1], [0.5])}])
+
+        res, extra_result = table.output(["c1", "c2"]).sort([["c1", SortType.Asc]]).to_df()
+        assert res["c1"].tolist() == ["12:30", "[1, 2]"]
+        assert res["c2"].tolist() == [{"1": 0.5}, {"3": 1.5, "7": 2.5}]
+
+        db_obj.drop_table("test_varchar_list_sparse"+suffix, ConflictType.Error)
