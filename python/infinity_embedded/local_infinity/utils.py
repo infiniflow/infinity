@@ -256,8 +256,13 @@ def parse_expr(expr):
 
 
 def get_search_optional_filter_from_opt_params(opt_params: dict):
+    """Split search optional parameters into (filter_expr, remaining params).
+
+    The caller's dict is left untouched: the "filter" entry used to be
+    popped out of it, silently changing data owned by the caller.
+    """
     optional_filter = None
-    k_to_pop = []
+    remaining_params = {}
     for k, v in opt_params.items():
         if k.lower() == "filter":
             if optional_filter is not None:
@@ -267,10 +272,9 @@ def get_search_optional_filter_from_opt_params(opt_params: dict):
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                         f"Invalid filter expression '{v}', type should be string, but get {type(v)}")
             optional_filter = traverse_conditions(condition(v))
-            k_to_pop.append(k)
-    for k in k_to_pop:
-        opt_params.pop(k)
-    return optional_filter
+        else:
+            remaining_params[k] = v
+    return optional_filter, remaining_params
 
 
 def get_local_function_expr_from_fde(fde_obj) -> WrapParsedExpr:

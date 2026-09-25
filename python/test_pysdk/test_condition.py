@@ -46,3 +46,39 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_search_opt_params_not_mutated_thrift(self):
+        # Regression test (thrift SDK): match_* used to pop "filter" out of
+        # the caller's options dict, silently changing data owned by the
+        # caller. The filter must still land on the built search expression.
+        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+        qb = InfinityThriftQueryBuilder(table=None)
+        opts = {"filter": "c2 > 1", "operator": "and"}
+        qb.match_text("c1", "hello", 3, opts)
+        assert opts == {"filter": "c2 > 1", "operator": "and"}
+        match_expr = qb._search.match_exprs[0].match_text_expr
+        assert match_expr.filter_expr is not None
+        assert match_expr.options_text == "topn=3;operator=and"
+
+        qb = InfinityThriftQueryBuilder(table=None)
+        opts = {"filter": "c2 > 1", "ef": "200"}
+        qb.match_dense("v", [1.0, 2.0], "float", "l2", 5, opts)
+        assert opts == {"filter": "c2 > 1", "ef": "200"}
+        knn_expr = qb._search.match_exprs[0].match_vector_expr
+        assert knn_expr.filter_expr is not None
+
+    def test_search_opt_params_not_mutated_embedded(self, request):
+        # Regression test (embedded SDK): same caller-dict mutation as the
+        # thrift SDK - "filter" was popped out of the options dict.
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.local_infinity.query_builder import InfinityLocalQueryBuilder
+
+        qb = InfinityLocalQueryBuilder(table=None)
+        opts = {"filter": "c2 > 1", "operator": "and"}
+        qb.match_text("c1", "hello", 3, opts)
+        assert opts == {"filter": "c2 > 1", "operator": "and"}
+        match_expr = qb._search.match_exprs[0].match_expr
+        assert match_expr.filter_expr is not None
+        assert match_expr.options_text == "topn=3;operator=and"
