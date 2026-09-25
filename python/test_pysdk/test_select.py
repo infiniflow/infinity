@@ -2522,3 +2522,26 @@ class TestInfinity:
         assert res["cast(c2 as varchar)"].tolist() == ["false", "true", "true"]
 
         db_obj.drop_table("test_varchar_bool_like"+suffix, ConflictType.Error)
+
+    def test_select_varchar_list_and_sparse_like_strings(self, suffix):
+        """
+        HTTP SDK: varchar cells shaped like a list or a sparse vector must come back
+        verbatim. The client parsed them by shape, so "1:0.5,2:0.3" came back as
+        "{'1': 0.5, '2': 0.3}" and "[1,2]" as "[1, 2]".
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_varchar_list_sparse_like"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_varchar_list_sparse_like"+suffix, {
+            "c1": {"type": "int"},
+            "c2": {"type": "varchar"}}, ConflictType.Error)
+        assert table
+
+        table.insert([{"c1": 1, "c2": "1:0.5,2:0.3"},
+                      {"c1": 2, "c2": "[1,2]"},
+                      {"c1": 3, "c2": "[3:4]"}])
+
+        res, extra_result = table.output(["c1", "c2"]).sort([["c1", SortType.Asc]]).to_df()
+        assert res["c2"].tolist() == ["1:0.5,2:0.3", "[1,2]", "[3:4]"]
+
+        res = db_obj.drop_table("test_varchar_list_sparse_like"+suffix)
+        assert res.error_code == ErrorCode.OK
