@@ -1202,9 +1202,13 @@ class table_http_result:
                 if len(tup) == line_i + 1:
                     continue
 
-                # A varchar cell is stored text: never parse it as a list or a sparse vector,
-                # whatever it looks like.
-                is_varchar = col_types.get(col_name, "").lower() == "varchar"
+                # A varchar cell, or a CAST(... AS VARCHAR) result, is text: never parse it
+                # as a list or a sparse vector, whatever it looks like.
+                declared_type = col_types.get(col_name)
+                if declared_type is None:
+                    is_varchar = _parse_cast_target_type(col_name) == "string"
+                else:
+                    is_varchar = declared_type.lower() == "varchar"
                 if v is None or isinstance(v, (int, float)) or is_varchar:
                     new_tup = tup + (v,)
                 elif is_list(v) and not is_json_function(col_name):

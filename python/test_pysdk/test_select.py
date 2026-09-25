@@ -2543,5 +2543,8 @@ class TestInfinity:
         res, extra_result = table.output(["c1", "c2"]).sort([["c1", SortType.Asc]]).to_df()
         assert res["c2"].tolist() == ["1:0.5,2:0.3", "[1,2]", "[3:4]"]
 
+        res, extra_result = table.output(["c1", "cast(c2 as varchar)"]).sort([["c1", SortType.Asc]]).to_df()
+        assert res["cast(c2 as varchar)"].tolist() == ["1:0.5,2:0.3", "[1,2]", "[3:4]"]
+
         res = db_obj.drop_table("test_varchar_list_sparse_like"+suffix)
         assert res.error_code == ErrorCode.OK
