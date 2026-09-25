@@ -46,3 +46,16 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_output_unnest_embedded(self, request):
+        # embedded SDK output traversal must support UNNEST; the generic Func
+        # arm fed the raw 'expressions' list to parse_expr and crashed with
+        # "unknown expression type: UNNEST(arr)".
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from sqlglot import parse_one
+        from infinity_embedded.local_infinity.utils import parse_expr as embedded_parse_expr
+        res = embedded_parse_expr(parse_one("unnest(arr)"))
+        assert res.function_expr.func_name == "unnest"
+        assert len(res.function_expr.arguments) == 1
+        assert res.function_expr.arguments[0].column_expr is not None
