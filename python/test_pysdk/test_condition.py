@@ -46,3 +46,17 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_like_function_names(self):
+        # sqlglot >= 30.x parses NOT LIKE as a Like node with negate=True
+        # rather than a Not(Like) wrapper; the traversal must honor the flag.
+        cases = {
+            "c1 LIKE '%test%'": "like",
+            "c1 NOT LIKE '%test%'": "not_like",
+            "c1 LIKE '%test%' ESCAPE '!'": "like",
+            "c1 NOT LIKE '%test%' ESCAPE '!'": "not_like",
+        }
+        for cond_str, expected_func in cases.items():
+            res = traverse_conditions(condition(cond_str))
+            func_name = res.type.function_expr.function_name
+            assert func_name == expected_func, f"{cond_str}: got {func_name}, want {expected_func}"
