@@ -391,10 +391,12 @@ class InfinityThriftQueryBuilder(ABC):
         self._columns = columns
         select_list: list[ParsedExpr] = []
         for column in columns:
-            if isinstance(column, str):
-                column = column.lower()
+            # match the special output tokens case-insensitively, but keep the
+            # original string for parsing: lowercasing the whole expression
+            # would corrupt string literals inside it
+            key = column.lower() if isinstance(column, str) else column
 
-            match column:
+            match key:
                 case "*":
                     column_expr = ColumnExpr(star=True, column_name=[])
                     expr_type = ParsedExprType(column_expr=column_expr)

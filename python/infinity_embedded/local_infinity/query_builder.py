@@ -451,10 +451,12 @@ class InfinityLocalQueryBuilder(ABC):
         self._columns = columns
         select_list: list[WrapParsedExpr] = []
         for column in columns:
-            if isinstance(column, str):
-                column = column.lower()
+            # match the special output tokens case-insensitively, but keep the
+            # original string for parsing: lowercasing the whole expression
+            # would corrupt string literals inside it
+            key = column.lower() if isinstance(column, str) else column
 
-            match column:
+            match key:
                 case "*":
                     column_expr = WrapColumnExpr()
                     column_expr.star = True
