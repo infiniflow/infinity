@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from common.utils import copy_data
 from infinity import index
-from infinity.common import ConflictType, SortType
+from infinity.common import Array, ConflictType, SortType
 from infinity.errors import ErrorCode
 from infinity.infinity_http import infinity_http
 
@@ -195,6 +195,28 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_array_embedding_embedded(self, suffix, request):
+        # embedded-only regression test: selecting an array-of-embedding column
+        # crashed the embedded SDK result parser (parse_single_array_bytes read
+        # the embedding info from the array's WrapDataType instead of the
+        # element's, so the element size came out 0 and the parser asserted)
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_array_embedding_embedded" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_select_array_embedding_embedded" + suffix,
+                                        {"c1": {"type": "array,vector,4,float"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": Array([1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0])}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]],)}))
+        res = db_obj.drop_table("test_select_array_embedding_embedded" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
 
     def test_select_json(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
