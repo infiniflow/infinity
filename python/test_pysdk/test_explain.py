@@ -72,3 +72,33 @@ class TestInfinity:
             print(res)
 
         db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)
+
+    def test_explain_group_by_having(self, suffix):
+        # explain() must carry group by / having into the explained query
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_explain_group_by_having"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_explain_group_by_having"+suffix, {
+            "c1": {"type": "varchar"}, "c2": {"type": "float"}}, ConflictType.Error)
+        assert table
+
+        table.insert({"c1": "hello", "c2": 1.0})
+        table.insert({"c1": "world", "c2": 2.0})
+        table.insert({"c1": "hello", "c2": 3.0})
+
+        with pl.Config(fmt_str_lengths=1000):
+            res = table.output(["c1", "sum(c2)"]).group_by(["c1"]).having("sum(c2) > 0").explain(ExplainType.Physical)
+            plan = str(res)
+            print(plan)
+            # a group-by query explains through an Aggregate operator; without
+            # forwarding group by the plan is a plain projection
+            assert "Aggregate" in plan
+
+            # having must reach the explained query as well: if having_expr
+            # were dropped again, the plan would be identical to the
+            # group-by-only explain
+            res_no_having = table.output(["c1", "sum(c2)"]).group_by(["c1"]).explain(ExplainType.Physical)
+            plan_no_having = str(res_no_having)
+            print(plan_no_having)
+            assert plan != plan_no_having
+
+        db_obj.drop_table("test_explain_group_by_having"+suffix, ConflictType.Error)
