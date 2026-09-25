@@ -218,19 +218,25 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnSparse:
             return parse_sparse_bytes(column_data_type, column_vector)
         case ttypes.ColumnType.ColumnDate:
-            return parse_date_bytes(column_vector)
+            return apply_null_bitmap(parse_date_bytes(column_vector), null_bitmap)
         case ttypes.ColumnType.ColumnTime:
-            return parse_time_bytes(column_vector)
+            return apply_null_bitmap(parse_time_bytes(column_vector), null_bitmap)
         case ttypes.ColumnType.ColumnDateTime:
-            return parse_datetime_bytes(column_vector)
+            return apply_null_bitmap(parse_datetime_bytes(column_vector), null_bitmap)
         case ttypes.ColumnType.ColumnTimestamp:
-            return parse_datetime_bytes(column_vector)
+            return apply_null_bitmap(parse_datetime_bytes(column_vector), null_bitmap)
         case ttypes.ColumnType.ColumnInterval:
-            return parse_interval_bytes(column_vector)
+            return apply_null_bitmap(parse_interval_bytes(column_vector), null_bitmap)
         case ttypes.ColumnType.ColumnArray:
             return parse_array_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
+
+
+def apply_null_bitmap(data: list[Any], null_bitmap: list[bool] | None) -> list[Any]:
+    if null_bitmap and len(null_bitmap) == len(data):
+        return [value if is_valid else pd.NA for value, is_valid in zip(data, null_bitmap)]
+    return data
 
 
 def parse_date_bytes(column_vector):

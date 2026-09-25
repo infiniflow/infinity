@@ -242,3 +242,34 @@ class TestNull:
 
         res = db.drop_table("test_null_default" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def test_null_temporal_columns(self, suffix):
+        """
+        NULL date, time, datetime, timestamp values come back as missing, not as epoch values.
+        """
+        db = self.infinity_obj.get_database("default_db")
+        db.drop_table("test_null_temporal" + suffix, ConflictType.Ignore)
+
+        db.create_table(
+            "test_null_temporal" + suffix,
+            {"id": {"type": "integer"},
+             "d": {"type": "date"},
+             "dt": {"type": "datetime"},
+             "tm": {"type": "time"},
+             "ts": {"type": "timestamp"}},
+            ConflictType.Error,
+        )
+        table = db.get_table("test_null_temporal" + suffix)
+
+        table.insert([{"id": 1, "d": "2024-05-06", "dt": "2024-05-06 07:08:09",
+                       "tm": "07:08:09", "ts": "2024-05-06 07:08:09"}])
+        table.insert([{"id": 2, "d": None, "dt": None, "tm": None, "ts": None}])
+
+        res, _ = table.output(["id", "d", "dt", "tm", "ts"]).to_df()
+        res = res.sort_values("id").reset_index(drop=True)
+        assert list(res.loc[0, ["d", "dt", "tm", "ts"]]) == [
+            "2024-05-06", "2024-05-06 07:08:09", "07:08:09", "2024-05-06 07:08:09"]
+        assert res.loc[1, ["d", "dt", "tm", "ts"]].isna().all()
+
+        res = db.drop_table("test_null_temporal" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
