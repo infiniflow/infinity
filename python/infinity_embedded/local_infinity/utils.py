@@ -174,9 +174,21 @@ def traverse_conditions(cons, fn=None):
     elif isinstance(cons, exp.Func):
         arguments = []
         for arg in cons.args.values():
-            if arg:
-                parsed_expr = parse_expr(arg)
-                arguments.append(parsed_expr)
+            if arg is None:
+                continue
+            if isinstance(arg, list):
+                if not arg:
+                    continue
+                # list-valued args need a dedicated arm (see exp.Unnest);
+                # keep raising instead of silently dropping them
+                parse_expr(arg)
+            if not isinstance(arg, exp.Expression):
+                # sqlglot nodes carry non-expression flags alongside their
+                # arguments (e.g. Count.big_int=True). Those are node metadata,
+                # not function arguments; skip them instead of feeding them to
+                # parse_expr, which crashes on values like True.
+                continue
+            arguments.append(parse_expr(arg))
         func_expr = WrapFunctionExpr()
         func_expr.func_name = cons.key
         func_expr.arguments = arguments
