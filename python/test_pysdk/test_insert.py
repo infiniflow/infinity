@@ -334,6 +334,29 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_embedding_numpy_float" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_insert_numpy_scalars(self, suffix):
+        """
+        target: test insert scalar columns with numpy scalar values
+        method: insert np.int64/np.int32/np.int8 and np.float32/np.float64/np.longdouble
+                values, as a pandas row yields them
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_numpy_scalars" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_insert_numpy_scalars" + suffix, {"c1": {"type": "int"}, "c2": {"type": "float"}},
+            ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": np.int64(1), "c2": np.float32(1.5)},
+                                {"c1": np.int32(2), "c2": np.float64(2.5)},
+                                {"c1": np.int8(3), "c2": np.longdouble(3.5)}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3), 'c2': (1.5, 2.5, 3.5)}).astype(
+            {'c1': 'Int32', 'c2': 'Float32'}))
+        res = db_obj.drop_table("test_insert_numpy_scalars" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_insert_big_embedding(self, suffix):
         """
         target: test insert embedding with big dimension
@@ -854,6 +877,7 @@ class TestInfinity:
         self._test_insert_big_varchar(suffix)
         self._test_insert_embedding(suffix)
         self._test_insert_embedding_numpy(suffix)
+        self._test_insert_numpy_scalars(suffix)
         self._test_insert_big_embedding(suffix)
         self._test_insert_big_embedding_float(suffix)
         self._test_insert_exceed_block_size(suffix)
