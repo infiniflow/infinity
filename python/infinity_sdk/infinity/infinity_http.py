@@ -85,6 +85,14 @@ def _parse_cast_target_type(cast_expr: str) -> str | None:
 
     return type_mapping.get(target_type, None)
 
+def _python_scalar(value):
+    """Convert a numpy scalar to int or float for JSON.
+
+    ``.item()`` is not enough: it returns ``np.longdouble`` unchanged.
+    """
+    return int(value) if isinstance(value, np.integer) else float(value)
+
+
 class http_network_util:
     header_dict = baseHeader
     response_dict = baseResponse
@@ -790,15 +798,15 @@ class table_http:
                     elif isinstance(value[key],
                                     np.ndarray):  # trans np array to list since http api can not parse np array
                         value[key] = value[key].tolist()
-                    elif isinstance(value[key], (np.integer, np.floating, np.longdouble)):
+                    elif isinstance(value[key], (np.integer, np.floating)):
                         # numpy scalars (e.g. from a DataFrame row) are not JSON serializable
-                        value[key] = value[key].item()
+                        value[key] = _python_scalar(value[key])
                     elif isinstance(value[key], list):
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
-                            elif isinstance(value[key][idx], (np.integer, np.floating, np.longdouble)):
-                                value[key][idx] = value[key][idx].item()
+                            elif isinstance(value[key][idx], (np.integer, np.floating)):
+                                value[key][idx] = _python_scalar(value[key][idx])
                     elif isinstance(value[key], SparseVector):
                         value[key] = value[key].to_dict()
 
