@@ -233,6 +233,23 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             raise NotImplementedError(f"Unsupported type {column_type}")
 
 
+# The server sends NULL cells of these types as zero vectors or empty values
+NULL_AS_EMPTY_COLUMN_TYPES = (
+    ttypes.ColumnType.ColumnEmbedding,
+    ttypes.ColumnType.ColumnMultiVector,
+    ttypes.ColumnType.ColumnTensor,
+    ttypes.ColumnType.ColumnTensorArray,
+    ttypes.ColumnType.ColumnSparse,
+    ttypes.ColumnType.ColumnArray,
+)
+
+
+def mask_null_values(data: list[Any], null_bitmap: list[bool] | None) -> list[Any]:
+    if null_bitmap and len(null_bitmap) == len(data):
+        return [value if is_valid else None for value, is_valid in zip(data, null_bitmap)]
+    return data
+
+
 def is_null_slot(null_bitmap: list[bool] | None, index: int, count: int) -> bool:
     # NULL slots can hold any bytes, so they are skipped before decoding
     return bool(null_bitmap) and len(null_bitmap) == count and not null_bitmap[index]
@@ -597,6 +614,8 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         column_bitmasks = column_field.bitmasks
 
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors, column_bitmasks)
+        if column_type in NULL_AS_EMPTY_COLUMN_TYPES:
+            data_list = mask_null_values(data_list, column_bitmasks)
         # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type

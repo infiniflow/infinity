@@ -276,6 +276,35 @@ class TestNull:
         res = db.drop_table("test_null_temporal" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def test_null_vector_columns(self, suffix):
+        """
+        NULL embedding, sparse and tensor values come back as missing, not as zeros or empty values.
+        """
+        db = self.infinity_obj.get_database("default_db")
+        db.drop_table("test_null_vector" + suffix, ConflictType.Ignore)
+
+        db.create_table(
+            "test_null_vector" + suffix,
+            {"id": {"type": "integer"},
+             "v": {"type": "vector,4,float"},
+             "sp": {"type": "sparse,100,float,int"},
+             "tn": {"type": "tensor,2,float"}},
+            ConflictType.Error,
+        )
+        table = db.get_table("test_null_vector" + suffix)
+
+        table.insert([{"id": 1, "v": [1.0, 2.0, 3.0, 4.0], "sp": {"3": 0.5},
+                       "tn": [[1.0, 2.0]]}])
+        table.insert([{"id": 2}])
+
+        res, _ = table.output(["id", "v", "sp", "tn"]).to_pl()
+        rows = sorted(res.rows())
+        assert rows[0][1] == [1.0, 2.0, 3.0, 4.0]
+        assert rows[1][1:] == (None, None, None)
+
+        res = db.drop_table("test_null_vector" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
 
 def test_thrift_null_temporal_slots_are_not_decoded():
     """
