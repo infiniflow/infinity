@@ -1120,3 +1120,33 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     
+    def test_insert_does_not_mutate_caller_rows(self, http, suffix):
+        # Regression test (HTTP SDK): insert() used to rewrite the caller's row
+        # dicts in place (ndarray -> list, SparseVector -> dict, FDE -> dict,
+        # numpy scalars inside lists -> python scalars), silently corrupting
+        # data the caller may reuse for a retry, a second table, or a diff.
+        if not http:
+            pytest.skip("http-only regression test")
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_no_caller_mutation" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_no_caller_mutation" + suffix, {
+            "c1": {"type": "int"},
+            "c2": {"type": "vector,4,float"},
+            "c3": {"type": "sparse,100,float,int"}}, ConflictType.Error)
+        assert table_obj
+
+        rows = [{"c1": 1,
+                 "c2": np.array([1.0, 2.0, 3.0, 4.0]),
+                 "c3": SparseVector([3, 7], [1.5, 2.5])}]
+        res = table_obj.insert(rows)
+        assert res.error_code == ErrorCode.OK
+
+        # the caller's data must be untouched
+        assert isinstance(rows[0]["c2"], np.ndarray)
+        assert isinstance(rows[0]["c3"], SparseVector)
+        assert rows[0]["c2"].tolist() == [1.0, 2.0, 3.0, 4.0]
+        assert rows[0]["c3"].indices == [3, 7]
+        assert rows[0]["c3"].values == [1.5, 2.5]
+
+        res = db_obj.drop_table("test_insert_no_caller_mutation" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

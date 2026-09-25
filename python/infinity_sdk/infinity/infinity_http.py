@@ -776,32 +776,42 @@ class table_http:
         else:
             values = [values]
 
+        # Convert to the HTTP API format without mutating the caller's data:
+        # the caller may reuse the same rows (retry, second table, later inserts).
+        converted_values = []
         for value in values:
             if isinstance(value, dict):
+                converted = {}
                 for key in value:
-                    if isinstance(value[key], FDE):
+                    v = value[key]
+                    if isinstance(v, FDE):
                         # Convert FDE object to HTTP API format
-                        fde_obj = value[key]
-                        value[key] = {
+                        converted[key] = {
                             "function": "fde",
-                            "tensor_data": fde_obj.tensor_data,
-                            "target_dimension": fde_obj.target_dimension
+                            "tensor_data": v.tensor_data,
+                            "target_dimension": v.target_dimension
                         }
-                    elif isinstance(value[key],
+                    elif isinstance(v,
                                     np.ndarray):  # trans np array to list since http api can not parse np array
-                        value[key] = value[key].tolist()
-                    elif isinstance(value[key], list):
-                        for idx in range(len(value[key])):
-                            if isinstance(value[key][idx], np.ndarray):
-                                value[key][idx] = value[key][idx].tolist()
-                            elif isinstance(value[key][idx], (np.integer, np.floating, np.longdouble)):
-                                value[key][idx] = value[key][idx].item()
-                    elif isinstance(value[key], SparseVector):
-                        value[key] = value[key].to_dict()
+                        converted[key] = v.tolist()
+                    elif isinstance(v, list):
+                        converted[key] = [
+                            x.tolist() if isinstance(x, np.ndarray)
+                            else x.item() if isinstance(x, (np.integer, np.floating, np.longdouble))
+                            else x
+                            for x in v
+                        ]
+                    elif isinstance(v, SparseVector):
+                        converted[key] = v.to_dict()
+                    else:
+                        converted[key] = v
+                converted_values.append(converted)
+            else:
+                converted_values.append(value)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.net.set_up_header(["accept", "content-type"])
-        r = self.net.request(url, "post", h, values)
+        r = self.net.request(url, "post", h, converted_values)
         self.net.raise_exception(r)
         return database_result()
 
