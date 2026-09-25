@@ -51,6 +51,40 @@ def traverse_conditions(cons, fn=None):
         expr.alias_name = cons.alias
         return expr
 
+    if isinstance(cons, exp.Is):
+        # Handle IS NULL / IS TRUE / IS FALSE / IS UNKNOWN.
+        # exp.Is is a sqlglot Binary subclass, so this arm must come before the
+        # generic Binary arm below, otherwise it is unreachable.
+        # Only IS NULL is supported; others must be rejected.
+        if not isinstance(cons.args.get('expression'), exp.Null):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = "is_null"
+        if fn:
+            func_expr.arguments = [fn(cons.this)]
+        else:
+            func_expr.arguments = [traverse_conditions(cons.this)]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
+    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Is):
+        # Handle IS NOT NULL / IS NOT TRUE / IS NOT FALSE / IS NOT UNKNOWN.
+        # Only IS NOT NULL is supported; others must be rejected.
+        inner_is = cons.args['this']
+        if not isinstance(inner_is.args.get('expression'), exp.Null):
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = "is_not_null"
+        if fn:
+            func_expr.arguments = [fn(inner_is.this)]
+        else:
+            func_expr.arguments = [traverse_conditions(inner_is.this)]
+        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
+
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
@@ -69,22 +103,6 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = function_expr
 
-        return parsed_expr
-    elif isinstance(cons, exp.Not) and isinstance(cons.args['this'], exp.Is):
-        # Handle IS NOT NULL / IS NOT TRUE / IS NOT FALSE / IS NOT UNKNOWN.
-        # Only IS NOT NULL is supported; others must be rejected.
-        inner_is = cons.args['this']
-        if not isinstance(inner_is.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
-        func_expr = WrapFunctionExpr()
-        func_expr.func_name = "is_not_null"
-        if fn:
-            func_expr.arguments = [fn(inner_is.this)]
-        else:
-            func_expr.arguments = [traverse_conditions(inner_is.this)]
-        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
-        parsed_expr.function_expr = func_expr
         return parsed_expr
     elif isinstance(cons, exp.Not) and not isinstance(cons.args['this'], exp.In):
         parsed_expr = WrapParsedExpr()
@@ -183,21 +201,6 @@ def traverse_conditions(cons, fn=None):
 
         parsed_expr = WrapParsedExpr()
         parsed_expr.type = ParsedExprType.kFunction
-        parsed_expr.function_expr = func_expr
-        return parsed_expr
-    elif isinstance(cons, exp.Is):
-        # Handle IS NULL / IS TRUE / IS FALSE / IS UNKNOWN.
-        # Only IS NULL is supported; others must be rejected.
-        if not isinstance(cons.args.get('expression'), exp.Null):
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                    f"Unsupported IS expression: {cons}. Only IS NULL / IS NOT NULL are supported.")
-        func_expr = WrapFunctionExpr()
-        func_expr.func_name = "is_null"
-        if fn:
-            func_expr.arguments = [fn(cons.this)]
-        else:
-            func_expr.arguments = [traverse_conditions(cons.this)]
-        parsed_expr = WrapParsedExpr(ParsedExprType.kFunction)
         parsed_expr.function_expr = func_expr
         return parsed_expr
     # in
