@@ -1,3 +1,5 @@
+import struct
+
 import infinity
 import pandas as pd
 import pytest
@@ -273,3 +275,20 @@ class TestNull:
 
         res = db.drop_table("test_null_temporal" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+
+def test_thrift_null_temporal_slots_are_not_decoded():
+    """
+    A NULL slot can hold any bytes, including a day count that datetime cannot represent.
+    """
+    from infinity.remote_thrift.infinity_thrift_rpc import ttypes
+    from infinity.remote_thrift.types import column_vector_to_list
+
+    date_bytes = struct.pack("<2i", 19849, 2**31 - 1)
+    assert column_vector_to_list(ttypes.ColumnType.ColumnDate, None, [date_bytes], [True, False]) == [
+        "2024-05-06", pd.NA]
+
+    datetime_bytes = struct.pack("<4i", 19849, 25689, 2**31 - 1, 2**31 - 1)
+    for column_type in (ttypes.ColumnType.ColumnDateTime, ttypes.ColumnType.ColumnTimestamp):
+        assert column_vector_to_list(column_type, None, [datetime_bytes], [True, False]) == [
+            "2024-05-06 07:08:09", pd.NA]
