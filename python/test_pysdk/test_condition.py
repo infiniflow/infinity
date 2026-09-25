@@ -46,3 +46,57 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_remote_constant_expr_mixed_numeric_lists(self):
+        # Regression test (thrift SDK): constant-expression and match_sparse
+        # type dispatch looked at the first element only, so a mixed
+        # int/float list like [1, 2.5] became an integer array, a sparse dict
+        # {1: 5, 2: 0.5} was truncated by int(v) in the SDK itself, and
+        # SparseVector([1, 2], [5, 0.5]) became a sparse integer array.
+        from infinity.common import SparseVector
+        from infinity.remote_thrift.infinity_thrift_rpc import ttypes
+        from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
+
+        L = ttypes.LiteralType
+        res = get_remote_constant_expr_from_python_value([1, 2.5])
+        assert res.literal_type == L.DoubleArray
+        assert res.f64_array_value == [1.0, 2.5]
+
+        res = get_remote_constant_expr_from_python_value([[1, 2.5]])
+        assert res.literal_type == L.DoubleTensor
+        assert res.f64_tensor_value == [[1.0, 2.5]]
+
+        res = get_remote_constant_expr_from_python_value({1: 5, 2: 0.5})
+        assert res.literal_type == L.SparseDoubleArray
+        assert res.i64_array_idx == [1, 2]
+        assert res.f64_array_value == [5.0, 0.5]
+
+        res = get_remote_constant_expr_from_python_value(SparseVector([1, 2], [5, 0.5]))
+        assert res.literal_type == L.SparseDoubleArray
+        assert res.f64_array_value == [5.0, 0.5]
+
+        # all-int inputs keep their integer types
+        res = get_remote_constant_expr_from_python_value([1, 2])
+        assert res.literal_type == L.IntegerArray
+        assert res.i64_array_value == [1, 2]
+
+        res = get_remote_constant_expr_from_python_value({1: 5, 2: 6})
+        assert res.literal_type == L.SparseIntegerArray
+        assert res.i64_array_value == [5, 6]
+
+    def test_match_sparse_mixed_numeric_values_thrift(self):
+        # Same first-element dispatch in the thrift match_sparse builder:
+        # {1: 5, 2: 0.5} became a sparse-integer query vector with 0.5
+        # truncated to 0.
+        from infinity.common import SparseVector
+        from infinity.remote_thrift.infinity_thrift_rpc import ttypes
+        from infinity.remote_thrift.types import make_match_sparse_expr
+
+        L = ttypes.LiteralType
+        expr = make_match_sparse_expr("c1", {1: 5, 2: 0.5}, "ip", 3)
+        assert expr.query_sparse_expr.literal_type == L.SparseDoubleArray
+        assert expr.query_sparse_expr.f64_array_value == [5.0, 0.5]
+
+        expr = make_match_sparse_expr("c1", SparseVector([1, 2], [5, 0.5]), "ip", 3)
+        assert expr.query_sparse_expr.literal_type == L.SparseDoubleArray
+        assert expr.query_sparse_expr.f64_array_value == [5.0, 0.5]

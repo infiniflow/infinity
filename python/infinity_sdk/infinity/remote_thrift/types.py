@@ -645,32 +645,36 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | 
     query_sparse_expr = ConstantExpr()
 
     match sparse_data:
-        case SparseVector([int(), *_] as indices, [int(), *_] as values):
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, int) for v in values):
             query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
             query_sparse_expr.i64_array_idx = indices
             query_sparse_expr.i64_array_value = values
-        case SparseVector([int(), *_] as indices, [float(), *_] as values):
+        case SparseVector([int(), *_] as indices, [*values]) if values and all(
+                isinstance(v, (int, float)) for v in values):
             query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
             query_sparse_expr.i64_array_idx = indices
-            query_sparse_expr.f64_array_value = values
+            query_sparse_expr.f64_array_value = [float(v) for v in values]
         case SparseVector([int(), *_], None):
             raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
                                     "No values! Sparse data does not support bool value type now")
         case dict():
             if len(sparse_data) == 0:
                 raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Empty sparse vector")
-            match next(iter(sparse_data.values())):
-                case int():
-                    query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
-                    query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
-                    query_sparse_expr.i64_array_value = [int(vv) for vv in sparse_data.values()]
-                case float():
-                    query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
-                    query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
-                    query_sparse_expr.f64_array_value = [float(vv) for vv in sparse_data.values()]
-                case _:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION,
-                                            f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}")
+            sparse_values = list(sparse_data.values())
+            if all(isinstance(vv, int) for vv in sparse_values):
+                query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
+                query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                query_sparse_expr.i64_array_value = [int(vv) for vv in sparse_values]
+            elif all(isinstance(vv, (int, float)) for vv in sparse_values):
+                # Any float among the values: store as a double sparse array.
+                # Dispatching on the first value alone truncated floats via int(vv).
+                query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
+                query_sparse_expr.i64_array_idx = [int(kk) for kk in sparse_data.keys()]
+                query_sparse_expr.f64_array_value = [float(vv) for vv in sparse_values]
+            else:
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                        f"Invalid sparse vector value type: {type(next(iter(sparse_data.values())))}")
         case _:
             raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data type {type(sparse_data)}")
 
