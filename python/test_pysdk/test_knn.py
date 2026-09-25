@@ -1022,6 +1022,31 @@ class TestInfinity:
 
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_dict(self, check_data, suffix):
+        # match_sparse accepts SparseVector | dict; the HTTP client used to call
+        # sparse_data.to_dict() unconditionally, so a plain dict crashed with
+        # AttributeError before the request was even sent.
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_scan_dict" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_scan_dict" + suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}},
+                                        ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        res, extra_result = (table_obj.output(["c1", "_similarity"])
+                             .match_sparse("c2", {0: 1.0, 20: 2.0, 80: 3.0}, "ip", 3)
+                             .to_df())
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
+            {'c1': 'Int32', 'SIMILARITY': 'Float32'}))
+
+        res = db_obj.drop_table("test_sparse_scan_dict" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_index(self, check_data, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_sparse_knn_with_index" + suffix, ConflictType.Ignore)
