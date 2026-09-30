@@ -75,6 +75,51 @@ class InitParameter:
         return ttypes.InitParameter(self.param_name, self.param_value)
 
 
+SPARSEGRAM_DEFAULT_MIN_GRAM = 3
+SPARSEGRAM_DEFAULT_MAX_GRAM = 12
+
+
+def sparsegram_analyzer(min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
+                        max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
+                        fold_case: bool = False) -> str:
+    """Build the analyzer name of a sparse gram full-text index.
+
+    The analyzer emits content-defined n-grams of the whole value instead of
+    tokens, which is what lets ``regex(column, pattern)`` filters use the index:
+    the literals the pattern proves mandatory are turned into gram lookups
+    before the regular expression runs, so the regular expression only verifies
+    candidates. Chinese, Japanese and Korean values additionally get one and two
+    character grams, so a single character or a two character word can narrow as
+    well.
+
+    Args:
+        min_gram: Shortest window considered, in characters. Defaults to 3.
+        max_gram: Longest window considered, in characters. Defaults to 12.
+            Raising it adds rare, high information grams for little index space.
+        fold_case: Emit the ASCII-lowercased form of every gram too. Required for
+            a case insensitive pattern such as ``(?i)nobel prize`` to use the
+            index at all; without it such a pattern falls back to a scan.
+
+    Returns:
+        An analyzer name such as ``"sparsegram-3-12"`` or
+        ``"sparsegram-3-12-fold"``.
+
+    Note:
+        The name is stored in the index definition, so build a new index to
+        change it.
+    """
+    for name, value in (("min_gram", min_gram), ("max_gram", max_gram)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{name} should be an integer, but got {value!r}")
+    if min_gram < 1 or max_gram < min_gram:
+        raise InfinityException(ErrorCode.INVALID_INDEX_PARAM,
+                                f"Expected 1 <= min_gram <= max_gram, but got min_gram={min_gram} and max_gram={max_gram}")
+    if not isinstance(fold_case, bool):
+        raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"fold_case should be a boolean, but got {fold_case!r}")
+    name = f"sparsegram-{min_gram}-{max_gram}"
+    return f"{name}-fold" if fold_case else name
+
+
 class IndexInfo:
     def __init__(self, target_name: str, index_type: IndexType, params: dict = None):
         self.target_name = target_name
@@ -86,6 +131,24 @@ class IndexInfo:
                 raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"{params} should be dictionary type")
         else:
             self.params = None
+
+    @staticmethod
+    def sparsegram(target_name: str,
+                   min_gram: int = SPARSEGRAM_DEFAULT_MIN_GRAM,
+                   max_gram: int = SPARSEGRAM_DEFAULT_MAX_GRAM,
+                   fold_case: bool = False) -> "IndexInfo":
+        """Build a full-text index that makes `regex()` filters use grams.
+
+        Shorthand for ``IndexInfo(target_name, IndexType.FullText,
+        {"analyzer": sparsegram_analyzer(...)})``.
+
+        Example::
+
+            table.create_index("idx", IndexInfo.sparsegram("doc", fold_case=True))
+            table.filter(regex_filter("doc", r"(?i)colou?r of the (sky|sea)"))
+        """
+        return IndexInfo(target_name, IndexType.FullText,
+                         {"analyzer": sparsegram_analyzer(min_gram, max_gram, fold_case)})
 
     def __str__(self):
         return f"IndexInfo({self.target_name}, {self.index_type}, {self.params})"
