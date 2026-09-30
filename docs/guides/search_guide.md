@@ -23,7 +23,7 @@ A full-text index must be built to perform a full-text search, and this index op
 
 ### Tokenizer
 
-When creating a full-text index, you are required to specify a tokenizer/analyzer, which will be used for future full-text searches on the same column(s). Infinity has many built-in tokenizers. Except for the Ngram analyzer and the default standard analyzer, all other analyzers require dedicated resource files. Please download the appropriate files for your chosen analyzer from [this link](https://github.com/infiniflow/resource) and save it to the directory specified by `resource_dir` in the configuration file.
+When creating a full-text index, you are required to specify a tokenizer/analyzer, which will be used for future full-text searches on the same column(s). Infinity has many built-in tokenizers. Except for the Ngram analyzer, the sparse gram analyzer and the default standard analyzer, all other analyzers require dedicated resource files. Please download the appropriate files for your chosen analyzer from [this link](https://github.com/infiniflow/resource) and save it to the directory specified by `resource_dir` in the configuration file.
 
 ```yaml
 [resource]
@@ -42,6 +42,14 @@ Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `F
 #### Ngram analyzer
 
 A definition of N-gram can be found on [wikipedia](https://en.wikipedia.org/wiki/N-gram). Use `"ngram-x"` to select the Ngram analyzer, where `x` represents the value of `N`. For example, a common choice for full-text searches in code is `"ngram-3"`.
+
+#### Sparse gram analyzer
+
+The sparse gram analyzer emits content-defined n-grams of the whole value instead of tokens, which is what makes a full-text index able to answer regular expressions. It is the analyzer to use for the columns you intend to query with `regex()`.
+
+Use `"sparsegram"` to select it. It accepts an optional window range, written `"sparsegram-min-max"` with the shortest and longest window in characters, defaulting to `3` and `12`, and an optional `-fold` suffix that additionally stores the ASCII-lowercased form of every gram, which a case-insensitive pattern such as `(?i)nobel prize` needs in order to use the index. Windows may span white space and punctuation, and Chinese, Japanese and Korean values also get one and two character grams, so that a single character or a two character word narrows as well.
+
+Because the value is not split into words, a `SEARCH MATCH TEXT` query against a sparse gram index is matched gram by gram rather than by keyword. When a column is searched by keywords as well, build a second full-text index on it with a regular analyzer: a predicate that names no index uses the regular analyzer index of the column, while `regex()` picks the sparse gram one on its own.
 
 #### Simplified Chinese analyzer
 
@@ -214,3 +222,34 @@ Filters based on secondary index can have arbitrary logical combinations. Suppor
 ### Full-text index filters
 
 Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during filtering.
+
+#### Regular expression filters
+
+A full-text index built with the [sparse gram analyzer](#sparse-gram-analyzer) also answers the `regex()` predicate, so a regular expression over a column does not have to read every row:
+
+```sql
+CREATE INDEX idx_doc_sg ON documents(doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12-fold');
+
+SELECT id FROM documents WHERE regex(doc, '(?i)colou?r of the (sky|sea)');
+```
+
+For every literal the pattern proves mandatory (here `colou` and `r of the `), the optimizer adds a `filter_fulltext` on that literal, whose grams the index scan looks up, and keeps the `regex()` above it to verify the candidates the grams let through. A pattern with no usable literal, and a column without such an index, keep the plain scan; neither case can change the result, because the narrowing only ever drops rows the pattern cannot match.
+
+The `fold` suffix in the analyzer name is what lets a case-insensitive pattern use the index; a case-sensitive pattern works either way. When a column carries more than one full-text index, a predicate that names no index uses the column's regular analyzer index, and an index can be named explicitly: `filter_fulltext('doc@idx_doc_sg', 'harmful chemical', 'operator=and')`. The plan of a query shows which index the narrowing went to with `EXPLAIN`.
+
+Inside a `SEARCH` statement the regular expression is evaluated as the search's own filter:
+
+```sql
+SELECT id, SCORE() FROM documents
+SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5')
+WHERE regex(doc, 'reaction');
+```
+
+`ORDER BY` is a modifier of a search result and cannot appear in the same `SELECT` as `SEARCH`, so sorting a search means wrapping it in a subquery:
+
+```sql
+SELECT * FROM (
+  SELECT id FROM documents SEARCH MATCH TEXT('doc', 'harmful chemical', 'topn=5')
+) ORDER BY id DESC;
+```
+

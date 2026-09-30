@@ -1415,6 +1415,28 @@ curl --request POST \
      } '
 ```
 
+- Creates a full-text index that answers `regex()` filters:
+
+```shell
+curl --request POST \
+     --url http://localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name_sg} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' 
+     {
+          "fields": 
+          [
+              "fulltext_column"
+          ],
+          "index": 
+          {
+              "type": "fulltext",
+              "analyzer": "sparsegram-3-12-fold"
+          },
+          "create_option": "ignore_if_exists"
+     } '
+```
+
 - Creates a BMP index on a sparse column
 
 ```shell
@@ -1518,6 +1540,7 @@ curl --request POST \
       - `"korean"`: Korean.
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram).
       - `"keyword"`: "noop" analyzer used for columns containing keywords only.
+      - `"sparsegram[-min[-max]][-fold]"`: Content-defined sparse n-grams of the whole value, indexed for regular expression search, so that a `regex()` filter over the column reads the rows the pattern's mandatory literals select instead of every row. `min` defaults to `3` and `max` to `12`; `fold` additionally stores the ASCII-lowercased form of every gram, which a case insensitive pattern needs. Chinese, Japanese and Korean values also get one and two character grams, so a single character or a two character word narrows as well.
   - Parameter settings for a secondary index:  
     - `"type"`: `"secondary"`
   - Parameter settings for a BMP index:  
