@@ -408,6 +408,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def filter(self, where: str | None) -> InfinityLocalQueryBuilder:
+        if where is None:
+            self._filter = None
+            return self
         where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
@@ -431,6 +434,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def group_by(self, columns: list[str] | str) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._group_by = None
+            return self
         group_by_list = []
         if isinstance(columns, list):
             for column in columns:
@@ -443,11 +449,17 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def having(self, having: str | None) -> InfinityLocalQueryBuilder:
+        if having is None:
+            self._having = None
+            return self
         having_expr = traverse_conditions(condition(having))
         self._having = having_expr
         return self
 
     def output(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._columns = None
+            return self
         self._columns = columns
         select_list: list[WrapParsedExpr] = []
         for column in columns:
@@ -564,6 +576,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def highlight(self, columns: list | None) -> InfinityLocalQueryBuilder:
+        if columns is None:
+            self._highlight = None
+            return self
         highlight_list: list[WrapParsedExpr] = []
         for column in columns:
             if isinstance(column, str):
@@ -582,6 +597,9 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None) -> InfinityLocalQueryBuilder:
+        if order_by_expr_list is None:
+            self._sort = None
+            return self
         sort_list: list[WrapOrderByExpr] = []
 
         order_by_expr_str = str
