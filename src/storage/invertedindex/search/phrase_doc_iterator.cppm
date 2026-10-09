@@ -64,6 +64,8 @@ public:
             threshold_ = threshold;
     }
 
+    void ForceSetScoreThreshold(float threshold) override { threshold_ = threshold; }
+
     u32 MatchCount() const override { return DocID() != INVALID_ROWID; }
 
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;

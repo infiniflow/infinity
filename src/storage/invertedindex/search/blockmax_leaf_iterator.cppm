@@ -39,6 +39,11 @@ public:
     virtual bool NextShallow(RowID doc_id) = 0;
 
     virtual float BM25Score() = 0;
+
+    // Unconditionally set the internal score threshold (unlike UpdateScoreThreshold
+    // which is monotonic and only raises). Used by BlockAtATimeIterator during
+    // BAAT traversal to disable child-side filtering so all documents are seen.
+    virtual void ForceSetScoreThreshold(float threshold) = 0;
 };
 
 } // namespace infinity
