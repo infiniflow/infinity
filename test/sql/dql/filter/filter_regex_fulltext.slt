@@ -151,6 +151,33 @@ PROJECT (4)
      - table index: #1
      - output_columns: [doc, __rowid]
 
+# A top-level alternation makes every branch optional, including the last one:
+# row 6 matches `Nobel` and has none of the grams of `nothing relevant`.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'Nobel|nothing relevant');
+----
+6
+7
+
+# A case insensitive group keeps its mode until its last run is stored. This
+# index has no folded grams, so the group's text cannot be required at all.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '(?i:THE NOBEL) Prize');
+----
+6
+
+# `\Q...\E` is quoted literal text and `\C` is any byte, not the letters Q, E
+# and C.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '\Qmain()\E');
+----
+8
+
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'ma\Cn');
+----
+8
+
 statement ok
 DROP TABLE IF EXISTS regex_ft;
 
