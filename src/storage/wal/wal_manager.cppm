@@ -99,6 +99,10 @@ public:
     TxnTimeStamp LastCheckpointTS() const;
     void SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts);
 
+    // Delete wal.log.* files whose entries are entirely covered by a completed checkpoint (max_commit_ts).
+    // Never touches the current, not-yet-rotated wal.log file.
+    void RecycleWalFile(TxnTimeStamp max_commit_ts);
+
     std::vector<std::shared_ptr<std::string>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
 

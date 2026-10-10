@@ -144,6 +144,8 @@ void WalManager::SetLastCheckpointTS(TxnTimeStamp new_last_ckp_ts) {
     return;
 }
 
+void WalManager::RecycleWalFile(TxnTimeStamp max_commit_ts) { WalFile::RecycleWalFile(max_commit_ts, wal_dir_); }
+
 std::vector<std::shared_ptr<std::string>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
     std::vector<std::shared_ptr<std::string>> log_strings;
