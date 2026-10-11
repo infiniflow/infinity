@@ -46,3 +46,16 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_condition_embedded_is_null(self, request):
+        # embedded SDK must support IS NULL filters: exp.Is is a sqlglot Binary
+        # subclass, so it hit the generic binary arm and raised
+        # "unknown binary expression: is" before the dedicated arm was reached.
+        # IS NOT NULL already worked because exp.Not is not a Binary.
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.local_infinity.utils import traverse_conditions as embedded_traverse
+        res = embedded_traverse(condition("c1 IS NULL"))
+        assert res.function_expr.func_name == "is_null"
+        res = embedded_traverse(condition("c1 IS NOT NULL"))
+        assert res.function_expr.func_name == "is_not_null"
