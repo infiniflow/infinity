@@ -1063,6 +1063,8 @@ class table_http_result:
         return self
 
     def sort(self, order_by_expr_list: list[list[str, SortType]] | None):
+        if order_by_expr_list is None:
+            return self
         for order_by_expr in order_by_expr_list:
             tmp = {}
             if len(order_by_expr) != 2:
