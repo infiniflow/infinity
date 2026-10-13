@@ -107,7 +107,33 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		return parseCaseWhenExpression(expr)
 	}
 
-	// Check for unary NOT with ! operator (before parentheses check)
+	// Check for parentheses - only remove if the entire expression is wrapped
+	// and parentheses are balanced
+	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
+		// Check if the outer parentheses are matched (not just prefix/suffix)
+		if isBalancedParentheses(expr) && isOuterParentheses(expr) {
+			// Remove outer parentheses and parse inner
+			return parseExpressionInternal(expr[1 : len(expr)-1])
+		}
+	}
+
+	// Check for binary operators with lowest precedence (must be before IN/BETWEEN)
+	//
+	// This split has to come before the unary NOT handling below: NOT binds
+	// tighter, so its operand is one expression. Parsing NOT first turned
+	// "a AND NOT (b) AND c" into "a AND NOT (b AND c)", dropping the "c" clause.
+	for _, op := range []string{"OR", "AND"} {
+		if left, right, found := splitByOperator(expr, op); found {
+			return &Expression{
+				Type:     ExprTypeBinary,
+				Operator: strings.ToLower(op),
+				Left:     left,
+				Right:    right,
+			}, nil
+		}
+	}
+
+	// Check for unary NOT with ! operator
 	if strings.HasPrefix(expr, "!") {
 		inner, err := parseExpressionInternal(expr[1:])
 		if err != nil {
@@ -120,7 +146,8 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 		}, nil
 	}
 
-	// Check for unary NOT keyword (must be before binary operators)
+	// Check for unary NOT keyword (must be before comparison operators: the
+	// operand of NOT is a comparison, e.g. "NOT a = 1")
 	if strings.HasPrefix(strings.ToUpper(expr), "NOT ") {
 		inner, err := parseExpressionInternal(expr[4:])
 		if err != nil {
@@ -131,28 +158,6 @@ func parseExpressionInternal(expr string) (*Expression, error) {
 			Operator: "not",
 			Left:     inner,
 		}, nil
-	}
-
-	// Check for parentheses - only remove if the entire expression is wrapped
-	// and parentheses are balanced
-	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") {
-		// Check if the outer parentheses are matched (not just prefix/suffix)
-		if isBalancedParentheses(expr) && isOuterParentheses(expr) {
-			// Remove outer parentheses and parse inner
-			return parseExpressionInternal(expr[1 : len(expr)-1])
-		}
-	}
-
-	// Check for binary operators with lowest precedence (must be before IN/BETWEEN)
-	for _, op := range []string{"OR", "AND"} {
-		if left, right, found := splitByOperator(expr, op); found {
-			return &Expression{
-				Type:     ExprTypeBinary,
-				Operator: strings.ToLower(op),
-				Left:     left,
-				Right:    right,
-			}, nil
-		}
 	}
 
 	// Check for comparison operators

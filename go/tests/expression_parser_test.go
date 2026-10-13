@@ -128,6 +128,9 @@ func TestParseExprLogical(t *testing.T) {
 		{"or", "c1 = 1 OR c2 = 2", "or(=(c1, 1), =(c2, 2))"},
 		{"not", "NOT c1 = 1", "not(=(c1, 1))"},
 		{"complex", "c1 = 1 AND c2 = 2 OR c3 = 3", "or(and(=(c1, 1), =(c2, 2)), =(c3, 3))"},
+		{"not followed by and", "c1 = 1 AND NOT (c2 = 2) AND c3 = 3", "and(=(c1, 1), and(not(=(c2, 2)), =(c3, 3)))"},
+		{"not followed by or", "NOT (c2 = 2) OR c3 = 3", "or(not(=(c2, 2)), =(c3, 3))"},
+		{"bang not followed by and", "!(c2 = 2) AND c3 = 3", "and(not(=(c2, 2)), =(c3, 3))"},
 	}
 
 	for _, tt := range tests {
