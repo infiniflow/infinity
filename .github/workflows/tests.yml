@@ -228,7 +228,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download debug unit test build artifacts
         uses: actions/download-artifact@v8
@@ -984,7 +984,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -1395,7 +1395,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -1456,7 +1456,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -1594,7 +1594,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download debug build artifacts
         uses: actions/download-artifact@v8
@@ -2090,7 +2090,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -2491,7 +2491,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8
@@ -2552,7 +2552,7 @@ jobs:
 
       - name: Start minio container
         run: |
-          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          docker run -d --name minio --network host -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v /tmp/minio-data:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
 
       - name: Download release build artifacts
         uses: actions/download-artifact@v8

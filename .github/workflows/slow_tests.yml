@@ -124,7 +124,7 @@ jobs:
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
           echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
           rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
@@ -401,7 +401,7 @@ jobs:
           echo "MINIO_CONTAINER=${MINIO_CONTAINER}" >> ${GITHUB_ENV}
           echo "MINIO_VOLUME_PATH=${MINIO_VOLUME_PATH}" >> ${GITHUB_ENV}
           rm -rf ${MINIO_VOLUME_PATH} && mkdir -p ${MINIO_VOLUME_PATH}
-          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data quay.io/minio/minio server /data --console-address ":9006" --address ":9005"
+          sudo docker run -d --name ${MINIO_CONTAINER} --network container:$(hostname) -e "MINIO_ROOT_PASSWORD=minioadmin" -e "MINIO_ROOT_USER=minioadmin" -v ${MINIO_VOLUME_PATH}:/data pgsty/silo:RELEASE.2026-08-06T00-00-00Z server /data --console-address ":9006" --address ":9005"
           sleep 5s
           if ! sudo docker ps --filter "name=${MINIO_CONTAINER}" --filter "status=running" | grep -q ${MINIO_CONTAINER}; then
               echo "Minio container is not running"
