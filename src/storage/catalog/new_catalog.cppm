@@ -323,7 +323,7 @@ public:
 
     static Status LoadFlushedChunkIndex1(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info, NewTxn *new_txn);
 
-    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag);
+    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta, UsageFlag usage_flag, bool invalidate_ft_cache = true);
 
     static Status GetColumnVector(ColumnMeta &column_meta,
                                   const std::shared_ptr<ColumnDef> &col_def,
