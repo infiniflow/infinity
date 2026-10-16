@@ -285,22 +285,17 @@ pub fn contains(doc: &str, path: &str, target: &Value) -> Value {
     Value::Bool(hit)
 }
 
-/// Searches the whole document (objects and arrays) for `target`.
+/// `json_contains(doc, value)`: true when `doc` is an array whose top-level
+/// elements include `value`. A non-array document (object/scalar) never
+/// contains anything.
 pub fn contains_value(doc: &str, target: &Value) -> Value {
     let Some(root) = parse(doc) else {
         return Value::Null;
     };
-    fn walk(j: &Json, target: &Value) -> bool {
-        if json_matches(j, target) {
-            return true;
-        }
-        match j {
-            Json::Arr(items) => items.iter().any(|x| walk(x, target)),
-            Json::Obj(entries) => entries.iter().any(|(_, v)| walk(v, target)),
-            _ => false,
-        }
+    match root {
+        Json::Arr(items) => Value::Bool(items.iter().any(|v| json_matches(v, target))),
+        _ => Value::Bool(false),
     }
-    Value::Bool(walk(&root, target))
 }
 
 fn json_matches(a: &Json, target: &Value) -> bool {

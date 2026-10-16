@@ -1661,7 +1661,14 @@ impl Engine {
                                         Some(other) if !matches!(other, Value::Null) => {
                                             emit(other.to_slt_string())
                                         }
-                                        _ => {}
+                                        // A JSON `null` is indistinguishable from
+                                        // SQL NULL in text storage; both yield
+                                        // one `null` row.
+                                        _ => {
+                                            if is_json_col {
+                                                emit("null".to_string());
+                                            }
+                                        }
                                     }
                                 }
                                 return Ok(QueryResult::Rows {
