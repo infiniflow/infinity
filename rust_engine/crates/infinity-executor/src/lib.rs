@@ -535,6 +535,22 @@ fn reshape_sparse(s: &str, float: bool) -> Option<String> {
     Some(format!("[{}]", body.join(",")))
 }
 
+/// Whether the type text declares a vector-like dimension
+/// (`EMBEDDING`/`VECTOR`/`TENSOR`/`TENSORARRAY`/`MULTIVECTOR`/`SPARSE`).
+fn declares_dimension(type_text: &str) -> bool {
+    let t = type_text.to_ascii_uppercase();
+    [
+        "EMBEDDING",
+        "VECTOR",
+        "TENSOR",
+        "TENSORARRAY",
+        "MULTIVECTOR",
+        "SPARSE",
+    ]
+    .iter()
+    .any(|k| t.starts_with(k))
+}
+
 fn is_bit_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().contains("BIT")
 }
@@ -1076,6 +1092,15 @@ impl Engine {
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
+                // A vector-like column's declared dimension must be positive.
+                for c in columns {
+                    if declares_dimension(&c.type_text) && type_dim(&c.type_text) == Some(0) {
+                        return Err(Error::Invalid(format!(
+                            "Embedding dimension column_type.width is 0, shall be positive: '{}'",
+                            c.name
+                        )));
+                    }
+                }
                 let names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
                 let defaults: Vec<Option<String>> = columns
                     .iter()
