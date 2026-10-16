@@ -1208,6 +1208,17 @@ impl Engine {
                 })
             }
             Statement::AlterTableDropColumn { table, column } => {
+                // an index still referencing the column blocks the drop
+                if self
+                    .catalog
+                    .list_indexes()?
+                    .iter()
+                    .any(|im| im.table == *table && im.column == *column)
+                {
+                    return Err(Error::Invalid(format!(
+                        "column '{column}' is used by an index"
+                    )));
+                }
                 let rows = self.fetch_rows_with_ids(table)?;
                 let idx = match self
                     .catalog
@@ -1387,6 +1398,15 @@ impl Engine {
                 rows: vec![],
             }),
             Statement::SetConfig { key, value } => {
+                // cache knobs cannot be changed while the cache is off
+                if key.to_ascii_lowercase().starts_with("cache_result")
+                    && value != "off"
+                    && !self.result_cache_enabled()
+                {
+                    return Err(Error::Invalid(format!(
+                        "config '{key}' is unavailable while result_cache is off"
+                    )));
+                }
                 self.config
                     .lock()
                     .unwrap()
@@ -1397,6 +1417,12 @@ impl Engine {
                 })
             }
             Statement::ShowVariable { key } => {
+                let cache_var = key.to_ascii_lowercase();
+                if cache_var.starts_with("cache_result") && !self.result_cache_enabled() {
+                    return Err(Error::Invalid(format!(
+                        "variable '{key}' is unavailable while result_cache is off"
+                    )));
+                }
                 let v = self
                     .config
                     .lock()
@@ -2116,6 +2142,14 @@ impl Engine {
             .types)
     }
 
+    /// True unless `result_cache` is explicitly `off`.
+    fn result_cache_enabled(&self) -> bool {
+        match self.config.lock().unwrap().get("result_cache") {
+            Some(v) => !v.eq_ignore_ascii_case("off"),
+            None => true,
+        }
+    }
+
     /// Validates `CREATE INDEX … USING <kind> WITH (…)`: the index kind must
     /// suit the column type and the options must be in range.
     fn validate_index(
@@ -2189,7 +2223,22 @@ impl Engine {
                     }
                 }
             }
-            "IVF" | "FLAT" | "EMVB" | "PLAID" => {
+            "PLAID" => {
+                if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "{index_type} index requires a vector column, got '{ty}'"
+                    )));
+                }
+                for (k, v) in opts {
+                    if k == "NBITS" {
+                        let n: i64 = v.parse().unwrap_or(0);
+                        if n != 2 && n != 4 {
+                            return Err(Error::Invalid(format!("nbits {n} must be 2 or 4")));
+                        }
+                    }
+                }
+            }
+            "IVF" | "FLAT" | "EMVB" => {
                 if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
                     return Err(Error::Invalid(format!(
                         "{index_type} index requires a vector column, got '{ty}'"
