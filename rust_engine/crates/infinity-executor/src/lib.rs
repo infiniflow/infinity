@@ -143,6 +143,43 @@ fn is_float_type(type_text: &str) -> bool {
     )
 }
 
+fn is_sparse_type(type_text: &str) -> bool {
+    type_text.to_ascii_uppercase().starts_with("SPARSE")
+}
+
+/// Canonical sparse rendering: `(empty)` when there is nothing, otherwise
+/// `[i:v,…]` sorted by index. Returns `None` for an invalid vector (negative or
+/// duplicated indices).
+fn reshape_sparse(s: &str, float: bool) -> Option<String> {
+    let t = s.trim();
+    let pairs = parse_sparse_str(t);
+    if pairs.is_empty() {
+        // an empty vector is valid; a non-empty literal that parses to nothing
+        // (e.g. a negative index) is not
+        return if t.is_empty() || t == "[]" {
+            Some("(empty)".to_string())
+        } else {
+            None
+        };
+    }
+    let mut sorted = pairs.clone();
+    sorted.sort_by_key(|(i, _)| *i);
+    if sorted.windows(2).any(|w| w[0].0 == w[1].0) {
+        return None; // duplicate index
+    }
+    let body: Vec<String> = sorted
+        .iter()
+        .map(|(i, v)| {
+            if float {
+                format!("{i}:{v:.6}")
+            } else {
+                format!("{i}:{}", fmt_num(*v))
+            }
+        })
+        .collect();
+    Some(format!("[{}]", body.join(",")))
+}
+
 fn is_bit_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().contains("BIT")
 }
@@ -202,6 +239,14 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
                 },
+                Some(t) if is_sparse_type(t) => {
+                    let float = t.to_ascii_uppercase().contains("FLOAT")
+                        || t.to_ascii_uppercase().contains("DOUBLE");
+                    match reshape_sparse(&s, float) {
+                        Some(v) => v,
+                        None => s,
+                    }
+                }
                 Some(t) if is_tensor_type(t) => {
                     let d = type_dim(t).unwrap_or(0);
                     if is_bit_type(t) {
@@ -694,6 +739,9 @@ impl Engine {
                         }
                     }
                 }
+                if rows.is_empty() {
+                    return Ok(QueryResult::Inserted { count: 0 });
+                }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
                 let types = self.column_types(table)?;
                 // one transaction -> one WAL record + one KV batch (batched durability)
@@ -1116,6 +1164,7 @@ impl Engine {
             .find(|(k, _)| k == "DELIMITER")
             .map(|(_, v)| decode_delimiter(v))
             .unwrap_or(',');
+        let types_for_scan = self.column_types(table)?;
         let mut rows: Vec<Vec<Literal>> = Vec::new();
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
@@ -1127,12 +1176,28 @@ impl Engine {
             } else {
                 line.split(delim).map(|s| s.to_string()).collect()
             };
-            rows.push(
-                fields
-                    .into_iter()
-                    .map(|f| Literal::Str(normalize_cell(&f)))
-                    .collect(),
-            );
+            let cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+            // skip rows whose typed (sparse) cells are malformed
+            let mut ok = true;
+            for (i, c) in cells.iter().enumerate() {
+                if let Some(t) = types_for_scan.get(i) {
+                    if is_sparse_type(t) {
+                        let up = t.to_ascii_uppercase();
+                        let float = up.contains("FLOAT") || up.contains("DOUBLE");
+                        if reshape_sparse(c, float).is_none() {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if !ok {
+                continue;
+            }
+            rows.push(cells.into_iter().map(Literal::Str).collect());
+        }
+        if rows.is_empty() {
+            return Ok(QueryResult::Inserted { count: 0 });
         }
         let base = self.store.scan_prefix(&row_prefix(table))?.len();
         let types = self.column_types(table)?;
