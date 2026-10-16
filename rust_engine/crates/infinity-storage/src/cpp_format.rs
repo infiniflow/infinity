@@ -419,13 +419,68 @@ pub fn read_block(
 /// Splits a raw `.col` body into its `[data_region][null_bitmap]` parts.
 pub fn split_body(raw: &[u8], capacity: usize, slot_size: usize) -> ColumnBody {
     let cap_bytes = ColumnBody::data_capacity_bytes(capacity, slot_size);
-    let bitmap_len = ColumnBody::null_bitmap_len(capacity);
+    split_body_at(raw, cap_bytes)
+}
+
+/// Splits a raw `.col` body given the column's layout, which knows the data
+/// region size for compact-bit (boolean) columns as well.
+pub fn split_body_for_layout(raw: &[u8], capacity: usize, layout: ColumnLayout) -> ColumnBody {
+    let cap_bytes = match layout {
+        ColumnLayout::CompactBit => ColumnBody::null_bitmap_len(capacity),
+        ColumnLayout::Fixed(width) | ColumnLayout::VarLen(width) => capacity * width,
+    };
+    split_body_at(raw, cap_bytes)
+}
+
+fn split_body_at(raw: &[u8], cap_bytes: usize) -> ColumnBody {
+    let bitmap_len = raw.len().saturating_sub(cap_bytes);
     let data = raw.get(..cap_bytes).unwrap_or(raw).to_vec();
     let null_bitmap = raw
         .get(cap_bytes..cap_bytes + bitmap_len)
         .unwrap_or(&[])
         .to_vec();
     ColumnBody { data, null_bitmap }
+}
+
+// ---------------------------------------------------------------------------
+// Date/time text -> wire/disk integers
+// ---------------------------------------------------------------------------
+
+/// Days from 1970-01-01 for a proleptic-Gregorian civil date (Hinnant's algorithm).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Parses `YYYY-MM-DD` (or `YYYY/MM/DD`) into days since the epoch — the
+/// `ColumnDate`/`ColumnDateTime` integer form.
+pub fn date_to_days(s: &str) -> Option<i32> {
+    let mut it = s.trim().split(['-', '/']);
+    let y: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next()?.parse().ok()?;
+    let d: i64 = it.next()?.parse().ok()?;
+    i32::try_from(days_from_civil(y, m, d)).ok()
+}
+
+/// Parses `HH:MM:SS` into seconds since midnight — the `ColumnTime` form.
+pub fn time_to_secs(s: &str) -> Option<i32> {
+    let mut it = s.trim().split(':');
+    let h: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next().unwrap_or("0").parse().ok()?;
+    let sec: i64 = it.next().unwrap_or("0").parse().ok()?;
+    i32::try_from(h * 3600 + m * 60 + sec).ok()
+}
+
+/// Splits `YYYY-MM-DD HH:MM:SS` into `(epoch days, seconds of day)` — the
+/// `ColumnDateTime`/`ColumnTimestamp` form.
+pub fn datetime_to_pair(s: &str) -> Option<(i32, i32)> {
+    let (d, t) = s.trim().split_once([' ', 'T'])?;
+    Some((date_to_days(d)?, time_to_secs(t)?))
 }
 
 /// How a column's values occupy the `.col` data region (spec §8.3).

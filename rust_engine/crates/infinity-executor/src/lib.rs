@@ -28,6 +28,8 @@ use infinity_storage::{FjallMetaStore, MetaStore};
 use infinity_txn::TxnManager;
 use tokio::sync::mpsc;
 
+mod cpp_blocks;
+
 /// Result of executing one statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryResult {
@@ -1248,6 +1250,8 @@ pub struct Engine {
     store: Arc<dyn MetaStore>,
     rt: tokio::runtime::Runtime,
     exchange_capacity: usize,
+    /// the engine's data directory (root of the C++-format block mirror)
+    dir: PathBuf,
     /// secondary indexes keyed by `"<table>.<column>"`
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// session/global configuration set via `SET CONFIG …`
@@ -1286,6 +1290,7 @@ impl Engine {
             store,
             rt,
             exchange_capacity: exchange_capacity.max(1),
+            dir,
             indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
@@ -1294,6 +1299,26 @@ impl Engine {
         };
         engine.rebuild_indexes()?;
         Ok(engine)
+    }
+
+    /// Best-effort database id for a (possibly qualified) table name.
+    ///
+    /// The catalog tracks table ids but not database ids, so the id is the
+    /// database's position in the sorted name list — deterministic, and equal
+    /// to C++'s own counter for databases created in name order. Unqualified
+    /// names resolve against `default_db`.
+    fn database_id_of(&self, table: &str) -> u64 {
+        let db = if table.contains('.') {
+            table.split('.').next().unwrap_or("default_db")
+        } else {
+            "default_db"
+        };
+        self.catalog
+            .list_databases()
+            .unwrap_or_default()
+            .iter()
+            .position(|d| d == db)
+            .unwrap_or(0) as u64
     }
 
     /// Rebuilds all declared indexes from stored rows (called on open).
@@ -3564,7 +3589,8 @@ impl Engine {
 
     pub fn flush(&self) -> Result<()> {
         self.catalog.flush()?;
-        self.txn.flush()
+        self.txn.flush()?;
+        self.flush_cpp_blocks()
     }
 }
 
