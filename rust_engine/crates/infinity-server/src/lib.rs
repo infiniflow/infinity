@@ -674,12 +674,7 @@ fn handle_connection(
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                     skip_struct(&mut ip)?;
                 }
-                write_app_exception(
-                    &mut writer,
-                    other,
-                    seq,
-                    &format!("unknown method: {other}"),
-                )?;
+                write_app_exception(&mut writer, other, seq, &format!("unknown method: {other}"))?;
             }
         }
     }

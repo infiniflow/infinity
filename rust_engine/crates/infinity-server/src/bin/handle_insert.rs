@@ -15,12 +15,7 @@ fn main() {
     let (seq, req) = read_insert_call(&mut stdin).expect("decode Insert call");
     let t = &req.table_name;
 
-    let ncols = req
-        .rows
-        .first()
-        .map(|(_, vs)| vs.len())
-        .unwrap_or(1)
-        .max(1);
+    let ncols = req.rows.first().map(|(_, vs)| vs.len()).unwrap_or(1).max(1);
     let cols: Vec<String> = (0..ncols).map(|i| format!("c{i} VARCHAR")).collect();
     let _ = engine.execute(&format!("CREATE TABLE {t} ({});", cols.join(", ")));
 
@@ -30,10 +25,7 @@ fn main() {
         .map(|(_, vs)| {
             format!(
                 "({})",
-                vs.iter()
-                    .map(|v| v.to_sql())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                vs.iter().map(|v| v.to_sql()).collect::<Vec<_>>().join(", ")
             )
         })
         .collect::<Vec<_>>()
