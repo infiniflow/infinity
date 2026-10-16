@@ -220,7 +220,7 @@ pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical
             bool_text(*op),
             render_pred_m(b, ids, logical)
         ),
-        Predicate::Not(a) => format!("NOT ({})", render_pred_m(a, ids, logical)),
+        Predicate::Not(a) => format!("NOT({})", render_pred_m(a, ids, logical)),
         Predicate::IsNull(e, neg) => format!(
             "{} IS {}NULL",
             render_expr_m(e, ids, logical),
@@ -824,8 +824,17 @@ pub struct IndexScanPlan<'a> {
     pub where_pred: &'a Predicate,
     pub order_by: &'a [OrderKey],
     pub schema: &'a [String],
+    /// Declared type text per column (schema order), to decide BigInt casts.
+    pub types: &'a [String],
     /// Columns carrying any index.
     pub indexed: &'a [String],
+}
+
+/// True for the integer column types that a comparison implicitly widens to
+/// `BigInt` in the reference plan (`CAST(col AS BigInt)`).
+fn is_integer_type(text: &str) -> bool {
+    let t = text.to_ascii_uppercase();
+    t.contains("INT") && !t.contains("POINT") && !t.contains("EMBEDDING") && !t.contains("TENSOR")
 }
 
 /// Splits a predicate on top-level `AND`s.
@@ -907,9 +916,10 @@ fn lit_plain(l: &Literal) -> String {
 }
 
 /// Renders one operand of an index-filter comparison.
-fn idx_operand(e: &ExprAst, ann: &dyn Fn(&str) -> String) -> String {
+fn idx_operand(e: &ExprAst, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> bool) -> String {
     match e {
-        ExprAst::Column(c) => format!("CAST({} AS BigInt)", ann(c)),
+        ExprAst::Column(c) if cast(c) => format!("CAST({} AS BigInt)", ann(c)),
+        ExprAst::Column(c) => ann(c),
         ExprAst::Func { name, args } if name.starts_with("json_extract") => {
             let col = match args.first() {
                 Some(ExprAst::Column(c)) => ann(c),
@@ -954,23 +964,23 @@ fn idx_json_pred(name: &str, args: &[ExprAst], ann: &dyn Fn(&str) -> String) -> 
 }
 
 /// Renders an index-filter predicate, qualifying column ids as `#1.<col>`.
-fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String) -> String {
+fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> bool) -> String {
     match p {
         Predicate::Cmp(a, op, b) => {
             format!(
                 "{} {} {}",
-                idx_operand(a, ann),
+                idx_operand(a, ann, cast),
                 cmp_text(*op),
-                idx_operand(b, ann)
+                idx_operand(b, ann, cast)
             )
         }
         Predicate::Bool(a, op, b) => format!(
             "({}) {} ({})",
-            idx_pred(a, ann),
+            idx_pred(a, ann, cast),
             bool_text(*op),
-            idx_pred(b, ann)
+            idx_pred(b, ann, cast)
         ),
-        Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann)),
+        Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann, cast)),
         Predicate::IsTrue(e) => {
             if let ExprAst::Func { args, .. } = e {
                 if fulltext_filter(e).is_some() {
@@ -1016,17 +1026,22 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
         Some(i) => format!("{c} (#1.{i})"),
         None => c.to_string(),
     };
+    // A comparison widens an integer column to BigInt, but never a varchar/date.
+    let cast = |c: &str| match p.schema.iter().position(|x| x == c) {
+        Some(i) => p.types.get(i).map(|t| is_integer_type(t)).unwrap_or(false),
+        None => false,
+    };
     // index filter: one conjunct at top level, several `(a) AND (b)`.
-    let index_filter = idx
-        .iter()
-        .map(|c| idx_pred(c, &ann))
-        .fold(String::new(), |acc, s| {
-            if acc.is_empty() {
-                s
-            } else {
-                format!("({acc}) AND ({s})")
-            }
-        });
+    let index_filter =
+        idx.iter()
+            .map(|c| idx_pred(c, &ann, &cast))
+            .fold(String::new(), |acc, s| {
+                if acc.is_empty() {
+                    s
+                } else {
+                    format!("({acc}) AND ({s})")
+                }
+            });
 
     // 1. column ids (bottom-up): leftover-filter columns, sort keys, projection.
     let mut leftover_cols = Vec::new();
@@ -1096,7 +1111,10 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
             })
             .collect();
         lines.push(attr(1, &format!("expressions: [{}]", keys.join(", "))));
-        let mut out = sort_cols.clone();
+        let mut out = leftover_cols.clone();
+        for c in &sort_cols {
+            add_col(&mut out, c);
+        }
         add_col(&mut out, "__rowid");
         lines.push(attr(1, &format!("output columns: [{}]", out.join(", "))));
     }

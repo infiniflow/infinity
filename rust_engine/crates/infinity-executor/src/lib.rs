@@ -1876,7 +1876,8 @@ impl Engine {
                         && !crate::explain::has_aggregate(items)
                         && search.is_none() =>
                     {
-                        let schema = self.table_schema(t)?;
+                        let meta = self.table_meta(t)?;
+                        let schema = &meta.columns;
                         // Try to push the filter into an index scan first.
                         let index_plan = match where_pred.as_ref() {
                             Some(w) if !logical && !*distinct => {
@@ -1886,7 +1887,8 @@ impl Engine {
                                     table: t,
                                     where_pred: w,
                                     order_by,
-                                    schema: &schema,
+                                    schema,
+                                    types: &meta.types,
                                     indexed: &indexed,
                                 })
                             }
@@ -1899,7 +1901,7 @@ impl Engine {
                                 where_pred: where_pred.as_ref(),
                                 order_by,
                                 distinct: *distinct,
-                                schema: &schema,
+                                schema,
                                 logical,
                             })
                         }))
