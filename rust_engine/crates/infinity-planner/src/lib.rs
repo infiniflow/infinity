@@ -529,12 +529,43 @@ pub fn plan_select(
     let is_star = matches!(items, [SelectItem::Star]);
 
     if has_agg {
+        // Aggregate arguments that are computed expressions (e.g.
+        // `COUNT(CAST(c3 AS INTEGER))`) are materialised as extra input columns.
+        let mut pre_exprs: Vec<ExprAst> = Vec::new();
+        let mut pre_pos: std::collections::HashMap<String, usize> = Default::default();
+        for it in items {
+            if let SelectItem::Aggregate(a) = it {
+                for oe in a.arg_exprs.iter().flatten() {
+                    pre_pos.entry(key_text(oe)).or_insert_with(|| {
+                        let i = pre_exprs.len();
+                        pre_exprs.push(oe.clone());
+                        i
+                    });
+                }
+            }
+        }
+        let base_cols = schema.len();
+        let mut agg_schema = schema.clone();
+        agg_schema.extend(pre_exprs.iter().map(key_text));
+        if !pre_exprs.is_empty() {
+            let mut exprs: Vec<Expr> = (0..schema.len()).map(Expr::Column).collect();
+            let mut names: Vec<String> = schema.clone();
+            for e in &pre_exprs {
+                exprs.push(compile_expr(e, &schema)?);
+                names.push(key_text(e));
+            }
+            plan = LogicalPlan::Projection {
+                input: Box::new(plan),
+                exprs,
+                names,
+            };
+        }
         // Group keys may be plain columns or arbitrary expressions; keep both a
         // canonical key text (for matching select items) and the compiled form.
         let group_texts: Vec<String> = group_by.iter().map(key_text).collect();
         let group_keys: Vec<Expr> = group_by
             .iter()
-            .map(|e| compile_expr(e, &schema))
+            .map(|e| compile_expr(e, &agg_schema))
             .collect::<Result<Vec<_>>>()?;
         let base = group_by.len();
         let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
@@ -547,7 +578,11 @@ pub fn plan_select(
                         let idxs: Vec<usize> = a
                             .args
                             .iter()
-                            .map(|c| resolve_column(&schema, c))
+                            .enumerate()
+                            .map(|(j, c)| match a.arg_exprs.get(j).and_then(|o| o.as_ref()) {
+                                Some(e) => Ok(base_cols + pre_pos[&key_text(e)]),
+                                None => resolve_column(&agg_schema, c),
+                            })
                             .collect::<Result<Vec<_>>>()?;
                         agg_index.insert(label.clone(), base + aggs.len());
                         aggs.push((a.func, idxs, a.distinct, label));
@@ -710,11 +745,13 @@ mod tests {
             SelectItem::Aggregate(SelectAgg {
                 func: AggFunc::Count,
                 args: vec![],
+                arg_exprs: vec![],
                 distinct: false,
             }),
             SelectItem::Aggregate(SelectAgg {
                 func: AggFunc::Sum,
                 args: vec!["id".into()],
+                arg_exprs: vec![],
                 distinct: false,
             }),
         ];

@@ -164,7 +164,11 @@ impl AggFunc {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectAgg {
     pub func: AggFunc,
+    /// Argument texts (a column name, or the canonical text of an expression).
     pub args: Vec<String>,
+    /// Aligned with `args`: `Some` when the argument is a computed expression
+    /// (e.g. `CAST(c3 AS INTEGER)`) rather than a plain column.
+    pub arg_exprs: Vec<Option<ExprAst>>,
     pub distinct: bool,
 }
 

@@ -1472,15 +1472,28 @@ impl Parser {
         self.expect(Token::LParen)?;
         let distinct = self.eat_kw("DISTINCT");
         let mut args: Vec<String> = Vec::new();
+        let mut arg_exprs: Vec<Option<ExprAst>> = Vec::new();
         if self.peek() == &Token::Star {
             self.advance();
         } else {
             loop {
-                match self.peek() {
-                    Token::Ident(_) => args.push(self.expect_ident()?),
+                match self.peek().clone() {
+                    // a function-call argument is a computed expression
+                    Token::Ident(_)
+                        if matches!(self.toks.get(self.pos + 1), Some(Token::LParen)) =>
+                    {
+                        let e = self.expr()?;
+                        args.push(expr_text(&e));
+                        arg_exprs.push(Some(e));
+                    }
+                    Token::Ident(_) => {
+                        args.push(self.expect_ident()?);
+                        arg_exprs.push(None);
+                    }
                     Token::RParen => break,
                     _ => {
                         self.advance();
+                        continue;
                     }
                 }
                 if self.peek() == &Token::Comma {
@@ -1498,6 +1511,7 @@ impl Parser {
         Ok(SelectAgg {
             func,
             args,
+            arg_exprs,
             distinct,
         })
     }
@@ -1557,6 +1571,24 @@ fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
 }
 
 /// Normalises a typed date/time literal to Infinity's zero-padded text form.
+/// A canonical text for an expression (used to label aggregate arguments).
+fn expr_text(e: &ExprAst) -> String {
+    match e {
+        ExprAst::Column(c) => c.clone(),
+        ExprAst::Literal(l) => l.to_slt_string(),
+        ExprAst::Func { name, args } => format!(
+            "{}({})",
+            name.to_ascii_lowercase(),
+            args.iter().map(expr_text).collect::<Vec<_>>().join(",")
+        ),
+        ExprAst::Binary(a, op, b) => format!("({}{:?}{})", expr_text(a), op, expr_text(b)),
+        ExprAst::Cmp(a, op, b) => format!("({}{:?}{})", expr_text(a), op, expr_text(b)),
+        ExprAst::Not(a) => format!("not({})", expr_text(a)),
+        ExprAst::And(a, b) => format!("({} and {})", expr_text(a), expr_text(b)),
+        ExprAst::Or(a, b) => format!("({} or {})", expr_text(a), expr_text(b)),
+    }
+}
+
 fn normalize_datetime(kind: &str, raw: &str) -> String {
     if kind == "INTERVAL" {
         return raw.trim().to_string();
@@ -1788,11 +1820,13 @@ mod tests {
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Count,
                         args: vec![],
+                        arg_exprs: vec![],
                         distinct: false
                     }),
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Sum,
                         args: vec!["id".into()],
+                        arg_exprs: vec![None],
                         distinct: false
                     }),
                 ],
@@ -1817,6 +1851,7 @@ mod tests {
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Count,
                         args: vec![],
+                        arg_exprs: vec![],
                         distinct: false
                     }),
                 ],
