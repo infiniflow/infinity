@@ -19,8 +19,9 @@ ADDR="${2:-127.0.0.1:23818}"
 PY="${3:-python3}"
 SDK="${4:-$(cd "$(dirname "$0")/../.." && pwd)/python/infinity_sdk}"
 BIN="$(cd "$(dirname "$0")/.." && pwd)/target/release/infinity"
-
+LOG=/tmp/restart_check_server.log
 PORT="${ADDR##*:}"
+
 # The SDK itself must be importable in the chosen interpreter.
 if ! PYTHONPATH="$SDK" "$PY" -c "import infinity" >/dev/null 2>&1; then
     echo "SKIP: Python SDK (and its deps) not importable with '$PY'"
@@ -28,17 +29,55 @@ if ! PYTHONPATH="$SDK" "$PY" -c "import infinity" >/dev/null 2>&1; then
     exit 0
 fi
 
+listening() { ss -ltn 2>/dev/null | grep -q ":${PORT}"; }
+
 kill_server() {
     local pid
     pid=$(ss -ltnp 2>/dev/null | grep ":${PORT}" | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
     [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null
-    sleep 1
+    for _ in $(seq 1 50); do
+        listening || break
+        sleep 0.1
+    done
 }
 
-rm -rf "$DATA_DIR" && mkdir -p "$DATA_DIR"
-kill_server
-"$BIN" serve "$DATA_DIR" "$ADDR" >/tmp/restart_check_server.log 2>&1 &
-sleep 3
+start_server() {
+    # A subshell keeps the server detached from this script's job control, so it
+    # survives the phases that follow.
+    ( "$BIN" serve "$DATA_DIR" "$ADDR" >>"$LOG" 2>&1 & )
+    for _ in $(seq 1 100); do
+        listening && return 0
+        sleep 0.1
+    done
+    echo "FAIL: server never listened on ${ADDR}; last log lines:"
+    tail -3 "$LOG"
+    return 1
+}
+
+# The SDK's first call on a fresh pool retries once; repeated failures here mean
+# the server is not usable, so surface them early.
+warmup() {
+    PYTHONPATH="$SDK" "$PY" - "$PORT" <<'PY'
+import sys, time
+import infinity
+from infinity.common import NetworkAddress
+
+port = int(sys.argv[1])
+last = None
+for _ in range(10):
+    try:
+        inf = infinity.connect(NetworkAddress('127.0.0.1', port))
+        inf.list_databases()
+        inf.disconnect()
+        print('warmup ok')
+        sys.exit(0)
+    except Exception as e:  # retry while the pool settles
+        last = e
+        time.sleep(0.5)
+print(f'warmup FAILED: {last}')
+sys.exit(1)
+PY
+}
 
 wire() {
     PYTHONPATH="$SDK" "$PY" - "$PORT" "$1" <<'PY'
@@ -67,10 +106,17 @@ else:
 PY
 }
 
-wire write
+rm -rf "$DATA_DIR" && mkdir -p "$DATA_DIR"
+: >"$LOG"
+kill_server
+start_server || exit 1
+warmup || { kill_server; exit 1; }
+wire write || { echo "FAIL: write phase failed"; kill_server; exit 1; }
+
 kill_server                        # crash, not a clean shutdown
-"$BIN" serve "$DATA_DIR" "$ADDR" >>/tmp/restart_check_server.log 2>&1 &
-sleep 3
+start_server || exit 1
+warmup || { kill_server; exit 1; }
+
 if wire read; then
     echo "== Gate C restart check: PASS =="
     rc=0
