@@ -198,9 +198,172 @@ pub fn column_def_from_bytes(bytes: &[u8]) -> Option<ColumnDefValue> {
     column_def_from_json(&infinity_expression::json::parse(text)?)
 }
 
+/// The index-type names the C++ writer stores (`IndexInfo::IndexTypeToString`,
+/// `src/parser/statement/extra/create_index_info.cpp:25-62`).
+pub mod index_type {
+    pub const IVF: &str = "IVF";
+    pub const HNSW: &str = "HNSW";
+    pub const FULLTEXT: &str = "FULLTEXT";
+    pub const SECONDARY: &str = "SECONDARY";
+    pub const SECONDARY_FUNCTIONAL: &str = "SECONDARYFUNCTIONAL";
+    pub const BMP: &str = "BMP";
+    pub const DISKANN: &str = "DISKANN";
+    pub const EMVB: &str = "EMVB";
+    pub const PLAID: &str = "PLAID";
+    pub const SMVE: &str = "SMVE";
+}
+
+/// Maps a `CREATE INDEX … USING <type>` keyword to the stored name.
+pub fn index_type_name(using: &str) -> Option<&'static str> {
+    Some(match using.trim().to_ascii_uppercase().as_str() {
+        "IVF" => index_type::IVF,
+        "HNSW" => index_type::HNSW,
+        "FULLTEXT" => index_type::FULLTEXT,
+        "SECONDARY" => index_type::SECONDARY,
+        "SECONDARYFUNCTIONAL" | "SECONDARY_FUNCTIONAL" => index_type::SECONDARY_FUNCTIONAL,
+        "BMP" => index_type::BMP,
+        "DISKANN" => index_type::DISKANN,
+        "EMVB" => index_type::EMVB,
+        "PLAID" => index_type::PLAID,
+        "SMVE" => index_type::SMVE,
+        _ => return None,
+    })
+}
+
+/// The `IndexBase::Serialize()` payload (`index_base_impl.cpp:243-251`).
+///
+/// Per-index-type extras (HNSW's `M`/`ef_construction`/…, IVF's `ivf_option`,
+/// the functional index's expression) are appended by the subclasses; this
+/// struct covers the five fields every index carries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexBaseValue {
+    pub index_type: String,
+    pub index_name: String,
+    pub index_comment: String,
+    pub file_name: String,
+    pub column_names: Vec<String>,
+}
+
+impl IndexBaseValue {
+    pub fn new(
+        index_type: impl Into<String>,
+        index_name: impl Into<String>,
+        file_name: impl Into<String>,
+        column_names: Vec<String>,
+    ) -> Self {
+        Self {
+            index_type: index_type.into(),
+            index_name: index_name.into(),
+            index_comment: String::new(),
+            file_name: file_name.into(),
+            column_names,
+        }
+    }
+}
+
+/// Encodes `IndexBase::Serialize()`.
+pub fn index_base_json(v: &IndexBaseValue) -> Json {
+    obj(vec![
+        (
+            "column_names".to_string(),
+            Json::Arr(v.column_names.iter().cloned().map(Json::Str).collect()),
+        ),
+        ("file_name".to_string(), Json::Str(v.file_name.clone())),
+        (
+            "index_comment".to_string(),
+            Json::Str(v.index_comment.clone()),
+        ),
+        ("index_name".to_string(), Json::Str(v.index_name.clone())),
+        ("index_type".to_string(), Json::Str(v.index_type.clone())),
+    ])
+}
+
+/// The bytes the catalog stores for `idx|…|index_base`.
+pub fn index_base_bytes(v: &IndexBaseValue) -> Vec<u8> {
+    index_base_json(v).compact().into_bytes()
+}
+
+/// Decodes `IndexBase::Deserialize`'s common fields (`index_base_impl.cpp:253-266`).
+///
+/// A missing (or non-string) `index_comment` becomes the empty string, exactly
+/// as the C++ reader does.
+pub fn index_base_from_json(j: &Json) -> Option<IndexBaseValue> {
+    let as_str = |v: Option<&Json>| match v {
+        Some(Json::Str(s)) => Some(s.clone()),
+        _ => None,
+    };
+    let index_type = as_str(field(j, "index_type"))?;
+    let index_name = as_str(field(j, "index_name"))?;
+    let file_name = as_str(field(j, "file_name"))?;
+    let column_names = match field(j, "column_names") {
+        Some(Json::Arr(items)) => items
+            .iter()
+            .map(|i| match i {
+                Json::Str(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?,
+        _ => return None,
+    };
+    Some(IndexBaseValue {
+        index_type,
+        index_name,
+        index_comment: as_str(field(j, "index_comment")).unwrap_or_default(),
+        file_name,
+        column_names,
+    })
+}
+
+/// Decodes an `index_base` record from its stored bytes.
+pub fn index_base_from_bytes(bytes: &[u8]) -> Option<IndexBaseValue> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    index_base_from_json(&infinity_expression::json::parse(text)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn index_base_matches_the_cpp_json() {
+        let mut v = IndexBaseValue::new(
+            index_type::HNSW,
+            "idx_vec",
+            "idx_vec_0",
+            vec!["v".to_string()],
+        );
+        v.index_comment = "vectors".to_string();
+        assert_eq!(
+            index_base_json(&v).compact(),
+            r#"{"column_names":["v"],"file_name":"idx_vec_0","index_comment":"vectors","index_name":"idx_vec","index_type":"HNSW"}"#
+        );
+        assert_eq!(index_base_from_bytes(&index_base_bytes(&v)).unwrap(), v);
+    }
+
+    #[test]
+    fn index_base_tolerates_a_missing_comment() {
+        let j = infinity_expression::json::parse(
+            r#"{"column_names":["c"],"file_name":"f","index_name":"i","index_type":"SECONDARY"}"#,
+        )
+        .unwrap();
+        let v = index_base_from_json(&j).unwrap();
+        assert_eq!(v.index_comment, "");
+        assert_eq!(v.index_type, "SECONDARY");
+        // Required fields really are required.
+        let bad = infinity_expression::json::parse(r#"{"index_name":"i"}"#).unwrap();
+        assert!(index_base_from_json(&bad).is_none());
+    }
+
+    #[test]
+    fn index_type_names_are_the_cpp_spellings() {
+        assert_eq!(index_type_name("hnsw"), Some("HNSW"));
+        assert_eq!(index_type_name("FULLTEXT"), Some("FULLTEXT"));
+        assert_eq!(
+            index_type_name("secondary_functional"),
+            Some("SECONDARYFUNCTIONAL")
+        );
+        assert_eq!(index_type_name("nope"), None);
+    }
 
     #[test]
     fn plain_integer_column_matches_the_cpp_json() {
