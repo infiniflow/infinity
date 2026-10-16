@@ -16,11 +16,16 @@ cd "$here/.." || exit 1
 RUSTFLAGS="--cfg loom" cargo test -q -p infinity-txn --lib loom || status=1
 
 # 2. miri on the FFI-free core (parser/expression/planner are pure Rust)
-if rustup component list --installed 2>/dev/null | grep -q '^miri'; then
+#    miri needs a nightly toolchain; the repo pins `nightly-2025-04-04` for it.
+miri_tc="nightly-2025-04-04"
+if rustup component list --installed --toolchain "$miri_tc" 2>/dev/null | grep -q '^miri'; then
+  cargo "+$miri_tc" miri test -p infinity-expression -p infinity-planner -p infinity-parser \
+    || status=1
+elif rustup component list --installed 2>/dev/null | grep -q '^miri'; then
   cargo +nightly miri test -p infinity-expression -p infinity-planner -p infinity-parser \
     || status=1
 else
-  echo "SKIP: miri not installed (rustup component add miri --toolchain nightly)"
+  echo "SKIP: miri not installed (rustup component add miri --toolchain $miri_tc)"
 fi
 
 # 3. parallel stress (needs a running server + python SDK)
