@@ -46,7 +46,7 @@
 | HNSW 能找到精确解，且**召回率**达标 | `infinity-index/vector: hnsw_finds_exact_vector`、`hnsw_recall_vs_flat` | ✅ |
 | 全文倒排：分词、单词查询、AND 查询与排序、top-k 截断 | `infinity-index/fulltext: tokenize_basic`、`single_term_lookup`、`and_query_and_ranking`、`top_k_limits`；**打分单调性**：`infinity-executor: fulltext_score`（见 §4 G5） | ✅ |
 | A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | — | **缺口**：Rust 侧索引未落盘为独立的块文件族，尚无「文件集合/发布/合并/清理」契约测试 |
-| `DROP INDEX` 后重建 | executor：`DROP INDEX` + 元数据重建路径 | ⚠️ 无专项测试 |
+| `DROP INDEX` 后重建 | `infinity-executor: index_drop_recreate`（DROP 前后与重建后查询结果一致；重建后写入的新行可见） | ✅ |
 
 ## 4. 显式登记的例外与缺口（Gate G 要求）
 
