@@ -2556,12 +2556,23 @@ impl Engine {
                 .unwrap_or(false)
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
-        // Drop per-term boosts (`term^2.0`) before tokenising.
+        // Per-term boosts (`term^2.0`) are stripped before tokenising.
         let query_clean = query
             .split_whitespace()
             .map(|w| w.split('^').next().unwrap_or(w))
             .collect::<Vec<_>>()
             .join(" ");
+        // field boosts from `col^w` / `col@index^w`
+        let field_boosts: Vec<f64> = m
+            .column
+            .split(',')
+            .map(|c| {
+                c.split('^')
+                    .nth(1)
+                    .and_then(|v| v.trim().parse::<f64>().ok())
+                    .unwrap_or(1.0)
+            })
+            .collect();
         let cols: Vec<usize> = match_columns(&m.column)
             .iter()
             .filter_map(|c| schema.iter().position(|s| s == c))
@@ -2614,12 +2625,24 @@ impl Engine {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
             None => None,
         };
-        let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
-            if let Some(p) = &in_filter {
-                if !p.eval_predicate(&row) {
-                    continue;
-                }
+        // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
+        // the number of indexed terms, and `similarity=boolean` scores one point
+        // per matching term weighted by the field/term boosts.
+        // Deleted rows still contribute to the index statistics (they are only
+        // filtered from the result), so gather every stored row first.
+        let prefix = row_prefix(table);
+        let defaults_len = self.table_defaults(table).unwrap_or_default().len();
+        let mut docs: Vec<(usize, Vec<Value>, Vec<String>, bool)> = Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
+                .split('\t')
+                .map(parse_value)
+                .collect();
+            while row.len() < defaults_len {
+                row.push(Value::Null);
             }
             let text: String = cols
                 .iter()
@@ -2630,13 +2653,66 @@ impl Engine {
                 })
                 .collect::<Vec<_>>()
                 .join(" ");
-            let doc: std::collections::HashSet<String> = tokenize(&text).into_iter().collect();
-            let hits = terms.iter().filter(|t| doc.contains(*t)).count();
-            if hits >= min_should && hits > 0 {
-                let score = hits as f64;
-                if threshold.map(|t| score >= t).unwrap_or(true) {
-                    scored.push((seq, score));
+            let live = self.store.get(&del_key(table, seq))?.is_none();
+            docs.push((seq, row, tokenize(&text), live));
+        }
+        let boolean = params.split(';').any(|p| {
+            p.split_once('=')
+                .map(|(k, v)| {
+                    k.trim().eq_ignore_ascii_case("similarity")
+                        && v.trim().eq_ignore_ascii_case("boolean")
+                })
+                .unwrap_or(false)
+        });
+        let n_docs = docs.len().max(1);
+        let avg_len: f64 = if docs.is_empty() {
+            1.0
+        } else {
+            docs.iter()
+                .map(|(_, _, toks, _)| toks.len().saturating_sub(1) as f64)
+                .sum::<f64>()
+                / docs.len() as f64
+        };
+        let avg_len = if avg_len <= 0.0 { 1.0 } else { avg_len };
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        for (seq, row, toks, live) in &docs {
+            if !live {
+                continue;
+            }
+            if let Some(p) = &in_filter {
+                if !p.eval_predicate(row) {
+                    continue;
                 }
+            }
+            let mut counts: HashMap<&str, usize> = HashMap::new();
+            for t in toks {
+                *counts.entry(t.as_str()).or_insert(0) += 1;
+            }
+            let len = toks.len().saturating_sub(1) as f64;
+            let mut score = 0.0f64;
+            let mut hits = 0usize;
+            for (ti, term) in terms.iter().enumerate() {
+                let tf = match counts.get(term.as_str()) {
+                    Some(c) => *c as f64,
+                    None => continue,
+                };
+                hits += 1;
+                let field = field_boosts.get(ti).copied().unwrap_or(1.0);
+                if boolean {
+                    score += field;
+                } else {
+                    let df = docs
+                        .iter()
+                        .filter(|(_, _, t, _)| t.iter().any(|x| x == term))
+                        .count()
+                        .max(1) as f64;
+                    let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
+                    let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                    score += idf * norm * field;
+                }
+            }
+            if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
+                scored.push((*seq, score));
             }
         }
         scored.sort_by(|a, b| {
