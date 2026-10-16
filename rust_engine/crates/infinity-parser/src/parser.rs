@@ -310,9 +310,23 @@ impl Parser {
                 };
                 let group_by = if self.eat_kw("GROUP") {
                     self.expect_kw("BY")?;
-                    Some(self.expect_ident()?)
+                    let mut keys = vec![self.expect_ident()?];
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        // tolerate expression keys: take the leading identifier
+                        if matches!(self.peek(), Token::Ident(_)) {
+                            keys.push(self.expect_ident()?);
+                            while !matches!(
+                                self.peek(),
+                                Token::Comma | Token::Ident(_) | Token::Semicolon | Token::Eof
+                            ) {
+                                self.advance();
+                            }
+                        }
+                    }
+                    keys
                 } else {
-                    None
+                    Vec::new()
                 };
                 let order_by = if self.eat_kw("ORDER") {
                     self.expect_kw("BY")?;
@@ -1392,7 +1406,7 @@ mod tests {
                 from: Some("t".into()),
                 join: None,
                 where_pred: None,
-                group_by: None,
+                group_by: vec![],
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1409,7 +1423,7 @@ mod tests {
                 from: None,
                 join: None,
                 where_pred: None,
-                group_by: None,
+                group_by: vec![],
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1430,7 +1444,7 @@ mod tests {
                 from: Some("t".into()),
                 join: None,
                 where_pred: Some(Predicate::simple("id", CmpOp::Ge, Literal::Int(2))),
-                group_by: None,
+                group_by: vec![],
                 order_by: None,
                 limit: Some(10),
                 search: None,
@@ -1459,7 +1473,7 @@ mod tests {
                 from: Some("t".into()),
                 join: None,
                 where_pred: None,
-                group_by: None,
+                group_by: vec![],
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1480,7 +1494,7 @@ mod tests {
                 from: Some("t".into()),
                 join: None,
                 where_pred: None,
-                group_by: Some("name".into()),
+                group_by: vec!["name".into()],
                 order_by: Some(OrderKey {
                     column: "name".into(),
                     asc: false
@@ -1505,7 +1519,7 @@ mod tests {
                     right: "bid".into()
                 }),
                 where_pred: Some(Predicate::simple("aid", CmpOp::Ge, Literal::Int(1))),
-                group_by: None,
+                group_by: vec![],
                 order_by: None,
                 limit: None,
                 search: None,

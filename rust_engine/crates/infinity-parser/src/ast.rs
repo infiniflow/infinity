@@ -296,7 +296,7 @@ pub enum Statement {
         from: Option<String>,
         join: Option<JoinClause>,
         where_pred: Option<Predicate>,
-        group_by: Option<String>,
+        group_by: Vec<String>,
         order_by: Option<OrderKey>,
         limit: Option<u64>,
         search: Option<Box<SearchClause>>,

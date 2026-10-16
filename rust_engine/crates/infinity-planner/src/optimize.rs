@@ -62,13 +62,13 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
         },
         LogicalPlan::Aggregate {
             input,
-            group_key,
-            group_name,
+            group_keys,
+            group_names,
             aggs,
         } => LogicalPlan::Aggregate {
             input: Box::new(optimize(*input)),
-            group_key,
-            group_name,
+            group_keys,
+            group_names,
             aggs,
         },
         LogicalPlan::Sort { input, key, asc } => LogicalPlan::Sort {
@@ -197,7 +197,7 @@ mod tests {
                 CmpOp::Ge,
                 infinity_parser::Literal::Int(1),
             )),
-            None,
+            &[],
             None,
             Some(10),
         )

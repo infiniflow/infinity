@@ -44,8 +44,8 @@ pub enum LogicalPlan {
     },
     Aggregate {
         input: Box<LogicalPlan>,
-        group_key: Option<usize>,
-        group_name: Option<String>,
+        group_keys: Vec<usize>,
+        group_names: Vec<String>,
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
@@ -248,11 +248,11 @@ fn gather_agg(
 fn compile_agg_expr(
     e: &ExprAst,
     agg_index: &std::collections::HashMap<String, usize>,
-    group_by: Option<&str>,
+    group_by: &[String],
 ) -> Result<Expr> {
     Ok(match e {
         ExprAst::Column(c) => {
-            if group_by == Some(c.as_str()) {
+            if group_by.iter().any(|g| g == c) {
                 Expr::Column(0)
             } else {
                 return Err(Error::Invalid(format!(
@@ -302,7 +302,7 @@ fn compile_agg_expr(
 fn item_agg_expr(
     it: &SelectItem,
     agg_index: &std::collections::HashMap<String, usize>,
-    group_by: Option<&str>,
+    group_by: &[String],
     _agg_names: &[String],
 ) -> Result<Expr> {
     match it {
@@ -313,15 +313,12 @@ fn item_agg_expr(
                 .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
             Ok(Expr::Column(idx))
         }
-        SelectItem::Column(c) => {
-            if group_by == Some(c.as_str()) {
-                Ok(Expr::Column(0))
-            } else {
-                Err(Error::Invalid(format!(
-                    "column '{c}' must appear in GROUP BY or inside an aggregate"
-                )))
-            }
-        }
+        SelectItem::Column(c) => match group_by.iter().position(|g| g == c) {
+            Some(i) => Ok(Expr::Column(i)),
+            None => Err(Error::Invalid(format!(
+                "column '{c}' must appear in GROUP BY or inside an aggregate"
+            ))),
+        },
         SelectItem::Literal(l) => Ok(Expr::Literal(Value::from_literal(l))),
         SelectItem::Func { name, args } => {
             let e = ExprAst::Func {
@@ -385,7 +382,7 @@ pub fn plan_select(
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
     where_pred: Option<&Predicate>,
-    group_by: Option<&str>,
+    group_by: &[String],
     order_by: Option<&OrderKey>,
     limit: Option<u64>,
 ) -> Result<LogicalPlan> {
@@ -428,7 +425,7 @@ pub fn plan_select(
         };
     }
 
-    let has_agg = group_by.is_some()
+    let has_agg = !group_by.is_empty()
         || items.iter().any(|i| match i {
             SelectItem::Aggregate(_) => true,
             SelectItem::Expr(e) => expr_has_agg(e),
@@ -437,11 +434,11 @@ pub fn plan_select(
     let is_star = matches!(items, [SelectItem::Star]);
 
     if has_agg {
-        let group_key = match group_by {
-            Some(name) => Some(resolve_column(&schema, name)?),
-            None => None,
-        };
-        let base = usize::from(group_by.is_some());
+        let group_keys: Vec<usize> = group_by
+            .iter()
+            .map(|name| resolve_column(&schema, name))
+            .collect::<Result<Vec<_>>>()?;
+        let base = group_by.len();
         let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
         let mut agg_index: std::collections::HashMap<String, usize> = Default::default();
         let mut needs_projection = false;
@@ -464,7 +461,7 @@ pub fn plan_select(
                     gather_agg(e, &schema, &mut aggs, &mut agg_index, base)?;
                 }
                 SelectItem::Column(c) => {
-                    if group_by != Some(c.as_str()) {
+                    if !group_by.iter().any(|g| g == c) {
                         return Err(Error::Invalid(format!(
                             "column '{c}' must appear in GROUP BY or inside an aggregate"
                         )));
@@ -480,15 +477,12 @@ pub fn plan_select(
                 }
             }
         }
-        let mut agg_names: Vec<String> = Vec::new();
-        if let Some(g) = group_by {
-            agg_names.push(g.to_string());
-        }
+        let mut agg_names: Vec<String> = group_by.to_vec();
         agg_names.extend(aggs.iter().map(|(_, _, _, l)| l.clone()));
         plan = LogicalPlan::Aggregate {
             input: Box::new(plan),
-            group_key,
-            group_name: group_by.map(|s| s.to_string()),
+            group_keys,
+            group_names: group_by.to_vec(),
             aggs,
         };
         out_names = agg_names.clone();
@@ -577,7 +571,7 @@ mod tests {
 
     #[test]
     fn plan_scan_only() {
-        let p = plan_select(&[SelectItem::Star], &tables(), None, None, None, None, None).unwrap();
+        let p = plan_select(&[SelectItem::Star], &tables(), None, None, &[], None, None).unwrap();
         assert_eq!(
             p,
             LogicalPlan::Scan {
@@ -601,12 +595,12 @@ mod tests {
                 distinct: false,
             }),
         ];
-        let p = plan_select(&items, &tables(), None, None, None, None, None).unwrap();
+        let p = plan_select(&items, &tables(), None, None, &[], None, None).unwrap();
         match p {
             LogicalPlan::Aggregate {
-                group_key, aggs, ..
+                group_keys, aggs, ..
             } => {
-                assert!(group_key.is_none());
+                assert!(group_keys.is_empty());
                 assert_eq!(aggs.len(), 2);
                 assert_eq!(aggs[1].3, "sum(id)");
             }
@@ -625,7 +619,7 @@ mod tests {
             left: "aid".into(),
             right: "bid".into(),
         };
-        let p = plan_select(&[SelectItem::Star], &t, Some(&j), None, None, None, None).unwrap();
+        let p = plan_select(&[SelectItem::Star], &t, Some(&j), None, &[], None, None).unwrap();
         match p {
             LogicalPlan::Join {
                 left_key,
@@ -646,7 +640,7 @@ mod tests {
             &tables(),
             None,
             None,
-            None,
+            &[],
             None,
             None
         )
@@ -660,7 +654,7 @@ mod tests {
             &dup,
             None,
             None,
-            None,
+            &[],
             None,
             None
         )

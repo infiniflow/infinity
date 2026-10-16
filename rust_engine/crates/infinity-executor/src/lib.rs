@@ -73,8 +73,8 @@ enum Stage {
     Filter(Expr),
     Projection(Vec<Expr>, Vec<String>),
     Aggregate {
-        group_key: Option<usize>,
-        group_name: Option<String>,
+        group_keys: Vec<usize>,
+        group_names: Vec<String>,
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
@@ -720,7 +720,7 @@ impl Engine {
                     &tables,
                     join.as_ref(),
                     where_pred.as_ref(),
-                    group_by.as_deref(),
+                    group_by,
                     order_by.as_ref(),
                     *limit,
                 )?;
@@ -761,13 +761,13 @@ impl Engine {
                 }
                 LogicalPlan::Aggregate {
                     input,
-                    group_key,
-                    group_name,
+                    group_keys,
+                    group_names,
                     aggs,
                 } => {
                     stages.push(Stage::Aggregate {
-                        group_key,
-                        group_name,
+                        group_keys,
+                        group_names,
                         aggs,
                     });
                     cur = *input;
@@ -1571,12 +1571,11 @@ async fn pipeline(
                 cols = names.clone();
             }
             Stage::Aggregate {
-                group_key,
-                group_name,
+                group_keys,
+                group_names,
                 aggs,
             } => {
-                let (new_cols, new_rows) =
-                    apply_aggregate(&data, *group_key, group_name.as_deref(), aggs);
+                let (new_cols, new_rows) = apply_aggregate(&data, group_keys, group_names, aggs);
                 cols = new_cols;
                 data = new_rows;
             }
@@ -1594,54 +1593,51 @@ async fn pipeline(
 
 fn apply_aggregate(
     rows: &[Vec<Value>],
-    group_key: Option<usize>,
-    group_name: Option<&str>,
+    group_keys: &[usize],
+    group_names: &[String],
     aggs: &[(AggFunc, Vec<usize>, bool, String)],
 ) -> (Vec<String>, Vec<Vec<Value>>) {
-    let mut names = Vec::new();
-    if let Some(g) = group_name {
-        names.push(g.to_string());
-    }
+    let mut names: Vec<String> = group_names.to_vec();
     for (_, _, _, label) in aggs {
         names.push(label.clone());
     }
 
-    match group_key {
-        None => {
-            let row: Vec<Value> = aggs
-                .iter()
-                .map(|(f, cols, distinct, _)| aggregate(*f, cols, *distinct, rows))
-                .collect();
-            (names, vec![row])
-        }
-        Some(k) => {
-            let mut order: Vec<Value> = Vec::new();
-            let mut groups: Vec<(Value, Vec<Vec<Value>>)> = Vec::new();
-            for r in rows {
-                let key = r.get(k).cloned().unwrap_or(Value::Null);
-                let idx = match order.iter().position(|o| *o == key) {
-                    Some(i) => i,
-                    None => {
-                        order.push(key.clone());
-                        groups.push((key.clone(), Vec::new()));
-                        groups.len() - 1
-                    }
-                };
-                groups[idx].1.push(r.clone());
-            }
-            let out = groups
-                .into_iter()
-                .map(|(key, grp)| {
-                    let mut row = vec![key];
-                    for (f, cols, distinct, _) in aggs {
-                        row.push(aggregate(*f, cols, *distinct, &grp));
-                    }
-                    row
-                })
-                .collect();
-            (names, out)
-        }
+    if group_keys.is_empty() {
+        let row: Vec<Value> = aggs
+            .iter()
+            .map(|(f, cols, distinct, _)| aggregate(*f, cols, *distinct, rows))
+            .collect();
+        return (names, vec![row]);
     }
+    // group by the tuple of key columns, preserving first-seen order
+    let mut order: Vec<Vec<Value>> = Vec::new();
+    let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
+    for r in rows {
+        let key: Vec<Value> = group_keys
+            .iter()
+            .map(|k| r.get(*k).cloned().unwrap_or(Value::Null))
+            .collect();
+        let idx = match order.iter().position(|o| *o == key) {
+            Some(i) => i,
+            None => {
+                order.push(key.clone());
+                groups.push((key.clone(), Vec::new()));
+                groups.len() - 1
+            }
+        };
+        groups[idx].1.push(r.clone());
+    }
+    let out = groups
+        .into_iter()
+        .map(|(key, grp)| {
+            let mut row = key;
+            for (f, cols, distinct, _) in aggs {
+                row.push(aggregate(*f, cols, *distinct, &grp));
+            }
+            row
+        })
+        .collect();
+    (names, out)
 }
 
 fn sort_rows(rows: &mut [Vec<Value>], key: usize, asc: bool) {
