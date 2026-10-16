@@ -331,6 +331,102 @@ pub fn verify_fst(buf: &[u8]) -> Result<(u64, u64), FormatError> {
     Ok((len, root_addr))
 }
 
+// ---------------------------------------------------------------------------
+// `.dic` — TermMeta region + FST (`memory_indexer_impl.cpp:516-543`,
+// `dict_reader_impl.cpp:46-90`)
+// ---------------------------------------------------------------------------
+
+/// The FST region starts with two `u64` header fields — `VERSION` then
+/// `FstType` (`fst/node.cppm:40`; `fst.cppm:64-112`).
+pub const FST_HEADER_LEN: usize = 16;
+
+/// Assembles a `.dic`: the TermMeta records, then the FST region on the tail.
+/// The C++ writes the records while building and `VirtualStore::Merge`s the FST
+/// onto the end (`memory_indexer_impl.cpp:516-543`).
+pub fn encode_dic(term_meta_region: &[u8], fst_region: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(term_meta_region.len() + fst_region.len());
+    out.extend_from_slice(term_meta_region);
+    out.extend_from_slice(fst_region);
+    out
+}
+
+/// Locates the FST region inside a `.dic` (`dict_reader_impl.cpp:46-67`):
+/// `root_addr` is the `u64` 12 bytes before the end and `fst_len` follows
+/// [`fst_len_from_trailer`]. Returns `(fst_start, fst_len, root_addr)`.
+pub fn dic_fst_region(buf: &[u8]) -> Result<(usize, usize, u64), FormatError> {
+    if buf.len() < 12 {
+        return Err(FormatError::Truncated {
+            need: 12,
+            got: buf.len(),
+        });
+    }
+    let at = buf.len() - 12;
+    let root_addr = u64::from_le_bytes(buf[at..at + 8].try_into().unwrap());
+    let fst_len = fst_len_from_trailer(root_addr);
+    if fst_len > buf.len() {
+        return Err(FormatError::Truncated {
+            need: fst_len,
+            got: buf.len(),
+        });
+    }
+    Ok((buf.len() - fst_len, fst_len, root_addr))
+}
+
+/// The FST region of a `.dic` — the bytes a `Fst::Get`/iteration call reads.
+pub fn dic_fst(buf: &[u8]) -> Result<&[u8], FormatError> {
+    let (start, len, _) = dic_fst_region(buf)?;
+    Ok(&buf[start..start + len])
+}
+
+/// Reads the FST region's `(VERSION, FstType)` header (`fst.cppm:64-112`).
+pub fn fst_header(fst: &[u8]) -> Result<(u64, u64), FormatError> {
+    if fst.len() < FST_HEADER_LEN {
+        return Err(FormatError::Truncated {
+            need: FST_HEADER_LEN,
+            got: fst.len(),
+        });
+    }
+    let version = u64::from_le_bytes(fst[0..8].try_into().unwrap());
+    let fst_type = u64::from_le_bytes(fst[8..16].try_into().unwrap());
+    Ok((version, fst_type))
+}
+
+/// Encodes the TermMeta region and returns each record's byte offset — the
+/// `u64` value the FST maps a term to (`memory_indexer_impl.cpp:516-543`).
+pub fn encode_term_meta_region_with_offsets(
+    metas: &[TermMeta],
+    flags: TermMetaFlags,
+) -> (Vec<u8>, Vec<u64>) {
+    let mut out = Vec::new();
+    let mut offsets = Vec::with_capacity(metas.len());
+    for m in metas {
+        offsets.push(out.len() as u64);
+        out.extend_from_slice(&encode_term_meta(m, flags));
+    }
+    (out, offsets)
+}
+
+/// Parses the TermMeta at absolute byte `offset` inside a `.dic`, which is what
+/// an FST lookup yields (`dict_reader_impl.cpp:80-90`).
+pub fn decode_dic_meta_at(
+    buf: &[u8],
+    offset: u64,
+    flags: TermMetaFlags,
+) -> Result<TermMeta, FormatError> {
+    let off = usize::try_from(offset).map_err(|_| FormatError::Truncated {
+        need: offset as usize,
+        got: buf.len(),
+    })?;
+    if off > buf.len() {
+        return Err(FormatError::Truncated {
+            need: off,
+            got: buf.len(),
+        });
+    }
+    let (meta, _) = decode_term_meta(&buf[off..], flags)?;
+    Ok(meta)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,6 +458,64 @@ mod tests {
             Err(FormatError::Checksum { .. })
         ));
         assert!(verify_fst(&fst[..8]).is_err());
+    }
+
+    #[test]
+    fn dic_roundtrip_locates_the_fst_and_reads_meta_by_offset() {
+        let flags = TermMetaFlags {
+            has_term_frequency: true,
+            has_term_payload: true,
+        };
+        let metas = [
+            TermMeta {
+                doc_freq: 2,
+                total_tf: 3,
+                payload: 0x11223344,
+                doc_start: 0,
+                pos_start: 8,
+                pos_end: 24,
+            },
+            TermMeta {
+                doc_freq: 5,
+                total_tf: 9,
+                payload: 0x55667788,
+                doc_start: 24,
+                pos_start: 40,
+                pos_end: 96,
+            },
+        ];
+        let (region, offsets) = encode_term_meta_region_with_offsets(&metas, flags);
+        assert_eq!(offsets, vec![0, encode_term_meta(&metas[0], flags).len() as u64]);
+
+        // A toy FST region: header, some node bytes, then the trailer. The
+        // reader derives the region length from `root_addr` as `root_addr + 21`,
+        // so pick the root addr the length implies.
+        let mut fst = Vec::new();
+        fst.extend_from_slice(&FST_VERSION.to_le_bytes());
+        fst.extend_from_slice(&0u64.to_le_bytes()); // FstType
+        fst.extend_from_slice(&[0xcd; 13]); // node data
+        let root_addr = (FST_HEADER_LEN + 13 + FST_TRAILER_LEN - 21) as u64;
+        append_fst_trailer(&mut fst, metas.len() as u64, root_addr);
+
+        let dic = encode_dic(&region, &fst);
+        // The FST sits at the tail; the trailing 12 bytes give root_addr.
+        let (start, len, got_root) = dic_fst_region(&dic).unwrap();
+        assert_eq!(start, region.len());
+        assert_eq!(len, fst.len());
+        assert_eq!(got_root, root_addr);
+        assert_eq!(dic_fst(&dic).unwrap(), fst.as_slice());
+        let (version, fst_type) = fst_header(dic_fst(&dic).unwrap()).unwrap();
+        assert_eq!((version, fst_type), (FST_VERSION, 0));
+        // The FST's trailing trailer is verifiable.
+        assert_eq!(verify_fst(dic_fst(&dic).unwrap()).unwrap(), (2, root_addr));
+
+        // Each recorded offset reads back its own record.
+        for (i, off) in offsets.iter().enumerate() {
+            assert_eq!(decode_dic_meta_at(&dic, *off, flags).unwrap(), metas[i]);
+        }
+        // An out-of-range offset is reported, not panicked.
+        assert!(decode_dic_meta_at(&dic, dic.len() as u64 + 1, flags).is_err());
+        assert!(dic_fst_region(&dic[..8]).is_err());
     }
 
     #[test]
