@@ -985,6 +985,29 @@ pub fn regex_literal_runs(pattern: &str) -> Vec<String> {
     out
 }
 
+/// The canonical text of a function-call operand (`sqrt(c1)`,
+/// `substring(c2,0,5)`), used to match a functional-index expression.
+fn func_expr_text(e: &ExprAst) -> Option<String> {
+    match e {
+        ExprAst::Func { name, args } => {
+            let inner: Vec<String> = args
+                .iter()
+                .map(|a| match a {
+                    ExprAst::Column(c) => c.clone(),
+                    ExprAst::Literal(l) => l.to_slt_string(),
+                    other => render_expr(other, &HashMap::new()),
+                })
+                .collect();
+            Some(format!(
+                "{}({})",
+                name.to_ascii_lowercase(),
+                inner.join(",")
+            ))
+        }
+        _ => None,
+    }
+}
+
 /// The column and pattern of a `regex(col, pattern)` predicate.
 pub(crate) fn regex_pred(p: &Predicate) -> Option<(String, String)> {
     let Predicate::IsTrue(ExprAst::Func { name, args }) = p else {
@@ -1097,6 +1120,16 @@ fn is_index_eligible(p: &Predicate, indexed: &[String]) -> bool {
             return indexed.iter().any(|x| x == &col);
         }
     }
+    // A comparison against a functional-index expression is pushable.
+    if let Predicate::Cmp(a, _, b) = p {
+        for e in [a, b] {
+            if let Some(t) = func_expr_text(e) {
+                if indexed.iter().any(|x| x == &t) {
+                    return true;
+                }
+            }
+        }
+    }
     let mut cols = Vec::new();
     pred_cols(p, &mut cols);
     // `filter_fulltext('col', …)` names its column as a string argument; it does
@@ -1152,6 +1185,17 @@ fn idx_operand(e: &ExprAst, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) ->
                 .unwrap_or_default();
             format!("({col} {name} {path})")
         }
+        // A functional-index expression (`sqrt(c1)`, `substring(c2, 0, 5)`).
+        ExprAst::Func { name, args } => {
+            let inner: Vec<String> = args
+                .iter()
+                .map(|a| match a {
+                    ExprAst::Column(c) => ann(c),
+                    other => render_expr(other, &HashMap::new()),
+                })
+                .collect();
+            format!("{}({})", name.to_ascii_lowercase(), inner.join(", "))
+        }
         ExprAst::Literal(l) => lit_plain(l),
         other => render_expr(other, &HashMap::new()),
     }
@@ -1197,23 +1241,40 @@ fn idx_json_pred(name: &str, args: &[ExprAst], ann: &dyn Fn(&str) -> String) -> 
 }
 
 /// Renders an index-filter predicate, qualifying column ids as `#1.<col>`.
-fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> bool) -> String {
+fn idx_pred(
+    p: &Predicate,
+    ann: &dyn Fn(&str) -> String,
+    cast: &dyn Fn(&str) -> bool,
+    funcs: &[String],
+) -> String {
     match p {
         Predicate::Cmp(a, op, b) => {
+            // An int literal compared against a functional-index call widens to
+            // Double (`sqrt(c1) > CAST(1 AS Double)`).
+            let is_func =
+                |e: &ExprAst| func_expr_text(e).is_some_and(|t| funcs.iter().any(|f| f == &t));
+            let operand = |e: &ExprAst, partner_is_func: bool| {
+                if partner_is_func {
+                    if let ExprAst::Literal(Literal::Int(i)) = e {
+                        return format!("CAST({i} AS Double)");
+                    }
+                }
+                idx_operand(e, ann, cast)
+            };
             format!(
                 "{} {} {}",
-                idx_operand(a, ann, cast),
+                operand(a, is_func(b)),
                 cmp_text(*op),
-                idx_operand(b, ann, cast)
+                operand(b, is_func(a))
             )
         }
         Predicate::Bool(a, op, b) => format!(
             "{} {} {}",
-            wrap_bool_operand(a, idx_pred(a, ann, cast)),
+            wrap_bool_operand(a, idx_pred(a, ann, cast, funcs)),
             bool_text(*op),
-            wrap_bool_operand(b, idx_pred(b, ann, cast))
+            wrap_bool_operand(b, idx_pred(b, ann, cast, funcs))
         ),
-        Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann, cast)),
+        Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann, cast, funcs)),
         Predicate::IsTrue(ExprAst::Func { name, args })
             if name.eq_ignore_ascii_case("regex") && args.len() == 2 =>
         {
@@ -1264,6 +1325,12 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
         None => false,
     };
 
+    let funcs: Vec<String> = p
+        .indexed
+        .iter()
+        .filter(|c| c.contains('('))
+        .cloned()
+        .collect();
     let conjuncts = split_and(p.where_pred);
     // index-filter parts: `(rendered, is_bare_fulltext)`.
     let mut idx_parts: Vec<(String, bool)> = Vec::new();
@@ -1296,7 +1363,7 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
             }
         }
         if is_index_eligible(c, p.indexed) {
-            idx_parts.push((idx_pred(c, &ann, &cast), is_fulltext_pred(c)));
+            idx_parts.push((idx_pred(c, &ann, &cast, &funcs), is_fulltext_pred(c)));
         } else {
             left.push(c);
         }

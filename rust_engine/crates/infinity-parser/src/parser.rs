@@ -1866,8 +1866,24 @@ fn index_column_from(toks: &[Token]) -> Result<String> {
                 _ => {}
             }
         }
+        // Record the canonical expression text (`sqrt(c1)`, `substring(c2,0,5)`)
+        // so the planner can match a functional-index predicate.
+        let inner_txt: String = inner
+            .iter()
+            .map(|t| match t {
+                Token::Ident(s) => s.clone(),
+                Token::Int(i) => i.to_string(),
+                Token::Str(s) => s.clone(),
+                Token::Star => "*".to_string(),
+                Token::Op(o) => o.clone(),
+                Token::Comma => ",".to_string(),
+                Token::LParen => "(".to_string(),
+                Token::RParen => ")".to_string(),
+                other => format!("{other:?}"),
+            })
+            .collect();
         return if has_column {
-            Ok(f.clone())
+            Ok(format!("{}({inner_txt})", f.to_ascii_lowercase()))
         } else {
             Err(Error::Invalid(format!(
                 "unsupported index expression '{f}'"
@@ -2117,8 +2133,7 @@ mod tests {
     fn parenthesized_predicate_is_an_expression() {
         // A parenthesised item may be a predicate, not just arithmetic:
         // `(num > 2 OR num < 1)` and `(filter_text(...) OR num > 2)`.
-        let Statement::Select { items, .. } = one("SELECT num, (num > 2 OR num < 1) FROM t")
-        else {
+        let Statement::Select { items, .. } = one("SELECT num, (num > 2 OR num < 1) FROM t") else {
             panic!("expected a SELECT");
         };
         assert!(
