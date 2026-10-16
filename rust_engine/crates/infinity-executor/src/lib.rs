@@ -132,7 +132,8 @@ fn type_dim(type_text: &str) -> Option<usize> {
 }
 
 fn is_tensor_type(type_text: &str) -> bool {
-    type_text.to_ascii_uppercase().starts_with("TENSOR")
+    let t = type_text.to_ascii_uppercase();
+    t.starts_with("TENSOR") || t.starts_with("TENSORARRAY") || t.starts_with("MULTIVECTOR")
 }
 
 fn is_float_type(type_text: &str) -> bool {
