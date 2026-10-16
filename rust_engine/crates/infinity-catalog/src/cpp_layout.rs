@@ -90,6 +90,23 @@ pub fn data_type_of_text(type_text: &str) -> Option<Json> {
                 Some(array_type_info(element)),
             ))
         }
+        "SPARSE" => {
+            // `SPARSE(<elem>,<bound>)` -> `SparseInfo::Serialize()`
+            // (`sparse_info.cpp:103-110`, `GetIndexType` `:44-58`).
+            let inner = up.split_once('(')?.1.trim_end_matches(')');
+            let mut parts = inner.split(',');
+            let elem = parts.next()?.trim().to_string();
+            let dim: i64 = parts.next()?.trim().parse().ok()?;
+            Some(data_type_json(
+                logical::SPARSE,
+                Some(value_format::sparse_type_info(
+                    element_code(&elem)?,
+                    value_format::sparse_index_type(dim),
+                    dim,
+                    value_format::sparse_store::SORT,
+                )),
+            ))
+        }
         _ => None,
     }
 }
@@ -491,6 +508,11 @@ mod tests {
         // Unknown shapes are reported instead of guessed.
         assert!(data_type_of_text("MYSTERY").is_none());
         assert!(data_type_of_text("EMBEDDING(BIT,8)").is_some());
+        // SPARSE carries the `SparseInfo` type_info (index type from the bound).
+        assert_eq!(
+            data_type_of_text("SPARSE(FLOAT,100)").unwrap().compact(),
+            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
+        );
     }
 
     #[test]

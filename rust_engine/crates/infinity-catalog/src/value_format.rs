@@ -56,6 +56,35 @@ pub mod element {
     pub const BFLOAT16: i64 = 9;
 }
 
+/// `LiteralType` ordinals (`src/parser/expr/constant_expr.h`).
+pub mod literal {
+    pub const BOOLEAN: i64 = 0;
+    pub const DOUBLE: i64 = 1;
+    pub const STRING: i64 = 2;
+    pub const INTEGER: i64 = 3;
+    pub const NULL: i64 = 4;
+    pub const DATE: i64 = 5;
+    pub const TIME: i64 = 6;
+    pub const DATETIME: i64 = 7;
+    pub const TIMESTAMP: i64 = 8;
+    pub const INTEGER_ARRAY: i64 = 9;
+    pub const DOUBLE_ARRAY: i64 = 10;
+    pub const SUB_ARRAY_ARRAY: i64 = 11;
+    pub const INTERVAL: i64 = 12;
+    pub const LONG_SPARSE_ARRAY: i64 = 13;
+    pub const DOUBLE_SPARSE_ARRAY: i64 = 14;
+    pub const EMPTY_ARRAY: i64 = 15;
+    pub const CURLY_BRACKETS_ARRAY: i64 = 16;
+    pub const JSON: i64 = 17;
+}
+
+/// `SparseStoreType` ordinals (`src/parser/type/info/sparse_info.h:29-33`).
+pub mod sparse_store {
+    pub const SORT: i64 = 0;
+    pub const SORTED: i64 = 1;
+    pub const INVALID: i64 = 2;
+}
+
 fn obj(entries: Vec<(String, Json)>) -> Json {
     Json::Obj(entries)
 }
@@ -412,6 +441,98 @@ pub fn metric_code_of(text: &str) -> i64 {
         "l2" => metric::L2,
         _ => metric::INVALID,
     }
+}
+
+/// `ConstantExpr::Serialize()` (`src/parser/expr/constant_expr.cpp:452-530`).
+///
+/// `value` is `None` for `kNull`/`kEmptyArray`, which write no `value` key;
+/// every other literal type writes exactly one.
+pub fn constant_expr_json(literal_type: i64, value: Option<Json>) -> Json {
+    let mut entries = vec![("type".to_string(), Json::Int(literal_type))];
+    if let Some(v) = value {
+        entries.push(("value".to_string(), v));
+    }
+    obj(entries)
+}
+
+/// A `kInteger`/`kDouble`/`kBoolean`/`kString` default, the common cases.
+pub fn constant_expr_int(v: i64) -> Json {
+    constant_expr_json(literal::INTEGER, Some(Json::Int(v)))
+}
+pub fn constant_expr_double(v: f64) -> Json {
+    constant_expr_json(literal::DOUBLE, Some(Json::Float(v)))
+}
+pub fn constant_expr_bool(v: bool) -> Json {
+    constant_expr_json(literal::BOOLEAN, Some(Json::Bool(v)))
+}
+pub fn constant_expr_string(v: &str) -> Json {
+    constant_expr_json(literal::STRING, Some(Json::Str(v.to_string())))
+}
+/// `kIntegerArray`: `j["value"] = long_array_`.
+pub fn constant_expr_int_array(values: &[i64]) -> Json {
+    constant_expr_json(
+        literal::INTEGER_ARRAY,
+        Some(Json::Arr(values.iter().map(|v| Json::Int(*v)).collect())),
+    )
+}
+/// `kDoubleArray`: `j["value"] = double_array_`.
+pub fn constant_expr_double_array(values: &[f64]) -> Json {
+    constant_expr_json(
+        literal::DOUBLE_ARRAY,
+        Some(Json::Arr(values.iter().map(|v| Json::Float(*v)).collect())),
+    )
+}
+/// `kCurlyBracketsArray`: each element is a nested `ConstantExpr::Serialize()`.
+pub fn constant_expr_curly_array(elements: Vec<Json>) -> Json {
+    constant_expr_json(
+        literal::CURLY_BRACKETS_ARRAY,
+        Some(Json::Arr(elements)),
+    )
+}
+/// `kLongSparseArray` / `kDoubleSparseArray`: `{indices:[…], data:[…]}`.
+///
+/// `n` picks the data vector's literal type (`data` is `i64` for the long
+/// variant and `f64` for the double one); `indices` is always `i64`.
+pub fn constant_expr_sparse_array(literal_type: i64, indices: &[i64], data: &[f64]) -> Json {
+    let long = literal_type == literal::LONG_SPARSE_ARRAY;
+    let data = Json::Arr(
+        data.iter()
+            .map(|v| if long { Json::Int(*v as i64) } else { Json::Float(*v) })
+            .collect(),
+    );
+    let indices = Json::Arr(indices.iter().map(|v| Json::Int(*v)).collect());
+    constant_expr_json(
+        literal_type,
+        Some(obj(vec![
+            ("data".to_string(), data),
+            ("indices".to_string(), indices),
+        ])),
+    )
+}
+
+/// `SparseInfo::GetIndexType()` (`sparse_info.cpp:44-58`): the index element
+/// type that can address `dimension`.
+pub fn sparse_index_type(dimension: i64) -> i64 {
+    if dimension <= 128 {
+        element::INT8
+    } else if dimension <= 32768 {
+        element::INT16
+    } else if dimension <= 2_147_483_648 {
+        element::INT32
+    } else {
+        element::INT64
+    }
+}
+
+/// `SparseInfo::Serialize()` (`src/parser/type/info/sparse_info.cpp:103-110`):
+/// a SPARSE column's `type_info`.
+pub fn sparse_type_info(data_type: i64, index_type: i64, dimension: i64, sort: i64) -> Json {
+    obj(vec![
+        ("data_type".to_string(), Json::Int(data_type)),
+        ("dimension".to_string(), Json::Int(dimension)),
+        ("index_type".to_string(), Json::Int(index_type)),
+        ("sort".to_string(), Json::Int(sort)),
+    ])
 }
 
 /// The buffer key for the record: every *other* key is a per-type extra.
@@ -780,8 +901,6 @@ mod tests {
 
     #[test]
     fn index_def_keeps_unknown_subtype_fields() {
-        // A subtype we have not modelled: the base fields still decode, and the
-        // rest is preserved verbatim rather than dropped.
         let j = infinity_expression::json::parse(
             r#"{"colbertsar_mode":true,"column_names":["c"],"file_name":"f","index_comment":"","index_name":"i","index_type":"PLAID","n_centroids":4,"nbits":8}"#,
         )
@@ -790,5 +909,64 @@ mod tests {
         assert_eq!(v.base.index_type, "PLAID");
         assert_eq!(v.extra.len(), 3);
         assert_eq!(index_def_json(&v).compact(), j.compact());
+    }
+
+    #[test]
+    fn constant_expr_matches_the_cpp_json() {
+        // `{"type":3,"value":7}` - keys sorted, `type` before `value`.
+        assert_eq!(constant_expr_int(7).compact(), r#"{"type":3,"value":7}"#);
+        assert_eq!(
+            constant_expr_string("hi").compact(),
+            r#"{"type":2,"value":"hi"}"#
+        );
+        assert_eq!(
+            constant_expr_bool(true).compact(),
+            r#"{"type":0,"value":true}"#
+        );
+        // A NULL writes no `value` key at all (`constant_expr.cpp:472-475`).
+        assert_eq!(
+            constant_expr_json(literal::NULL, None).compact(),
+            r#"{"type":4}"#
+        );
+        assert_eq!(
+            constant_expr_int_array(&[1, 2]).compact(),
+            r#"{"type":9,"value":[1,2]}"#
+        );
+        assert_eq!(
+            constant_expr_double_array(&[1.5]).compact(),
+            r#"{"type":10,"value":[1.5]}"#
+        );
+        // Curly-brackets elements recurse.
+        assert_eq!(
+            constant_expr_curly_array(vec![constant_expr_int(1)]).compact(),
+            r#"{"type":16,"value":[{"type":3,"value":1}]}"#
+        );
+        // Sparse arrays nest `{data, indices}` (sorted).
+        assert_eq!(
+            constant_expr_sparse_array(literal::DOUBLE_SPARSE_ARRAY, &[0, 5], &[1.0, 2.5]).compact(),
+            r#"{"type":14,"value":{"data":[1.0,2.5],"indices":[0,5]}}"#
+        );
+        assert_eq!(
+            constant_expr_sparse_array(literal::LONG_SPARSE_ARRAY, &[3], &[9.0]).compact(),
+            r#"{"type":13,"value":{"data":[9],"indices":[3]}}"#
+        );
+    }
+
+    #[test]
+    fn sparse_type_info_matches_the_cpp_json() {
+        // `{"data_type":6,"dimension":100,"index_type":2,"sort":0}` - the
+        // index type is int8 for a bound of 100 (`GetIndexType`).
+        assert_eq!(
+            sparse_type_info(element::FLOAT32, sparse_index_type(100), 100, sparse_store::SORT)
+                .compact(),
+            r#"{"data_type":6,"dimension":100,"index_type":2,"sort":0}"#
+        );
+        // Bound thresholds: 128 -> int8, 129 -> int16, 32768 -> int16,
+        // 32769 -> int32, 2^31+1 -> int64 (`sparse_info.cpp:44-58`).
+        assert_eq!(sparse_index_type(128), element::INT8);
+        assert_eq!(sparse_index_type(129), element::INT16);
+        assert_eq!(sparse_index_type(32768), element::INT16);
+        assert_eq!(sparse_index_type(32769), element::INT32);
+        assert_eq!(sparse_index_type(2_147_483_649), element::INT64);
     }
 }
