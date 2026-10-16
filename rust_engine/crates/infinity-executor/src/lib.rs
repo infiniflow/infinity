@@ -421,6 +421,59 @@ fn validate_tensor_dimension(type_text: &str, lit: &str) -> Result<()> {
 }
 
 /// ARRAY columns render with braces: `[1,2]` → `{1,2}`, `[]` → `{}`.
+/// Whether the element type declared inside a `TENSOR`/`EMBEDDING`-style type
+/// text is an integer type (the first comma-separated parameter).
+fn declared_elem_is_int(type_text: &str) -> bool {
+    let t = type_text.to_ascii_uppercase();
+    let inner = t.split('(').nth(1).unwrap_or("");
+    array_elem_is_int(&format!("ARRAY({}", inner.split(',').next().unwrap_or("")))
+}
+
+/// Whether an `ARRAY(<elem>)` type has an integer element type.
+fn array_elem_is_int(type_text: &str) -> bool {
+    let t = type_text.to_ascii_uppercase();
+    let inner = t.split('(').nth(1).unwrap_or("").trim_end_matches(')');
+    matches!(
+        inner.trim(),
+        "INT"
+            | "INTEGER"
+            | "TINYINT"
+            | "SMALLINT"
+            | "BIGINT"
+            | "INT8"
+            | "INT16"
+            | "INT32"
+            | "INT64"
+    )
+}
+
+/// Truncates every numeric token in `s` to an integer.
+fn truncate_numbers(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut num = String::new();
+    for c in s.chars() {
+        if c.is_ascii_digit() || c == '.' || c == '-' {
+            num.push(c);
+            continue;
+        }
+        if !num.is_empty() {
+            match num.parse::<f64>() {
+                Ok(f) => out.push_str(&(f as i64).to_string()),
+                Err(_) => out.push_str(&num),
+            }
+            num.clear();
+        }
+        out.push(c);
+    }
+    if !num.is_empty() {
+        match num.parse::<f64>() {
+            Ok(f) => out.push_str(&(f as i64).to_string()),
+            Err(_) => out.push_str(&num),
+        }
+    }
+    out
+}
+
 fn brace_render(s: &str) -> String {
     let t = s.trim();
     if !t.starts_with('[') || !t.ends_with(']') {
@@ -694,7 +747,14 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
                 },
-                Some(t) if is_array_type(t) => brace_render(&s),
+                Some(t) if is_array_type(t) => {
+                    let rendered = brace_render(&s);
+                    if array_elem_is_int(t) {
+                        truncate_numbers(&rendered)
+                    } else {
+                        rendered
+                    }
+                }
                 // JSON columns are stored compactly (sorted keys, no spaces)
                 Some(t) if is_json_type(t) => match infinity_expression::json::parse(&s) {
                     Some(j) => j.compact(),
@@ -711,6 +771,9 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                 Some(t) if is_embedding_type(t) => {
                     if is_bit_type(t) {
                         pack_bit_vector(&s)
+                    } else if declared_elem_is_int(t) {
+                        // an integer element type truncates the stored values
+                        truncate_numbers(&s)
                     } else {
                         s
                     }
@@ -2815,12 +2878,37 @@ impl Engine {
                             }
                         })
                         .collect();
+                    if qv.is_empty() {
+                        continue;
+                    }
+                    // a MULTIVECTOR holds several vectors; the row scores by the
+                    // best-matching sub-vector
+                    let multivector = types
+                        .get(col_idx)
+                        .map(|t| t.to_ascii_uppercase().starts_with("MULTIVECTOR"))
+                        .unwrap_or(false);
+                    if multivector {
+                        let mut best: Option<(f64, f64)> = None;
+                        for sv in parse_tensor_leaves(v) {
+                            if sv.len() != qv.len() {
+                                continue;
+                            }
+                            let (sim, dist) = vector_score(&qv, &sv, &metric);
+                            if best.map(|(s, _)| sim > s).unwrap_or(true) {
+                                best = Some((sim, dist));
+                            }
+                        }
+                        if let Some((sim, dist)) = best {
+                            scored.push((*seq, sim, dist));
+                        }
+                        continue;
+                    }
                     let rv: Vec<f64> = if bit_col {
                         parse_bit_leaves(v).into_iter().flatten().collect()
                     } else {
                         parse_vec_str(v)
                     };
-                    if qv.is_empty() || rv.len() != qv.len() {
+                    if rv.len() != qv.len() {
                         continue;
                     }
                     let (sim, dist) = vector_score(&qv, &rv, &metric);

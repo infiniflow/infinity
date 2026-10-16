@@ -1138,6 +1138,10 @@ impl Parser {
                 self.expect_kw("INDEX")?;
                 out.using_index = Some(self.paren_list_text()?);
             }
+            // `IGNORE INDEX` disables index selection
+            if self.eat_kw("IGNORE") {
+                self.expect_kw("INDEX")?;
+            }
             let next_is_match = self.peek() == &Token::Comma
                 && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("MATCH"));
             let next_is_fusion =
@@ -1789,7 +1793,9 @@ fn normalize_datetime(kind: &str, raw: &str) -> String {
     if kind == "INTERVAL" {
         return raw.trim().to_string();
     }
-    let s = raw.trim();
+    // accept `/` as a date separator, e.g. `DATE '2222/11/11'`
+    let s = raw.trim().replace('/', "-");
+    let s = s.as_str();
     let (date_part, time_part) = if let Some((a, b)) = s.split_once(' ') {
         (Some(a.to_string()), Some(b.to_string()))
     } else if s.contains(':') {

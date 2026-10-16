@@ -489,7 +489,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     println!("-- statements that should error but did not --");
     let mut eranked: Vec<_> = stmt_err_missing.iter().collect();
     eranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
-    for (word, samples) in eranked.iter().take(15) {
+    for (word, samples) in eranked.iter().take(40) {
         println!("{:>5}  {}", samples.len(), word);
         for s in samples.iter().take(6) {
             println!("        {}", s.replace('\n', " "));
@@ -499,7 +499,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     println!("-- top files by failed records --");
     let mut franked: Vec<_> = file_fail.iter().collect();
     franked.sort_by(|a, b| b.1.cmp(a.1));
-    for (file, n) in franked.iter().take(40) {
+    for (file, n) in franked.iter().take(200) {
         println!("{n:>5}  {file}");
     }
     for (reason, samples) in ranked.iter().take(25) {

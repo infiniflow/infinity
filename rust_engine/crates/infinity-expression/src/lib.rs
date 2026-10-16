@@ -790,6 +790,22 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             .as_f64()
             .map(|v| Value::Float(v.sqrt()))
             .unwrap_or(Value::Null),
+        "LN" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.ln()))
+            .unwrap_or(Value::Null),
+        "LOG10" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.log10()))
+            .unwrap_or(Value::Null),
+        "LOG2" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.log2()))
+            .unwrap_or(Value::Null),
+        "EXP" => a0()
+            .as_f64()
+            .map(|v| Value::Float(v.exp()))
+            .unwrap_or(Value::Null),
         "ABS" => match a0() {
             Value::Int(i) => Value::Int(i.abs()),
             Value::Float(f) => Value::Float(f.abs()),
@@ -842,6 +858,14 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             // TRUNC renders exactly `n` decimal places.
             Value::Str(format!("{t:.prec$}", prec = n.max(0) as usize))
         }
+        // 1-based position of a substring, or 0 when absent
+        "CHAR_POSITION" | "STRPOS" | "INSTR" => match (a0(), a1()) {
+            (Value::Str(hay), Value::Str(needle)) => match hay.find(&needle) {
+                Some(i) => Value::Int(hay[..i].chars().count() as i64 + 1),
+                None => Value::Int(0),
+            },
+            _ => Value::Null,
+        },
         "UPPER" => match a0() {
             Value::Str(s) => Value::Str(s.to_uppercase()),
             _ => Value::Null,
