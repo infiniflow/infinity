@@ -350,6 +350,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
         std::collections::HashMap::new();
     let mut stmt_fail: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
+    let mut file_fail: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for (idx, f) in files.iter().enumerate() {
         let d = std::env::temp_dir().join(format!("infconf-{}-{idx}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
@@ -357,6 +358,13 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
             Ok(e) => e,
             Err(_) => continue,
         };
+        let fname = f
+            .strip_prefix(slt_dir)
+            .unwrap_or(f)
+            .to_string_lossy()
+            .trim_start_matches('/')
+            .to_string();
+        let mut this_file_fails = 0usize;
         let text = std::fs::read_to_string(f).unwrap_or_default();
         for rec in split_records(&text) {
             let head = rec[0].trim();
@@ -386,6 +394,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         if ok {
                             stmt_ok_pass += 1;
                         } else {
+                            this_file_fails += 1;
                             stmt_fail
                                 .entry(format!("{:?} ({})", res.unwrap_err(), first_word(&sql)))
                                 .or_default()
@@ -417,6 +426,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         if got == exp {
                             query_pass += 1;
                         } else {
+                            this_file_fails += 1;
                             fail_reasons
                                 .entry(format!("MISMATCH ({})", first_word(&sql)))
                                 .or_default()
@@ -424,6 +434,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         }
                     }
                     Err(err) => {
+                        this_file_fails += 1;
                         fail_reasons
                             .entry(format!("{err} ({})", first_word(&sql)))
                             .or_default()
@@ -433,6 +444,9 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
             }
         }
         let _ = std::fs::remove_dir_all(&d);
+        if this_file_fails > 0 {
+            file_fail.insert(fname, this_file_fails);
+        }
     }
     println!("== Rust conformance baseline (SQL Logic Test) ==");
     println!("files          : {}", files.len());
@@ -451,6 +465,12 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
         }
     }
     println!("-- top query failure reasons --");
+    println!("-- top files by failed records --");
+    let mut franked: Vec<_> = file_fail.iter().collect();
+    franked.sort_by(|a, b| b.1.cmp(a.1));
+    for (file, n) in franked.iter().take(15) {
+        println!("{n:>5}  {file}");
+    }
     for (reason, samples) in ranked.iter().take(25) {
         println!("{:>5}  {}", samples.len(), reason);
         for s in samples.iter().take(3) {

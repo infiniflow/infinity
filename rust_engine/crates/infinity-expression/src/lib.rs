@@ -7,7 +7,7 @@ pub mod json;
 
 use std::cmp::Ordering;
 
-use infinity_parser::{AggFunc, CmpOp, Literal};
+use infinity_parser::{AggFunc, BinOp, CmpOp, Literal};
 
 /// A runtime value.
 #[derive(Debug, Clone, PartialEq)]
@@ -81,6 +81,8 @@ pub enum Expr {
     Like(Box<Expr>, Box<Expr>),
     /// `expr [NOT] IN (…)`.
     In(Box<Expr>, Vec<Expr>, bool),
+    /// `a <op> b` arithmetic.
+    Binary(Box<Expr>, BinOp, Box<Expr>),
     /// A scalar function call; unknown functions evaluate to NULL.
     Func {
         name: String,
@@ -135,6 +137,11 @@ impl Expr {
                     .any(|v| x.partial_cmp_value(&v.eval(row)) == Some(std::cmp::Ordering::Equal));
                 Value::Bool(found != *neg)
             }
+            Expr::Binary(a, op, b) => {
+                let x = a.eval(row);
+                let y = b.eval(row);
+                eval_binary(&x, *op, &y)
+            }
             Expr::Func { name, args } => eval_func(name, args, row),
         }
     }
@@ -143,6 +150,48 @@ impl Expr {
     pub fn eval_predicate(&self, row: &[Value]) -> bool {
         matches!(self.eval(row), Value::Bool(true))
     }
+}
+
+/// Evaluates `a <op> b` with numeric promotion; NULL propagates.
+fn eval_binary(a: &Value, op: BinOp, b: &Value) -> Value {
+    let (x, y) = match (a, b) {
+        (Value::Int(x), Value::Int(y)) if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul) => {
+            let v = match op {
+                BinOp::Add => x.wrapping_add(*y),
+                BinOp::Sub => x.wrapping_sub(*y),
+                _ => x.wrapping_mul(*y),
+            };
+            return Value::Int(v);
+        }
+        (Value::Int(x), Value::Int(y)) if op == BinOp::Mod => {
+            return if *y == 0 {
+                Value::Null
+            } else {
+                Value::Int(x % y)
+            }
+        }
+        _ => match (a.as_f64(), b.as_f64()) {
+            (Some(x), Some(y)) => (x, y),
+            _ => return Value::Null,
+        },
+    };
+    Value::Float(match op {
+        BinOp::Add => x + y,
+        BinOp::Sub => x - y,
+        BinOp::Mul => x * y,
+        BinOp::Div => {
+            if y == 0.0 {
+                return Value::Null;
+            }
+            x / y
+        }
+        BinOp::Mod => {
+            if y == 0.0 {
+                return Value::Null;
+            }
+            x % y
+        }
+    })
 }
 
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.

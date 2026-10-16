@@ -23,6 +23,22 @@ pub enum Token {
     Eof,
 }
 
+/// True if the previous token ends a value (so `-`/`+` is a binary operator
+/// rather than a sign).
+fn prev_is_value(out: &[Token]) -> bool {
+    matches!(
+        out.last(),
+        Some(
+            Token::Ident(_)
+                | Token::Int(_)
+                | Token::Float(_)
+                | Token::Str(_)
+                | Token::RParen
+                | Token::RBracket
+        )
+    )
+}
+
 pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
     let chars: Vec<char> = sql.chars().collect();
     let mut i = 0;
@@ -129,7 +145,10 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                 out.push(Token::Str(s));
             }
             c if c.is_ascii_digit()
-                || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit()) =>
+                || (c == '-'
+                    && i + 1 < chars.len()
+                    && chars[i + 1].is_ascii_digit()
+                    && !prev_is_value(&out)) =>
             {
                 let start = i;
                 if c == '-' {
@@ -161,6 +180,10 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                     i += 1;
                 }
                 out.push(Token::Ident(chars[start..i].iter().collect()));
+            }
+            '+' | '-' | '/' | '%' => {
+                out.push(Token::Op(c.to_string()));
+                i += 1;
             }
             other => return Err(Error::Invalid(format!("unexpected character '{other}'"))),
         }
@@ -196,14 +219,28 @@ mod tests {
 
     #[test]
     fn lexes_numbers_and_strings() {
-        let t = tokenize("1 -2 3.5 'hi'").unwrap();
+        let t = tokenize("1, -2, 3.5, 'hi'").unwrap();
         assert_eq!(
             t,
             vec![
                 Token::Int(1),
+                Token::Comma,
                 Token::Int(-2),
+                Token::Comma,
                 Token::Float(3.5),
+                Token::Comma,
                 Token::Str("hi".into()),
+                Token::Eof
+            ]
+        );
+        // after a value, `-` is a binary operator (not a sign)
+        let t = tokenize("a-2").unwrap();
+        assert_eq!(
+            t,
+            vec![
+                Token::Ident("a".into()),
+                Token::Op("-".into()),
+                Token::Int(2),
                 Token::Eof
             ]
         );

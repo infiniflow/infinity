@@ -27,12 +27,23 @@ impl Literal {
     }
 }
 
+/// A binary arithmetic operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+}
+
 /// A scalar expression as parsed from SQL text (names not yet resolved).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprAst {
     Column(String),
     Literal(Literal),
     Func { name: String, args: Vec<ExprAst> },
+    Binary(Box<ExprAst>, BinOp, Box<ExprAst>),
 }
 
 /// A boolean connective.
@@ -124,6 +135,20 @@ impl AggFunc {
             AggFunc::Last => "last",
         }
     }
+
+    /// Parses an aggregate name (case-insensitive).
+    pub fn from_name(name: &str) -> Option<AggFunc> {
+        Some(match name.to_ascii_uppercase().as_str() {
+            "COUNT" => AggFunc::Count,
+            "SUM" => AggFunc::Sum,
+            "AVG" => AggFunc::Avg,
+            "MIN" => AggFunc::Min,
+            "MAX" => AggFunc::Max,
+            "FIRST" => AggFunc::First,
+            "LAST" => AggFunc::Last,
+            _ => return None,
+        })
+    }
 }
 
 /// An aggregate call, e.g. `COUNT(*)` (arg `None`) or `SUM(col)`.
@@ -170,6 +195,8 @@ pub enum SelectItem {
         name: String,
         args: Vec<ExprAst>,
     },
+    /// An arbitrary scalar expression (e.g. `MAX(c1)+SUM(c2)`).
+    Expr(ExprAst),
 }
 
 /// One `MATCH <KIND> (<column>, <args...>)` term of a `SEARCH MATCH` clause.
@@ -227,7 +254,7 @@ pub enum Statement {
     },
     Update {
         table: String,
-        assignments: Vec<(String, Literal)>,
+        assignments: Vec<(String, ExprAst)>,
         where_pred: Option<Predicate>,
     },
     Show {

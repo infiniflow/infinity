@@ -456,10 +456,10 @@ impl Engine {
             } => {
                 let schema = self.table_schema(table)?;
                 let mut asg = Vec::new();
-                for (c, l) in assignments {
+                for (c, e) in assignments {
                     asg.push((
                         infinity_planner::resolve_column(&schema, c)?,
-                        Value::from_literal(l),
+                        infinity_planner::compile_expr(e, &schema)?,
                     ));
                 }
                 let pred = match where_pred {
@@ -475,9 +475,9 @@ impl Engine {
                     };
                     if matches {
                         let mut nr = row.clone();
-                        for (idx, val) in &asg {
+                        for (idx, expr) in &asg {
                             if *idx < nr.len() {
-                                nr[*idx] = val.clone();
+                                nr[*idx] = expr.eval(&row);
                             }
                         }
                         to_del.push(seq);

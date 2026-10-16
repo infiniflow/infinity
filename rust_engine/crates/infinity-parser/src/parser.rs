@@ -3,7 +3,7 @@
 use infinity_common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
     Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 use crate::lexer::{tokenize, Token};
@@ -342,7 +342,7 @@ impl Parser {
                 loop {
                     let col = self.expect_ident()?;
                     self.expect(Token::Op("=".into()))?;
-                    let val = self.literal()?;
+                    let val = self.expr()?;
                     assignments.push((col, val));
                     if self.peek() == &Token::Comma {
                         self.advance();
@@ -528,8 +528,50 @@ impl Parser {
         Ok(Predicate::IsTrue(left))
     }
 
-    /// Parses a scalar expression: column ref, literal (incl. array), or function call.
+    /// Parses a scalar expression with `+ - * / %` precedence.
     fn expr(&mut self) -> Result<ExprAst> {
+        let mut left = self.term()?;
+        loop {
+            let op = match self.peek() {
+                Token::Op(s) if s == "+" => Some(BinOp::Add),
+                Token::Op(s) if s == "-" => Some(BinOp::Sub),
+                _ => None,
+            };
+            match op {
+                Some(op) => {
+                    self.advance();
+                    let right = self.term()?;
+                    left = ExprAst::Binary(Box::new(left), op, Box::new(right));
+                }
+                None => break,
+            }
+        }
+        Ok(left)
+    }
+
+    fn term(&mut self) -> Result<ExprAst> {
+        let mut left = self.atom()?;
+        loop {
+            let op = match self.peek() {
+                Token::Star => Some(BinOp::Mul),
+                Token::Op(s) if s == "/" => Some(BinOp::Div),
+                Token::Op(s) if s == "%" => Some(BinOp::Mod),
+                _ => None,
+            };
+            match op {
+                Some(op) => {
+                    self.advance();
+                    let right = self.atom()?;
+                    left = ExprAst::Binary(Box::new(left), op, Box::new(right));
+                }
+                None => break,
+            }
+        }
+        Ok(left)
+    }
+
+    /// Parses a scalar atom: column ref, literal (incl. array), or function call.
+    fn atom(&mut self) -> Result<ExprAst> {
         match self.peek().clone() {
             Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                 Ok(ExprAst::Literal(self.literal()?))
@@ -770,6 +812,23 @@ impl Parser {
                 }
                 match self.peek() {
                     Token::Comma | Token::RParen | Token::Eof => break,
+                    // consume a balanced group (e.g. `WITH (sort)`, `COMMENT '…'`)
+                    Token::LParen => {
+                        let mut depth = 0i32;
+                        loop {
+                            match self.advance() {
+                                Token::LParen => depth += 1,
+                                Token::RParen => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                                Token::Eof | Token::Semicolon => break,
+                                _ => {}
+                            }
+                        }
+                    }
                     _ => {
                         self.advance();
                     }
@@ -918,6 +977,20 @@ impl Parser {
                 }
                 _ => return self.err("expected select item"),
             };
+            // Absorb a trailing arithmetic expression (`MAX(c1)+SUM(c2)`).
+            let needs_more = match self.peek() {
+                Token::Star => true,
+                Token::Op(s) => s == "+" || s == "-" || s == "/" || s == "%",
+                _ => false,
+            };
+            let item = if needs_more {
+                match select_item_to_expr(&item) {
+                    Some(left) => SelectItem::Expr(self.continue_binary(left)?),
+                    None => item,
+                }
+            } else {
+                item
+            };
             items.push(item);
             // tolerate an output alias: `<expr> AS name`
             if self.eat_kw("AS") {
@@ -956,6 +1029,59 @@ impl Parser {
         }
         self.expect(Token::RParen)?;
         Ok(SelectAgg { func, arg })
+    }
+
+    /// Continues a binary expression from an already-parsed left operand.
+    fn continue_binary(&mut self, mut left: ExprAst) -> Result<ExprAst> {
+        loop {
+            let op = match self.peek() {
+                Token::Star => Some(BinOp::Mul),
+                Token::Op(s) if s == "/" => Some(BinOp::Div),
+                Token::Op(s) if s == "%" => Some(BinOp::Mod),
+                _ => None,
+            };
+            match op {
+                Some(op) => {
+                    self.advance();
+                    let right = self.atom()?;
+                    left = ExprAst::Binary(Box::new(left), op, Box::new(right));
+                }
+                None => break,
+            }
+        }
+        loop {
+            let op = match self.peek() {
+                Token::Op(s) if s == "+" => Some(BinOp::Add),
+                Token::Op(s) if s == "-" => Some(BinOp::Sub),
+                _ => None,
+            };
+            match op {
+                Some(op) => {
+                    self.advance();
+                    let right = self.term()?;
+                    left = ExprAst::Binary(Box::new(left), op, Box::new(right));
+                }
+                None => break,
+            }
+        }
+        Ok(left)
+    }
+}
+
+/// Converts a select item into an expression so a binary tail can be parsed.
+fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
+    match item {
+        SelectItem::Column(c) => Some(ExprAst::Column(c.clone())),
+        SelectItem::Literal(l) => Some(ExprAst::Literal(l.clone())),
+        SelectItem::Func { name, args } => Some(ExprAst::Func {
+            name: name.clone(),
+            args: args.clone(),
+        }),
+        SelectItem::Aggregate(a) => Some(ExprAst::Func {
+            name: a.func.as_str().to_ascii_uppercase(),
+            args: a.arg.clone().map(ExprAst::Column).into_iter().collect(),
+        }),
+        _ => None,
     }
 }
 

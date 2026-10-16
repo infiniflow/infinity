@@ -83,6 +83,11 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
     Ok(match e {
         ExprAst::Column(c) => Expr::Column(resolve_column(schema, c)?),
         ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
+        ExprAst::Binary(a, op, b) => Expr::Binary(
+            Box::new(compile_expr(a, schema)?),
+            *op,
+            Box::new(compile_expr(b, schema)?),
+        ),
         ExprAst::Func { name, args } => {
             // SEARCH MATCH pseudo-columns are exposed as hidden scan columns.
             let hidden = match name.to_ascii_uppercase().as_str() {
@@ -145,6 +150,141 @@ fn agg_label(func: AggFunc, arg: &Option<String>) -> String {
     match arg {
         Some(c) => format!("{}({})", func.as_str(), c),
         None => format!("{}(*)", func.as_str()),
+    }
+}
+
+/// Registers every aggregate found in `e` (recursively) into `aggs`/`index`.
+fn gather_agg(
+    e: &ExprAst,
+    schema: &[String],
+    aggs: &mut Vec<(AggFunc, Option<usize>, String)>,
+    index: &mut std::collections::HashMap<String, usize>,
+    base: usize,
+) -> Result<()> {
+    match e {
+        ExprAst::Func { name, args } => {
+            if let Some(f) = AggFunc::from_name(name) {
+                let arg = match args.first() {
+                    Some(ExprAst::Column(c)) => Some(c.clone()),
+                    _ => None,
+                };
+                let label = agg_label(f, &arg);
+                if !index.contains_key(&label) {
+                    let arg_idx = match &arg {
+                        Some(c) => Some(resolve_column(schema, c)?),
+                        None => None,
+                    };
+                    index.insert(label.clone(), base + aggs.len());
+                    aggs.push((f, arg_idx, label));
+                }
+            } else {
+                for a in args {
+                    gather_agg(a, schema, aggs, index, base)?;
+                }
+            }
+        }
+        ExprAst::Binary(a, _, b) => {
+            gather_agg(a, schema, aggs, index, base)?;
+            gather_agg(b, schema, aggs, index, base)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Compiles an expression over the *aggregate output* schema (group column then
+/// aggregate results). Aggregate calls become column references.
+fn compile_agg_expr(
+    e: &ExprAst,
+    agg_index: &std::collections::HashMap<String, usize>,
+    group_by: Option<&str>,
+) -> Result<Expr> {
+    Ok(match e {
+        ExprAst::Column(c) => {
+            if group_by == Some(c.as_str()) {
+                Expr::Column(0)
+            } else {
+                return Err(Error::Invalid(format!(
+                    "column '{c}' must appear in GROUP BY or inside an aggregate"
+                )));
+            }
+        }
+        ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
+        ExprAst::Binary(a, op, b) => Expr::Binary(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
+            *op,
+            Box::new(compile_agg_expr(b, agg_index, group_by)?),
+        ),
+        ExprAst::Func { name, args } => {
+            if let Some(f) = AggFunc::from_name(name) {
+                let arg = match args.first() {
+                    Some(ExprAst::Column(c)) => Some(c.clone()),
+                    _ => None,
+                };
+                let label = agg_label(f, &arg);
+                let idx = *agg_index
+                    .get(&label)
+                    .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
+                Expr::Column(idx)
+            } else {
+                Expr::Func {
+                    name: name.clone(),
+                    args: args
+                        .iter()
+                        .map(|a| compile_agg_expr(a, agg_index, group_by))
+                        .collect::<Result<Vec<_>>>()?,
+                }
+            }
+        }
+    })
+}
+
+/// Builds the post-aggregate projection expression for one select item.
+fn item_agg_expr(
+    it: &SelectItem,
+    agg_index: &std::collections::HashMap<String, usize>,
+    group_by: Option<&str>,
+    _agg_names: &[String],
+) -> Result<Expr> {
+    match it {
+        SelectItem::Aggregate(a) => {
+            let label = agg_label(a.func, &a.arg);
+            let idx = *agg_index
+                .get(&label)
+                .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
+            Ok(Expr::Column(idx))
+        }
+        SelectItem::Column(c) => {
+            if group_by == Some(c.as_str()) {
+                Ok(Expr::Column(0))
+            } else {
+                Err(Error::Invalid(format!(
+                    "column '{c}' must appear in GROUP BY or inside an aggregate"
+                )))
+            }
+        }
+        SelectItem::Literal(l) => Ok(Expr::Literal(Value::from_literal(l))),
+        SelectItem::Func { name, args } => {
+            let e = ExprAst::Func {
+                name: name.clone(),
+                args: args.clone(),
+            };
+            compile_agg_expr(&e, agg_index, group_by)
+        }
+        SelectItem::Expr(e) => compile_agg_expr(e, agg_index, group_by),
+        SelectItem::Star => Err(Error::Invalid("star not allowed with aggregation".into())),
+    }
+}
+
+/// A display name for a select item (used for post-aggregate projection).
+fn item_label(it: &SelectItem) -> String {
+    match it {
+        SelectItem::Aggregate(a) => agg_label(a.func, &a.arg),
+        SelectItem::Column(c) => c.clone(),
+        SelectItem::Func { name, .. } => name.to_ascii_lowercase(),
+        SelectItem::Literal(_) => "c0".to_string(),
+        SelectItem::Expr(_) => "expr".to_string(),
+        SelectItem::Star => "*".to_string(),
     }
 }
 
@@ -228,20 +368,26 @@ pub fn plan_select(
             Some(name) => Some(resolve_column(&schema, name)?),
             None => None,
         };
+        let base = usize::from(group_by.is_some());
         let mut aggs: Vec<(AggFunc, Option<usize>, String)> = Vec::new();
-        let mut names: Vec<String> = Vec::new();
-        if let Some(g) = group_by {
-            names.push(g.to_string());
-        }
+        let mut agg_index: std::collections::HashMap<String, usize> = Default::default();
+        let mut needs_projection = false;
         for it in items {
             match it {
                 SelectItem::Aggregate(a) => {
-                    let arg_idx = match &a.arg {
-                        Some(c) => Some(resolve_column(&schema, c)?),
-                        None => None,
-                    };
-                    names.push(agg_label(a.func, &a.arg));
-                    aggs.push((a.func, arg_idx, agg_label(a.func, &a.arg)));
+                    let label = agg_label(a.func, &a.arg);
+                    if !agg_index.contains_key(&label) {
+                        let arg_idx = match &a.arg {
+                            Some(c) => Some(resolve_column(&schema, c)?),
+                            None => None,
+                        };
+                        agg_index.insert(label.clone(), base + aggs.len());
+                        aggs.push((a.func, arg_idx, label));
+                    }
+                }
+                SelectItem::Expr(e) => {
+                    needs_projection = true;
+                    gather_agg(e, &schema, &mut aggs, &mut agg_index, base)?;
                 }
                 SelectItem::Column(c) => {
                     if group_by != Some(c.as_str()) {
@@ -260,13 +406,32 @@ pub fn plan_select(
                 }
             }
         }
+        let mut agg_names: Vec<String> = Vec::new();
+        if let Some(g) = group_by {
+            agg_names.push(g.to_string());
+        }
+        agg_names.extend(aggs.iter().map(|(_, _, l)| l.clone()));
         plan = LogicalPlan::Aggregate {
             input: Box::new(plan),
             group_key,
             group_name: group_by.map(|s| s.to_string()),
             aggs,
         };
-        out_names = names;
+        out_names = agg_names.clone();
+        if needs_projection {
+            let mut exprs = Vec::new();
+            let mut names = Vec::new();
+            for it in items {
+                exprs.push(item_agg_expr(it, &agg_index, group_by, &agg_names)?);
+                names.push(item_label(it));
+            }
+            plan = LogicalPlan::Projection {
+                input: Box::new(plan),
+                exprs,
+                names: names.clone(),
+            };
+            out_names = names;
+        }
     } else if !is_star {
         let mut exprs = Vec::new();
         let mut names = Vec::new();
@@ -287,6 +452,10 @@ pub fn plan_select(
                 SelectItem::Literal(l) => {
                     names.push(format!("c{}", exprs.len()));
                     exprs.push(Expr::Literal(Value::from_literal(l)));
+                }
+                SelectItem::Expr(e) => {
+                    names.push("expr".to_string());
+                    exprs.push(compile_expr(e, &schema)?);
                 }
                 _ => return Err(Error::Invalid("projection must reference columns".into())),
             }

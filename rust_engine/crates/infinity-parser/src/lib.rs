@@ -9,7 +9,7 @@ pub mod lexer;
 pub mod parser;
 
 pub use ast::{
-    AggFunc, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
     Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 pub use parser::parse;
