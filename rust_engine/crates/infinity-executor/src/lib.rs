@@ -2418,6 +2418,12 @@ impl Engine {
                 };
                 cells.push(cell);
             }
+            // validate each typed cell (sparse range, tensor dimension)
+            for (i, cell) in cells.iter().enumerate() {
+                if let Some(ty) = types.get(i) {
+                    validate_insert_value(ty, cell.to_slt_string().trim())?;
+                }
+            }
             rows.push(cells);
         }
         if rows.is_empty() {
