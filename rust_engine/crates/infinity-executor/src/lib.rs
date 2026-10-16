@@ -1358,8 +1358,11 @@ impl Engine {
                     existed,
                 })
             }
-            Statement::DropIndex { name } => {
+            Statement::DropIndex { name, if_exists } => {
                 let existed = self.catalog.drop_index(name)?;
+                if !existed && !*if_exists {
+                    return Err(Error::Invalid(format!("index '{name}' does not exist")));
+                }
                 Ok(QueryResult::DroppedIndex {
                     name: name.clone(),
                     existed,
@@ -1446,6 +1449,16 @@ impl Engine {
                 out.push(SNAP_REC);
                 out.push_str(&meta.types.join(&SNAP_FLD.to_string()));
                 out.push(SNAP_REC);
+                // the snapshot also carries the table's index declarations
+                let idxs: Vec<String> = self
+                    .catalog
+                    .list_indexes()?
+                    .into_iter()
+                    .filter(|im| im.table == *table)
+                    .map(|im| format!("{}{SNAP_FLD}{}", im.name, im.column))
+                    .collect();
+                out.push_str(&idxs.join(&SNAP_REC.to_string()));
+                out.push(SNAP_REC);
                 for (_, row) in &rows {
                     out.push_str(
                         &row.iter()
@@ -1504,6 +1517,14 @@ impl Engine {
                     .split(SNAP_FLD)
                     .map(|s| s.to_string())
                     .collect();
+                let indexes: Vec<(String, String)> = recs
+                    .next()
+                    .unwrap_or_default()
+                    .split(SNAP_REC)
+                    .filter(|s| !s.is_empty())
+                    .filter_map(|s| s.split_once(SNAP_FLD))
+                    .map(|(n, c)| (n.to_string(), c.to_string()))
+                    .collect();
                 let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
                 // replace any current incarnation of the table
                 if self.catalog.get_table_by_name(&table)?.is_some() {
@@ -1523,6 +1544,13 @@ impl Engine {
                         // store uses tabs
                         let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
                         self.store.put(&row_key(&table, i), &encoded.into_bytes())?;
+                    }
+                }
+                // re-create the snapshot's indexes
+                for (name, column) in indexes {
+                    self.catalog.create_index(&name, &table, &column)?;
+                    if self.table_schema(&table)?.iter().any(|c| c == &column) {
+                        self.build_index(&table, &column)?;
                     }
                 }
                 Ok(QueryResult::Rows {
@@ -1611,12 +1639,25 @@ impl Engine {
                 where_pred,
             } => {
                 let schema = self.table_schema(table)?;
+                let not_nulls = self
+                    .catalog
+                    .get_table_by_name(table)?
+                    .map(|m| m.not_nulls)
+                    .unwrap_or_default();
                 let mut asg = Vec::new();
                 for (c, e) in assignments {
-                    asg.push((
-                        infinity_planner::resolve_column(&schema, c)?,
-                        infinity_planner::compile_expr(e, &schema)?,
-                    ));
+                    let idx = infinity_planner::resolve_column(&schema, c)?;
+                    if not_nulls.get(idx).copied().unwrap_or(false)
+                        && matches!(
+                            e,
+                            infinity_parser::ExprAst::Literal(infinity_parser::Literal::Null)
+                        )
+                    {
+                        return Err(Error::Invalid(format!(
+                            "null value in NOT NULL column '{c}'"
+                        )));
+                    }
+                    asg.push((idx, infinity_planner::compile_expr(e, &schema)?));
                 }
                 let pred = match where_pred {
                     Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
@@ -2265,21 +2306,11 @@ impl Engine {
                 }
             }
             // skip rows whose typed (sparse) cells are malformed
-            let mut ok = true;
             for (i, c) in cells.iter().enumerate() {
                 if let Some(t) = types_for_scan.get(i) {
-                    if is_sparse_type(t) {
-                        let up = t.to_ascii_uppercase();
-                        let float = up.contains("FLOAT") || up.contains("DOUBLE");
-                        if reshape_sparse(c, float).is_none() {
-                            ok = false;
-                            break;
-                        }
-                    }
+                    // a malformed typed cell is a hard error
+                    validate_insert_value(t, c.trim())?;
                 }
-            }
-            if !ok {
-                continue;
             }
             rows.push(cells.into_iter().map(Literal::Str).collect());
         }

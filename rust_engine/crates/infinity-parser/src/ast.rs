@@ -275,6 +275,7 @@ pub enum Statement {
     },
     DropIndex {
         name: String,
+        if_exists: bool,
     },
     /// A tolerated session/utility statement (`SET …`, `PRAGMA …`).
     Utility {

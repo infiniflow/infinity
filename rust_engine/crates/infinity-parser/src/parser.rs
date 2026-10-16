@@ -273,13 +273,13 @@ impl Parser {
                     let name = self.expect_ident()?;
                     Ok(Statement::DropSnapshot { name })
                 } else if self.eat_kw("INDEX") {
-                    self.eat_if_exists();
+                    let if_exists = self.eat_if_exists();
                     let name = self.expect_ident()?;
                     // tolerate `ON <table>`
                     if self.eat_kw("ON") {
                         let _ = self.expect_ident();
                     }
-                    Ok(Statement::DropIndex { name })
+                    Ok(Statement::DropIndex { name, if_exists })
                 } else {
                     self.expect_kw("TABLE")?;
                     self.eat_if_exists();
@@ -1522,8 +1522,10 @@ impl Parser {
         let distinct = self.eat_kw("DISTINCT");
         let mut args: Vec<String> = Vec::new();
         let mut arg_exprs: Vec<Option<ExprAst>> = Vec::new();
+        let mut saw_star = false;
         if self.peek() == &Token::Star {
             self.advance();
+            saw_star = true;
         } else {
             loop {
                 match self.peek().clone() {
@@ -1557,6 +1559,12 @@ impl Parser {
             self.advance();
         }
         self.expect(Token::RParen)?;
+        // `COUNT()` / `SUM()` with no argument is invalid; a sentinel empty
+        // argument fails column resolution later.
+        if args.is_empty() && !saw_star {
+            args.push(String::new());
+            arg_exprs.push(None);
+        }
         Ok(SelectAgg {
             func,
             args,
@@ -2162,7 +2170,8 @@ mod tests {
         assert_eq!(
             one("DROP INDEX idx1 ON t"),
             Statement::DropIndex {
-                name: "idx1".into()
+                name: "idx1".into(),
+                if_exists: false,
             }
         );
         match one("COPY t FROM '/x/y.csv' WITH (DELIMITER ',', FORMAT CSV)") {
