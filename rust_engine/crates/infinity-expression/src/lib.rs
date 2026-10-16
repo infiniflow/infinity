@@ -618,19 +618,42 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             .unwrap_or(Value::Null),
         "ROUND" => {
             let x = a0();
+            // 1-argument ROUND preserves the argument's type; 2-argument ROUND
+            // returns a float, rounded to `n` decimal places (negative `n`
+            // rounds to tens/hundreds/…).
+            if args.len() < 2 {
+                return match x {
+                    Value::Int(i) => Value::Int(i),
+                    Value::Float(f) => Value::Float(f.round()),
+                    _ => Value::Null,
+                };
+            }
+            let xf = match &x {
+                Value::Float(f) => *f,
+                Value::Int(i) => *i as f64,
+                _ => return Value::Null,
+            };
             let n = match a1() {
                 Value::Int(i) => i,
                 Value::Float(f) => f as i64,
                 _ => 0,
             };
-            match x {
-                Value::Float(f) => {
-                    let m = 10f64.powi(n as i32);
-                    Value::Float((f * m).round() / m)
-                }
-                Value::Int(i) => Value::Int(i),
-                _ => Value::Null,
-            }
+            let m = 10f64.powi(n as i32);
+            Value::Float((xf * m).round() / m)
+        }
+        "TRUNC" | "TRUNCATE" => {
+            let Some(xf) = a0().as_f64() else {
+                return Value::Null;
+            };
+            let n = match a1() {
+                Value::Int(i) => i,
+                Value::Float(f) => f as i64,
+                _ => 0,
+            };
+            let m = 10f64.powi(n as i32);
+            let t = (xf * m).trunc() / m;
+            // TRUNC renders exactly `n` decimal places.
+            Value::Str(format!("{t:.prec$}", prec = n.max(0) as usize))
         }
         "UPPER" => match a0() {
             Value::Str(s) => Value::Str(s.to_uppercase()),
@@ -909,6 +932,59 @@ mod tests {
         assert_eq!(aggregate(AggFunc::Avg, &[0], false, &[]), Value::Null);
         assert_eq!(aggregate(AggFunc::Count, &[0], false, &[]), Value::Int(0));
         assert_eq!(aggregate(AggFunc::Min, &[0], false, &[]), Value::Null);
+    }
+
+    #[test]
+    fn round_and_trunc_arity() {
+        let f = |name: &str, args: Vec<Expr>| Expr::Func {
+            name: name.into(),
+            args,
+        };
+        let r = vec![Value::Int(125), Value::Null, Value::Null];
+        // 1-arg ROUND preserves the type; 2-arg ROUND yields a float
+        assert_eq!(f("ROUND", vec![Expr::Column(0)]).eval(&r), Value::Int(125));
+        assert_eq!(
+            f(
+                "ROUND",
+                vec![Expr::Column(0), Expr::Literal(Value::Int(-1))]
+            )
+            .eval(&r),
+            Value::Float(130.0)
+        );
+        assert_eq!(
+            f(
+                "ROUND",
+                vec![
+                    Expr::Literal(Value::Float(125.555)),
+                    Expr::Literal(Value::Int(2))
+                ]
+            )
+            .eval(&r),
+            Value::Float(125.56)
+        );
+        // TRUNC renders exactly `n` decimals
+        assert_eq!(
+            f(
+                "TRUNC",
+                vec![
+                    Expr::Literal(Value::Float(2.4)),
+                    Expr::Literal(Value::Int(12))
+                ]
+            )
+            .eval(&r),
+            Value::Str("2.400000000000".into())
+        );
+        assert_eq!(
+            f(
+                "TRUNC",
+                vec![
+                    Expr::Literal(Value::Float(-2.5)),
+                    Expr::Literal(Value::Int(2))
+                ]
+            )
+            .eval(&r),
+            Value::Str("-2.50".into())
+        );
     }
 
     #[test]

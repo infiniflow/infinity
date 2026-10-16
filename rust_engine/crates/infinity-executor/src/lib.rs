@@ -155,17 +155,6 @@ enum ElemType {
     Int64,
 }
 
-impl ElemType {
-    /// Whether the element type is an integer, which selects the integer SIMD
-    /// distance functions (squared L2 without the square root).
-    fn is_integer(self) -> bool {
-        matches!(
-            self,
-            ElemType::Int8 | ElemType::UInt8 | ElemType::Int16 | ElemType::Int32 | ElemType::Int64
-        )
-    }
-}
-
 fn elem_type_of(token: &str) -> ElemType {
     // The parser concatenates type tokens without spaces (`UNSIGNEDTINYINT`),
     // so compare against a whitespace-free uppercase form.
@@ -513,6 +502,34 @@ fn is_bit_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().contains("BIT")
 }
 
+/// Whether the type text is a fixed-width embedding column
+/// (`EMBEDDING(...)` / `VECTOR(...)`).
+fn is_embedding_type(type_text: &str) -> bool {
+    let t = type_text.to_ascii_uppercase();
+    t.starts_with("EMBEDDING") || t.starts_with("VECTOR")
+}
+
+/// Packs a flat bit embedding into a single bit string, e.g. `[0000000000000001]`.
+fn pack_bit_vector(s: &str) -> String {
+    let t = s.trim();
+    let inner = t.trim_start_matches('[').trim_end_matches(']');
+    if inner.trim().is_empty() {
+        return "[]".to_string();
+    }
+    let bits: String = inner
+        .split([',', ' '])
+        .filter(|x| !x.trim().is_empty())
+        .map(|x| {
+            if x.trim().parse::<f64>().map(|f| f != 0.0).unwrap_or(false) {
+                '1'
+            } else {
+                '0'
+            }
+        })
+        .collect();
+    format!("[{bits}]")
+}
+
 /// Packs a bit tensor into rows of `dim` `0`/`1` characters.
 fn reshape_bit_tensor(s: &str, dim: usize) -> String {
     let t = s.trim();
@@ -625,6 +642,13 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                     match reshape_sparse(&s, float) {
                         Some(v) => v,
                         None => s,
+                    }
+                }
+                Some(t) if is_embedding_type(t) => {
+                    if is_bit_type(t) {
+                        pack_bit_vector(&s)
+                    } else {
+                        s
                     }
                 }
                 Some(t) if is_tensor_type(t) => {
@@ -2050,16 +2074,33 @@ impl Engine {
                     let dot = sparse_dot(&qv, &rv);
                     scored.push((*seq, dot, -dot));
                 } else {
+                    // A `bit` embedding column stores a bit string, so both the
+                    // query and the stored value are read as 0/1 positions.
+                    let bit_col = types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
                     let qv: Vec<f64> = query_items
                         .iter()
                         .filter_map(|x| x.parse::<f64>().ok())
+                        .map(|x| {
+                            if bit_col {
+                                if x != 0.0 {
+                                    1.0
+                                } else {
+                                    0.0
+                                }
+                            } else {
+                                x
+                            }
+                        })
                         .collect();
-                    let rv = parse_vec_str(v);
+                    let rv: Vec<f64> = if bit_col {
+                        parse_bit_leaves(v).into_iter().flatten().collect()
+                    } else {
+                        parse_vec_str(v)
+                    };
                     if qv.is_empty() || rv.len() != qv.len() {
                         continue;
                     }
-                    let int_elem = vector_col_elem(&types, col_idx);
-                    let (sim, dist) = vector_score(&qv, &rv, &metric, int_elem);
+                    let (sim, dist) = vector_score(&qv, &rv, &metric);
                     scored.push((*seq, sim, dist));
                 }
             }
@@ -2072,7 +2113,18 @@ impl Engine {
                 .then(a.0.cmp(&b.0))
         });
         if let Some(th) = threshold {
-            scored.retain(|(_, sim, dist)| if use_sim { *sim >= th } else { *dist >= th });
+            // For a distance metric the threshold is an upper bound; for a
+            // similarity metric it is a lower bound.
+            let is_dist = !is_sparse && !is_tensor && matches!(metric.as_str(), "l2" | "hamming");
+            scored.retain(|(_, sim, dist)| {
+                if is_dist {
+                    *dist <= th
+                } else if use_sim {
+                    *sim >= th
+                } else {
+                    *dist >= th
+                }
+            });
         }
         scored.truncate(topn);
 
@@ -2505,7 +2557,7 @@ fn parse_topn_param(p: &str) -> Option<usize> {
 }
 
 /// Returns `(similarity, distance)` for the given metric.
-fn vector_score(q: &[f64], v: &[f64], metric: &str, int_elem: bool) -> (f64, f64) {
+fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
     let dot: f64 = q.iter().zip(v).map(|(a, b)| a * b).sum();
     let nq: f64 = q.iter().map(|a| a * a).sum::<f64>().sqrt();
     let nv: f64 = v.iter().map(|a| a * a).sum::<f64>().sqrt();
@@ -2519,22 +2571,21 @@ fn vector_score(q: &[f64], v: &[f64], metric: &str, int_elem: bool) -> (f64, f64
             };
             (c, 1.0 - c)
         }
+        "hamming" => {
+            // Hamming distance: the number of differing positions.
+            let d = q
+                .iter()
+                .zip(v)
+                .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
+                .count() as f64;
+            (1.0 / (1.0 + d), d)
+        }
         _ => {
-            let sq: f64 = q.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
-            // Integer element types use the integer L2 kernel, which returns the
-            // squared distance without taking the square root.
-            let d = if int_elem { sq } else { sq.sqrt() };
+            // `l2` reports the *squared* Euclidean distance (no square root).
+            let d: f64 = q.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
             (1.0 / (1.0 + d), d)
         }
     }
-}
-
-/// Whether the embedding column at `col_idx` has an integer element type.
-fn vector_col_elem(types: &[String], col_idx: usize) -> bool {
-    types
-        .get(col_idx)
-        .map(|t| tensor_elem_type(t).is_integer())
-        .unwrap_or(false)
 }
 
 /// Runs the operator stages over rows received from a bounded producer/consumer
@@ -3083,15 +3134,16 @@ mod tests {
     }
 
     #[test]
-    fn integer_embeddings_report_squared_l2() {
-        // u8/i8 columns use the integer L2 kernel (no square root).
-        let (_, d_int) = vector_score(&[0.0, 0.0, 0.0], &[2.0, 3.0, 4.0], "l2", true);
-        assert!((d_int - 29.0).abs() < 1e-9, "got {d_int}");
-        let (_, d_float) = vector_score(&[0.0, 0.0, 0.0], &[2.0, 3.0, 4.0], "l2", false);
-        assert!((d_float - 29.0f64.sqrt()).abs() < 1e-9, "got {d_float}");
-        // ip is a plain dot product regardless of element type.
-        let (s_int, _) = vector_score(&[3.0, 2.0, 1.0], &[10.0, 11.0, 12.0], "ip", true);
-        assert!((s_int - 64.0).abs() < 1e-9, "got {s_int}");
+    fn l2_distance_is_squared() {
+        // `l2` reports the squared Euclidean distance (integer and float alike).
+        let (_, d) = vector_score(&[0.0, 0.0, 0.0], &[2.0, 3.0, 4.0], "l2");
+        assert!((d - 29.0).abs() < 1e-9, "got {d}");
+        // ip is a plain dot product.
+        let (s, _) = vector_score(&[3.0, 2.0, 1.0], &[10.0, 11.0, 12.0], "ip");
+        assert!((s - 64.0).abs() < 1e-9, "got {s}");
+        // hamming counts differing positions.
+        let (_, h) = vector_score(&[1.0, 0.0, 1.0], &[1.0, 1.0, 1.0], "hamming");
+        assert!((h - 1.0).abs() < 1e-9, "got {h}");
     }
 
     #[test]
