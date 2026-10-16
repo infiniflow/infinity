@@ -429,6 +429,20 @@ impl Catalog {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
         let indexes = self.list_indexes()?;
+        self.write_cpp_layout_from(store, &dbs, &tables, &indexes)
+    }
+
+    /// Like [`Self::write_cpp_layout`] but from an explicit snapshot. The
+    /// C++-only catalog mode needs this: it mutates the desired lists and then
+    /// rewrites the whole layout, and the just-mutated state is not yet readable
+    /// back from the store.
+    pub fn write_cpp_layout_from(
+        &self,
+        store: &dyn MetaStore,
+        dbs: &[String],
+        tables: &[TableMeta],
+        indexes: &[IndexMeta],
+    ) -> Result<usize> {
         let mut written = 0usize;
 
         let next_table_id = tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
@@ -450,7 +464,7 @@ impl Catalog {
         // table's db id, table id and column types.
         let mut resolved: Vec<(String, String, u64, CppTable)> = Vec::new();
 
-        for t in &tables {
+        for t in tables {
             let db_name = db_of(&t.name);
             if !dbs.iter().any(|d| d == db_name) {
                 continue; // unknown database: nothing to hang the table under
@@ -532,7 +546,7 @@ impl Catalog {
         // Index records: `idx|{db}|{tbl}|{name}|{ts}` -> index_id (a per-table
         // counter starting at 0), plus an `index_base` tag holding the C++
         // `IndexBase::Serialize()` JSON (`table_index_meta_impl.cpp:90-97`).
-        for im in &indexes {
+        for im in indexes {
             let im_table = table_of(&im.table);
             let im_db = db_of(&im.table);
             let Some((db_str, tbl_str, ts, cpp)) = resolved
