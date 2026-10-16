@@ -67,8 +67,8 @@ pub enum Predicate {
     IsTrue(ExprAst),
     /// `expr IS [NOT] NULL`.
     IsNull(ExprAst, bool),
-    /// `expr LIKE pattern`.
-    Like(ExprAst, ExprAst),
+    /// `expr [NOT] LIKE pattern [ESCAPE c]`.
+    Like(ExprAst, ExprAst, Option<char>, bool),
     /// `expr [NOT] IN (v1, v2, …)`.
     In(ExprAst, Vec<ExprAst>, bool),
     /// `AND` / `OR` of two predicates.

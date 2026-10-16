@@ -154,9 +154,11 @@ pub fn predicate_expr(pred: &Predicate, schema: &[String]) -> Result<Expr> {
         ),
         Predicate::IsTrue(e) => compile_expr(e, schema)?,
         Predicate::IsNull(e, neg) => Expr::IsNull(Box::new(compile_expr(e, schema)?), *neg),
-        Predicate::Like(a, pat) => Expr::Like(
+        Predicate::Like(a, pat, esc, neg) => Expr::Like(
             Box::new(compile_expr(a, schema)?),
             Box::new(compile_expr(pat, schema)?),
+            *esc,
+            *neg,
         ),
         Predicate::In(a, vals, neg) => Expr::In(
             Box::new(compile_expr(a, schema)?),
@@ -259,9 +261,11 @@ fn compile_agg_predicate(
         Predicate::IsNull(e, neg) => {
             Expr::IsNull(Box::new(compile_agg_expr(e, agg_index, group_by)?), *neg)
         }
-        Predicate::Like(a, b) => Expr::Like(
+        Predicate::Like(a, b, esc, neg) => Expr::Like(
             Box::new(compile_agg_expr(a, agg_index, group_by)?),
             Box::new(compile_agg_expr(b, agg_index, group_by)?),
+            *esc,
+            *neg,
         ),
         Predicate::In(a, vals, neg) => Expr::In(
             Box::new(compile_agg_expr(a, agg_index, group_by)?),

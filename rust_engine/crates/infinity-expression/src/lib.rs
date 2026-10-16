@@ -90,8 +90,8 @@ pub enum Expr {
     Not(Box<Expr>),
     /// `expr IS [NOT] NULL`.
     IsNull(Box<Expr>, bool),
-    /// `expr LIKE pattern`.
-    Like(Box<Expr>, Box<Expr>),
+    /// `expr [NOT] LIKE pattern [ESCAPE c]`.
+    Like(Box<Expr>, Box<Expr>, Option<char>, bool),
     /// `expr [NOT] IN (…)`.
     In(Box<Expr>, Vec<Expr>, bool),
     /// `a <op> b` arithmetic.
@@ -139,7 +139,7 @@ impl Expr {
                 let is_null = matches!(a.eval(row), Value::Null);
                 Value::Bool(is_null != *neg)
             }
-            Expr::Like(a, pat) => {
+            Expr::Like(a, pat, esc, neg) => {
                 let text = match a.eval(row) {
                     Value::Str(s) => s,
                     other => other.to_slt_string(),
@@ -148,7 +148,9 @@ impl Expr {
                     Value::Str(s) => s,
                     other => other.to_slt_string(),
                 };
-                Value::Bool(like_match(&text, &pattern))
+                // Infinity escapes with `\` unless ESCAPE says otherwise
+                let e = esc.unwrap_or('\\');
+                Value::Bool(like_match(&text, &pattern, e) != *neg)
             }
             Expr::In(a, vals, neg) => {
                 let x = a.eval(row);
@@ -473,9 +475,21 @@ fn fulltext_match(text: &str, query: &str) -> bool {
 }
 
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.
-fn like_match(text: &str, pattern: &str) -> bool {
+fn like_match(text: &str, pattern: &str, escape: char) -> bool {
     let t: Vec<char> = text.chars().collect();
-    let p: Vec<char> = pattern.chars().collect();
+    // collapse `\c` escapes into a marker so they compare literally
+    let mut p: Vec<char> = Vec::new();
+    let mut it = pattern.chars();
+    while let Some(c) = it.next() {
+        if c == escape {
+            if let Some(next) = it.next() {
+                p.push('\u{1}');
+                p.push(next);
+                continue;
+            }
+        }
+        p.push(c);
+    }
     // dp[i][j] = p[..j] matches t[..i]
     let mut dp = vec![vec![false; p.len() + 1]; t.len() + 1];
     dp[0][0] = true;
@@ -486,10 +500,15 @@ fn like_match(text: &str, pattern: &str) -> bool {
     }
     for i in 1..=t.len() {
         for j in 1..=p.len() {
-            dp[i][j] = match p[j - 1] {
-                '%' => dp[i - 1][j] || dp[i][j - 1],
-                '_' => dp[i - 1][j - 1],
-                c => dp[i - 1][j - 1] && t[i - 1] == c,
+            // an escaped character is matched before `%` / `_` are considered
+            dp[i][j] = if j >= 2 && p[j - 2] == '\u{1}' {
+                dp[i - 1][j - 2] && t[i - 1] == p[j - 1]
+            } else {
+                match p[j - 1] {
+                    '%' => dp[i - 1][j] || dp[i][j - 1],
+                    '_' => dp[i - 1][j - 1],
+                    c => dp[i - 1][j - 1] && t[i - 1] == c,
+                }
             };
         }
     }
@@ -870,6 +889,16 @@ mod tests {
         );
         assert_eq!(f("LENGTH", vec![Expr::Column(1)]).eval(&row), Value::Int(2));
         assert_eq!(f("NOPE", vec![Expr::Column(0)]).eval(&row), Value::Null);
+    }
+
+    #[test]
+    fn like_with_escape() {
+        assert!(like_match("cat%", "cat\\%", '\\'));
+        assert!(!like_match("cat", "cat\\%", '\\'));
+        assert!(like_match("hello_world", "hello\\_%", '\\'));
+        assert!(like_match("hello_x", "hello#_%", '#'));
+        assert!(like_match("hello world", "hello wor%", '\\'));
+        assert!(!like_match("abc", "A_C", 'a')); // LIKE is case-sensitive
     }
 
     #[test]

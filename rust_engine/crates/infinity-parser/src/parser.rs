@@ -663,9 +663,30 @@ impl Parser {
             self.expect_kw("NULL")?;
             return Ok(Predicate::IsNull(left, neg));
         }
-        if self.eat_kw("LIKE") {
+        // `[NOT] LIKE <pattern> [ESCAPE '<c>']`
+        let like_neg = if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("NOT")) {
+            let save = self.pos;
+            self.advance();
+            if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("LIKE")) {
+                true
+            } else {
+                self.pos = save;
+                false
+            }
+        } else {
+            false
+        };
+        let is_like = matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("LIKE"));
+        if is_like {
+            self.advance();
             let pat = self.expr()?;
-            return Ok(Predicate::Like(left, pat));
+            let mut escape = None;
+            if self.eat_kw("ESCAPE") {
+                if let Token::Str(c) = self.advance() {
+                    escape = c.chars().next();
+                }
+            }
+            return Ok(Predicate::Like(left, pat, escape, like_neg));
         }
         let neg_in = if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("NOT")) {
             let save = self.pos;
