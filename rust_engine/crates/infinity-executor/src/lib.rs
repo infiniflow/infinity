@@ -887,6 +887,24 @@ fn describe_type(type_text: &str) -> String {
         let dim = parts.get(1).map(|s| s.trim()).unwrap_or("");
         return format!("Embedding({elem},{dim})");
     }
+    // Parameterised vector-ish types print their element type and dimension, so
+    // callers can recover both from `SHOW TABLE … COLUMNS`.
+    for (kw, name) in [
+        ("TENSORARRAY(", "TensorArray"),
+        ("MULTIVECTOR(", "MultiVector"),
+        ("TENSOR(", "Tensor"),
+    ] {
+        if up.starts_with(kw) {
+            let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
+            let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+            let elem = parts
+                .first()
+                .map(|s| s.to_ascii_lowercase())
+                .unwrap_or_default();
+            let dim = parts.get(1).map(|s| s.trim()).unwrap_or("");
+            return format!("{name}({elem},{dim})");
+        }
+    }
     let base = up.split('(').next().unwrap_or(&up);
     match base {
         "BOOL" | "BOOLEAN" => "Boolean".to_string(),
