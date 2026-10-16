@@ -129,6 +129,32 @@ fn del_prefix(table: &str) -> Vec<u8> {
 fn snap_key(name: &str) -> Vec<u8> {
     format!("snap:{name}").into_bytes()
 }
+/// `rank_features` contribution: `cell` is a JSON array of
+/// `{"<tag>": <number>}` objects, and each listed tag adds `number * weight`.
+/// A missing tag contributes nothing.
+fn rank_features_bonus(cell: &str, tags: &[(String, f64)]) -> f64 {
+    let mut sum = 0.0;
+    for (tag, weight) in tags {
+        let key = format!("\"{tag}\"");
+        let Some(pos) = cell.find(&key) else {
+            continue;
+        };
+        let rest = cell[pos + key.len()..].trim_start();
+        let Some(rest) = rest.strip_prefix(':') else {
+            continue;
+        };
+        let num: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || "+-.eE".contains(*c))
+            .collect();
+        if let Ok(v) = num.parse::<f64>() {
+            sum += v * weight;
+        }
+    }
+    sum
+}
+
 /// Overwrites a search-result row's hidden `#_score` column (the last one).
 fn set_score(row: &mut [Value], score: f64) {
     if let Some(last) = row.last_mut() {
@@ -3202,6 +3228,35 @@ impl Engine {
                 })
                 .unwrap_or(false)
         });
+        // `rank_features=<col>^<tag>^<weight>,…`: each document's `<col>` value is
+        // a JSON array of `{"<tag>": <number>}` objects (its index uses the
+        // `rankfeatures` analyzer), and the score gains `number * weight` for
+        // every listed tag.
+        let rank_features: Vec<(usize, Vec<(String, f64)>)> = {
+            let spec = params
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case("rank_features"))
+                .map(|(_, v)| v.to_string());
+            let mut groups: Vec<(usize, Vec<(String, f64)>)> = Vec::new();
+            if let Some(spec) = spec {
+                for item in spec.split(',') {
+                    let parts: Vec<&str> = item.split('^').map(str::trim).collect();
+                    let (Some(col), Some(tag)) = (parts.first(), parts.get(1)) else {
+                        continue;
+                    };
+                    let Some(ci) = schema.iter().position(|c| c == col) else {
+                        continue;
+                    };
+                    let weight = parts.get(2).and_then(|w| w.parse().ok()).unwrap_or(1.0);
+                    match groups.iter_mut().find(|(c, _)| *c == ci) {
+                        Some((_, list)) => list.push(((*tag).to_string(), weight)),
+                        None => groups.push((ci, vec![((*tag).to_string(), weight)])),
+                    }
+                }
+            }
+            groups
+        };
         let n_docs = docs.len().max(1);
         let avg_len: f64 = if docs.is_empty() {
             1.0
@@ -3255,6 +3310,10 @@ impl Engine {
                     let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
                     score += idf * norm * field;
                 }
+            }
+            for (ci, tags) in &rank_features {
+                let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                score += rank_features_bonus(&cell, tags);
             }
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
                 scored.push((*seq, score));
@@ -4709,6 +4768,17 @@ mod tests {
                 .unwrap();
         }
         e.flush().unwrap();
+    }
+
+    #[test]
+    fn rank_features_bonus_sums_listed_tags() {
+        let cell = r#"[{"Tag1":1},{"Tag2":2}]"#;
+        let tags = [("Tag1".to_string(), 1.0), ("Tag2".to_string(), 2.0)];
+        assert_eq!(rank_features_bonus(cell, &tags), 5.0);
+        // A tag the document does not carry contributes nothing.
+        let tags = [("Tag3".to_string(), 4.0), ("Tag1".to_string(), 1.0)];
+        assert_eq!(rank_features_bonus(cell, &tags), 1.0);
+        assert_eq!(rank_features_bonus("[]", &tags), 0.0);
     }
 
     /// A store opened exactly the way `Engine::open` opens its catalog, so a
