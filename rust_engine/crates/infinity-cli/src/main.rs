@@ -428,7 +428,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         } else {
                             this_file_fails += 1;
                             fail_reasons
-                                .entry(format!("MISMATCH ({})", first_word(&sql)))
+                                .entry(format!("MISMATCH ({})", mismatch_key(&sql)))
                                 .or_default()
                                 .push(format!("{sql}  ==> got {got:?} want {exp:?}"));
                         }
@@ -478,6 +478,24 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
         }
     }
     Ok(())
+}
+
+/// A failure key: the leading keywords plus (when present) the FROM table.
+fn mismatch_key(sql: &str) -> String {
+    let head = first_word(sql);
+    let up = sql.to_uppercase();
+    let table = up
+        .find(" FROM ")
+        .map(|i| sql[i + 6..].trim_start())
+        .and_then(|rest| rest.split_whitespace().next())
+        .unwrap_or("");
+    if table.is_empty() {
+        head
+    } else {
+        format!("{head} {}:{}", table, "")
+            .trim_end_matches(':')
+            .to_string()
+    }
 }
 
 fn first_word(sql: &str) -> String {

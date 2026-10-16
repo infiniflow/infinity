@@ -135,6 +135,28 @@ fn is_tensor_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("TENSOR")
 }
 
+fn is_bit_type(type_text: &str) -> bool {
+    type_text.to_ascii_uppercase().contains("BIT")
+}
+
+/// Packs a bit tensor into rows of `dim` `0`/`1` characters.
+fn reshape_bit_tensor(s: &str, dim: usize) -> String {
+    let flat = parse_vec_str(s);
+    if flat.is_empty() {
+        return s.trim().to_string();
+    }
+    let d = if dim == 0 { flat.len() } else { dim };
+    let groups: Vec<String> = flat
+        .chunks(d)
+        .map(|c| {
+            c.iter()
+                .map(|v| if *v != 0.0 { '1' } else { '0' })
+                .collect()
+        })
+        .collect();
+    format!("[[{}]]", groups.join("],["))
+}
+
 /// Reshapes a flat tensor literal (`[a,b,c,d,e,f,g,h]`) into `[[a,b,c,d],[e,f,g,h]]`.
 fn reshape_tensor(s: &str, dim: usize) -> String {
     let t = s.trim();
@@ -167,10 +189,14 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
         .map(|(i, v)| {
             let s = v.to_slt_string();
             match types.get(i) {
-                Some(t) if is_tensor_type(t) => match type_dim(t) {
-                    Some(d) => reshape_tensor(&s, d),
-                    None => s,
-                },
+                Some(t) if is_tensor_type(t) => {
+                    let d = type_dim(t).unwrap_or(0);
+                    if is_bit_type(t) {
+                        reshape_bit_tensor(&s, d)
+                    } else {
+                        reshape_tensor(&s, d)
+                    }
+                }
                 _ => s,
             }
         })
