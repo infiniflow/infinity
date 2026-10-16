@@ -63,6 +63,15 @@ impl Value {
                     // booleans compare against their textual form too
                     (Value::Bool(b), Value::Str(s2)) => Some(b.to_string().cmp(s2)),
                     (Value::Str(s2), Value::Bool(b)) => Some(s2.cmp(&b.to_string())),
+                    // implicit numeric coercion: number vs numeric string
+                    (Value::Str(a), other2) => match (a.trim().parse::<f64>(), other2.as_f64()) {
+                        (Ok(f), Some(g)) => f.partial_cmp(&g),
+                        _ => None,
+                    },
+                    (other2, Value::Str(b)) => match (other2.as_f64(), b.trim().parse::<f64>()) {
+                        (Some(f), Ok(g)) => f.partial_cmp(&g),
+                        _ => None,
+                    },
                     _ => None,
                 },
             },
