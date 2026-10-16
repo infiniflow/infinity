@@ -600,6 +600,352 @@ pub fn fst_common_input(idx: u8) -> Option<u8> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FST node decoding (`fst/node.cppm`), verified against real C++-built FSTs
+// ---------------------------------------------------------------------------
+
+/// `TRANS_INDEX_THRESHOLD` (`fst/node.cppm:52`): a node with more transitions
+/// than this adds a 256-byte byte -> index table.
+pub const FST_TRANS_INDEX_THRESHOLD: usize = 32;
+
+/// The `root_addr` from an FST's trailer (`fst.cppm:77`), 12 bytes before the
+/// end. Does not verify the checksum.
+pub fn fst_root_addr(fst: &[u8]) -> Result<u64, FormatError> {
+    if fst.len() < 12 {
+        return Err(FormatError::Truncated {
+            need: 12,
+            got: fst.len(),
+        });
+    }
+    let at = fst.len() - 12;
+    Ok(u64::from_le_bytes(fst[at..at + 8].try_into().unwrap()))
+}
+
+/// `PackSizes` (`fst/node.cppm:110-127`): the transition/output widths packed
+/// into one byte (transition size in the high nibble).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct FstPackSizes {
+    tsize: usize,
+    osize: usize,
+}
+
+impl FstPackSizes {
+    fn from_byte(b: u8) -> Self {
+        Self {
+            tsize: (b >> 4) as usize,
+            osize: (b & 0x0f) as usize,
+        }
+    }
+}
+
+/// One decoded FST node (`fst/node.cppm:203-253`, `:755-795`).
+struct FstNode<'a> {
+    data: &'a [u8],
+    /// Address of the state byte (`start_`).
+    start: usize,
+    /// The end of the node's data (`end_`), used as the delta base.
+    end: usize,
+    ntrans: usize,
+    state: u8,
+    sizes: FstPackSizes,
+    is_final: bool,
+    final_output: u64,
+}
+
+fn fst_err(need: usize, got: usize) -> FormatError {
+    FormatError::Truncated { need, got }
+}
+
+impl<'a> FstNode<'a> {
+    /// `State::NtransLen` (`fst/node.cppm:615-621`).
+    fn ntrans_len(state: u8) -> usize {
+        if state & 0x3f == 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// `StateOneTransNext`/`StateOneTrans` `InputLen` (`fst/node.cppm:361-366`,
+    /// `:438-443`).
+    fn input_len(state: u8) -> usize {
+        if state & 0x3f == 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// The `Node::Node(addr, data_ptr)` constructor (`fst/node.cppm:755-795`).
+    fn new(data: &'a [u8], addr: u64) -> Result<Self, FormatError> {
+        if addr == FST_EMPTY_ADDRESS {
+            // The empty node is final with a zero output.
+            return Ok(Self {
+                data,
+                start: 0,
+                end: 0,
+                ntrans: 0,
+                state: 0,
+                sizes: FstPackSizes::default(),
+                is_final: true,
+                final_output: 0,
+            });
+        }
+        let start = usize::try_from(addr).map_err(|_| fst_err(addr as usize, data.len()))?;
+        if start >= data.len() {
+            return Err(fst_err(start + 1, data.len()));
+        }
+        let data_len = start + 1;
+        let state = data[start];
+        let get = |i: usize| -> Result<u8, FormatError> { data.get(i).copied().ok_or(fst_err(i + 1, data.len())) };
+        match state & 0b1100_0000 {
+            0b1100_0000 => {
+                // StateOneTransNext: one transition to the previously compiled
+                // node.
+                let il = Self::input_len(state);
+                let end = data_len.checked_sub(1 + il).ok_or(fst_err(data_len, data.len()))?;
+                Ok(Self {
+                    data,
+                    start,
+                    end,
+                    ntrans: 1,
+                    state,
+                    sizes: FstPackSizes::default(),
+                    is_final: false,
+                    final_output: 0,
+                })
+            }
+            0b1000_0000 => {
+                // StateOneTrans: one transition with an output.
+                let il = Self::input_len(state);
+                let ntl = Self::ntrans_len(state);
+                let sizes = FstPackSizes::from_byte(get(data_len - 1 - ntl - 1)?);
+                let end = data_len
+                    .checked_sub(1 + il + 1 + sizes.tsize + sizes.osize)
+                    .ok_or(fst_err(data_len, data.len()))?;
+                Ok(Self {
+                    data,
+                    start,
+                    end,
+                    ntrans: 1,
+                    state,
+                    sizes,
+                    is_final: false,
+                    final_output: 0,
+                })
+            }
+            _ => {
+                // StateAnyTrans.
+                let ntl = Self::ntrans_len(state);
+                let mut ntrans = (state & 0x3f) as usize;
+                if ntrans == 0 {
+                    let v = get(data_len - 2)?;
+                    // "1" can never be a normal count, so it means 256.
+                    ntrans = if v == 1 { 256 } else { v as usize };
+                }
+                let sizes = FstPackSizes::from_byte(get(data_len - 1 - ntl - 1)?);
+                let index_size = if ntrans > FST_TRANS_INDEX_THRESHOLD {
+                    256
+                } else {
+                    0
+                };
+                let total = ntrans + ntrans * sizes.tsize + index_size;
+                let is_final = state & 0b0100_0000 != 0;
+                let final_osize = if is_final { sizes.osize } else { 0 };
+                let end = data_len
+                    .checked_sub(1 + ntl + 1 + total + ntrans * sizes.osize + final_osize)
+                    .ok_or(fst_err(data_len, data.len()))?;
+                let final_output = if sizes.osize == 0 || !is_final {
+                    0
+                } else {
+                    let at = data_len - 1 - ntl - 1 - total - ntrans * sizes.osize - sizes.osize;
+                    fst_unpack_uint(&data[at..], sizes.osize as u8)?
+                };
+                Ok(Self {
+                    data,
+                    start,
+                    end,
+                    ntrans,
+                    state,
+                    sizes,
+                    is_final,
+                    final_output,
+                })
+            }
+        }
+    }
+
+    /// The `i`th transition's input byte (`fst/node.cppm:370-378`, `:455-463`,
+    /// `:672-676`).
+    fn input_at(&self, i: usize) -> Result<u8, FormatError> {
+        match self.state & 0b1100_0000 {
+            0b1100_0000 => {
+                // A common input, else the byte just before the state byte.
+                if let Some(b) = fst_common_input(self.state & 0x3f) {
+                    Ok(b)
+                } else {
+                    self.data.get(self.start.wrapping_sub(1)).copied().ok_or(fst_err(self.start, self.data.len()))
+                }
+            }
+            0b1000_0000 => {
+                if let Some(b) = fst_common_input(self.state & 0x3f) {
+                    Ok(b)
+                } else {
+                    self.data.get(self.start.wrapping_sub(1)).copied().ok_or(fst_err(self.start, self.data.len()))
+                }
+            }
+            _ => {
+                let ntl = Self::ntrans_len(self.state);
+                let index_size = if self.ntrans > FST_TRANS_INDEX_THRESHOLD {
+                    256
+                } else {
+                    0
+                };
+                let at = self.start as isize - ntl as isize - 1 - index_size as isize - i as isize - 1;
+                if at < 0 {
+                    return Err(fst_err(self.start, self.data.len()));
+                }
+                self.data.get(at as usize).copied().ok_or(fst_err(at as usize + 1, self.data.len()))
+            }
+        }
+    }
+
+    /// The `i`th transition's output (`fst/node.cppm:465-472`, `:703-713`).
+    fn output_at(&self, i: usize) -> Result<u64, FormatError> {
+        match self.state & 0b1100_0000 {
+            0b1100_0000 => Ok(0),
+            0b1000_0000 => {
+                // `OutputOf`
+                if self.sizes.osize == 0 {
+                    return Ok(0);
+                }
+                let il = Self::input_len(self.state);
+                let at = self.start - il - 1 - self.sizes.tsize - self.sizes.osize;
+                fst_unpack_uint(&self.data[at..], self.sizes.osize as u8)
+            }
+            _ => {
+                if self.sizes.osize == 0 {
+                    return Ok(0);
+                }
+                let ntl = Self::ntrans_len(self.state);
+                let total = self.ntrans + self.ntrans * self.sizes.tsize
+                    + if self.ntrans > FST_TRANS_INDEX_THRESHOLD {
+                        256
+                    } else {
+                        0
+                    };
+                let at = self.start as isize
+                    - ntl as isize
+                    - 1
+                    - total as isize
+                    - (i * self.sizes.osize) as isize
+                    - self.sizes.osize as isize;
+                if at < 0 {
+                    return Err(fst_err(self.start, self.data.len()));
+                }
+                fst_unpack_uint(&self.data[at as usize..], self.sizes.osize as u8)
+            }
+        }
+    }
+
+    /// The `i`th transition's target address (`fst/node.cppm:380`, `:474-478`,
+    /// `:661-669`).
+    fn trans_addr(&self, i: usize) -> Result<u64, FormatError> {
+        match self.state & 0b1100_0000 {
+            0b1100_0000 => Ok(self.end as u64 - 1),
+            0b1000_0000 => {
+                let il = Self::input_len(self.state);
+                let at = self.start - il - 1 - self.sizes.tsize;
+                fst_unpack_delta(&self.data[at..], self.sizes.tsize as u8, self.end as u64)
+            }
+            _ => {
+                let ntl = Self::ntrans_len(self.state);
+                let index_size = if self.ntrans > FST_TRANS_INDEX_THRESHOLD {
+                    256
+                } else {
+                    0
+                };
+                let at = self.start as isize
+                    - ntl as isize
+                    - 1
+                    - index_size as isize
+                    - self.ntrans as isize
+                    - (i * self.sizes.tsize) as isize
+                    - self.sizes.tsize as isize;
+                if at < 0 {
+                    return Err(fst_err(self.start, self.data.len()));
+                }
+                fst_unpack_delta(&self.data[at as usize..], self.sizes.tsize as u8, self.end as u64)
+            }
+        }
+    }
+
+    /// `FindInput` (`fst/node.cppm:395-402`, `:493-500`, `:679-701`): the index
+    /// of the transition whose input is `b`.
+    fn find_input(&self, b: u8) -> Result<Option<usize>, FormatError> {
+        match self.state & 0b1100_0000 {
+            0b1100_0000 | 0b1000_0000 => {
+                if self.input_at(0)? == b {
+                    Ok(Some(0))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => {
+                if self.ntrans > FST_TRANS_INDEX_THRESHOLD {
+                    let index_size = 256;
+                    let start = self.start - Self::ntrans_len(self.state) - 1 - index_size;
+                    let i = self.data[start + b as usize] as usize;
+                    // The C++ compares `i > ntrans`; a value of `ntrans` or more
+                    // marks an absent transition.
+                    if i > self.ntrans {
+                        Ok(None)
+                    } else {
+                        Ok(Some(i))
+                    }
+                } else {
+                    if self.ntrans == 0 {
+                        return Ok(None);
+                    }
+                    let ntl = Self::ntrans_len(self.state);
+                    let start = self.start - ntl - 1 - self.ntrans;
+                    for i in 0..self.ntrans {
+                        if *self
+                            .data
+                            .get(start + i)
+                            .ok_or(fst_err(start + i + 1, self.data.len()))?
+                            == b
+                        {
+                            return Ok(Some(self.ntrans - i - 1));
+                        }
+                    }
+                    Ok(None)
+                }
+            }
+        }
+    }
+}
+
+/// Looks up `key` in a whole FST region (`Fst::Get`, `fst.cppm:156-181`),
+/// returning its value when present.
+pub fn fst_get(fst: &[u8], key: &[u8]) -> Result<Option<u64>, FormatError> {
+    let mut addr = fst_root_addr(fst)?;
+    let mut out = 0u64;
+    for &b in key {
+        let node = FstNode::new(fst, addr)?;
+        let Some(ti) = node.find_input(b)? else {
+            return Ok(None);
+        };
+        out = out.wrapping_add(node.output_at(ti)?);
+        addr = node.trans_addr(ti)?;
+    }
+    let node = FstNode::new(fst, addr)?;
+    if !node.is_final {
+        return Ok(None);
+    }
+    Ok(Some(out.wrapping_add(node.final_output)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -765,6 +1111,121 @@ mod tests {
         assert_eq!(fst_pack_delta_size(100_000, 1), 3);
         assert_eq!(n, 3);
         assert_eq!(fst_unpack_delta(&big, n, 100_000).unwrap(), 1);
+    }
+
+    /// Decodes a lowercase hex string (test helper).
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn golden_fsts_from_the_cpp_builder_verify() {
+        // Real bytes emitted by the C++ `FstBuilder` (the amalgamated
+        // `src/storage/invertedindex/fst/*` built with clang, keys "app",
+        // "apple", "apply", "banana", "band", "cat" etc. mapped to 100, 200…).
+        // They pin the header, the trailer layout, the masked CRC-32/IEEE and
+        // the `root_addr + 21` length rule against ground truth.
+        let goldens: &[(&str, &str, u64, u64)] = &[
+            // label, hex, len_, root_addr
+            (
+                "empty",
+                "0300000000000000000000000000000000000000000000000000000000000000028ba85c",
+                0,
+                0,
+            ),
+            (
+                "one",
+                "0300000000000000000000000000000064001185010000000000000013000000000000003963da13",
+                1,
+                19,
+            ),
+            (
+                "two",
+                "03000000000000000000000000000000c86400006261110202000000000000001700000000000000d16c7686",
+                2,
+                23,
+            ),
+            (
+                "words",
+                "0300000000000000000000000000000064000000796511020064016c1141c9c9001085cb6400000164611102cbc5001081c5580290016400010513636261120306000000000000003f00000000000000b514bf07",
+                6,
+                63,
+            ),
+            (
+                "shared",
+                "03000000000000000000000000000000640000006261110200109ac80001046261110209109a2c010000010462611202001085c5c5f401640001066261120205000000000000003e00000000000000a7fbf8f8",
+                5,
+                62,
+            ),
+        ];
+        for (label, hex, want_len, want_root) in goldens {
+            let fst = unhex(hex);
+            // Header is VERSION then FstType.
+            assert_eq!(fst_header(&fst).unwrap(), (FST_VERSION, 0), "{label}");
+            // The trailer's `len_`/`root_addr` and its checksum all verify.
+            let (len, root) = verify_fst(&fst).unwrap_or_else(|e| panic!("{label}: {e:?}"));
+            assert_eq!((len, root), (*want_len, *want_root), "{label}");
+            // The region length the reader derives equals the real length.
+            assert_eq!(fst_len_from_trailer(root), fst.len(), "{label}");
+            // The empty FST is exactly the header plus the trailer (no nodes).
+            if *want_root == 0 {
+                assert_eq!(fst.len(), FST_HEADER_LEN + FST_TRAILER_LEN, "{label}");
+                assert_eq!(fst.len(), 36);
+            }
+        }
+    }
+
+    #[test]
+    fn fst_lookup_decodes_the_cpp_built_fsts() {
+        // The same goldens as `golden_fsts_from_the_cpp_builder_verify`, but
+        // now driving the node decoder: every inserted key must resolve to its
+        // value, and a missing key must not.
+        let cases: &[(&str, &[(&str, u64)])] = &[
+            ("empty", &[]),
+            ("one", &[("a", 100)]),
+            ("two", &[("a", 100), ("b", 200)]),
+            (
+                "words",
+                &[
+                    ("app", 100),
+                    ("apple", 200),
+                    ("apply", 300),
+                    ("banana", 400),
+                    ("band", 500),
+                    ("cat", 600),
+                ],
+            ),
+            (
+                "shared",
+                &[("aaaa", 100), ("aaab", 200), ("aabb", 300), ("abbb", 400), ("baaa", 500)],
+            ),
+        ];
+        let hexes = [
+            "0300000000000000000000000000000000000000000000000000000000000000028ba85c",
+            "0300000000000000000000000000000064001185010000000000000013000000000000003963da13",
+            "03000000000000000000000000000000c86400006261110202000000000000001700000000000000d16c7686",
+            "0300000000000000000000000000000064000000796511020064016c1141c9c9001085cb6400000164611102cbc5001081c5580290016400010513636261120306000000000000003f00000000000000b514bf07",
+            "03000000000000000000000000000000640000006261110200109ac80001046261110209109a2c010000010462611202001085c5c5f401640001066261120205000000000000003e00000000000000a7fbf8f8",
+        ];
+        for ((_, pairs), hex) in cases.iter().zip(hexes) {
+            let fst = unhex(hex);
+            for (k, v) in *pairs {
+                assert_eq!(
+                    fst_get(&fst, k.as_bytes()).unwrap(),
+                    Some(*v),
+                    "key {k}"
+                );
+            }
+            // Keys not in the set are absent (only meaningful when the set is
+            // non-empty and we can pick a stranger).
+            if !pairs.is_empty() {
+                assert_eq!(fst_get(&fst, b"\xff\xfe").unwrap(), None);
+                assert_eq!(fst_get(&fst, b"ap").unwrap(), None);
+            }
+        }
     }
 
     #[test]
