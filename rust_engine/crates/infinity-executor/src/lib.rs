@@ -1459,11 +1459,10 @@ impl Engine {
                             if let Some(ci) = schema.iter().position(|c| c == col) {
                                 // Array elements render as six-decimal floats for
                                 // float element types, matching `.slt` output.
-                                let float_elems = self
-                                    .column_types(t)?
-                                    .get(ci)
-                                    .map(|ty| array_elem_is_float(ty))
-                                    .unwrap_or(false);
+                                let col_ty =
+                                    self.column_types(t)?.get(ci).cloned().unwrap_or_default();
+                                let float_elems = array_elem_is_float(&col_ty);
+                                let is_json_col = is_json_type(&col_ty);
                                 let pred = match where_pred.as_ref() {
                                     Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
                                     None => None,
@@ -1506,30 +1505,33 @@ impl Engine {
                                     };
                                     match row.get(ci) {
                                         Some(Value::Str(cell)) => {
-                                            // An `ARRAY` column renders as a brace
-                                            // literal `{a,b,c}`; a JSON column uses
-                                            // `[...]`.
-                                            if let Some(elems) = brace_array_elems(cell) {
-                                                for e in elems {
-                                                    emit(if float_elems {
-                                                        fmt_float6(&e)
-                                                    } else {
-                                                        e
-                                                    });
-                                                }
-                                            } else {
-                                                match infinity_expression::json::parse(cell) {
-                                                    Some(infinity_expression::json::Json::Arr(
-                                                        elems,
-                                                    )) => {
-                                                        for e in elems {
-                                                            emit(e.compact());
-                                                        }
+                                            // A JSON column unnests its array
+                                            // elements (or yields the whole value
+                                            // for an object/scalar); an `ARRAY`
+                                            // column uses the brace literal form.
+                                            if !is_json_col && !cell.trim_start().starts_with('[') {
+                                                if let Some(elems) = brace_array_elems(cell) {
+                                                    for e in elems {
+                                                        emit(if float_elems {
+                                                            fmt_float6(&e)
+                                                        } else {
+                                                            e
+                                                        });
                                                     }
-                                                    // Unnest of an object / scalar yields itself.
-                                                    Some(other) => emit(other.compact()),
-                                                    None => {}
+                                                    continue;
                                                 }
+                                            }
+                                            match infinity_expression::json::parse(cell) {
+                                                Some(infinity_expression::json::Json::Arr(
+                                                    elems,
+                                                )) => {
+                                                    for e in elems {
+                                                        emit(e.compact());
+                                                    }
+                                                }
+                                                // Unnest of an object / scalar yields itself.
+                                                Some(other) => emit(other.compact()),
+                                                None => {}
                                             }
                                         }
                                         Some(other) if !matches!(other, Value::Null) => {
@@ -2039,6 +2041,8 @@ impl Engine {
             .or_else(|| parse_threshold(&params));
 
         let rows = self.fetch_rows_with_ids(table)?;
+        // A `bit` sparse column scores and renders as an integer.
+        let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
         for (seq, row) in &rows {
             // The WHERE predicate filters candidates *before* top-N ranking.
@@ -2070,8 +2074,25 @@ impl Engine {
                     let score = tensor_score(&q, v, col_elem, qry_elem);
                     scored.push((*seq, score, -score));
                 } else if is_sparse {
-                    let (qv, rv) = (parse_sparse(&query_items), parse_sparse_str(v));
-                    let dot = sparse_dot(&qv, &rv);
+                    // A `bit` sparse vector holds bare indices; its inner product
+                    // is the number of shared positions.
+                    let dot = if bit_sparse {
+                        let qidx: Vec<i64> = query_items
+                            .iter()
+                            .filter_map(|x| x.trim().parse::<i64>().ok())
+                            .collect();
+                        let ridx: Vec<i64> = v
+                            .trim()
+                            .trim_start_matches('[')
+                            .trim_end_matches(']')
+                            .split(',')
+                            .filter_map(|x| x.trim().parse::<i64>().ok())
+                            .collect();
+                        qidx.iter().filter(|i| ridx.contains(i)).count() as f64
+                    } else {
+                        let (qv, rv) = (parse_sparse(&query_items), parse_sparse_str(v));
+                        sparse_dot(&qv, &rv)
+                    };
                     scored.push((*seq, dot, -dot));
                 } else {
                     // A `bit` embedding column stores a bit string, so both the
@@ -2129,13 +2150,20 @@ impl Engine {
         scored.truncate(topn);
 
         let mut by_id: HashMap<usize, Vec<Value>> = rows.into_iter().collect();
+        let num = |f: f64| {
+            if bit_sparse {
+                Value::Int(f as i64)
+            } else {
+                Value::Float(f)
+            }
+        };
         let mut out = Vec::new();
         for (seq, sim, dist) in scored {
             let mut row = by_id.remove(&seq).unwrap_or_default();
             row.push(Value::Int(seq as i64));
-            row.push(Value::Float(sim));
+            row.push(num(sim));
             row.push(Value::Float(dist));
-            row.push(Value::Float(if use_sim { sim } else { dist }));
+            row.push(num(if use_sim { sim } else { dist }));
             out.push(row);
         }
         Ok((out, hidden))
