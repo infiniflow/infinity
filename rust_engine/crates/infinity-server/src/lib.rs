@@ -829,12 +829,7 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
             dimension,
             element_type,
             ..
-        } => {
-            return format!(
-                "SPARSE({}, {dimension})",
-                element_type_name(*element_type)
-            )
-        }
+        } => return format!("SPARSE({}, {dimension})", element_type_name(*element_type)),
         PhysicalWire::None => {}
     }
     match c.logic_type {
@@ -2787,8 +2782,6 @@ pub fn write_list_database_response(w: &mut impl Write, seq: i32, names: &[Strin
 // -------- Delete --------
 
 /// The subset of `DeleteRequest` needed to run `DELETE`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DeleteReq {
     pub db_name: String,
     pub table_name: String,
     pub where_sql: Option<String>,
