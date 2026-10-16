@@ -99,6 +99,14 @@ impl Parser {
         match kw.as_str() {
             "CREATE" => {
                 self.advance();
+                if self.eat_kw("SNAPSHOT") {
+                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        self.advance();
+                    }
+                    return Ok(Statement::Utility {
+                        text: "CREATE SNAPSHOT".into(),
+                    });
+                }
                 if self.eat_kw("DATABASE") {
                     // tolerate: CREATE DATABASE [IF NOT EXISTS] name
                     let _ = self.eat_kw("IF");
@@ -239,6 +247,20 @@ impl Parser {
                             columns = self.column_defs()?;
                         }
                         Ok(Statement::AlterTableAdd { table, columns })
+                    } else if self.eat_kw("DROP") {
+                        let _ = self.eat_kw("COLUMN");
+                        let column = if self.peek() == &Token::LParen {
+                            self.advance();
+                            let c = self.expect_ident()?;
+                            while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                                self.advance();
+                            }
+                            self.expect(Token::RParen)?;
+                            c
+                        } else {
+                            self.expect_ident()?
+                        };
+                        Ok(Statement::AlterTableDropColumn { table, column })
                     } else {
                         while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
                             self.advance();

@@ -224,6 +224,27 @@ impl Catalog {
         Ok(meta)
     }
 
+    /// Removes a column from an existing table.
+    pub fn drop_column(&self, name: &str, column: &str) -> Result<usize> {
+        let mut meta = self
+            .get_table_by_name(name)?
+            .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
+        let idx = meta
+            .columns
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::Catalog(format!("column '{column}' does not exist")))?;
+        meta.columns.remove(idx);
+        if idx < meta.defaults.len() {
+            meta.defaults.remove(idx);
+        }
+        if idx < meta.not_nulls.len() {
+            meta.not_nulls.remove(idx);
+        }
+        self.store.put(&table_key(meta.id), &meta.encode())?;
+        Ok(idx)
+    }
+
     pub fn get_table(&self, id: u64) -> Result<Option<TableMeta>> {
         match self.store.get(&table_key(id))? {
             Some(b) => Ok(Some(TableMeta::decode(id, &b)?)),

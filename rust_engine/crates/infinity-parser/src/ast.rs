@@ -279,6 +279,10 @@ pub enum Statement {
         table: String,
         columns: Vec<ColumnDef>,
     },
+    AlterTableDropColumn {
+        table: String,
+        column: String,
+    },
     Select {
         items: Vec<SelectItem>,
         from: Option<String>,

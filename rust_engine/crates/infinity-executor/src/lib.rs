@@ -306,6 +306,54 @@ impl Engine {
                     name: t.name,
                 })
             }
+            Statement::AlterTableDropColumn { table, column } => {
+                let rows = self.fetch_rows_with_ids(table)?;
+                let idx = match self
+                    .catalog
+                    .get_table_by_name(table)?
+                    .and_then(|m| m.columns.iter().position(|c| c == column))
+                {
+                    Some(i) => i,
+                    None => return Err(Error::Invalid(format!("unknown column '{column}'"))),
+                };
+                // rewrite rows without the dropped column
+                let mut t = self.txn.begin();
+                for (seq, _) in &rows {
+                    t.put(del_key(table, *seq), b"1".to_vec());
+                }
+                let mut next = self.next_row_seq(table)?;
+                for (_, row) in &rows {
+                    let mut nr = row.clone();
+                    if idx < nr.len() {
+                        nr.remove(idx);
+                    }
+                    let encoded = nr
+                        .iter()
+                        .map(|v| v.to_slt_string())
+                        .collect::<Vec<_>>()
+                        .join("\t");
+                    t.put(row_key(table, next), encoded.into_bytes());
+                    next += 1;
+                }
+                self.txn.commit(t)?;
+                self.catalog.drop_column(table, column)?;
+                if let Some(im) = self
+                    .catalog
+                    .list_indexes()?
+                    .into_iter()
+                    .find(|i| i.table == *table && i.column == *column)
+                {
+                    let _ = self.catalog.drop_index(&im.name);
+                }
+                self.indexes
+                    .lock()
+                    .unwrap()
+                    .remove(&index_key(table, column));
+                Ok(QueryResult::CreatedTable {
+                    id: 0,
+                    name: table.clone(),
+                })
+            }
             Statement::AlterTableAdd { table, columns } => {
                 // `ADD COLUMN … NOT NULL` requires a default for existing rows.
                 for c in columns {
