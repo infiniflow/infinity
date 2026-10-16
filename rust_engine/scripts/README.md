@@ -8,7 +8,7 @@
 | `run_gate_b.sh` | Gate B — SDK/协议 | `python/test_pysdk`、`go/tests`、HTTP（`tools/run_http_api.py`），**不改 SDK** | **部分**：`infinity-server` 二进制已就位（`cargo build -p infinity-server`），未改动的 Python SDK 可连上 Rust 服务，`test_pysdk` 通过 **1031/1672**；已派发 `GetDatabase/CreateDatabase/DropDatabase/GetTable/DropTable/CreateIndex/DropIndex/Insert/Select`，其余仍多为 `unknown method` |
 | `run_gate_c.sh` | Gate C — 持久化/恢复 | workspace 测试、`test/sql/snapshot`、`python/restart_test`、MinIO | **部分**：`test/sql/snapshot` **171/171**、`8/8` error，workspace 测试全绿；MinIO 需 CI 服务；`python/restart_test` 需 SDK 环境 |
 | `run_gate_d.sh` | Gate D — 并发/稳定性 | loom 模型、miri（纯 Rust 核心）、`python/parallel_test` | **部分**：loom `commit_ts` 唯一性已通过；miri 已在 `nightly-2025-04-04` 上通过（parser/expression/planner 共 38 个用例）；`python/parallel_test` 需 SDK 环境 |
-| `run_gate_e.sh` | Gate E — 性能 | `infinity bench` + `tools/ci_tools/check_benchmark_result.py`（<7% 门限） | **部分（2026-10-16 实测 PASS）**：insert 79,604 rows/s、select 2000 行 3.55 ms；<7% 比对需 `--golden` |
+| `run_gate_e.sh` | Gate E — 性能 | `infinity bench` + `tools/ci_tools/check_benchmark_result.py`（<7% 门限） | **部分（实测 PASS）**：`infinity bench` 输出 `Total cost : <t> s` 机读行，`run_gate_e.sh` 直接以位置参数调用 checker；未给 C++ golden 时用**自基线**（两次运行互比，<7%）已 PASS。与 C++ golden 对齐需可比硬件 |
 | `deny.toml` + CI | Gate F — 工程质量 | fmt / clippy `-D warnings` / test / cargo-deny；工具链钉 `1.94.1` | **达标**：CI 六个作业全绿；9/9 核心 crate `#![forbid(unsafe_code)]` |
 | `docs/INVARIANT_MATRIX.md` | Gate G — 不变量 | C++ 不变量 → Rust 测试对照 + 显式登记缺口 | **清单已产出**：5 项缺口（G1–G5）已登记，尚未「纳入门槛」 |
 

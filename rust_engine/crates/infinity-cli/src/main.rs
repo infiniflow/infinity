@@ -169,6 +169,10 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
                 n as f64 / ins.as_secs_f64()
             );
             println!("select: {rows} rows in {:?}", sel);
+            // Machine-readable lines consumed by
+            // `tools/ci_tools/check_benchmark_result.py` (Gate E).
+            println!("Total cost : {:.6} s", ins.as_secs_f64());
+            println!("Total cost : {:.6} s", sel.as_secs_f64());
             Ok(())
         }
         "import-csv" => {
