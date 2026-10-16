@@ -448,18 +448,25 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                 }
             } else if head.starts_with("query ") {
                 queries += 1;
+                // `query <types> [<sort-mode>] [<label>]` — default `nosort`.
+                let rowsort = head.split_whitespace().nth(2) == Some("rowsort");
                 match e.execute(&sql) {
                     Ok(rs) => {
                         let mut rows: Vec<String> = Vec::new();
                         if let Some(QueryResult::Rows { rows: r, .. }) = rs.into_iter().next() {
                             for row in r {
-                                rows.push(row.join(" ").trim_end().to_string());
+                                // normalize each column, then join — matches
+                                // `default_validator` in sqllogictest-rs.
+                                let cols: Vec<String> = row.iter().map(|c| norm(c)).collect();
+                                rows.push(cols.join(" "));
                             }
                         }
                         let mut got = rows;
-                        got.sort();
-                        let mut exp = expected;
-                        exp.sort();
+                        let mut exp: Vec<String> = expected.iter().map(|s| norm(s)).collect();
+                        if rowsort {
+                            got.sort();
+                            exp.sort();
+                        }
                         if got == exp {
                             query_pass += 1;
                         } else {
@@ -550,4 +557,11 @@ fn first_word(sql: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
         .to_uppercase()
+}
+
+/// The `sqllogictest-rs` `default_normalizer`: trim and collapse runs of ASCII
+/// whitespace to a single space. This makes the comparison insensitive to the
+/// indentation of multi-line results such as `EXPLAIN` output.
+fn norm(s: &str) -> String {
+    s.split_ascii_whitespace().collect::<Vec<_>>().join(" ")
 }
