@@ -4428,7 +4428,11 @@ fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]
                 (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
                 (Value::Null, _) => std::cmp::Ordering::Less,
                 (_, Value::Null) => std::cmp::Ordering::Greater,
-                _ => x.partial_cmp_value(y).unwrap_or(std::cmp::Ordering::Equal),
+                // Fall back to a textual comparison for mixed types so the
+                // order stays total (e.g. an int beside a non-numeric string).
+                _ => x
+                    .partial_cmp_value(y)
+                    .unwrap_or_else(|| x.to_slt_string().cmp(&y.to_slt_string())),
             };
             if !*asc {
                 ord = ord.reverse();
@@ -4466,7 +4470,11 @@ mod tests {
         assert_eq!(cpp[0].table_name, "t");
         assert_eq!(cpp[0].db_name, "default_db");
         assert_eq!(
-            cpp[0].columns.iter().map(|c| c.column_name.clone()).collect::<Vec<_>>(),
+            cpp[0]
+                .columns
+                .iter()
+                .map(|c| c.column_name.clone())
+                .collect::<Vec<_>>(),
             vec!["id", "name"]
         );
         assert_eq!(
