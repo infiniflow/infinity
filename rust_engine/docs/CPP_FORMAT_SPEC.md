@@ -477,7 +477,8 @@ u8[pos_list_len]
     - `{1,2,3,4,5}` → 1 word = `0300fa09`
     - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `01700016 81404030 28201a15 d12d0b00`
   - **复现配方**：`clang++-23 -std=c++23 -O2 -march=native -I<fastpfor>/headers -I<repo>/third_party/newpfor main.cpp <fastpfor>/src/{bitpacking,bitpackingaligned,bitpackingunaligned,simdbitpacking,simdunalignedbitpacking,horizontalbitpacking}.cpp <repo>/third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`，其中 `main.cpp` 用 `encodeArray`（u32）/ `Compress(...,true)`（u16）并打印字节。**注意**：FastPForLib 不在仓库内（由 C++ 构建拉取），故未随仓库提交生成器；上述字节已固定在本节。同理注意 `-O2` 与 `-march` 必须与目标一致（SIMD 路径按位宽分派，但字节输出与 -O 无关——已核）。
-- **Rust 侧状态**：`TermPostings` 目前把 skip/list 体当作**不透明字节**（`inverted_format.rs`），u32/u16 块编解码**尚未实现**——这是全文格式兼容最后一项待落地工作，有了上面的真值即可逐位实现并断言。
+- **Rust 侧状态**：`TermPostings` 目前把 skip/list 体当作**不透明字节**（`inverted_format.rs`），u32/u16 块编解码**尚未实现**。
+- **实现难度已定量（2026-10-17 实测结论，重要）**：SIMD-BP128 的字节布局**不是**「按位顺序的朴素打包」，因此**无法从一个简单公式推导**，必须**逐宽度移植 FastPForLib 的 SSE 位打包表**。已用探针（`a[i]=i`，逐宽度）反解验证：u32 布局按 **32 位 SSE lane 交错**（例如宽度 4 时输出顺序为 `0,4,8,…,28,1,5,…,29,…`，即 `i mod 4` 分 lane），且**不同宽度的交错模式不同**（宽度 2/4 恰好等于朴素顺序，宽度 7 明显不是）。原路线的规模：`__SIMD_fastpackN_32`/`__SIMD_fastunpackN_32` 共 `N=1..32`（各约 60–130 行 SSE），即 **≈2000+ 行**机械移植；u16 侧对应 `third_party/newpfor` 的 `pack.h`/`unpack.h`/`unaligned_unpack.h`。**建议**：u32 直接用「朴素布局 + 自己的 128 值块」不行（会写出与 C++ 不兼容的字节），所以要么逐宽度移植 SSE 表，要么接受「只读 C++ 索引、不写 C++ 索引」的降级；真值字节与复现配方见上，可逐宽度断言。
 
 ### 9.3.6 `.len`（列长 / BM25 统计）
 
