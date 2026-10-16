@@ -317,6 +317,117 @@ pub fn fulltext_files(base_name: &str) -> [String; 3] {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// §8.1/§8.3 — a block directory on disk
+// ---------------------------------------------------------------------------
+
+use std::path::{Path, PathBuf};
+
+/// One column of a block: its `[data_region][null_bitmap]` body plus the raw
+/// contents of the outline file (`col_{id}_out`, empty for fixed-width columns).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockColumn {
+    pub column_id: u64,
+    pub body: ColumnBody,
+    pub outline: Vec<u8>,
+}
+
+/// Block identifiers, used to build the C++ directory path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockId {
+    pub db_id: u64,
+    pub table_id: u64,
+    pub segment_id: u32,
+    pub block_id: u16,
+}
+
+/// One column of a block as read back from disk: the raw `.col` body (i.e.
+/// `[data_region][null_bitmap]`, undivided) and the outline contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawBlockColumn {
+    pub column_id: u64,
+    pub body: Vec<u8>,
+    pub outline: Vec<u8>,
+}
+
+/// Writes one block directory in the C++ layout.
+///
+/// Files are created in the C++ order: every column's `{id}.col` (followed by
+/// its `col_{id}_out` when present), and the `version` file **last**.
+pub fn write_block(
+    root: &Path,
+    id: BlockId,
+    columns: &[BlockColumn],
+    version: &BlockVersionFile,
+) -> std::io::Result<PathBuf> {
+    let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
+    std::fs::create_dir_all(&dir)?;
+    for col in columns {
+        std::fs::write(
+            dir.join(column_file(col.column_id)),
+            encode_data_file(&col.body.encode()),
+        )?;
+        if !col.outline.is_empty() {
+            // The outline file is raw: no header, no trailer.
+            std::fs::write(dir.join(column_outline_file(col.column_id)), &col.outline)?;
+        }
+    }
+    std::fs::write(dir.join(VERSION_FILE), version.encode())?;
+    Ok(dir)
+}
+
+/// Reads a block directory written by [`write_block`] (or by the C++ engine).
+///
+/// Returns the `version` file plus every `{id}.col` body, sorted by column id.
+pub fn read_block(
+    root: &Path,
+    id: BlockId,
+) -> std::io::Result<(BlockVersionFile, Vec<RawBlockColumn>)> {
+    let dir = root.join(block_dir(id.db_id, id.table_id, id.segment_id, id.block_id));
+    let version = BlockVersionFile::decode(&std::fs::read(dir.join(VERSION_FILE))?)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    let mut columns = Vec::new();
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(stem) = name.strip_suffix(".col") else {
+            continue;
+        };
+        let Ok(column_id) = stem.parse::<u64>() else {
+            continue;
+        };
+        let body = decode_data_file(&std::fs::read(entry.path())?)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let outline_path = dir.join(column_outline_file(column_id));
+        let outline = if outline_path.exists() {
+            std::fs::read(&outline_path)?
+        } else {
+            Vec::new()
+        };
+        columns.push(RawBlockColumn {
+            column_id,
+            body,
+            outline,
+        });
+    }
+    columns.sort_by_key(|c| c.column_id);
+    Ok((version, columns))
+}
+
+/// Splits a raw `.col` body into its `[data_region][null_bitmap]` parts.
+pub fn split_body(raw: &[u8], capacity: usize, slot_size: usize) -> ColumnBody {
+    let cap_bytes = ColumnBody::data_capacity_bytes(capacity, slot_size);
+    let bitmap_len = ColumnBody::null_bitmap_len(capacity);
+    let data = raw.get(..cap_bytes).unwrap_or(raw).to_vec();
+    let null_bitmap = raw
+        .get(cap_bytes..cap_bytes + bitmap_len)
+        .unwrap_or(&[])
+        .to_vec();
+    ColumnBody { data, null_bitmap }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,5 +538,84 @@ mod tests {
                 "ft_000000000000001f.len".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn block_roundtrip_on_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let id = BlockId {
+            db_id: 1,
+            table_id: 2,
+            segment_id: 3,
+            block_id: 4,
+        };
+        // A 4-byte-slot int column with 3 rows (row 1 NULL) and a varchar column
+        // whose payload lives in the outline file.
+        let ints: Vec<u8> = [7i32, 0, 9].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let int_body = ColumnBody::build(8192, 4, &ints, &[true, false, true]).unwrap();
+        let varchar = ColumnBody {
+            data: {
+                let mut d = Vec::new();
+                for (len, off) in [(5u32, 0u64), (2u32, 5u64)] {
+                    // C++ `Varchar` slot: u64 with 24-bit length and 48-bit offset.
+                    d.extend_from_slice(&((len as u64) | (off << 24)).to_le_bytes());
+                }
+                d
+            },
+            null_bitmap: vec![0b0000_0011],
+        };
+        let columns = vec![
+            BlockColumn {
+                column_id: 0,
+                body: int_body,
+                outline: Vec::new(),
+            },
+            BlockColumn {
+                column_id: 1,
+                body: varchar,
+                outline: b"helloab".to_vec(),
+            },
+        ];
+        let mut version = BlockVersionFile::new(&[(10, 3)], DEFAULT_BLOCK_CAPACITY);
+        version.delete(1, 20);
+
+        let dir = write_block(tmp.path(), id, &columns, &version).unwrap();
+        // `version` written last, and the outline exists only for the varchar col.
+        assert!(dir.join("0.col").exists());
+        assert!(dir.join("1.col").exists());
+        assert!(dir.join("col_1_out").exists());
+        assert!(!dir.join("col_0_out").exists());
+        assert!(dir.join(VERSION_FILE).exists());
+
+        let (got_version, got_columns) = read_block(tmp.path(), id).unwrap();
+        assert_eq!(got_version, version);
+        assert_eq!(got_columns.len(), 2);
+
+        // The int column's body is `[data_region][null_bitmap]`.
+        let split = split_body(&got_columns[0].body, 8192, 4);
+        assert_eq!(&split.data[..12], &ints[..]);
+        assert_eq!(split.null_bitmap[0], 0b0000_0101);
+        assert!(got_columns[0].outline.is_empty());
+
+        // The varchar column points into the raw outline file.
+        assert_eq!(got_columns[1].outline, b"helloab");
+        let slot0 = u64::from_le_bytes(got_columns[1].body[0..8].try_into().unwrap());
+        assert_eq!(slot0 & 0x00ff_ffff, 5); // length
+        assert_eq!(slot0 >> 24, 0); // outline offset
+    }
+
+    #[test]
+    fn read_block_rejects_bad_version_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let id = BlockId {
+            db_id: 0,
+            table_id: 0,
+            segment_id: 0,
+            block_id: 0,
+        };
+        let dir = write_block(tmp.path(), id, &[], &BlockVersionFile::new(&[], 4)).unwrap();
+        std::fs::write(dir.join(VERSION_FILE), b"\x01").unwrap();
+        let err = read_block(tmp.path(), id).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
     }
 }
