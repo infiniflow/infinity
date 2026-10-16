@@ -1224,26 +1224,59 @@ impl Engine {
                 })
             }
             Statement::RenameTable { table, new_name } => {
-                self.catalog.rename_table(table, new_name)?;
-                // move the table's rows to the new name
-                let prefix = row_prefix(table);
-                for (k, v) in self.store.scan_prefix(&prefix)? {
-                    let seq = &k[prefix.len()..];
-                    let mut nk = row_prefix(new_name);
-                    nk.extend_from_slice(seq);
-                    self.store.put(&nk, &v)?;
+                let meta = self
+                    .catalog
+                    .get_table_by_name(table)?
+                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+                if self.catalog.get_table_by_name(new_name)?.is_some() {
+                    return Err(Error::Invalid(format!("table '{new_name}' already exists")));
+                }
+                let _ = meta;
+                let rows = self.fetch_rows_with_ids(table)?;
+                let mut next = self.next_row_seq(new_name)?;
+                let mut t = self.txn.begin();
+                for (seq, row) in &rows {
+                    // retire the old row, write it under the new table name
+                    t.put(del_key(table, *seq), b"1".to_vec());
+                    let encoded = row
+                        .iter()
+                        .map(|v| v.to_slt_string())
+                        .collect::<Vec<_>>()
+                        .join("\t");
+                    t.put(row_key(new_name, next), encoded.into_bytes());
+                    next += 1;
+                }
+                self.txn.commit(t)?;
+                for (k, _) in self.store.scan_prefix(&row_prefix(table))? {
                     self.store.delete(&k)?;
                 }
-                // indexes follow the table
+                for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
+                    self.store.delete(&k)?;
+                }
+                // move the secondary-index entries and declarations
+                let old_prefix = format!("{table}.");
+                let pairs: Vec<(String, String)> = self
+                    .indexes
+                    .lock()
+                    .unwrap()
+                    .keys()
+                    .filter(|k| k.starts_with(&old_prefix))
+                    .map(|k| (k.clone(), k[old_prefix.len()..].to_string()))
+                    .collect();
+                let mut guard = self.indexes.lock().unwrap();
+                for (old_key, column) in pairs {
+                    if let Some(v) = guard.remove(&old_key) {
+                        guard.insert(index_key(new_name, &column), v);
+                    }
+                }
+                drop(guard);
                 for im in self.catalog.list_indexes()? {
                     if im.table == *table {
+                        let _ = self.catalog.drop_index(&im.name);
                         self.catalog.create_index(&im.name, new_name, &im.column)?;
                     }
                 }
-                self.indexes
-                    .lock()
-                    .unwrap()
-                    .retain(|k, _| !k.starts_with(&format!("{table}.")));
+                self.catalog.rename_table(table, new_name)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],

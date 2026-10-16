@@ -394,7 +394,7 @@ impl Parser {
                         }
                         Ok(Statement::AlterTableAdd { table, columns })
                     } else if self.eat_kw("RENAME") {
-                        let _ = self.eat_kw("TO");
+                        // `RENAME [COLUMN …] TO <new name>`
                         while !matches!(self.peek(), Token::Semicolon | Token::Eof)
                             && !matches!(self.peek(), Token::Ident(v) if v.eq_ignore_ascii_case("TO"))
                         {
