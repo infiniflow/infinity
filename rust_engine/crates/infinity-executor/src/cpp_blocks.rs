@@ -227,34 +227,44 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
     Some(format!("[{}]", parts.join(",")))
 }
 
-/// `ARRAY(<scalar>)` → the element's `ColumnType`.
-///
-/// Only one level of fixed-width scalar elements is supported: the slot records
-/// just the outer element count (§8.3), so a nested array's inner counts or a
-/// variable-length element's payload offsets would be unrecoverable. Those
-/// return `None` and are reported as unsupported by the caller.
-pub fn array_shape(type_text: &str) -> Option<i32> {
-    let up = type_text.trim().to_ascii_uppercase();
-    let rest = up.strip_prefix("ARRAY(")?;
-    let inner = rest.trim_end_matches(')').trim();
-    if inner.starts_with("ARRAY(") {
-        return None; // nested arrays: the inner counts are not recorded
-    }
-    let elem = column_type_of(inner)?;
-    // Variable-length or nested elements are out of scope for this writer.
-    match cpp_format::column_layout(elem) {
-        Some(ColumnLayout::Fixed(_)) | Some(ColumnLayout::CompactBit) => Some(elem),
-        _ => None,
-    }
+/// Element shape of an `ARRAY(...)` column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrayElem {
+    /// A fixed-width scalar element (its `ColumnType`).
+    Fixed(i32),
+    /// An `ARRAY(<fixed scalar>)` element; the value is the inner scalar's
+    /// `ColumnType`. The outer elements are 8-byte `ArrayType` slots into the
+    /// outline, each pointing at its own elements — `ArrayInfo::ElemSize` is the
+    /// inner `DataType::Size()`, which for an array is the 8-byte slot.
+    Nested(i32),
 }
 
-/// Width of one array element slot.
-fn array_element_width(elem_col: i32) -> Option<usize> {
-    match cpp_format::column_layout(elem_col)? {
+/// Width of a fixed-width scalar's slot, `None` for variable-length ones.
+fn fixed_scalar_width(col: i32) -> Option<usize> {
+    match cpp_format::column_layout(col)? {
         ColumnLayout::Fixed(w) => Some(w),
         ColumnLayout::CompactBit => Some(1),
         ColumnLayout::VarLen(_) => None,
     }
+}
+
+/// `ARRAY(<scalar>)` / `ARRAY(ARRAY(<scalar>))` → its element shape.
+///
+/// Only fixed-width scalar leaves are supported. A variable-length element
+/// (varchar/json) or a second nesting level returns `None` and is reported as
+/// unsupported by the caller.
+pub fn array_shape(type_text: &str) -> Option<ArrayElem> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let rest = up.strip_prefix("ARRAY(")?;
+    let inner = rest.trim_end_matches(')').trim();
+    if let Some(scalar) = inner.strip_prefix("ARRAY(") {
+        let col = column_type_of(scalar.trim_end_matches(')').trim())?;
+        fixed_scalar_width(col)?;
+        return Some(ArrayElem::Nested(col));
+    }
+    let col = column_type_of(inner)?;
+    fixed_scalar_width(col)?;
+    Some(ArrayElem::Fixed(col))
 }
 
 /// Parses the engine's array rendering `{1,2,3}` into its elements.
@@ -271,6 +281,51 @@ pub fn parse_braces(cell: &str) -> Vec<String> {
     inner.split(',').map(|s| s.trim().to_string()).collect()
 }
 
+/// Splits the body of a `{{…},{…}}` rendering into its top-level groups, e.g.
+/// `{0,3},{1}` → `["{0,3}", "{1}"]`. A `{}` group is kept (as an empty one).
+fn split_top_braces(inner: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    for c in inner.chars() {
+        match c {
+            '{' => {
+                depth += 1;
+                cur.push(c);
+            }
+            '}' => {
+                depth -= 1;
+                cur.push(c);
+                if depth == 0 {
+                    out.push(cur.trim().to_string());
+                    cur.clear();
+                }
+            }
+            ',' if depth == 0 => {}
+            _ => cur.push(c),
+        }
+    }
+    if !cur.trim().is_empty() {
+        out.push(cur.trim().to_string());
+    }
+    out
+}
+
+/// Parses the engine's nested-array rendering `{{0,3},{1}}` into one inner
+/// element list per outer element.
+fn parse_nested_braces(cell: &str) -> Vec<Vec<String>> {
+    let t = cell.trim();
+    let inner = if t.starts_with('{') && t.ends_with('}') && t.len() >= 2 {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    };
+    split_top_braces(inner)
+        .iter()
+        .map(|g| parse_braces(g))
+        .collect()
+}
+
 /// Encodes one array value: appends the elements to `outline` and returns the
 /// `{count:16; offset:48}` slot.
 fn encode_array_slot(
@@ -281,38 +336,89 @@ fn encode_array_slot(
     if value.eq_ignore_ascii_case("null") {
         return Ok(None);
     }
-    let elem_col = array_shape(type_text)
+    let elem = array_shape(type_text)
         .ok_or_else(|| Error::Invalid(format!("not a supported array type: '{type_text}'")))?;
-    let width = array_element_width(elem_col)
-        .ok_or_else(|| Error::Invalid("array element is not fixed-width".into()))?;
-    let elems = parse_braces(value);
-    let offset = outline.len() as u64;
-    for e in &elems {
-        match encode_value("", elem_col, e)? {
-            Some(bytes) => outline.extend_from_slice(&bytes),
-            // A NULL element is a zeroed slot (the element bitmap lives in the
-            // inner column, which the C++ reader supplies for nested arrays).
-            None => outline.extend_from_slice(&vec![0u8; width]),
+    match elem {
+        ArrayElem::Fixed(col) => {
+            let width = fixed_scalar_width(col)
+                .ok_or_else(|| Error::Invalid("array element is not fixed-width".into()))?;
+            let elems = parse_braces(value);
+            let offset = outline.len() as u64;
+            for e in &elems {
+                match encode_value("", col, e)? {
+                    Some(bytes) => outline.extend_from_slice(&bytes),
+                    // A NULL element is a zeroed slot (the element bitmap lives
+                    // in the inner column, which the C++ reader supplies).
+                    None => outline.extend_from_slice(&vec![0u8; width]),
+                }
+            }
+            Ok(Some(
+                cpp_format::varlen_count_offset_slot(elems.len() as u64, offset).to_vec(),
+            ))
+        }
+        ArrayElem::Nested(col) => {
+            let width = fixed_scalar_width(col)
+                .ok_or_else(|| Error::Invalid("array element is not fixed-width".into()))?;
+            let groups = parse_nested_braces(value);
+            // Each inner array's data first (recording its offset), then the
+            // `ArrayType` slot that points at it; the outer slot points at the
+            // run of inner slots.
+            let mut inner_slots: Vec<[u8; 8]> = Vec::with_capacity(groups.len());
+            for g in &groups {
+                let data_offset = outline.len() as u64;
+                for e in g {
+                    match encode_value("", col, e)? {
+                        Some(bytes) => outline.extend_from_slice(&bytes),
+                        None => outline.extend_from_slice(&vec![0u8; width]),
+                    }
+                }
+                inner_slots.push(cpp_format::varlen_count_offset_slot(g.len() as u64, data_offset));
+            }
+            let slots_offset = outline.len() as u64;
+            for s in &inner_slots {
+                outline.extend_from_slice(s);
+            }
+            Ok(Some(
+                cpp_format::varlen_count_offset_slot(groups.len() as u64, slots_offset).to_vec(),
+            ))
         }
     }
-    Ok(Some(
-        cpp_format::varlen_count_offset_slot(elems.len() as u64, offset).to_vec(),
-    ))
 }
 
 /// Decodes one array slot out of the outline.
 fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<String> {
-    let elem_col = array_shape(type_text)?;
+    let elem = array_shape(type_text)?;
     let word = u64::from_le_bytes(slot.try_into().ok()?);
     let count = (word & 0xffff) as usize;
     let offset = (word >> 16) as usize;
-    let width = array_element_width(elem_col)?;
-    let tail = outline.get(offset..offset + count * width)?;
-    let mut parts = Vec::with_capacity(count);
-    for k in 0..count {
-        parts.push(decode_value("", elem_col, tail, k)?);
+    match elem {
+        ArrayElem::Fixed(col) => {
+            let width = fixed_scalar_width(col)?;
+            let tail = outline.get(offset..offset + count * width)?;
+            let mut parts = Vec::with_capacity(count);
+            for k in 0..count {
+                parts.push(decode_value("", col, tail, k)?);
+            }
+            Some(format!("{{{}}}", parts.join(",")))
+        }
+        ArrayElem::Nested(col) => {
+            let width = fixed_scalar_width(col)?;
+            let mut groups = Vec::with_capacity(count);
+            for gi in 0..count {
+                let at = offset + gi * 8;
+                let inner = u64::from_le_bytes(outline.get(at..at + 8)?.try_into().ok()?);
+                let inner_count = (inner & 0xffff) as usize;
+                let inner_offset = (inner >> 16) as usize;
+                let mut parts = Vec::with_capacity(inner_count);
+                for k in 0..inner_count {
+                    let base = inner_offset + k * width;
+                    parts.push(decode_value("", col, outline.get(base..base + width)?, 0)?);
+                }
+                groups.push(format!("{{{}}}", parts.join(",")));
+            }
+            Some(format!("{{{}}}", groups.join(",")))
+        }
     }
-    Some(format!("{{{}}}", parts.join(",")))
 }
 
 /// Renders an engine-rendered value as a SQL literal for re-insertion.
@@ -1220,11 +1326,15 @@ mod tests {
 
     #[test]
     fn array_shape_parsing() {
-        assert_eq!(array_shape("ARRAY(INT)"), Some(3));
-        assert_eq!(array_shape("ARRAY(DOUBLE)"), Some(6));
-        // Nested arrays and variable-length elements are out of scope: the slot
-        // records only the outer count.
-        assert_eq!(array_shape("ARRAY(ARRAY(INT))"), None);
+        assert_eq!(array_shape("ARRAY(INT)"), Some(ArrayElem::Fixed(3)));
+        assert_eq!(array_shape("ARRAY(DOUBLE)"), Some(ArrayElem::Fixed(6)));
+        // One nesting level of fixed-width leaves; a second level or a
+        // variable-length element is out of scope.
+        assert_eq!(
+            array_shape("ARRAY(ARRAY(INT))"),
+            Some(ArrayElem::Nested(3))
+        );
+        assert_eq!(array_shape("ARRAY(ARRAY(ARRAY(INT)))"), None);
         assert_eq!(array_shape("ARRAY(VARCHAR)"), None);
     }
 
@@ -1247,6 +1357,35 @@ mod tests {
             vec![
                 vec!["1".to_string(), "{1,2,3}".to_string()],
                 vec!["2".to_string(), "{7}".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_array_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE na (id INT, a ARRAY(ARRAY(INT)));")
+            .unwrap();
+        // An empty outer array, an outer array with an empty inner one, and
+        // mixed inner lengths.
+        engine
+            .execute("INSERT INTO na VALUES (1, {{0,3},{1}});")
+            .unwrap();
+        engine
+            .execute("INSERT INTO na VALUES (2, {{0,3},{}});")
+            .unwrap();
+        engine.execute("INSERT INTO na VALUES (3, {});").unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("na").unwrap(), 3);
+        let (_, rows) = engine.read_cpp_blocks("na").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "{{0,3},{1}}".to_string()],
+                vec!["2".to_string(), "{{0,3},{}}".to_string()],
+                vec!["3".to_string(), "{}".to_string()],
             ]
         );
     }
