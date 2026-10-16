@@ -456,7 +456,11 @@ impl Engine {
                 columns: vec![],
                 rows: vec![],
             }),
-            Statement::Explain { inner } => self.execute_stmt(inner),
+            // EXPLAIN only describes a plan; it must not execute the statement.
+            Statement::Explain { .. } => Ok(QueryResult::Rows {
+                columns: vec![],
+                rows: vec![],
+            }),
             Statement::Copy {
                 table,
                 from,

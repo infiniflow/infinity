@@ -106,6 +106,10 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                 out.push(Token::Op("=".into()));
                 i += 1;
             }
+            '.' => {
+                out.push(Token::Op(".".into()));
+                i += 1;
+            }
             '!' if i + 1 < chars.len() && chars[i + 1] == '=' => {
                 out.push(Token::Op("!=".into()));
                 i += 2;

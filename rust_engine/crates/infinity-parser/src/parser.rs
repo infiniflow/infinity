@@ -70,7 +70,18 @@ impl Parser {
     }
     fn expect_ident(&mut self) -> Result<String> {
         match self.advance() {
-            Token::Ident(s) => Ok(s),
+            Token::Ident(mut s) => {
+                // tolerate `db.table` / `db.schema.table`: keep the base name
+                while self.peek() == &Token::Op(".".into()) {
+                    self.advance();
+                    if let Token::Ident(next) = self.advance() {
+                        s = next;
+                    } else {
+                        break;
+                    }
+                }
+                Ok(s)
+            }
             _ => self.err("expected identifier"),
         }
     }
@@ -121,7 +132,38 @@ impl Parser {
                     self.expect_kw("ON")?;
                     let table = self.expect_ident()?;
                     self.expect(Token::LParen)?;
-                    let column = self.expect_ident()?;
+                    // a plain column, or a functional-index expression
+                    let mut column = String::new();
+                    let mut depth = 0i32;
+                    while !matches!(self.peek(), Token::Eof) {
+                        match self.peek().clone() {
+                            Token::RParen if depth == 0 => break,
+                            Token::LParen => {
+                                depth += 1;
+                                self.advance();
+                            }
+                            Token::RParen => {
+                                depth -= 1;
+                                self.advance();
+                            }
+                            Token::Ident(n)
+                                if column.is_empty()
+                                    && !matches!(
+                                        self.toks.get(self.pos + 1),
+                                        Some(Token::LParen)
+                                    ) =>
+                            {
+                                column = n;
+                                self.advance();
+                            }
+                            _ => {
+                                if depth == 0 && self.peek() == &Token::Comma {
+                                    break;
+                                }
+                                self.advance();
+                            }
+                        }
+                    }
                     // tolerate additional index columns
                     while !matches!(self.peek(), Token::RParen | Token::Eof) {
                         self.advance();
@@ -145,6 +187,27 @@ impl Parser {
                     self.expect(Token::LParen)?;
                     let columns = self.column_defs()?;
                     self.expect(Token::RParen)?;
+                    // tolerate a trailing `PROPERTIES (…)` / `WITH (…)` clause
+                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        if self.peek() == &Token::LParen {
+                            let mut depth = 0i32;
+                            loop {
+                                match self.advance() {
+                                    Token::LParen => depth += 1,
+                                    Token::RParen => {
+                                        depth -= 1;
+                                        if depth == 0 {
+                                            break;
+                                        }
+                                    }
+                                    Token::Eof | Token::Semicolon => break,
+                                    _ => {}
+                                }
+                            }
+                        } else {
+                            self.advance();
+                        }
+                    }
                     Ok(Statement::CreateTable { name, columns })
                 }
             }
@@ -180,7 +243,8 @@ impl Parser {
                 let name = self.expect_ident()?;
                 Ok(Statement::RestoreSnapshot { name })
             }
-            "SET" | "SNAPSHOT" | "USE" | "DUMP" | "PRAGMA" | "COMPACT" => {
+            "SET" | "SNAPSHOT" | "USE" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH"
+            | "CHECK" => {
                 self.advance();
                 let mut parts: Vec<String> = Vec::new();
                 while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
@@ -635,6 +699,25 @@ impl Parser {
 
     /// Parses a scalar atom: column ref, literal (incl. array), or function call.
     fn atom(&mut self) -> Result<ExprAst> {
+        // unary minus / plus
+        if let Token::Op(op) = self.peek().clone() {
+            if op == "-" || op == "+" {
+                self.advance();
+                let inner = self.atom()?;
+                if op == "-" {
+                    return Ok(match inner {
+                        ExprAst::Literal(Literal::Int(i)) => ExprAst::Literal(Literal::Int(-i)),
+                        ExprAst::Literal(Literal::Float(f)) => ExprAst::Literal(Literal::Float(-f)),
+                        other => ExprAst::Binary(
+                            Box::new(ExprAst::Literal(Literal::Int(0))),
+                            BinOp::Sub,
+                            Box::new(other),
+                        ),
+                    });
+                }
+                return Ok(inner);
+            }
+        }
         match self.peek().clone() {
             Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                 Ok(ExprAst::Literal(self.literal()?))
@@ -645,6 +728,10 @@ impl Parser {
                 if s.eq_ignore_ascii_case("NULL") {
                     self.advance();
                     return Ok(ExprAst::Literal(Literal::Null));
+                }
+                if s.eq_ignore_ascii_case("TRUE") || s.eq_ignore_ascii_case("FALSE") {
+                    self.advance();
+                    return Ok(ExprAst::Literal(Literal::Str(s.to_ascii_lowercase())));
                 }
                 // `CAST(expr AS TYPE)` / `TRY_CAST(...)`: encode the type name as a
                 // string literal argument.
