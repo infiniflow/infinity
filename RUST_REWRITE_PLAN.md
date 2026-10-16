@@ -426,7 +426,8 @@ QueryContext::query(sql)
   - **向量**：`vector,4,float` / `vector,3,float16` / `vector,3,int8` → `List(Float64)`/`List(Int64)`，逐元素一致。
   - **稀疏**：`sparse,100,float,int8`，插入 `{0:1.5,3:2.5}` → SDK 解出 `SparseVector`（`{'0':1.5,'3':2.5}`）；空稀疏发 `nnz=0` 前缀。
   - **日期时间/JSON**：`DATE`→i32 纪元天数、`TIME`→i32 当日秒、`DATETIME`→(i32 天数,i32 秒)、`JSON`→与 Varchar 同的长度前缀 UTF-8；`null`（任意大小写）置零并置**假**位掩码，JSON 的 NULL 解出 `None`（注：SDK 的 `parse_date_bytes` 不消费位图，故 NULL 日期显示为 `1970-01-01`，属 SDK 侧行为）。
-  - **张量/张量数组**：`Tensor(FLOAT,3)`、`TensorArray(FLOAT,3)` 解出 `List(List(Float64))` / `List(List(List(Float64)))`，逐元素一致；`INSERT` 的 `ConstantExpr` 字段 10/11（`i64/f64_tensor_array_value`）与三级 `list<list<list<T>>>` 读取补齐，`ValueLit` 增加 `Int/FloatTensorArray`。
+  - **张量/张量数组**：`Tensor(FLOAT,3)`、`TensorArray(FLOAT,3)` 解出 `List(List(Float64))` / `List(List(List(Float64)))`，逐元素一致；`INSERT` 的 `ConstantExpr` 字段 10/11（`i64/f64_tensor_array_value`）与三级 `list<list<list<T>>>` 读取补齐，`ValueLit` 增加 `Int/FloatTensorArray`。**多向量** `MULTIVECTOR(FLOAT,3)` 复用张量路径，`[[1,2,3],[4,5,6]]` 回读一致。
+  - **数组（含嵌套）**：`PhysicalWire::Array` 携带元素自身的 `DataType`（写/读整棵 `DataType` 树，`array_type{1: element_data_type}`）；打包为 `u32 count` + 逐元素按其 `ColumnType` 编解码，并按声明文本推导**每层**的 `ColumnType` 递归（`array_levels`）。`ValueLit` 新增 `Brackets` 承载 SDK 的 `Array(...)` 包装（`literal_type=18` + 字段 13），渲染为 `{…}`。经未改动的 SDK 实测：`array,int`→`[1,2,3]`、`array,varchar`→`['ab','cd']`、`array,array,array,int`→`[[[1,2],[3,4]],[[5,6]],[[]],[]]`（与 pysdk `test_insert.py::_test_insert_array` 期望完全一致）。
   - 为使张量参数可见，`describe_type` 现在渲染 `Tensor/TensorArray/MultiVector(<elem>,<dim>)`（此前只输出裸 `Tensor`）。Gate A 无回归。
   - **环境限制（诚实记录）**：本机存在**并行会话**，双方都以 `127.0.0.1:23817` 为 SDK 测试端口；我方 `serve` 多次被对方占用/回收（`Address already in use` 或进程被 SIGKILL），故**全量 `python/test_pysdk` 计数本轮无法刷新**（两次试跑分别得 442/1639 与 395/1817，均在服务端被杀后失真，不作为证据）。B 关卡结论仍以**逐类型 SDK 往返 + 干净 `disconnect()`** 为准。
 - **有界容量=1 不做死锁**（50 行扫描 + 早停 `LIMIT`，容量 1 下正常返回）——PoC A 结论落进真实执行器。
