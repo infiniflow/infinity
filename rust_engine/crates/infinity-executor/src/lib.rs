@@ -592,10 +592,7 @@ impl Engine {
                     .next()
                     .unwrap_or_default()
                     .split(SNAP_FLD)
-                    .map(|s| match s.strip_prefix('1') {
-                        Some(v) => Some(v.to_string()),
-                        None => None,
-                    })
+                    .map(|s| s.strip_prefix('1').map(|v| v.to_string()))
                     .collect();
                 let not_nulls: Vec<bool> = recs
                     .next()
