@@ -500,7 +500,27 @@ fn is_datetime_type(type_text: &str) -> bool {
 }
 
 /// Renders a `Value` as a JSON field value (strings quoted, arrays/objects raw).
-fn json_value(v: &Value) -> String {
+/// Renders a cell as JSON. A sparse column (`[i:v,…]`) becomes a JSON object so
+/// the line stays valid JSON and round-trips through `COPY … FROM … JSONL`.
+fn json_value_typed(v: &Value, type_text: &str) -> String {
+    if is_sparse_type(type_text) {
+        if let Value::Str(s) = v {
+            let t = s.trim();
+            if t.starts_with('[') {
+                let pairs: Vec<String> = t
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .split(',')
+                    .filter(|x| !x.trim().is_empty())
+                    .map(|kv| match kv.split_once(':') {
+                        Some((i, val)) => format!("\"{}\" : {}", i.trim(), val.trim()),
+                        None => format!("\"{}\" : 1", kv.trim()),
+                    })
+                    .collect();
+                return format!("{{{}}}", pairs.join(","));
+            }
+        }
+    }
     match v {
         Value::Str(s) => {
             let t = s.trim();
@@ -3026,6 +3046,7 @@ impl Engine {
     fn copy_to(&self, table: &str, path: &str, opts: &[(String, String)]) -> Result<QueryResult> {
         let rows = self.fetch_rows(table)?;
         let schema = self.table_schema(table)?;
+        let column_types = self.column_types(table)?;
         let jsonl = opts
             .iter()
             .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSONL"));
@@ -3050,7 +3071,13 @@ impl Engine {
                 let fields: Vec<String> = schema
                     .iter()
                     .zip(row.iter())
-                    .map(|(name, v)| format!("\"{name}\":{}", json_value(v)))
+                    .map(|(name, v)| {
+                        let ty = column_types
+                            .get(schema.iter().position(|c| c == name).unwrap_or(usize::MAX))
+                            .map(String::as_str)
+                            .unwrap_or("");
+                        format!("\"{name}\":{}", json_value_typed(v, ty))
+                    })
                     .collect();
                 out.push('{');
                 out.push_str(&fields.join(","));
@@ -3077,8 +3104,8 @@ impl Engine {
         })
     }
 
-    /// Runs a single-term `SEARCH MATCH VECTOR` by brute force, returning the
-    /// matching rows with hidden `ROW_ID/SIMILARITY/DISTANCE/SCORE` columns.
+    /// Runs `SEARCH …`. A single `MATCH` clause ranks its own column; several
+    /// clauses combined with `FUSION(…)` return the union of the sub-searches.
     fn run_search(
         &self,
         table: &str,
@@ -3089,10 +3116,57 @@ impl Engine {
             .iter()
             .map(|x| x.to_string())
             .collect();
-        let m = match (s.matches.len(), s.matches.first()) {
-            (1, Some(m)) => m,
-            _ => return Ok((Vec::new(), hidden)),
-        };
+        if s.matches.len() > 1 {
+            // `FUSION(…)`: the union of every sub-search, deduplicated by row id.
+            let mut seen: std::collections::HashSet<i64> = Default::default();
+            let mut out: Vec<(i64, Vec<Value>)> = Vec::new();
+            for m in &s.matches {
+                let (rows, _) = self.run_one_match(
+                    table,
+                    m,
+                    s.using_index.as_deref(),
+                    s.with_opts.as_deref(),
+                    pred,
+                )?;
+                for row in rows {
+                    let id = match row.iter().rev().nth(3) {
+                        Some(Value::Int(i)) => *i,
+                        _ => continue,
+                    };
+                    if seen.insert(id) {
+                        out.push((id, row));
+                    }
+                }
+            }
+            out.sort_by_key(|(id, _)| *id);
+            return Ok((out.into_iter().map(|(_, r)| r).collect(), hidden));
+        }
+        match s.matches.first() {
+            Some(m) => self.run_one_match(
+                table,
+                m,
+                s.using_index.as_deref(),
+                s.with_opts.as_deref(),
+                pred,
+            ),
+            None => Ok((Vec::new(), hidden)),
+        }
+    }
+
+    /// Runs a single `MATCH` clause by brute force, returning the matching rows
+    /// with hidden `ROW_ID/SIMILARITY/DISTANCE/SCORE` columns.
+    fn run_one_match(
+        &self,
+        table: &str,
+        m: &MatchClause,
+        using_index: Option<&str>,
+        with_opts: Option<&str>,
+        pred: Option<&Expr>,
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let hidden: Vec<String> = ["#_row_id", "#_similarity", "#_distance", "#_score"]
+            .iter()
+            .map(|x| x.to_string())
+            .collect();
         let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
         if m.kind.eq_ignore_ascii_case("TEXT") {
@@ -3102,7 +3176,7 @@ impl Engine {
             return Ok((Vec::new(), hidden));
         }
         // `USING INDEX (name)` must reference an existing index
-        if let Some(list) = s.using_index.as_deref() {
+        if let Some(list) = using_index {
             for name in list
                 .trim()
                 .trim_start_matches('(')
@@ -3168,9 +3242,7 @@ impl Engine {
             m.args.iter().rev().find_map(arg_int).unwrap_or(10).max(0) as usize
         };
         let params = arg_str(m.args.get(3)).unwrap_or_default();
-        let threshold = s
-            .with_opts
-            .as_deref()
+        let threshold = with_opts
             .and_then(parse_threshold)
             .or_else(|| parse_threshold(&params));
 
