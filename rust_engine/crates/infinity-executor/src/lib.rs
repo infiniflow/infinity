@@ -235,6 +235,10 @@ fn parse_value(cell: &str) -> Value {
         Value::Float(f)
     } else if cell.eq_ignore_ascii_case("null") {
         Value::Null
+    } else if cell.eq_ignore_ascii_case("true") {
+        Value::Bool(true)
+    } else if cell.eq_ignore_ascii_case("false") {
+        Value::Bool(false)
     } else {
         Value::Str(cell.to_string())
     }

@@ -59,6 +59,9 @@ impl Value {
                 (Some(a), Some(b)) => a.partial_cmp(&b),
                 _ => match (self, other) {
                     (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
+                    // booleans compare against their textual form too
+                    (Value::Bool(b), Value::Str(s2)) => Some(b.to_string().cmp(s2)),
+                    (Value::Str(s2), Value::Bool(b)) => Some(s2.cmp(&b.to_string())),
                     _ => None,
                 },
             },
