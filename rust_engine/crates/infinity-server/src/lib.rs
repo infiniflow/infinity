@@ -585,12 +585,101 @@ fn handle_connection(
                 };
                 write_reply_common(&mut writer, &name, seq, &resp)?;
             }
+            "Insert" => {
+                let req = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_insert_args(&mut ip)?
+                };
+                let sid = req.session_id;
+                let table = if req.db_name.is_empty() {
+                    req.table_name.clone()
+                } else {
+                    format!("{}.{}", req.db_name, req.table_name)
+                };
+                // Rows that share a column list are batched into one statement.
+                let mut resp = CommonResponse {
+                    error_code: OK,
+                    error_msg: "OK".into(),
+                    session_id: sid,
+                };
+                let mut i = 0usize;
+                while i < req.rows.len() {
+                    let (cols, _) = &req.rows[i];
+                    let mut batch: Vec<String> = Vec::new();
+                    while i < req.rows.len() && &req.rows[i].0 == cols {
+                        batch.push(format!(
+                            "({})",
+                            req.rows[i]
+                                .1
+                                .iter()
+                                .map(|v| v.to_sql())
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        ));
+                        i += 1;
+                    }
+                    let sql = if cols.is_empty() {
+                        format!("INSERT INTO {table} VALUES {};", batch.join(","))
+                    } else {
+                        format!(
+                            "INSERT INTO {table} ({}) VALUES {};",
+                            cols.join(","),
+                            batch.join(",")
+                        )
+                    };
+                    resp = run_common(engine.as_ref(), &sql, sid);
+                    if resp.error_code != OK {
+                        break;
+                    }
+                }
+                write_reply_common(&mut writer, "Insert", seq, &resp)?;
+            }
+            "Select" => {
+                let req = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_select_args(&mut ip)?
+                };
+                let err = |msg: String| SelectResponseWire {
+                    error_code: 1,
+                    error_msg: msg,
+                    column_defs: Vec::new(),
+                    column_fields: Vec::new(),
+                    extra_result: String::new(),
+                };
+                let resp = match &engine {
+                    Some(eng) => match eng.execute(&req.to_sql()) {
+                        Ok(rs) => {
+                            let mut columns: Vec<String> = Vec::new();
+                            let mut rows: Vec<Vec<String>> = Vec::new();
+                            for r in rs {
+                                if let QueryResult::Rows {
+                                    columns: c,
+                                    rows: rw,
+                                } = r
+                                {
+                                    columns = c;
+                                    rows = rw;
+                                }
+                            }
+                            select_response_from(&columns, &rows)
+                        }
+                        Err(e) => err(e.to_string()),
+                    },
+                    None => err("no engine bound".into()),
+                };
+                write_select_response(&mut writer, seq, &resp)?;
+            }
             other => {
                 {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                     skip_struct(&mut ip)?;
                 }
-                write_app_exception(&mut writer, other, seq, "unknown method")?;
+                write_app_exception(
+                    &mut writer,
+                    other,
+                    seq,
+                    &format!("unknown method: {other}"),
+                )?;
             }
         }
     }
@@ -1443,7 +1532,8 @@ impl ValueLit {
 pub struct InsertReq {
     pub db_name: String,
     pub table_name: String,
-    pub values: Vec<ValueLit>,
+    /// One entry per row: its column list and values.
+    pub rows: Vec<(Vec<String>, Vec<ValueLit>)>,
     pub session_id: i64,
 }
 
@@ -1502,8 +1592,11 @@ fn read_parsed_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Val
     Ok(val)
 }
 
-fn read_insert_field(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<ValueLit>> {
+fn read_insert_field(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(Vec<String>, Vec<ValueLit>)> {
     ip.read_struct_begin().map_err(tw)?; // Field
+    let mut cols: Vec<String> = Vec::new();
     let mut vals = Vec::new();
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
@@ -1514,7 +1607,7 @@ fn read_insert_field(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Ve
             Some(1) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let _ = ip.read_string().map_err(tw)?;
+                    cols.push(ip.read_string().map_err(tw)?);
                 }
                 ip.read_list_end().map_err(tw)?;
             }
@@ -1530,7 +1623,7 @@ fn read_insert_field(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Ve
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    Ok(vals)
+    Ok((cols, vals))
 }
 
 /// Reads the args of an `Insert` CALL (after the message head).
@@ -1541,7 +1634,7 @@ pub fn read_insert_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     let mut r = InsertReq {
         db_name: String::new(),
         table_name: String::new(),
-        values: Vec::new(),
+        rows: Vec::new(),
         session_id: 0,
     };
     loop {
@@ -1555,7 +1648,7 @@ pub fn read_insert_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
             Some(3) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    r.values.extend(read_insert_field(ip)?);
+                    r.rows.push(read_insert_field(ip)?);
                 }
                 ip.read_list_end().map_err(tw)?;
             }
