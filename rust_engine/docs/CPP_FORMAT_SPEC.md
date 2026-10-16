@@ -496,3 +496,41 @@ u8[pos_list_len]
 | LVQ/Rabitq/Sparse 的 Meta 完整字段与 `compress_data_size` | **部分**（字段顺序已给） | `lvq_vec_store.cppm`、`rabitq_vec_store.cppm`、`sparse_vec_store.cppm` |
 | 全文跨段合并后的 base_name/row_count 后缀语义 | **UNKNOWN** | `new_txn_index_impl.cpp:2239`、`column_index_merger_impl.cpp` |
 | FastPForLib 版本（影响 SIMD-BP128 逐位一致） | **VERIFY** | `cmake/`、`vcpkg.json` 中的 pin |
+
+## 8.6 已验证：Catalog 的**值编码**（§2.6.1 第 ④ 项的剩余一半）
+
+§8.2 只说「值为 ColumnDef / IndexBase JSON」；本节把**已核对**的字段与嵌套格式冻结如下（`file:line` 为证），供实现 catalog 时逐字节复刻。
+
+**写点**：`TableMeta::InitSet` 对每个列写 `KeyEncode::TableColumnKey(db_id, table_id, column->name(), commit_ts)` → **`column->ToJson().dump()`**（`src/storage/catalog/meta/table_meta_impl.cpp:297-303`）。
+
+**`ColumnDef::ToJson()`**（`src/parser/definition/column_def.cpp:228-248`）：
+
+| 键 | 值 | 条件 |
+|---|---|---|
+| `column_type` | `DataType::Serialize()`（见下，嵌套对象） | 总是 |
+| `column_id` | `column->id()`（整数） | 总是 |
+| `column_name` | 列名（字符串） | 总是 |
+| `constraints` | **数组**，逐项 append 约束枚举的整数值 | 仅当有约束 |
+| `column_comment` | 列注释（字符串） | 仅当注释非空 |
+| `default` | `ConstantExpr::Serialize()` | 仅当有默认值 |
+
+> nlohmann 的 `json` 是 `std::map`，**键按字典序**输出；`serde_json::Value` 默认同为 `BTreeMap`，故两者的键序天然一致，可直接逐字节比较。
+
+**`DataType::Serialize()`**（`src/parser/type/data_type.cpp:427-435`）：
+
+| 键 | 值 | 条件 |
+|---|---|---|
+| `data_type` | `LogicalType` 的整数值（`type_`） | 总是 |
+| `type_info` | `type_info_->Serialize()`（见下） | 仅当 `type_info_ != nullptr` |
+
+**`type_info` 的分支**（以 `DataType::Deserialize` 的读法为准，`src/parser/type/data_type.cpp:437-476`，读取方与写入方字段名一致）：
+
+| LogicalType | `type_info` 形状 |
+|---|---|
+| `kArray` | **就是元素类型的 DataType JSON 对象本身**（`DataType::Deserialize(type_info_json.raw_json())` 直接递归解析该 json） |
+| `kDecimal` | `{"precision": <int>, "scale": <int>}` |
+| `kEmbedding` / `kTensor` / `kTensorArray` / `kMultiVector` | `{"embedding_type": <EmbeddingDataType 整数>, "dimension": <int>}` |
+| `kSparse` | 由 `SparseInfo::Deserialize(type_info_json.raw_json())` 解析（字段名未逐条核对 → **VERIFY**：`src/parser/type/type_info.cpp` 中 `SparseInfo::Serialize/Deserialize`） |
+| 其余 | 无 `type_info` |
+
+**仍待冻结**（实现 catalog 前需补）：①`ConstantExpr::Serialize()`（`default` 值）；②`SparseInfo::Serialize()` 字段名；③`IndexBase` 各索引类型的 JSON（`idx|…|index_base` 值，见 `src/storage/definition/index_*_impl.cpp`）；④自定义 MergeOperator 的语义（`src/storage/common/rocksdb_merge_operator_impl.cpp`）。**注**：实现这些编码需要 JSON 序列化（本工作区尚无 `serde_json`，需新增依赖或手写最小 JSON）。
