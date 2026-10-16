@@ -215,10 +215,10 @@ pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical
             render_cmp_operand(b, ids)
         ),
         Predicate::Bool(a, op, b) => format!(
-            "({}) {} ({})",
-            render_pred_m(a, ids, logical),
+            "{} {} {}",
+            wrap_bool_operand(a, render_pred_m(a, ids, logical)),
             bool_text(*op),
-            render_pred_m(b, ids, logical)
+            wrap_bool_operand(b, render_pred_m(b, ids, logical))
         ),
         Predicate::Not(a) => format!("NOT({})", render_pred_m(a, ids, logical)),
         Predicate::IsNull(e, neg) => format!(
@@ -939,6 +939,21 @@ fn idx_operand(e: &ExprAst, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) ->
     }
 }
 
+/// True when `p` is a bare `filter_fulltext`/`filter_text` call.
+fn is_fulltext_pred(p: &Predicate) -> bool {
+    matches!(p, Predicate::IsTrue(e) if fulltext_filter(e).is_some())
+}
+
+/// Parenthesizes a boolean operand unless it is a full-text filter (the
+/// reference plan leaves `FILTER_FULLTEXT(…)` bare inside `AND`/`OR`).
+fn wrap_bool_operand(p: &Predicate, s: String) -> String {
+    if is_fulltext_pred(p) {
+        s
+    } else {
+        format!("({s})")
+    }
+}
+
 /// Renders a json *predicate* function (`json_contains`, `json_exists_path`).
 fn idx_json_pred(name: &str, args: &[ExprAst], ann: &dyn Fn(&str) -> String) -> Option<String> {
     let col = match args.first() {
@@ -975,10 +990,10 @@ fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> 
             )
         }
         Predicate::Bool(a, op, b) => format!(
-            "({}) {} ({})",
-            idx_pred(a, ann, cast),
+            "{} {} {}",
+            wrap_bool_operand(a, idx_pred(a, ann, cast)),
             bool_text(*op),
-            idx_pred(b, ann, cast)
+            wrap_bool_operand(b, idx_pred(b, ann, cast))
         ),
         Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann, cast)),
         Predicate::IsTrue(e) => {
