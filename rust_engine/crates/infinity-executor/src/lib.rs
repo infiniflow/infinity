@@ -3256,7 +3256,7 @@ impl Engine {
         // Deleted rows still contribute to the index statistics (they are only
         // filtered from the result), so gather every stored row first.
         let prefix = row_prefix(table);
-        let defaults_len = self.table_defaults(table).unwrap_or_default().len();
+        let defaults = self.table_defaults(table).unwrap_or_default();
         let mut docs: Vec<(usize, Vec<Value>, Vec<String>, bool)> = Vec::new();
         for (k, v) in self.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
@@ -3266,8 +3266,14 @@ impl Engine {
                 .split('\t')
                 .map(parse_value)
                 .collect();
-            while row.len() < defaults_len {
-                row.push(Value::Null);
+            // Rows loaded before a column was added (or from a narrower COPY)
+            // take the column's default value, not NULL.
+            while row.len() < defaults.len() {
+                let i = row.len();
+                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
             }
             let text: String = cols
                 .iter()
