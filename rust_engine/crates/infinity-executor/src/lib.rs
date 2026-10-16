@@ -1323,6 +1323,9 @@ pub struct Engine {
     /// number of write batches (`COPY`/`INSERT`) per table; a table with more
     /// than one batch is planned as several segments (a `MERGE` operator).
     write_batches: Mutex<HashMap<String, usize>>,
+    /// Serialises row-id assignment + writes so concurrent inserts do not
+    /// collide on the same base sequence.
+    insert_lock: Mutex<()>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1375,6 +1378,7 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
+            insert_lock: Mutex::new(()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -2423,7 +2427,10 @@ impl Engine {
                 if rows.is_empty() {
                     return Ok(QueryResult::Inserted { count: 0 });
                 }
-                let base = self.store.scan_prefix(&row_prefix(table))?.len();
+                // Serialise row-id assignment and the write batch: two sessions
+                // inserting concurrently must not pick the same base sequence.
+                let _guard = self.insert_lock.lock().unwrap();
+                let base = self.next_row_seq(table)?;
                 let types = self.column_types(table)?;
                 // tensor-like values must match the declared dimension, and
                 // sparse values must be in range
