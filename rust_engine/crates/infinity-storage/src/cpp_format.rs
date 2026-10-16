@@ -428,6 +428,142 @@ pub fn split_body(raw: &[u8], capacity: usize, slot_size: usize) -> ColumnBody {
     ColumnBody { data, null_bitmap }
 }
 
+/// How a column's values occupy the `.col` data region (spec §8.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnLayout {
+    /// Boolean/null: `(capacity + 7) / 8` packed bits (C++ `kCompactBit`).
+    CompactBit,
+    /// `capacity * n` bytes, one little-endian value per row.
+    Fixed(usize),
+    /// `capacity * n` bytes of slot structs; the payload lives in the outline
+    /// file (C++ `kVarBuffer`).
+    VarLen(usize),
+}
+
+/// Maps the SDK/wire `ColumnType` code to its `.col` layout. `None` for types
+/// this module does not pack yet (embedding/tensor/… — fixed but dim-dependent).
+pub fn column_layout(column_type: i32) -> Option<ColumnLayout> {
+    Some(match column_type {
+        0 => ColumnLayout::CompactBit,           // Boolean
+        1 => ColumnLayout::Fixed(1),             // Int8
+        2 => ColumnLayout::Fixed(2),             // Int16
+        3 => ColumnLayout::Fixed(4),             // Int32
+        4 => ColumnLayout::Fixed(8),             // Int64
+        5 => ColumnLayout::Fixed(4),             // Float32
+        6 => ColumnLayout::Fixed(8),             // Float64
+        7 => ColumnLayout::Fixed(2),             // Float16
+        8 => ColumnLayout::Fixed(2),             // BFloat16
+        9 => ColumnLayout::VarLen(16),           // Varchar
+        13 => ColumnLayout::VarLen(16),          // Sparse (i64 nnz + i64 offset)
+        16 => ColumnLayout::Fixed(4),            // Date
+        17 => ColumnLayout::Fixed(4),            // Time
+        18 => ColumnLayout::Fixed(8),            // DateTime
+        19 => ColumnLayout::Fixed(8),            // Timestamp
+        20 => ColumnLayout::Fixed(8),            // Interval
+        21 => ColumnLayout::VarLen(8),           // Array
+        22 => ColumnLayout::VarLen(16),          // Json
+        11 | 12 | 14 => ColumnLayout::VarLen(8), // Tensor / TensorArray / MultiVector
+        _ => return None,
+    })
+}
+
+/// Packs a **scalar** column into its `.col` body plus outline contents.
+///
+/// `slots[i]` is the row's already-encoded value; `None` marks a NULL (the slot
+/// is zeroed and the row's null bit cleared). Rules by layout:
+///   * `CompactBit` — `Some(b"\x01")` (or `b"true"`/`b"1"`) sets the bit.
+///   * `Fixed(n)` — `Some` must be exactly `n` bytes, little-endian.
+///   * `VarLen(16)` for `Varchar`(9)/`Json`(22) — `Some` is the UTF-8 payload,
+///     appended to the outline; the slot records `u64(24-bit length | 48-bit
+///     outline offset)`.
+///
+/// Array / tensor / sparse columns carry an element count that the string
+/// level does not know, so they are packed by the caller (see the wire layer's
+/// `rows_to_column_fields_typed`); this function rejects them.
+pub fn pack_column(
+    column_type: i32,
+    slots: &[Option<&[u8]>],
+    capacity: usize,
+) -> Result<(ColumnBody, Vec<u8>), FormatError> {
+    let err = || FormatError::Truncated {
+        need: 0,
+        got: slots.len(),
+    };
+    let layout = column_layout(column_type).ok_or_else(err)?;
+    let mut valid = Vec::with_capacity(slots.len());
+
+    match layout {
+        ColumnLayout::CompactBit => {
+            let mut bits = vec![0u8; ColumnBody::null_bitmap_len(capacity)];
+            let mut null_bitmap = vec![0u8; ColumnBody::null_bitmap_len(capacity)];
+            for (row, v) in slots.iter().enumerate() {
+                let Some(v) = v else {
+                    valid.push(false);
+                    continue;
+                };
+                valid.push(true);
+                null_bitmap[row / 8] |= 1 << (row % 8);
+                let on: &[u8] = v;
+                if on == b"1" || on.eq_ignore_ascii_case(b"true") {
+                    bits[row / 8] |= 1 << (row % 8);
+                }
+            }
+            Ok((
+                ColumnBody {
+                    data: bits,
+                    null_bitmap,
+                },
+                Vec::new(),
+            ))
+        }
+        ColumnLayout::Fixed(width) => {
+            let mut data = Vec::with_capacity(slots.len() * width);
+            for v in slots {
+                valid.push(v.is_some());
+                match v {
+                    Some(bytes) if bytes.len() == width => data.extend_from_slice(bytes),
+                    Some(_) => return Err(err()), // wrong slot encoding
+                    None => data.extend_from_slice(&vec![0u8; width]),
+                }
+            }
+            Ok((
+                ColumnBody::build(capacity, width, &data, &valid)?,
+                Vec::new(),
+            ))
+        }
+        ColumnLayout::VarLen(16) if matches!(column_type, 9 | 22) => {
+            // C++ `Varchar` (16 bytes): word 0 = `u64 { length_ : 24; prefix_[5] }`
+            // (the 5 prefix bytes are the payload's first five bytes), word 1 =
+            // `u64 file_offset` into the outline.
+            let mut outline = Vec::new();
+            let mut data = Vec::with_capacity(slots.len() * 16);
+            for v in slots {
+                valid.push(v.is_some());
+                let Some(payload) = v else {
+                    // A NULL slot is left all-zero; nothing is appended.
+                    data.extend_from_slice(&[0u8; 16]);
+                    continue;
+                };
+                let offset = outline.len() as u64;
+                outline.extend_from_slice(payload);
+                let len = payload.len() as u64 & 0x00ff_ffff;
+                let mut prefix = [0u8; 5];
+                for (i, b) in payload.iter().take(5).enumerate() {
+                    prefix[i] = *b;
+                }
+                let mut word0 = len;
+                for (i, b) in prefix.iter().enumerate() {
+                    word0 |= (*b as u64) << (24 + 8 * i);
+                }
+                data.extend_from_slice(&word0.to_le_bytes());
+                data.extend_from_slice(&offset.to_le_bytes());
+            }
+            Ok((ColumnBody::build(capacity, 16, &data, &valid)?, outline))
+        }
+        _ => Err(err()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -555,10 +691,15 @@ mod tests {
         let int_body = ColumnBody::build(8192, 4, &ints, &[true, false, true]).unwrap();
         let varchar = ColumnBody {
             data: {
+                // Two 16-byte slots: word0 = length (| prefix), word1 = offset.
                 let mut d = Vec::new();
-                for (len, off) in [(5u32, 0u64), (2u32, 5u64)] {
-                    // C++ `Varchar` slot: u64 with 24-bit length and 48-bit offset.
-                    d.extend_from_slice(&((len as u64) | (off << 24)).to_le_bytes());
+                for (payload, off) in [(b"hello".as_slice(), 0u64), (b"ab".as_slice(), 5u64)] {
+                    let mut word0 = payload.len() as u64;
+                    for (i, b) in payload.iter().take(5).enumerate() {
+                        word0 |= (*b as u64) << (24 + 8 * i);
+                    }
+                    d.extend_from_slice(&word0.to_le_bytes());
+                    d.extend_from_slice(&off.to_le_bytes());
                 }
                 d
             },
@@ -599,9 +740,11 @@ mod tests {
 
         // The varchar column points into the raw outline file.
         assert_eq!(got_columns[1].outline, b"helloab");
-        let slot0 = u64::from_le_bytes(got_columns[1].body[0..8].try_into().unwrap());
-        assert_eq!(slot0 & 0x00ff_ffff, 5); // length
-        assert_eq!(slot0 >> 24, 0); // outline offset
+        let w0 = u64::from_le_bytes(got_columns[1].body[0..8].try_into().unwrap());
+        let off = u64::from_le_bytes(got_columns[1].body[8..16].try_into().unwrap());
+        assert_eq!(w0 & 0x00ff_ffff, 5); // length
+        assert_eq!(&w0.to_le_bytes()[3..8], b"hello"); // inlined prefix
+        assert_eq!(off, 0); // outline offset of the first row
     }
 
     #[test]
@@ -617,5 +760,74 @@ mod tests {
         std::fs::write(dir.join(VERSION_FILE), b"\x01").unwrap();
         let err = read_block(tmp.path(), id).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn column_layout_widths_match_cpp() {
+        assert_eq!(column_layout(0), Some(ColumnLayout::CompactBit)); // Boolean
+        assert_eq!(column_layout(3), Some(ColumnLayout::Fixed(4))); // Integer
+        assert_eq!(column_layout(4), Some(ColumnLayout::Fixed(8))); // BigInt
+        assert_eq!(column_layout(7), Some(ColumnLayout::Fixed(2))); // Float16
+        assert_eq!(column_layout(9), Some(ColumnLayout::VarLen(16))); // Varchar
+        assert_eq!(column_layout(22), Some(ColumnLayout::VarLen(16))); // Json
+        assert_eq!(column_layout(255), None);
+    }
+
+    #[test]
+    fn pack_fixed_column_lays_values_and_nulls() {
+        let a = 7i32.to_le_bytes();
+        let c = 9i32.to_le_bytes();
+        let (body, outline) = pack_column(3, &[Some(&a), None, Some(&c)], 4).unwrap();
+        assert!(outline.is_empty());
+        assert_eq!(body.data.len(), 16); // padded to capacity * 4
+        assert_eq!(&body.data[0..4], &a);
+        assert_eq!(&body.data[4..8], &[0, 0, 0, 0]); // NULL slot is zeroed
+        assert_eq!(&body.data[8..12], &c);
+        assert_eq!(body.null_bitmap[0], 0b0000_0101);
+    }
+
+    #[test]
+    fn pack_fixed_column_rejects_wrong_slot_width() {
+        // A 2-byte value in a 4-byte slot is a caller bug.
+        let bytes = 1i16.to_le_bytes();
+        assert!(pack_column(3, &[Some(&bytes)], 4).is_err());
+    }
+
+    #[test]
+    fn pack_bit_column() {
+        let (body, _) =
+            pack_column(0, &[Some(b"true"), Some(b"false"), None, Some(b"1")], 4).unwrap();
+        assert_eq!(body.data.len(), 1); // (capacity + 7) / 8
+        assert_eq!(body.data[0], 0b0000_1001); // rows 0 and 3 are true
+        assert_eq!(body.null_bitmap[0], 0b0000_1011); // row 2 is NULL
+    }
+
+    #[test]
+    fn pack_varchar_column_offsets_into_outline() {
+        let (body, outline) = pack_column(9, &[Some(b"hello"), None, Some(b"ab")], 4).unwrap();
+        assert_eq!(outline, b"helloab");
+        assert_eq!(body.data.len(), 64); // capacity * 16
+        let word = |row: usize| -> (u64, u64) {
+            let at = row * 16;
+            (
+                u64::from_le_bytes(body.data[at..at + 8].try_into().unwrap()),
+                u64::from_le_bytes(body.data[at + 8..at + 16].try_into().unwrap()),
+            )
+        };
+        // word 0 = 24-bit length | 5 prefix bytes; word 1 = outline offset.
+        let (w0, off0) = word(0);
+        assert_eq!((w0 & 0x00ff_ffff, off0), (5, 0)); // "hello"
+        assert_eq!(&w0.to_le_bytes()[3..8], b"hello"); // prefix inlined
+        assert_eq!(word(1), (0, 0)); // NULL slot is all zero
+        let (w2, off2) = word(2);
+        assert_eq!((w2 & 0x00ff_ffff, off2), (2, 5)); // "ab" @ 5
+        assert_eq!(body.null_bitmap[0], 0b0000_0101);
+    }
+
+    #[test]
+    fn pack_column_rejects_unsupported_types() {
+        // Arrays need an element count the byte-level API does not have.
+        assert!(pack_column(21, &[Some(b"")], 4).is_err());
+        assert!(pack_column(13, &[Some(b"")], 4).is_err());
     }
 }

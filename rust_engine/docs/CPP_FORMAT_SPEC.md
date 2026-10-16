@@ -262,6 +262,8 @@ slot 宽度（`logical_type.cpp:183-255` 的 `type_size[]`；`DataType::Size()` 
 | 类型 | slot 布局 | 依据 |
 |---|---|---|
 | Varchar | `u64 length_:24` + `union{ char inline[13] \| { char prefix[5]; u64 file_offset } }`，`sizeof=16`；`length<=13` 内联，否则体在 outline 的 `file_offset` | `varchar.h:25-27,31-68` |
+
+> **Varchar slot 的字节序（实现按此落盘）**：slot 共 16 字节 = `word0`（低 24 位 = `length`，其后 40 位 = payload 的前 5 字节，即 `prefix_[5]`）+ `word1`（= `file_offset`，指向 `col_{id}_out` 的追加偏移）。因此 `word0 = length \| (prefix[0]<<24) \| (prefix[1]<<32) \| …`，`word1 = offset`。NULL 行整槽置零、不追加 outline 内容。（C++ 对 `length<=13` 走 `inline_[13]` 分支，Rust 侧一律走 outline 分支——`file_offset` 在 `length>13` 时才是权威来源，短串的 inline 分支待接执行器时再补。）
 | MultiVector / Tensor / TensorArray / Array | `u64 { count:16; file_offset:48 }`，`sizeof=8` | `multi_vector_type.h:23-33`；`tensor_type.h:23-30`；`tensor_array_type.h:28-36`；`array_type.h:23-29` |
 | Sparse | `i64 nnz_` + `i64 file_offset_`，`sizeof=16` | `sparse_type.h:26,76-77` |
 | Json | `u64 length_` + `u64 file_offset_`，`sizeof=16` | `json_type.h:23-26` |

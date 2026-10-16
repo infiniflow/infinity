@@ -17,10 +17,11 @@ pub mod mvcc;
 pub mod wal;
 
 pub use cpp_format::{
-    block_dir, chunk_index_file, column_file, column_outline_file, decode_data_file,
-    encode_data_file, fulltext_base_name, fulltext_files, read_block, segment_index_dir,
-    split_body, write_block, BlockColumn, BlockId, BlockVersionFile, ColumnBody, FormatError,
-    RawBlockColumn, DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY, VERSION_FILE,
+    block_dir, chunk_index_file, column_file, column_layout, column_outline_file, decode_data_file,
+    encode_data_file, fulltext_base_name, fulltext_files, pack_column, read_block,
+    segment_index_dir, split_body, write_block, BlockColumn, BlockId, BlockVersionFile, ColumnBody,
+    ColumnLayout, FormatError, RawBlockColumn, DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY,
+    VERSION_FILE,
 };
 pub use crc::crc32_ieee;
 pub use metastore::{FjallMetaStore, MetaStore};
