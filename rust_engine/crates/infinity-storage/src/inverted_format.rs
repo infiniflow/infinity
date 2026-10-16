@@ -529,6 +529,77 @@ pub fn fst_unpack_delta(buf: &[u8], nbytes: u8, node_addr: u64) -> Result<u64, F
     }
 }
 
+// ---------------------------------------------------------------------------
+// FST common-input tables (`fst/common_inputs.cppm`)
+// ---------------------------------------------------------------------------
+//
+// `COMMON_INPUTS` ranks the bytes by frequency across real dictionaries; the
+// node encoders use it to store a transition's input in six bits when the byte
+// is common enough. Both arrays are a permutation of 0..=255 and
+// `FST_COMMON_INPUTS_INV[FST_COMMON_INPUTS[b]] == b` holds for every byte
+// (checked in a test).
+
+/// `COMMON_INPUTS[256]` (`fst/common_inputs.cppm:20-278`): byte -> rank.
+pub const FST_COMMON_INPUTS: [u8; 256] = [
+    84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+    116, 80, 117, 118, 79, 39, 30, 81, 75, 74, 82, 57, 66, 16, 12, 2,
+    19, 20, 21, 27, 32, 29, 35, 36, 37, 34, 24, 73, 119, 23, 120, 40,
+    83, 44, 48, 42, 43, 49, 46, 62, 61, 47, 69, 68, 58, 56, 55, 59,
+    51, 72, 54, 45, 52, 64, 65, 63, 71, 67, 70, 77, 121, 78, 122, 31,
+    123, 4, 25, 9, 17, 1, 26, 22, 13, 7, 50, 38, 14, 15, 10, 3,
+    8, 60, 6, 5, 0, 18, 33, 11, 41, 28, 53, 124, 125, 126, 76, 127,
+    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
+    144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
+    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+    224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+    240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+];
+
+/// `COMMON_INPUTS_INV[256]` (`fst/common_inputs.cppm:280-291`): rank-1 -> byte.
+pub const FST_COMMON_INPUTS_INV: [u8; 256] = [
+    116, 101, 47, 111, 97, 115, 114, 105, 112, 99, 110, 119, 46, 104, 108, 109,
+    45, 100, 117, 48, 49, 50, 103, 61, 58, 98, 102, 51, 121, 53, 38, 95,
+    52, 118, 57, 54, 55, 56, 107, 37, 63, 120, 67, 68, 65, 83, 70, 73,
+    66, 69, 106, 80, 84, 122, 82, 78, 77, 43, 76, 79, 113, 72, 71, 87,
+    85, 86, 44, 89, 75, 74, 90, 88, 81, 59, 41, 40, 126, 91, 93, 36,
+    33, 39, 42, 64, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    28, 29, 30, 31, 32, 34, 35, 60, 62, 92, 94, 96, 123, 124, 125, 127,
+    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
+    144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
+    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
+    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
+    224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+    240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+];
+
+/// `State::CommonIdx` (`fst/node.cppm:282-290`): the six-bit index for `input`,
+/// or `0` when its rank exceeds `max` (i.e. the input must be stored verbatim).
+pub fn fst_common_idx(input: u8, max: u8) -> u8 {
+    let val = FST_COMMON_INPUTS[input as usize].wrapping_add(1);
+    if val > max {
+        0
+    } else {
+        val
+    }
+}
+
+/// `State::CommonInput` (`fst/node.cppm:292-301`): the byte for a stored index,
+/// or `None` for the `0` sentinel meaning "input is stored verbatim".
+pub fn fst_common_input(idx: u8) -> Option<u8> {
+    if idx == 0 {
+        None
+    } else {
+        Some(FST_COMMON_INPUTS_INV[idx as usize - 1])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -694,6 +765,56 @@ mod tests {
         assert_eq!(fst_pack_delta_size(100_000, 1), 3);
         assert_eq!(n, 3);
         assert_eq!(fst_unpack_delta(&big, n, 100_000).unwrap(), 1);
+    }
+
+    #[test]
+    fn common_input_tables_are_inverses() {
+        // Both tables are permutations of 0..=255, and `INV[A[b]] == b` holds,
+        // which is the relation `CommonIdx`/`CommonInput` rely on.
+        let mut seen = [false; 256];
+        for b in 0..256 {
+            assert_eq!(
+                FST_COMMON_INPUTS_INV[FST_COMMON_INPUTS[b] as usize],
+                b as u8,
+                "INV[A[{b}]] must be {b}"
+            );
+            assert!(!seen[b], "COMMON_INPUTS has a duplicate at {b}");
+            seen[b] = true;
+        }
+        let mut seen_inv = [false; 256];
+        for v in FST_COMMON_INPUTS_INV {
+            assert!(!seen_inv[v as usize]);
+            seen_inv[v as usize] = true;
+        }
+    }
+
+    #[test]
+    fn common_idx_and_input_round_trip_within_the_max() {
+        // The most common byte ('t') ranks first, so `CommonIdx('t', 63) == 1`.
+        assert_eq!(FST_COMMON_INPUTS[b't' as usize], 0);
+        assert_eq!(fst_common_idx(b't', 0b11_1111), 1);
+        assert_eq!(fst_common_input(1), Some(b't'));
+        // 'e' ranks second, 'p' ninth.
+        assert_eq!(fst_common_idx(b'e', 63), 2);
+        assert_eq!(fst_common_input(2), Some(b'e'));
+        assert_eq!(fst_common_input(9), Some(b'p'));
+        // The 0 index means "no common input" (stored verbatim).
+        assert_eq!(fst_common_input(0), None);
+        // A rank above `max` falls back to 0.
+        assert_eq!(fst_common_idx(b't', 0), 0);
+        assert_eq!(fst_common_idx(b'z', 3), 0);
+        // Every byte round-trips through its own rank when max is 255 - except
+        // the rank-255 byte, whose `(rank + 1) % 256` wraps to the 0 sentinel
+        // and is therefore always stored verbatim (`fst/node.cppm:284`).
+        for b in 0..=255u8 {
+            let idx = fst_common_idx(b, 255);
+            if FST_COMMON_INPUTS[b as usize] == 255 {
+                assert_eq!(idx, 0);
+                continue;
+            }
+            assert_ne!(idx, 0);
+            assert_eq!(fst_common_input(idx), Some(b));
+        }
     }
 
     #[test]
