@@ -504,7 +504,9 @@ impl Engine {
             .position(|c| c == column)
             .ok_or_else(|| Error::Invalid(format!("unknown column '{column}'")))?;
         let mut idx = SecondaryIndex::new();
-        for (seq, row) in self.fetch_rows(table)?.iter().enumerate() {
+        // key by the *storage* sequence id (not the positional index: a rewrite
+        // such as DROP COLUMN re-appends rows under new seqs)
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
             if let Some(v) = row.get(col_idx) {
                 idx.insert(v.to_slt_string().as_bytes(), seq as u64);
             }
@@ -610,6 +612,17 @@ impl Engine {
                     .lock()
                     .unwrap()
                     .remove(&index_key(table, column));
+                // remaining indexes now hold stale row ids: rebuild them
+                let remaining: Vec<String> = self
+                    .catalog
+                    .list_indexes()?
+                    .into_iter()
+                    .filter(|i| i.table == *table)
+                    .map(|i| i.column)
+                    .collect();
+                for col in remaining {
+                    self.build_index(table, &col)?;
+                }
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
