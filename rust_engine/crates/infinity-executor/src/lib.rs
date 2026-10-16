@@ -1011,10 +1011,10 @@ impl Engine {
             .unwrap_or_else(|| if is_sparse { "ip".into() } else { "l2".into() })
             .to_ascii_lowercase();
         let topn = if is_tensor {
-            // topn lives in the trailing parameter string (empty => no limit).
+            // topn lives in the trailing parameter string; the default is 10.
             match arg_str(m.args.get(3)) {
-                Some(p) => parse_topn_param(&p).unwrap_or(usize::MAX),
-                None => usize::MAX,
+                Some(p) => parse_topn_param(&p).unwrap_or(10),
+                None => 10,
             }
         } else {
             m.args.iter().rev().find_map(arg_int).unwrap_or(10).max(0) as usize
