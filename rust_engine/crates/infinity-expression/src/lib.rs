@@ -91,6 +91,9 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
+    /// `filter_text(col, '…')` / `filter_fulltext(col, '…')`: term matching over
+    /// the given column's text.
+    FullText(usize, String),
 }
 
 impl Expr {
@@ -156,6 +159,14 @@ impl Expr {
                 eval_binary(&x, *op, &y)
             }
             Expr::Func { name, args } => eval_func(name, args, row),
+            Expr::FullText(i, q) => {
+                let text = match row.get(*i) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => String::new(),
+                };
+                Value::Bool(fulltext_match(&text, q))
+            }
         }
     }
 
@@ -413,6 +424,32 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// Tokenises text into lowercase word tokens.
+fn tokens(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
+        .collect()
+}
+
+/// `filter_text` semantics: whitespace-separated terms are AND-ed; `OR`
+/// separates alternatives; every term of a group must appear.
+fn fulltext_match(text: &str, query: &str) -> bool {
+    let doc = tokens(text);
+    let mut groups: Vec<Vec<String>> = vec![Vec::new()];
+    for w in query.split_whitespace() {
+        if w.eq_ignore_ascii_case("or") {
+            groups.push(Vec::new());
+        } else {
+            groups.last_mut().unwrap().extend(tokens(w));
+        }
+    }
+    groups
+        .iter()
+        .filter(|g| !g.is_empty())
+        .any(|g| g.iter().all(|t| doc.iter().any(|d| d == t)))
 }
 
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.

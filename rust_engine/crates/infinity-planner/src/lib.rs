@@ -7,7 +7,9 @@ pub mod optimize;
 
 use infinity_common::{Error, Result};
 use infinity_expression::{Expr, Value};
-use infinity_parser::{AggFunc, BoolOp, ExprAst, JoinClause, OrderKey, Predicate, SelectItem};
+use infinity_parser::{
+    AggFunc, BoolOp, ExprAst, JoinClause, Literal, OrderKey, Predicate, SelectItem,
+};
 
 /// A simple logical plan.
 #[derive(Debug, Clone, PartialEq)]
@@ -94,6 +96,20 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             Box::new(compile_expr(b, schema)?),
         ),
         ExprAst::Func { name, args } => {
+            // `filter_text(col, '…')` / `filter_fulltext(col, '…')` resolve the
+            // column name at compile time.
+            let up = name.to_ascii_uppercase();
+            if up == "FILTER_TEXT" || up == "FILTER_FULLTEXT" {
+                if let (Some(ExprAst::Literal(Literal::Str(col))), Some(q)) =
+                    (args.first(), args.get(1))
+                {
+                    if let (Some(i), ExprAst::Literal(Literal::Str(query))) =
+                        (schema.iter().position(|c| c == col), q)
+                    {
+                        return Ok(Expr::FullText(i, query.clone()));
+                    }
+                }
+            }
             // SEARCH MATCH pseudo-columns are exposed as hidden scan columns.
             let hidden = match name.to_ascii_uppercase().as_str() {
                 "ROW_ID" => Some("#_row_id"),
