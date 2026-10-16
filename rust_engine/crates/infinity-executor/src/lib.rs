@@ -4359,7 +4359,14 @@ fn sort_rows(rows: &mut [Vec<Value>], keys: &[(usize, bool)]) {
         for (key, asc) in keys {
             let x = a.get(*key).unwrap_or(&Value::Null);
             let y = b.get(*key).unwrap_or(&Value::Null);
-            let mut ord = x.partial_cmp_value(y).unwrap_or(std::cmp::Ordering::Equal);
+            // NULLs order before every non-NULL (so ASC → NULLS FIRST, and the
+            // reverse below gives DESC → NULLS LAST).
+            let mut ord = match (x, y) {
+                (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
+                (Value::Null, _) => std::cmp::Ordering::Less,
+                (_, Value::Null) => std::cmp::Ordering::Greater,
+                _ => x.partial_cmp_value(y).unwrap_or(std::cmp::Ordering::Equal),
+            };
             if !*asc {
                 ord = ord.reverse();
             }
