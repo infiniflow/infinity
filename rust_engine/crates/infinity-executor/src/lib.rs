@@ -1983,6 +1983,12 @@ impl Engine {
                 }
                 if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
                     validate_search_pseudo_columns(s, items)?;
+                    // an outer WHERE cannot be combined with an in-subsearch filter
+                    if where_pred.is_some() && s.matches.iter().any(|m| m.filter.is_some()) {
+                        return Err(Error::Invalid(
+                            "cannot have both a where clause and a subsearch filter".into(),
+                        ));
+                    }
                 }
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
