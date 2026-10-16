@@ -151,6 +151,88 @@ PROJECT (4)
      - table index: #1
      - output_columns: [doc, __rowid]
 
+# A top-level alternation makes every branch optional, including the last one:
+# row 6 matches `Nobel` and has none of the grams of `nothing relevant`.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'Nobel|nothing relevant');
+----
+6
+7
+
+# No branch can prove a literal, so nothing is pushed down: the plan keeps the
+# scan it would have had instead of requiring the last branch's runs.
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, 'Nobel|nothing relevant');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex Nobel|nothing relevant
+   - output columns: [doc, __rowid]
+  -> TABLE SCAN (2)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - output_columns: [doc, __rowid]
+
+# A case insensitive group keeps its mode until its last run is stored. This
+# index has no folded grams, so the group's text cannot be required at all.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '(?i:THE NOBEL) Prize');
+----
+6
+
+# Dropping the group's run must not cost the runs outside it: the case
+# sensitive ` Prize` is still pushed down.
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, '(?i:THE NOBEL) Prize');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex (?i:THE NOBEL) Prize
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc@regex_ft_idx', ' Prize', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
+
+# `\Q...\E` is quoted literal text and `\C` is any byte, not the letters Q, E
+# and C.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, '\Qmain()\E');
+----
+8
+
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'ma\Cn');
+----
+8
+
+# `\C` consumes exactly one byte, so it breaks a run without destroying it:
+# both sides stay above the analyzer floor and are still pushed down.
+query I rowsort
+SELECT id FROM regex_ft WHERE regex(doc, 'error\Creading');
+----
+3
+
+query T
+EXPLAIN SELECT * FROM regex_ft WHERE regex(doc, 'error\Creading');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex error\Creading
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_ft(default_db.regex_ft)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc@regex_ft_idx', 'reading', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc@regex_ft_idx', 'error', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
+
 statement ok
 DROP TABLE IF EXISTS regex_ft;
 
@@ -197,6 +279,28 @@ query I rowsort
 SELECT id FROM regex_ft_ci WHERE regex(doc, '(?i)nobel prize');
 ----
 1
+
+# The scoped form reaches the same folded run as the flag form above: the
+# group's own mode decides, so its text is lowercased and stays usable.
+query I rowsort
+SELECT id FROM regex_ft_ci WHERE regex(doc, '(?i:THE NOBEL) Prize');
+----
+1
+
+query T
+EXPLAIN SELECT * FROM regex_ft_ci WHERE regex(doc, '(?i:THE NOBEL) Prize');
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [id (#1), doc (#0)]
+-> FILTER (3)
+   - filter: doc (#0) regex (?i:THE NOBEL) Prize
+   - output columns: [doc, __rowid]
+  -> INDEX SCAN (6)
+     - table name: regex_ft_ci(default_db.regex_ft_ci)
+     - table index: #1
+     - filter: FILTER_FULLTEXT('doc@regex_ft_ci_idx', 'the nobel', 'operator=and;similarity=boolean') AND FILTER_FULLTEXT('doc@regex_ft_ci_idx', ' Prize', 'operator=and;similarity=boolean')
+     - output_columns: [__rowid]
 
 # A cased non-ASCII letter cannot be folded by the index, so it cuts the run
 # instead of being required; the remaining ASCII part still narrows, and the
