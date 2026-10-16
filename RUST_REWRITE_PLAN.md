@@ -173,7 +173,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 **仍未做**：①MergeOperator 已查证为**注册但从不调用**（无 `->Merge(` 调用点）→ 对磁盘格式无影响，无需实现；②**让引擎自己的 catalog 就用这套键值**（当前是 addive 的 `write_cpp_layout`，引擎自身仍写 `tbl:{id}` 等自有键，所以 `<dir>/catalog` 还不是 C++ 的）；③把 C++ 布局落到 `<root>/catalog` 的 RocksDB 上（现在写到独立 store，避免与自有键混在同一 keyspace）。**至此 §8.6 的值编码已全部冻结**：`ColumnDef`/`DataType`、`IndexBase` 全部十种类型、`ConstantExpr`、`SparseInfo` 都有逐字段复刻 + pin 测试。
 - `catalog_format`：**全部 catalog 键**（`catalog|db|…`、`tbl|col|…`、`catalog|blk|…`、`idx_chunk|…` 等）与对应前缀、drop 墓碑、全局系统键，逐字符串断言。
 
-**尚未落地**：#68 剩余（执行器仍以 fjall 行文本为主存储，块文件是镜像；`EMBEDDING(BIT,*)`/`TENSORARRAY`/嵌套 `ARRAY`/变长元素数组待补）；#69 剩余（RocksDB 基底 + 列/索引值编码均已就绪，仍缺把 C++ 布局作为**主** catalog 落盘）；#70 剩余（**文件格式已齐**：HNSW 头/向量/标签/图区 + IVF plain/SQ/PQ；仍缺把索引持久化接进查询路径）；#71 剩余（**FST 已完整**：容器 `.dic`、打包原语、`COMMON_INPUTS` 表、节点状态机的**编解码**均已逐位对齐 C++ 真值——真值由 `rust_engine/tools/fst_golden/gen.py` 用真实 C++ 源码+clang 生成；仅剩 posting 块编解码 **FastPFor SIMD-BP128（u32）** 与 **NewPForDelta（u16）**，二者的 C++ 真值字节与复现配方已记入 `docs/CPP_FORMAT_SPEC.md` §9.3.5）。
+**尚未落地**：#68 剩余（执行器仍以 fjall 行文本为主存储，块文件是镜像；`EMBEDDING(BIT,*)`/`TENSORARRAY`/嵌套 `ARRAY`/变长元素数组待补）；#69 剩余（RocksDB 基底 + 列/索引值编码均已就绪，仍缺把 C++ 布局作为**主** catalog 落盘）；#70 剩余（**文件格式已齐**：HNSW 头/向量/标签/图区 + IVF plain/SQ/PQ；仍缺把索引持久化接进查询路径）；#71 **落盘格式已全部完成**（`.dic` 容器、FST 打包原语/`COMMON_INPUTS`/节点状态机、`.pos` 的 **u32 SIMD-BP128 复合**与 **u16 NewPForDelta** 的**编解码**，全部逐位对齐 C++ 真值——FST 真值由 `rust_engine/tools/fst_golden/gen.py` 生成，posting 真值由 `third_party/newpfor`+FastPForLib 编译的 harness 生成，均记入 `docs/CPP_FORMAT_SPEC.md` §9.3.5）；#71 剩余仅为**把索引持久化/查询接进引擎**（执行器侧）。
 
 ### 2.7 测试资产（验收面）
 
