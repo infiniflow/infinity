@@ -1771,15 +1771,18 @@ impl Engine {
                     } if join.is_none()
                         && group_by.is_empty()
                         && !*distinct
-                        && search.is_none() => {
+                        && search.is_none() =>
+                    {
                         let schema = self.table_schema(t)?;
-                        Some(crate::explain::explain_select(&crate::explain::SelectPlan {
-                            items,
-                            table: t,
-                            where_pred: where_pred.as_ref(),
-                            order_by,
-                            schema: &schema,
-                        }))
+                        Some(crate::explain::explain_select(
+                            &crate::explain::SelectPlan {
+                                items,
+                                table: t,
+                                where_pred: where_pred.as_ref(),
+                                order_by,
+                                schema: &schema,
+                            },
+                        ))
                     }
                     Statement::CreateTable { name, columns } => {
                         let (db, tbl) = match name.split_once('.') {
