@@ -40,7 +40,7 @@ fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStor
 
 fn usage() -> ! {
     eprintln!(
-        "usage: infinity <create-table|list-tables|put|get|recover|query|bench|import-csv|conformance|smoke> <dir> [args...]"
+        "usage: infinity <create-table|list-tables|put|get|recover|query|bench|serve|import-csv|conformance|smoke> <dir> [args...]"
     );
     std::process::exit(2);
 }
@@ -125,6 +125,17 @@ fn run(args: &[String]) -> infinity_common::Result<()> {
             }
             e.flush()?;
             Ok(())
+        }
+        "serve" => {
+            // `infinity serve <dir> [host:port]` — Thrift/Thrift-over-TCP frontend.
+            let addr = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| "0.0.0.0:23817".into());
+            let engine = std::sync::Arc::new(infinity_executor::Engine::open(&dir)?);
+            let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
+            println!("serving on {}", server.local_addr()?);
+            server.run();
         }
         "bench" => {
             let n: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(2000);

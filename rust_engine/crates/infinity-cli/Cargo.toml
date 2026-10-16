@@ -14,3 +14,4 @@ infinity-storage.workspace = true
 infinity-catalog.workspace = true
 infinity-txn.workspace = true
 infinity-executor.workspace = true
+infinity-server.workspace = true

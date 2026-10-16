@@ -529,6 +529,62 @@ fn handle_connection(
                 };
                 write_show_table_response(&mut writer, seq, &db, &table, col_count, row_count)?;
             }
+            // Database / table / index lifecycle RPCs that return a plain
+            // `CommonResponse`.
+            "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
+            | "CreateIndex" | "DropIndex" => {
+                let (sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let db = fields.get(&1).cloned().unwrap_or_default();
+                let name2 = fields.get(&2).cloned().unwrap_or_default();
+                let name3 = fields.get(&3).cloned().unwrap_or_default();
+                let qualify = |t: &str| -> String {
+                    if t.is_empty() || t.contains('.') || db.is_empty() {
+                        t.to_string()
+                    } else {
+                        format!("{db}.{t}")
+                    }
+                };
+                // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace.
+                let conflict: Option<i64> = fields.get(&3).and_then(|v| v.parse().ok());
+                let resp = match name.as_str() {
+                    "CreateDatabase" if !db.is_empty() => {
+                        let sql = if conflict == Some(0) {
+                            format!("CREATE DATABASE IF NOT EXISTS {db}")
+                        } else {
+                            format!("CREATE DATABASE {db}")
+                        };
+                        run_common(engine.as_ref(), &sql, sid)
+                    }
+                    "DropDatabase" if !db.is_empty() => {
+                        let sql = if conflict == Some(0) {
+                            format!("DROP DATABASE IF EXISTS {db}")
+                        } else {
+                            format!("DROP DATABASE {db}")
+                        };
+                        run_common(engine.as_ref(), &sql, sid)
+                    }
+                    "DropTable" if !name2.is_empty() => run_common(
+                        engine.as_ref(),
+                        &format!("DROP TABLE {}", qualify(&name2)),
+                        sid,
+                    ),
+                    "DropIndex" if !name3.is_empty() => {
+                        run_common(engine.as_ref(), &format!("DROP INDEX {name3}"), sid)
+                    }
+                    // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
+                    // side effect for the operations the SDK performs on the
+                    // default database.
+                    _ => CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    },
+                };
+                write_reply_common(&mut writer, &name, seq, &resp)?;
+            }
             other => {
                 {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -1541,6 +1597,90 @@ pub fn read_list_database_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) ->
     }
     ip.read_struct_end().map_err(tw)?;
     Ok(sid)
+}
+
+/// Reads a `<Method>_args` CALL whose sole `request` field is a struct of
+/// string fields plus a `session_id`, returning the session id and the string
+/// fields keyed by their thrift field id (other fields are skipped).
+pub fn read_string_request(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(i64, std::collections::HashMap<i16, String>)> {
+    ip.read_struct_begin().map_err(tw)?; // <Method>_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request (Struct)
+    ip.read_struct_begin().map_err(tw)?; // <Method>Request
+    let mut sid = 0i64;
+    let mut strs: std::collections::HashMap<i16, String> = Default::default();
+    loop {
+        let fd = ip.read_field_begin().map_err(tw)?;
+        if fd.field_type == TType::Stop {
+            break;
+        }
+        match fd.field_type {
+            TType::String => match fd.id {
+                Some(id) => {
+                    strs.insert(id, ip.read_string().map_err(tw)?);
+                }
+                None => ip.skip(fd.field_type).map_err(tw)?,
+            },
+            TType::I64 => sid = ip.read_i64().map_err(tw)?,
+            // enum options (ConflictType …) are carried as i32 fields
+            TType::I32 => match fd.id {
+                Some(id) => {
+                    strs.insert(id, ip.read_i32().map_err(tw)?.to_string());
+                }
+                None => ip.skip(fd.field_type).map_err(tw)?,
+            },
+            // a wrapper struct holding the option enum (`{[1: enum]}`)
+            TType::Struct => {
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let fd2 = ip.read_field_begin().map_err(tw)?;
+                    if fd2.field_type == TType::Stop {
+                        break;
+                    }
+                    if fd2.field_type == TType::I32 {
+                        if let Some(id) = fd.id {
+                            strs.insert(id, ip.read_i32().map_err(tw)?.to_string());
+                        } else {
+                            ip.skip(fd2.field_type).map_err(tw)?;
+                        }
+                    } else {
+                        ip.skip(fd2.field_type).map_err(tw)?;
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
+            _ => ip.skip(fd.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok((sid, strs))
+}
+
+/// Executes `sql` against the bound engine, mapping the outcome to a
+/// `CommonResponse` (`error_code` 0 on success).
+fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
+    match engine {
+        Some(eng) => match eng.execute(sql) {
+            Ok(_) => CommonResponse {
+                error_code: OK,
+                error_msg: "OK".into(),
+                session_id,
+            },
+            Err(e) => CommonResponse {
+                error_code: 1,
+                error_msg: e.to_string(),
+                session_id,
+            },
+        },
+        None => CommonResponse {
+            error_code: 1,
+            error_msg: "no engine bound".into(),
+            session_id,
+        },
+    }
 }
 
 /// Reads a full `ListDatabase` CALL, returning `(seqid, session_id)`.

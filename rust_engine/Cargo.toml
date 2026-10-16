@@ -30,6 +30,7 @@ infinity-expression = { path = "crates/infinity-expression" }
 infinity-planner = { path = "crates/infinity-planner" }
 infinity-index = { path = "crates/infinity-index" }
 infinity-executor = { path = "crates/infinity-executor" }
+infinity-server = { path = "crates/infinity-server" }
 fjall = "3"
 crc32fast = "1"
 thiserror = "1"
