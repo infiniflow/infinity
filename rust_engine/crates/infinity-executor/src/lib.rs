@@ -1019,23 +1019,52 @@ impl Engine {
                                             continue;
                                         }
                                     }
+                                    // values of the leading plain columns, in SELECT order
+                                    let lead: Vec<String> = items
+                                        .iter()
+                                        .filter_map(|it| match it {
+                                            SelectItem::Column(c) => Some(c),
+                                            _ => None,
+                                        })
+                                        .map(|c| {
+                                            schema
+                                                .iter()
+                                                .position(|s| s == c)
+                                                .and_then(|i| row.get(i))
+                                                .map(|v| v.to_slt_string())
+                                                .unwrap_or_default()
+                                        })
+                                        .collect();
+                                    let mut emit = |val: String| {
+                                        let mut r: Vec<String> =
+                                            (0..items.len()).map(|_| String::new()).collect();
+                                        r[u] = val;
+                                        let mut li = 0usize;
+                                        for i in 0..items.len() {
+                                            if i != u {
+                                                r[i] = lead.get(li).cloned().unwrap_or_default();
+                                                li += 1;
+                                            }
+                                        }
+                                        out.push(r);
+                                    };
                                     match row.get(ci) {
                                         Some(Value::Str(cell)) => {
                                             match infinity_expression::json::parse(cell) {
                                                 Some(infinity_expression::json::Json::Arr(
-                                                    items,
+                                                    elems,
                                                 )) => {
-                                                    for e in items {
-                                                        out.push(vec![e.compact()]);
+                                                    for e in elems {
+                                                        emit(e.compact());
                                                     }
                                                 }
                                                 // Unnest of an object / scalar yields itself.
-                                                Some(other) => out.push(vec![other.compact()]),
+                                                Some(other) => emit(other.compact()),
                                                 None => {}
                                             }
                                         }
                                         Some(other) if !matches!(other, Value::Null) => {
-                                            out.push(vec![other.to_slt_string()])
+                                            emit(other.to_slt_string())
                                         }
                                         _ => {}
                                     }
