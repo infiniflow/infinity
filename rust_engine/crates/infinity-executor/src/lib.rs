@@ -1040,9 +1040,9 @@ impl Engine {
                                             (0..items.len()).map(|_| String::new()).collect();
                                         r[u] = val;
                                         let mut li = 0usize;
-                                        for i in 0..items.len() {
+                                        for (i, slot) in r.iter_mut().enumerate() {
                                             if i != u {
-                                                r[i] = lead.get(li).cloned().unwrap_or_default();
+                                                *slot = lead.get(li).cloned().unwrap_or_default();
                                                 li += 1;
                                             }
                                         }
