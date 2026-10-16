@@ -147,7 +147,11 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                     if let (Some(i), ExprAst::Literal(Literal::Str(query))) =
                         (schema.iter().position(|c| c == col_name), q)
                     {
-                        return Ok(Expr::FullText(i, query.clone()));
+                        let opts = match args.get(2) {
+                            Some(ExprAst::Literal(Literal::Str(o))) => o.clone(),
+                            _ => String::new(),
+                        };
+                        return Ok(Expr::FullText(i, query.clone(), opts));
                     }
                 }
             }

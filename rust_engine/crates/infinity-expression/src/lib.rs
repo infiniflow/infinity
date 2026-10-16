@@ -102,9 +102,10 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
-    /// `filter_text(col, '…')` / `filter_fulltext(col, '…')`: term matching over
-    /// the given column's text.
-    FullText(usize, String),
+    /// `filter_text(col, '…', 'opts')` / `filter_fulltext(col, '…', 'opts')`:
+    /// term matching over the given column's text (the third field carries the
+    /// option string).
+    FullText(usize, String, String),
     /// `regex(col, pattern)`: regular-expression search over a column's text.
     Regex(usize, Box<Expr>),
 }
@@ -196,13 +197,13 @@ impl Expr {
                 eval_binary(&x, *op, &y)
             }
             Expr::Func { name, args } => eval_func(name, args, row),
-            Expr::FullText(i, q) => {
+            Expr::FullText(i, q, opts) => {
                 let text = match row.get(*i) {
                     Some(Value::Str(s)) => s.clone(),
                     Some(other) => other.to_slt_string(),
                     None => String::new(),
                 };
-                Value::Bool(fulltext_match(&text, q))
+                Value::Bool(fulltext_match(&text, q, opts))
             }
             Expr::Regex(i, pat) => {
                 let text = match row.get(*i) {
@@ -701,8 +702,78 @@ fn tokens(text: &str) -> Vec<String> {
 
 /// `filter_text` semantics: whitespace-separated terms are AND-ed; `OR`
 /// separates alternatives; every term of a group must appear.
-fn fulltext_match(text: &str, query: &str) -> bool {
+/// Required number of matching terms for a group of `optional` terms, from a
+/// Lucene `minimum_should_match` spec: a whitespace-separated list of
+/// `[n<]value` clauses evaluated in order (the last applicable one wins), where
+/// `value` is a count, a percentage, or a negative form.
+pub fn minimum_should_match(spec: &str, optional: usize) -> usize {
+    if optional == 0 {
+        return 0;
+    }
+    let clause_value = |value: &str| -> Option<usize> {
+        let (num, pct) = match value.strip_suffix('%') {
+            Some(n) => (n, true),
+            None => (value, false),
+        };
+        let n: i64 = num.trim().parse().ok()?;
+        if pct {
+            let scaled = (optional as f64 * n.unsigned_abs() as f64 / 100.0).floor() as i64;
+            Some(if n < 0 {
+                (optional as i64 - scaled).max(0) as usize
+            } else {
+                scaled.max(0) as usize
+            })
+        } else {
+            Some(if n < 0 {
+                (optional as i64 + n).max(0) as usize
+            } else {
+                n as usize
+            })
+        }
+    };
+    let mut required = 1usize.min(optional);
+    for clause in spec.split_whitespace() {
+        match clause.split_once('<') {
+            Some((cond, rest)) => {
+                let cond: i64 = match cond.trim().parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if optional as i64 > cond {
+                    match clause_value(rest.trim()) {
+                        Some(v) => required = v.min(optional),
+                        None => continue,
+                    }
+                } else {
+                    required = optional;
+                }
+            }
+            None => match clause_value(clause) {
+                Some(v) => required = v.min(optional),
+                None => continue,
+            },
+        }
+    }
+    required
+}
+
+/// `filter_text` / `filter_fulltext` term matching. The query is split into
+/// `OR` groups (the default operator is `or`, so the last group's terms each
+/// count as optional); `operator=and` and `minimum_should_match` refine how
+/// many terms a group must contain.
+fn fulltext_match(text: &str, query: &str, opts: &str) -> bool {
     let doc = tokens(text);
+    let mut operator_and = false;
+    let mut msm: Option<String> = None;
+    for part in opts.split(';') {
+        if let Some((k, v)) = part.split_once('=') {
+            match k.trim().to_ascii_lowercase().as_str() {
+                "operator" if v.trim().eq_ignore_ascii_case("and") => operator_and = true,
+                "minimum_should_match" => msm = Some(v.trim().to_string()),
+                _ => {}
+            }
+        }
+    }
     let mut groups: Vec<Vec<String>> = vec![Vec::new()];
     for w in query.split_whitespace() {
         if w.eq_ignore_ascii_case("or") {
@@ -711,10 +782,17 @@ fn fulltext_match(text: &str, query: &str) -> bool {
             groups.last_mut().unwrap().extend(tokens(w));
         }
     }
-    groups
-        .iter()
-        .filter(|g| !g.is_empty())
-        .any(|g| g.iter().all(|t| doc.iter().any(|d| d == t)))
+    groups.iter().filter(|g| !g.is_empty()).any(|g| {
+        let hits = g.iter().filter(|t| doc.iter().any(|d| d == *t)).count();
+        let need = if operator_and {
+            g.len()
+        } else if let Some(m) = &msm {
+            minimum_should_match(m, g.len())
+        } else {
+            1
+        };
+        need > 0 && hits >= need
+    })
 }
 
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.

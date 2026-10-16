@@ -310,18 +310,15 @@ fn json_matches(a: &Json, target: &Value) -> bool {
         },
         Value::Bool(b) => matches!(a, Json::Bool(j) if j == b),
         Value::Str(s) => {
-            // An explicitly quoted target (`'"1"'`) is a JSON string and only
-            // matches a JSON string; an unquoted one also matches numbers and
-            // booleans through their compact text.
-            if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
-                let bare = &s[1..s.len() - 1];
-                matches!(a, Json::Str(v) if v == bare)
-            } else {
-                match a {
+            // The target is JSON when it parses as such (`"1"` is the string
+            // "1", not the number), and a bare string otherwise (`b`).
+            match parse(s) {
+                Some(t) => a == &t,
+                None => match a {
                     Json::Str(v) => v == s,
                     Json::Null => s == "null",
                     other => other.compact() == *s,
-                }
+                },
             }
         }
         Value::Null => matches!(a, Json::Null),
