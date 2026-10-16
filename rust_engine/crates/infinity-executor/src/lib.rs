@@ -320,6 +320,75 @@ fn array_leaf_depths(text: &str) -> Vec<usize> {
     depths
 }
 
+/// The innermost numeric groups of an array literal, in order, each as its list
+/// of element tokens. A flat literal yields a single group.
+fn innermost_groups(text: &str) -> Vec<Vec<String>> {
+    let t = text.trim();
+    let inner = t.strip_prefix('[').unwrap_or(t);
+    let inner = inner.strip_suffix(']').unwrap_or(inner);
+    if inner.trim().is_empty() {
+        return Vec::new();
+    }
+    if inner.trim_start().starts_with('[') {
+        split_top_level(inner)
+            .iter()
+            .flat_map(|g| innermost_groups(g))
+            .collect()
+    } else {
+        let items: Vec<String> = inner
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        vec![items]
+    }
+}
+
+/// Validates a tensor-like literal against its declared dimension: every
+/// embedding must have exactly `dim` elements, and a flat literal must be a
+/// whole multiple of `dim`. Non tensor-like columns always pass.
+fn validate_tensor_dimension(type_text: &str, lit: &str) -> Result<()> {
+    let up = type_text.to_ascii_uppercase();
+    if !is_tensor_type(&up) {
+        return Ok(());
+    }
+    // Only array literals carry a dimension; NULL/default padding is left alone.
+    if !lit.trim_start().starts_with('[') {
+        return Ok(());
+    }
+    if up.starts_with("TENSORARRAY") {
+        let depths = array_leaf_depths(lit);
+        if !depths.is_empty() && depths.iter().any(|d| *d != 3) {
+            return Err(Error::Invalid(
+                "TENSORARRAY value must be nested as [[[…]]]".into(),
+            ));
+        }
+    }
+    let dim = match type_dim(type_text) {
+        Some(d) if d > 0 => d,
+        _ => return Ok(()),
+    };
+    let groups = innermost_groups(lit);
+    if groups.len() == 1 {
+        let n = groups[0].len();
+        if n != 0 && !n.is_multiple_of(dim) {
+            return Err(Error::Invalid(format!(
+                "tensor dimension mismatch: expected a multiple of {dim}, got {n}"
+            )));
+        }
+    } else {
+        for g in &groups {
+            if g.len() != dim {
+                return Err(Error::Invalid(format!(
+                    "tensor dimension mismatch: expected {dim}, got {}",
+                    g.len()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// ARRAY columns render with braces: `[1,2]` → `{1,2}`, `[]` → `{}`.
 fn brace_render(s: &str) -> String {
     let t = s.trim();
@@ -497,13 +566,10 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                 Some(t) if is_tensor_type(t) => {
                     let d = type_dim(t).unwrap_or(0);
                     if is_bit_type(t) {
-                        let packed = reshape_bit_tensor(&s, d);
-                        // a TENSORARRAY keeps an extra nesting level
-                        if t.to_ascii_uppercase().starts_with("TENSORARRAY") {
-                            format!("[{packed}]")
-                        } else {
-                            packed
-                        }
+                        // `pack_bit_leaves` preserves the literal's nesting, so a
+                        // `TENSORARRAY` (whose literal is already triple-nested)
+                        // needs no extra wrapper.
+                        reshape_bit_tensor(&s, d)
                     } else {
                         reshape_tensor(&s, d)
                     }
@@ -1117,19 +1183,11 @@ impl Engine {
                 }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
                 let types = self.column_types(table)?;
-                // a TENSORARRAY literal must be uniformly triple-nested
+                // tensor-like values must match the declared dimension
                 for row in &rows {
                     for (i, cell) in row.iter().enumerate() {
                         if let Some(t) = types.get(i) {
-                            if t.to_ascii_uppercase().starts_with("TENSORARRAY") {
-                                let lit = cell.to_slt_string();
-                                let depths = array_leaf_depths(lit.trim());
-                                if !depths.is_empty() && depths.iter().any(|d| *d != 3) {
-                                    return Err(Error::Invalid(
-                                        "TENSORARRAY value must be nested as [[[…]]]".into(),
-                                    ));
-                                }
-                            }
+                            validate_tensor_dimension(t, cell.to_slt_string().trim())?;
                         }
                     }
                 }
@@ -2818,5 +2876,30 @@ mod tests {
             ElemType::UInt8
         );
         assert_eq!(tensor_elem_type("TENSOR(FLOAT16, 4)"), ElemType::Float16);
+    }
+
+    #[test]
+    fn tensor_dimension_validation() {
+        let t = "TENSOR(FLOAT,16)";
+        // a flat literal must be a whole multiple of the dimension
+        assert!(validate_tensor_dimension(t, "[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]").is_ok());
+        assert!(validate_tensor_dimension(t, "[1,2,3]").is_err());
+        // nested literals must have every embedding of exactly `dim`
+        assert!(validate_tensor_dimension(
+            t,
+            "[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16],[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]]"
+        )
+        .is_ok());
+        // a TENSORARRAY must be triple-nested and every leaf the declared size
+        let ta = "TENSORARRAY(BIT,8)";
+        assert!(
+            validate_tensor_dimension(ta, "[[[0,1,2,3,0,5,6,7],[8,9,0,11,12,0,14,15]]]").is_ok()
+        );
+        assert!(
+            validate_tensor_dimension(ta, "[[[1,2,3,4,5,6,7,8],[9,10,11,12,13,14,15]]]").is_err()
+        );
+        // scalars / NULL padding are not dimension-checked
+        assert!(validate_tensor_dimension(t, "null").is_ok());
+        assert!(validate_tensor_dimension("VARCHAR", "'no tensor'").is_ok());
     }
 }
