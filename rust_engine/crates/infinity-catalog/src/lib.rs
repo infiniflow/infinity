@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cpp_layout;
 /// C++-compatible value encoding for catalog records (spec §8.6).
 pub mod value_format;
 

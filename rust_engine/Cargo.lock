@@ -287,6 +287,7 @@ name = "infinity-catalog"
 version = "0.1.0"
 dependencies = [
  "infinity-common",
+ "infinity-expression",
  "infinity-storage",
  "tempfile",
 ]
