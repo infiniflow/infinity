@@ -153,6 +153,17 @@ fn agg_label(func: AggFunc, arg: &Option<String>) -> String {
     }
 }
 
+/// True if `e` contains an aggregate call.
+fn expr_has_agg(e: &ExprAst) -> bool {
+    match e {
+        ExprAst::Func { name, args } => {
+            AggFunc::from_name(name).is_some() || args.iter().any(expr_has_agg)
+        }
+        ExprAst::Binary(a, _, b) => expr_has_agg(a) || expr_has_agg(b),
+        _ => false,
+    }
+}
+
 /// Registers every aggregate found in `e` (recursively) into `aggs`/`index`.
 fn gather_agg(
     e: &ExprAst,
@@ -333,14 +344,23 @@ pub fn plan_select(
     if tables.is_empty() {
         let mut row = Vec::new();
         for it in items {
-            match it {
-                SelectItem::Literal(l) => row.push(Value::from_literal(l)),
+            let e = match it {
+                SelectItem::Literal(l) => Expr::Literal(Value::from_literal(l)),
+                SelectItem::Func { name, args } => compile_expr(
+                    &ExprAst::Func {
+                        name: name.clone(),
+                        args: args.clone(),
+                    },
+                    &[],
+                )?,
+                SelectItem::Expr(e) => compile_expr(e, &[])?,
                 _ => {
                     return Err(Error::Invalid(
-                        "SELECT without FROM may only contain literals".into(),
+                        "SELECT without FROM may only contain constant expressions".into(),
                     ))
                 }
-            }
+            };
+            row.push(e.eval(&[]));
         }
         let columns: Vec<String> = (0..row.len()).map(|i| format!("c{i}")).collect();
         return Ok(LogicalPlan::Values {
@@ -360,7 +380,12 @@ pub fn plan_select(
         };
     }
 
-    let has_agg = group_by.is_some() || items.iter().any(|i| matches!(i, SelectItem::Aggregate(_)));
+    let has_agg = group_by.is_some()
+        || items.iter().any(|i| match i {
+            SelectItem::Aggregate(_) => true,
+            SelectItem::Expr(e) => expr_has_agg(e),
+            _ => false,
+        });
     let is_star = matches!(items, [SelectItem::Star]);
 
     if has_agg {

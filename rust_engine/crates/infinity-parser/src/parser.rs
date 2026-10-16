@@ -583,6 +583,40 @@ impl Parser {
                     self.advance();
                     return Ok(ExprAst::Literal(Literal::Null));
                 }
+                // `CAST(expr AS TYPE)` / `TRY_CAST(...)`: encode the type name as a
+                // string literal argument.
+                if s.eq_ignore_ascii_case("CAST") || s.eq_ignore_ascii_case("TRY_CAST") {
+                    self.advance();
+                    self.expect(Token::LParen)?;
+                    let inner = self.expr()?;
+                    self.expect_kw("AS")?;
+                    let ty = self.expect_ident()?;
+                    // consume an optional balanced parameter list (e.g. `VARCHAR(10)`)
+                    if self.peek() == &Token::LParen {
+                        let mut depth = 0i32;
+                        loop {
+                            match self.advance() {
+                                Token::LParen => depth += 1,
+                                Token::RParen => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                                Token::Eof | Token::Semicolon => break,
+                                _ => {}
+                            }
+                        }
+                    }
+                    self.expect(Token::RParen)?;
+                    return Ok(ExprAst::Func {
+                        name: "CAST".to_string(),
+                        args: vec![
+                            inner,
+                            ExprAst::Literal(Literal::Str(ty.to_ascii_uppercase())),
+                        ],
+                    });
+                }
                 if matches!(self.toks.get(self.pos + 1), Some(Token::LParen)) {
                     self.advance();
                     self.expect(Token::LParen)?;
@@ -952,24 +986,19 @@ impl Parser {
                 }
                 Token::Ident(_) => {
                     if matches!(self.toks.get(self.pos + 1), Some(Token::LParen)) {
-                        let name = self.expect_ident()?.to_ascii_uppercase();
+                        let name = match self.peek() {
+                            Token::Ident(s) => s.to_ascii_uppercase(),
+                            _ => unreachable!(),
+                        };
                         if is_agg_name(&name) {
-                            SelectItem::Aggregate(self.aggregate_name(name)?)
+                            let n = self.expect_ident()?;
+                            SelectItem::Aggregate(self.aggregate_name(n)?)
                         } else {
-                            self.expect(Token::LParen)?;
-                            let mut args = Vec::new();
-                            if self.peek() != &Token::RParen {
-                                loop {
-                                    args.push(self.expr()?);
-                                    if self.peek() == &Token::Comma {
-                                        self.advance();
-                                    } else {
-                                        break;
-                                    }
-                                }
+                            // let `atom` handle CAST and generic function calls
+                            match self.atom()? {
+                                ExprAst::Func { name, args } => SelectItem::Func { name, args },
+                                other => SelectItem::Expr(other),
                             }
-                            self.expect(Token::RParen)?;
-                            SelectItem::Func { name, args }
                         }
                     } else {
                         SelectItem::Column(self.expect_ident()?)

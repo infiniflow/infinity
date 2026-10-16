@@ -194,6 +194,63 @@ fn eval_binary(a: &Value, op: BinOp, b: &Value) -> Value {
     })
 }
 
+/// `CAST(value AS type)`; out-of-range / unparseable numeric casts yield NULL.
+fn cast_value(v: &Value, ty: &str) -> Value {
+    if matches!(v, Value::Null) {
+        return Value::Null;
+    }
+    let as_int = |v: &Value| -> Option<i64> {
+        match v {
+            Value::Int(i) => Some(*i),
+            Value::Float(f) => Some(*f as i64),
+            Value::Bool(b) => Some(i64::from(*b)),
+            Value::Str(s) => s.trim().parse::<i64>().ok(),
+            Value::Null => None,
+        }
+    };
+    let as_float = |v: &Value| -> Option<f64> {
+        match v {
+            Value::Int(i) => Some(*i as f64),
+            Value::Float(f) => Some(*f),
+            Value::Bool(b) => Some(f64::from(u8::from(*b))),
+            Value::Str(s) => s.trim().parse::<f64>().ok(),
+            Value::Null => None,
+        }
+    };
+    match ty {
+        "TINYINT" => as_int(v)
+            .and_then(|i| i8::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "SMALLINT" => as_int(v)
+            .and_then(|i| i16::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "INT" | "INTEGER" => as_int(v)
+            .and_then(|i| i32::try_from(i).ok())
+            .map(|i| Value::Int(i as i64))
+            .unwrap_or(Value::Null),
+        "BIGINT" => as_int(v).map(Value::Int).unwrap_or(Value::Null),
+        "FLOAT" | "REAL" => match as_float(v) {
+            Some(f) => Value::Float((f as f32) as f64),
+            None => Value::Null,
+        },
+        "DOUBLE" => as_float(v).map(Value::Float).unwrap_or(Value::Null),
+        "BOOL" | "BOOLEAN" => match v {
+            Value::Bool(b) => Value::Bool(*b),
+            Value::Str(s) => match s.trim().to_ascii_lowercase().as_str() {
+                "true" | "1" => Value::Bool(true),
+                "false" | "0" => Value::Bool(false),
+                _ => Value::Null,
+            },
+            Value::Int(i) => Value::Bool(*i != 0),
+            _ => Value::Null,
+        },
+        // VARCHAR / TEXT / STRING and anything else: render as text.
+        _ => Value::Str(v.to_slt_string()),
+    }
+}
+
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.
 fn like_match(text: &str, pattern: &str) -> bool {
     let t: Vec<char> = text.chars().collect();
@@ -298,6 +355,13 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             };
             let target = args.get(2).map(|e| e.eval(row)).unwrap_or(Value::Null);
             json::contains(&doc, &path, &target)
+        }
+        "CAST" => {
+            let ty = match a1() {
+                Value::Str(s) => s.to_ascii_uppercase(),
+                _ => return Value::Null,
+            };
+            cast_value(&a0(), &ty)
         }
         _ => Value::Null,
     }
