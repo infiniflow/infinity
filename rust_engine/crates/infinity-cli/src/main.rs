@@ -489,7 +489,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     println!("-- statements that should error but did not --");
     let mut eranked: Vec<_> = stmt_err_missing.iter().collect();
     eranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
-    for (word, samples) in eranked.iter().take(40) {
+    for (word, samples) in eranked.iter().take(15) {
         println!("{:>5}  {}", samples.len(), word);
         for s in samples.iter().take(6) {
             println!("        {}", s.replace('\n', " "));
