@@ -1010,6 +1010,8 @@ pub struct IndexScanPlan<'a> {
     pub table: &'a str,
     pub where_pred: &'a Predicate,
     pub order_by: &'a [OrderKey],
+    /// A `LIMIT` together with an `ORDER BY` becomes a physical `TOP`.
+    pub limit: Option<u64>,
     pub schema: &'a [String],
     /// Declared type text per column (schema order), to decide BigInt casts.
     pub types: &'a [String],
@@ -1381,7 +1383,13 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
     let mut depth = 0;
     if has_sort {
         depth = 1;
-        lines.push(header(1, "SORT", 4));
+        // `ORDER BY … LIMIT n` is planned as a physical `TOP`.
+        let top = p.limit.is_some();
+        if top {
+            lines.push(header(1, "TOP", 4));
+        } else {
+            lines.push(header(1, "SORT", 4));
+        }
         let keys: Vec<String> = p
             .order_by
             .iter()
@@ -1393,7 +1401,15 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
                 format!("{col} {}", if k.asc { "ASC" } else { "DESC" })
             })
             .collect();
-        lines.push(attr(1, &format!("expressions: [{}]", keys.join(", "))));
+        let key_label = if top {
+            "sort expressions"
+        } else {
+            "expressions"
+        };
+        lines.push(attr(1, &format!("{key_label}: [{}]", keys.join(", "))));
+        if top {
+            lines.push(attr(1, &format!("limit: {}", p.limit.unwrap_or(0))));
+        }
         let mut out = leftover_cols.clone();
         for c in &sort_cols {
             add_col(&mut out, c);

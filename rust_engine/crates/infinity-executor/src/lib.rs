@@ -1971,7 +1971,7 @@ impl Engine {
                         order_by,
                         distinct,
                         search,
-                        limit: _,
+                        limit,
                         ..
                     } if join.is_none()
                         && group_by.is_empty()
@@ -1990,6 +1990,7 @@ impl Engine {
                                     table: t,
                                     where_pred: w,
                                     order_by,
+                                    limit: *limit,
                                     schema,
                                     types: &meta.types,
                                     indexed: &indexed,
