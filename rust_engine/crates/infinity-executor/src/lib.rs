@@ -638,6 +638,7 @@ impl Engine {
                 join,
                 where_pred,
                 group_by,
+                having,
                 order_by,
                 limit,
                 search,
@@ -721,6 +722,7 @@ impl Engine {
                     join.as_ref(),
                     where_pred.as_ref(),
                     group_by,
+                    having.as_deref(),
                     order_by.as_ref(),
                     *limit,
                 )?;

@@ -328,6 +328,11 @@ impl Parser {
                 } else {
                     Vec::new()
                 };
+                let having = if self.eat_kw("HAVING") {
+                    Some(Box::new(self.predicate()?))
+                } else {
+                    None
+                };
                 let order_by = if self.eat_kw("ORDER") {
                     self.expect_kw("BY")?;
                     let column = self.expect_ident()?;
@@ -364,6 +369,7 @@ impl Parser {
                     join,
                     where_pred,
                     group_by,
+                    having,
                     order_by,
                     limit,
                     search,
@@ -1407,6 +1413,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                having: None,
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1424,6 +1431,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                having: None,
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1445,6 +1453,7 @@ mod tests {
                 join: None,
                 where_pred: Some(Predicate::simple("id", CmpOp::Ge, Literal::Int(2))),
                 group_by: vec![],
+                having: None,
                 order_by: None,
                 limit: Some(10),
                 search: None,
@@ -1474,6 +1483,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                having: None,
                 order_by: None,
                 limit: None,
                 search: None,
@@ -1495,6 +1505,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec!["name".into()],
+                having: None,
                 order_by: Some(OrderKey {
                     column: "name".into(),
                     asc: false
@@ -1520,6 +1531,7 @@ mod tests {
                 }),
                 where_pred: Some(Predicate::simple("aid", CmpOp::Ge, Literal::Int(1))),
                 group_by: vec![],
+                having: None,
                 order_by: None,
                 limit: None,
                 search: None,

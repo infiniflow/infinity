@@ -199,6 +199,7 @@ mod tests {
             )),
             &[],
             None,
+            None,
             Some(10),
         )
         .unwrap();

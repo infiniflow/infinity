@@ -243,6 +243,45 @@ fn gather_agg(
     Ok(())
 }
 
+/// Compiles a HAVING predicate over the aggregate output schema.
+fn compile_agg_predicate(
+    pred: &Predicate,
+    agg_index: &std::collections::HashMap<String, usize>,
+    group_by: &[String],
+) -> Result<Expr> {
+    Ok(match pred {
+        Predicate::Cmp(l, op, r) => Expr::Cmp(
+            Box::new(compile_agg_expr(l, agg_index, group_by)?),
+            *op,
+            Box::new(compile_agg_expr(r, agg_index, group_by)?),
+        ),
+        Predicate::IsTrue(e) => compile_agg_expr(e, agg_index, group_by)?,
+        Predicate::IsNull(e, neg) => {
+            Expr::IsNull(Box::new(compile_agg_expr(e, agg_index, group_by)?), *neg)
+        }
+        Predicate::Like(a, b) => Expr::Like(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
+            Box::new(compile_agg_expr(b, agg_index, group_by)?),
+        ),
+        Predicate::In(a, vals, neg) => Expr::In(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
+            vals.iter()
+                .map(|v| compile_agg_expr(v, agg_index, group_by))
+                .collect::<Result<Vec<_>>>()?,
+            *neg,
+        ),
+        Predicate::Bool(a, BoolOp::And, b) => Expr::And(
+            Box::new(compile_agg_predicate(a, agg_index, group_by)?),
+            Box::new(compile_agg_predicate(b, agg_index, group_by)?),
+        ),
+        Predicate::Bool(a, BoolOp::Or, b) => Expr::Or(
+            Box::new(compile_agg_predicate(a, agg_index, group_by)?),
+            Box::new(compile_agg_predicate(b, agg_index, group_by)?),
+        ),
+        Predicate::Not(a) => Expr::Not(Box::new(compile_agg_predicate(a, agg_index, group_by)?)),
+    })
+}
+
 /// Compiles an expression over the *aggregate output* schema (group column then
 /// aggregate results). Aggregate calls become column references.
 fn compile_agg_expr(
@@ -377,12 +416,14 @@ fn build_source(
 
 /// Plans a `SELECT`. `tables` is the list of `(table, columns)` in FROM/JOIN
 /// order; pass an empty slice for a constant `SELECT` with no FROM.
+#[allow(clippy::too_many_arguments)]
 pub fn plan_select(
     items: &[SelectItem],
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
     where_pred: Option<&Predicate>,
     group_by: &[String],
+    having: Option<&Predicate>,
     order_by: Option<&OrderKey>,
     limit: Option<u64>,
 ) -> Result<LogicalPlan> {
@@ -486,6 +527,14 @@ pub fn plan_select(
             aggs,
         };
         out_names = agg_names.clone();
+        // HAVING filters the aggregate output (group columns + aggregate results).
+        if let Some(h) = having {
+            let pred = compile_agg_predicate(h, &agg_index, group_by)?;
+            plan = LogicalPlan::Filter {
+                input: Box::new(plan),
+                predicate: pred,
+            };
+        }
         if needs_projection {
             let mut exprs = Vec::new();
             let mut names = Vec::new();
@@ -571,7 +620,17 @@ mod tests {
 
     #[test]
     fn plan_scan_only() {
-        let p = plan_select(&[SelectItem::Star], &tables(), None, None, &[], None, None).unwrap();
+        let p = plan_select(
+            &[SelectItem::Star],
+            &tables(),
+            None,
+            None,
+            &[],
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(
             p,
             LogicalPlan::Scan {
@@ -595,7 +654,7 @@ mod tests {
                 distinct: false,
             }),
         ];
-        let p = plan_select(&items, &tables(), None, None, &[], None, None).unwrap();
+        let p = plan_select(&items, &tables(), None, None, &[], None, None, None).unwrap();
         match p {
             LogicalPlan::Aggregate {
                 group_keys, aggs, ..
@@ -619,7 +678,17 @@ mod tests {
             left: "aid".into(),
             right: "bid".into(),
         };
-        let p = plan_select(&[SelectItem::Star], &t, Some(&j), None, &[], None, None).unwrap();
+        let p = plan_select(
+            &[SelectItem::Star],
+            &t,
+            Some(&j),
+            None,
+            &[],
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         match p {
             LogicalPlan::Join {
                 left_key,
@@ -642,6 +711,7 @@ mod tests {
             None,
             &[],
             None,
+            None,
             None
         )
         .is_err());
@@ -655,6 +725,7 @@ mod tests {
             None,
             None,
             &[],
+            None,
             None,
             None
         )
