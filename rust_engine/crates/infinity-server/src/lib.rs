@@ -673,7 +673,11 @@ fn handle_connection(
                                     rows = rw;
                                 }
                             }
-                            select_response_from(&columns, &rows)
+                            select_response_from_typed(
+                                &columns,
+                                &declared_types(eng, &req.table_name, &columns),
+                                &rows,
+                            )
                         }
                         Err(e) => err(e.to_string()),
                     },
@@ -790,6 +794,46 @@ fn handle_connection(
     Ok(())
 }
 
+/// The `ElementType` name the engine expects inside `EMBEDDING(<elem>,<dim>)`.
+fn element_type_name(elem: i32) -> &'static str {
+    match elem {
+        0 => "BIT",
+        1 => "UINT8",
+        2 => "INT8",
+        3 => "INT16",
+        4 => "INT32",
+        5 => "INT64",
+        6 => "FLOAT",
+        7 => "FLOAT64",
+        8 => "FLOAT16",
+        9 => "BFLOAT16",
+        _ => "FLOAT",
+    }
+}
+
+/// Renders a declared `ColumnDef` back into the engine's SQL type text, so a
+/// `CreateTable` RPC preserves the column's real type (embedding included)
+/// instead of flattening everything to `VARCHAR`.
+fn column_sql_type(c: &ColumnDefWire) -> String {
+    if let Some((dim, elem)) = c.embedding {
+        return format!("EMBEDDING({}, {dim})", element_type_name(elem));
+    }
+    match c.logic_type {
+        0 => "BOOLEAN".into(),
+        1 => "TINYINT".into(),
+        2 => "SMALLINT".into(),
+        3 => "INTEGER".into(),
+        4 => "BIGINT".into(),
+        5 => "HUGEINT".into(),
+        7 => "FLOAT".into(),
+        8 => "DOUBLE".into(),
+        9 => "FLOAT16".into(),
+        10 => "BFLOAT16".into(),
+        13 => "TENSOR(FLOAT, 0)".into(),
+        _ => "VARCHAR".into(),
+    }
+}
+
 /// Applies a `CreateTable` request to the engine (or errors if no engine bound).
 fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
     let Some(engine) = engine else {
@@ -802,7 +846,7 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
     let cols: Vec<String> = req
         .columns
         .iter()
-        .map(|c| format!("{} VARCHAR", c.name))
+        .map(|c| format!("{} {}", c.name, column_sql_type(c)))
         .collect();
     let sql = format!("CREATE TABLE {} ({});", req.table_name, cols.join(", "));
     match engine.execute(&sql) {
@@ -855,17 +899,94 @@ pub struct ColumnField {
     pub bitmasks: Vec<bool>,
 }
 
-/// Maps a `DataType` (logic) code to the `ColumnType` code the SDK decodes by.
-fn data_type_code(logic_type: i32) -> i32 {
-    match logic_type {
-        0 => 0,     // Boolean
-        1 => 1,     // Int8
-        2 => 2,     // Int16
-        3 | 4 => 3, // Integer
-        5 => 5,     // Float32
-        6 | 8 => 6, // Double
-        7 => 7,     // Float16
-        _ => 9,     // Varchar
+/// IEEE-754 binary16 of an `f32` (round to nearest even), enough for the wire.
+fn f32_to_f16_bits(f: f32) -> u16 {
+    let bits = f.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exp = ((bits >> 23) & 0xff) as i32 - 127 + 15;
+    let mant = bits & 0x007f_ffff;
+    if exp <= 0 {
+        return sign;
+    }
+    if exp >= 31 {
+        return sign | 0x7c00;
+    }
+    let half = sign | ((exp as u16) << 10) | ((mant >> 13) as u16);
+    let rest = mant & 0x1fff;
+    if rest > 0x1000 || (rest == 0x1000 && half & 1 == 1) {
+        half + 1
+    } else {
+        half
+    }
+}
+
+/// Parses `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` into the wire descriptor
+/// `(dimension, element_type)` using the SDK's `ElementType` codes.
+fn embedding_info(type_text: &str) -> Option<(i32, i32)> {
+    let up = type_text.to_ascii_uppercase();
+    if !(up.starts_with("EMBEDDING") || up.starts_with("VECTOR")) {
+        return None;
+    }
+    let inner = up.split_once('(')?.1.trim_end_matches(')').to_string();
+    let mut parts = inner.split(',');
+    let elem = parts.next()?.trim().to_string();
+    let dim: i32 = parts.next()?.trim().parse().ok()?;
+    let elem_code = if elem.contains("UINT8") {
+        1
+    } else if elem.contains("INT8") || elem.contains("TINYINT") {
+        2
+    } else if elem.contains("INT16") {
+        3
+    } else if elem.contains("INT32") || elem == "INT" {
+        4
+    } else if elem.contains("INT64") {
+        5
+    } else if elem.contains("FLOAT64") || elem.contains("DOUBLE") {
+        7
+    } else if elem.contains("BFLOAT16") {
+        9
+    } else if elem.contains("FLOAT16") {
+        8
+    } else if elem.contains("BIT") {
+        0
+    } else {
+        6 // Float32
+    };
+    Some((dim, elem_code))
+}
+
+/// `LogicType.Embedding` (SDK ordinal) — announced for vector columns.
+const LOGIC_EMBEDDING: i32 = 12;
+
+/// Maps a wire `ColumnType` (how the column bytes are packed) to the SDK's
+/// `LogicType` ordinal (`ColumnDef.data_type.logic_type`), which the SDK turns
+/// into a Polars dtype via `logic_type_to_dtype`.
+fn column_type_to_logic(column_type: i32) -> i32 {
+    match column_type {
+        0 => 0,   // ColumnBool -> Boolean
+        1 => 1,   // ColumnInt8 -> TinyInt
+        2 => 2,   // ColumnInt16 -> SmallInt
+        3 => 3,   // ColumnInt32 -> Integer
+        4 => 4,   // ColumnInt64 -> BigInt
+        5 => 7,   // ColumnFloat32 -> Float
+        6 => 8,   // ColumnFloat64 -> Double
+        7 => 9,   // ColumnFloat16 -> Float16
+        8 => 10,  // ColumnBFloat16 -> BFloat16
+        9 => 11,  // ColumnVarchar -> Varchar
+        10 => 12, // ColumnEmbedding -> Embedding
+        11 => 13, // ColumnTensor -> Tensor
+        12 => 14, // ColumnTensorArray -> TensorArray
+        13 => 15, // ColumnSparse -> Sparse
+        14 => 16, // ColumnMultiVector -> MultiVector
+        15 => 4,  // ColumnRowID -> BigInt
+        16 => 17, // ColumnDate -> Date
+        17 => 18, // ColumnTime -> Time
+        18 => 19, // ColumnDateTime -> DateTime
+        19 => 20, // ColumnTimestamp -> Timestamp
+        20 => 21, // ColumnInterval -> Interval
+        21 => 22, // ColumnArray -> Array
+        22 => 23, // ColumnJson -> Json
+        _ => 11,  // Varchar
     }
 }
 
@@ -907,8 +1028,56 @@ fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
 /// is a single chunk packed for its `ColumnType` (the SDK unpacks it with
 /// `struct.unpack`); NULL values contribute zero bytes and a `false` bitmask.
 pub fn rows_to_column_fields(columns: &[String], rows: &[Vec<String>]) -> Vec<ColumnField> {
+    rows_to_column_fields_typed(columns, &[], rows)
+}
+
+/// Packs each column for its `ColumnType`; a declared embedding column is a raw
+/// element stream sliced by the reader's dimension.
+pub fn rows_to_column_fields_typed(
+    columns: &[String],
+    types: &[String],
+    rows: &[Vec<String>],
+) -> Vec<ColumnField> {
     let mut out = Vec::new();
     for (ci, name) in columns.iter().enumerate() {
+        if let Some((dim, elem)) = types.get(ci).and_then(|t| embedding_info(t)) {
+            let mut chunk: Vec<u8> = Vec::new();
+            let mut masks = Vec::with_capacity(rows.len());
+            for r in rows {
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "NULL");
+                masks.push(cell.is_some());
+                let vals: Vec<f64> = cell
+                    .map(|v| {
+                        v.trim()
+                            .trim_start_matches('[')
+                            .trim_end_matches(']')
+                            .split(',')
+                            .filter_map(|x| x.trim().parse::<f64>().ok())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for k in 0..dim as usize {
+                    let f = vals.get(k).copied().unwrap_or(0.0);
+                    match elem {
+                        1 => chunk.push(f as u8),
+                        2 => chunk.push(f as i8 as u8),
+                        3 => chunk.extend_from_slice(&(f as i16).to_le_bytes()),
+                        4 => chunk.extend_from_slice(&(f as i32).to_le_bytes()),
+                        5 => chunk.extend_from_slice(&(f as i64).to_le_bytes()),
+                        7 => chunk.extend_from_slice(&f.to_le_bytes()),
+                        8 => chunk.extend_from_slice(&f32_to_f16_bits(f as f32).to_le_bytes()),
+                        _ => chunk.extend_from_slice(&(f as f32).to_le_bytes()),
+                    }
+                }
+            }
+            out.push(ColumnField {
+                column_type: 10, // ColumnEmbedding
+                column_name: name.clone(),
+                column_vectors: vec![chunk],
+                bitmasks: masks,
+            });
+            continue;
+        }
         let code = infer_column_type(rows, ci);
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
@@ -1059,6 +1228,8 @@ pub struct ColumnDefWire {
     pub name: String,
     /// `LogicType` enum ordinal (caller-supplied).
     pub logic_type: i32,
+    /// `Some((dimension, element_type))` for embedding/vector columns.
+    pub embedding: Option<(i32, i32)>,
 }
 
 /// A minimal `SelectResponse` (fields 1..=5).
@@ -1121,10 +1292,35 @@ pub fn write_select_response(
             .map_err(tw)?;
         o.write_i32(cd.logic_type).map_err(tw)?;
         o.write_field_end().map_err(tw)?;
-        o.write_field_begin(&TFieldIdentifier::new("column_type", TType::I32, 2i16))
+        if let Some((dim, elem)) = cd.embedding {
+            // physical_type{ 3: embedding_type{ 1: dimension, 2: element_type } }
+            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new(
+                "embedding_type",
+                TType::Struct,
+                3i16,
+            ))
             .map_err(tw)?;
-        o.write_i32(data_type_code(cd.logic_type)).map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
+                .map_err(tw)?;
+            o.write_i32(dim).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
+                .map_err(tw)?;
+            o.write_i32(elem).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
         o.write_field_stop().map_err(tw)?;
         o.write_struct_end().map_err(tw)?;
         o.write_field_end().map_err(tw)?;
@@ -1213,6 +1409,7 @@ pub struct CreateTableReq {
 fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ColumnDefWire> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut id, mut name, mut lt) = (0i32, String::new(), 0i32);
+    let mut embedding: Option<(i32, i32)> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -1230,8 +1427,9 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                     }
                     match g.id {
                         Some(1) => lt = ip.read_i32().map_err(tw)?,
-                        Some(2) => {
-                            let _: i32 = ip.read_i32().map_err(tw)?;
+                        // physical_type (a struct): carries the embedding descriptor.
+                        Some(2) if g.field_type == TType::Struct => {
+                            embedding = read_physical_type(ip)?;
                         }
                         _ => ip.skip(g.field_type).map_err(tw)?,
                     }
@@ -1248,7 +1446,59 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
         id,
         name,
         logic_type: lt,
+        embedding,
     })
+}
+
+/// Reads `PhysicalType`, returning the `(dimension, element_type)` embedding
+/// descriptor when field 3 is present.
+fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<(i32, i32)>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut emb = None;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(3) if f.field_type == TType::Struct => {
+                ip.read_struct_begin().map_err(tw)?; // EmbeddingType
+                let (mut dim, mut elem) = (0i32, 0i32);
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    match g.id {
+                        Some(1) => dim = ip.read_i32().map_err(tw)?,
+                        Some(2) => elem = ip.read_i32().map_err(tw)?,
+                        _ => ip.skip(g.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+                emb = Some((dim, elem));
+            }
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(emb)
+}
+
+/// Consumes the trailing `stop` of a `<Method>_args` struct.
+///
+/// The per-method readers stop right after the inner `…Request` struct; that
+/// leaves the *enclosing* args struct's own `stop` byte in the stream, which
+/// desynchronizes every subsequent message on the same connection (the SDK
+/// then silently reconnects and retries, and `Disconnect` surfaces a
+/// `CLIENT_CLOSE`). Every `read_*_args` must therefore finish here.
+fn end_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<()> {
+    let _ = ip.read_field_end();
+    let _ = ip.read_field_begin();
+    ip.read_struct_end().map_err(tw)?;
+    Ok(())
 }
 
 /// Reads the args of a `CreateTable` CALL (after the message head).
@@ -1285,6 +1535,7 @@ pub fn read_create_table_args(
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?; // CreateTableRequest
+    end_args(ip)?; // CreateTable_args
     Ok(req)
 }
 
@@ -1654,6 +1905,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?; // SelectRequest
+    end_args(ip)?; // Select_args
     Ok(r)
 }
 
@@ -1665,22 +1917,67 @@ pub fn read_select_call(r: &mut impl Read) -> Result<(i32, SelectReq)> {
     Ok((msg.sequence_number, req))
 }
 
-/// Builds a `SelectResponse` from a materialized result set.
+/// Builds a `SelectResponse` from a materialized result set (no declared types).
 pub fn select_response_from(columns: &[String], rows: &[Vec<String>]) -> SelectResponseWire {
+    select_response_from_typed(columns, &[], rows)
+}
+
+/// Resolves each result column to its declared type text via
+/// `SHOW TABLE <table> COLUMNS`, so non-scalar columns are announced with their
+/// physical descriptor. Unknown columns map to an empty string (inferred).
+pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<String> {
+    let mut map: HashMap<String, String> = HashMap::new();
+    if let Ok(rs) = engine.execute(&format!("SHOW TABLE {table} COLUMNS;")) {
+        for r in rs {
+            if let QueryResult::Rows { rows, .. } = r {
+                for row in rows {
+                    if row.len() >= 2 {
+                        map.insert(row[0].to_ascii_lowercase(), row[1].clone());
+                    }
+                }
+            }
+        }
+    }
+    columns
+        .iter()
+        .map(|c| {
+            let key = c.rsplit('.').next().unwrap_or(c).to_ascii_lowercase();
+            map.get(&key).cloned().unwrap_or_default()
+        })
+        .collect()
+}
+
+/// Builds a `SelectResponse` with declared column type *text* available, so
+/// non-scalar columns (embedding/vector/...) are announced with their physical
+/// descriptor and packed as their live element stream.
+pub fn select_response_from_typed(
+    columns: &[String],
+    types: &[String],
+    rows: &[Vec<String>],
+) -> SelectResponseWire {
     let column_defs = columns
         .iter()
         .enumerate()
-        .map(|(i, name)| ColumnDefWire {
-            id: i as i32,
-            name: name.clone(),
-            logic_type: data_type_code(infer_column_type(rows, i)),
+        .map(|(i, name)| {
+            let embedding = types.get(i).and_then(|t| embedding_info(t));
+            let logic_type = if embedding.is_some() {
+                LOGIC_EMBEDDING
+            } else {
+                column_type_to_logic(infer_column_type(rows, i))
+            };
+            ColumnDefWire {
+                id: i as i32,
+                name: name.clone(),
+                logic_type,
+                embedding,
+            }
         })
         .collect();
     SelectResponseWire {
         error_code: 0,
         error_msg: "OK".into(),
         column_defs,
-        column_fields: rows_to_column_fields(columns, rows),
+        column_fields: rows_to_column_fields_typed(columns, types, rows),
         extra_result: String::new(),
     }
 }
@@ -1695,6 +1992,21 @@ pub enum ValueLit {
     Str(String),
     Bool(bool),
     Null,
+    /// `[..]` of ints (embedding/int array).
+    IntArray(Vec<i64>),
+    /// `[..]` of floats (embedding/float array).
+    FloatArray(Vec<f64>),
+    /// `[[..],..]` int tensor.
+    IntTensor(Vec<Vec<i64>>),
+    /// `[[..],..]` float tensor.
+    FloatTensor(Vec<Vec<f64>>),
+    /// Sparse vector `{index: value}` (index/values paired).
+    Sparse {
+        indices: Vec<i64>,
+        ints: Vec<i64>,
+        floats: Vec<f64>,
+        is_float: bool,
+    },
 }
 
 impl ValueLit {
@@ -1711,6 +2023,70 @@ impl ValueLit {
                 }
             }
             ValueLit::Null => "NULL".to_string(),
+            ValueLit::IntArray(v) => {
+                format!(
+                    "[{}]",
+                    v.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            ValueLit::FloatArray(v) => {
+                format!(
+                    "[{}]",
+                    v.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            ValueLit::IntTensor(v) => format!(
+                "[{}]",
+                v.iter()
+                    .map(|r| format!(
+                        "[{}]",
+                        r.iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            ValueLit::FloatTensor(v) => format!(
+                "[{}]",
+                v.iter()
+                    .map(|r| format!(
+                        "[{}]",
+                        r.iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            ValueLit::Sparse {
+                indices,
+                ints,
+                floats,
+                is_float,
+            } => {
+                let pairs: Vec<String> = indices
+                    .iter()
+                    .enumerate()
+                    .map(|(k, idx)| {
+                        let val = if *is_float {
+                            floats.get(k).copied().unwrap_or(0.0).to_string()
+                        } else {
+                            ints.get(k).copied().unwrap_or(0).to_string()
+                        };
+                        format!("{idx}:{val}")
+                    })
+                    .collect();
+                format!("[{}]", pairs.join(","))
+            }
         }
     }
 }
@@ -1728,6 +2104,11 @@ pub struct InsertReq {
 fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ValueLit> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut lt, mut b, mut i, mut f, mut s) = (0i32, None, None, None, None);
+    let mut i64_arr: Vec<i64> = Vec::new();
+    let mut f64_arr: Vec<f64> = Vec::new();
+    let mut i64_tensor: Vec<Vec<i64>> = Vec::new();
+    let mut f64_tensor: Vec<Vec<f64>> = Vec::new();
+    let mut idx_arr: Vec<i64> = Vec::new();
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
         if fd.field_type == TType::Stop {
@@ -1739,6 +2120,11 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
             Some(3) => i = Some(ip.read_i64().map_err(tw)?),
             Some(4) => f = Some(ip.read_double().map_err(tw)?),
             Some(5) => s = Some(ip.read_string().map_err(tw)?),
+            Some(6) => i64_arr = read_i64_list(ip)?,
+            Some(7) => f64_arr = read_f64_list(ip)?,
+            Some(8) => i64_tensor = read_i64_list_list(ip)?,
+            Some(9) => f64_tensor = read_f64_list_list(ip)?,
+            Some(12) => idx_arr = read_i64_list(ip)?,
             _ => ip.skip(fd.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -1749,8 +2135,68 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
         1 => ValueLit::Float(f.unwrap_or(0.0)),
         2 => ValueLit::Str(s.unwrap_or_default()),
         3 => ValueLit::Int(i.unwrap_or(0)),
+        5 => ValueLit::IntArray(i64_arr),       // IntegerArray
+        6 => ValueLit::FloatArray(f64_arr),     // DoubleArray
+        7 => ValueLit::IntTensor(i64_tensor),   // IntegerTensor
+        8 => ValueLit::FloatTensor(f64_tensor), // DoubleTensor
+        11 => ValueLit::Sparse {
+            indices: idx_arr,
+            ints: i64_arr,
+            floats: Vec::new(),
+            is_float: false,
+        },
+        12 => ValueLit::Sparse {
+            indices: idx_arr,
+            ints: Vec::new(),
+            floats: f64_arr,
+            is_float: true,
+        },
         _ => ValueLit::Null,
     })
+}
+
+/// Reads a `list<i64>`.
+fn read_i64_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<i64>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(ip.read_i64().map_err(tw)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// Reads a `list<double>`.
+fn read_f64_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<f64>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(ip.read_double().map_err(tw)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// Reads a `list<list<i64>>`.
+fn read_i64_list_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<Vec<i64>>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(read_i64_list(ip)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// Reads a `list<list<double>>`.
+fn read_f64_list_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<Vec<f64>>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(read_f64_list(ip)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
 }
 
 fn read_parsed_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ValueLit> {
@@ -1846,6 +2292,7 @@ pub fn read_insert_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?; // InsertRequest
+    end_args(ip)?; // Insert_args
     Ok(r)
 }
 
@@ -1877,6 +2324,7 @@ pub fn read_list_database_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) ->
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?; // ListDatabase_args
     Ok(sid)
 }
 
@@ -1937,6 +2385,7 @@ pub fn read_string_request(
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?; // <Method>_args
     Ok((sid, strs))
 }
 
@@ -2058,7 +2507,8 @@ pub fn read_delete_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         }
         ip.read_field_end().map_err(tw)?;
     }
-    ip.read_struct_end().map_err(tw)?;
+    ip.read_struct_end().map_err(tw)?; // DeleteRequest
+    end_args(ip)?; // Delete_args
     Ok(r)
 }
 
@@ -2187,11 +2637,10 @@ pub fn read_update_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         }
         ip.read_field_end().map_err(tw)?;
     }
-    ip.read_struct_end().map_err(tw)?;
+    ip.read_struct_end().map_err(tw)?; // UpdateRequest
+    end_args(ip)?; // Update_args
     Ok(r)
 }
-
-/// Reads a full `Update` CALL, returning `(seqid, request)`.
 pub fn read_update_call(r: &mut impl Read) -> Result<(i32, UpdateReq)> {
     let mut ip = TBinaryInputProtocol::new(r, true);
     let msg = ip.read_message_begin().map_err(tw)?;
@@ -2222,7 +2671,8 @@ pub fn read_show_table_args(
         }
         ip.read_field_end().map_err(tw)?;
     }
-    ip.read_struct_end().map_err(tw)?;
+    ip.read_struct_end().map_err(tw)?; // ShowTableRequest
+    end_args(ip)?; // ShowTable_args
     Ok((db, table, sid))
 }
 
@@ -2369,11 +2819,127 @@ mod tests {
                 id: 0,
                 name: "id".into(),
                 logic_type: 5,
+                embedding: None,
             }],
             session_id: 1,
         };
         assert_eq!(create_table(&addr, &req).unwrap().error_code, OK);
         // creating the same table again must fail: the engine kept the state
         assert_ne!(create_table(&addr, &req).unwrap().error_code, OK);
+    }
+
+    /// Regression: every `read_*_args` must consume the *enclosing*
+    /// `<Method>_args` struct's `stop`. Leaving it behind desynchronizes the
+    /// stream (the next message starts one byte late) — which reset the
+    /// connection and made the SDK silently reconnect before every later RPC.
+    #[test]
+    fn args_readers_consume_the_enclosing_struct() {
+        fn frame(
+            method: &str,
+            body: impl FnOnce(&mut TBinaryOutputProtocol<&mut Vec<u8>>),
+        ) -> Vec<u8> {
+            // `<Method>_args { 1: request{ body } }`
+            let mut buf = Vec::new();
+            let mut o = TBinaryOutputProtocol::new(&mut buf, true);
+            o.write_struct_begin(&TStructIdentifier::new(format!("{method}_args")))
+                .unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("request", TType::Struct, 1i16))
+                .unwrap();
+            body(&mut o);
+            o.write_field_end().unwrap();
+            o.write_field_stop().unwrap();
+            o.write_struct_end().unwrap();
+            o.flush().unwrap();
+            buf
+        }
+        fn check(buf: &[u8], read: impl FnOnce(&mut TBinaryInputProtocol<&mut &[u8]>)) {
+            let mut rd = buf;
+            {
+                let mut ip = TBinaryInputProtocol::new(&mut rd, true);
+                read(&mut ip);
+            }
+            assert!(rd.is_empty(), "reader left {} trailing byte(s)", rd.len());
+        }
+
+        // ListDatabase { session_id: i64 }
+        let buf = frame("ListDatabase", |o| {
+            o.write_struct_begin(&TStructIdentifier::new("ListDatabaseRequest"))
+                .unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 1i16))
+                .unwrap();
+            o.write_i64(7).unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_stop().unwrap();
+            o.write_struct_end().unwrap();
+        });
+        check(&buf, |ip| {
+            assert_eq!(read_list_database_args(ip).unwrap(), 7);
+        });
+
+        // Delete { db, table, session_id }
+        let buf = frame("Delete", |o| {
+            o.write_struct_begin(&TStructIdentifier::new("DeleteRequest"))
+                .unwrap();
+            for (id, name) in [(1i16, "db_name"), (2, "table_name")] {
+                o.write_field_begin(&TFieldIdentifier::new(name, TType::String, id))
+                    .unwrap();
+                o.write_string("x").unwrap();
+                o.write_field_end().unwrap();
+            }
+            o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 4i16))
+                .unwrap();
+            o.write_i64(9).unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_stop().unwrap();
+            o.write_struct_end().unwrap();
+        });
+        check(&buf, |ip| {
+            let r = read_delete_args(ip).unwrap();
+            assert_eq!((r.db_name.as_str(), r.session_id), ("x", 9));
+        });
+
+        // ShowTable { db, table, session_id }
+        let buf = frame("ShowTable", |o| {
+            o.write_struct_begin(&TStructIdentifier::new("ShowTableRequest"))
+                .unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("db_name", TType::String, 1i16))
+                .unwrap();
+            o.write_string("d").unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("table_name", TType::String, 2i16))
+                .unwrap();
+            o.write_string("t").unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 3i16))
+                .unwrap();
+            o.write_i64(11).unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_stop().unwrap();
+            o.write_struct_end().unwrap();
+        });
+        check(&buf, |ip| {
+            let (db, table, sid) = read_show_table_args(ip).unwrap();
+            assert_eq!((db.as_str(), table.as_str(), sid), ("d", "t", 11));
+        });
+
+        // `<Method>_args` with string fields (used by DropTable/CreateIndex/…)
+        let buf = frame("DropTable", |o| {
+            o.write_struct_begin(&TStructIdentifier::new("DropTableRequest"))
+                .unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("db_name", TType::String, 1i16))
+                .unwrap();
+            o.write_string("d").unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_begin(&TFieldIdentifier::new("session_id", TType::I64, 3i16))
+                .unwrap();
+            o.write_i64(13).unwrap();
+            o.write_field_end().unwrap();
+            o.write_field_stop().unwrap();
+            o.write_struct_end().unwrap();
+        });
+        check(&buf, |ip| {
+            let (sid, strs) = read_string_request(ip).unwrap();
+            assert_eq!((sid, strs.get(&1).map(String::as_str)), (13, Some("d")));
+        });
     }
 }

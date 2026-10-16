@@ -21,11 +21,13 @@ fn main() {
                 id: 0,
                 name: "id".into(),
                 logic_type: 5,
+                embedding: None,
             },
             ColumnDefWire {
                 id: 1,
                 name: "name".into(),
                 logic_type: 2,
+                embedding: None,
             },
         ],
         column_fields: rows_to_column_fields(&columns, &rows),
