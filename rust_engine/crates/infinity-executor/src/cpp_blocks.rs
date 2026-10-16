@@ -25,6 +25,9 @@ use infinity_storage::knn_format;
 
 use crate::Engine;
 
+/// `(row id, vector)` pairs read back from a vector index mirror.
+type VectorRows = Vec<(u32, Vec<f32>)>;
+
 /// Maps an element-type name to the SDK `ElementType` code. `None` for bit
 /// elements, which this writer does not pack.
 fn element_code(elem: &str) -> Option<i32> {
@@ -1017,6 +1020,14 @@ impl Engine {
         for im in self.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let _ = self.write_cpp_hnsw_index(&im.table, &im.name);
+            } else if im.index_type.eq_ignore_ascii_case("IVF") {
+                let k = im
+                    .options
+                    .iter()
+                    .find(|(key, _)| key.eq_ignore_ascii_case("CENTROID_COUNT"))
+                    .and_then(|(_, v)| v.trim().parse().ok())
+                    .unwrap_or(16);
+                let _ = self.write_cpp_ivf_index(&im.table, &im.name, k);
             }
         }
         Ok(())
@@ -1194,7 +1205,7 @@ impl Engine {
     }
 
     /// The vectors of `table`'s `column` as `(row id, vector)`.
-    fn cpp_column_vectors(&self, table: &str, column: &str) -> Result<Vec<(u32, Vec<f32>)>> {
+    fn cpp_column_vectors(&self, table: &str, column: &str) -> Result<VectorRows> {
         let schema = self.table_schema(table)?;
         let col_idx = schema
             .iter()
@@ -1312,7 +1323,7 @@ impl Engine {
         &self,
         table: &str,
         index_name: &str,
-    ) -> Result<Vec<(u32, Vec<f32>)>> {
+    ) -> Result<VectorRows> {
         let table = self.qualified_table(table);
         let meta = self
             .catalog
@@ -1323,9 +1334,8 @@ impl Engine {
         let path = self
             .blocks_root()
             .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx", meta.id));
-        let bytes = std::fs::read(&path).map_err(|_| {
-            Error::NotFound(format!("no HNSW mirror at {}", path.display()))
-        })?;
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let chunk = knn_format::decode_hnsw_chunk(
             &bytes,
             4,
@@ -1344,6 +1354,157 @@ impl Engine {
             out.push((*label, v));
         }
         Ok(out)
+    }
+
+    /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
+    /// `column`'s vectors: a deterministic k-means partitions them into
+    /// `centroid_count` parts (task #70).
+    fn cpp_ivf_chunk(
+        &self,
+        table: &str,
+        column: &str,
+        centroid_count: usize,
+    ) -> Result<(usize, Vec<u8>)> {
+        let vectors = self.cpp_column_vectors(table, column)?;
+        if vectors.is_empty() {
+            return Err(Error::Invalid(format!(
+                "no vectors to index in '{table}.{column}'"
+            )));
+        }
+        let dim = vectors[0].1.len();
+        let k = centroid_count.clamp(1, vectors.len());
+        // Deterministic seeding: pick k evenly spaced vectors.
+        let mut centroids: Vec<Vec<f32>> = (0..k)
+            .map(|c| vectors[c * vectors.len() / k].1.clone())
+            .collect();
+        let mut assign = vec![0usize; vectors.len()];
+        for _ in 0..10 {
+            let mut changed = false;
+            for (i, (_, v)) in vectors.iter().enumerate() {
+                let mut best = 0;
+                let mut best_d = f32::INFINITY;
+                for (c, cent) in centroids.iter().enumerate() {
+                    let d = infinity_index::vector::l2_sq(v, cent);
+                    if d < best_d {
+                        best_d = d;
+                        best = c;
+                    }
+                }
+                if assign[i] != best {
+                    assign[i] = best;
+                    changed = true;
+                }
+            }
+            // Recompute each centroid as the mean of its members.
+            let mut sums = vec![vec![0.0f64; dim]; k];
+            let mut counts = vec![0usize; k];
+            for (i, (_, v)) in vectors.iter().enumerate() {
+                counts[assign[i]] += 1;
+                for (d, x) in v.iter().enumerate() {
+                    sums[assign[i]][d] += *x as f64;
+                }
+            }
+            for c in 0..k {
+                if counts[c] > 0 {
+                    centroids[c] = sums[c].iter().map(|s| (*s / counts[c] as f64) as f32).collect();
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+
+        let mut parts = vec![knn_format::IvfPlainPart::default(); k];
+        for (i, (label, v)) in vectors.iter().enumerate() {
+            let part = &mut parts[assign[i]];
+            part.segment_offsets.push(*label);
+            for x in v {
+                part.vectors.extend_from_slice(&x.to_le_bytes());
+            }
+        }
+        let header = knn_format::IvfChunkHeader {
+            row_count: vectors.len() as u32,
+            embedding_count: vectors.len() as u32,
+            dimension: dim as u32,
+            centroid_count: k as u32,
+        };
+        let flat: Vec<f32> = centroids.into_iter().flatten().collect();
+        let chunk = knn_format::encode_ivf_plain_chunk(&header, &flat, &parts)
+            .map_err(|e| Error::Invalid(format!("cannot encode IVF chunk: {e}")))?;
+        Ok((vectors.len(), chunk))
+    }
+
+    /// Writes `table`'s index as a C++ IVF chunk file (`kPlain`) under
+    /// `…/idx_{id}/seg_0/chunk_0.idx`, returning how many vectors were written.
+    pub fn write_cpp_ivf_index(
+        &self,
+        table: &str,
+        index_name: &str,
+        centroid_count: usize,
+    ) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let column = self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| im.name == index_name)
+            .map(|im| im.column)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        let (count, chunk) = self.cpp_ivf_chunk(&table, &column, centroid_count)?;
+        let db_id = self.database_id_of(&table);
+        let dir = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
+        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        Ok(count)
+    }
+
+    /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
+    /// the centroids and `(row id, vector)` pairs.
+    pub fn read_cpp_ivf_index(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Result<(Vec<f32>, VectorRows)> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let db_id = self.database_id_of(&table);
+        let path = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx", meta.id));
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no IVF mirror at {}", path.display())))?;
+        let (header, centroids, parts) = knn_format::decode_ivf_plain_chunk(&bytes, 4)
+            .map_err(|e| Error::Invalid(format!("bad IVF chunk: {e}")))?;
+        let dim = header.dimension as usize;
+        let mut out = Vec::new();
+        for part in parts {
+            for (i, label) in part.segment_offsets.iter().enumerate() {
+                let at = i * dim * 4;
+                let v = part.vectors[at..at + dim * 4]
+                    .chunks_exact(4)
+                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .collect();
+                out.push((*label, v));
+            }
+        }
+        Ok((centroids, out))
     }
 }
 
@@ -1882,6 +2043,38 @@ mod tests {
         assert_eq!(back[0], (0, vec![1.0, 2.0, 3.0]));
         assert_eq!(back[1], (1, vec![4.0, 5.0, 6.0]));
         assert_eq!(back[2], (2, vec![7.0, 8.0, 9.0]));
+    }
+
+    #[test]
+    fn ivf_index_mirror_roundtrips_the_vectors() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        // Two well-separated clusters.
+        engine
+            .execute("INSERT INTO iv VALUES (1, [0,0]), (2, [0,1]), (3, [10,10]), (4, [10,11]);")
+            .unwrap();
+        engine
+            .execute("CREATE INDEX iv_idx ON iv (v) USING IVF;")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_ivf_index("iv", "iv_idx", 2).unwrap(), 4);
+        let (centroids, back) = engine.read_cpp_ivf_index("iv", "iv_idx").unwrap();
+        assert_eq!(centroids.len(), 4); // 2 centroids * dimension 2
+        // Every vector comes back, under its row id.
+        let mut got: Vec<(u32, Vec<f32>)> = back;
+        got.sort_by_key(|(l, _)| *l);
+        assert_eq!(
+            got,
+            vec![
+                (0, vec![0.0, 0.0]),
+                (1, vec![0.0, 1.0]),
+                (2, vec![10.0, 10.0]),
+                (3, vec![10.0, 11.0]),
+            ]
+        );
     }
 
     #[test]
