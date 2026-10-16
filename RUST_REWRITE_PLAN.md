@@ -164,12 +164,12 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 **已落地的实现**（`infinity-storage` 新模块 + `infinity-executor::cpp_blocks`，均带逐字节单测）：
 - `cpp_format`：数据文件框架、块 `version` 文件、列体 `[data_region][null_bitmap]`、`ColumnLayout`/`pack_column`（含 Varchar 两字 slot 与 embedding 内联定宽）、**整块目录读写**、日期时间与 f16/bf16 编解码。
-- `cpp_blocks`（执行器）：**把真实表数据镜像成 C++ 块文件**（`{data_dir}/blocks/db_{db}/tbl_{id}/seg_0/blk_{n}/`，每 8192 行一块），`Engine::flush()` 自动对每张可打包的表做镜像，并可**脱离 KV** 从块文件读回。实测：`INT` 列 `0.col`=33816、`BOOL` 列 `2.col`=2072、`EMBEDDING(FLOAT,3)` 列 `1.col`=**99352**（= 16 + 8192·3·4 + 1024 + 8）、`version`=65556，均为冻结布局算出的精确字节数。
+- `cpp_blocks`（执行器）：**把真实表数据镜像成 C++ 块文件**（`{data_dir}/blocks/db_{db}/tbl_{id}/seg_0/blk_{n}/`，每 8192 行一块），`Engine::flush()` 自动对每张可打包的表做镜像，并可**脱离 KV** 从块文件读回。**已覆盖列型**：定宽标量（int/float/date/time/datetime）、`VARCHAR`/`JSON`（两字 slot + outline）、`EMBEDDING`/`VECTOR`（内联定宽）、`TENSOR`/`MULTIVECTOR`、`SPARSE`、`ARRAY(<定宽标量>)`（均为 count/offset slot + outline）。实测字节：`INT` 列 `0.col`=33816、`BOOL` 列=2072、`EMBEDDING(FLOAT,3)` 列 `1.col`=**99352**（16 + 8192·3·4 + 1024 + 8）、`TENSOR(FLOAT,3)`/`SPARSE`/`ARRAY(INT)` 列 `1.col`=66584（8 字节 slot）且 `col_1_out` 分别为 24/12 字节，`version`=65556——全部等于冻结布局算出的精确字节数。**明确不支持**（返回错误而非写错字节）：`EMBEDDING(BIT,*)`、`TENSORARRAY`、嵌套 `ARRAY`、变长元素数组（slot 只记外层计数，内层计数/偏移不可还原）。
 - `inverted_format`：LEB128、TermMeta（`.dic` 记录区，含 tf/payload 选项位）、`.len` 裸 `u32[]`、`.pos` 每 term 框架、`fst_len_from_trailer`。
 - `knn_format`：HNSW 头部（56 字节定偏移）、`labels`、整块块文件组装/解析（用 `layer_sum` 与顶点 stride 校验图区长度，对应 C++ 的「读到文件尾」断言）、`get_mmax`/level0/levelx stride。
 - `catalog_format`：**全部 catalog 键**（`catalog|db|…`、`tbl|col|…`、`catalog|blk|…`、`idx_chunk|…` 等）与对应前缀、drop 墓碑、全局系统键，逐字符串断言。
 
-**尚未落地**：#68 剩余（tensor/array/sparse/multivector 列的 outline 编码；执行器仍以 fjall 行文本为主存储，块文件是镜像）；#69（RocksDB 基底 + 值编码 + MergeOperator）；#70（HNSW 图区 padding 需实测、IVF 块布局）；#71（FST 状态机、FastPFor SIMD-BP128、NewPForDelta）。
+**尚未落地**：#68 剩余（执行器仍以 fjall 行文本为主存储，块文件是镜像；上述不支持列型待补）；#69（RocksDB 基底 + 值编码 + MergeOperator）；#70（HNSW 图区 padding 需实测、IVF 块布局）；#71（FST 状态机、FastPFor SIMD-BP128、NewPForDelta）。
 
 ### 2.7 测试资产（验收面）
 
