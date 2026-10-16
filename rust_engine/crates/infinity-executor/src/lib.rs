@@ -3380,7 +3380,13 @@ impl Engine {
                     None => continue,
                 };
                 hits += 1;
-                let field = field_boosts.get(ti).copied().unwrap_or(1.0);
+                // A single-column query applies that column's boost to every
+                // query term.
+                let field = if cols.len() == 1 {
+                    field_boosts.first().copied().unwrap_or(1.0)
+                } else {
+                    field_boosts.get(ti).copied().unwrap_or(1.0)
+                };
                 if boolean {
                     score += field;
                 } else {
