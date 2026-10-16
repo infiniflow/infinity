@@ -1628,7 +1628,13 @@ impl Engine {
                 for im in self.catalog.list_indexes()? {
                     if im.table == *table {
                         let _ = self.catalog.drop_index(&im.name);
-                        self.catalog.create_index(&im.name, new_name, &im.column)?;
+                        self.catalog.create_index_typed(
+                            &im.name,
+                            new_name,
+                            &im.column,
+                            &im.index_type,
+                            &im.options,
+                        )?;
                     }
                 }
                 self.catalog.rename_table(table, new_name)?;
@@ -1871,8 +1877,25 @@ impl Engine {
                         && search.is_none() =>
                     {
                         let schema = self.table_schema(t)?;
-                        Some(crate::explain::explain_select(
-                            &crate::explain::SelectPlan {
+                        // Try to push the filter into an index scan first.
+                        let index_plan = match where_pred.as_ref() {
+                            Some(w) if !logical && !*distinct => {
+                                let indexed = self.indexed_columns(t)?;
+                                crate::explain::explain_index_scan(
+                                    &crate::explain::IndexScanPlan {
+                                        items,
+                                        table: t,
+                                        where_pred: w,
+                                        order_by,
+                                        schema: &schema,
+                                        indexed: &indexed,
+                                    },
+                                )
+                            }
+                            _ => None,
+                        };
+                        Some(index_plan.unwrap_or_else(|| {
+                            crate::explain::explain_select(&crate::explain::SelectPlan {
                                 items,
                                 table: t,
                                 where_pred: where_pred.as_ref(),
@@ -1880,8 +1903,8 @@ impl Engine {
                                 distinct: *distinct,
                                 schema: &schema,
                                 logical,
-                            },
-                        ))
+                            })
+                        }))
                     }
                     Statement::Delete { table, where_pred } if logical => Some(
                         crate::explain::explain_logical_delete(table, where_pred.as_ref()),
@@ -1950,7 +1973,8 @@ impl Engine {
                 if duplicate && !*if_not_exists {
                     return Err(Error::Invalid(format!("index '{name}' already exists")));
                 }
-                self.catalog.create_index(name, table, column)?;
+                self.catalog
+                    .create_index_typed(name, table, column, index_type, opts)?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
                     let a = a.trim().trim_matches(|c| c == '\'' || c == '"');

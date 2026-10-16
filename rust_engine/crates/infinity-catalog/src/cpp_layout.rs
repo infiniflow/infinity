@@ -12,9 +12,9 @@ use infinity_expression::json::Json;
 use infinity_storage::{catalog_format as key, MetaStore};
 
 use crate::value_format::{
-    self, array_type_info, data_type_json, embedding_type_info, logical, ColumnDefValue,
+    self, array_type_info, data_type_json, embedding_type_info, logical, ColumnDefValue, IndexDefValue,
 };
-use crate::{Catalog, TableMeta};
+use crate::{Catalog, IndexMeta, TableMeta};
 
 /// One table as read back from a C++-layout catalog.
 #[derive(Debug, Clone, PartialEq)]
@@ -133,6 +133,78 @@ fn table_of(table: &str) -> &str {
     table.rsplit('.').next().unwrap_or(table)
 }
 
+/// Builds the C++ `IndexBase`-family record for one engine index.
+///
+/// Returns `None` for a `USING` kind the C++ has no index class for (or for a
+/// column that vanished); the caller then leaves no record rather than write a
+/// half-formed one.
+fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
+    let col = table
+        .columns
+        .iter()
+        .find(|c| c.column_name == im.column)?;
+    let opt = |k: &str| -> Option<String> {
+        im.options
+            .iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(k))
+            .map(|(_, v)| v.clone())
+    };
+    let opt_word = |k: &str, default: &str| -> String {
+        opt(k)
+            .map(|v| v.trim().trim_matches(|c| c == '\'' || c == '"').to_string())
+            .unwrap_or_else(|| default.to_string())
+    };
+    let opt_num = |k: &str, default: i64| -> i64 {
+        opt(k).and_then(|v| v.trim().parse().ok()).unwrap_or(default)
+    };
+    match im.index_type.as_str() {
+        "HNSW" => Some(IndexDefValue::hnsw(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            value_format::metric_name_of(&opt_word("METRIC", "l2")),
+            value_format::hnsw_encode_name_of(&opt_word("ENCODE", "plain")),
+            value_format::hnsw_build::PLAIN,
+            opt_num("M", value_format::HNSW_M),
+            opt_num("EF_CONSTRUCTION", value_format::HNSW_EF_CONSTRUCTION),
+            opt_num("BLOCK_SIZE", value_format::HNSW_BLOCK_SIZE),
+        )),
+        "FULLTEXT" => Some(IndexDefValue::full_text(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            &opt_word("ANALYZER", "standard"),
+        )),
+        // An index with no `USING` kind is the C++ default, a secondary index.
+        "SECONDARY" | "" => {
+            let is_json =
+                value_format::data_type_code(&col.column_type) == Some(value_format::logical::JSON);
+            let low = opt("CARDINALITY")
+                .map(|v| v.eq_ignore_ascii_case("low"))
+                .unwrap_or(false);
+            Some(IndexDefValue::secondary(
+                &im.name,
+                &table.table_name,
+                &im.column,
+                low,
+                is_json,
+            ))
+        }
+        "IVF" | "FLAT" => {
+            let elem = value_format::type_info_int(&col.column_type, "embedding_type")
+                .unwrap_or(value_format::element::FLOAT32);
+            Some(IndexDefValue::ivf_plain(
+                &im.name,
+                &table.table_name,
+                &im.column,
+                value_format::metric_code_of(&opt_word("METRIC", "l2")),
+                elem,
+            ))
+        }
+        _ => None,
+    }
+}
+
 impl Catalog {
     /// Writes every database, table and column into `store` using the C++
     /// key space and value encoding, returning how many records were written.
@@ -142,6 +214,7 @@ impl Catalog {
     pub fn write_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
         let dbs = self.list_databases()?;
         let tables = self.list_tables()?;
+        let indexes = self.list_indexes()?;
         let mut written = 0usize;
 
         let next_table_id = tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
@@ -158,6 +231,10 @@ impl Catalog {
             )?;
             written += 2;
         }
+
+        // Resolved table layout, kept so the index pass below can reach each
+        // table's db id, table id and column types.
+        let mut resolved: Vec<(String, String, u64, CppTable)> = Vec::new();
 
         for t in &tables {
             let db_name = db_of(&t.name);
@@ -179,6 +256,9 @@ impl Catalog {
                 ("next_segment_id", 0),
                 ("unsealed_segment_id", 0),
                 ("comment", 0),
+                // `next_index_id` starts at 0 (`table_meta_impl.cpp:281-282`);
+                // the C++ reader takes it as the next id to hand out.
+                ("next_index_id", 0),
             ] {
                 store.put(
                     key::catalog_table_tag_key(&db_str, &tbl_str, tag).as_bytes(),
@@ -188,6 +268,7 @@ impl Catalog {
             }
             written += 1;
 
+            let mut columns = Vec::new();
             for (i, col) in t.columns.iter().enumerate() {
                 let type_text = t.types.get(i).cloned().unwrap_or_default();
                 let Some(data_type) = data_type_of_text(&type_text) else {
@@ -204,6 +285,66 @@ impl Catalog {
                     &value_format::column_def_bytes(&value),
                 )?;
                 written += 1;
+                columns.push(value);
+            }
+            resolved.push((
+                db_str,
+                tbl_str,
+                ts,
+                CppTable {
+                    db_name: db_name.to_string(),
+                    db_id,
+                    table_name: name.to_string(),
+                    table_id: t.id,
+                    columns,
+                    next_column_id: t.columns.len() as u64,
+                },
+            ));
+        }
+
+        // Index records: `idx|{db}|{tbl}|{name}|{ts}` -> index_id (a per-table
+        // counter starting at 0), plus an `index_base` tag holding the C++
+        // `IndexBase::Serialize()` JSON (`table_index_meta_impl.cpp:90-97`).
+        for im in &indexes {
+            let im_table = table_of(&im.table);
+            let im_db = db_of(&im.table);
+            let Some((db_str, tbl_str, ts, cpp)) = resolved
+                .iter()
+                .find(|(_, _, _, c)| c.table_name == im_table && c.db_name == im_db)
+            else {
+                continue; // the index's table is not in the written layout
+            };
+            let Some(def) = index_def_for(im, cpp) else {
+                continue;
+            };
+            // `list_indexes` is ordered, so ids are stable across runs.
+            let index_id = indexes
+                .iter()
+                .filter(|o| table_of(&o.table) == im_table && db_of(&o.table) == im_db)
+                .position(|o| o.name == im.name)
+                .unwrap_or(0);
+            store.put(
+                key::catalog_index_key(db_str, tbl_str, &im.name, *ts).as_bytes(),
+                index_id.to_string().as_bytes(),
+            )?;
+            store.put(
+                key::catalog_index_tag_key(db_str, tbl_str, &index_id.to_string(), "index_base")
+                    .as_bytes(),
+                &value_format::index_def_bytes(&def),
+            )?;
+            written += 2;
+        }
+        // Record how many ids each table handed out.
+        for (db_str, tbl_str, _, cpp) in &resolved {
+            let count = indexes
+                .iter()
+                .filter(|o| table_of(&o.table) == cpp.table_name && db_of(&o.table) == cpp.db_name)
+                .count();
+            if count > 0 {
+                store.put(
+                    key::catalog_table_tag_key(db_str, tbl_str, "next_index_id").as_bytes(),
+                    count.to_string().as_bytes(),
+                )?;
             }
         }
 
@@ -278,6 +419,30 @@ pub fn read_cpp_layout(store: &dyn MetaStore) -> Result<Vec<CppTable>> {
             });
         }
     }
+    Ok(out)
+}
+
+/// Reads back the index records written by [`Catalog::write_cpp_layout`]:
+/// every `idx|…|index_base` tag, decoded.
+pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
+    let mut out = Vec::new();
+    for (k, v) in store.scan_prefix(b"catalog|idx|")? {
+        let key = String::from_utf8_lossy(&k).to_string();
+        // `catalog|idx|{db}|{tbl}|{name}|{ts}` - six fields. The value is the
+        // numeric index id that locates the `index_base` tag.
+        let fields: Vec<&str> = key.split('|').collect();
+        if fields.len() != 6 {
+            continue;
+        }
+        let index_id = String::from_utf8_lossy(&v).to_string();
+        let tag = key::catalog_index_tag_key(fields[2], fields[3], &index_id, "index_base");
+        if let Some(bytes) = store.get(tag.as_bytes())? {
+            if let Some(def) = value_format::index_def_from_bytes(&bytes) {
+                out.push(def);
+            }
+        }
+    }
+    out.sort_by(|a, b| a.base.index_name.cmp(&b.base.index_name));
     Ok(out)
 }
 
@@ -404,5 +569,68 @@ mod tests {
         let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
         let err = cat.write_cpp_layout(store.as_ref()).unwrap_err();
         assert!(err.to_string().contains("does not cover"), "{err}");
+    }
+
+    #[test]
+    fn index_records_are_written_in_the_cpp_layout() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cat = Catalog::open(tmp.path()).unwrap();
+        let columns = ["id", "v", "body"].map(String::from).to_vec();
+        let types = ["INTEGER", "EMBEDDING(FLOAT,4)", "VARCHAR"]
+            .map(String::from)
+            .to_vec();
+        cat.create_table_typed(
+            "default_db.t",
+            &columns,
+            &[None, None, None],
+            &[false, false, false],
+            &types,
+            &[None, None, None],
+        )
+        .unwrap();
+        cat.create_index_typed(
+            "idx_vec",
+            "default_db.t",
+            "v",
+            "HNSW",
+            &[("METRIC".to_string(), "l2".to_string())],
+        )
+        .unwrap();
+        cat.create_index_typed(
+            "idx_ft",
+            "default_db.t",
+            "body",
+            "FULLTEXT",
+            &[("ANALYZER".to_string(), "standard".to_string())],
+        )
+        .unwrap();
+
+        let out = tempfile::tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        cat.write_cpp_layout(store.as_ref()).unwrap();
+
+        // The `next_index_id` tag counts both indexes.
+        let db = cat.list_databases().unwrap();
+        let db_id = db.iter().position(|d| d == "default_db").unwrap().to_string();
+        let tables = cat.list_tables().unwrap();
+        let tbl_id = tables[0].id.to_string();
+        assert_eq!(
+            store
+                .get(key::catalog_table_tag_key(&db_id, &tbl_id, "next_index_id").as_bytes())
+                .unwrap()
+                .map(|v| String::from_utf8_lossy(&v).to_string()),
+            Some("2".to_string())
+        );
+
+        let defs = read_cpp_indexes(store.as_ref()).unwrap();
+        assert_eq!(defs.len(), 2);
+        let hnsw = defs.iter().find(|d| d.base.index_name == "idx_vec").unwrap();
+        assert_eq!(hnsw.base.index_type, "HNSW");
+        assert_eq!(hnsw.base.file_name, "t_idx_vec");
+        assert_eq!(hnsw.base.column_names, vec!["v".to_string()]);
+        let ft = defs.iter().find(|d| d.base.index_name == "idx_ft").unwrap();
+        assert_eq!(ft.base.index_type, "FULLTEXT");
+        assert_eq!(ft.base.file_name, "t_idx_ft");
+        assert_eq!(ft.base.column_names, vec!["body".to_string()]);
     }
 }

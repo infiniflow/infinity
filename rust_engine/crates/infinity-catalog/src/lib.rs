@@ -121,22 +121,54 @@ pub struct IndexMeta {
     pub name: String,
     pub table: String,
     pub column: String,
+    /// `CREATE INDEX … USING <kind>`, upper-cased (`HNSW`, `FULLTEXT`, …);
+    /// empty when the statement did not name one.
+    pub index_type: String,
+    /// `WITH (…)` options, keys upper-cased as the parser yields them.
+    pub options: Vec<(String, String)>,
 }
+
+/// Separates the stored option pairs; `\x1f` (unit separator) cannot occur in
+/// a parsed identifier/value.
+const OPT_SEP: char = '\x1f';
 
 impl IndexMeta {
     fn encode(&self) -> Vec<u8> {
-        format!("{}\t{}", self.table, self.column).into_bytes()
+        let opts = self
+            .options
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join(&OPT_SEP.to_string());
+        format!("{}\t{}\t{}\t{}", self.table, self.column, self.index_type, opts).into_bytes()
     }
     fn decode(name: &[u8], bytes: &[u8]) -> Result<Self> {
         let name = String::from_utf8_lossy(name).to_string();
         let s = String::from_utf8_lossy(bytes);
-        let (table, column) = s
-            .split_once('\t')
+        // Older records carried just `table\tcolumn`; newer ones append the
+        // index type and the `WITH` options.
+        let mut it = s.splitn(4, '\t');
+        let table = it
+            .next()
             .ok_or_else(|| Error::Catalog(format!("bad index meta for '{name}'")))?;
+        let column = it
+            .next()
+            .ok_or_else(|| Error::Catalog(format!("bad index meta for '{name}'")))?;
+        let index_type = it.next().unwrap_or_default().to_string();
+        let options = it
+            .next()
+            .unwrap_or_default()
+            .split(OPT_SEP)
+            .filter(|p| !p.is_empty())
+            .filter_map(|p| p.split_once('='))
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         Ok(Self {
             name,
             table: table.to_string(),
             column: column.to_string(),
+            index_type,
+            options,
         })
     }
 }
@@ -411,10 +443,25 @@ impl Catalog {
 
     /// Creates an index on `table(column)`; returns its metadata.
     pub fn create_index(&self, name: &str, table: &str, column: &str) -> Result<IndexMeta> {
+        self.create_index_typed(name, table, column, "", &[])
+    }
+
+    /// Creates an index, recording the `USING <kind>` type and `WITH (…)`
+    /// options so the C++ catalog can be written faithfully.
+    pub fn create_index_typed(
+        &self,
+        name: &str,
+        table: &str,
+        column: &str,
+        index_type: &str,
+        options: &[(String, String)],
+    ) -> Result<IndexMeta> {
         let meta = IndexMeta {
             name: name.to_string(),
             table: table.to_string(),
             column: column.to_string(),
+            index_type: index_type.to_ascii_uppercase(),
+            options: options.to_vec(),
         };
         self.store.put(&index_key(name), meta.encode().as_slice())?;
         Ok(meta)
