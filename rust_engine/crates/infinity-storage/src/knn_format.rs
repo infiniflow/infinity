@@ -372,9 +372,194 @@ pub fn decode_graph_region(
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// IVF chunk (plain storage) — spec §9.2
+// ---------------------------------------------------------------------------
+
+/// The fixed prefix of an IVF `chunk_{id}.idx` file (spec §9.2): four `u32`s
+/// followed by `centroid_count * dimension` `f32` centroids.
+///
+/// The file is **not self-describing**: the logical column type, the embedding
+/// element type and the IVF options (metric, storage kind, SQ/PQ parameters)
+/// live in the catalog's IndexBase JSON, not here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IvfChunkHeader {
+    pub row_count: u32,
+    pub embedding_count: u32,
+    pub dimension: u32,
+    pub centroid_count: u32,
+}
+
+/// One plain-storage part: the vectors assigned to one centroid.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IvfPlainPart {
+    /// `SegmentOffset` (rowid.segment_offset) of each vector in this part.
+    pub segment_offsets: Vec<u32>,
+    /// The vectors' raw element bytes (`segment_offsets.len() * dimension *
+    /// element_size`).
+    pub vectors: Vec<u8>,
+}
+
+/// Encodes an IVF chunk in the **plain** storage layout (`kPlain`).
+///
+/// `row_count`, `embedding_count`, `dimension` and `centroid_count` come first,
+/// then the `f32` centroids, then each part as `u32 embedding_num`,
+/// `u32[embedding_num]` segment offsets and the raw vectors
+/// (`ivf_index_storage.cpp:100-104`;
+/// `ivf_index_storage_parts_impl.cpp:96-107,162-163,560-571`).
+pub fn encode_ivf_plain_chunk(
+    header: &IvfChunkHeader,
+    centroids: &[f32],
+    parts: &[IvfPlainPart],
+) -> Result<Vec<u8>, FormatError> {
+    if centroids.len() != header.centroid_count as usize * header.dimension as usize {
+        return Err(FormatError::Truncated {
+            need: header.centroid_count as usize * header.dimension as usize,
+            got: centroids.len(),
+        });
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(&header.row_count.to_le_bytes());
+    out.extend_from_slice(&header.embedding_count.to_le_bytes());
+    out.extend_from_slice(&header.dimension.to_le_bytes());
+    out.extend_from_slice(&header.centroid_count.to_le_bytes());
+    for c in centroids {
+        out.extend_from_slice(&c.to_le_bytes());
+    }
+    for part in parts {
+        out.extend_from_slice(&(part.segment_offsets.len() as u32).to_le_bytes());
+        for s in &part.segment_offsets {
+            out.extend_from_slice(&s.to_le_bytes());
+        }
+        out.extend_from_slice(&part.vectors);
+    }
+    Ok(out)
+}
+
+/// Decodes an IVF chunk in the plain storage layout.
+///
+/// `element_size` is the element width in bytes (4 for `float`); it is not
+/// stored in the file, so the caller must know the column's element type.
+pub fn decode_ivf_plain_chunk(
+    bytes: &[u8],
+    element_size: usize,
+) -> Result<(IvfChunkHeader, Vec<f32>, Vec<IvfPlainPart>), FormatError> {
+    let short = |need: usize| FormatError::Truncated {
+        need,
+        got: bytes.len(),
+    };
+    if bytes.len() < 16 {
+        return Err(short(16));
+    }
+    let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+    let header = IvfChunkHeader {
+        row_count: u32_at(0),
+        embedding_count: u32_at(4),
+        dimension: u32_at(8),
+        centroid_count: u32_at(12),
+    };
+    let centroid_floats = header.centroid_count as usize * header.dimension as usize;
+    let mut at = 16;
+    if bytes.len() < at + centroid_floats * 4 {
+        return Err(short(at + centroid_floats * 4));
+    }
+    let centroids: Vec<f32> = (0..centroid_floats)
+        .map(|i| f32::from_le_bytes(bytes[at + i * 4..at + i * 4 + 4].try_into().unwrap()))
+        .collect();
+    at += centroid_floats * 4;
+
+    let mut parts = Vec::with_capacity(header.centroid_count as usize);
+    for _ in 0..header.centroid_count {
+        if bytes.len() < at + 4 {
+            return Err(short(at + 4));
+        }
+        let n = u32_at(at) as usize;
+        at += 4;
+        if bytes.len() < at + n * 4 {
+            return Err(short(at + n * 4));
+        }
+        let segment_offsets: Vec<u32> = (0..n).map(|i| u32_at(at + i * 4)).collect();
+        at += n * 4;
+        let vec_len = n * header.dimension as usize * element_size;
+        if bytes.len() < at + vec_len {
+            return Err(short(at + vec_len));
+        }
+        let vectors = bytes[at..at + vec_len].to_vec();
+        at += vec_len;
+        parts.push(IvfPlainPart {
+            segment_offsets,
+            vectors,
+        });
+    }
+    Ok((header, centroids, parts))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ivf_plain_chunk_roundtrip() {
+        let header = IvfChunkHeader {
+            row_count: 2,
+            embedding_count: 2,
+            dimension: 2,
+            centroid_count: 2,
+        };
+        // Two centroids of dimension 2.
+        let centroids = [0.0f32, 0.0, 1.0, 1.0];
+        let parts = vec![
+            IvfPlainPart {
+                segment_offsets: vec![0],
+                vectors: [1.0f32, 2.0].iter().flat_map(|v| v.to_le_bytes()).collect(),
+            },
+            IvfPlainPart {
+                segment_offsets: vec![1],
+                vectors: [3.0f32, 4.0].iter().flat_map(|v| v.to_le_bytes()).collect(),
+            },
+        ];
+        let bytes = encode_ivf_plain_chunk(&header, &centroids, &parts).unwrap();
+        // 16 (header) + 2*2*4 (centroids) + (4 + 1*4 + 8) * 2 parts.
+        assert_eq!(bytes.len(), 16 + 16 + 16 * 2);
+        assert_eq!(&bytes[0..4], &2u32.to_le_bytes()); // row_count
+        assert_eq!(&bytes[4..8], &2u32.to_le_bytes()); // embedding_count
+        assert_eq!(&bytes[8..12], &2u32.to_le_bytes()); // dimension
+        assert_eq!(&bytes[12..16], &2u32.to_le_bytes()); // centroid_count
+        assert_eq!(&bytes[16..20], &0.0f32.to_le_bytes()); // first centroid
+
+        let (h, c, p) = decode_ivf_plain_chunk(&bytes, 4).unwrap();
+        assert_eq!(h, header);
+        assert_eq!(c, centroids.to_vec());
+        assert_eq!(p, parts);
+    }
+
+    #[test]
+    fn ivf_plain_chunk_rejects_bad_centroid_count() {
+        let header = IvfChunkHeader {
+            row_count: 0,
+            embedding_count: 0,
+            dimension: 2,
+            centroid_count: 3,
+        };
+        assert!(encode_ivf_plain_chunk(&header, &[0.0f32; 4], &[]).is_err());
+    }
+
+    #[test]
+    fn ivf_plain_chunk_rejects_truncation() {
+        let header = IvfChunkHeader {
+            row_count: 1,
+            embedding_count: 1,
+            dimension: 2,
+            centroid_count: 1,
+        };
+        let parts = vec![IvfPlainPart {
+            segment_offsets: vec![0],
+            vectors: vec![0u8; 8],
+        }];
+        let bytes = encode_ivf_plain_chunk(&header, &[0.0f32, 0.0], &parts).unwrap();
+        assert!(decode_ivf_plain_chunk(&bytes[..bytes.len() - 1], 4).is_err());
+        assert!(decode_ivf_plain_chunk(&bytes[..8], 4).is_err());
+    }
 
     #[test]
     fn vertex_struct_sizes_match_the_measured_cpp_layout() {

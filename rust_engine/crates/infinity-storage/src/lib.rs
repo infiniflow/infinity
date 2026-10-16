@@ -31,8 +31,9 @@ pub use cpp_format::{
 };
 pub use crc::crc32_ieee;
 pub use knn_format::{
-    decode_graph_region, encode_graph_region, HnswChunk, HnswGraphVertex, HnswHeader,
-    HNSW_HEADER_LEN, VERTEX_L0_SIZE, VERTEX_LX_SIZE,
+    decode_graph_region, decode_ivf_plain_chunk, encode_graph_region, encode_ivf_plain_chunk,
+    HnswChunk, HnswGraphVertex, HnswHeader, IvfChunkHeader, IvfPlainPart, HNSW_HEADER_LEN,
+    VERTEX_L0_SIZE, VERTEX_LX_SIZE,
 };
 pub use metastore::{FjallMetaStore, MetaStore};
 pub use mvcc::{BlockVersion, CreateField};
