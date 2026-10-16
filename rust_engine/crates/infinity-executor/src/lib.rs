@@ -904,6 +904,64 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// Evaluates a Lucene `minimum_should_match` spec against the number of
+/// optional clauses, returning how many terms a document must match.
+///
+/// The spec is a whitespace-separated list of clauses evaluated in order; the
+/// last one that applies wins. Each clause is `[n<]value` where `value` is a
+/// non-negative count, a negative count (`optional - n`), or a percentage of
+/// the optional count (negative percentages subtract from it).
+fn minimum_should_match(spec: &str, optional: usize) -> usize {
+    if optional == 0 {
+        return 0;
+    }
+    let clause_value = |value: &str| -> Option<usize> {
+        let (num, pct) = match value.strip_suffix('%') {
+            Some(n) => (n, true),
+            None => (value, false),
+        };
+        let n: i64 = num.trim().parse().ok()?;
+        if pct {
+            let scaled = (optional as f64 * n.unsigned_abs() as f64 / 100.0).floor() as i64;
+            Some(if n < 0 {
+                (optional as i64 - scaled).max(0) as usize
+            } else {
+                scaled.max(0) as usize
+            })
+        } else {
+            Some(if n < 0 {
+                (optional as i64 + n).max(0) as usize
+            } else {
+                n as usize
+            })
+        }
+    };
+    let mut required = 1usize.min(optional);
+    for clause in spec.split_whitespace() {
+        match clause.split_once('<') {
+            Some((cond, rest)) => {
+                let cond: i64 = match cond.trim().parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if optional as i64 > cond {
+                    match clause_value(rest.trim()) {
+                        Some(v) => required = v.min(optional),
+                        None => continue,
+                    }
+                } else {
+                    required = optional;
+                }
+            }
+            None => match clause_value(clause) {
+                Some(v) => required = v.min(optional),
+                None => continue,
+            },
+        }
+    }
+    required
+}
+
 /// True when the select list references the `ROW_ID()` pseudo-column.
 fn uses_row_id(items: &[SelectItem]) -> bool {
     fn in_expr(e: &ExprAst) -> bool {
@@ -2482,9 +2540,20 @@ impl Engine {
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
         let params = arg_str(m.args.get(1)).unwrap_or_default();
-        if params.to_ascii_lowercase().contains("threshold") {
-            return Ok((Vec::new(), hidden.to_vec()));
-        }
+        // `threshold=<f>` keeps only documents scoring at least `f`
+        let threshold: Option<f64> = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("threshold"))
+            .and_then(|(_, v)| v.trim().parse().ok());
+        // `operator=and` requires every query term (`or` is the default)
+        let require_all = params.split(';').any(|p| {
+            p.split_once('=')
+                .map(|(k, v)| {
+                    k.trim().eq_ignore_ascii_case("operator") && v.trim().eq_ignore_ascii_case("and")
+                })
+                .unwrap_or(false)
+        });
         let query = arg_str(m.args.first()).unwrap_or_default();
         // Drop per-term boosts (`term^2.0`) before tokenising.
         let query_clean = query
@@ -2536,17 +2605,9 @@ impl Engine {
             .split(';')
             .filter_map(|p| p.split_once('='))
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
-            .map(|(_, v)| {
-                let v = v.trim();
-                match v.strip_suffix('%') {
-                    Some(num) => {
-                        let pct: f64 = num.trim().parse().unwrap_or(0.0);
-                        ((pct / 100.0) * terms.len() as f64).ceil().max(1.0) as usize
-                    }
-                    None => v.parse::<usize>().unwrap_or(1),
-                }
-            })
+            .map(|(_, v)| minimum_should_match(v.trim(), terms.len()))
             .unwrap_or(1);
+        let min_should = if require_all { terms.len() } else { min_should };
         let topn = parse_topn_param(&params).unwrap_or(10);
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
@@ -2571,7 +2632,10 @@ impl Engine {
             let doc: std::collections::HashSet<String> = tokenize(&text).into_iter().collect();
             let hits = terms.iter().filter(|t| doc.contains(*t)).count();
             if hits >= min_should && hits > 0 {
-                scored.push((seq, hits as f64));
+                let score = hits as f64;
+                if threshold.map(|t| score >= t).unwrap_or(true) {
+                    scored.push((seq, score));
+                }
             }
         }
         scored.sort_by(|a, b| {
