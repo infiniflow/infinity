@@ -904,6 +904,28 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// True when the select list references the `ROW_ID()` pseudo-column.
+fn uses_row_id(items: &[SelectItem]) -> bool {
+    fn in_expr(e: &ExprAst) -> bool {
+        match e {
+            ExprAst::Func { name, args } => {
+                name.eq_ignore_ascii_case("ROW_ID") || args.iter().any(in_expr)
+            }
+            ExprAst::Binary(a, _, b)
+            | ExprAst::Cmp(a, _, b)
+            | ExprAst::And(a, b)
+            | ExprAst::Or(a, b) => in_expr(a) || in_expr(b),
+            ExprAst::Not(a) => in_expr(a),
+            _ => false,
+        }
+    }
+    items.iter().any(|it| match it {
+        SelectItem::Func { name, .. } => name.eq_ignore_ascii_case("ROW_ID"),
+        SelectItem::Expr(e) => in_expr(e),
+        _ => false,
+    })
+}
+
 /// `DISTANCE()` requires a distance metric and `SIMILARITY()` a similarity
 /// metric; reject the mismatch.
 fn validate_search_pseudo_columns(s: &SearchClause, items: &[SelectItem]) -> Result<()> {
@@ -2053,6 +2075,29 @@ impl Engine {
                     }
                     override_rows = Some(rows);
                 }
+                // `ROW_ID()` outside a SEARCH exposes the row's sequence number
+                // as a hidden scan column.
+                let mut rowid_col = false;
+                if search.is_none() {
+                    if let Some(t) = from.as_ref() {
+                        if unnest_rows.is_none() && uses_row_id(items) {
+                            if let Some(entry) = tables.first_mut() {
+                                entry.1.push("#_row_id".into());
+                            }
+                            let rows: Vec<Vec<Value>> = self
+                                .fetch_rows_with_ids(t)?
+                                .into_iter()
+                                .map(|(seq, mut r)| {
+                                    r.push(Value::Int(seq as i64));
+                                    r
+                                })
+                                .collect();
+                            override_rows = Some(rows);
+                            rowid_col = true;
+                        }
+                    }
+                }
+                let _ = rowid_col;
                 // An ORDER BY key that names a select alias is rewritten to the
                 // corresponding output label.
                 let order_keys: Vec<infinity_parser::OrderKey> = order_by
@@ -2090,7 +2135,13 @@ impl Engine {
                     if let (Some(t), Some(pred)) = (from.as_ref(), where_pred.as_ref()) {
                         if let Some((col, CmpOp::Eq, val)) = pred.as_column_literal() {
                             if let Some(ids) = self.index_lookup(t, col, val) {
-                                override_rows = Some(self.fetch_rows_by_ids(t, &ids)?);
+                                let mut rows = self.fetch_rows_by_ids(t, &ids)?;
+                                if rowid_col {
+                                    for (r, id) in rows.iter_mut().zip(ids.iter()) {
+                                        r.push(Value::Int(*id as i64));
+                                    }
+                                }
+                                override_rows = Some(rows);
                             }
                         }
                     }
