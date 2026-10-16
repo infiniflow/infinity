@@ -3329,7 +3329,7 @@ impl Engine {
             1.0
         } else {
             docs.iter()
-                .map(|(_, _, toks, _)| toks.len() as f64)
+                .map(|(_, _, toks, _)| toks.len().saturating_sub(1) as f64)
                 .sum::<f64>()
                 / docs.len() as f64
         };
@@ -3358,7 +3358,7 @@ impl Engine {
             for t in toks {
                 *counts.entry(t.as_str()).or_insert(0) += 1;
             }
-            let len = toks.len() as f64;
+            let len = toks.len().saturating_sub(1) as f64;
             let mut score = 0.0f64;
             let mut hits = 0usize;
             if keyword_field {
@@ -3764,7 +3764,10 @@ impl Engine {
             .iter()
             .map(|x| x.to_string())
             .collect();
-        if s.matches.len() > 1 {
+        // A `FUSION(…)` tail always routes through the fusion operator, even
+        // when it has a single child (e.g. `FUSION('match_tensor', …)` re-ranks
+        // the one sub-search's candidates).
+        if s.matches.len() > 1 || s.fusion.is_some() {
             return self.fuse_matches(table, s, pred, hidden);
         }
         match s.matches.first() {
@@ -3821,6 +3824,11 @@ impl Engine {
             min_heap.push(match_is_min_heap(m));
             children.push(rows);
         }
+        // `match_tensor` ignores the children's scores entirely: it reranks the
+        // union of the rows by a tensor similarity.
+        if method == "match_tensor" {
+            return self.fuse_match_tensor(table, &opt, children, hidden);
+        }
         // Per-document child scores, in first-seen order (fragment 0 first, then
         // each document in rank order).
         struct Doc {
@@ -3862,6 +3870,45 @@ impl Engine {
             .and_then(|v| v.parse::<usize>().ok())
             .filter(|n| *n >= 1)
             .unwrap_or(100);
+        // `FUSION('match_tensor', …)` re-ranks the candidates its children
+        // produced by the MaxSim of a tensor column against a query tensor
+        // (`physical_fusion_impl.cpp`): the fusion score replaces the child
+        // scores rather than combining them.
+        if method == "match_tensor"
+            && opt("match_method")
+                .map(|m| m.eq_ignore_ascii_case("maxsim"))
+                .unwrap_or(true)
+        {
+            let schema = self.table_schema(table)?;
+            let types = self.column_types(table)?;
+            let col_name = opt("column_name").unwrap_or_default();
+            let col_idx = schema.iter().position(|c| c == &col_name);
+            let q: Vec<Vec<f64>> = opt("search_tensor")
+                .map(|s| parse_tensor_leaves(&s))
+                .unwrap_or_default();
+            let col_elem = col_idx
+                .and_then(|i| types.get(i))
+                .map(|t| tensor_elem_type(t))
+                .unwrap_or(ElemType::Float32);
+            let qry_elem = opt("tensor_data_type")
+                .map(|s| elem_type_of(&s))
+                .unwrap_or(ElemType::Float32);
+            for doc in &mut docs {
+                let score = match col_idx.and_then(|i| doc.row.get(i)) {
+                    Some(Value::Str(v)) => tensor_score(&q, v, col_elem, qry_elem),
+                    _ => 0.0,
+                };
+                set_score(&mut doc.row, score);
+            }
+            let mut docs = docs;
+            docs.sort_by(|a, b| {
+                row_score(&b.row)
+                    .partial_cmp(&row_score(&a.row))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            docs.truncate(topn);
+            return Ok((docs.into_iter().map(|d| d.row).collect(), hidden));
+        }
         if method == "rrf" {
             let rank_constant: f64 = opt("rank_constant")
                 .and_then(|v| v.parse::<f64>().ok())
@@ -3960,6 +4007,82 @@ impl Engine {
         });
         docs.truncate(topn);
         Ok((docs.into_iter().map(|d| d.row).collect(), hidden))
+    }
+
+    /// `FUSION('match_tensor', …)`: reranks the **union** of the sub-search rows
+    /// by the `search_tensor` option's similarity against `column_name`,
+    /// reproducing `PhysicalFusion::ExecuteMatchTensor`. The children's own
+    /// scores are not used — only the row set they produced.
+    fn fuse_match_tensor(
+        &self,
+        table: &str,
+        opt: &impl Fn(&str) -> Option<String>,
+        children: Vec<Vec<Vec<Value>>>,
+        hidden: Vec<String>,
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let column = opt("column_name").unwrap_or_default();
+        let search_tensor = opt("search_tensor").unwrap_or_default();
+        let data_type = opt("tensor_data_type").unwrap_or_else(|| "float".into());
+        let topn = opt("topn")
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| *n > 0)
+            .unwrap_or(10);
+        let schema = self.table_schema(table)?;
+        let types = self.column_types(table)?;
+        let col_idx = schema
+            .iter()
+            .position(|c| *c == column)
+            .ok_or_else(|| Error::Invalid(format!("no column '{column}' for match_tensor")))?;
+        // Mirror the `MATCH TENSOR` query path: reshape by the declared
+        // dimension before parsing into per-tensor leaves.
+        let qtext = match type_dim(&types[col_idx]) {
+            Some(d) => reshape_tensor(&search_tensor, d),
+            None => search_tensor.clone(),
+        };
+        let q = parse_tensor_leaves(&qtext);
+        let col_elem = tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
+        let qry_elem = elem_type_of(&data_type);
+
+        // Deduplicate the union by row id, keeping the first occurrence's row.
+        let mut seen: std::collections::HashSet<i64> = Default::default();
+        let mut candidates: Vec<(i64, Vec<Value>)> = Vec::new();
+        for child in children {
+            for row in child {
+                let id = match row.iter().rev().nth(3) {
+                    Some(Value::Int(i)) => *i,
+                    _ => continue,
+                };
+                if seen.insert(id) {
+                    candidates.push((id, row));
+                }
+            }
+        }
+        let mut scored: Vec<(i64, f64, Vec<Value>)> = Vec::new();
+        for (id, row) in candidates {
+            let cell = match row.get(col_idx) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(v) => v.to_slt_string(),
+                None => continue,
+            };
+            let score = tensor_score(&q, &cell, col_elem, qry_elem);
+            scored.push((id, score, row));
+        }
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        scored.truncate(topn);
+        Ok((
+            scored
+                .into_iter()
+                .map(|(_, score, mut row)| {
+                    set_score(&mut row, score);
+                    row
+                })
+                .collect(),
+            hidden,
+        ))
     }
 
     /// Runs a single `MATCH` clause by brute force, returning the matching rows
