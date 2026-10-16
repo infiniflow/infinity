@@ -114,6 +114,9 @@ fn row_prefix(table: &str) -> Vec<u8> {
 fn del_key(table: &str, seq: usize) -> Vec<u8> {
     format!("del:{table}:{seq:016}").into_bytes()
 }
+fn del_prefix(table: &str) -> Vec<u8> {
+    format!("del:{table}:").into_bytes()
+}
 
 /// The declared dimension of a `TENSOR(FLOAT,d)` / `EMBEDDING(FLOAT,d)` column.
 fn type_dim(type_text: &str) -> Option<usize> {
@@ -475,6 +478,24 @@ impl Engine {
             }
             Statement::DropTable { name } => {
                 let existed = self.catalog.drop_table(name)?;
+                // Purge the table's stored rows and tombstones so a later
+                // CREATE TABLE with the same name starts empty.
+                for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
+                    self.store.delete(&k)?;
+                }
+                for (k, _) in self.store.scan_prefix(&del_prefix(name))? {
+                    self.store.delete(&k)?;
+                }
+                let key_prefix = format!("{name}.");
+                self.indexes
+                    .lock()
+                    .unwrap()
+                    .retain(|k, _| !k.starts_with(&key_prefix));
+                for im in self.catalog.list_indexes()? {
+                    if im.table == *name {
+                        let _ = self.catalog.drop_index(&im.name);
+                    }
+                }
                 Ok(QueryResult::DroppedTable {
                     name: name.clone(),
                     existed,
