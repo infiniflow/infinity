@@ -233,6 +233,10 @@ pub struct SearchClause {
 }
 
 /// A parsed statement.
+///
+/// `Select` is intentionally the largest variant; it is a short-lived parse
+/// tree, so boxing its fields would only complicate matching.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     CreateTable {
@@ -329,7 +333,9 @@ pub enum Statement {
         from: Option<String>,
         join: Option<JoinClause>,
         where_pred: Option<Predicate>,
-        group_by: Vec<String>,
+        group_by: Vec<ExprAst>,
+        /// Output aliases, aligned with `items` (`<expr> AS name`).
+        aliases: Vec<Option<String>>,
         having: Option<Box<Predicate>>,
         order_by: Option<OrderKey>,
         limit: Option<u64>,

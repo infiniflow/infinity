@@ -403,7 +403,7 @@ impl Parser {
             "SELECT" => {
                 self.advance();
                 let distinct = self.eat_kw("DISTINCT");
-                let items = self.select_items()?;
+                let (items, aliases) = self.select_items()?;
                 let from = if self.eat_kw("FROM") {
                     Some(self.expect_table_name()?)
                 } else {
@@ -431,19 +431,11 @@ impl Parser {
                 };
                 let group_by = if self.eat_kw("GROUP") {
                     self.expect_kw("BY")?;
-                    let mut keys = vec![self.expect_ident()?];
+                    // group keys may be plain columns or arbitrary expressions
+                    let mut keys = vec![self.expr()?];
                     while self.peek() == &Token::Comma {
                         self.advance();
-                        // tolerate expression keys: take the leading identifier
-                        if matches!(self.peek(), Token::Ident(_)) {
-                            keys.push(self.expect_ident()?);
-                            while !matches!(
-                                self.peek(),
-                                Token::Comma | Token::Ident(_) | Token::Semicolon | Token::Eof
-                            ) {
-                                self.advance();
-                            }
-                        }
+                        keys.push(self.expr()?);
                     }
                     keys
                 } else {
@@ -525,6 +517,7 @@ impl Parser {
                     join,
                     where_pred,
                     group_by,
+                    aliases,
                     having,
                     order_by,
                     limit,
@@ -1326,7 +1319,8 @@ impl Parser {
         }
     }
 
-    fn select_items(&mut self) -> Result<Vec<SelectItem>> {
+    fn select_items(&mut self) -> Result<(Vec<SelectItem>, Vec<Option<String>>)> {
+        let mut aliases: Vec<Option<String>> = Vec::new();
         let mut items = Vec::new();
         loop {
             let item = match self.peek() {
@@ -1337,7 +1331,7 @@ impl Parser {
                 Token::LParen => SelectItem::Expr(self.expr()?),
                 Token::Ident(n) if n.eq_ignore_ascii_case("NOT") => {
                     self.advance();
-                    match select_item_to_expr(&self.select_items().map(|mut v| {
+                    match select_item_to_expr(&self.select_items().map(|(mut v, _)| {
                         if v.is_empty() {
                             SelectItem::Literal(Literal::Null)
                         } else {
@@ -1410,7 +1404,7 @@ impl Parser {
                     };
                     self.advance();
                     let right_item = match self.select_items() {
-                        Ok(mut v) if !v.is_empty() => v.remove(0),
+                        Ok((mut v, _)) if !v.is_empty() => v.remove(0),
                         _ => SelectItem::Literal(Literal::Null),
                     };
                     let right = match select_item_to_expr(&right_item) {
@@ -1453,17 +1447,22 @@ impl Parser {
                 item
             };
             items.push(item);
-            // tolerate an output alias: `<expr> AS name`
+            // capture an output alias: `<expr> AS name`
+            let mut alias = None;
             if self.eat_kw("AS") {
-                let _ = self.advance();
+                if let Token::Ident(n) = self.peek().clone() {
+                    alias = Some(n);
+                    self.advance();
+                }
             }
+            aliases.push(alias);
             if self.peek() == &Token::Comma {
                 self.advance();
             } else {
                 break;
             }
         }
-        Ok(items)
+        Ok((items, aliases))
     }
 
     fn aggregate_name(&mut self, name: String) -> Result<SelectAgg> {
@@ -1725,6 +1724,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                aliases: vec![None],
                 having: None,
                 order_by: None,
                 limit: None,
@@ -1744,6 +1744,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                aliases: vec![None, None],
                 having: None,
                 order_by: None,
                 limit: None,
@@ -1767,6 +1768,7 @@ mod tests {
                 join: None,
                 where_pred: Some(Predicate::simple("id", CmpOp::Ge, Literal::Int(2))),
                 group_by: vec![],
+                aliases: vec![None, None],
                 having: None,
                 order_by: None,
                 limit: Some(10),
@@ -1798,6 +1800,7 @@ mod tests {
                 join: None,
                 where_pred: None,
                 group_by: vec![],
+                aliases: vec![None, None],
                 having: None,
                 order_by: None,
                 limit: None,
@@ -1820,7 +1823,8 @@ mod tests {
                 from: Some("t".into()),
                 join: None,
                 where_pred: None,
-                group_by: vec!["name".into()],
+                group_by: vec![ExprAst::Column("name".into())],
+                aliases: vec![None, None],
                 having: None,
                 order_by: Some(OrderKey {
                     column: "name".into(),
@@ -1848,6 +1852,7 @@ mod tests {
                 }),
                 where_pred: Some(Predicate::simple("aid", CmpOp::Ge, Literal::Int(1))),
                 group_by: vec![],
+                aliases: vec![None],
                 having: None,
                 order_by: None,
                 limit: None,

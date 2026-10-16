@@ -44,7 +44,8 @@ pub enum LogicalPlan {
     },
     Aggregate {
         input: Box<LogicalPlan>,
-        group_keys: Vec<usize>,
+        /// group-key expressions, evaluated per input row
+        group_keys: Vec<Expr>,
         group_names: Vec<String>,
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
@@ -311,15 +312,17 @@ fn compile_agg_expr(
     agg_index: &std::collections::HashMap<String, usize>,
     group_by: &[String],
 ) -> Result<Expr> {
+    // A select expression that matches a GROUP BY key resolves to that key's
+    // output column.
+    let text = key_text(e);
+    if let Some(i) = group_by.iter().position(|g| *g == text) {
+        return Ok(Expr::Column(i));
+    }
     Ok(match e {
         ExprAst::Column(c) => {
-            if group_by.iter().any(|g| g == c) {
-                Expr::Column(0)
-            } else {
-                return Err(Error::Invalid(format!(
-                    "column '{c}' must appear in GROUP BY or inside an aggregate"
-                )));
-            }
+            return Err(Error::Invalid(format!(
+                "column '{c}' must appear in GROUP BY or inside an aggregate"
+            )));
         }
         ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
         ExprAst::Binary(a, op, b) => Expr::Binary(
@@ -368,6 +371,25 @@ fn compile_agg_expr(
     })
 }
 
+/// A canonical text for an expression, used to match select items against
+/// GROUP BY keys (both are parsed from the same query text).
+fn key_text(e: &ExprAst) -> String {
+    match e {
+        ExprAst::Column(c) => c.clone(),
+        ExprAst::Literal(l) => l.to_slt_string(),
+        ExprAst::Func { name, args } => format!(
+            "{}({})",
+            name.to_ascii_lowercase(),
+            args.iter().map(key_text).collect::<Vec<_>>().join(",")
+        ),
+        ExprAst::Binary(a, op, b) => format!("({}{:?}{})", key_text(a), op, key_text(b)),
+        ExprAst::Cmp(a, op, b) => format!("({}{:?}{})", key_text(a), op, key_text(b)),
+        ExprAst::Not(a) => format!("not({})", key_text(a)),
+        ExprAst::And(a, b) => format!("({} and {})", key_text(a), key_text(b)),
+        ExprAst::Or(a, b) => format!("({} or {})", key_text(a), key_text(b)),
+    }
+}
+
 /// Builds the post-aggregate projection expression for one select item.
 fn item_agg_expr(
     it: &SelectItem,
@@ -403,13 +425,13 @@ fn item_agg_expr(
 }
 
 /// A display name for a select item (used for post-aggregate projection).
-fn item_label(it: &SelectItem) -> String {
+pub fn item_label(it: &SelectItem) -> String {
     match it {
         SelectItem::Aggregate(a) => agg_label(a.func, &a.args),
         SelectItem::Column(c) => c.clone(),
         SelectItem::Func { name, .. } => name.to_ascii_lowercase(),
         SelectItem::Literal(_) => "c0".to_string(),
-        SelectItem::Expr(_) => "expr".to_string(),
+        SelectItem::Expr(e) => key_text(e),
         SelectItem::Star => "*".to_string(),
     }
 }
@@ -453,7 +475,7 @@ pub fn plan_select(
     tables: &[(String, Vec<String>)],
     join: Option<&JoinClause>,
     where_pred: Option<&Predicate>,
-    group_by: &[String],
+    group_by: &[ExprAst],
     having: Option<&Predicate>,
     order_by: Option<&OrderKey>,
     limit: Option<u64>,
@@ -507,9 +529,12 @@ pub fn plan_select(
     let is_star = matches!(items, [SelectItem::Star]);
 
     if has_agg {
-        let group_keys: Vec<usize> = group_by
+        // Group keys may be plain columns or arbitrary expressions; keep both a
+        // canonical key text (for matching select items) and the compiled form.
+        let group_texts: Vec<String> = group_by.iter().map(key_text).collect();
+        let group_keys: Vec<Expr> = group_by
             .iter()
-            .map(|name| resolve_column(&schema, name))
+            .map(|e| compile_expr(e, &schema))
             .collect::<Result<Vec<_>>>()?;
         let base = group_by.len();
         let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
@@ -532,7 +557,7 @@ pub fn plan_select(
                     gather_agg(e, &schema, &mut aggs, &mut agg_index, base)?;
                 }
                 SelectItem::Column(c) => {
-                    if !group_by.iter().any(|g| g == c) {
+                    if !group_texts.iter().any(|g| g == c) {
                         return Err(Error::Invalid(format!(
                             "column '{c}' must appear in GROUP BY or inside an aggregate"
                         )));
@@ -548,18 +573,18 @@ pub fn plan_select(
                 }
             }
         }
-        let mut agg_names: Vec<String> = group_by.to_vec();
+        let mut agg_names: Vec<String> = group_texts.clone();
         agg_names.extend(aggs.iter().map(|(_, _, _, l)| l.clone()));
         plan = LogicalPlan::Aggregate {
             input: Box::new(plan),
             group_keys,
-            group_names: group_by.to_vec(),
+            group_names: group_texts.clone(),
             aggs,
         };
         out_names = agg_names.clone();
         // HAVING filters the aggregate output (group columns + aggregate results).
         if let Some(h) = having {
-            let pred = compile_agg_predicate(h, &agg_index, group_by)?;
+            let pred = compile_agg_predicate(h, &agg_index, &group_texts)?;
             plan = LogicalPlan::Filter {
                 input: Box::new(plan),
                 predicate: pred,
@@ -571,7 +596,7 @@ pub fn plan_select(
             let mut exprs = Vec::new();
             let mut names = Vec::new();
             for it in items {
-                exprs.push(item_agg_expr(it, &agg_index, group_by, &agg_names)?);
+                exprs.push(item_agg_expr(it, &agg_index, &group_texts, &agg_names)?);
                 names.push(item_label(it));
             }
             plan = LogicalPlan::Projection {

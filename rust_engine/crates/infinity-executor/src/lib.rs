@@ -73,7 +73,7 @@ enum Stage {
     Filter(Expr),
     Projection(Vec<Expr>, Vec<String>),
     Aggregate {
-        group_keys: Vec<usize>,
+        group_keys: Vec<Expr>,
         group_names: Vec<String>,
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
@@ -1549,6 +1549,7 @@ impl Engine {
                 join,
                 where_pred,
                 group_by,
+                aliases,
                 having,
                 order_by,
                 limit,
@@ -1702,6 +1703,20 @@ impl Engine {
                     }
                     override_rows = Some(rows);
                 }
+                // An ORDER BY key that names a select alias is rewritten to the
+                // corresponding output label.
+                let order_key = order_by.as_ref().map(|ok| {
+                    let mut ok = ok.clone();
+                    if let Some(i) = aliases
+                        .iter()
+                        .position(|a| a.as_deref() == Some(ok.column.as_str()))
+                    {
+                        if let Some(item) = items.get(i) {
+                            ok.column = infinity_planner::item_label(item);
+                        }
+                    }
+                    ok
+                });
                 let plan = plan_select(
                     items,
                     &tables,
@@ -1709,7 +1724,7 @@ impl Engine {
                     where_pred.as_ref(),
                     group_by,
                     having.as_deref(),
-                    order_by.as_ref(),
+                    order_key.as_ref(),
                     *limit,
                     *offset,
                 )?;
@@ -2848,7 +2863,7 @@ async fn pipeline(
 
 fn apply_aggregate(
     rows: &[Vec<Value>],
-    group_keys: &[usize],
+    group_keys: &[Expr],
     group_names: &[String],
     aggs: &[(AggFunc, Vec<usize>, bool, String)],
 ) -> (Vec<String>, Vec<Vec<Value>>) {
@@ -2868,10 +2883,7 @@ fn apply_aggregate(
     let mut order: Vec<Vec<Value>> = Vec::new();
     let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
     for r in rows {
-        let key: Vec<Value> = group_keys
-            .iter()
-            .map(|k| r.get(*k).cloned().unwrap_or(Value::Null))
-            .collect();
+        let key: Vec<Value> = group_keys.iter().map(|k| k.eval(r)).collect();
         let idx = match order.iter().position(|o| *o == key) {
             Some(i) => i,
             None => {
