@@ -1385,6 +1385,222 @@ pub fn build_fst(entries: &[(Vec<u8>, u64)]) -> Vec<u8> {
     b.finish()
 }
 
+// ---------------------------------------------------------------------------
+// u32 posting block codec: `CompositeCodec<SIMDBinaryPacking, VariableByte>`
+// (`fastpfor_impl.cpp:55-57`; layout verified against C++ ground truth)
+// ---------------------------------------------------------------------------
+//
+// `SIMDBinaryPacking` handles whole 128-value mini-blocks; the remaining tail
+// goes through `VariableByte`. Its byte layout is a plain bit-packing *per
+// 32-bit SSE lane*: for a mini-block at width `w` the 128 values split by
+// `index % 4` into four lanes, each lane's values are packed LSB-first into a
+// `w`-word bit stream, and lane `L`'s k-th word lands at output word
+// `L + 4*k`. (Verified: this reproduces the C++ bytes for widths 1..17.)
+
+/// `SIMDBinaryPacking::MiniBlockSize` (`simdbitpacking.h:36`).
+pub const POSTING_MINI_BLOCK: usize = 128;
+/// `HowManyMiniBlocks` (`simdbitpacking.h:37`): mini-blocks per bit-width header.
+pub const POSTING_MINI_BLOCKS_PER_GROUP: usize = 16;
+
+/// The bit width needed to store `v` (`maxbits`), `0` for zero.
+fn max_bits(v: u32) -> u8 {
+    (32 - v.leading_zeros()) as u8
+}
+
+/// Packs one 128-value mini-block at width `w` into `4*w` words (the lane
+/// layout above).
+fn pack_mini_block(values: &[u32], w: u8, out: &mut Vec<u8>) {
+    let w = w as usize;
+    let mut words = vec![0u32; 4 * w];
+    for lane in 0..4usize {
+        let mut bit = 0usize;
+        let mut idx = lane;
+        while idx < values.len() {
+            let v = values[idx];
+            for bpos in 0..w {
+                if (v >> bpos) & 1 != 0 {
+                    let gb = bit + bpos;
+                    words[lane + 4 * (gb / 32)] |= 1 << (gb % 32);
+                }
+            }
+            bit += w;
+            idx += 4;
+        }
+    }
+    for word in words {
+        out.extend_from_slice(&word.to_le_bytes());
+    }
+}
+
+/// Unpacks one 128-value mini-block of width `w` from `buf`, appending up to
+/// `count` values.
+fn unpack_mini_block(buf: &[u8], w: u8, count: usize, out: &mut Vec<u32>) -> Result<(), FormatError> {
+    let w = w as usize;
+    let nwords = 4 * w;
+    if buf.len() < nwords * 4 {
+        return Err(FormatError::Truncated {
+            need: nwords * 4,
+            got: buf.len(),
+        });
+    }
+    let word = |i: usize| -> u32 { u32::from_le_bytes(buf[i * 4..i * 4 + 4].try_into().unwrap()) };
+    for idx in 0..count {
+        let lane = idx % 4;
+        let pos = idx / 4;
+        let mut value = 0u32;
+        for bpos in 0..w {
+            let gb = pos * w + bpos;
+            let bitval = (word(lane + 4 * (gb / 32)) >> (gb % 32)) & 1;
+            value |= bitval << bpos;
+        }
+        out.push(value);
+    }
+    Ok(())
+}
+
+/// `VariableByte::encodeToByteArray` (`variablebyte.h:64-...`): 7-bit groups,
+/// LSB first, high bit set on the last byte, then zero-padded to 32 bits.
+fn vb_encode(values: &[u32], out: &mut Vec<u8>) {
+    for &v in values {
+        let mut val = v as u64;
+        loop {
+            let byte = (val & 0x7f) as u8;
+            val >>= 7;
+            if val == 0 {
+                out.push(byte | 0x80);
+                break;
+            }
+            out.push(byte);
+        }
+    }
+    while !out.len().is_multiple_of(4) {
+        out.push(0);
+    }
+}
+
+/// `VariableByte::decodeArray`: reads `count` values, returning how many bytes
+/// were consumed.
+fn vb_decode(buf: &[u8], count: usize) -> Result<(Vec<u32>, usize), FormatError> {
+    let mut out = Vec::with_capacity(count);
+    let mut pos = 0usize;
+    for _ in 0..count {
+        let mut value = 0u64;
+        let mut shift = 0u32;
+        loop {
+            let byte = *buf.get(pos).ok_or(FormatError::Truncated {
+                need: pos + 1,
+                got: buf.len(),
+            })?;
+            pos += 1;
+            value |= ((byte & 0x7f) as u64) << shift;
+            if byte & 0x80 != 0 {
+                break;
+            }
+            shift += 7;
+        }
+        out.push(value as u32);
+    }
+    Ok((out, pos))
+}
+
+/// Encodes a u32 posting field with the C++ `SIMDBinaryPacking + VariableByte`
+/// composite: whole 128-value blocks go through SIMD-BP128, the tail through
+/// variable-byte.
+pub fn encode_u32_block(values: &[u32]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let simd_len = values.len() / POSTING_MINI_BLOCK * POSTING_MINI_BLOCK;
+    // SIMDBinaryPacking always writes its own length first (0 for no blocks).
+    out.extend_from_slice(&(simd_len as u32).to_le_bytes());
+    let nblocks = simd_len / POSTING_MINI_BLOCK;
+    let mut b = 0usize;
+    while b < nblocks {
+        let group = (nblocks - b).min(POSTING_MINI_BLOCKS_PER_GROUP);
+        let mut widths = [0u8; POSTING_MINI_BLOCKS_PER_GROUP];
+        for (i, w) in widths.iter_mut().enumerate().take(group) {
+            let mb = &values[(b + i) * POSTING_MINI_BLOCK..(b + i + 1) * POSTING_MINI_BLOCK];
+            *w = mb.iter().map(|v| max_bits(*v)).max().unwrap_or(0);
+        }
+        // Four words, each packing four widths big-endian.
+        for g in 0..4 {
+            let w = ((widths[4 * g] as u32) << 24)
+                | ((widths[4 * g + 1] as u32) << 16)
+                | ((widths[4 * g + 2] as u32) << 8)
+                | widths[4 * g + 3] as u32;
+            out.extend_from_slice(&w.to_le_bytes());
+        }
+        for (i, &w) in widths.iter().enumerate().take(group) {
+            let mb = &values[(b + i) * POSTING_MINI_BLOCK..(b + i + 1) * POSTING_MINI_BLOCK];
+            pack_mini_block(mb, w, &mut out);
+        }
+        b += group;
+    }
+    if values.len() > simd_len {
+        vb_encode(&values[simd_len..], &mut out);
+    }
+    out
+}
+
+/// Decodes a u32 posting field, returning the decoded values and how many bytes
+/// were consumed (`IntEncoder::Decode` needs `expected` because the SIMD/`VB`
+/// split is not self-describing).
+pub fn decode_u32_block(
+    buf: &[u8],
+    expected: usize,
+) -> Result<(Vec<u32>, usize), FormatError> {
+    if buf.len() < 4 {
+        return Err(FormatError::Truncated {
+            need: 4,
+            got: buf.len(),
+        });
+    }
+    let simd_len = u32::from_le_bytes(buf[0..4].try_into().unwrap()) as usize;
+    let mut pos = 4usize;
+    let mut out = Vec::with_capacity(expected);
+    let nblocks = simd_len / POSTING_MINI_BLOCK;
+    let mut b = 0usize;
+    while out.len() < simd_len {
+        let group = (nblocks - b).min(POSTING_MINI_BLOCKS_PER_GROUP);
+        // Four header words carry the 16 widths.
+        if pos + 16 > buf.len() {
+            return Err(FormatError::Truncated {
+                need: pos + 16,
+                got: buf.len(),
+            });
+        }
+        let mut widths = [0u8; POSTING_MINI_BLOCKS_PER_GROUP];
+        for g in 0..4 {
+            let w = u32::from_le_bytes(buf[pos + 4 * g..pos + 4 * g + 4].try_into().unwrap());
+            widths[4 * g] = (w >> 24) as u8;
+            widths[4 * g + 1] = (w >> 16) as u8;
+            widths[4 * g + 2] = (w >> 8) as u8;
+            widths[4 * g + 3] = w as u8;
+        }
+        pos += 16;
+        for &w in widths.iter().take(group) {
+            let count = (simd_len - out.len()).min(POSTING_MINI_BLOCK);
+            let nbytes = 4 * w as usize * 4;
+            if pos + nbytes > buf.len() {
+                return Err(FormatError::Truncated {
+                    need: pos + nbytes,
+                    got: buf.len(),
+                });
+            }
+            unpack_mini_block(&buf[pos..pos + nbytes], w, count, &mut out)?;
+            pos += nbytes;
+        }
+        b += group;
+    }
+    // The remaining values are variable-byte encoded.
+    if expected > simd_len {
+        let (tail, used) = vb_decode(&buf[pos..], expected - simd_len)?;
+        out.extend_from_slice(&tail);
+        // `VariableByte` zero-pads to a 32-bit boundary, and the C++ reader
+        // consumes the padded span.
+        pos = (pos + used).div_ceil(4) * 4;
+    }
+    Ok((out, pos))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1723,6 +1939,77 @@ mod tests {
             for (k, v) in *pairs {
                 assert_eq!(fst_get(&built, k.as_bytes()).unwrap(), Some(*v), "{label}/{k}");
             }
+        }
+    }
+
+    #[test]
+    fn u32_block_matches_the_cpp_bytes() {
+        // C++ `CompositeCodec<SIMDBinaryPacking, VariableByte>` output (see
+        // CPP_FORMAT_SPEC.md 9.3.5 for the harness recipe), labels matching the
+        // inputs below. `small`/`big`/`mixed` have no 128-block, so they are
+        // pure variable-byte; `tail260` exercises SIMD + VB together.
+        let words = |i: usize| (i % 5) as u32;
+        let cases: &[(&str, Vec<u32>, &str)] = &[
+            ("small", vec![1, 2, 3, 4, 5], "000000008182838485000000"),
+            (
+                "zeros",
+                vec![0u32; 128],
+                "8000000000000000000000000000000000000000",
+            ),
+            (
+                "mixed",
+                vec![1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89],
+                "00000000818181828385888d95a2b7d9",
+            ),
+            (
+                "big",
+                vec![100000, 200000, 300000, 400000],
+                "00000000200d86401a8c602792003598",
+            ),
+            (
+                "bw1",
+                (0..128).map(|i| 1 + (i % 3) as u32).collect(),
+                "8000000000000002000000000000000000000000799ee7799ee7799ee7799ee7799ee7799ee7799ee7799ee7799ee7799ee7799e",
+            ),
+            (
+                "bw2",
+                (0..128).map(|i| 2 + (i % 3) as u32).collect(),
+                "80000000000000030000000000000000000000001a356ad4a3468d1ad4a851a31a356ad4a851a346356ad4a8468d1a35a851a3468d1a356a51a3468d6ad4a8518d1a356a",
+            ),
+            (
+                "bw7",
+                (0..128).map(|i| 7 + (i % 3) as u32).collect(),
+                "800000000000000400000000000000000000000087799887988779987998877987799887799887798779988798877998799887799887799879988779877998879887799887799887988779987998877987799887",
+            ),
+            (
+                "bw255",
+                (0..128).map(|i| 255 + (i % 3) as u32).collect(),
+                "8000000000000009000000000000000000000000ff0006fc0003fe0301ff010cff0006fc0730e03f18f01fc0f80f60c00730e03f8001ff0180ff00067f0003fe8001ff010cf80f60fc0730e00318f01f0cf80f60c07f00033f8001ffc080ff00c07f0003fe0318f0010cf80f06fc0730fe0318f01fc080ff60c07f00e03f80011fc080ff0006fc0703fe0318ff010cf80006fc0730e03f80f01fc0800f60c07f30e03f80",
+            ),
+            (
+                "bw65535",
+                (0..128).map(|i| 65535 + (i % 3) as u32).collect(),
+                "8000000000000011000000000000000000000000ffff0000000003000100ffffffff00000600fcfffeff030001000c000600fcff070030001800f0fff8ff0f0007003000e0ff3f001f00c0006000c0ffe0ff3f00800100ff80ffff007f000003800100ffff01000c000600fc00feff03ff01000c00f8ff0fff070030001800f000f8ff0f006000c000e0ff3fff1f00c0006000c0ff7f0000008001000080ffffff7f00000300feffffff0100000006000300feff030018000c00f8fffcff070003001800f0ff1f000f0060003000e0fff0ff1f00c00080ffc0ff7f003f008001c00080ffff000006000300fe00ffff01ff00000600fcff07ff030018000c00f800fcff07003000e000f0ff1fff0f0060003000e0ff3f008000c0008000c0ff7fff3f0080",
+            ),
+            (
+                "sq128",
+                (0..128).map(|i| (i * i) as u32).collect(),
+                "800000000000000e00000000000000000000000000000400014006100400094009400c900440020005a40221061003440784036901640024416e10270179402a4184902d400c0004240d4144100e8404040fc94444016440561169a469416e107c9173841e0009a41f6149be21c409d922294af402c4403812cb243a42d2103c92d9043e001084048150a6140411c9448951ec9444415a004da55ca156115f445f8561e919e406e4590e17ef1a3947fa5a649705418400242587c164118a8425068d4966c409a442f619b1a6294abe125c9acb86b6003124b9e1715ebdc43299c0a973d40d8443f01d9327f44da213f89db107fc",
+            ),
+            (
+                "tail260",
+                (0..260).map(words).collect(),
+                "0001000000000303000000000000000000000000e014700a01a780530a38059c53c029e038059c02c029e014024e01a714700a384e01a780700a38058053c029059c024e53c029e09c024e01e014700a01a7805314700a38a78053c038059c02c029e014059c024e29e014704e01a780700a380581828384",
+            ),
+        ];
+        for (label, values, hex) in cases {
+            let want = unhex(hex);
+            // Encode must be byte-identical to the C++ codec.
+            assert_eq!(encode_u32_block(values), want, "{label}: encode");
+            // And decode must recover the values.
+            let (got, used) = decode_u32_block(&want, values.len()).unwrap();
+            assert_eq!(&got, values, "{label}: decode");
+            assert_eq!(used, want.len(), "{label}: bytes consumed");
         }
     }
 

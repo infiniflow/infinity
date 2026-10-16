@@ -477,8 +477,10 @@ u8[pos_list_len]
     - `{1,2,3,4,5}` → 1 word = `0300fa09`
     - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `01700016 81404030 28201a15 d12d0b00`
   - **复现配方**：`clang++-23 -std=c++23 -O2 -march=native -I<fastpfor>/headers -I<repo>/third_party/newpfor main.cpp <fastpfor>/src/{bitpacking,bitpackingaligned,bitpackingunaligned,simdbitpacking,simdunalignedbitpacking,horizontalbitpacking}.cpp <repo>/third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`，其中 `main.cpp` 用 `encodeArray`（u32）/ `Compress(...,true)`（u16）并打印字节。**注意**：FastPForLib 不在仓库内（由 C++ 构建拉取），故未随仓库提交生成器；上述字节已固定在本节。同理注意 `-O2` 与 `-march` 必须与目标一致（SIMD 路径按位宽分派，但字节输出与 -O 无关——已核）。
-- **Rust 侧状态**：`TermPostings` 目前把 skip/list 体当作**不透明字节**（`inverted_format.rs`），u32/u16 块编解码**尚未实现**。
-- **实现难度已定量（2026-10-17 实测结论，重要）**：SIMD-BP128 的字节布局**不是**「按位顺序的朴素打包」，因此**无法从一个简单公式推导**，必须**逐宽度移植 FastPForLib 的 SSE 位打包表**。已用探针（`a[i]=i`，逐宽度）反解验证：u32 布局按 **32 位 SSE lane 交错**（例如宽度 4 时输出顺序为 `0,4,8,…,28,1,5,…,29,…`，即 `i mod 4` 分 lane），且**不同宽度的交错模式不同**（宽度 2/4 恰好等于朴素顺序，宽度 7 明显不是）。原路线的规模：`__SIMD_fastpackN_32`/`__SIMD_fastunpackN_32` 共 `N=1..32`（各约 60–130 行 SSE），即 **≈2000+ 行**机械移植；u16 侧对应 `third_party/newpfor` 的 `pack.h`/`unpack.h`/`unaligned_unpack.h`。**建议**：u32 直接用「朴素布局 + 自己的 128 值块」不行（会写出与 C++ 不兼容的字节），所以要么逐宽度移植 SSE 表，要么接受「只读 C++ 索引、不写 C++ 索引」的降级；真值字节与复现配方见上，可逐宽度断言。
+- **Rust 侧状态（2026-10-17 更新）**：
+  - **u32 块编解码已实现并逐位对齐 C++**（`infinity-storage::inverted_format::{encode_u32_block, decode_u32_block, POSTING_MINI_BLOCK}`）。**布局规律已定论**（无需移植 SSE 表）：`CompositeCodec<SIMDBinaryPacking, VariableByte>`；SIMD 部件写 `u32 simd_len`，随后每 16 个 128-值 mini-block 一组，先写 **4 个 u32 的位宽头**（每个 u32 内含 4 个位宽，**大端序**：`Bs[4g]<<24|Bs[4g+1]<<16|Bs[4g+2]<<8|Bs[4g+3]`），再写各 mini-block 的 `4*w` 个字。**mini-block 内部布局 = 按 32 位 SSE lane 的位流**：128 个值按 `index % 4` 分成 4 条 lane，lane L 的值（`i≡L mod 4`，按 `i/4` 排序）以 LSB-first 连续打包成 `w` 个字的位流，lane L 的第 k 个字落在输出字 `L + 4k`。剩余 `len%128` 个值走 **VariableByte**（7 位/字节、LSB 优先、**最高位在最后一字节置 1**，最后补 0 到 32 位边界）。已用 11 个 C++ 真值用例（位宽 1/2/3/7/8/16/17、纯 VB、SIMD+VB 混合）断言**编码逐位相同**且解码往返。
+  - **u16 块（NewPForDelta）仍待实现**：对应 `third_party/newpfor` 的 `pack.h`/`unpack.h`/`unaligned_unpack.h`；真值字节见上（`{1,2,3,4,5}`→`0300fa09` 等），可照 u32 的方式反解或移植。
+- **关于「布局不可推导」的更正（2026-10-17 晚）**：先用探针（`a[i]=i`，逐宽度）观察到 SIMD-BP128 按 32 位 SSE lane 交错、且宽度 2/4 恰等于朴素顺序，因而一度判定「必须逐宽度移植 SSE 表（≈2000 行）」。**随后按「lane = `index % 4`、lane 内 LSB-first 连续位流、lane L 的第 k 字落在字 `L+4k`」建模，一次通过全部 11 个真值用例**（含宽度 17），故该判定**已推翻**：布局是**可推导的**，Rust 实现只需上述规则（见上一条），无需移植任何 SSE 代码。
 
 ### 9.3.6 `.len`（列长 / BM25 统计）
 
