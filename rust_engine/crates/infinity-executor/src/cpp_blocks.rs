@@ -64,10 +64,14 @@ pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
 /// `TENSOR(<elem>,<dim>)` / `MULTIVECTOR(<elem>,<dim>)` →
 /// `(ColumnType, dimension, ElementType)`.
 ///
-/// `TENSORARRAY` is excluded: its outline body is a concatenation of tensors
-/// whose per-tensor length is not recorded in the slot (§8.3 records only a
-/// total count), so the split point is ambiguous. Bit elements are excluded for
-/// the same reason as embeddings.
+/// `TENSORARRAY` is excluded as a *clean* gap, not because it is ambiguous:
+/// its slot (`TensorArrayT`, `tensor_array_type.h:28-36`) is the same
+/// `{tensor_num:16; file_offset:48}`, and `file_offset_` points at
+/// `tensor_num` 8-byte `TensorT` records (`SetTensorArray`,
+/// `column_vector_impl.cpp:2792-2805`; `GetTensorArrayMeta`, `:2784-2790`),
+/// each giving that tensor's own count and data offset. So the split *is*
+/// derivable - implementing it needs a meta array written into the outline.
+/// Bit elements are excluded for the same reason as embeddings.
 pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let up = type_text.trim().to_ascii_uppercase();
     let (column_type, rest) = if let Some(r) = up.strip_prefix("MULTIVECTOR(") {

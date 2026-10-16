@@ -271,6 +271,8 @@ slot 宽度（`logical_type.cpp:183-255` 的 `type_size[]`；`DataType::Size()` 
 
 outline 文件（`col_{id}_out`）：内容 = 各次 `Append` 的原始字节按序首尾相接（`var_buffer_impl.cpp:28-46,85-104`）；`Append` 返回的 `offset`（= 追加前累积大小）写入 slot 的 `file_offset_`；**文件无索引、无头**，寻址全靠 slot 字段。Sparse 的 outline 内容 = `indices`（`nnz * index_width`）紧跟 `data`（`nnz * data_width`）（`vector_buffer.cppm:161-184`；`sparse_info.h:55-65`）。
 
+> **更正（2026-10-17）：`TENSORARRAY` 的切分是*可推导*的，不是歧义。** 其 slot 与 `TENSOR` 同为 `TensorArrayT = {tensor_num:16; file_offset:48}`（`tensor_array_type.h:28-36`），而 `file_offset_` 指向 outline 里 `tensor_num` 个 **8 字节 `TensorT` 记录**（`SetTensorArray`：逐个 `SetTensor` 写各 tensor 数据并记下其 `{count:16; offset:48}`，再把这段 meta 数组 `AppendTensorArrayMeta` 到 `file_offset_`——`column_vector_impl.cpp:2792-2805`；`GetTensorArrayMeta` `:2784-2790` 反读）。因此每个 tensor 的长度与位置都能从 outline 读出，此前「slot 只记总数、切分歧义」的结论**已推翻**；实现只需在 outline 里多写一段 meta 数组。`EMBEDDING(BIT,d)` 亦已补齐（位打包 `ceil(d/8)` 字节，见 `embedding_size`）。
+
 ## 8.4 Byte-level 实现清单（Rust 照此读写）
 
 1. 数据根 `{data_dir}`；路径节点全十进制：`db_{u64}/tbl_{u64}/seg_{u32}/blk_{u16}`；索引 `…/idx_{index_id}/seg_{seg_id}`。
