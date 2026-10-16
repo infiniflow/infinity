@@ -6,7 +6,7 @@
 >
 > 本文件为 **v0.1**：Rust 侧只登记**已存在**的测试（名称与 `cargo test` 输出的完全一致），
 > 未覆盖项在「缺口」列写明状态。C++ 侧以计划书「附录 A：核心不变量」与 CI 的
-> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G1、G3、G5 闭合）。
+> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G1、G2、G3、G5 闭合；G4 的 sanitizer 部分仍待）。
 
 ## 1. 配置校验 / 拒绝行为
 
@@ -54,7 +54,7 @@
 | # | 缺口 | 理由 / 影响 |
 |---|---|---|
 | G1 | ~~**配置项的范围校验**（`config_ut.cpp` 类）~~ | **已闭合（2026-10-17）**：`SET CONFIG` 对已知键（`result_cache`/`cache_result_capacity`/`CHECKPOINT_INTERVAL`）做值域校验并**拒绝**越界/非法值（不静默钳制）；未知键保持容忍。回归测试：`infinity-executor/tests/config_validation.rs`（4 用例）。 |
-| G2 | **索引文件族契约**（A3） | Rust 侧索引当前在内存 + KV 元数据中维护，尚未按 C++ 的「块文件族 + `ChunkIndexMetaInfo` 发布」落地；需在磁盘驻留索引（M4+）阶段补测。 |
+| G2 | ~~**索引文件族契约**（A3）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/index_file_family.rs`（4 用例）把 C++ 的索引路径/文件族契约固定下来——①路径形状 `db_{db}/tbl_{tbl}/idx_{index}/seg_{seg}`、向量族的 `chunk_{n}.idx`、块数据的 `db_{db}/tbl_{tbl}/seg_{seg}/blk_{blk}` 与 `{col}.col`/`col_{id}_out`/`version`；②全文族的后缀集 `.dic`/`.pos`/`.spill`（瞬时）/`.len` 与 `{index_dir}/{base_name}{suffix}` 拼法；③两类索引的**文件集合差异**（向量=单 `chunk_{n}.idx`；全文=`.dic`+`.pos`+`.len`）；④用真实编解码器把全文族的 `.dic`+`.pos`+`.len` 组成一个可回读的倒排索引（term→offset→TermMeta→postings）。此前该缺口的原因是磁盘格式未落地，现随 #68/#70/#71 完成而闭合。 |
 | G3 | ~~**跨底座宕机一致性**（KV+WAL+块文件同时崩溃）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/crash_consistency.rs` 把 PoC C 的边界场景落成回归测试 —— ①块写后崩溃→事务不可见；②WAL 落盘后崩溃→回放可见；③完整提交→无需回放即可见；④块文件丢失→由 WAL 载荷重建；⑤WAL 撕裂尾→回放在有效前缀处停止。 |
 | G4 | **`miri` / sanitizer** 覆盖 | **部分闭合（2026-10-17）**：miri 已在 `nightly-2025-04-04` 上对纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，共 38 用例）跑通，`run_gate_d.sh` 已接上；**sanitizer（TSAN/ASAN）** 仍需带 FFI/SIMD 的 nightly 与工具链，未覆盖。 |
 | G5 | ~~全文**打分**不变量（相似度单调性等）~~ | **已闭合（2026-10-17）**：`infinity-executor/tests/fulltext_score.rs`（BM25 近似实现的单调性不变量）：①更高 tf 不打低于低 tf；②等 tf 下更短文档不打低于更长文档；③不含查询词的行不出现在结果里。精确分值与 C++/iresearch 的对齐仍属打分移植任务（见 §5.1）。 |
