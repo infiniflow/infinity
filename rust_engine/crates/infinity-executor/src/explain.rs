@@ -1194,6 +1194,66 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
     Some(lines)
 }
 
+/// True when `items` is exactly one `COUNT(*)` (an unrenderable-by-the-generic
+/// printer shape that still has a fixed physical form).
+pub fn is_count_star_only(items: &[SelectItem]) -> bool {
+    matches!(items, [SelectItem::Aggregate(a)]
+        if matches!(a.func, AggFunc::Count) && a.args.is_empty())
+}
+
+/// The physical `EXPLAIN` text for `SELECT COUNT(*) FROM t [WHERE …]`, a single
+/// `AGGREGATE` node over an optional `FILTER`.
+pub fn explain_count_star(table: &str, where_pred: Option<&Predicate>) -> Vec<String> {
+    let alias = table.split('.').next_back().unwrap_or(table);
+    let db = table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    let mut cols: Vec<String> = Vec::new();
+    if let Some(w) = where_pred {
+        pred_cols(w, &mut cols);
+    }
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    for c in &cols {
+        if !ids.contains_key(c) {
+            ids.insert(c.clone(), ids.len());
+        }
+    }
+    let rowid_id = ids.len();
+    let mut out = cols.clone();
+    add_col(&mut out, "__rowid");
+
+    let has_filter = where_pred.is_some();
+    let project_id = if has_filter { 5 } else { 4 };
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", project_id));
+    lines.push(attr(0, "table index: #4"));
+    lines.push(attr(0, "expressions: [count(star) (#0)]"));
+    lines.push(header(1, "AGGREGATE", 4));
+    lines.push(attr(1, "aggregate table index: #3"));
+    lines.push(attr(
+        1,
+        &format!("aggregate: [COUNT(__rowid (#{rowid_id}))]"),
+    ));
+    if let Some(w) = where_pred {
+        lines.push(header(2, "FILTER", 3));
+        lines.push(attr(
+            2,
+            &format!("filter: {}", render_pred_m(w, &ids, false)),
+        ));
+        lines.push(attr(2, &format!("output columns: [{}]", out.join(", "))));
+    }
+    let scan_d = if has_filter { 3 } else { 2 };
+    lines.push(header(scan_d, "TABLE SCAN", 2));
+    lines.push(attr(scan_d, &format!("table name: {alias}({db}.{alias})")));
+    lines.push(attr(scan_d, "table index: #1"));
+    lines.push(attr(
+        scan_d,
+        &format!("output_columns: [{}]", out.join(", ")),
+    ));
+    lines
+}
+
 /// The logical-plan `AGGREGATE` text (`EXPLAIN LOGICAL SELECT <agg> …`).
 ///
 /// Handles the `MIN/MAX/SUM/COUNT/FIRST/LAST` and `AVG` (expanded to

@@ -1812,6 +1812,22 @@ impl Engine {
                         from: Some(t),
                         join,
                         group_by,
+                        where_pred,
+                        search,
+                        ..
+                    } if !logical
+                        && join.is_none()
+                        && search.is_none()
+                        && group_by.is_empty()
+                        && crate::explain::is_count_star_only(items) =>
+                    {
+                        Some(crate::explain::explain_count_star(t, where_pred.as_ref()))
+                    }
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
+                        group_by,
                         order_by,
                         search,
                         ..
