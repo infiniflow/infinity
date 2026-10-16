@@ -494,9 +494,233 @@ pub fn decode_ivf_plain_chunk(
     Ok((header, centroids, parts))
 }
 
+/// One scalar-quantized part (spec §9.2 `kScalarQuantization`): the shared
+/// `common_vec_a`/`common_vec_b` live in the chunk base, each part carries its
+/// quantized codes plus their dot product with the query vector.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvfSqPart {
+    /// `SegmentOffset` (rowid.segment_offset) of each vector in this part.
+    pub segment_offsets: Vec<u32>,
+    /// Quantized codes, `segment_offsets.len() * sq_bytes` (8-bit: `dim`,
+    /// 4-bit: `(dim + 1) / 2` per vector).
+    pub codes: Vec<u8>,
+    /// `dot_v_e`, one `f32` per vector.
+    pub dot_v_e: Vec<f32>,
+}
+
+/// Bytes each scalar-quantized vector occupies for `dimension` and `sq_bits`
+/// (8 or 4 bits per component).
+pub fn sq_bytes_per_vector(dimension: u32, sq_bits: u8) -> usize {
+    if sq_bits == 4 {
+        (dimension as usize).div_ceil(2)
+    } else {
+        dimension as usize
+    }
+}
+
+/// A decoded scalar-quantized IVF chunk.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvfSqChunk {
+    pub header: IvfChunkHeader,
+    pub centroids: Vec<f32>,
+    pub common_vec_a: Vec<f32>,
+    pub common_vec_b: Vec<f32>,
+    pub parts: Vec<IvfSqPart>,
+}
+
+/// Encodes an IVF chunk in the scalar-quantized storage layout.
+///
+/// Layout (`ivf_index_storage_parts_impl.cpp:256-263,672-688`): the plain header
+/// and centroids, then the shared `f32[dim] common_vec_a` and
+/// `f32[dim] common_vec_b`, then each part as `u32 embedding_num` +
+/// `u32[embedding_num]` offsets + the codes + `embedding_num` `f32` dot products.
+pub fn encode_ivf_sq_chunk(
+    header: &IvfChunkHeader,
+    centroids: &[f32],
+    common_vec_a: &[f32],
+    common_vec_b: &[f32],
+    parts: &[IvfSqPart],
+    sq_bits: u8,
+) -> Result<Vec<u8>, FormatError> {
+    let dim = header.dimension as usize;
+    let bad = |need: usize, got: usize| FormatError::Truncated { need, got };
+    if centroids.len() != header.centroid_count as usize * dim {
+        return Err(bad(header.centroid_count as usize * dim, centroids.len()));
+    }
+    if common_vec_a.len() != dim || common_vec_b.len() != dim {
+        return Err(bad(dim, common_vec_a.len().min(common_vec_b.len())));
+    }
+    let per_vector = sq_bytes_per_vector(header.dimension, sq_bits);
+    let mut out = Vec::new();
+    out.extend_from_slice(&header.row_count.to_le_bytes());
+    out.extend_from_slice(&header.embedding_count.to_le_bytes());
+    out.extend_from_slice(&header.dimension.to_le_bytes());
+    out.extend_from_slice(&header.centroid_count.to_le_bytes());
+    for v in centroids.iter().chain(common_vec_a).chain(common_vec_b) {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    for part in parts {
+        let n = part.segment_offsets.len();
+        if part.codes.len() != n * per_vector || part.dot_v_e.len() != n {
+            return Err(bad(n * per_vector, part.codes.len()));
+        }
+        out.extend_from_slice(&(n as u32).to_le_bytes());
+        for s in &part.segment_offsets {
+            out.extend_from_slice(&s.to_le_bytes());
+        }
+        out.extend_from_slice(&part.codes);
+        for d in &part.dot_v_e {
+            out.extend_from_slice(&d.to_le_bytes());
+        }
+    }
+    Ok(out)
+}
+
+/// Decodes an IVF chunk in the scalar-quantized storage layout, returning the
+/// header, centroids, the two shared vectors and the parts.
+pub fn decode_ivf_sq_chunk(bytes: &[u8], sq_bits: u8) -> Result<IvfSqChunk, FormatError> {
+    let short = |need: usize| FormatError::Truncated {
+        need,
+        got: bytes.len(),
+    };
+    if bytes.len() < 16 {
+        return Err(short(16));
+    }
+    let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+    let header = IvfChunkHeader {
+        row_count: u32_at(0),
+        embedding_count: u32_at(4),
+        dimension: u32_at(8),
+        centroid_count: u32_at(12),
+    };
+    let dim = header.dimension as usize;
+    let floats = header.centroid_count as usize * dim + 2 * dim;
+    let mut at = 16;
+    if bytes.len() < at + floats * 4 {
+        return Err(short(at + floats * 4));
+    }
+    let read_f32 = |from: &mut usize, n: usize| -> Vec<f32> {
+        let out = (0..n)
+            .map(|i| {
+                f32::from_le_bytes(bytes[*from + i * 4..*from + i * 4 + 4].try_into().unwrap())
+            })
+            .collect();
+        *from += n * 4;
+        out
+    };
+    let centroids = read_f32(&mut at, header.centroid_count as usize * dim);
+    let common_vec_a = read_f32(&mut at, dim);
+    let common_vec_b = read_f32(&mut at, dim);
+
+    let per_vector = sq_bytes_per_vector(header.dimension, sq_bits);
+    let mut parts = Vec::with_capacity(header.centroid_count as usize);
+    for _ in 0..header.centroid_count {
+        if bytes.len() < at + 4 {
+            return Err(short(at + 4));
+        }
+        let n = u32_at(at) as usize;
+        at += 4;
+        if bytes.len() < at + n * 4 {
+            return Err(short(at + n * 4));
+        }
+        let segment_offsets: Vec<u32> = (0..n).map(|i| u32_at(at + i * 4)).collect();
+        at += n * 4;
+        if bytes.len() < at + n * per_vector + n * 4 {
+            return Err(short(at + n * per_vector + n * 4));
+        }
+        let codes = bytes[at..at + n * per_vector].to_vec();
+        at += n * per_vector;
+        let dot_v_e = read_f32(&mut at, n);
+        parts.push(IvfSqPart {
+            segment_offsets,
+            codes,
+            dot_v_e,
+        });
+    }
+    Ok(IvfSqChunk {
+        header,
+        centroids,
+        common_vec_a,
+        common_vec_b,
+        parts,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ivf_sq_chunk_roundtrip() {
+        let header = IvfChunkHeader {
+            row_count: 2,
+            embedding_count: 2,
+            dimension: 2,
+            centroid_count: 1,
+        };
+        let centroids = [0.5f32, 0.5];
+        let a = [1.0f32, 0.0];
+        let b = [0.0f32, 1.0];
+        let parts = vec![IvfSqPart {
+            segment_offsets: vec![3, 4],
+            // 8-bit: dim (2) bytes per vector.
+            codes: vec![1, 2, 3, 4],
+            dot_v_e: vec![0.25, 0.5],
+        }];
+        let bytes = encode_ivf_sq_chunk(&header, &centroids, &a, &b, &parts, 8).unwrap();
+        // 16 header + (1*2 + 2*2) centroids/a/b floats + 4 + 2*4 offsets + 4 codes + 2*4 dots
+        assert_eq!(bytes.len(), 16 + 6 * 4 + 4 + 8 + 4 + 8);
+
+        let got = decode_ivf_sq_chunk(&bytes, 8).unwrap();
+        assert_eq!(got.header, header);
+        assert_eq!(got.centroids, centroids.to_vec());
+        assert_eq!(got.common_vec_a, a.to_vec());
+        assert_eq!(got.common_vec_b, b.to_vec());
+        assert_eq!(got.parts, parts);
+
+        // 4-bit codes halve the code bytes per vector.
+        assert_eq!(sq_bytes_per_vector(2, 4), 1);
+        assert_eq!(sq_bytes_per_vector(3, 4), 2);
+        let ok = IvfSqPart {
+            segment_offsets: vec![0, 1],
+            codes: vec![0x12, 0x34],
+            dot_v_e: vec![0.0, 0.0],
+        };
+        let bytes =
+            encode_ivf_sq_chunk(&header, &centroids, &a, &b, std::slice::from_ref(&ok), 4).unwrap();
+        let got = decode_ivf_sq_chunk(&bytes, 4).unwrap();
+        assert_eq!(got.parts, vec![ok]);
+    }
+
+    #[test]
+    fn ivf_sq_chunk_rejects_shape_mismatches() {
+        let header = IvfChunkHeader {
+            row_count: 1,
+            embedding_count: 1,
+            dimension: 2,
+            centroid_count: 1,
+        };
+        // Wrong code length for the declared embedding count.
+        let bad = vec![IvfSqPart {
+            segment_offsets: vec![0],
+            codes: vec![1, 2, 3],
+            dot_v_e: vec![0.0],
+        }];
+        assert!(
+            encode_ivf_sq_chunk(&header, &[0.0, 0.0], &[0.0, 0.0], &[0.0, 0.0], &bad, 8).is_err()
+        );
+        // Wrong shared-vector length.
+        assert!(encode_ivf_sq_chunk(&header, &[0.0, 0.0], &[0.0], &[0.0, 0.0], &[], 8).is_err());
+        // Truncated input.
+        let ok = vec![IvfSqPart {
+            segment_offsets: vec![0],
+            codes: vec![1, 2],
+            dot_v_e: vec![0.0],
+        }];
+        let bytes =
+            encode_ivf_sq_chunk(&header, &[0.0, 0.0], &[0.0, 0.0], &[0.0, 0.0], &ok, 8).unwrap();
+        assert!(decode_ivf_sq_chunk(&bytes[..bytes.len() - 1], 8).is_err());
+    }
 
     #[test]
     fn ivf_plain_chunk_roundtrip() {

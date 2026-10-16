@@ -36,9 +36,10 @@ pub use inverted_format::{
     TermMeta, TermMetaFlags, TermPostings, FST_TRAILER_LEN, FST_VERSION,
 };
 pub use knn_format::{
-    decode_graph_region, decode_ivf_plain_chunk, encode_graph_region, encode_ivf_plain_chunk,
-    HnswChunk, HnswGraphVertex, HnswHeader, IvfChunkHeader, IvfPlainPart, HNSW_HEADER_LEN,
-    VERTEX_L0_SIZE, VERTEX_LX_SIZE,
+    decode_graph_region, decode_ivf_plain_chunk, decode_ivf_sq_chunk, encode_graph_region,
+    encode_ivf_plain_chunk, encode_ivf_sq_chunk, sq_bytes_per_vector, HnswChunk, HnswGraphVertex,
+    HnswHeader, IvfChunkHeader, IvfPlainPart, IvfSqPart, HNSW_HEADER_LEN, VERTEX_L0_SIZE,
+    VERTEX_LX_SIZE,
 };
 pub use metastore::{FjallMetaStore, MetaStore};
 pub use mvcc::{BlockVersion, CreateField};
