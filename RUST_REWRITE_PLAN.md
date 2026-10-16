@@ -45,7 +45,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 ### 1.3 非目标（Non-Goals）
 
-- 不追求与旧版本**磁盘格式**兼容（新引擎使用新存储格式；提供导入工具或要求重灌数据，见 §3 D2）。
+- ~~不追求与旧版本**磁盘格式**兼容~~ → **已于 2026-10-16 收紧为「必须兼容」**（全文倒排、向量列存储、向量索引、Catalog KV 均须与 C++ 磁盘格式互通，见 §2.6.1；旧表述见 D2 已被取代）。
 - 不在首版重写集群/分布式能力（现有 peer/cluster 为实验性、默认关闭，见 §2.5，建议 M5 之后再评估）。
 - 不重写 SDK 的对外 API 形态（保持在 SDK 侧尽量不变，SQL/Python/Go 语义不变）。
 
@@ -141,6 +141,24 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 稀疏 / BMP | `kBMP` | 已实现 | 自研 block-max inverted |
 
 > 待办：在开工前产出一份**「索引 × 操作（create/insert/optimize/compact/dump/restore）× 状态」**矩阵，作为 M3 的验收依据。
+
+### 2.6.1 磁盘格式兼容要求（2026-10-16 收紧，取代 §3 D2 的「不追求磁盘兼容」）
+
+**要求（用户指令）**：本次移植**必须兼容 C++ 的磁盘格式**，范围明确覆盖：**①全文倒排索引**（含词典 FST / postings / block-max / column-length 布局）、**②向量列的存储**（列/段文件）、**③向量索引**（HNSW / IVF / EMVB-PLAID 等的索引文件）。任何**格式不同**的第三方库（即使能力等价）**一律排除**（Tantivy 即因此排除，见附录 B）。
+
+**判定规则**：能否被 C++ 侧按原路径打开并读回（`DESCRIBE/SEARCH/SHOW` 结果一致），而不是「能力等价」。
+
+**据此对现有选型的审计**（诚实记录，均为**未达标**项）：
+
+| 子系统 | C++ 格式 | 当前 Rust 实现 | 判定 |
+|---|---|---|---|
+| 全文倒排 | 自研 `storage/invertedindex/fst` + `format/` + posting/block-max | 自研 BM25 + 内存匹配（无磁盘倒排） | **不符**：打分/行集已对齐（`fulltext_delete` 7/7），但**未落盘、未复刻文件格式** |
+| 向量列存储 | 列/段文件（`storage/segment`、column vector 序列化） | 行文本写入 fjall KV | **不符** |
+| 向量索引 | HNSW/IVF 索引文件（表目录下） | 仅内存二级索引，`open` 时重建 | **不符**：既不兼容，也未持久化 |
+| Catalog/Meta KV | **RocksDB + 自定义 MergeOperator**（`src/storage/catalog/kv_store*.cppm`、`src/storage/common/rocksdb_merge_operator*`） | fjall（纯 Rust LSM） | **不符**：需改用 `rust-rocksdb`（§4.2 已列为「保留磁盘兼容」回退） |
+| 二级索引 | PGM-index 文件 | 内存 BTree 重建 | **不符** |
+
+**结论**：当前的 Rust 引擎满足的是 **SQL 语义 / 协议 / 打分公式**级一致（Gate A 的 statement 面已达 100%，query 面 1366/1532），**但不满足磁盘格式兼容**。要达到本要求，需按上表逐项替换为「读 C++ 格式、写 C++ 格式」的实现（存储内核 M1 需重做列/段编码；M3 需落盘 HNSW/IVF/PGM/倒排；KV 需切到 RocksDB）。**该要求已登记为阻塞项（任务 #67），并覆盖 §3 D2 的旧表述。**
 
 ### 2.7 测试资产（验收面）
 
