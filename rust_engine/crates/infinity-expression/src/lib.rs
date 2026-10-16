@@ -385,7 +385,7 @@ fn iso_week(y: i64, m: i64, d: i64) -> i64 {
     let thursday = days - (dow - 4);
     let (ty, _, _) = civil_from_days(thursday);
     let jan1 = days_from_civil(ty, 1, 1);
-    ((thursday - jan1) / 7 + 1)
+    (thursday - jan1) / 7 + 1
 }
 
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
