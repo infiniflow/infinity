@@ -115,6 +115,45 @@ impl HnswIndex {
         self.data.is_empty()
     }
 
+    /// Vector dimension.
+    pub fn dims(&self) -> usize {
+        self.dims
+    }
+
+    /// Neighbour limit for layers ≥ 1 (`M`).
+    pub fn m(&self) -> usize {
+        self.m
+    }
+
+    /// How many layers above level 0 `node` appears in.
+    pub fn level_of(&self, node: usize) -> usize {
+        self.levels.get(node).copied().unwrap_or(0)
+    }
+
+    /// Neighbours of `node` on `layer` (empty when absent).
+    pub fn neighbors(&self, layer: usize, node: usize) -> &[usize] {
+        self.links
+            .get(layer)
+            .and_then(|l| l.get(node))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    /// The stored vector of `node`.
+    pub fn vector(&self, node: usize) -> &[f32] {
+        &self.data[node]
+    }
+
+    /// The entry point, if any vectors were added.
+    pub fn entry_point(&self) -> Option<usize> {
+        self.entry
+    }
+
+    /// The highest populated layer.
+    pub fn max_level(&self) -> usize {
+        self.max_level
+    }
+
     fn random_level(&mut self) -> usize {
         let u = self.rng.unit().max(1e-12);
         (-u.ln() * self.ml) as usize

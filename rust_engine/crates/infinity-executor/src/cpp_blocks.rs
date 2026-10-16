@@ -14,11 +14,14 @@
 use std::path::PathBuf;
 
 use infinity_common::{Error, Result};
+use infinity_expression::Value;
+use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
     push_embedding_element, read_embedding_element, time_to_secs, BlockColumn, BlockId,
     BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
 };
+use infinity_storage::knn_format;
 
 use crate::Engine;
 
@@ -1009,6 +1012,13 @@ impl Engine {
                 self.write_cpp_blocks(&meta.name)?;
             }
         }
+        // Vector indexes mirror alongside the rows. This is best-effort: an
+        // index whose column is not an embedding column simply has no mirror.
+        for im in self.catalog.list_indexes()? {
+            if im.index_type.eq_ignore_ascii_case("HNSW") {
+                let _ = self.write_cpp_hnsw_index(&im.table, &im.name);
+            }
+        }
         Ok(())
     }
 
@@ -1164,6 +1174,176 @@ impl Engine {
             }
         }
         Ok((meta.columns.clone(), rows))
+    }
+
+    /// The C++ index id of `index_name` within `table`: the position of the
+    /// index among the table's indexes, which is how `write_cpp_layout` numbers
+    /// them (`next_index_id`, `cpp_layout.rs:545-550`).
+    fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        let ids: Vec<String> = self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .filter(|im| im.table == short || im.table == table)
+            .map(|im| im.name)
+            .collect();
+        ids.iter()
+            .position(|n| n == index_name)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))
+    }
+
+    /// The vectors of `table`'s `column` as `(row id, vector)`.
+    fn cpp_column_vectors(&self, table: &str, column: &str) -> Result<Vec<(u32, Vec<f32>)>> {
+        let schema = self.table_schema(table)?;
+        let col_idx = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
+        let mut out = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            if let Some(Value::Str(s)) = row.get(col_idx) {
+                out.push((seq as u32, crate::parse_vec_str(s).iter().map(|x| *x as f32).collect()));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Builds a C++ HNSW `chunk_0.idx` body for `column`'s vectors (task #70).
+    ///
+    /// The graph is built by the engine's own `HnswIndex` and serialized with the
+    /// C++ layout (§9.2): 56-byte header, plain vector region, graph region, then
+    /// the `u32` label array. Byte-identity with a C++-built index is not
+    /// required — the offsets are explicit, so the C++ loader reads it.
+    fn cpp_hnsw_chunk(&self, table: &str, column: &str) -> Result<(usize, Vec<u8>)> {
+        let vectors = self.cpp_column_vectors(table, column)?;
+        if vectors.is_empty() {
+            return Err(Error::Invalid(format!(
+                "no vectors to index in '{table}.{column}'"
+            )));
+        }
+        let dim = vectors[0].1.len();
+        let mut index = HnswIndex::new(dim, 16, 200, 200);
+        let mut labels = Vec::with_capacity(vectors.len());
+        for (label, v) in &vectors {
+            index.add(v);
+            labels.push(*label);
+        }
+        let m = index.m() as u64;
+        let (mmax0, mmax) = knn_format::get_mmax(m);
+        let mut header = knn_format::HnswHeader::plain(m, 200, index.len() as u64, dim as u64);
+        header.max_layer = index.max_level() as i32;
+        header.enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
+        let mut vector_region = Vec::with_capacity(index.len() * dim * 4);
+        for n in 0..index.len() {
+            for x in index.vector(n) {
+                vector_region.extend_from_slice(&x.to_le_bytes());
+            }
+        }
+        // Neighbour counts must not exceed the level's limit.
+        let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
+            .map(|n| {
+                let level = index.level_of(n);
+                let neighbors_l0 = index
+                    .neighbors(0, n)
+                    .iter()
+                    .take(mmax0 as usize)
+                    .map(|&x| x as u32)
+                    .collect();
+                let upper = (1..=level)
+                    .map(|l| {
+                        index
+                            .neighbors(l, n)
+                            .iter()
+                            .take(mmax as usize)
+                            .map(|&x| x as u32)
+                            .collect()
+                    })
+                    .collect();
+                knn_format::HnswGraphVertex {
+                    layer_count: level as i32,
+                    neighbors_l0,
+                    upper,
+                }
+            })
+            .collect();
+        let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
+        let chunk = knn_format::encode_hnsw_chunk(&header, &vector_region, &graph, &labels);
+        Ok((index.len(), chunk))
+    }
+
+    /// Writes `table`'s index as a C++ HNSW chunk file under
+    /// `{data_dir}/blocks/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_0.idx`,
+    /// returning how many vectors were written (task #70).
+    pub fn write_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let column = self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| im.name == index_name)
+            .map(|im| im.column)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        let (count, chunk) = self.cpp_hnsw_chunk(&table, &column)?;
+        let db_id = self.database_id_of(&table);
+        let dir = self.blocks_root().join(format!(
+            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0",
+            meta.id
+        ));
+        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        Ok(count)
+    }
+
+    /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning
+    /// `(row id, vector)` pairs **without** consulting the index metadata.
+    pub fn read_cpp_hnsw_index(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Result<Vec<(u32, Vec<f32>)>> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let db_id = self.database_id_of(&table);
+        let path = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx", meta.id));
+        let bytes = std::fs::read(&path).map_err(|_| {
+            Error::NotFound(format!("no HNSW mirror at {}", path.display()))
+        })?;
+        let chunk = knn_format::decode_hnsw_chunk(
+            &bytes,
+            4,
+            knn_format::VERTEX_L0_SIZE,
+            knn_format::VERTEX_LX_SIZE,
+        )
+        .map_err(|e| Error::Invalid(format!("bad HNSW chunk: {e}")))?;
+        let dim = chunk.header.dim as usize;
+        let mut out = Vec::with_capacity(chunk.header.cur_vec_num as usize);
+        for (i, label) in chunk.labels.iter().enumerate() {
+            let at = i * dim * 4;
+            let v = chunk.vectors[at..at + dim * 4]
+                .chunks_exact(4)
+                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                .collect();
+            out.push((*label, v));
+        }
+        Ok(out)
     }
 }
 
@@ -1679,6 +1859,29 @@ mod tests {
         let rows = row_strings(&engine, "SELECT * FROM lv;");
         assert_eq!(rows[0][1], long);
         assert_eq!(rows[1][1], "short");
+    }
+
+    #[test]
+    fn hnsw_index_mirror_roundtrips_the_vectors() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO hv VALUES (1, [1,2,3]), (2, [4,5,6]), (3, [7,8,9]);")
+            .unwrap();
+        engine
+            .execute("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_hnsw_index("hv", "hv_idx").unwrap(), 3);
+        let back = engine.read_cpp_hnsw_index("hv", "hv_idx").unwrap();
+        // Labels are the row sequence numbers, so the order is the insert order.
+        assert_eq!(back.len(), 3);
+        assert_eq!(back[0], (0, vec![1.0, 2.0, 3.0]));
+        assert_eq!(back[1], (1, vec![4.0, 5.0, 6.0]));
+        assert_eq!(back[2], (2, vec![7.0, 8.0, 9.0]));
     }
 
     #[test]
