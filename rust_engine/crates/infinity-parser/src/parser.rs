@@ -483,40 +483,35 @@ impl Parser {
                 };
                 let order_by = if self.eat_kw("ORDER") {
                     self.expect_kw("BY")?;
-                    let column = self.expect_ident()?;
-                    let asc = if self.eat_kw("DESC") {
-                        false
-                    } else {
-                        let _ = self.eat_kw("ASC");
-                        true
-                    };
-                    // tolerate an expression key (`ORDER BY c2 + c3 DESC`)
-                    while !matches!(
-                        self.peek(),
-                        Token::Comma | Token::Semicolon | Token::Eof | Token::Ident(_)
-                    ) || matches!(self.peek(), Token::Ident(k) if !k.eq_ignore_ascii_case("LIMIT"))
-                    {
-                        if matches!(self.peek(), Token::Comma | Token::Semicolon | Token::Eof)
-                            || matches!(self.peek(), Token::Ident(k) if k.eq_ignore_ascii_case("LIMIT"))
+                    let mut keys: Vec<OrderKey> = Vec::new();
+                    loop {
+                        let column = self.expect_ident()?;
+                        let asc = if self.eat_kw("DESC") {
+                            false
+                        } else {
+                            let _ = self.eat_kw("ASC");
+                            true
+                        };
+                        keys.push(OrderKey { column, asc });
+                        // tolerate a trailing expression after the leading column
+                        while !matches!(self.peek(), Token::Comma | Token::Semicolon | Token::Eof)
+                            && !matches!(self.peek(), Token::Ident(k)
+                            if k.eq_ignore_ascii_case("LIMIT")
+                                || k.eq_ignore_ascii_case("OFFSET"))
                         {
+                            self.advance();
+                            let _ = self.eat_kw("ASC");
+                            let _ = self.eat_kw("DESC");
+                        }
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        } else {
                             break;
                         }
-                        self.advance();
-                        let _ = self.eat_kw("ASC");
-                        let _ = self.eat_kw("DESC");
                     }
-                    // tolerate extra ORDER BY keys
-                    while self.peek() == &Token::Comma {
-                        self.advance();
-                        if matches!(self.peek(), Token::Ident(_)) {
-                            self.advance();
-                            let _ = self.eat_kw("DESC");
-                            let _ = self.eat_kw("ASC");
-                        }
-                    }
-                    Some(OrderKey { column, asc })
+                    keys
                 } else {
-                    None
+                    Vec::new()
                 };
                 let mut limit = None;
                 let mut offset = None;
@@ -1959,7 +1954,7 @@ mod tests {
                 group_by: vec![],
                 aliases: vec![None],
                 having: None,
-                order_by: None,
+                order_by: vec![],
                 limit: None,
                 offset: None,
                 search: None,
@@ -1979,7 +1974,7 @@ mod tests {
                 group_by: vec![],
                 aliases: vec![None, None],
                 having: None,
-                order_by: None,
+                order_by: vec![],
                 limit: None,
                 offset: None,
                 search: None,
@@ -2003,7 +1998,7 @@ mod tests {
                 group_by: vec![],
                 aliases: vec![None, None],
                 having: None,
-                order_by: None,
+                order_by: vec![],
                 limit: Some(10),
                 offset: None,
                 search: None,
@@ -2037,7 +2032,7 @@ mod tests {
                 group_by: vec![],
                 aliases: vec![None, None],
                 having: None,
-                order_by: None,
+                order_by: vec![],
                 limit: None,
                 offset: None,
                 search: None,
@@ -2062,10 +2057,10 @@ mod tests {
                 group_by: vec![ExprAst::Column("name".into())],
                 aliases: vec![None, None],
                 having: None,
-                order_by: Some(OrderKey {
+                order_by: vec![OrderKey {
                     column: "name".into(),
-                    asc: false
-                }),
+                    asc: false,
+                }],
                 limit: Some(5),
                 offset: None,
                 search: None,
@@ -2090,7 +2085,7 @@ mod tests {
                 group_by: vec![],
                 aliases: vec![None],
                 having: None,
-                order_by: None,
+                order_by: vec![],
                 limit: None,
                 offset: None,
                 search: None,

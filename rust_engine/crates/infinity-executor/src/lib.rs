@@ -78,8 +78,7 @@ enum Stage {
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
-        key: usize,
-        asc: bool,
+        keys: Vec<(usize, bool)>,
     },
     Limit(u64),
     Offset(u64),
@@ -2015,18 +2014,21 @@ impl Engine {
                 }
                 // An ORDER BY key that names a select alias is rewritten to the
                 // corresponding output label.
-                let order_key = order_by.as_ref().map(|ok| {
-                    let mut ok = ok.clone();
-                    if let Some(i) = aliases
-                        .iter()
-                        .position(|a| a.as_deref() == Some(ok.column.as_str()))
-                    {
-                        if let Some(item) = items.get(i) {
-                            ok.column = infinity_planner::item_label(item);
+                let order_keys: Vec<infinity_parser::OrderKey> = order_by
+                    .iter()
+                    .map(|ok| {
+                        let mut ok = ok.clone();
+                        if let Some(i) = aliases
+                            .iter()
+                            .position(|a| a.as_deref() == Some(ok.column.as_str()))
+                        {
+                            if let Some(item) = items.get(i) {
+                                ok.column = infinity_planner::item_label(item);
+                            }
                         }
-                    }
-                    ok
-                });
+                        ok
+                    })
+                    .collect();
                 let plan = plan_select(
                     items,
                     &tables,
@@ -2034,7 +2036,7 @@ impl Engine {
                     where_pred.as_ref(),
                     group_by,
                     having.as_deref(),
-                    order_key.as_ref(),
+                    &order_keys,
                     *limit,
                     *offset,
                 )?;
@@ -2073,8 +2075,8 @@ impl Engine {
                     stages.push(Stage::Offset(n));
                     cur = *input;
                 }
-                LogicalPlan::Sort { input, key, asc } => {
-                    stages.push(Stage::Sort { key, asc });
+                LogicalPlan::Sort { input, keys } => {
+                    stages.push(Stage::Sort { keys });
                     cur = *input;
                 }
                 LogicalPlan::Aggregate {
@@ -3365,7 +3367,7 @@ async fn pipeline(
                 cols = new_cols;
                 data = new_rows;
             }
-            Stage::Sort { key, asc } => sort_rows(&mut data, *key, *asc),
+            Stage::Sort { keys } => sort_rows(&mut data, keys),
             Stage::Limit(n) => data.truncate(*n as usize),
             Stage::Offset(n) => {
                 let k = (*n as usize).min(data.len());
@@ -3427,16 +3429,20 @@ fn apply_aggregate(
     (names, out)
 }
 
-fn sort_rows(rows: &mut [Vec<Value>], key: usize, asc: bool) {
+fn sort_rows(rows: &mut [Vec<Value>], keys: &[(usize, bool)]) {
     rows.sort_by(|a, b| {
-        let x = a.get(key).unwrap_or(&Value::Null);
-        let y = b.get(key).unwrap_or(&Value::Null);
-        let ord = x.partial_cmp_value(y).unwrap_or(std::cmp::Ordering::Equal);
-        if asc {
-            ord
-        } else {
-            ord.reverse()
+        for (key, asc) in keys {
+            let x = a.get(*key).unwrap_or(&Value::Null);
+            let y = b.get(*key).unwrap_or(&Value::Null);
+            let mut ord = x.partial_cmp_value(y).unwrap_or(std::cmp::Ordering::Equal);
+            if !*asc {
+                ord = ord.reverse();
+            }
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
         }
+        std::cmp::Ordering::Equal
     });
 }
 

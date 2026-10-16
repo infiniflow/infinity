@@ -358,7 +358,8 @@ pub enum Statement {
         /// Output aliases, aligned with `items` (`<expr> AS name`).
         aliases: Vec<Option<String>>,
         having: Option<Box<Predicate>>,
-        order_by: Option<OrderKey>,
+        /// ORDER BY keys, in priority order (empty when absent).
+        order_by: Vec<OrderKey>,
         limit: Option<u64>,
         offset: Option<u64>,
         search: Option<Box<SearchClause>>,

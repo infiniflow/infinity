@@ -51,8 +51,8 @@ pub enum LogicalPlan {
     },
     Sort {
         input: Box<LogicalPlan>,
-        key: usize,
-        asc: bool,
+        /// sort keys in priority order, each `(column, ascending)`
+        keys: Vec<(usize, bool)>,
     },
     Limit {
         input: Box<LogicalPlan>,
@@ -502,7 +502,7 @@ pub fn plan_select(
     where_pred: Option<&Predicate>,
     group_by: &[ExprAst],
     having: Option<&Predicate>,
-    order_by: Option<&OrderKey>,
+    order_by: &[OrderKey],
     limit: Option<u64>,
     offset: Option<u64>,
 ) -> Result<LogicalPlan> {
@@ -708,12 +708,14 @@ pub fn plan_select(
         out_names = names;
     }
 
-    if let Some(ok) = order_by {
-        let key = resolve_column(&out_names, &ok.column)?;
+    if !order_by.is_empty() {
+        let keys: Vec<(usize, bool)> = order_by
+            .iter()
+            .map(|ok| Ok((resolve_column(&out_names, &ok.column)?, ok.asc)))
+            .collect::<Result<Vec<_>>>()?;
         plan = LogicalPlan::Sort {
             input: Box::new(plan),
-            key,
-            asc: ok.asc,
+            keys,
         };
     }
 
@@ -750,7 +752,7 @@ mod tests {
             None,
             &[],
             None,
-            None,
+            &[],
             None,
             None,
         )
@@ -780,7 +782,7 @@ mod tests {
                 distinct: false,
             }),
         ];
-        let p = plan_select(&items, &tables(), None, None, &[], None, None, None, None).unwrap();
+        let p = plan_select(&items, &tables(), None, None, &[], None, &[], None, None).unwrap();
         // the select list is always projected over the aggregate output
         let inner = match p {
             LogicalPlan::Projection { input, .. } => *input,
@@ -816,7 +818,7 @@ mod tests {
             None,
             &[],
             None,
-            None,
+            &[],
             None,
             None,
         )
@@ -843,7 +845,7 @@ mod tests {
             None,
             &[],
             None,
-            None,
+            &[],
             None,
             None
         )
@@ -859,7 +861,7 @@ mod tests {
             None,
             &[],
             None,
-            None,
+            &[],
             None,
             None
         )

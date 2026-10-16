@@ -102,9 +102,14 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                 out.push(Token::Semicolon);
                 i += 1;
             }
+            // `==` is accepted as an alias for `=`
             '=' => {
+                if i + 1 < chars.len() && chars[i + 1] == '=' {
+                    i += 2;
+                } else {
+                    i += 1;
+                }
                 out.push(Token::Op("=".into()));
-                i += 1;
             }
             '.' => {
                 out.push(Token::Op(".".into()));

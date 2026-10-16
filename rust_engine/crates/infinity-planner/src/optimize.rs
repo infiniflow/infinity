@@ -44,10 +44,9 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
                     input: Box::new(optimize(*input)),
                     n,
                 },
-                LogicalPlan::Sort { input, key, asc } => LogicalPlan::Sort {
+                LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
                     input: Box::new(LogicalPlan::Filter { input, predicate }),
-                    key,
-                    asc,
+                    keys,
                 },
                 other => LogicalPlan::Filter {
                     input: Box::new(other),
@@ -79,10 +78,9 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             input: Box::new(optimize(*input)),
             n,
         },
-        LogicalPlan::Sort { input, key, asc } => LogicalPlan::Sort {
+        LogicalPlan::Sort { input, keys } => LogicalPlan::Sort {
             input: Box::new(optimize(*input)),
-            key,
-            asc,
+            keys,
         },
         LogicalPlan::Join {
             left,
@@ -164,8 +162,7 @@ mod tests {
         let plan = LogicalPlan::Filter {
             input: Box::new(LogicalPlan::Sort {
                 input: Box::new(scan()),
-                key: 0,
-                asc: true,
+                keys: vec![(0, true)],
             }),
             predicate: pred,
         };
@@ -207,7 +204,7 @@ mod tests {
             )),
             &[],
             None,
-            None,
+            &[],
             Some(10),
             None,
         )
