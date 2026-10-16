@@ -143,6 +143,25 @@ fn is_float_type(type_text: &str) -> bool {
     )
 }
 
+fn is_array_type(type_text: &str) -> bool {
+    type_text.to_ascii_uppercase().starts_with("ARRAY")
+}
+
+/// ARRAY columns render with braces: `[1,2]` → `{1,2}`, `[]` → `{}`.
+fn brace_render(s: &str) -> String {
+    let t = s.trim();
+    if !t.starts_with('[') || !t.ends_with(']') {
+        return t.to_string();
+    }
+    t.chars()
+        .map(|c| match c {
+            '[' => '{',
+            ']' => '}',
+            other => other,
+        })
+        .collect()
+}
+
 fn is_json_type(type_text: &str) -> bool {
     type_text.eq_ignore_ascii_case("JSON")
 }
@@ -288,6 +307,7 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
                 },
+                Some(t) if is_array_type(t) => brace_render(&s),
                 // JSON columns are stored compactly (sorted keys, no spaces)
                 Some(t) if is_json_type(t) => match infinity_expression::json::parse(&s) {
                     Some(j) => j.compact(),
@@ -329,6 +349,10 @@ fn describe_type(type_text: &str) -> String {
         return "Invalid".to_string();
     }
     let up = t.to_ascii_uppercase();
+    if up.starts_with("ARRAY(") {
+        let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
+        return format!("Array({})", describe_type(inner));
+    }
     if up.starts_with("SPARSE(") {
         let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
