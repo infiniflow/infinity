@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
 pub mod inverted_format;
