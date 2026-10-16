@@ -88,6 +88,11 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             *op,
             Box::new(compile_expr(b, schema)?),
         ),
+        ExprAst::Cmp(a, op, b) => Expr::Cmp(
+            Box::new(compile_expr(a, schema)?),
+            *op,
+            Box::new(compile_expr(b, schema)?),
+        ),
         ExprAst::Func { name, args } => {
             // SEARCH MATCH pseudo-columns are exposed as hidden scan columns.
             let hidden = match name.to_ascii_uppercase().as_str() {
@@ -160,6 +165,7 @@ fn expr_has_agg(e: &ExprAst) -> bool {
             AggFunc::from_name(name).is_some() || args.iter().any(expr_has_agg)
         }
         ExprAst::Binary(a, _, b) => expr_has_agg(a) || expr_has_agg(b),
+        ExprAst::Cmp(a, _, b) => expr_has_agg(a) || expr_has_agg(b),
         _ => false,
     }
 }
@@ -198,6 +204,10 @@ fn gather_agg(
             gather_agg(a, schema, aggs, index, base)?;
             gather_agg(b, schema, aggs, index, base)?;
         }
+        ExprAst::Cmp(a, _, b) => {
+            gather_agg(a, schema, aggs, index, base)?;
+            gather_agg(b, schema, aggs, index, base)?;
+        }
         _ => {}
     }
     Ok(())
@@ -222,6 +232,11 @@ fn compile_agg_expr(
         }
         ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
         ExprAst::Binary(a, op, b) => Expr::Binary(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
+            *op,
+            Box::new(compile_agg_expr(b, agg_index, group_by)?),
+        ),
+        ExprAst::Cmp(a, op, b) => Expr::Cmp(
             Box::new(compile_agg_expr(a, agg_index, group_by)?),
             *op,
             Box::new(compile_agg_expr(b, agg_index, group_by)?),

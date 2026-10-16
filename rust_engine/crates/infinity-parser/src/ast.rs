@@ -42,8 +42,13 @@ pub enum BinOp {
 pub enum ExprAst {
     Column(String),
     Literal(Literal),
-    Func { name: String, args: Vec<ExprAst> },
+    Func {
+        name: String,
+        args: Vec<ExprAst>,
+    },
     Binary(Box<ExprAst>, BinOp, Box<ExprAst>),
+    /// A comparison usable as a projected boolean expression.
+    Cmp(Box<ExprAst>, CmpOp, Box<ExprAst>),
 }
 
 /// A boolean connective.

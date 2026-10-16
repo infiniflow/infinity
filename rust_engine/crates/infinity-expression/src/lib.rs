@@ -98,18 +98,21 @@ impl Expr {
             Expr::Cmp(a, op, b) => {
                 let x = a.eval(row);
                 let y = b.eval(row);
-                let r = match x.partial_cmp_value(&y) {
-                    Some(ord) => match op {
-                        CmpOp::Eq => ord == Ordering::Equal,
-                        CmpOp::Ne => ord != Ordering::Equal,
-                        CmpOp::Lt => ord == Ordering::Less,
-                        CmpOp::Le => ord != Ordering::Greater,
-                        CmpOp::Gt => ord == Ordering::Greater,
-                        CmpOp::Ge => ord != Ordering::Less,
-                    },
-                    None => false, // NULL comparisons are false
-                };
-                Value::Bool(r)
+                match x.partial_cmp_value(&y) {
+                    Some(ord) => {
+                        let r = match op {
+                            CmpOp::Eq => ord == Ordering::Equal,
+                            CmpOp::Ne => ord != Ordering::Equal,
+                            CmpOp::Lt => ord == Ordering::Less,
+                            CmpOp::Le => ord != Ordering::Greater,
+                            CmpOp::Gt => ord == Ordering::Greater,
+                            CmpOp::Ge => ord != Ordering::Less,
+                        };
+                        Value::Bool(r)
+                    }
+                    // A NULL operand makes the comparison unknown (falsy in WHERE).
+                    None => Value::Null,
+                }
             }
             Expr::And(a, b) => Value::Bool(a.eval_predicate(row) && b.eval_predicate(row)),
             Expr::Or(a, b) => Value::Bool(a.eval_predicate(row) || b.eval_predicate(row)),
@@ -252,6 +255,14 @@ fn cast_value(v: &Value, ty: &str) -> Value {
             },
             Value::Int(i) => Value::Bool(*i != 0),
             _ => Value::Null,
+        },
+        // JSON: re-serialise compactly with sorted keys.
+        "JSON" => match v {
+            Value::Str(s) => match crate::json::parse(s) {
+                Some(j) => Value::Str(j.compact()),
+                None => Value::Str(s.clone()),
+            },
+            other => other.clone(),
         },
         // VARCHAR / TEXT / STRING and anything else: render as text.
         _ => Value::Str(v.to_slt_string()),
@@ -535,6 +546,9 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
                 Value::Str(s) => s,
                 _ => return Value::Null,
             };
+            if args.len() == 2 {
+                return json::contains_value(&doc, &a1());
+            }
             let path = match a1() {
                 Value::Str(s) => s,
                 _ => return Value::Null,
@@ -564,6 +578,13 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             };
             dt_component(&val, &field.to_ascii_uppercase())
         }
+        "PARSE_JSON" => match a0() {
+            Value::Str(s) => match json::parse(&s) {
+                Some(v) => Value::Str(v.compact()),
+                None => Value::Null,
+            },
+            _ => Value::Null,
+        },
         "CAST" => {
             let ty = match a1() {
                 Value::Str(s) => s.to_ascii_uppercase(),
@@ -693,13 +714,15 @@ mod tests {
     }
 
     #[test]
-    fn null_comparison_is_false() {
+    fn null_comparison_is_unknown() {
         let e = Expr::Cmp(
             Box::new(Expr::Literal(Value::Null)),
             CmpOp::Eq,
             Box::new(Expr::Literal(Value::Int(1))),
         );
-        assert_eq!(e.eval(&[]), Value::Bool(false));
+        // three-valued logic: the comparison is unknown, hence falsy in a predicate
+        assert_eq!(e.eval(&[]), Value::Null);
+        assert!(!e.eval_predicate(&[]));
     }
 
     #[test]

@@ -1084,6 +1084,19 @@ impl Parser {
             } else {
                 item
             };
+            // Absorb a trailing comparison (projected as a boolean expression).
+            let item = match self.peek().clone() {
+                Token::Op(s) if cmp_op(&s).is_some() => match select_item_to_expr(&item) {
+                    Some(left) => {
+                        let op = cmp_op(&s).unwrap();
+                        self.advance();
+                        let right = self.expr()?;
+                        SelectItem::Expr(ExprAst::Cmp(Box::new(left), op, Box::new(right)))
+                    }
+                    None => item,
+                },
+                _ => item,
+            };
             // Absorb a trailing arithmetic expression (`MAX(c1)+SUM(c2)`).
             let needs_more = match self.peek() {
                 Token::Star => true,

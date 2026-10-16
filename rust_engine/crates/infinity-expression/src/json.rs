@@ -29,7 +29,10 @@ impl Json {
                 format!("[{}]", inner.join(","))
             }
             Json::Obj(entries) => {
-                let inner: Vec<String> = entries
+                // Infinity renders object keys in sorted order.
+                let mut sorted: Vec<&(String, Json)> = entries.iter().collect();
+                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                let inner: Vec<String> = sorted
                     .iter()
                     .map(|(k, v)| format!("\"{}\":{}", escape(k), v.compact()))
                     .collect();
@@ -280,6 +283,24 @@ pub fn contains(doc: &str, path: &str, target: &Value) -> Value {
         other => json_matches(other, target),
     };
     Value::Bool(hit)
+}
+
+/// Searches the whole document (objects and arrays) for `target`.
+pub fn contains_value(doc: &str, target: &Value) -> Value {
+    let Some(root) = parse(doc) else {
+        return Value::Null;
+    };
+    fn walk(j: &Json, target: &Value) -> bool {
+        if json_matches(j, target) {
+            return true;
+        }
+        match j {
+            Json::Arr(items) => items.iter().any(|x| walk(x, target)),
+            Json::Obj(entries) => entries.iter().any(|(_, v)| walk(v, target)),
+            _ => false,
+        }
+    }
+    Value::Bool(walk(&root, target))
 }
 
 fn json_matches(a: &Json, target: &Value) -> bool {

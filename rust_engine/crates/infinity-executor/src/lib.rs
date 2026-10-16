@@ -638,14 +638,25 @@ impl Engine {
                                             continue;
                                         }
                                     }
-                                    if let Some(Value::Str(cell)) = row.get(ci) {
-                                        if let Some(infinity_expression::json::Json::Arr(items)) =
-                                            infinity_expression::json::parse(cell)
-                                        {
-                                            for e in items {
-                                                out.push(vec![e.compact()]);
+                                    match row.get(ci) {
+                                        Some(Value::Str(cell)) => {
+                                            match infinity_expression::json::parse(cell) {
+                                                Some(infinity_expression::json::Json::Arr(
+                                                    items,
+                                                )) => {
+                                                    for e in items {
+                                                        out.push(vec![e.compact()]);
+                                                    }
+                                                }
+                                                // Unnest of an object / scalar yields itself.
+                                                Some(other) => out.push(vec![other.compact()]),
+                                                None => {}
                                             }
                                         }
+                                        Some(other) if !matches!(other, Value::Null) => {
+                                            out.push(vec![other.to_slt_string()])
+                                        }
+                                        _ => {}
                                     }
                                 }
                                 return Ok(QueryResult::Rows {
