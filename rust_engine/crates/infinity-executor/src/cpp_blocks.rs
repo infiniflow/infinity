@@ -384,7 +384,10 @@ fn encode_array_slot(
                         None => outline.extend_from_slice(&vec![0u8; width]),
                     }
                 }
-                inner_slots.push(cpp_format::varlen_count_offset_slot(g.len() as u64, data_offset));
+                inner_slots.push(cpp_format::varlen_count_offset_slot(
+                    g.len() as u64,
+                    data_offset,
+                ));
             }
             let slots_offset = outline.len() as u64;
             for s in &inner_slots {
@@ -441,7 +444,13 @@ fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<St
                 let mut parts = Vec::with_capacity(inner_count);
                 for k in 0..inner_count {
                     let base = inner_offset + k * width;
-                    parts.push(decode_value("", col, outline.get(base..base + width)?, 0, outline)?);
+                    parts.push(decode_value(
+                        "",
+                        col,
+                        outline.get(base..base + width)?,
+                        0,
+                        outline,
+                    )?);
                 }
                 groups.push(format!("{{{}}}", parts.join(",")));
             }
@@ -644,7 +653,10 @@ fn encode_tensorarray_slot(
     for rows in &tensors {
         let offset = outline.len() as u64;
         outline.extend_from_slice(&cpp_format::pack_tensor_body(rows, dim, elem));
-        metas.push(cpp_format::varlen_count_offset_slot(rows.len() as u64, offset));
+        metas.push(cpp_format::varlen_count_offset_slot(
+            rows.len() as u64,
+            offset,
+        ));
     }
     let offset = outline.len() as u64;
     for meta in &metas {
@@ -1173,10 +1185,14 @@ impl Engine {
                                 decode_array_value(&meta.types[col], slot, &raw.outline)
                                     .unwrap_or_else(|| "null".into())
                             }
-                            OutlineKind::None => {
-                                decode_value(&meta.types[col], *column_type, &body.data, row, &raw.outline)
-                                    .unwrap_or_else(|| "null".into())
-                            }
+                            OutlineKind::None => decode_value(
+                                &meta.types[col],
+                                *column_type,
+                                &body.data,
+                                row,
+                                &raw.outline,
+                            )
+                            .unwrap_or_else(|| "null".into()),
                         }
                     };
                     out.push(value);
@@ -1214,7 +1230,10 @@ impl Engine {
         let mut out = Vec::new();
         for (seq, row) in self.fetch_rows_with_ids(table)? {
             if let Some(Value::Str(s)) = row.get(col_idx) {
-                out.push((seq as u32, crate::parse_vec_str(s).iter().map(|x| *x as f32).collect()));
+                out.push((
+                    seq as u32,
+                    crate::parse_vec_str(s).iter().map(|x| *x as f32).collect(),
+                ));
             }
         }
         Ok(out)
@@ -1302,10 +1321,9 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let (count, chunk) = self.cpp_hnsw_chunk(&table, &column)?;
         let db_id = self.database_id_of(&table);
-        let dir = self.blocks_root().join(format!(
-            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0",
-            meta.id
-        ));
+        let dir = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
         std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
             path: dir.clone(),
             source: e,
@@ -1319,11 +1337,7 @@ impl Engine {
 
     /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning
     /// `(row id, vector)` pairs **without** consulting the index metadata.
-    pub fn read_cpp_hnsw_index(
-        &self,
-        table: &str,
-        index_name: &str,
-    ) -> Result<VectorRows> {
+    pub fn read_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<VectorRows> {
         let table = self.qualified_table(table);
         let meta = self
             .catalog
@@ -1331,9 +1345,10 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let db_id = self.database_id_of(&table);
-        let path = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx", meta.id));
+        let path = self.blocks_root().join(format!(
+            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
+            meta.id
+        ));
         let bytes = std::fs::read(&path)
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let chunk = knn_format::decode_hnsw_chunk(
@@ -1406,7 +1421,10 @@ impl Engine {
             }
             for c in 0..k {
                 if counts[c] > 0 {
-                    centroids[c] = sums[c].iter().map(|s| (*s / counts[c] as f64) as f32).collect();
+                    centroids[c] = sums[c]
+                        .iter()
+                        .map(|s| (*s / counts[c] as f64) as f32)
+                        .collect();
                 }
             }
             if !changed {
@@ -1485,9 +1503,10 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let db_id = self.database_id_of(&table);
-        let path = self
-            .blocks_root()
-            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx", meta.id));
+        let path = self.blocks_root().join(format!(
+            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
+            meta.id
+        ));
         let bytes = std::fs::read(&path)
             .map_err(|_| Error::NotFound(format!("no IVF mirror at {}", path.display())))?;
         let (header, centroids, parts) = knn_format::decode_ivf_plain_chunk(&bytes, 4)
@@ -1711,10 +1730,7 @@ mod tests {
         assert_eq!(array_shape("ARRAY(DOUBLE)"), Some(ArrayElem::Fixed(6)));
         // One nesting level of fixed-width leaves; a second level or a
         // variable-length element is out of scope.
-        assert_eq!(
-            array_shape("ARRAY(ARRAY(INT))"),
-            Some(ArrayElem::Nested(3))
-        );
+        assert_eq!(array_shape("ARRAY(ARRAY(INT))"), Some(ArrayElem::Nested(3)));
         assert_eq!(array_shape("ARRAY(ARRAY(ARRAY(INT)))"), None);
         assert_eq!(array_shape("ARRAY(VARCHAR)"), Some(ArrayElem::VarLen(9)));
         // A tensor/sparse element is not an array element.
@@ -2063,7 +2079,7 @@ mod tests {
         assert_eq!(engine.write_cpp_ivf_index("iv", "iv_idx", 2).unwrap(), 4);
         let (centroids, back) = engine.read_cpp_ivf_index("iv", "iv_idx").unwrap();
         assert_eq!(centroids.len(), 4); // 2 centroids * dimension 2
-        // Every vector comes back, under its row id.
+                                        // Every vector comes back, under its row id.
         let mut got: Vec<(u32, Vec<f32>)> = back;
         got.sort_by_key(|(l, _)| *l);
         assert_eq!(

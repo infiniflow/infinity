@@ -140,7 +140,11 @@ impl IndexMeta {
             .map(|(k, v)| format!("{k}={v}"))
             .collect::<Vec<_>>()
             .join(&OPT_SEP.to_string());
-        format!("{}\t{}\t{}\t{}", self.table, self.column, self.index_type, opts).into_bytes()
+        format!(
+            "{}\t{}\t{}\t{}",
+            self.table, self.column, self.index_type, opts
+        )
+        .into_bytes()
     }
     fn decode(name: &[u8], bytes: &[u8]) -> Result<Self> {
         let name = String::from_utf8_lossy(name).to_string();

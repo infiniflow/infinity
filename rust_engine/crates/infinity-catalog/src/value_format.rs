@@ -500,10 +500,7 @@ pub fn constant_expr_double_array(values: &[f64]) -> Json {
 }
 /// `kCurlyBracketsArray`: each element is a nested `ConstantExpr::Serialize()`.
 pub fn constant_expr_curly_array(elements: Vec<Json>) -> Json {
-    constant_expr_json(
-        literal::CURLY_BRACKETS_ARRAY,
-        Some(Json::Arr(elements)),
-    )
+    constant_expr_json(literal::CURLY_BRACKETS_ARRAY, Some(Json::Arr(elements)))
 }
 /// `kLongSparseArray` / `kDoubleSparseArray`: `{indices:[…], data:[…]}`.
 ///
@@ -513,7 +510,13 @@ pub fn constant_expr_sparse_array(literal_type: i64, indices: &[i64], data: &[f6
     let long = literal_type == literal::LONG_SPARSE_ARRAY;
     let data = Json::Arr(
         data.iter()
-            .map(|v| if long { Json::Int(*v as i64) } else { Json::Float(*v) })
+            .map(|v| {
+                if long {
+                    Json::Int(*v as i64)
+                } else {
+                    Json::Float(*v)
+                }
+            })
             .collect(),
     );
     let indices = Json::Arr(indices.iter().map(|v| Json::Int(*v)).collect());
@@ -674,9 +677,18 @@ impl IndexDefValue {
             ("max_points_per_centroid_".to_string(), Json::Int(256)),
         ]);
         let storage = obj(vec![
-            ("plain_storage_data_type_".to_string(), Json::Int(plain_storage_data_type)),
-            ("product_quantization_subspace_bits_".to_string(), Json::Int(0)),
-            ("product_quantization_subspace_num_".to_string(), Json::Int(0)),
+            (
+                "plain_storage_data_type_".to_string(),
+                Json::Int(plain_storage_data_type),
+            ),
+            (
+                "product_quantization_subspace_bits_".to_string(),
+                Json::Int(0),
+            ),
+            (
+                "product_quantization_subspace_num_".to_string(),
+                Json::Int(0),
+            ),
             ("scalar_quantization_bits_".to_string(), Json::Int(0)),
             ("type_".to_string(), Json::Int(ivf_storage::PLAIN)),
         ]);
@@ -1019,15 +1031,22 @@ mod tests {
             r#"{"cardinality":"low","column_names":["doc"],"file_name":"t_idx_json","index_comment":"","index_name":"idx_json","index_type":"SECONDARY","is_json_index":true}"#
         );
         let high = IndexDefValue::secondary("idx_i", "t", "i", false, false);
-        assert!(index_def_json(&high).compact().contains(r#""cardinality":"high""#));
-        assert!(index_def_json(&high).compact().contains(r#""is_json_index":false"#));
+        assert!(index_def_json(&high)
+            .compact()
+            .contains(r#""cardinality":"high""#));
+        assert!(index_def_json(&high)
+            .compact()
+            .contains(r#""is_json_index":false"#));
     }
 
     #[test]
     fn ivf_index_nests_its_option() {
         let v = IndexDefValue::ivf_plain("idx_ivf", "t", "v", metric::L2, element::FLOAT32);
         let text = index_def_json(&v).compact();
-        assert!(text.starts_with(r#"{"column_names":["v"],"file_name":"t_idx_ivf","#), "{text}");
+        assert!(
+            text.starts_with(r#"{"column_names":["v"],"file_name":"t_idx_ivf","#),
+            "{text}"
+        );
         assert!(text.contains(r#""index_type":"IVF""#), "{text}");
         // The nested option keeps every field `to_json` writes.
         assert!(text.contains(r#""metric_":2"#), "{text}");
@@ -1037,7 +1056,10 @@ mod tests {
         assert!(text.contains(r#""type_":0"#), "{text}");
         assert!(text.contains(r#""plain_storage_data_type_":6"#), "{text}");
         // `ivf_option` decodes back to the same bytes.
-        assert_eq!(index_def_from_bytes(&index_def_bytes(&v)).unwrap().base, v.base);
+        assert_eq!(
+            index_def_from_bytes(&index_def_bytes(&v)).unwrap().base,
+            v.base
+        );
     }
 
     #[test]
@@ -1084,7 +1106,8 @@ mod tests {
         );
         // Sparse arrays nest `{data, indices}` (sorted).
         assert_eq!(
-            constant_expr_sparse_array(literal::DOUBLE_SPARSE_ARRAY, &[0, 5], &[1.0, 2.5]).compact(),
+            constant_expr_sparse_array(literal::DOUBLE_SPARSE_ARRAY, &[0, 5], &[1.0, 2.5])
+                .compact(),
             r#"{"type":14,"value":{"data":[1.0,2.5],"indices":[0,5]}}"#
         );
         assert_eq!(
@@ -1096,8 +1119,14 @@ mod tests {
     #[test]
     fn remaining_subtypes_match_the_cpp_json() {
         assert_eq!(
-            index_def_json(&IndexDefValue::bmp("i", "t", "c", 128, bmp_compress::COMPRESSED))
-                .compact(),
+            index_def_json(&IndexDefValue::bmp(
+                "i",
+                "t",
+                "c",
+                128,
+                bmp_compress::COMPRESSED
+            ))
+            .compact(),
             r#"{"block_size":128,"column_names":["c"],"compress_type":1,"file_name":"t_i","index_comment":"","index_name":"i","index_type":"BMP"}"#
         );
         assert_eq!(
@@ -1113,8 +1142,10 @@ mod tests {
             r#"{"column_names":["c"],"file_name":"t_i","index_comment":"","index_name":"i","index_type":"EMVB","pq_subspace_bits":8,"pq_subspace_num":16}"#
         );
         assert_eq!(
-            index_def_json(&IndexDefValue::diskann("i", "t", "c", "l2", "plain", 64, 100, 8, 1))
-                .compact(),
+            index_def_json(&IndexDefValue::diskann(
+                "i", "t", "c", "l2", "plain", 64, 100, 8, 1
+            ))
+            .compact(),
             r#"{"L":100,"R":64,"column_names":["c"],"encode_type":"plain","file_name":"t_i","index_comment":"","index_name":"i","index_type":"DISKANN","metric_type":"l2","num_parts":1,"num_pq_chunks":8}"#
         );
         // The functional index embeds a DataType object and a JSON object.
@@ -1138,8 +1169,13 @@ mod tests {
         // `{"data_type":6,"dimension":100,"index_type":2,"sort":0}` - the
         // index type is int8 for a bound of 100 (`GetIndexType`).
         assert_eq!(
-            sparse_type_info(element::FLOAT32, sparse_index_type(100), 100, sparse_store::SORT)
-                .compact(),
+            sparse_type_info(
+                element::FLOAT32,
+                sparse_index_type(100),
+                100,
+                sparse_store::SORT
+            )
+            .compact(),
             r#"{"data_type":6,"dimension":100,"index_type":2,"sort":0}"#
         );
         // Bound thresholds: 128 -> int8, 129 -> int16, 32768 -> int16,

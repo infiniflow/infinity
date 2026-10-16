@@ -1179,12 +1179,8 @@ mod tests {
         // ≤ `VARCHAR_INLINE_LENGTH` (13) bytes stay in the slot; a longer payload
         // is appended to the outline with a 5-byte prefix plus its offset.
         let long = b"this string is definitely longer than thirteen bytes";
-        let (body, outline) = pack_column(
-            9,
-            &[Some(b"hello"), None, Some(b"ab"), Some(long)],
-            4,
-        )
-        .unwrap();
+        let (body, outline) =
+            pack_column(9, &[Some(b"hello"), None, Some(b"ab"), Some(long)], 4).unwrap();
         assert_eq!(outline, long); // only the long payload is outlined
         assert_eq!(body.data.len(), 64); // capacity * 16
         let word = |row: usize| -> (u64, u64) {
@@ -1200,7 +1196,7 @@ mod tests {
         assert_eq!(&w0.to_le_bytes()[3..8], b"hello");
         assert_eq!(off0, 0);
         assert_eq!(word(1), (0, 0)); // NULL slot is all zero
-        // row 2: "ab" inlined too.
+                                     // row 2: "ab" inlined too.
         let (w2, off2) = word(2);
         assert_eq!(w2 & 0x00ff_ffff, 2);
         assert_eq!(&w2.to_le_bytes()[3..5], b"ab");

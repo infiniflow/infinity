@@ -12,7 +12,8 @@ use infinity_expression::json::Json;
 use infinity_storage::{catalog_format as key, MetaStore};
 
 use crate::value_format::{
-    self, array_type_info, data_type_json, embedding_type_info, logical, ColumnDefValue, IndexDefValue,
+    self, array_type_info, data_type_json, embedding_type_info, logical, ColumnDefValue,
+    IndexDefValue,
 };
 use crate::{Catalog, IndexMeta, TableMeta};
 
@@ -233,7 +234,9 @@ pub fn default_constant_expr(text: &str) -> Option<infinity_expression::json::Js
         return Some(value_format::constant_expr_bool(false));
     }
     if let Some(inner) = t.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
-        return Some(value_format::constant_expr_string(&inner.replace("''", "'")));
+        return Some(value_format::constant_expr_string(
+            &inner.replace("''", "'"),
+        ));
     }
     if let Ok(i) = t.parse::<i64>() {
         return Some(value_format::constant_expr_int(i));
@@ -305,10 +308,7 @@ fn table_of(table: &str) -> &str {
 /// column that vanished); the caller then leaves no record rather than write a
 /// half-formed one.
 fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
-    let col = table
-        .columns
-        .iter()
-        .find(|c| c.column_name == im.column)?;
+    let col = table.columns.iter().find(|c| c.column_name == im.column)?;
     let opt = |k: &str| -> Option<String> {
         im.options
             .iter()
@@ -321,7 +321,9 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
             .unwrap_or_else(|| default.to_string())
     };
     let opt_num = |k: &str, default: i64| -> i64 {
-        opt(k).and_then(|v| v.trim().parse().ok()).unwrap_or(default)
+        opt(k)
+            .and_then(|v| v.trim().parse().ok())
+            .unwrap_or(default)
     };
     match im.index_type.as_str() {
         "HNSW" => Some(IndexDefValue::hnsw(
@@ -612,10 +614,15 @@ impl Catalog {
                 .collect();
             let comments: Vec<Option<String>> =
                 t.columns.iter().map(|c| c.column_comment.clone()).collect();
-            let defaults: Vec<Option<String>> =
-                t.columns.iter().map(|c| c.default.as_ref().and_then(default_text_of)).collect();
+            let defaults: Vec<Option<String>> = t
+                .columns
+                .iter()
+                .map(|c| c.default.as_ref().and_then(default_text_of))
+                .collect();
             let not_nulls: Vec<bool> = t.columns.iter().map(is_not_null).collect();
-            self.create_table_typed(&qualified, &columns, &defaults, &not_nulls, &types, &comments)?;
+            self.create_table_typed(
+                &qualified, &columns, &defaults, &not_nulls, &types, &comments,
+            )?;
             imported += 1;
         }
         // Index records, resolved against the tables just imported.
@@ -623,11 +630,7 @@ impl Catalog {
             let table = def.base.column_names.first().and_then(|c| {
                 cpp_tables
                     .iter()
-                    .find(|t| {
-                        t.columns
-                            .iter()
-                            .any(|col| &col.column_name == c)
-                    })
+                    .find(|t| t.columns.iter().any(|col| &col.column_name == c))
                     .map(|t| format!("{}.{}", t.db_name, t.table_name))
             });
             let Some(table) = table else { continue };
@@ -654,7 +657,13 @@ impl Catalog {
             if let Some(c) = opt("cardinality") {
                 options.push(("CARDINALITY".to_string(), c));
             }
-            self.create_index_typed(&def.base.index_name, &table, &column, &def.base.index_type, &options)?;
+            self.create_index_typed(
+                &def.base.index_name,
+                &table,
+                &column,
+                &def.base.index_type,
+                &options,
+            )?;
         }
         Ok(imported)
     }
@@ -919,7 +928,10 @@ mod tests {
         let n = imported.import_cpp_layout(store.as_ref()).unwrap();
         assert_eq!(n, 1);
 
-        assert!(imported.list_databases().unwrap().contains(&"default_db".to_string()));
+        assert!(imported
+            .list_databases()
+            .unwrap()
+            .contains(&"default_db".to_string()));
         let t = imported.get_table_by_name("default_db.t").unwrap().unwrap();
         assert_eq!(t.columns, columns);
         // Types round-trip through the reverse mapping.
@@ -949,7 +961,10 @@ mod tests {
         let meta = read_cpp_tables_as_meta(store.as_ref()).unwrap();
         assert_eq!(meta.len(), 1);
         assert_eq!(meta[0].name, "default_db.t");
-        assert_eq!(meta[0].types, vec!["INTEGER", "VARCHAR", "EMBEDDING(FLOAT32,3)"]);
+        assert_eq!(
+            meta[0].types,
+            vec!["INTEGER", "VARCHAR", "EMBEDDING(FLOAT32,3)"]
+        );
         assert_eq!(meta[0].not_nulls, vec![true, false, false]);
         assert_eq!(meta[0].defaults[1], Some("'x'".to_string()));
         assert_eq!(meta[0].comments[1], Some("note".to_string()));
@@ -1014,7 +1029,11 @@ mod tests {
 
         // The `next_index_id` tag counts both indexes.
         let db = cat.list_databases().unwrap();
-        let db_id = db.iter().position(|d| d == "default_db").unwrap().to_string();
+        let db_id = db
+            .iter()
+            .position(|d| d == "default_db")
+            .unwrap()
+            .to_string();
         let tables = cat.list_tables().unwrap();
         let tbl_id = tables[0].id.to_string();
         assert_eq!(
@@ -1027,7 +1046,10 @@ mod tests {
 
         let defs = read_cpp_indexes(store.as_ref()).unwrap();
         assert_eq!(defs.len(), 2);
-        let hnsw = defs.iter().find(|d| d.base.index_name == "idx_vec").unwrap();
+        let hnsw = defs
+            .iter()
+            .find(|d| d.base.index_name == "idx_vec")
+            .unwrap();
         assert_eq!(hnsw.base.index_type, "HNSW");
         assert_eq!(hnsw.base.file_name, "t_idx_vec");
         assert_eq!(hnsw.base.column_names, vec!["v".to_string()]);

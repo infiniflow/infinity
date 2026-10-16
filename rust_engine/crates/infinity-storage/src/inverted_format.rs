@@ -564,42 +564,36 @@ pub fn fst_unpack_delta(buf: &[u8], nbytes: u8, node_addr: u64) -> Result<u64, F
 
 /// `COMMON_INPUTS[256]` (`fst/common_inputs.cppm:20-278`): byte -> rank.
 pub const FST_COMMON_INPUTS: [u8; 256] = [
-    84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
-    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-    116, 80, 117, 118, 79, 39, 30, 81, 75, 74, 82, 57, 66, 16, 12, 2,
-    19, 20, 21, 27, 32, 29, 35, 36, 37, 34, 24, 73, 119, 23, 120, 40,
-    83, 44, 48, 42, 43, 49, 46, 62, 61, 47, 69, 68, 58, 56, 55, 59,
-    51, 72, 54, 45, 52, 64, 65, 63, 71, 67, 70, 77, 121, 78, 122, 31,
-    123, 4, 25, 9, 17, 1, 26, 22, 13, 7, 50, 38, 14, 15, 10, 3,
-    8, 60, 6, 5, 0, 18, 33, 11, 41, 28, 53, 124, 125, 126, 76, 127,
-    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
-    144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
-    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
-    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
-    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
-    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
-    224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
-    240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+    84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105,
+    106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 80, 117, 118, 79, 39, 30, 81, 75, 74,
+    82, 57, 66, 16, 12, 2, 19, 20, 21, 27, 32, 29, 35, 36, 37, 34, 24, 73, 119, 23, 120, 40, 83,
+    44, 48, 42, 43, 49, 46, 62, 61, 47, 69, 68, 58, 56, 55, 59, 51, 72, 54, 45, 52, 64, 65, 63, 71,
+    67, 70, 77, 121, 78, 122, 31, 123, 4, 25, 9, 17, 1, 26, 22, 13, 7, 50, 38, 14, 15, 10, 3, 8,
+    60, 6, 5, 0, 18, 33, 11, 41, 28, 53, 124, 125, 126, 76, 127, 128, 129, 130, 131, 132, 133, 134,
+    135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153,
+    154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172,
+    173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
+    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210,
+    211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229,
+    230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248,
+    249, 250, 251, 252, 253, 254, 255,
 ];
 
 /// `COMMON_INPUTS_INV[256]` (`fst/common_inputs.cppm:280-291`): rank-1 -> byte.
 pub const FST_COMMON_INPUTS_INV: [u8; 256] = [
-    116, 101, 47, 111, 97, 115, 114, 105, 112, 99, 110, 119, 46, 104, 108, 109,
-    45, 100, 117, 48, 49, 50, 103, 61, 58, 98, 102, 51, 121, 53, 38, 95,
-    52, 118, 57, 54, 55, 56, 107, 37, 63, 120, 67, 68, 65, 83, 70, 73,
-    66, 69, 106, 80, 84, 122, 82, 78, 77, 43, 76, 79, 113, 72, 71, 87,
-    85, 86, 44, 89, 75, 74, 90, 88, 81, 59, 41, 40, 126, 91, 93, 36,
-    33, 39, 42, 64, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-    28, 29, 30, 31, 32, 34, 35, 60, 62, 92, 94, 96, 123, 124, 125, 127,
-    128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143,
-    144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
-    160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
-    176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191,
-    192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207,
-    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223,
-    224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
-    240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
+    116, 101, 47, 111, 97, 115, 114, 105, 112, 99, 110, 119, 46, 104, 108, 109, 45, 100, 117, 48,
+    49, 50, 103, 61, 58, 98, 102, 51, 121, 53, 38, 95, 52, 118, 57, 54, 55, 56, 107, 37, 63, 120,
+    67, 68, 65, 83, 70, 73, 66, 69, 106, 80, 84, 122, 82, 78, 77, 43, 76, 79, 113, 72, 71, 87, 85,
+    86, 44, 89, 75, 74, 90, 88, 81, 59, 41, 40, 126, 91, 93, 36, 33, 39, 42, 64, 0, 1, 2, 3, 4, 5,
+    6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+    31, 32, 34, 35, 60, 62, 92, 94, 96, 123, 124, 125, 127, 128, 129, 130, 131, 132, 133, 134, 135,
+    136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154,
+    155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173,
+    174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192,
+    193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211,
+    212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230,
+    231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249,
+    250, 251, 252, 253, 254, 255,
 ];
 
 /// `State::CommonIdx` (`fst/node.cppm:282-290`): the six-bit index for `input`,
@@ -720,13 +714,17 @@ impl<'a> FstNode<'a> {
         }
         let data_len = start + 1;
         let state = data[start];
-        let get = |i: usize| -> Result<u8, FormatError> { data.get(i).copied().ok_or(fst_err(i + 1, data.len())) };
+        let get = |i: usize| -> Result<u8, FormatError> {
+            data.get(i).copied().ok_or(fst_err(i + 1, data.len()))
+        };
         match state & 0b1100_0000 {
             0b1100_0000 => {
                 // StateOneTransNext: one transition to the previously compiled
                 // node.
                 let il = Self::input_len(state);
-                let end = data_len.checked_sub(1 + il).ok_or(fst_err(data_len, data.len()))?;
+                let end = data_len
+                    .checked_sub(1 + il)
+                    .ok_or(fst_err(data_len, data.len()))?;
                 Ok(Self {
                     data,
                     start,
@@ -807,14 +805,20 @@ impl<'a> FstNode<'a> {
                 if let Some(b) = fst_common_input(self.state & 0x3f) {
                     Ok(b)
                 } else {
-                    self.data.get(self.start.wrapping_sub(1)).copied().ok_or(fst_err(self.start, self.data.len()))
+                    self.data
+                        .get(self.start.wrapping_sub(1))
+                        .copied()
+                        .ok_or(fst_err(self.start, self.data.len()))
                 }
             }
             0b1000_0000 => {
                 if let Some(b) = fst_common_input(self.state & 0x3f) {
                     Ok(b)
                 } else {
-                    self.data.get(self.start.wrapping_sub(1)).copied().ok_or(fst_err(self.start, self.data.len()))
+                    self.data
+                        .get(self.start.wrapping_sub(1))
+                        .copied()
+                        .ok_or(fst_err(self.start, self.data.len()))
                 }
             }
             _ => {
@@ -824,11 +828,15 @@ impl<'a> FstNode<'a> {
                 } else {
                     0
                 };
-                let at = self.start as isize - ntl as isize - 1 - index_size as isize - i as isize - 1;
+                let at =
+                    self.start as isize - ntl as isize - 1 - index_size as isize - i as isize - 1;
                 if at < 0 {
                     return Err(fst_err(self.start, self.data.len()));
                 }
-                self.data.get(at as usize).copied().ok_or(fst_err(at as usize + 1, self.data.len()))
+                self.data
+                    .get(at as usize)
+                    .copied()
+                    .ok_or(fst_err(at as usize + 1, self.data.len()))
             }
         }
     }
@@ -851,7 +859,8 @@ impl<'a> FstNode<'a> {
                     return Ok(0);
                 }
                 let ntl = Self::ntrans_len(self.state);
-                let total = self.ntrans + self.ntrans * self.sizes.tsize
+                let total = self.ntrans
+                    + self.ntrans * self.sizes.tsize
                     + if self.ntrans > FST_TRANS_INDEX_THRESHOLD {
                         256
                     } else {
@@ -898,7 +907,11 @@ impl<'a> FstNode<'a> {
                 if at < 0 {
                     return Err(fst_err(self.start, self.data.len()));
                 }
-                fst_unpack_delta(&self.data[at as usize..], self.sizes.tsize as u8, self.end as u64)
+                fst_unpack_delta(
+                    &self.data[at as usize..],
+                    self.sizes.tsize as u8,
+                    self.end as u64,
+                )
             }
         }
     }
@@ -1191,7 +1204,7 @@ impl FstBuilder {
         let mut out = FstOutput(val);
         if key.is_empty() {
             self.len = 1; // must be the first key
-            // SetRootOutput
+                          // SetRootOutput
             self.unfinished[0].node.is_final = true;
             self.unfinished[0].node.final_output = out;
             return;
@@ -1239,7 +1252,8 @@ impl FstBuilder {
         let len = self.unfinished.len();
         assert!(self.unfinished[len - 1].last.is_none());
         self.unfinished[len - 1].last = Some((bs[0], out));
-        self.unfinished.resize(len + bs.len() - 1, UnfinishedNode::default());
+        self.unfinished
+            .resize(len + bs.len() - 1, UnfinishedNode::default());
         for (i, &b) in bs.iter().enumerate().skip(1) {
             self.unfinished[len + i - 1].last = Some((b, FstOutput::default()));
         }
@@ -1457,7 +1471,12 @@ fn pack_mini_block(values: &[u32], w: u8, out: &mut Vec<u8>) {
 
 /// Unpacks one 128-value mini-block of width `w` from `buf`, appending up to
 /// `count` values.
-fn unpack_mini_block(buf: &[u8], w: u8, count: usize, out: &mut Vec<u32>) -> Result<(), FormatError> {
+fn unpack_mini_block(
+    buf: &[u8],
+    w: u8,
+    count: usize,
+    out: &mut Vec<u32>,
+) -> Result<(), FormatError> {
     let w = w as usize;
     let nwords = 4 * w;
     if buf.len() < nwords * 4 {
@@ -1566,10 +1585,7 @@ pub fn encode_u32_block(values: &[u32]) -> Vec<u8> {
 /// Decodes a u32 posting field, returning the decoded values and how many bytes
 /// were consumed (`IntEncoder::Decode` needs `expected` because the SIMD/`VB`
 /// split is not self-describing).
-pub fn decode_u32_block(
-    buf: &[u8],
-    expected: usize,
-) -> Result<(Vec<u32>, usize), FormatError> {
+pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize), FormatError> {
     if buf.len() < 4 {
         return Err(FormatError::Truncated {
             need: 4,
@@ -1700,10 +1716,7 @@ fn s9_apply(dest: &mut [u16], words: &[u32], first_exception_pos: usize, frame_b
 /// Decodes a u16 posting field (`NewPForDeltaCompressor::Decompress`), returning
 /// the values and how many bytes were consumed. `expected` is the value count
 /// because the last block is only marked by a header bit.
-pub fn decode_u16_block(
-    buf: &[u8],
-    expected: usize,
-) -> Result<(Vec<u16>, usize), FormatError> {
+pub fn decode_u16_block(buf: &[u8], expected: usize) -> Result<(Vec<u16>, usize), FormatError> {
     let mut pos = 0usize;
     let mut out: Vec<u16> = Vec::with_capacity(expected);
     loop {
@@ -1784,7 +1797,9 @@ pub fn decode_u16_block(
                     }
                     let words: Vec<u32> = (0..exc)
                         .map(|i| {
-                            u32::from_le_bytes(buf[pos + 4 * i..pos + 4 * i + 4].try_into().unwrap())
+                            u32::from_le_bytes(
+                                buf[pos + 4 * i..pos + 4 * i + 4].try_into().unwrap(),
+                            )
                         })
                         .collect();
                     s9_apply(&mut block, &words, fep as usize - 1, fb);
@@ -1857,7 +1872,13 @@ fn npf_make_header(
 /// count or a special-frame marker.
 fn npf_select_bits(block: &[u16]) -> (u32, u32) {
     // `FRAME_BIT_MAP[i] == i` except for 31/32 which map to 32.
-    let frame_bit_map = |i: usize| -> u32 { if i >= 31 { 32 } else { i as u32 } };
+    let frame_bit_map = |i: usize| -> u32 {
+        if i >= 31 {
+            32
+        } else {
+            i as u32
+        }
+    };
     let mut num_bit_array = [0u32; 33];
     let first_value = block[0];
     let mut is_all_same = true;
@@ -1875,7 +1896,13 @@ fn npf_select_bits(block: &[u16]) -> (u32, u32) {
     if max_bits == 0 {
         return (0, 0);
     }
-    let inline = |v: u16| -> u32 { if (v as u32) <= 2047 { 0 } else { 1 } };
+    let inline = |v: u16| -> u32 {
+        if (v as u32) <= 2047 {
+            0
+        } else {
+            1
+        }
+    };
     if is_all_same {
         return (0, NPF_SAME_INLINE - inline(first_value));
     }
@@ -1995,7 +2022,13 @@ fn npf_transform_to_frame(
     is_last_block: bool,
 ) {
     let header = |exc_range: u32| {
-        npf_make_header(frame_bits, first_exception_pos as u32, code.len(), exc_range, is_last_block)
+        npf_make_header(
+            frame_bits,
+            first_exception_pos as u32,
+            code.len(),
+            exc_range,
+            is_last_block,
+        )
     };
     if first_exception_pos == 0 {
         out.extend_from_slice(&header(0).to_le_bytes());
@@ -2025,7 +2058,10 @@ fn npf_transform_to_special_frame(
     marker: u32,
     is_last_block: bool,
 ) {
-    let store_alone = matches!(marker, NPF_SAME_ALONE | NPF_INCREASE_ALONE | NPF_DECREASE_ALONE);
+    let store_alone = matches!(
+        marker,
+        NPF_SAME_ALONE | NPF_INCREASE_ALONE | NPF_DECREASE_ALONE
+    );
     let mut value = block[0];
     if matches!(marker, NPF_DECREASE_INLINE | NPF_DECREASE_ALONE) {
         value = block[block.len() - 1];
@@ -2057,7 +2093,11 @@ fn npf_compress_block(
     }
     if matches!(
         num_exceptions,
-        NPF_SAME_ALONE | NPF_SAME_INLINE | NPF_INCREASE_ALONE | NPF_INCREASE_INLINE | NPF_DECREASE_ALONE
+        NPF_SAME_ALONE
+            | NPF_SAME_INLINE
+            | NPF_INCREASE_ALONE
+            | NPF_INCREASE_INLINE
+            | NPF_DECREASE_ALONE
             | NPF_DECREASE_INLINE
     ) {
         npf_transform_to_special_frame(out, block, num_exceptions, is_last_block);
@@ -2112,7 +2152,13 @@ pub fn encode_u16_block(values: &[u16]) -> Vec<u8> {
         let len = (values.len() - off).min(NPF_BLOCK_SIZE);
         let block = &values[off..off + len];
         let (frame_bits, num_exceptions) = npf_select_bits(block);
-        npf_compress_block(&mut out, block, frame_bits, num_exceptions, blk + 1 == total);
+        npf_compress_block(
+            &mut out,
+            block,
+            frame_bits,
+            num_exceptions,
+            blk + 1 == total,
+        );
     }
     out
 }
@@ -2175,7 +2221,10 @@ mod tests {
             },
         ];
         let (region, offsets) = encode_term_meta_region_with_offsets(&metas, flags);
-        assert_eq!(offsets, vec![0, encode_term_meta(&metas[0], flags).len() as u64]);
+        assert_eq!(
+            offsets,
+            vec![0, encode_term_meta(&metas[0], flags).len() as u64]
+        );
 
         // A toy FST region: header, some node bytes, then the trailer. The
         // reader derives the region length from `root_addr` as `root_addr + 21`,
@@ -2371,7 +2420,13 @@ mod tests {
             ),
             (
                 "shared",
-                &[("aaaa", 100), ("aaab", 200), ("aabb", 300), ("abbb", 400), ("baaa", 500)],
+                &[
+                    ("aaaa", 100),
+                    ("aaab", 200),
+                    ("aabb", 300),
+                    ("abbb", 400),
+                    ("baaa", 500),
+                ],
             ),
         ];
         let hexes = [
@@ -2384,11 +2439,7 @@ mod tests {
         for ((_, pairs), hex) in cases.iter().zip(hexes) {
             let fst = unhex(hex);
             for (k, v) in *pairs {
-                assert_eq!(
-                    fst_get(&fst, k.as_bytes()).unwrap(),
-                    Some(*v),
-                    "key {k}"
-                );
+                assert_eq!(fst_get(&fst, k.as_bytes()).unwrap(), Some(*v), "key {k}");
             }
             // Keys not in the set are absent (only meaningful when the set is
             // non-empty and we can pick a stranger).
@@ -2445,15 +2496,21 @@ mod tests {
             ),
         ];
         for (label, pairs, hex) in cases {
-            let entries: Vec<(Vec<u8>, u64)> =
-                pairs.iter().map(|(k, v)| (k.as_bytes().to_vec(), *v)).collect();
+            let entries: Vec<(Vec<u8>, u64)> = pairs
+                .iter()
+                .map(|(k, v)| (k.as_bytes().to_vec(), *v))
+                .collect();
             let built = build_fst(&entries);
             let want = unhex(hex);
             assert_eq!(built.len(), want.len(), "{label}: length");
             assert_eq!(built, want, "{label}: bytes");
             // And the result reads back through our own decoder.
             for (k, v) in *pairs {
-                assert_eq!(fst_get(&built, k.as_bytes()).unwrap(), Some(*v), "{label}/{k}");
+                assert_eq!(
+                    fst_get(&built, k.as_bytes()).unwrap(),
+                    Some(*v),
+                    "{label}/{k}"
+                );
             }
         }
     }
@@ -2687,8 +2744,7 @@ mod tests {
         let mut seen = [false; 256];
         for b in 0..256 {
             assert_eq!(
-                FST_COMMON_INPUTS_INV[FST_COMMON_INPUTS[b] as usize],
-                b as u8,
+                FST_COMMON_INPUTS_INV[FST_COMMON_INPUTS[b] as usize], b as u8,
                 "INV[A[{b}]] must be {b}"
             );
             assert!(!seen[b], "COMMON_INPUTS has a duplicate at {b}");

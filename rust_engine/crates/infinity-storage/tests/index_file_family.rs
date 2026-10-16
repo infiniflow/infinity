@@ -20,7 +20,10 @@ fn index_paths_use_the_cpp_layout() {
     assert_eq!(dir, "db_0/tbl_1/idx_2/seg_3");
     // The vector family's per-chunk file.
     assert_eq!(cf::chunk_index_file(4), "chunk_4.idx");
-    assert_eq!(format!("{dir}/{}", cf::chunk_index_file(4)), "db_0/tbl_1/idx_2/seg_3/chunk_4.idx");
+    assert_eq!(
+        format!("{dir}/{}", cf::chunk_index_file(4)),
+        "db_0/tbl_1/idx_2/seg_3/chunk_4.idx"
+    );
     // Table data lives under the block dir.
     assert_eq!(cf::block_dir(0, 1, 2, 5), "db_0/tbl_1/seg_2/blk_5");
     assert_eq!(cf::column_file(7), "7.col");
@@ -108,7 +111,10 @@ fn fulltext_chunk_files_compose_into_a_readable_index() {
 
     // `.len` is a bare `u32[row_cnt]`.
     let len_file = inv::encode_column_lengths(&[2, 1, 3, 5, 1, 1, 2, 4]);
-    assert_eq!(inv::decode_column_lengths(&len_file).unwrap(), vec![2, 1, 3, 5, 1, 1, 2, 4]);
+    assert_eq!(
+        inv::decode_column_lengths(&len_file).unwrap(),
+        vec![2, 1, 3, 5, 1, 1, 2, 4]
+    );
 
     // Read the family back: term -> offset -> meta -> postings slice.
     let fst_bytes = inv::dic_fst(&dict).unwrap();
