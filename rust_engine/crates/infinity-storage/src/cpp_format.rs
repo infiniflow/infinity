@@ -788,9 +788,10 @@ pub fn element_width(element_type: i32) -> usize {
 /// is zeroed and the row's null bit cleared). Rules by layout:
 ///   * `CompactBit` — `Some(b"\x01")` (or `b"true"`/`b"1"`) sets the bit.
 ///   * `Fixed(n)` — `Some` must be exactly `n` bytes, little-endian.
-///   * `VarLen(16)` for `Varchar`(9)/`Json`(22) — `Some` is the UTF-8 payload,
-///     appended to the outline; the slot records `u64(24-bit length | 48-bit
-///     outline offset)`.
+///   * `VarLen(16)` for `Varchar`(9)/`Json`(22) — `Some` is the UTF-8 payload:
+///     at most 13 bytes are inlined in the slot, a longer one is appended to
+///     the outline and the slot records `u64(24-bit length | 40-bit prefix)` plus
+///     the outline offset.
 ///
 /// Array / tensor / sparse columns carry an element count that the string
 /// level does not know, so they are packed by the caller (see the wire layer's
@@ -861,9 +862,10 @@ pub fn pack_column_with_layout(
             ))
         }
         ColumnLayout::VarLen(16) if matches!(column_type, 9 | 22) => {
-            // C++ `Varchar` (16 bytes): word 0 = `u64 { length_ : 24; prefix_[5] }`
-            // (the 5 prefix bytes are the payload's first five bytes), word 1 =
-            // `u64 file_offset` into the outline.
+            // C++ `Varchar` (16 bytes, `varchar.h`): the first 24 bits hold the
+            // length. A payload of at most `VARCHAR_INLINE_LENGTH` (13) is stored
+            // **inline** in the remaining 13 bytes; only a longer one is appended
+            // to the outline, with the slot holding a 5-byte prefix and the offset.
             let mut outline = Vec::new();
             let mut data = Vec::with_capacity(slots.len() * 16);
             for v in slots {
@@ -873,19 +875,18 @@ pub fn pack_column_with_layout(
                     data.extend_from_slice(&[0u8; 16]);
                     continue;
                 };
-                let offset = outline.len() as u64;
-                outline.extend_from_slice(payload);
                 let len = payload.len() as u64 & 0x00ff_ffff;
-                let mut prefix = [0u8; 5];
-                for (i, b) in payload.iter().take(5).enumerate() {
-                    prefix[i] = *b;
+                let mut slot = [0u8; 16];
+                slot[0..3].copy_from_slice(&len.to_le_bytes()[..3]);
+                if payload.len() <= 13 {
+                    slot[3..3 + payload.len()].copy_from_slice(payload);
+                } else {
+                    let offset = outline.len() as u64;
+                    outline.extend_from_slice(payload);
+                    slot[3..8].copy_from_slice(&payload[..5]);
+                    slot[8..16].copy_from_slice(&offset.to_le_bytes());
                 }
-                let mut word0 = len;
-                for (i, b) in prefix.iter().enumerate() {
-                    word0 |= (*b as u64) << (24 + 8 * i);
-                }
-                data.extend_from_slice(&word0.to_le_bytes());
-                data.extend_from_slice(&offset.to_le_bytes());
+                data.extend_from_slice(&slot);
             }
             Ok((ColumnBody::build(capacity, 16, &data, &valid)?, outline))
         }
@@ -1150,9 +1151,17 @@ mod tests {
     }
 
     #[test]
-    fn pack_varchar_column_offsets_into_outline() {
-        let (body, outline) = pack_column(9, &[Some(b"hello"), None, Some(b"ab")], 4).unwrap();
-        assert_eq!(outline, b"helloab");
+    fn pack_varchar_column_inlines_short_and_outlines_long() {
+        // ≤ `VARCHAR_INLINE_LENGTH` (13) bytes stay in the slot; a longer payload
+        // is appended to the outline with a 5-byte prefix plus its offset.
+        let long = b"this string is definitely longer than thirteen bytes";
+        let (body, outline) = pack_column(
+            9,
+            &[Some(b"hello"), None, Some(b"ab"), Some(long)],
+            4,
+        )
+        .unwrap();
+        assert_eq!(outline, long); // only the long payload is outlined
         assert_eq!(body.data.len(), 64); // capacity * 16
         let word = |row: usize| -> (u64, u64) {
             let at = row * 16;
@@ -1161,14 +1170,23 @@ mod tests {
                 u64::from_le_bytes(body.data[at + 8..at + 16].try_into().unwrap()),
             )
         };
-        // word 0 = 24-bit length | 5 prefix bytes; word 1 = outline offset.
+        // row 0: "hello" inlined (24-bit length | 5 prefix bytes).
         let (w0, off0) = word(0);
-        assert_eq!((w0 & 0x00ff_ffff, off0), (5, 0)); // "hello"
-        assert_eq!(&w0.to_le_bytes()[3..8], b"hello"); // prefix inlined
+        assert_eq!(w0 & 0x00ff_ffff, 5);
+        assert_eq!(&w0.to_le_bytes()[3..8], b"hello");
+        assert_eq!(off0, 0);
         assert_eq!(word(1), (0, 0)); // NULL slot is all zero
+        // row 2: "ab" inlined too.
         let (w2, off2) = word(2);
-        assert_eq!((w2 & 0x00ff_ffff, off2), (2, 5)); // "ab" @ 5
-        assert_eq!(body.null_bitmap[0], 0b0000_0101);
+        assert_eq!(w2 & 0x00ff_ffff, 2);
+        assert_eq!(&w2.to_le_bytes()[3..5], b"ab");
+        assert_eq!(off2, 0);
+        // row 3: the long payload sits in the outline at 0.
+        let (w3, off3) = word(3);
+        assert_eq!(w3 & 0x00ff_ffff, long.len() as u64);
+        assert_eq!(&w3.to_le_bytes()[3..8], &long[..5]);
+        assert_eq!(off3, 0);
+        assert_eq!(body.null_bitmap[0], 0b0000_1101);
     }
 
     #[test]

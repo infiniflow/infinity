@@ -397,7 +397,7 @@ fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<St
             let tail = outline.get(offset..offset + count * width)?;
             let mut parts = Vec::with_capacity(count);
             for k in 0..count {
-                parts.push(decode_value("", col, tail, k)?);
+                parts.push(decode_value("", col, tail, k, outline)?);
             }
             Some(format!("{{{}}}", parts.join(",")))
         }
@@ -412,7 +412,7 @@ fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<St
                 let mut parts = Vec::with_capacity(inner_count);
                 for k in 0..inner_count {
                     let base = inner_offset + k * width;
-                    parts.push(decode_value("", col, outline.get(base..base + width)?, 0)?);
+                    parts.push(decode_value("", col, outline.get(base..base + width)?, 0, outline)?);
                 }
                 groups.push(format!("{{{}}}", parts.join(",")));
             }
@@ -749,7 +749,13 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
 }
 
 /// Decodes a slot back into the text form the engine renders.
-fn decode_value(type_text: &str, column_type: i32, body: &[u8], row: usize) -> Option<String> {
+fn decode_value(
+    type_text: &str,
+    column_type: i32,
+    body: &[u8],
+    row: usize,
+    outline: &[u8],
+) -> Option<String> {
     if let Some((dim, elem)) = embedding_shape(type_text) {
         if elem == 0 {
             // BIT: emit the comma-separated form the engine's SQL accepts
@@ -806,19 +812,21 @@ fn decode_value(type_text: &str, column_type: i32, body: &[u8], row: usize) -> O
             })
         }
         ColumnLayout::VarLen(16) => {
-            // Varchar/Json: word0 = 24-bit length | 5 prefix bytes,
-            // word1 = outline offset.
+            // Varchar/Json (`varchar.h`): word 0 starts with the 24-bit length.
+            // A payload of at most `VARCHAR_INLINE_LENGTH` (13) is inlined in the
+            // remaining 13 bytes; a longer one lives in the outline and the slot
+            // carries the 5-byte prefix plus the offset.
             let at = row * 16;
             let w0 = u64::from_le_bytes(body.get(at..at + 8)?.try_into().ok()?);
             let len = (w0 & 0x00ff_ffff) as usize;
             if len <= 13 {
-                // Inline payload: the first `len` of the 13 inline bytes.
                 let inline = &body.get(at + 3..at + 16)?[..len];
                 Some(String::from_utf8_lossy(inline).to_string())
             } else {
-                // Longer payloads live in the outline; the reader needs the
-                // outline file, so report the length instead of guessing.
-                Some(format!("<outline:{}>", len))
+                let offset =
+                    u64::from_le_bytes(body.get(at + 8..at + 16)?.try_into().ok()?) as usize;
+                let bytes = outline.get(offset..offset + len)?;
+                Some(String::from_utf8_lossy(bytes).to_string())
             }
         }
         ColumnLayout::VarLen(_) => None,
@@ -1113,7 +1121,7 @@ impl Engine {
                                     .unwrap_or_else(|| "null".into())
                             }
                             OutlineKind::None => {
-                                decode_value(&meta.types[col], *column_type, &body.data, row)
+                                decode_value(&meta.types[col], *column_type, &body.data, row, &raw.outline)
                                     .unwrap_or_else(|| "null".into())
                             }
                         }
@@ -1552,7 +1560,7 @@ mod tests {
             bytes
         );
         assert_eq!(
-            decode_value("EMBEDDING(BIT,8)", 10, &bytes, 0).unwrap(),
+            decode_value("EMBEDDING(BIT,8)", 10, &bytes, 0, &[]).unwrap(),
             "[1,0,1,1,0,0,0,1]"
         );
     }
@@ -1586,6 +1594,31 @@ mod tests {
             .unwrap();
         let err = engine.write_cpp_blocks("v").unwrap_err();
         assert!(err.to_string().contains("not supported"), "{err}");
+    }
+
+    #[test]
+    fn long_varchar_survives_a_block_round_trip() {
+        // A payload longer than `VARCHAR_INLINE_LENGTH` (13) lives in the
+        // outline; the reader must follow the slot's offset to get it back.
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE lv (id INT, s VARCHAR);")
+            .unwrap();
+        let long = "this string is definitely longer than thirteen bytes";
+        engine
+            .execute(&format!("INSERT INTO lv VALUES (1, '{long}');"))
+            .unwrap();
+        engine
+            .execute("INSERT INTO lv VALUES (2, 'short');")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("lv").unwrap(), 2);
+        engine.execute("DELETE FROM lv;").unwrap();
+        assert_eq!(engine.load_cpp_blocks("lv").unwrap(), 2);
+        let rows = row_strings(&engine, "SELECT * FROM lv;");
+        assert_eq!(rows[0][1], long);
+        assert_eq!(rows[1][1], "short");
     }
 
     #[test]
