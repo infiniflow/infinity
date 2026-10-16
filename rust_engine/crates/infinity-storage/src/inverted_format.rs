@@ -1601,6 +1601,212 @@ pub fn decode_u32_block(
     Ok((out, pos))
 }
 
+// ---------------------------------------------------------------------------
+// u16 posting block codec: IndexLib `NewPForDeltaCompressor`
+// (`third_party/newpfor/`; layout verified against C++ output)
+// ---------------------------------------------------------------------------
+
+/// `NewPForDeltaCompressor::BLOCK_SIZE` (`new_pfordelta_compressor.h:51`).
+pub const NPF_BLOCK_SIZE: usize = 128;
+
+/// `S9Compressor`'s field widths and counts (`s9compressor.h:59-60`).
+const S9_BIT_LENGTH: [u32; 9] = [1, 2, 3, 4, 5, 7, 9, 14, 28];
+const S9_CODE_NUM: [usize; 9] = [28, 14, 9, 7, 5, 4, 3, 2, 1];
+
+/// The six "special frame" markers (`firstExceptionPos`,
+/// `new_pfordelta_compressor.h:55-64`).
+const NPF_SAME_INLINE: u32 = 255;
+const NPF_SAME_ALONE: u32 = 254;
+const NPF_INCREASE_INLINE: u32 = 253;
+const NPF_INCREASE_ALONE: u32 = 252;
+const NPF_DECREASE_INLINE: u32 = 251;
+const NPF_DECREASE_ALONE: u32 = 250;
+
+/// Header bitfields (`NewPForDeltaCompressorHeader`, `:30-42`).
+#[derive(Debug, Clone, Copy)]
+struct NpfHeader {
+    is_last: bool,
+    exception_range: u32,
+    frame_bits: u32,
+    first_exception_pos: u32,
+    data_num: usize,
+}
+
+fn npf_header(x: u32) -> NpfHeader {
+    let raw = (x >> 12) & 0x1f;
+    NpfHeader {
+        is_last: x & 1 != 0,
+        exception_range: (x >> 1) & 0x7ff,
+        frame_bits: if raw == 31 { 32 } else { raw },
+        first_exception_pos: (x >> 17) & 0xff,
+        data_num: ((x >> 25) & 0x7f) as usize + 1,
+    }
+}
+
+/// `S9Decode` (`new_pfordelta_compressor.h`): ORs the exception magnitudes back
+/// into `dest`, starting at `first_exception_pos` (already `fep - 1`).
+///
+/// The stream alternates exception-value and gap fields; the top four bits of
+/// each word pick a case (0..8 starts with a value, 16..24 with a gap), and
+/// `head` carries the alternation across words.
+fn s9_apply(dest: &mut [u16], words: &[u32], first_exception_pos: usize, frame_bits: u32) {
+    let mut cur = first_exception_pos;
+    let mut head = 0u32;
+    for &val in words {
+        let c = (val >> 28) + head;
+        let idx = (c % 16) as usize;
+        let b = S9_BIT_LENGTH[idx];
+        let n = S9_CODE_NUM[idx];
+        let mut want_value = c < 16;
+        for j in 0..n {
+            let field = (val >> ((n - 1 - j) as u32 * b)) & ((1u32 << b) - 1);
+            if want_value {
+                if cur < dest.len() {
+                    dest[cur] |= (field.wrapping_shl(frame_bits) & 0xffff) as u16;
+                }
+                want_value = false;
+            } else {
+                cur += field as usize + 1;
+                want_value = true;
+            }
+        }
+        head = if want_value { 0 } else { 16 };
+    }
+}
+
+/// Decodes a u16 posting field (`NewPForDeltaCompressor::Decompress`), returning
+/// the values and how many bytes were consumed. `expected` is the value count
+/// because the last block is only marked by a header bit.
+pub fn decode_u16_block(
+    buf: &[u8],
+    expected: usize,
+) -> Result<(Vec<u16>, usize), FormatError> {
+    let mut pos = 0usize;
+    let mut out: Vec<u16> = Vec::with_capacity(expected);
+    loop {
+        if pos + 4 > buf.len() {
+            return Err(FormatError::Truncated {
+                need: pos + 4,
+                got: buf.len(),
+            });
+        }
+        let header = npf_header(u32::from_le_bytes(buf[pos..pos + 4].try_into().unwrap()));
+        pos += 4;
+        let word = |i: usize| -> Result<u32, FormatError> {
+            let at = pos - 4 + 4 * i;
+            buf.get(at..at + 4)
+                .map(|s| u32::from_le_bytes(s.try_into().unwrap()))
+                .ok_or(FormatError::Truncated {
+                    need: at + 4,
+                    got: buf.len(),
+                })
+        };
+        let dn = header.data_num;
+        let mut block = vec![0u16; dn];
+        match header.first_exception_pos {
+            NPF_SAME_INLINE => {
+                block.fill(header.exception_range as u16);
+            }
+            NPF_SAME_ALONE => {
+                let v = word(0)? as u16;
+                pos += 4;
+                block.fill(v);
+            }
+            NPF_INCREASE_INLINE => {
+                for (i, v) in block.iter_mut().enumerate() {
+                    *v = (header.exception_range as u16).wrapping_add(i as u16);
+                }
+            }
+            NPF_INCREASE_ALONE => {
+                let v = word(0)? as u16;
+                pos += 4;
+                for (i, d) in block.iter_mut().enumerate() {
+                    *d = v.wrapping_add(i as u16);
+                }
+            }
+            NPF_DECREASE_INLINE => {
+                for (i, v) in block.iter_mut().enumerate() {
+                    *v = (header.exception_range as u16).wrapping_sub(i as u16);
+                }
+            }
+            NPF_DECREASE_ALONE => {
+                let v = word(0)? as u16;
+                pos += 4;
+                for (i, d) in block.iter_mut().enumerate() {
+                    *d = v.wrapping_sub(i as u16);
+                }
+            }
+            fep => {
+                // General frame: `dn` packed values, then the exception words.
+                let fb = header.frame_bits;
+                let frame_words = (dn * fb as usize).div_ceil(32);
+                let nbytes = frame_words * 4;
+                if pos + nbytes > buf.len() {
+                    return Err(FormatError::Truncated {
+                        need: pos + nbytes,
+                        got: buf.len(),
+                    });
+                }
+                unpack_n_u16(&buf[pos..pos + nbytes], fb, dn, &mut block)?;
+                pos += nbytes;
+                if fep != 0 {
+                    // `exceptionIntRange` words of S9-encoded exceptions.
+                    let exc = header.exception_range as usize;
+                    if pos + exc * 4 > buf.len() {
+                        return Err(FormatError::Truncated {
+                            need: pos + exc * 4,
+                            got: buf.len(),
+                        });
+                    }
+                    let words: Vec<u32> = (0..exc)
+                        .map(|i| {
+                            u32::from_le_bytes(buf[pos + 4 * i..pos + 4 * i + 4].try_into().unwrap())
+                        })
+                        .collect();
+                    s9_apply(&mut block, &words, fep as usize - 1, fb);
+                    pos += exc * 4;
+                }
+            }
+        }
+        out.extend_from_slice(&block);
+        if header.is_last || out.len() >= expected {
+            break;
+        }
+    }
+    Ok((out, pos))
+}
+
+/// `unpack_N<T>` (`unpack.h`): `n` values of `bits` bits each, packed LSB-first
+/// and read sequentially (the 32-value main loop plus the unaligned tail is
+/// equivalent to one naive pass).
+fn unpack_n_u16(buf: &[u8], bits: u32, n: usize, out: &mut [u16]) -> Result<(), FormatError> {
+    if bits == 0 {
+        return Ok(());
+    }
+    for (j, o) in out.iter_mut().enumerate().take(n) {
+        let bit = j as u64 * bits as u64;
+        let word = (bit / 32) as usize;
+        let off = (bit % 32) as u32;
+        let at = word * 4;
+        let lo = buf.get(at..at + 4).ok_or(FormatError::Truncated {
+            need: at + 4,
+            got: buf.len(),
+        })?;
+        let mut v = u32::from_le_bytes(lo.try_into().unwrap()) >> off;
+        // A field may straddle a word boundary.
+        if off + bits > 32 {
+            let hi = buf.get(at + 4..at + 8).ok_or(FormatError::Truncated {
+                need: at + 8,
+                got: buf.len(),
+            })?;
+            let hi = u32::from_le_bytes(hi.try_into().unwrap());
+            v |= hi << (32 - off);
+        }
+        *o = (v & ((1u32 << bits) - 1)) as u16;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2010,6 +2216,69 @@ mod tests {
             let (got, used) = decode_u32_block(&want, values.len()).unwrap();
             assert_eq!(&got, values, "{label}: decode");
             assert_eq!(used, want.len(), "{label}: bytes consumed");
+        }
+    }
+
+    #[test]
+    fn u16_block_decodes_the_cpp_bytes() {
+        // C++ `NewPForDeltaCompressor::Compress(..., true)` output, covering
+        // every special frame, a plain frame and frames with S9 exceptions.
+        let mut e3: Vec<u16> = (0..128).map(|i| (i % 8) as u16).collect();
+        e3[5] = 1000;
+        e3[40] = 2000;
+        e3[100] = 300;
+        let mut e1: Vec<u16> = (0..4).cycle().take(128).collect();
+        e1[0] = 5000;
+        let cases: Vec<(&str, Vec<u16>, &str)> = vec![
+            ("inc5", vec![1, 2, 3, 4, 5], "0300fa09"),
+            (
+                "fib12",
+                vec![1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89],
+                "017000168140403028201a15d12d0b00",
+            ),
+            (
+                "mod7",
+                (0..128).map(|i| (i % 7) as u16).collect(),
+                "013000fe88c61ad158231a6b44638d68ac118d35a2b14634d688c61ad158231a6b44638d68ac118d35a2b14634d688c61ad15823",
+            ),
+            ("const", vec![1000u16; 128], "d107feff"),
+            (
+                "rand",
+                (0..128).map(|i| ((i * 37) % 1000) as u16).collect(),
+                "01a000fe0094a0c41b94e4e2cd40283525d765bc8567e08a50d6a9e9afe426ecf2d478772efcf92424e1c624b87423d0494cc565d96ee015a8e2937466eaebb808b72cf5dd9c076ffe0848b421c92ddc0464d2527055a6db7704a6e8e49c98f62aeec12c476df7e6c0972fc2116c4462cb360095a4d45b94e5e6dd80283629e7a5bc866bf0ca50d7adf9efe48760c41a90d4a2cd3f2425e5d664b87527e0894cc669e9ae",
+            ),
+            (
+                "two_blocks",
+                (0..130).map(|i| (i % 3) as u16).collect(),
+                "002000fe24499224499224499224499224499224499224499224499224499224499224490120000202000000",
+            ),
+            (
+                "exc3",
+                e3,
+                "05300cfe8846f888c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fa88c6fafa44f46125c00e70",
+            ),
+            (
+                "exc1",
+                e1,
+                "032002fee4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e2040080",
+            ),
+            (
+                "exc20",
+                {
+                    let mut v: Vec<u16> = (0..128).map(|i| (i % 16) as u16).collect();
+                    for k in 0..20 {
+                        v[k * 6] = 4000 + k as u16;
+                    }
+                    v
+                },
+                "01c000fea01f00023000045000a17f000890000ab000a2df000ef000001000a33f00045000067000a49f000ab0000cd000a5ff00001000023000a65f00067000089000a7bf000cd0000ef000a81f00023000045000a97f000890000ab000aadf000ef000001000ab3f00045000067000ac9f000ab0000cd000adff00001000023000ae5f00067000089000afbf000cd0000ef000b01f00023000045000b17f000890000ab000b2df000ef000001000b33f000450000670000890000ab0000cd0000ef000",
+            ),
+        ];
+        for (label, values, hex) in cases {
+            let bytes = unhex(hex);
+            let (got, used) = decode_u16_block(&bytes, values.len()).unwrap();
+            assert_eq!(got, values, "{label}: decode");
+            assert_eq!(used, bytes.len(), "{label}: bytes consumed");
         }
     }
 
