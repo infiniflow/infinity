@@ -2550,7 +2550,8 @@ impl Engine {
         let require_all = params.split(';').any(|p| {
             p.split_once('=')
                 .map(|(k, v)| {
-                    k.trim().eq_ignore_ascii_case("operator") && v.trim().eq_ignore_ascii_case("and")
+                    k.trim().eq_ignore_ascii_case("operator")
+                        && v.trim().eq_ignore_ascii_case("and")
                 })
                 .unwrap_or(false)
         });
