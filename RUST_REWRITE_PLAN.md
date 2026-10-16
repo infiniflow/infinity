@@ -440,7 +440,7 @@ QueryContext::query(sql)
 | 关卡 | 本次实测结果 | 结论 |
 |---|---|---|
 | **A** | `statement ok` **1746/1746（100%）**、`statement error` **129/129（100%）**、`query` **1378/1532（90.0%）** | **未达标**：缺口集中在 `EXPLAIN` 计划文本（≈50，需复刻 C++ binder 的 `GetNewLogicalNodeId()` 编号）与全文/FUSION 打分（≈120，已复刻 `BM25Ranker` 公式且单段用例逐位一致，多段用例需 C++ 的**段级统计**） |
-| **B** | `run_gate_b.sh` → **FAIL**：pysdk/HTTP 用例报 `An error occurred: None`（缺 `infinity` Python 模块 / 未构建 SDK 与服务） | **无证据**：需先补齐 Thrift 全量 RPC + 构建 SDK |
+| **B** | **已有可复现证据（2026-10-16 晚）**：新增 `infinity serve <dir> [host:port]` 前端（CLI 链接 `infinity-server`），**未修改的官方 Python SDK** 可 `import infinity` → `connect(127.0.0.1:23817)` → `ListDatabase` 成功；全量 `python/test_pysdk -m "not complex and not slow"` 结果 **1268 passed / 386 failed / 598 errors / 7 skipped**（2259 选中）；其中 **≈586 个 error 是环境问题**（`PermissionError: '/var/infinity'`，CI 会预建该夹具目录，非 root 无法创建；集中在 `test_knn.py` 363、`test_py_import.py` 223）；`test_database.py` 已达 **20 passed / 2 failed** | **部分达标**：协议/握手/SDK 全链路已通；剩余为 engine 侧未实现的 RPC 与索引能力 |
 | **C** | 快照 `.slt` 通过；`python/restart_test` → `ModuleNotFoundError: No module named 'infinity'`；`INFINITY_MINIO_ENDPOINT` 未设 → SKIP | **部分**：Rust 侧快照/重启路径有覆盖，SDK 侧与 MinIO 无证据 |
 | **D** | loom `commit_ts` 唯一性 → `test result: ok`；`miri` 未安装 → SKIP；`python/parallel_test` 缺 `infinity` 模块 | **部分**：Rust 侧并发模型有证据，SDK 侧与 miri 无证据 |
 | **E** | `run_gate_e.sh` → **PASS**：insert **79,604 rows/s**、select 2000 行 **3.55 ms**；<7% golden 比对需 `--golden` 目录 | **部分**：有基准数字，缺 golden 对照 |
