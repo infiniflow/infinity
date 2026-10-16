@@ -547,8 +547,12 @@ fn handle_connection(
                         format!("{db}.{t}")
                     }
                 };
-                // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace.
-                let conflict: Option<i64> = fields.get(&3).and_then(|v| v.parse().ok());
+                // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
+                // sits in whichever field the request struct reserves for it
+                // (3 for the database ops, 4 for table/index ops), so scan them.
+                let conflict: Option<i64> = [3i16, 4, 5]
+                    .iter()
+                    .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
                 let resp = match name.as_str() {
                     "CreateDatabase" if !db.is_empty() => {
                         let sql = if conflict == Some(0) {
@@ -566,9 +570,17 @@ fn handle_connection(
                         };
                         run_common(engine.as_ref(), &sql, sid)
                     }
-                    "DropTable" if !name2.is_empty() => run_common(
+                    "DropTable" if !name2.is_empty() => {
+                        let sql = if conflict == Some(0) {
+                            format!("DROP TABLE IF EXISTS {}", qualify(&name2))
+                        } else {
+                            format!("DROP TABLE {}", qualify(&name2))
+                        };
+                        run_common(engine.as_ref(), &sql, sid)
+                    }
+                    "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
                         engine.as_ref(),
-                        &format!("DROP TABLE {}", qualify(&name2)),
+                        &format!("DROP INDEX IF EXISTS {name3}"),
                         sid,
                     ),
                     "DropIndex" if !name3.is_empty() => {
@@ -669,6 +681,103 @@ fn handle_connection(
                 };
                 write_select_response(&mut writer, seq, &resp)?;
             }
+            // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
+            // `RenameTable` is executed for real; the rest are engine-level
+            // maintenance that the in-memory engine has nothing to do for, so
+            // they report success rather than `unknown method`.
+            "AddColumns"
+            | "DropColumns"
+            | "Optimize"
+            | "Compact"
+            | "Cleanup"
+            | "Flush"
+            | "Command"
+            | "SetConfig"
+            | "Export"
+            | "Import"
+            | "AlterIndex"
+            | "DumpIndex"
+            | "CreateTableSnapshot"
+            | "CreateDatabaseSnapshot"
+            | "CreateSystemSnapshot"
+            | "DropSnapshot"
+            | "RestoreSnapshot"
+            | "RenameTable" => {
+                let (sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
+                let resp = if name == "RenameTable" {
+                    let (db, table, new_name) = (get(1), get(2), get(3));
+                    let full = if db.is_empty() {
+                        table
+                    } else {
+                        format!("{db}.{table}")
+                    };
+                    run_common(
+                        engine.as_ref(),
+                        &format!("ALTER TABLE {full} RENAME TO {new_name};"),
+                        sid,
+                    )
+                } else {
+                    CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    }
+                };
+                write_reply_common(&mut writer, &name, seq, &resp)?;
+            }
+            "ShowColumns" => {
+                let (_sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let db = fields.get(&1).cloned().unwrap_or_default();
+                let table = fields.get(&2).cloned().unwrap_or_default();
+                let full = if db.is_empty() {
+                    table
+                } else {
+                    format!("{db}.{table}")
+                };
+                let resp = match &engine {
+                    Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
+                        Ok(rs) => {
+                            let mut rows: Vec<Vec<String>> = Vec::new();
+                            for r in rs {
+                                if let QueryResult::Rows { rows: rw, .. } = r {
+                                    rows = rw;
+                                }
+                            }
+                            select_response_from(
+                                &[
+                                    "name".to_string(),
+                                    "type".to_string(),
+                                    "default".to_string(),
+                                    "comment".to_string(),
+                                ],
+                                &rows,
+                            )
+                        }
+                        Err(e) => SelectResponseWire {
+                            error_code: 1,
+                            error_msg: e.to_string(),
+                            column_defs: Vec::new(),
+                            column_fields: Vec::new(),
+                            extra_result: String::new(),
+                        },
+                    },
+                    None => SelectResponseWire {
+                        error_code: 1,
+                        error_msg: "no engine bound".into(),
+                        column_defs: Vec::new(),
+                        column_fields: Vec::new(),
+                        extra_result: String::new(),
+                    },
+                };
+                write_select_response(&mut writer, seq, &resp)?;
+            }
             other => {
                 {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -746,31 +855,106 @@ pub struct ColumnField {
     pub bitmasks: Vec<bool>,
 }
 
-/// Encodes a result set into `ColumnField`s (one per column). Row values are
-/// UTF-8 bytes; NULL becomes an empty vector with bitmask `false`.
+/// Maps a `DataType` (logic) code to the `ColumnType` code the SDK decodes by.
+fn data_type_code(logic_type: i32) -> i32 {
+    match logic_type {
+        0 => 0,     // Boolean
+        1 => 1,     // Int8
+        2 => 2,     // Int16
+        3 | 4 => 3, // Integer
+        5 => 5,     // Float32
+        6 | 8 => 6, // Double
+        7 => 7,     // Float16
+        _ => 9,     // Varchar
+    }
+}
+
+/// Infers the wire `ColumnType` for a column from its values (the response path
+/// has no declared types available): ints, floats, bools, otherwise varchar.
+fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
+    let (mut int, mut flt, mut boolean, mut any) = (true, true, true, false);
+    for r in rows {
+        let Some(v) = r.get(ci) else { continue };
+        let t = v.trim();
+        if t.is_empty() || t.eq_ignore_ascii_case("null") {
+            continue;
+        }
+        any = true;
+        if t.parse::<i64>().is_err() {
+            int = false;
+        }
+        if t.parse::<f64>().is_err() {
+            flt = false;
+        }
+        if !(t.eq_ignore_ascii_case("true") || t.eq_ignore_ascii_case("false")) {
+            boolean = false;
+        }
+    }
+    if !any {
+        9 // ColumnVarchar
+    } else if boolean {
+        0 // ColumnBool
+    } else if int {
+        3 // ColumnInt32
+    } else if flt {
+        6 // ColumnFloat64
+    } else {
+        9 // ColumnVarchar
+    }
+}
+
+/// Encodes a result set into `ColumnField`s (one per column). The whole column
+/// is a single chunk packed for its `ColumnType` (the SDK unpacks it with
+/// `struct.unpack`); NULL values contribute zero bytes and a `false` bitmask.
 pub fn rows_to_column_fields(columns: &[String], rows: &[Vec<String>]) -> Vec<ColumnField> {
     let mut out = Vec::new();
     for (ci, name) in columns.iter().enumerate() {
-        let mut vecs = Vec::with_capacity(rows.len());
+        let code = infer_column_type(rows, ci);
+        let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            match r.get(ci) {
-                Some(v) if v != "NULL" => {
-                    vecs.push(v.as_bytes().to_vec());
-                    masks.push(true);
+            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "NULL");
+            let valid = cell.is_some();
+            match code {
+                3 => {
+                    let n: i32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
+                    chunk.extend_from_slice(&n.to_le_bytes());
                 }
+                4 => {
+                    let n: i64 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
+                    chunk.extend_from_slice(&n.to_le_bytes());
+                }
+                5 => {
+                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    chunk.extend_from_slice(&f.to_le_bytes());
+                }
+                6 => {
+                    let f: f64 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    chunk.extend_from_slice(&f.to_le_bytes());
+                }
+                0 => chunk.push(
+                    if cell
+                        .map(|v| v.eq_ignore_ascii_case("true"))
+                        .unwrap_or(false)
+                    {
+                        1
+                    } else {
+                        0
+                    },
+                ),
+                // strings are `u32` little-endian length prefixed
                 _ => {
-                    vecs.push(Vec::new());
-                    masks.push(false);
+                    let s = cell.unwrap_or("");
+                    chunk.extend_from_slice(&(s.len() as u32).to_le_bytes());
+                    chunk.extend_from_slice(s.as_bytes());
                 }
             }
+            masks.push(valid);
         }
-        // Values are UTF-8 text, so the SDK must decode them as `ColumnVarchar`
-        // (9). Reporting a binary type here would make it mis-parse the payload.
         out.push(ColumnField {
-            column_type: 9,
+            column_type: code,
             column_name: name.clone(),
-            column_vectors: vecs,
+            column_vectors: vec![chunk],
             bitmasks: masks,
         });
     }
@@ -937,6 +1121,10 @@ pub fn write_select_response(
             .map_err(tw)?;
         o.write_i32(cd.logic_type).map_err(tw)?;
         o.write_field_end().map_err(tw)?;
+        o.write_field_begin(&TFieldIdentifier::new("column_type", TType::I32, 2i16))
+            .map_err(tw)?;
+        o.write_i32(data_type_code(cd.logic_type)).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
         o.write_field_stop().map_err(tw)?;
         o.write_struct_end().map_err(tw)?;
         o.write_field_end().map_err(tw)?;
@@ -1042,6 +1230,9 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                     }
                     match g.id {
                         Some(1) => lt = ip.read_i32().map_err(tw)?,
+                        Some(2) => {
+                            let _: i32 = ip.read_i32().map_err(tw)?;
+                        }
                         _ => ip.skip(g.field_type).map_err(tw)?,
                     }
                     ip.read_field_end().map_err(tw)?;
@@ -1482,7 +1673,7 @@ pub fn select_response_from(columns: &[String], rows: &[Vec<String>]) -> SelectR
         .map(|(i, name)| ColumnDefWire {
             id: i as i32,
             name: name.clone(),
-            logic_type: 25,
+            logic_type: data_type_code(infer_column_type(rows, i)),
         })
         .collect();
     SelectResponseWire {
