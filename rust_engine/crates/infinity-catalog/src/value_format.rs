@@ -377,6 +377,22 @@ pub mod ivf_storage {
     pub const PRODUCT_QUANTIZATION: i64 = 2;
 }
 
+/// `BMPCompressType` ordinals (`bmp_util.cppm:28-32`).
+pub mod bmp_compress {
+    pub const RAW: i64 = 0;
+    pub const COMPRESSED: i64 = 1;
+    pub const INVALID: i64 = 2;
+}
+
+/// `DiskAnnEncodeTypeToString` spelling (`index_diskann_impl.cpp:34-41`).
+pub fn diskann_encode_name_of(text: &str) -> &'static str {
+    if text.trim().eq_ignore_ascii_case("plain") {
+        "plain"
+    } else {
+        "invalid"
+    }
+}
+
 /// HNSW build defaults (`src/common/default_values.cppm:178-180`).
 pub const HNSW_M: i64 = 16;
 pub const HNSW_EF_CONSTRUCTION: i64 = 200;
@@ -677,6 +693,131 @@ impl IndexDefValue {
         ))
         .with("ivf_option", option)
     }
+
+    /// `IndexBMP::Serialize()` (`index_bmp_impl.cpp:118-123`).
+    pub fn bmp(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        block_size: i64,
+        compress_type: i64,
+    ) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::BMP,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with("block_size", Json::Int(block_size))
+        .with("compress_type", Json::Int(compress_type))
+    }
+
+    /// `IndexSMVE::Serialize()` (`index_smve_impl.cpp:99-104`).
+    pub fn smve(index_name: &str, table_name: &str, column: &str, width: i64, topk: i64) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::SMVE,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with("width", Json::Int(width))
+        .with("topk", Json::Int(topk))
+    }
+
+    /// `IndexPLAID::Serialize()` (`index_plaid_impl.cpp:133-139`).
+    pub fn plaid(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        nbits: i64,
+        n_centroids: i64,
+        colbertsar_mode: bool,
+    ) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::PLAID,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with("nbits", Json::Int(nbits))
+        .with("n_centroids", Json::Int(n_centroids))
+        .with("colbertsar_mode", Json::Bool(colbertsar_mode))
+    }
+
+    /// `IndexEMVB::Serialize()` (`index_emvb_impl.cpp:128-133`).
+    pub fn emvb(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        pq_subspace_num: i64,
+        pq_subspace_bits: i64,
+    ) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::EMVB,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with("pq_subspace_num", Json::Int(pq_subspace_num))
+        .with("pq_subspace_bits", Json::Int(pq_subspace_bits))
+    }
+
+    /// `IndexDiskAnn::Serialize()` (`index_diskann_impl.cpp:142-151`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn diskann(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        metric: &str,
+        encode: &str,
+        r: i64,
+        l: i64,
+        num_pq_chunks: i64,
+        num_parts: i64,
+    ) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::DISKANN,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with("metric_type", Json::Str(metric.to_string()))
+        .with("encode_type", Json::Str(encode.to_string()))
+        .with("R", Json::Int(r))
+        .with("L", Json::Int(l))
+        .with("num_pq_chunks", Json::Int(num_pq_chunks))
+        .with("num_parts", Json::Int(num_parts))
+    }
+
+    /// `IndexSecondaryFunctional::Serialize()`
+    /// (`index_secondary_functional_impl.cpp:69-78`).
+    ///
+    /// `func_return_type` is a `DataType::Serialize()` object and
+    /// `function_expression` an embedded JSON object (the C++ reparses the
+    /// stored string, so the value is an object, not a string).
+    pub fn secondary_functional(
+        index_name: &str,
+        table_name: &str,
+        column: &str,
+        func_col_params: &str,
+        func_return_type: Json,
+        function_expression: Json,
+        low_cardinality: bool,
+    ) -> Self {
+        Self::new(IndexBaseValue::new(
+            index_type::SECONDARY_FUNCTIONAL,
+            index_name,
+            index_file_name(table_name, index_name),
+            vec![column.to_string()],
+        ))
+        .with(
+            "cardinality",
+            Json::Str(if low_cardinality { "low" } else { "high" }.to_string()),
+        )
+        .with("func_col_params", Json::Str(func_col_params.to_string()))
+        .with("func_return_type", func_return_type)
+        .with("function_expression", function_expression)
+    }
 }
 
 /// Encodes a full `IndexBase`-family record, i.e. the base fields plus the
@@ -949,6 +1090,46 @@ mod tests {
         assert_eq!(
             constant_expr_sparse_array(literal::LONG_SPARSE_ARRAY, &[3], &[9.0]).compact(),
             r#"{"type":13,"value":{"data":[9],"indices":[3]}}"#
+        );
+    }
+
+    #[test]
+    fn remaining_subtypes_match_the_cpp_json() {
+        assert_eq!(
+            index_def_json(&IndexDefValue::bmp("i", "t", "c", 128, bmp_compress::COMPRESSED))
+                .compact(),
+            r#"{"block_size":128,"column_names":["c"],"compress_type":1,"file_name":"t_i","index_comment":"","index_name":"i","index_type":"BMP"}"#
+        );
+        assert_eq!(
+            index_def_json(&IndexDefValue::smve("i", "t", "c", 2048, 8)).compact(),
+            r#"{"column_names":["c"],"file_name":"t_i","index_comment":"","index_name":"i","index_type":"SMVE","topk":8,"width":2048}"#
+        );
+        assert_eq!(
+            index_def_json(&IndexDefValue::plaid("i", "t", "c", 4, 0, false)).compact(),
+            r#"{"colbertsar_mode":false,"column_names":["c"],"file_name":"t_i","index_comment":"","index_name":"i","index_type":"PLAID","n_centroids":0,"nbits":4}"#
+        );
+        assert_eq!(
+            index_def_json(&IndexDefValue::emvb("i", "t", "c", 16, 8)).compact(),
+            r#"{"column_names":["c"],"file_name":"t_i","index_comment":"","index_name":"i","index_type":"EMVB","pq_subspace_bits":8,"pq_subspace_num":16}"#
+        );
+        assert_eq!(
+            index_def_json(&IndexDefValue::diskann("i", "t", "c", "l2", "plain", 64, 100, 8, 1))
+                .compact(),
+            r#"{"L":100,"R":64,"column_names":["c"],"encode_type":"plain","file_name":"t_i","index_comment":"","index_name":"i","index_type":"DISKANN","metric_type":"l2","num_parts":1,"num_pq_chunks":8}"#
+        );
+        // The functional index embeds a DataType object and a JSON object.
+        let v = IndexDefValue::secondary_functional(
+            "i",
+            "t",
+            "c",
+            "fn(c)",
+            data_type_json(logical::INTEGER, None),
+            infinity_expression::json::parse(r#"{"name":"sqrt"}"#).unwrap(),
+            false,
+        );
+        assert_eq!(
+            index_def_json(&v).compact(),
+            r#"{"cardinality":"high","column_names":["c"],"file_name":"t_i","func_col_params":"fn(c)","func_return_type":{"data_type":3},"function_expression":{"name":"sqrt"},"index_comment":"","index_name":"i","index_type":"SECONDARYFUNCTIONAL"}"#
         );
     }
 

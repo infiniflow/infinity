@@ -218,6 +218,52 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
                 elem,
             ))
         }
+        "BMP" => Some(IndexDefValue::bmp(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            opt_num("BLOCK_SIZE", 0),
+            if opt_word("COMPRESS_TYPE", "compressed").eq_ignore_ascii_case("raw") {
+                value_format::bmp_compress::RAW
+            } else {
+                value_format::bmp_compress::COMPRESSED
+            },
+        )),
+        "SMVE" => Some(IndexDefValue::smve(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            opt_num("WIDTH", 2048),
+            opt_num("TOPK", 8),
+        )),
+        "PLAID" => Some(IndexDefValue::plaid(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            opt_num("NBITS", 4),
+            opt_num("N_CENTROIDS", 0),
+            opt("COLBERTSAR_MODE")
+                .map(|v| v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false),
+        )),
+        "EMVB" => Some(IndexDefValue::emvb(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            opt_num("PQ_SUBSPACE_NUM", 0),
+            opt_num("PQ_SUBSPACE_BITS", 0),
+        )),
+        "DISKANN" => Some(IndexDefValue::diskann(
+            &im.name,
+            &table.table_name,
+            &im.column,
+            value_format::metric_name_of(&opt_word("METRIC", "l2")),
+            value_format::diskann_encode_name_of(&opt_word("ENCODE", "plain")),
+            opt_num("R", 0),
+            opt_num("L", 0),
+            opt_num("NUM_PQ_CHUNKS", 0),
+            opt_num("NUM_PARTS", 0),
+        )),
         _ => None,
     }
 }
