@@ -129,6 +129,32 @@ fn del_prefix(table: &str) -> Vec<u8> {
 fn snap_key(name: &str) -> Vec<u8> {
     format!("snap:{name}").into_bytes()
 }
+/// Overwrites a search-result row's hidden `#_score` column (the last one).
+fn set_score(row: &mut [Value], score: f64) {
+    if let Some(last) = row.last_mut() {
+        *last = Value::Float(score);
+    }
+}
+/// Reads a search-result row's hidden `#_score` column (the last one).
+fn row_score(row: &[Value]) -> f64 {
+    match row.last() {
+        Some(Value::Float(f)) => *f,
+        Some(Value::Int(i)) => *i as f64,
+        _ => 0.0,
+    }
+}
+/// Whether a fusion child's scores are similarities (higher is better, so no
+/// sign flip) rather than distances. Mirrors `PhysicalFusion`'s `min_heaps`:
+/// `MATCH`/`MATCH TENSOR`/`MATCH SPARSE` are similarities, and an L2/Hamming
+/// vector scan is a distance (`KnnExpression::IsKnnMinHeap`).
+fn match_is_min_heap(m: &MatchClause) -> bool {
+    if m.kind.eq_ignore_ascii_case("VECTOR") {
+        let metric = arg_str(m.args.get(2)).unwrap_or_default();
+        !matches!(metric.trim().to_ascii_lowercase().as_str(), "l2" | "hamming")
+    } else {
+        true
+    }
+}
 /// Record / field separators used inside a snapshot blob.
 const SNAP_REC: char = '\u{1d}';
 const SNAP_FLD: char = '\u{1c}';
@@ -3043,6 +3069,7 @@ impl Engine {
         &self,
         table: &str,
         m: &MatchClause,
+        pred: Option<&Expr>,
         hidden: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
@@ -3191,6 +3218,13 @@ impl Engine {
                 continue;
             }
             if let Some(p) = &in_filter {
+                if !p.eval_predicate(row) {
+                    continue;
+                }
+            }
+            // The outer WHERE (a fusion child's inherited filter) prunes
+            // candidates before the top-N ranking.
+            if let Some(p) = pred {
                 if !p.eval_predicate(row) {
                     continue;
                 }
@@ -3583,29 +3617,7 @@ impl Engine {
             .map(|x| x.to_string())
             .collect();
         if s.matches.len() > 1 {
-            // `FUSION(…)`: the union of every sub-search, deduplicated by row id.
-            let mut seen: std::collections::HashSet<i64> = Default::default();
-            let mut out: Vec<(i64, Vec<Value>)> = Vec::new();
-            for m in &s.matches {
-                let (rows, _) = self.run_one_match(
-                    table,
-                    m,
-                    s.using_index.as_deref(),
-                    s.with_opts.as_deref(),
-                    pred,
-                )?;
-                for row in rows {
-                    let id = match row.iter().rev().nth(3) {
-                        Some(Value::Int(i)) => *i,
-                        _ => continue,
-                    };
-                    if seen.insert(id) {
-                        out.push((id, row));
-                    }
-                }
-            }
-            out.sort_by_key(|(id, _)| *id);
-            return Ok((out.into_iter().map(|(_, r)| r).collect(), hidden));
+            return self.fuse_matches(table, s, pred, hidden);
         }
         match s.matches.first() {
             Some(m) => self.run_one_match(
@@ -3617,6 +3629,185 @@ impl Engine {
             ),
             None => Ok((Vec::new(), hidden)),
         }
+    }
+
+    /// `FUSION(…)`: runs every sub-search and combines the per-document child
+    /// scores. Reproduces `PhysicalFusion::ExecuteRRFWeighted`
+    /// (`physical_fusion_impl.cpp`): `rrf` is rank-based with a rank constant of
+    /// 60, `weighted_sum`/`max` combine scores normalised by `none` (default for
+    /// ...), `minmax` (the default), `l2` or `atan`, with per-child weights.
+    fn fuse_matches(
+        &self,
+        table: &str,
+        s: &SearchClause,
+        pred: Option<&Expr>,
+        hidden: Vec<String>,
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let method = s
+            .fusion
+            .clone()
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase();
+        let params = s.fusion_params.clone().unwrap_or_default();
+        let opt = |key: &str| -> Option<String> {
+            params
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+                .map(|(_, v)| v.trim().to_string())
+        };
+        let num_children = s.matches.len();
+        // Run each sub-search (best-first) and note whether its score is a
+        // similarity (higher is better) or a distance (lower is better).
+        let mut children: Vec<Vec<Vec<Value>>> = Vec::with_capacity(num_children);
+        let mut min_heap: Vec<bool> = Vec::with_capacity(num_children);
+        for m in &s.matches {
+            let (rows, _) = self.run_one_match(
+                table,
+                m,
+                s.using_index.as_deref(),
+                s.with_opts.as_deref(),
+                pred,
+            )?;
+            min_heap.push(match_is_min_heap(m));
+            children.push(rows);
+        }
+        // Per-document child scores, in first-seen order (fragment 0 first, then
+        // each document in rank order).
+        struct Doc {
+            scores: Vec<f64>,
+            mask: Vec<bool>,
+            row: Vec<Value>,
+        }
+        let mut docs: Vec<Doc> = Vec::new();
+        let mut index: HashMap<i64, usize> = HashMap::new();
+        for (ci, rows) in children.iter().enumerate() {
+            for (rank, row) in rows.iter().enumerate() {
+                let id = match row.iter().rev().nth(3) {
+                    Some(Value::Int(i)) => *i,
+                    _ => continue,
+                };
+                let score = match row.last() {
+                    Some(Value::Float(f)) => *f,
+                    Some(Value::Int(i)) => *i as f64,
+                    _ => 0.0,
+                };
+                let di = *index.entry(id).or_insert_with(|| {
+                    docs.push(Doc {
+                        scores: vec![0.0; num_children],
+                        mask: vec![false; num_children],
+                        row: row.clone(),
+                    });
+                    docs.len() - 1
+                });
+                docs[di].mask[ci] = true;
+                docs[di].scores[ci] = if method == "rrf" {
+                    (rank + 1) as f64
+                } else {
+                    score
+                };
+            }
+        }
+        let topn: usize = opt("topn")
+            .or_else(|| opt("window_size"))
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|n| *n >= 1)
+            .unwrap_or(100);
+        if method == "rrf" {
+            let rank_constant: f64 = opt("rank_constant")
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|n| *n >= 1.0)
+                .unwrap_or(60.0);
+            for doc in &mut docs {
+                let mut score = 0.0;
+                for (ci, rank) in doc.scores.iter().enumerate() {
+                    if doc.mask[ci] && *rank >= 1.0 {
+                        score += 1.0 / (rank_constant + rank);
+                    }
+                }
+                set_score(&mut doc.row, score);
+            }
+        } else {
+            // `weights` (default 1.0 each) and `normalize` (default `minmax`).
+            let mut weights: Vec<f64> = opt("weights")
+                .map(|w| w.split(',').filter_map(|x| x.trim().parse::<f64>().ok()).collect())
+                .unwrap_or_default();
+            weights.resize(num_children, 1.0);
+            let normalize = opt("normalize")
+                .map(|v| v.to_ascii_lowercase())
+                .unwrap_or_else(|| "minmax".into());
+            let mut min_scores = vec![f64::INFINITY; num_children];
+            let mut max_scores = vec![f64::NEG_INFINITY; num_children];
+            let mut l2_sums = vec![0.0f64; num_children];
+            for doc in &docs {
+                for ci in 0..num_children {
+                    if !doc.mask[ci] {
+                        continue;
+                    }
+                    let score = doc.scores[ci];
+                    match normalize.as_str() {
+                        "minmax" => {
+                            min_scores[ci] = min_scores[ci].min(score);
+                            max_scores[ci] = max_scores[ci].max(score);
+                        }
+                        "l2" | "l2_norm" => l2_sums[ci] += score * score,
+                        _ => {}
+                    }
+                }
+            }
+            for doc in &mut docs {
+                let mut fusion = if method == "max" {
+                    f64::NEG_INFINITY
+                } else {
+                    0.0
+                };
+                for ci in 0..num_children {
+                    if !doc.mask[ci] {
+                        continue;
+                    }
+                    let mut score = doc.scores[ci];
+                    match normalize.as_str() {
+                        "atan" => score = score.atan() / std::f64::consts::PI + 0.5,
+                        "minmax" => {
+                            score = if max_scores[ci] != min_scores[ci] {
+                                (score - min_scores[ci]) / (max_scores[ci] - min_scores[ci])
+                            } else {
+                                0.0
+                            }
+                        }
+                        "l2" | "l2_norm" => {
+                            let norm = l2_sums[ci].sqrt();
+                            if norm > 0.0 {
+                                score /= norm;
+                            }
+                        }
+                        _ => {}
+                    }
+                    if !min_heap[ci] {
+                        if normalize == "none" {
+                            score = -score;
+                        } else {
+                            score = 1.0 - score;
+                        }
+                    }
+                    if method == "max" {
+                        fusion = fusion.max(score);
+                    } else {
+                        fusion += weights[ci] * score;
+                    }
+                }
+                set_score(&mut doc.row, fusion);
+            }
+        }
+        let mut docs: Vec<Doc> = docs;
+        docs.sort_by(|a, b| {
+            let x = row_score(&a.row);
+            let y = row_score(&b.row);
+            y.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        docs.truncate(topn);
+        Ok((docs.into_iter().map(|d| d.row).collect(), hidden))
     }
 
     /// Runs a single `MATCH` clause by brute force, returning the matching rows
@@ -3636,7 +3827,7 @@ impl Engine {
         let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
         if m.kind.eq_ignore_ascii_case("TEXT") {
-            return self.search_text_terms(table, m, &hidden);
+            return self.search_text_terms(table, m, pred, &hidden);
         }
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
