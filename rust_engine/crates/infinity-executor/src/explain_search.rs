@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use infinity_parser::{ExprAst, Literal, Predicate, SearchClause, SelectItem};
+use infinity_parser::{ExprAst, Literal, MatchClause, Predicate, SearchClause, SelectItem};
 
 use crate::explain::{add_col, attr, expr_cols, header, render_expr};
 
@@ -241,7 +241,10 @@ fn render_item_expr(e: &ExprAst, score_id: usize, rowid_id: usize) -> String {
 /// Produces the physical `EXPLAIN` text for a `SEARCH MATCH` plan. Returns
 /// `None` for shapes this printer does not yet model (fusion, merges, …).
 pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
-    if p.search.fusion.is_some() || p.search.matches.len() != 1 {
+    if p.search.fusion.is_some() {
+        return explain_fusion(p);
+    }
+    if p.search.matches.len() != 1 {
         return None;
     }
     let m = &p.search.matches[0];
@@ -260,9 +263,11 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
         .map(|(d, _)| d)
         .unwrap_or("default_db");
 
-    // Columns referenced by the outer WHERE, in order of first appearance.
+    // A node-level `WHERE` (inside the match parens) takes precedence over the
+    // statement's outer WHERE for the index/leftover filter split.
+    let filter_src = m.filter.as_ref().or(p.where_pred);
     let mut filter_cols: Vec<String> = Vec::new();
-    if let Some(w) = p.where_pred {
+    if let Some(w) = filter_src {
         pred_cols(w, &mut filter_cols);
     }
 
@@ -328,90 +333,116 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
         }
     };
     let indexed_any = filter_cols.iter().any(|c| p.indexed.iter().any(|x| x == c));
-    let index_filter: String = match p.where_pred {
+    let index_filter: String = match filter_src {
         Some(w) if indexed_any => render_pred_ids(w, &idx_annotation),
         _ => "None".to_string(),
     };
-    let leftover_filter: String = match p.where_pred {
+    let leftover_filter: String = match filter_src {
         Some(w) if !indexed_any => render_pred_ids(w, &leaf_annotation),
         _ => "None".to_string(),
     };
 
-    match kind.as_str() {
+    if !render_leaf(
+        &mut lines,
+        &kind,
+        m,
+        leaf_d,
+        alias,
+        db,
+        &leaf_out,
+        &index_filter,
+        &leftover_filter,
+        filter_src.map(|w| {
+            if indexed_any {
+                render_pred_ids(w, &idx_annotation)
+            } else {
+                render_pred_ids(w, &leaf_annotation)
+            }
+        }),
+        p.schema,
+        p.types,
+        2,
+    ) {
+        return None;
+    }
+
+    Some(lines)
+}
+
+/// Appends the lines of one search-scan node (`MATCH`/`KNN SCAN`/
+/// `MatchTensorScan`/`MatchSparseScan`). Returns `false` for an unknown kind.
+#[allow(clippy::too_many_arguments)]
+fn render_leaf(
+    lines: &mut Vec<String>,
+    kind: &str,
+    m: &MatchClause,
+    d: usize,
+    alias: &str,
+    db: &str,
+    leaf_out: &[String],
+    index_filter: &str,
+    leftover_filter: &str,
+    knn_filter: Option<String>,
+    schema: &[String],
+    types: &[String],
+    id: u64,
+) -> bool {
+    match kind {
         "VECTOR" => {
             let col = m.column.clone();
             let vals = m.args.first().and_then(arr_arg).unwrap_or_default();
             let etype = m.args.get(1).and_then(str_arg).unwrap_or_default();
             let dist = m.args.get(2).and_then(str_arg).unwrap_or_default();
-            lines.push(header(leaf_d, "KNN SCAN", 2));
-            lines.push(attr(leaf_d, &format!("table name: {alias}({db}.{alias})")));
-            lines.push(attr(leaf_d, "table index: #4"));
-            lines.push(attr(leaf_d, &format!("embedding info: {col}")));
-            lines.push(attr(
-                leaf_d,
-                &format!("element type: {}", element_type(&etype)),
-            ));
-            lines.push(attr(leaf_d, &format!("dimension: {}", vals.len())));
-            lines.push(attr(
-                leaf_d,
-                &format!("distance type: {}", distance_type(&dist)),
-            ));
-            lines.push(attr(
-                leaf_d,
-                &format!("query embedding: {}", vec_text(&vals)),
-            ));
-            if let Some(w) = p.where_pred {
-                lines.push(attr(
-                    leaf_d,
-                    &format!("filter: {}", render_pred_ids(w, &leaf_annotation)),
-                ));
+            lines.push(header(d, "KNN SCAN", id));
+            lines.push(attr(d, &format!("table name: {alias}({db}.{alias})")));
+            lines.push(attr(d, "table index: #4"));
+            lines.push(attr(d, &format!("embedding info: {col}")));
+            lines.push(attr(d, &format!("element type: {}", element_type(&etype))));
+            lines.push(attr(d, &format!("dimension: {}", vals.len())));
+            lines.push(attr(d, &format!("distance type: {}", distance_type(&dist))));
+            lines.push(attr(d, &format!("query embedding: {}", vec_text(&vals))));
+            if let Some(f) = knn_filter {
+                lines.push(attr(d, &format!("filter: {f}")));
             }
             lines.push(attr(
-                leaf_d,
+                d,
                 &format!("output columns: [{}]", leaf_out.join(", ")),
             ));
         }
         "TENSOR" => {
             let col = m.column.clone();
             let vals = m.args.first().and_then(arr_arg).unwrap_or_default();
-            let op = m.args.get(2).and_then(str_arg).unwrap_or_default();
             let opts = m.args.get(3).and_then(str_arg).unwrap_or_default();
-            let dim = p
-                .schema
+            let dim = schema
                 .iter()
                 .position(|c| c == &col)
-                .and_then(|i| p.types.get(i))
+                .and_then(|i| types.get(i))
                 .and_then(|t| crate::type_dim_deep(t))
                 .unwrap_or(vals.len());
-            let op_name = match op.to_ascii_lowercase().as_str() {
-                "maxsim" => "MAX_SIM",
-                other => &other.to_ascii_uppercase(),
-            };
             let mut expr = format!("MATCH TENSOR ({col}, {}, MAX_SIM", tensor_text(&vals, dim));
-            let _ = op_name;
             if let Some(f) = m.filter.as_ref() {
                 expr.push_str(&format!(", WHERE ({})", render_pred_plain(f)));
             } else if !opts.is_empty() {
                 expr.push_str(&format!(", '{opts}'"));
             }
             expr.push(')');
-            lines.push(header(leaf_d, "MatchTensorScan", 2));
-            lines.push(attr(leaf_d, &format!("table name: {alias}({db}.{alias})")));
-            lines.push(attr(leaf_d, "table index: #1"));
-            lines.push(attr(leaf_d, &format!("MatchTensor expression: {expr}")));
-            lines.push(attr(leaf_d, &format!("Top N: {}", top_n_of(&opts))));
-            lines.push(attr(leaf_d, &format!("index filter: {index_filter}")));
-            lines.push(attr(leaf_d, &format!("leftover filter: {leftover_filter}")));
+            lines.push(header(d, "MatchTensorScan", id));
+            lines.push(attr(d, &format!("table name: {alias}({db}.{alias})")));
+            lines.push(attr(d, "table index: #1"));
+            lines.push(attr(d, &format!("MatchTensor expression: {expr}")));
+            lines.push(attr(d, &format!("Top N: {}", top_n_of(&opts))));
+            lines.push(attr(d, &format!("index filter: {index_filter}")));
+            lines.push(attr(d, &format!("leftover filter: {leftover_filter}")));
             lines.push(attr(
-                leaf_d,
+                d,
                 &format!("output columns: [{}]", leaf_out.join(", ")),
             ));
         }
         "SPARSE" => {
-            lines.push(header(leaf_d, "MatchSparseScan", 2));
-            lines.push(attr(leaf_d, "table index: #1"));
+            lines.push(header(d, "MatchSparseScan", id));
+            lines.push(attr(d, "table index: #1"));
             lines.push(attr(
-                leaf_d,
+                d,
                 &format!("output columns: [{}]", leaf_out.join(", ")),
             ));
         }
@@ -419,23 +450,145 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
             let field = m.column.clone();
             let query = m.args.first().and_then(str_arg).unwrap_or_default();
             let opts = m.args.get(1).and_then(str_arg).unwrap_or_default();
-            lines.push(header(leaf_d, "MATCH", 2));
-            lines.push(attr(leaf_d, &format!("table name: {alias}({db}.{alias})")));
-            lines.push(attr(leaf_d, "table index: #1"));
+            lines.push(header(d, "MATCH", id));
+            lines.push(attr(d, &format!("table name: {alias}({db}.{alias})")));
+            lines.push(attr(d, "table index: #1"));
             lines.push(attr(
-                leaf_d,
+                d,
                 &format!("match expression: MATCH TEXT ('{field}', '{query}', '{opts}')"),
             ));
-            lines.push(attr(leaf_d, &format!("index filter: {index_filter}")));
-            lines.push(attr(leaf_d, &format!("leftover filter: {leftover_filter}")));
+            lines.push(attr(d, &format!("index filter: {index_filter}")));
+            lines.push(attr(d, &format!("leftover filter: {leftover_filter}")));
             lines.push(attr(
-                leaf_d,
+                d,
                 &format!("output columns: [{}]", leaf_out.join(", ")),
             ));
         }
-        _ => return None,
+        _ => return false,
     }
+    true
+}
 
+/// The physical `EXPLAIN` text for a fused (`…, FUSION('…')`) search plan:
+/// `PROJECT -> FUSION -> <child>, …`. The children output only the non-indexed
+/// filter columns plus `__score`/`__rowid`; the projection re-derives the
+/// selected columns.
+fn explain_fusion(p: &SearchPlan) -> Option<Vec<String>> {
+    if p.offset.is_some() || p.limit.is_some() {
+        return None;
+    }
+    let matches = &p.search.matches;
+    if matches.is_empty() {
+        return None;
+    }
+    let alias = p.table.split('.').next_back().unwrap_or(p.table);
+    let db = p
+        .table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+
+    let mut filter_cols: Vec<String> = Vec::new();
+    if let Some(w) = p.where_pred {
+        pred_cols(w, &mut filter_cols);
+    }
+    let mut regular: Vec<String> = Vec::new();
+    for c in &filter_cols {
+        if p.indexed.iter().any(|x| x == c) {
+            continue;
+        }
+        add_col(&mut regular, c);
+    }
+    for it in p.items {
+        if let SelectItem::Column(c) = it {
+            add_col(&mut regular, c);
+        }
+    }
+    let mut child_out: Vec<String> = filter_cols
+        .iter()
+        .filter(|c| !p.indexed.iter().any(|x| x.as_str() == c.as_str()))
+        .cloned()
+        .collect();
+    add_col(&mut child_out, "__score");
+    add_col(&mut child_out, "__rowid");
+
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    for (i, c) in regular.iter().enumerate() {
+        ids.insert(c.clone(), i);
+    }
+    let score_id = regular.len();
+    let rowid_id = regular.len() + 1;
+    let proj: Vec<String> = p
+        .items
+        .iter()
+        .filter_map(|it| render_item(it, &ids, score_id, rowid_id))
+        .collect();
+
+    let idx_annotation = |c: &str| -> String {
+        match p.schema.iter().position(|x| x == c) {
+            Some(i) => format!("{c} (#1.{i})"),
+            None => c.to_string(),
+        }
+    };
+    let leaf_annotation = |c: &str| -> String {
+        match ids.get(c) {
+            Some(i) => format!("{c} (#{i})"),
+            None => c.to_string(),
+        }
+    };
+    let indexed_any = filter_cols.iter().any(|c| p.indexed.iter().any(|x| x == c));
+    let index_filter = match p.where_pred {
+        Some(w) if indexed_any => render_pred_ids(w, &idx_annotation),
+        _ => "None".to_string(),
+    };
+    let leftover_filter = match p.where_pred {
+        Some(w) if !indexed_any => render_pred_ids(w, &leaf_annotation),
+        _ => "None".to_string(),
+    };
+    let knn_filter = p.where_pred.map(|w| {
+        if indexed_any {
+            render_pred_ids(w, &idx_annotation)
+        } else {
+            render_pred_ids(w, &leaf_annotation)
+        }
+    });
+
+    let fusion_name = p.search.fusion.clone().unwrap_or_default();
+    let fusion_params = p.search.fusion_params.clone().unwrap_or_default();
+
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", 5));
+    lines.push(attr(0, "table index: #4"));
+    lines.push(attr(0, &format!("expressions: [{}]", proj.join(", "))));
+    lines.push(header(1, "FUSION", 4));
+    lines.push(attr(
+        1,
+        &format!("fusion: #FUSION('{fusion_name}', '{fusion_params}')"),
+    ));
+    lines.push(attr(
+        1,
+        &format!("output columns: [{}]", child_out.join(", ")),
+    ));
+    for (i, m) in matches.iter().enumerate() {
+        let kind = m.kind.to_ascii_uppercase();
+        if !render_leaf(
+            &mut lines,
+            &kind,
+            m,
+            1,
+            alias,
+            db,
+            &child_out,
+            &index_filter,
+            &leftover_filter,
+            knn_filter.clone(),
+            p.schema,
+            p.types,
+            2 + i as u64,
+        ) {
+            return None;
+        }
+    }
     Some(lines)
 }
 
