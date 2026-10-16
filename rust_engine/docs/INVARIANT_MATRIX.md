@@ -6,13 +6,13 @@
 >
 > 本文件为 **v0.1**：Rust 侧只登记**已存在**的测试（名称与 `cargo test` 输出的完全一致），
 > 未覆盖项在「缺口」列写明状态。C++ 侧以计划书「附录 A：核心不变量」与 CI 的
-> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G3、G5 闭合）。
+> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G1、G3、G5 闭合）。
 
 ## 1. 配置校验 / 拒绝行为
 
 | C++ 不变量 / 用例 | Rust 对应 | 状态 |
 |---|---|---|
-| 参数越界必须**拒绝**而非静默钳制（`config_ut.cpp:175`） | — | **缺口**：Rust 侧尚无对应的配置校验（`SET CONFIG` 只存键值，不做范围校验） |
+| 参数越界必须**拒绝**而非静默钳制（`config_ut.cpp:175`） | `infinity-executor: config_validation`（`SET CONFIG` 对**已知键**做值域校验：`result_cache ∈ {on,off,clear,suspend}`、`cache_result_capacity` 正整数、`CHECKPOINT_INTERVAL` 非负整数；越界/非法即报错，未知键仍容忍） | ✅ |
 | `Connect` 的 `client_version` 必须匹配（否则握手失败） | `infinity-server: handshake_policy`、`tcp_connect_success_and_mismatch` | ✅ |
 | 校验和错误的 WAL 帧必须**停止读取**而非跳过 | `infinity-storage: corrupt_checksum_stops_reading` | ✅ |
 | 撕裂尾（torn tail）必须被容忍并丢弃 | `infinity-storage: torn_tail_is_ignored` | ✅ |
@@ -52,10 +52,10 @@
 
 | # | 缺口 | 理由 / 影响 |
 |---|---|---|
-| G1 | **配置项的范围校验**（`config_ut.cpp` 类） | 当前 `SET CONFIG` 为容错实现（键值 stored，不做范围/类型校验）。补齐需先冻结「配置项 × 合法域」清单——属 M6 前的独立任务。 |
+| G1 | ~~**配置项的范围校验**（`config_ut.cpp` 类）~~ | **已闭合（2026-10-17）**：`SET CONFIG` 对已知键（`result_cache`/`cache_result_capacity`/`CHECKPOINT_INTERVAL`）做值域校验并**拒绝**越界/非法值（不静默钳制）；未知键保持容忍。回归测试：`infinity-executor/tests/config_validation.rs`（4 用例）。 |
 | G2 | **索引文件族契约**（A3） | Rust 侧索引当前在内存 + KV 元数据中维护，尚未按 C++ 的「块文件族 + `ChunkIndexMetaInfo` 发布」落地；需在磁盘驻留索引（M4+）阶段补测。 |
 | G3 | ~~**跨底座宕机一致性**（KV+WAL+块文件同时崩溃）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/crash_consistency.rs` 把 PoC C 的边界场景落成回归测试 —— ①块写后崩溃→事务不可见；②WAL 落盘后崩溃→回放可见；③完整提交→无需回放即可见；④块文件丢失→由 WAL 载荷重建；⑤WAL 撕裂尾→回放在有效前缀处停止。 |
-| G4 | **`miri` / sanitizer** 覆盖 | 计划 §6 Gate D 要求；当前仅有 `--cfg loom` 模型（`infinity-txn`）与常规单测。 |
+| G4 | **`miri` / sanitizer** 覆盖 | **部分闭合（2026-10-17）**：miri 已在 `nightly-2025-04-04` 上对纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，共 38 用例）跑通，`run_gate_d.sh` 已接上；**sanitizer（TSAN/ASAN）** 仍需带 FFI/SIMD 的 nightly 与工具链，未覆盖。 |
 | G5 | ~~全文**打分**不变量（相似度单调性等）~~ | **已闭合（2026-10-17）**：`infinity-executor/tests/fulltext_score.rs`（BM25 近似实现的单调性不变量）：①更高 tf 不打低于低 tf；②等 tf 下更短文档不打低于更长文档；③不含查询词的行不出现在结果里。精确分值与 C++/iresearch 的对齐仍属打分移植任务（见 §5.1）。 |
 
 ## 5. 使用方式

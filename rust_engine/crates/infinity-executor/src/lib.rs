@@ -937,6 +937,37 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// Rejects an out-of-range or malformed value for a **known** config key
+/// (unknown keys are tolerated). Mirrors the C++ `Config` range checks
+/// (`src/unit_test/main/config_ut.cpp::TestOutofRangeValues`): config values are
+/// validated, never silently clamped.
+fn invalid_config_value(key: &str, value: &str) -> Option<String> {
+    match key.to_ascii_uppercase().as_str() {
+        "RESULT_CACHE" => {
+            let ok = matches!(
+                value.to_ascii_lowercase().as_str(),
+                "on" | "off" | "clear" | "suspend"
+            );
+            (!ok).then(|| {
+                format!("invalid value '{value}' for result_cache (expected on|off|clear|suspend)")
+            })
+        }
+        "CACHE_RESULT_CAPACITY" => match value.parse::<u64>() {
+            Ok(n) if n >= 1 => None,
+            _ => Some(format!(
+                "invalid value '{value}' for cache_result_capacity (expected a positive integer)"
+            )),
+        },
+        "CHECKPOINT_INTERVAL" => match value.parse::<u64>() {
+            Ok(_) => None,
+            Err(_) => Some(format!(
+                "invalid value '{value}' for CHECKPOINT_INTERVAL (expected a non-negative integer)"
+            )),
+        },
+        _ => None,
+    }
+}
+
 /// True when a statement can change data or metadata and therefore invalidates
 /// cached `SELECT` results.
 fn invalidates_result_cache(stmt: &Statement) -> bool {
@@ -1335,10 +1366,17 @@ impl Engine {
                 out.push(res);
                 continue;
             }
-            if invalidates_result_cache(&qualified) {
+            let mutating = invalidates_result_cache(&qualified);
+            if mutating {
                 self.result_cache.lock().unwrap().clear();
             }
             out.push(self.execute_stmt(&qualified)?);
+            // Durability: a committed mutation must survive a crash, so both the
+            // catalog and the row/meta KV are fsynced before acknowledging.
+            if mutating {
+                self.catalog.flush()?;
+                self.store.flush()?;
+            }
         }
         Ok(out)
     }
@@ -1751,6 +1789,10 @@ impl Engine {
                 rows: vec![],
             }),
             Statement::SetConfig { key, value } => {
+                // a known key with an out-of-range/malformed value is rejected
+                if let Some(msg) = invalid_config_value(key, value) {
+                    return Err(Error::Invalid(msg));
+                }
                 // cache knobs cannot be changed while the cache is off
                 if key.to_ascii_lowercase().starts_with("cache_result")
                     && value != "off"
