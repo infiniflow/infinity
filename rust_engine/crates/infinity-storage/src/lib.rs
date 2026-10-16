@@ -16,6 +16,10 @@ pub mod crc;
 pub mod inverted_format;
 pub mod knn_format;
 pub mod metastore;
+/// RocksDB substrate for a C++-compatible catalog (plan §2.6.1 item 4), behind
+/// the `rocksdb-store` feature.
+#[cfg(feature = "rocksdb-store")]
+pub mod metastore_rocks;
 pub mod mvcc;
 pub mod wal;
 
@@ -43,5 +47,7 @@ pub use knn_format::{
     VERTEX_LX_SIZE,
 };
 pub use metastore::{FjallMetaStore, MetaStore};
+#[cfg(feature = "rocksdb-store")]
+pub use metastore_rocks::RocksMetaStore;
 pub use mvcc::{BlockVersion, CreateField};
 pub use wal::{WalManager, WalRecord, WAL_MAGIC};

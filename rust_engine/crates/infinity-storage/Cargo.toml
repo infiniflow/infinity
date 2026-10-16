@@ -8,6 +8,14 @@ license.workspace = true
 infinity-common.workspace = true
 fjall.workspace = true
 crc32fast.workspace = true
+# Optional RocksDB substrate for C++-compatible catalog KV (plan §2.6.1 item 4).
+# Off by default so the default build stays pure-Rust and fast; enable with
+# `--features rocksdb-store`.
+rocksdb = { version = "0.25", optional = true, default-features = false }
+
+[features]
+default = []
+rocksdb-store = ["dep:rocksdb"]
 
 [dev-dependencies]
 tempfile.workspace = true
