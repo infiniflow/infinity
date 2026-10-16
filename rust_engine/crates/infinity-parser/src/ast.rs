@@ -197,6 +197,8 @@ pub struct ColumnDef {
     pub type_text: String,
     pub default: Option<Literal>,
     pub not_null: bool,
+    /// `COMMENT '…'`
+    pub comment: Option<String>,
 }
 
 /// A `SELECT` list item.

@@ -1235,6 +1235,7 @@ impl Parser {
             let (ty, type_text) = self.parse_type()?;
             let mut default = None;
             let mut not_null = false;
+            let mut comment = None;
             // Tolerate column constraints (NOT NULL, PRIMARY KEY, DEFAULT …, COMMENT …).
             loop {
                 if self.eat_kw("NOT") {
@@ -1244,6 +1245,13 @@ impl Parser {
                 }
                 if self.eat_kw("DEFAULT") {
                     default = Some(self.literal()?);
+                    continue;
+                }
+                if self.eat_kw("COMMENT") {
+                    if let Token::Str(c) = self.peek().clone() {
+                        self.advance();
+                        comment = Some(c);
+                    }
                     continue;
                 }
                 match self.peek() {
@@ -1276,6 +1284,7 @@ impl Parser {
                 type_text,
                 default,
                 not_null,
+                comment,
             });
             if self.peek() == &Token::Comma {
                 self.advance();
@@ -1917,21 +1926,24 @@ mod tests {
                         ty: LogicalType::Integer,
                         type_text: "INT".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                     ColumnDef {
                         name: "name".into(),
                         ty: LogicalType::Varchar,
                         type_text: "VARCHAR".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                     ColumnDef {
                         name: "v".into(),
                         ty: LogicalType::Double,
                         type_text: "DOUBLE".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                 ],
             }
@@ -2257,21 +2269,24 @@ mod tests {
                         ty: LogicalType::Integer,
                         type_text: "INT".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                     ColumnDef {
                         name: "b".into(),
                         ty: LogicalType::Invalid,
                         type_text: "TENSOR(FLOAT,16)".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                     ColumnDef {
                         name: "c".into(),
                         ty: LogicalType::Invalid,
                         type_text: "EMBEDDING(FLOAT,4)".into(),
                         default: None,
-                        not_null: false
+                        not_null: false,
+                        comment: None,
                     },
                 ],
             }

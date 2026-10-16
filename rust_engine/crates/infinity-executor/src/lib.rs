@@ -1407,9 +1407,11 @@ impl Engine {
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
+                let comments: Vec<Option<String>> =
+                    columns.iter().map(|c| c.comment.clone()).collect();
                 let t = self
                     .catalog
-                    .create_table_typed(name, &names, &defaults, &not_nulls, &types)?;
+                    .create_table_typed(name, &names, &defaults, &not_nulls, &types, &comments)?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -1561,8 +1563,14 @@ impl Engine {
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
-                self.catalog
-                    .add_columns_typed(table, &names, &defaults, &not_nulls, &types)?;
+                self.catalog.add_columns_typed(
+                    table,
+                    &names,
+                    &defaults,
+                    &not_nulls,
+                    &types,
+                    &vec![None; names.len()],
+                )?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
@@ -1747,7 +1755,11 @@ impl Engine {
                                 meta.defaults.get(i).and_then(|d| d.as_ref()),
                                 &ty,
                             ),
-                            "(empty)".to_string(),
+                            meta.comments
+                                .get(i)
+                                .cloned()
+                                .flatten()
+                                .unwrap_or_else(|| "(empty)".to_string()),
                         ]
                     })
                     .collect();
@@ -1873,8 +1885,14 @@ impl Engine {
                         self.store.delete(&k)?;
                     }
                 }
-                self.catalog
-                    .create_table_typed(&table, &columns, &defaults, &not_nulls, &types)?;
+                self.catalog.create_table_typed(
+                    &table,
+                    &columns,
+                    &defaults,
+                    &not_nulls,
+                    &types,
+                    &vec![None; columns.len()],
+                )?;
                 for (i, r) in rows.iter().enumerate() {
                     if !r.is_empty() {
                         // the snapshot blob separates cells with SNAP_FLD; the row
@@ -2875,11 +2893,7 @@ impl Engine {
             if line.is_empty() {
                 continue;
             }
-            let fields: Vec<String> = if delim == ',' {
-                csv_fields(line)
-            } else {
-                line.split(delim).map(|s| s.to_string()).collect()
-            };
+            let fields: Vec<String> = csv_fields(line, delim);
             let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
             // an empty CSV cell takes the column default when one is declared
             for (i, c) in cells.iter_mut().enumerate() {
@@ -3489,7 +3503,7 @@ fn find_file(dir: &Path, name: &std::ffi::OsStr) -> Option<PathBuf> {
 }
 
 /// Splits one CSV line, honouring double-quoted fields (with `""` escapes).
-fn csv_fields(line: &str) -> Vec<String> {
+fn csv_fields(line: &str, delim: char) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_q = false;
@@ -3504,8 +3518,17 @@ fn csv_fields(line: &str) -> Vec<String> {
                     in_q = false;
                 }
             }
-            '"' => in_q = true,
-            ',' if !in_q => out.push(std::mem::take(&mut cur)),
+            '"' => {
+                // A quote only opens a field when it is the first character
+                // (RFC 4180); elsewhere it is literal (e.g. prose in a
+                // tab-delimited body column).
+                if cur.is_empty() {
+                    in_q = true;
+                } else {
+                    cur.push('"');
+                }
+            }
+            c if c == delim && !in_q => out.push(std::mem::take(&mut cur)),
             _ => cur.push(c),
         }
     }

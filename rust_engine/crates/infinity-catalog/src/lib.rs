@@ -23,6 +23,8 @@ pub struct TableMeta {
     pub not_nulls: Vec<bool>,
     /// Per-column declared type text (e.g. `TENSOR(FLOAT,4)`).
     pub types: Vec<String>,
+    /// Per-column `COMMENT '…'`.
+    pub comments: Vec<Option<String>>,
 }
 
 /// Field/record separators for the encoded table metadata.
@@ -47,7 +49,8 @@ impl TableMeta {
                     "0"
                 };
                 let ty = self.types.get(i).cloned().unwrap_or_default();
-                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}")
+                let cm = self.comments.get(i).cloned().flatten().unwrap_or_default();
+                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}{FSEP}{cm}")
             })
             .collect();
         format!("{}{RSEP}{}", self.name, cols.join(&RSEP.to_string())).into_bytes()
@@ -62,12 +65,14 @@ impl TableMeta {
         let mut defaults = Vec::new();
         let mut not_nulls = Vec::new();
         let mut types = Vec::new();
+        let mut comments = Vec::new();
         for part in cols.split(RSEP).filter(|c| !c.is_empty()) {
             let mut f = part.split(FSEP);
             let n = f.next().unwrap_or(part);
             let d = f.next().unwrap_or("");
             let nn = f.next().unwrap_or("0");
             let ty = f.next().unwrap_or("");
+            let cm = f.next().unwrap_or("");
             columns.push(n.to_string());
             defaults.push(if d.is_empty() {
                 None
@@ -76,6 +81,11 @@ impl TableMeta {
             });
             not_nulls.push(nn == "1");
             types.push(ty.to_string());
+            comments.push(if cm.is_empty() {
+                None
+            } else {
+                Some(cm.to_string())
+            });
         }
         Ok(Self {
             id,
@@ -84,6 +94,7 @@ impl TableMeta {
             defaults,
             not_nulls,
             types,
+            comments,
         })
     }
 }
@@ -197,6 +208,7 @@ impl Catalog {
             defaults,
             not_nulls,
             &vec![String::new(); columns.len()],
+            &vec![None; columns.len()],
         )
     }
 
@@ -208,6 +220,7 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
         types: &[String],
+        comments: &[Option<String>],
     ) -> Result<TableMeta> {
         if self.get_table_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
@@ -220,6 +233,7 @@ impl Catalog {
             defaults: defaults.to_vec(),
             not_nulls: not_nulls.to_vec(),
             types: types.to_vec(),
+            comments: comments.to_vec(),
         };
         self.store.atomic_write(&[
             (table_key(id), meta.encode()),
@@ -243,6 +257,7 @@ impl Catalog {
             defaults,
             not_nulls,
             &vec![String::new(); columns.len()],
+            &vec![None; columns.len()],
         )
     }
 
@@ -254,6 +269,7 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
         types: &[String],
+        comments: &[Option<String>],
     ) -> Result<TableMeta> {
         let mut meta = self
             .get_table_by_name(name)?
@@ -267,6 +283,7 @@ impl Catalog {
             meta.not_nulls
                 .push(not_nulls.get(i).copied().unwrap_or(false));
             meta.types.push(types.get(i).cloned().unwrap_or_default());
+            meta.comments.push(comments.get(i).cloned().flatten());
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(meta)
@@ -291,6 +308,9 @@ impl Catalog {
         }
         if idx < meta.types.len() {
             meta.types.remove(idx);
+        }
+        if idx < meta.comments.len() {
+            meta.comments.remove(idx);
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(idx)
