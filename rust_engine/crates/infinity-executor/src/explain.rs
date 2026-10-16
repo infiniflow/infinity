@@ -986,7 +986,7 @@ pub fn regex_literal_runs(pattern: &str) -> Vec<String> {
 }
 
 /// The column and pattern of a `regex(col, pattern)` predicate.
-fn regex_pred(p: &Predicate) -> Option<(String, String)> {
+pub(crate) fn regex_pred(p: &Predicate) -> Option<(String, String)> {
     let Predicate::IsTrue(ExprAst::Func { name, args }) = p else {
         return None;
     };

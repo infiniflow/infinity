@@ -138,6 +138,19 @@ fn render_pred_ids(p: &Predicate, annotate: &dyn Fn(&str) -> String) -> String {
             render_expr(e, &HashMap::new()),
             if *neg { "NOT " } else { "" }
         ),
+        Predicate::IsTrue(ExprAst::Func { name, args })
+            if name.eq_ignore_ascii_case("regex") && args.len() == 2 =>
+        {
+            let col = match &args[0] {
+                ExprAst::Column(c) => annotate(c),
+                other => render_expr(other, &HashMap::new()),
+            };
+            let pat = match &args[1] {
+                ExprAst::Literal(Literal::Str(s)) => s.clone(),
+                other => render_expr(other, &HashMap::new()),
+            };
+            format!("{col} regex {pat}")
+        }
         Predicate::IsTrue(e) => render_expr(e, &HashMap::new()),
         Predicate::Like(a, b, _, neg) => format!(
             "{} {}LIKE {}",
@@ -302,12 +315,17 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
     if let Some(w) = filter_src {
         pred_cols(w, &mut filter_cols);
     }
+    // A `regex` predicate runs in the match's own filter slot (the leftover
+    // filter), never as an index narrowing, so its column stays in the output.
+    let is_regex = filter_src
+        .map(|w| crate::explain::regex_pred(w).is_some())
+        .unwrap_or(false);
 
     // Leaf output: non-indexed filter columns, then the selected columns, then
     // the synthetic `__score` / `__rowid`.
     let mut regular: Vec<String> = Vec::new();
     for c in &filter_cols {
-        if p.indexed.iter().any(|x| x == c) {
+        if !is_regex && p.indexed.iter().any(|x| x == c) {
             continue;
         }
         add_col(&mut regular, c);
@@ -364,7 +382,7 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
             None => c.to_string(),
         }
     };
-    let indexed_any = filter_cols.iter().any(|c| p.indexed.iter().any(|x| x == c));
+    let indexed_any = !is_regex && filter_cols.iter().any(|c| p.indexed.iter().any(|x| x == c));
     let index_filter: String = match filter_src {
         Some(w) if indexed_any => render_pred_ids(w, &idx_annotation),
         _ => "None".to_string(),
