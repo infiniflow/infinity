@@ -1284,6 +1284,17 @@ impl Engine {
 
     pub fn open_with_capacity(dir: impl AsRef<Path>, exchange_capacity: usize) -> Result<Self> {
         let dir: PathBuf = dir.as_ref().to_path_buf();
+        // The catalog lives at `<dir>/catalog`, the path the C++ engine uses for
+        // its catalog RocksDB. Under `rocksdb-store` the native catalog shares
+        // that one RocksDB with the C++ key space (see `flush`), so a C++ engine
+        // can open this directory's catalog; otherwise it is a fjall store.
+        #[cfg(feature = "rocksdb-store")]
+        let catalog = {
+            let catalog_store: Arc<dyn MetaStore> =
+                Arc::new(infinity_storage::RocksMetaStore::open(dir.join("catalog"))?);
+            Catalog::with_store(catalog_store)
+        };
+        #[cfg(not(feature = "rocksdb-store"))]
         let catalog = Catalog::open(dir.join("catalog"))?;
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
@@ -1316,10 +1327,12 @@ impl Engine {
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
         // If this directory was written by the C++ engine (its catalog keys are
-        // in the store, but the native catalog is empty), take over its
+        // in the catalog store, but the native catalog is empty), take over its
         // schema so the engine can open a C++-produced directory (§2.6.1).
         if engine.catalog.list_tables()?.is_empty() {
-            let _ = engine.catalog.import_cpp_layout(engine.store.as_ref());
+            let _ = engine
+                .catalog
+                .import_cpp_layout(engine.catalog.store().as_ref());
         }
         Ok(engine)
     }
@@ -3863,11 +3876,14 @@ impl Engine {
         self.catalog.flush()?;
         self.txn.flush()?;
         self.flush_cpp_blocks()?;
-        // Mirror the catalog into the C++ key space / value encoding so a C++
-        // engine can read this directory. Best effort: a column type the C++
-        // encoding does not cover yet leaves the previous layout in place
+        // Mirror the catalog into the C++ key space / value encoding, in the
+        // catalog store at `<dir>/catalog` (the path the C++ engine uses), so a
+        // C++ engine can read this directory. Best effort: a column type the
+        // C++ encoding does not cover yet leaves the previous layout in place
         // rather than failing the flush.
-        let _ = self.catalog.write_cpp_layout(self.store.as_ref());
+        let _ = self
+            .catalog
+            .write_cpp_layout(self.catalog.store().as_ref());
         Ok(())
     }
 }
@@ -4491,13 +4507,28 @@ mod tests {
         e.flush().unwrap();
     }
 
+    /// A store opened exactly the way `Engine::open` opens its catalog, so a
+    /// test can plant or inspect the C++ key space at `<dir>/catalog`.
+    fn open_catalog_store(dir: &std::path::Path) -> std::sync::Arc<dyn MetaStore> {
+        #[cfg(feature = "rocksdb-store")]
+        {
+            std::sync::Arc::new(infinity_storage::RocksMetaStore::open(dir).unwrap())
+        }
+        #[cfg(not(feature = "rocksdb-store"))]
+        {
+            std::sync::Arc::new(FjallMetaStore::open(dir, "catalog").unwrap())
+        }
+    }
+
     #[test]
     fn flush_mirrors_the_catalog_into_the_cpp_key_space() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
         seed(&e);
-        // The C++ keys the C++ engine reads are present in the engine's store.
-        let cpp = infinity_catalog::cpp_layout::read_cpp_layout(e.store().as_ref()).unwrap();
+        // The C++ keys the C++ engine reads sit beside the native catalog in
+        // the same `<dir>/catalog` store.
+        let cpp =
+            infinity_catalog::cpp_layout::read_cpp_layout(e.catalog().store().as_ref()).unwrap();
         assert_eq!(cpp.len(), 1, "expected one C++ table record");
         assert_eq!(cpp[0].table_name, "t");
         assert_eq!(cpp[0].db_name, "default_db");
@@ -4518,7 +4549,7 @@ mod tests {
     #[test]
     fn opens_a_directory_written_by_the_cpp_engine() {
         // A C++ engine's schema, dropped into an otherwise empty directory's
-        // store with no native catalog: opening it must import the schema.
+        // catalog store with no native catalog: opening it must import it.
         let src = tempdir().unwrap();
         let cat = Catalog::open(src.path()).unwrap();
         cat.create_table_typed(
@@ -4533,9 +4564,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         {
-            let store: std::sync::Arc<dyn MetaStore> = std::sync::Arc::new(
-                FjallMetaStore::open(dir.path().join("kv"), "default").unwrap(),
-            );
+            let store = open_catalog_store(&dir.path().join("catalog"));
             cat.write_cpp_layout(store.as_ref()).unwrap();
         } // release the store lock before the engine opens it
 
