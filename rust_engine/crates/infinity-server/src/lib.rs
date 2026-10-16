@@ -782,6 +782,55 @@ fn handle_connection(
                 };
                 write_select_response(&mut writer, seq, &resp)?;
             }
+            "ListTable" => {
+                let (_sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let db = fields.get(&1).cloned().unwrap_or_default();
+                let prefix = format!("{db}.");
+                let names: Vec<String> = match &engine {
+                    Some(eng) => eng
+                        .catalog()
+                        .list_tables()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                        .map(|t| {
+                            if db.is_empty() {
+                                t.name
+                            } else {
+                                t.name.trim_start_matches(&prefix).to_string()
+                            }
+                        })
+                        .collect(),
+                    None => Vec::new(),
+                };
+                write_string_list_response(&mut writer, seq, "ListTable", "table_names", &names)?;
+            }
+            "ListIndex" => {
+                let (_sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let table = fields.get(&2).cloned().unwrap_or_default();
+                let names: Vec<String> = match &engine {
+                    Some(eng) => eng
+                        .catalog()
+                        .list_indexes()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|im| {
+                            table.is_empty()
+                                || im.table == table
+                                || im.table.ends_with(&format!(".{table}"))
+                        })
+                        .map(|im| im.name)
+                        .collect(),
+                    None => Vec::new(),
+                };
+                write_string_list_response(&mut writer, seq, "ListIndex", "index_names", &names)?;
+            }
             other => {
                 {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -2781,7 +2830,54 @@ pub fn write_list_database_response(w: &mut impl Write, seq: i32, names: &[Strin
 
 // -------- Delete --------
 
+/// Writes a `<Method>_result` REPLY carrying
+/// `{error_code, error_msg, <list_field>: list<string>}` — used by
+/// `ListTable` (`table_names`) and `ListIndex` (`index_names`).
+pub fn write_string_list_response(
+    w: &mut impl Write,
+    seq: i32,
+    method: &str,
+    list_field: &str,
+    names: &[String],
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(method, TMessageType::Reply, seq))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new(format!("{method}_result")))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new(format!("{method}Response")))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(0).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string("OK").map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new(list_field, TType::List, 3i16))
+        .map_err(tw)?;
+    o.write_list_begin(&TListIdentifier::new(TType::String, names.len() as i32))
+        .map_err(tw)?;
+    for n in names {
+        o.write_string(n).map_err(tw)?;
+    }
+    o.write_list_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.flush().map_err(tw)?;
+    Ok(())
+}
+
 /// The subset of `DeleteRequest` needed to run `DELETE`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeleteReq {
     pub db_name: String,
     pub table_name: String,
     pub where_sql: Option<String>,
