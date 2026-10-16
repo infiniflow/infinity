@@ -426,475 +426,492 @@ fn handle_connection(
         // connection: reply with a Thrift exception instead of dropping the
         // socket (the SDK reports `connection reset` otherwise).
         let handled: Result<()> = (|| {
-        match name.as_str() {
-            "Connect" => {
-                let cv = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_connect_args(&mut ip)?
-                };
-                let sid = next_session.fetch_add(1, Ordering::SeqCst);
-                let resp = handshake(cv, sid);
-                if resp.error_code == OK {
-                    sessions.lock().unwrap().insert(sid, cv);
+            match name.as_str() {
+                "Connect" => {
+                    let cv = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_connect_args(&mut ip)?
+                    };
+                    let sid = next_session.fetch_add(1, Ordering::SeqCst);
+                    let resp = handshake(cv, sid);
+                    if resp.error_code == OK {
+                        sessions.lock().unwrap().insert(sid, cv);
+                    }
+                    write_reply_common(&mut writer, "Connect", seq, &resp)?;
                 }
-                write_reply_common(&mut writer, "Connect", seq, &resp)?;
-            }
-            "Disconnect" => {
-                let sid = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_common_args(&mut ip)?
-                };
-                sessions.lock().unwrap().remove(&sid);
-                let resp = CommonResponse {
-                    error_code: OK,
-                    error_msg: "OK".into(),
-                    session_id: sid,
-                };
-                write_reply_common(&mut writer, "Disconnect", seq, &resp)?;
-            }
-            "CreateTable" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_create_table_args(&mut ip)?
-                };
-                let resp = run_create_table(engine.as_deref(), &req);
-                write_reply_common(&mut writer, "CreateTable", seq, &resp)?;
-            }
-            "ListDatabase" => {
-                let _sid = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_list_database_args(&mut ip)?
-                };
-                let names = match &engine {
-                    Some(eng) => eng.catalog().list_databases().unwrap_or_default(),
-                    None => vec!["default_db".to_string()],
-                };
-                write_list_database_response(&mut writer, seq, &names)?;
-            }
-            "Delete" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_delete_args(&mut ip)?
-                };
-                let deleted = match &engine {
-                    Some(eng) => match eng.execute(&req.to_sql()) {
-                        Ok(rs) => rs
-                            .into_iter()
-                            .map(|r| {
-                                if let QueryResult::Deleted { count } = r {
-                                    count as i64
-                                } else {
-                                    0
-                                }
-                            })
-                            .sum::<i64>(),
-                        Err(_) => -1,
-                    },
-                    None => -1,
-                };
-                write_delete_response(&mut writer, seq, deleted.max(0))?;
-            }
-            "Update" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_update_args(&mut ip)?
-                };
-                let resp = match &engine {
-                    Some(eng) => match eng.execute(&req.to_sql()) {
-                        Ok(_) => CommonResponse {
-                            error_code: OK,
-                            error_msg: "OK".into(),
-                            session_id: req.session_id,
-                        },
-                        Err(e) => CommonResponse {
-                            error_code: 1,
-                            error_msg: e.to_string(),
-                            session_id: req.session_id,
-                        },
-                    },
-                    None => CommonResponse {
-                        error_code: 1,
-                        error_msg: "no engine bound".into(),
-                        session_id: req.session_id,
-                    },
-                };
-                write_reply_common(&mut writer, "Update", seq, &resp)?;
-            }
-            "ShowTable" => {
-                let (db, table, _sid) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_show_table_args(&mut ip)?
-                };
-                let (col_count, row_count) = match &engine {
-                    Some(eng) => match eng.catalog().get_table_by_name(&table) {
-                        Ok(Some(meta)) => (
-                            meta.columns.len() as i64,
-                            eng.row_count(&table).unwrap_or(0) as i64,
-                        ),
-                        _ => (0, 0),
-                    },
-                    None => (0, 0),
-                };
-                write_show_table_response(&mut writer, seq, &db, &table, col_count, row_count)?;
-            }
-            // Database / table / index lifecycle RPCs that return a plain
-            // `CommonResponse`.
-            "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
-            | "DropIndex" => {
-                let (sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let db = fields.get(&1).cloned().unwrap_or_default();
-                let name2 = fields.get(&2).cloned().unwrap_or_default();
-                let name3 = fields.get(&3).cloned().unwrap_or_default();
-                let qualify = |t: &str| -> String {
-                    if t.is_empty() || t.contains('.') || db.is_empty() {
-                        t.to_string()
-                    } else {
-                        format!("{db}.{t}")
-                    }
-                };
-                // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
-                // sits in whichever field the request struct reserves for it
-                // (3 for the database ops, 4 for table/index ops), so scan them.
-                let conflict: Option<i64> = [3i16, 4, 5]
-                    .iter()
-                    .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
-                let resp = match name.as_str() {
-                    "CreateDatabase" if !db.is_empty() => {
-                        let sql = if conflict == Some(0) {
-                            format!("CREATE DATABASE IF NOT EXISTS {db}")
-                        } else {
-                            format!("CREATE DATABASE {db}")
-                        };
-                        run_common(engine.as_ref(), &sql, sid)
-                    }
-                    "DropDatabase" if !db.is_empty() => {
-                        let sql = if conflict == Some(0) {
-                            format!("DROP DATABASE IF EXISTS {db}")
-                        } else {
-                            format!("DROP DATABASE {db}")
-                        };
-                        run_common(engine.as_ref(), &sql, sid)
-                    }
-                    "DropTable" if !name2.is_empty() => {
-                        let sql = if conflict == Some(0) {
-                            format!("DROP TABLE IF EXISTS {}", qualify(&name2))
-                        } else {
-                            format!("DROP TABLE {}", qualify(&name2))
-                        };
-                        run_common(engine.as_ref(), &sql, sid)
-                    }
-                    "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
-                        engine.as_ref(),
-                        &format!("DROP INDEX IF EXISTS {name3}"),
-                        sid,
-                    ),
-                    "DropIndex" if !name3.is_empty() => {
-                        run_common(engine.as_ref(), &format!("DROP INDEX {name3}"), sid)
-                    }
-                    // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
-                    // side effect for the operations the SDK performs on the
-                    // default database.
-                    _ => CommonResponse {
+                "Disconnect" => {
+                    let sid = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_common_args(&mut ip)?
+                    };
+                    sessions.lock().unwrap().remove(&sid);
+                    let resp = CommonResponse {
                         error_code: OK,
                         error_msg: "OK".into(),
                         session_id: sid,
-                    },
-                };
-                write_reply_common(&mut writer, &name, seq, &resp)?;
-            }
-            "Insert" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_insert_args(&mut ip)?
-                };
-                let sid = req.session_id;
-                let table = if req.db_name.is_empty() {
-                    req.table_name.clone()
-                } else {
-                    format!("{}.{}", req.db_name, req.table_name)
-                };
-                // Rows that share a column list are batched into one statement.
-                let mut resp = CommonResponse {
-                    error_code: OK,
-                    error_msg: "OK".into(),
-                    session_id: sid,
-                };
-                let mut i = 0usize;
-                while i < req.rows.len() {
-                    let (cols, _) = &req.rows[i];
-                    let mut batch: Vec<String> = Vec::new();
-                    while i < req.rows.len() && &req.rows[i].0 == cols {
-                        batch.push(format!(
-                            "({})",
-                            req.rows[i]
-                                .1
-                                .iter()
-                                .map(|v| v.to_sql())
-                                .collect::<Vec<_>>()
-                                .join(",")
-                        ));
-                        i += 1;
-                    }
-                    let sql = if cols.is_empty() {
-                        format!("INSERT INTO {table} VALUES {};", batch.join(","))
-                    } else {
-                        format!(
-                            "INSERT INTO {table} ({}) VALUES {};",
-                            cols.join(","),
-                            batch.join(",")
-                        )
                     };
-                    resp = run_common(engine.as_ref(), &sql, sid);
-                    if resp.error_code != OK {
-                        break;
-                    }
+                    write_reply_common(&mut writer, "Disconnect", seq, &resp)?;
                 }
-                write_reply_common(&mut writer, "Insert", seq, &resp)?;
-            }
-            "Select" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_select_args(&mut ip)?
-                };
-                let err = |msg: String| SelectResponseWire {
-                    error_code: 1,
-                    error_msg: msg,
-                    column_defs: Vec::new(),
-                    column_fields: Vec::new(),
-                    extra_result: String::new(),
-                };
-                let resp = match &engine {
-                    Some(eng) => match eng.execute(&req.to_sql()) {
-                        Ok(rs) => {
-                            let mut columns: Vec<String> = Vec::new();
-                            let mut rows: Vec<Vec<String>> = Vec::new();
-                            for r in rs {
-                                if let QueryResult::Rows {
-                                    columns: c,
-                                    rows: rw,
-                                } = r
-                                {
-                                    columns = c;
-                                    rows = rw;
-                                }
-                            }
-                            select_response_from_typed(
-                                &columns,
-                                &declared_types(eng, &req.table_name, &columns),
-                                &rows,
-                            )
+                "CreateTable" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_create_table_args(&mut ip)?
+                    };
+                    let resp = run_create_table(engine.as_deref(), &req);
+                    write_reply_common(&mut writer, "CreateTable", seq, &resp)?;
+                }
+                "ListDatabase" => {
+                    let _sid = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_list_database_args(&mut ip)?
+                    };
+                    let names = match &engine {
+                        Some(eng) => eng.catalog().list_databases().unwrap_or_default(),
+                        None => vec!["default_db".to_string()],
+                    };
+                    write_list_database_response(&mut writer, seq, &names)?;
+                }
+                "Delete" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_delete_args(&mut ip)?
+                    };
+                    let deleted = match &engine {
+                        Some(eng) => match eng.execute(&req.to_sql()) {
+                            Ok(rs) => rs
+                                .into_iter()
+                                .map(|r| {
+                                    if let QueryResult::Deleted { count } = r {
+                                        count as i64
+                                    } else {
+                                        0
+                                    }
+                                })
+                                .sum::<i64>(),
+                            Err(_) => -1,
+                        },
+                        None => -1,
+                    };
+                    write_delete_response(&mut writer, seq, deleted.max(0))?;
+                }
+                "Update" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_update_args(&mut ip)?
+                    };
+                    let resp = match &engine {
+                        Some(eng) => match eng.execute(&req.to_sql()) {
+                            Ok(_) => CommonResponse {
+                                error_code: OK,
+                                error_msg: "OK".into(),
+                                session_id: req.session_id,
+                            },
+                            Err(e) => CommonResponse {
+                                error_code: 1,
+                                error_msg: e.to_string(),
+                                session_id: req.session_id,
+                            },
+                        },
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: req.session_id,
+                        },
+                    };
+                    write_reply_common(&mut writer, "Update", seq, &resp)?;
+                }
+                "ShowTable" => {
+                    let (db, table, _sid) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_show_table_args(&mut ip)?
+                    };
+                    let (col_count, row_count) = match &engine {
+                        Some(eng) => match eng.catalog().get_table_by_name(&table) {
+                            Ok(Some(meta)) => (
+                                meta.columns.len() as i64,
+                                eng.row_count(&table).unwrap_or(0) as i64,
+                            ),
+                            _ => (0, 0),
+                        },
+                        None => (0, 0),
+                    };
+                    write_show_table_response(&mut writer, seq, &db, &table, col_count, row_count)?;
+                }
+                // Database / table / index lifecycle RPCs that return a plain
+                // `CommonResponse`.
+                "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
+                | "DropIndex" => {
+                    let (sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let db = fields.get(&1).cloned().unwrap_or_default();
+                    let name2 = fields.get(&2).cloned().unwrap_or_default();
+                    let name3 = fields.get(&3).cloned().unwrap_or_default();
+                    let qualify = |t: &str| -> String {
+                        if t.is_empty() || t.contains('.') || db.is_empty() {
+                            t.to_string()
+                        } else {
+                            format!("{db}.{t}")
                         }
-                        Err(e) => err(e.to_string()),
-                    },
-                    None => err("no engine bound".into()),
-                };
-                write_select_response(&mut writer, seq, &resp)?;
-            }
-            // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
-            // `RenameTable` is executed for real; the rest are engine-level
-            // maintenance that the in-memory engine has nothing to do for, so
-            // they report success rather than `unknown method`.
-            "AddColumns"
-            | "DropColumns"
-            | "Optimize"
-            | "Compact"
-            | "Cleanup"
-            | "Flush"
-            | "Command"
-            | "SetConfig"
-            | "Export"
-            | "Import"
-            | "AlterIndex"
-            | "DumpIndex"
-            | "CreateTableSnapshot"
-            | "CreateDatabaseSnapshot"
-            | "CreateSystemSnapshot"
-            | "DropSnapshot"
-            | "RestoreSnapshot"
-            | "RenameTable" => {
-                let (sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
-                let resp = if name == "RenameTable" {
-                    let (db, table, new_name) = (get(1), get(2), get(3));
+                    };
+                    // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
+                    // sits in whichever field the request struct reserves for it
+                    // (3 for the database ops, 4 for table/index ops), so scan them.
+                    let conflict: Option<i64> = [3i16, 4, 5]
+                        .iter()
+                        .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
+                    let resp = match name.as_str() {
+                        "CreateDatabase" if !db.is_empty() => {
+                            let sql = if conflict == Some(0) {
+                                format!("CREATE DATABASE IF NOT EXISTS {db}")
+                            } else {
+                                format!("CREATE DATABASE {db}")
+                            };
+                            run_common(engine.as_ref(), &sql, sid)
+                        }
+                        "DropDatabase" if !db.is_empty() => {
+                            let sql = if conflict == Some(0) {
+                                format!("DROP DATABASE IF EXISTS {db}")
+                            } else {
+                                format!("DROP DATABASE {db}")
+                            };
+                            run_common(engine.as_ref(), &sql, sid)
+                        }
+                        "DropTable" if !name2.is_empty() => {
+                            let sql = if conflict == Some(0) {
+                                format!("DROP TABLE IF EXISTS {}", qualify(&name2))
+                            } else {
+                                format!("DROP TABLE {}", qualify(&name2))
+                            };
+                            run_common(engine.as_ref(), &sql, sid)
+                        }
+                        "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
+                            engine.as_ref(),
+                            &format!("DROP INDEX IF EXISTS {name3}"),
+                            sid,
+                        ),
+                        "DropIndex" if !name3.is_empty() => {
+                            run_common(engine.as_ref(), &format!("DROP INDEX {name3}"), sid)
+                        }
+                        // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
+                        // side effect for the operations the SDK performs on the
+                        // default database.
+                        _ => CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        },
+                    };
+                    write_reply_common(&mut writer, &name, seq, &resp)?;
+                }
+                "Insert" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_insert_args(&mut ip)?
+                    };
+                    let sid = req.session_id;
+                    let table = if req.db_name.is_empty() {
+                        req.table_name.clone()
+                    } else {
+                        format!("{}.{}", req.db_name, req.table_name)
+                    };
+                    // Rows that share a column list are batched into one statement.
+                    let mut resp = CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    };
+                    let mut i = 0usize;
+                    while i < req.rows.len() {
+                        let (cols, _) = &req.rows[i];
+                        let mut batch: Vec<String> = Vec::new();
+                        while i < req.rows.len() && &req.rows[i].0 == cols {
+                            batch.push(format!(
+                                "({})",
+                                req.rows[i]
+                                    .1
+                                    .iter()
+                                    .map(|v| v.to_sql())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ));
+                            i += 1;
+                        }
+                        let sql = if cols.is_empty() {
+                            format!("INSERT INTO {table} VALUES {};", batch.join(","))
+                        } else {
+                            format!(
+                                "INSERT INTO {table} ({}) VALUES {};",
+                                cols.join(","),
+                                batch.join(",")
+                            )
+                        };
+                        resp = run_common(engine.as_ref(), &sql, sid);
+                        if resp.error_code != OK {
+                            break;
+                        }
+                    }
+                    write_reply_common(&mut writer, "Insert", seq, &resp)?;
+                }
+                "Select" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_select_args(&mut ip)?
+                    };
+                    let err = |msg: String| SelectResponseWire {
+                        error_code: 1,
+                        error_msg: msg,
+                        column_defs: Vec::new(),
+                        column_fields: Vec::new(),
+                        extra_result: String::new(),
+                    };
+                    let resp = match &engine {
+                        Some(eng) => match eng.execute(&req.to_sql()) {
+                            Ok(rs) => {
+                                let mut columns: Vec<String> = Vec::new();
+                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                for r in rs {
+                                    if let QueryResult::Rows {
+                                        columns: c,
+                                        rows: rw,
+                                    } = r
+                                    {
+                                        columns = c;
+                                        rows = rw;
+                                    }
+                                }
+                                select_response_from_typed(
+                                    &columns,
+                                    &declared_types(eng, &req.table_name, &columns),
+                                    &rows,
+                                )
+                            }
+                            Err(e) => err(e.to_string()),
+                        },
+                        None => err("no engine bound".into()),
+                    };
+                    write_select_response(&mut writer, seq, &resp)?;
+                }
+                // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
+                // `RenameTable` is executed for real; the rest are engine-level
+                // maintenance that the in-memory engine has nothing to do for, so
+                // they report success rather than `unknown method`.
+                "AddColumns"
+                | "DropColumns"
+                | "Optimize"
+                | "Compact"
+                | "Cleanup"
+                | "Flush"
+                | "Command"
+                | "SetConfig"
+                | "Export"
+                | "Import"
+                | "AlterIndex"
+                | "DumpIndex"
+                | "CreateTableSnapshot"
+                | "CreateDatabaseSnapshot"
+                | "CreateSystemSnapshot"
+                | "DropSnapshot"
+                | "RestoreSnapshot"
+                | "RenameTable" => {
+                    let (sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
+                    let resp = if name == "RenameTable" {
+                        let (db, table, new_name) = (get(1), get(2), get(3));
+                        let full = if db.is_empty() {
+                            table
+                        } else {
+                            format!("{db}.{table}")
+                        };
+                        run_common(
+                            engine.as_ref(),
+                            &format!("ALTER TABLE {full} RENAME TO {new_name};"),
+                            sid,
+                        )
+                    } else {
+                        CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: sid,
+                        }
+                    };
+                    write_reply_common(&mut writer, &name, seq, &resp)?;
+                }
+                "ShowColumns" => {
+                    let (_sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let db = fields.get(&1).cloned().unwrap_or_default();
+                    let table = fields.get(&2).cloned().unwrap_or_default();
                     let full = if db.is_empty() {
                         table
                     } else {
                         format!("{db}.{table}")
                     };
-                    run_common(
-                        engine.as_ref(),
-                        &format!("ALTER TABLE {full} RENAME TO {new_name};"),
-                        sid,
-                    )
-                } else {
-                    CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: sid,
-                    }
-                };
-                write_reply_common(&mut writer, &name, seq, &resp)?;
-            }
-            "ShowColumns" => {
-                let (_sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let db = fields.get(&1).cloned().unwrap_or_default();
-                let table = fields.get(&2).cloned().unwrap_or_default();
-                let full = if db.is_empty() {
-                    table
-                } else {
-                    format!("{db}.{table}")
-                };
-                let resp = match &engine {
-                    Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
-                        Ok(rs) => {
-                            let mut rows: Vec<Vec<String>> = Vec::new();
-                            for r in rs {
-                                if let QueryResult::Rows { rows: rw, .. } = r {
-                                    rows = rw;
+                    let resp = match &engine {
+                        Some(eng) => match eng.execute(&format!("SHOW TABLE {full} COLUMNS;")) {
+                            Ok(rs) => {
+                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                for r in rs {
+                                    if let QueryResult::Rows { rows: rw, .. } = r {
+                                        rows = rw;
+                                    }
                                 }
+                                select_response_from(
+                                    &[
+                                        "name".to_string(),
+                                        "type".to_string(),
+                                        "default".to_string(),
+                                        "comment".to_string(),
+                                    ],
+                                    &rows,
+                                )
                             }
-                            select_response_from(
-                                &[
-                                    "name".to_string(),
-                                    "type".to_string(),
-                                    "default".to_string(),
-                                    "comment".to_string(),
-                                ],
-                                &rows,
-                            )
-                        }
-                        Err(e) => SelectResponseWire {
+                            Err(e) => SelectResponseWire {
+                                error_code: 1,
+                                error_msg: e.to_string(),
+                                column_defs: Vec::new(),
+                                column_fields: Vec::new(),
+                                extra_result: String::new(),
+                            },
+                        },
+                        None => SelectResponseWire {
                             error_code: 1,
-                            error_msg: e.to_string(),
+                            error_msg: "no engine bound".into(),
                             column_defs: Vec::new(),
                             column_fields: Vec::new(),
                             extra_result: String::new(),
                         },
-                    },
-                    None => SelectResponseWire {
-                        error_code: 1,
-                        error_msg: "no engine bound".into(),
-                        column_defs: Vec::new(),
-                        column_fields: Vec::new(),
-                        extra_result: String::new(),
-                    },
-                };
-                write_select_response(&mut writer, seq, &resp)?;
-            }
-            "ListTable" => {
-                let (_sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let db = fields.get(&1).cloned().unwrap_or_default();
-                let prefix = format!("{db}.");
-                let names: Vec<String> = match &engine {
-                    Some(eng) => eng
-                        .catalog()
-                        .list_tables()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
-                        .map(|t| {
-                            if db.is_empty() {
-                                t.name
-                            } else {
-                                t.name.trim_start_matches(&prefix).to_string()
-                            }
-                        })
-                        .collect(),
-                    None => Vec::new(),
-                };
-                write_string_list_response(&mut writer, seq, "ListTable", "table_names", &names)?;
-            }
-            "ListIndex" => {
-                let (_sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let table = fields.get(&2).cloned().unwrap_or_default();
-                let names: Vec<String> = match &engine {
-                    Some(eng) => eng
-                        .catalog()
-                        .list_indexes()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter(|im| {
-                            table.is_empty()
-                                || im.table == table
-                                || im.table.ends_with(&format!(".{table}"))
-                        })
-                        .map(|im| im.name)
-                        .collect(),
-                    None => Vec::new(),
-                };
-                write_string_list_response(&mut writer, seq, "ListIndex", "index_names", &names)?;
-            }
-            "ShowDatabase" => {
-                let (_sid, fields) = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_string_request(&mut ip)?
-                };
-                let db = fields.get(&1).cloned().unwrap_or_default();
-                let prefix = format!("{db}.");
-                let table_count = match &engine {
-                    Some(eng) => eng
-                        .catalog()
-                        .list_tables()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
-                        .count() as i64,
-                    None => 0,
-                };
-                write_show_database_response(&mut writer, seq, &db, table_count, "")?;
-            }
-            "CreateIndex" => {
-                let req = {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    read_create_index_args(&mut ip)?
-                };
-                let full = if req.db_name.is_empty() {
-                    req.table_name.clone()
-                } else {
-                    format!("{}.{}", req.db_name, req.table_name)
-                };
-                let resp = if req.column.is_empty() {
-                    CommonResponse {
-                        error_code: OK,
-                        error_msg: "OK".into(),
-                        session_id: req.session_id,
-                    }
-                } else {
-                    run_common(
-                        engine.as_ref(),
-                        &format!(
-                            "CREATE INDEX {} ON {} ({});",
-                            req.index_name, full, req.column
-                        ),
-                        req.session_id,
-                    )
-                };
-                write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
-            }
-            other => {
-                {
-                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                    skip_struct(&mut ip)?;
+                    };
+                    write_select_response(&mut writer, seq, &resp)?;
                 }
-                write_app_exception(&mut writer, other, seq, &format!("unknown method: {other}"))?;
+                "ListTable" => {
+                    let (_sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let db = fields.get(&1).cloned().unwrap_or_default();
+                    let prefix = format!("{db}.");
+                    let names: Vec<String> = match &engine {
+                        Some(eng) => eng
+                            .catalog()
+                            .list_tables()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                            .map(|t| {
+                                if db.is_empty() {
+                                    t.name
+                                } else {
+                                    t.name.trim_start_matches(&prefix).to_string()
+                                }
+                            })
+                            .collect(),
+                        None => Vec::new(),
+                    };
+                    write_string_list_response(
+                        &mut writer,
+                        seq,
+                        "ListTable",
+                        "table_names",
+                        &names,
+                    )?;
+                }
+                "ListIndex" => {
+                    let (_sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let table = fields.get(&2).cloned().unwrap_or_default();
+                    let names: Vec<String> = match &engine {
+                        Some(eng) => eng
+                            .catalog()
+                            .list_indexes()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|im| {
+                                table.is_empty()
+                                    || im.table == table
+                                    || im.table.ends_with(&format!(".{table}"))
+                            })
+                            .map(|im| im.name)
+                            .collect(),
+                        None => Vec::new(),
+                    };
+                    write_string_list_response(
+                        &mut writer,
+                        seq,
+                        "ListIndex",
+                        "index_names",
+                        &names,
+                    )?;
+                }
+                "ShowDatabase" => {
+                    let (_sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let db = fields.get(&1).cloned().unwrap_or_default();
+                    let prefix = format!("{db}.");
+                    let table_count = match &engine {
+                        Some(eng) => eng
+                            .catalog()
+                            .list_tables()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                            .count() as i64,
+                        None => 0,
+                    };
+                    write_show_database_response(&mut writer, seq, &db, table_count, "")?;
+                }
+                "CreateIndex" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_create_index_args(&mut ip)?
+                    };
+                    let full = if req.db_name.is_empty() {
+                        req.table_name.clone()
+                    } else {
+                        format!("{}.{}", req.db_name, req.table_name)
+                    };
+                    let resp = if req.column.is_empty() {
+                        CommonResponse {
+                            error_code: OK,
+                            error_msg: "OK".into(),
+                            session_id: req.session_id,
+                        }
+                    } else {
+                        run_common(
+                            engine.as_ref(),
+                            &format!(
+                                "CREATE INDEX {} ON {} ({});",
+                                req.index_name, full, req.column
+                            ),
+                            req.session_id,
+                        )
+                    };
+                    write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
+                }
+                other => {
+                    {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        skip_struct(&mut ip)?;
+                    }
+                    write_app_exception(
+                        &mut writer,
+                        other,
+                        seq,
+                        &format!("unknown method: {other}"),
+                    )?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
         })();
         if let Err(e) = handled {
             let _ = write_app_exception(&mut writer, &name, seq, &format!("{e}"));
@@ -1588,28 +1605,53 @@ fn parse_array_elements(cell: &str) -> Vec<String> {
     out
 }
 
-/// Appends one array element packed for its `ColumnType`, recursing into nested
-/// arrays.
-fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str) {
-    if element_column_type == 21 {
-        let elems = parse_array_elements(text);
-        chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
-        for e in &elems {
-            // Nested arrays only appear for `array,array,…`; their elements are
-            // packed as strings here (the SDK recurses with the same rule).
-            let s = e.trim();
-            chunk.extend_from_slice(&(s.len() as u32).to_le_bytes());
-            chunk.extend_from_slice(s.as_bytes());
-        }
-        return;
+/// The `ColumnType` of each nesting level of an `ARRAY(…)` type, outermost
+/// first. `ARRAY(ARRAY(INT))` → `[21, 3]` (an array of arrays of int).
+fn array_levels(text: &str) -> Vec<i32> {
+    let mut out = Vec::new();
+    let mut cur = text.trim().to_string();
+    while cur.to_ascii_uppercase().starts_with("ARRAY(") {
+        let inner = match cur.find('(') {
+            Some(i) => cur[i + 1..].trim_end_matches(')').trim().to_string(),
+            None => break,
+        };
+        let (logic, _col) = element_type_meta(&inner);
+        out.push(logic_to_column_type(logic));
+        cur = inner;
     }
+    out
+}
+
+/// Appends one array value packed for the given per-level `ColumnType`s.
+fn pack_array_value(chunk: &mut Vec<u8>, levels: &[i32], text: &str) {
+    let elems = parse_array_elements(text);
+    chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
+    let Some((&head, rest)) = levels.split_first() else {
+        return;
+    };
+    for e in &elems {
+        if rest.is_empty() {
+            pack_array_element(chunk, head, e);
+        } else {
+            pack_array_value(chunk, rest, e);
+        }
+    }
+}
+
+/// Appends one scalar array element packed for its `ColumnType`.
+fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str) {
     let t = text.trim();
     match element_column_type {
         0 => chunk.push(if t.eq_ignore_ascii_case("true") { 1 } else { 0 }),
+        1 => chunk.push(t.parse::<i8>().unwrap_or(0) as u8),
+        2 => chunk.extend_from_slice(&t.parse::<i16>().unwrap_or(0).to_le_bytes()),
         3 => chunk.extend_from_slice(&t.parse::<i32>().unwrap_or(0).to_le_bytes()),
         4 => chunk.extend_from_slice(&t.parse::<i64>().unwrap_or(0).to_le_bytes()),
         5 => chunk.extend_from_slice(&t.parse::<f32>().unwrap_or(0.0).to_le_bytes()),
         6 => chunk.extend_from_slice(&t.parse::<f64>().unwrap_or(0.0).to_le_bytes()),
+        7 => {
+            chunk.extend_from_slice(&f32_to_f16_bits(t.parse::<f32>().unwrap_or(0.0)).to_le_bytes())
+        }
         16 => chunk.extend_from_slice(&date_to_days(t).unwrap_or(0).to_le_bytes()),
         17 => chunk.extend_from_slice(&time_to_secs(t).unwrap_or(0).to_le_bytes()),
         18 => {
@@ -1677,10 +1719,7 @@ pub fn rows_to_column_fields_typed(
     for (ci, name) in columns.iter().enumerate() {
         let declared = types.get(ci).map(String::as_str).unwrap_or("");
         let kind = classify_column(declared, rows, ci);
-        if let ColKind::Array {
-            element_column_type,
-        } = kind
-        {
+        if let ColKind::Array { .. } = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
@@ -1689,10 +1728,10 @@ pub fn rows_to_column_fields_typed(
                     .map(String::as_str)
                     .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
-                let elems = cell.map(parse_array_elements).unwrap_or_default();
-                chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
-                for e in &elems {
-                    pack_array_element(&mut chunk, element_column_type, e);
+                let levels = array_levels(declared);
+                match cell {
+                    Some(c) => pack_array_value(&mut chunk, &levels, c),
+                    None => chunk.extend_from_slice(&0u32.to_le_bytes()),
                 }
             }
             out.push(ColumnField {
@@ -2127,8 +2166,12 @@ fn write_data_type(
                 .map_err(tw)?;
             o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
                 .map_err(tw)?;
-            o.write_field_begin(&TFieldIdentifier::new("embedding_type", TType::Struct, 3i16))
-                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new(
+                "embedding_type",
+                TType::Struct,
+                3i16,
+            ))
+            .map_err(tw)?;
             o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
                 .map_err(tw)?;
             o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
@@ -2396,9 +2439,7 @@ fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<P
 
 /// Reads a `DataType` (`{1: logic_type, 2: physical_type}`), recursing for
 /// array element types.
-fn read_data_type(
-    ip: &mut TBinaryInputProtocol<&mut impl Read>,
-) -> Result<(i32, PhysicalWire)> {
+fn read_data_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(i32, PhysicalWire)> {
     ip.read_struct_begin().map_err(tw)?;
     let mut logic = 0i32;
     let mut physical = PhysicalWire::None;
@@ -4330,5 +4371,30 @@ mod tests {
         assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 2); // "ab"
         assert_eq!(&b[8..10], b"ab");
+
+        // Nested arrays recurse: `{{1,2},{3}}` -> count 2, then each sub-array.
+        let ncols = vec!["n".to_string()];
+        let ntypes = vec!["ARRAY(ARRAY(INT))".to_string()];
+        let nrows = vec![vec!["{{1,2},{3}}".to_string()]];
+        let nf = rows_to_column_fields_typed(&ncols, &ntypes, &nrows);
+        let b = &nf[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // outer
+        assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 2); // inner #1
+        assert_eq!(i32::from_le_bytes(b[8..12].try_into().unwrap()), 1);
+        assert_eq!(i32::from_le_bytes(b[12..16].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(b[16..20].try_into().unwrap()), 1); // inner #2
+        assert_eq!(i32::from_le_bytes(b[20..24].try_into().unwrap()), 3);
+        let nresp = select_response_from_typed(&ncols, &ntypes, &nrows);
+        assert_eq!(nresp.column_defs[0].logic_type, 22); // Array
+        assert_eq!(
+            nresp.column_defs[0].physical,
+            PhysicalWire::Array {
+                element_logic_type: 22, // Array
+                element: Box::new(PhysicalWire::Array {
+                    element_logic_type: 3, // Integer
+                    element: Box::new(PhysicalWire::None),
+                }),
+            }
+        );
     }
 }
