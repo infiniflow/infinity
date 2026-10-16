@@ -646,9 +646,257 @@ pub fn decode_ivf_sq_chunk(bytes: &[u8], sq_bits: u8) -> Result<IvfSqChunk, Form
     })
 }
 
+/// One product-quantized part (spec §9.2 `kProductQuantization`): the per-chunk
+/// codebook lives in the chunk base, each part carries its code words.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IvfPqPart {
+    /// `SegmentOffset` (rowid.segment_offset) of each vector in this part.
+    pub segment_offsets: Vec<u32>,
+    /// `PQ_Code_Storage::last_code_id_` - the code count in this part.
+    pub last_code_id: u64,
+    /// Raw code words: `storage_size * word_size` bytes, `word_size` 1 for
+    /// 4/8/12-bit codes or 2 for 16-bit codes.
+    pub codes: Vec<u8>,
+    /// Width of one code word (1 or 2 bytes).
+    pub word_size: usize,
+}
+
+/// The per-chunk product-quantization codebook.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvfPqCodebook {
+    /// `real_subspace_centroid_num`.
+    pub real_subspace_centroid_num: u32,
+    /// `f32[dim * real_subspace_centroid_num]`.
+    pub codewords: Vec<f32>,
+    /// `f32[real_subspace_centroid_num * subspace_num]`.
+    pub subspace_weights: Vec<f32>,
+}
+
+/// A decoded product-quantized IVF chunk.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IvfPqChunk {
+    pub header: IvfChunkHeader,
+    pub centroids: Vec<f32>,
+    pub codebook: IvfPqCodebook,
+    pub parts: Vec<IvfPqPart>,
+}
+
+/// Encodes an IVF chunk in the product-quantized storage layout.
+///
+/// `ivf_index_storage_parts_impl.cpp:355-367,904-916,1057-1064`: the plain header
+/// and centroids, then the codebook (`u32 real_subspace_centroid_num`, the
+/// codewords, the subspace weights), then each part as `u32 embedding_num` +
+/// `u32[embedding_num]` offsets + `u64 last_code_id` + `u32 storage_size` + the
+/// code words.
+pub fn encode_ivf_pq_chunk(
+    header: &IvfChunkHeader,
+    centroids: &[f32],
+    codebook: &IvfPqCodebook,
+    parts: &[IvfPqPart],
+) -> Result<Vec<u8>, FormatError> {
+    let dim = header.dimension as usize;
+    let bad = |need: usize, got: usize| FormatError::Truncated { need, got };
+    if centroids.len() != header.centroid_count as usize * dim {
+        return Err(bad(header.centroid_count as usize * dim, centroids.len()));
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(&header.row_count.to_le_bytes());
+    out.extend_from_slice(&header.embedding_count.to_le_bytes());
+    out.extend_from_slice(&header.dimension.to_le_bytes());
+    out.extend_from_slice(&header.centroid_count.to_le_bytes());
+    for c in centroids {
+        out.extend_from_slice(&c.to_le_bytes());
+    }
+    out.extend_from_slice(&codebook.real_subspace_centroid_num.to_le_bytes());
+    for f in &codebook.codewords {
+        out.extend_from_slice(&f.to_le_bytes());
+    }
+    for f in &codebook.subspace_weights {
+        out.extend_from_slice(&f.to_le_bytes());
+    }
+    for part in parts {
+        let n = part.segment_offsets.len();
+        if part.word_size == 0 || !part.codes.len().is_multiple_of(part.word_size) {
+            return Err(bad(part.word_size, part.codes.len()));
+        }
+        out.extend_from_slice(&(n as u32).to_le_bytes());
+        for s in &part.segment_offsets {
+            out.extend_from_slice(&s.to_le_bytes());
+        }
+        out.extend_from_slice(&part.last_code_id.to_le_bytes());
+        out.extend_from_slice(&((part.codes.len() / part.word_size) as u32).to_le_bytes());
+        out.extend_from_slice(&part.codes);
+    }
+    Ok(out)
+}
+
+/// Decodes an IVF chunk in the product-quantized storage layout.
+///
+/// `word_size` is the code word width (1 or 2 bytes), which the file does not
+/// record - it follows from the code bit width in the IVF options.
+pub fn decode_ivf_pq_chunk(
+    bytes: &[u8],
+    word_size: usize,
+    codeword_floats: usize,
+    subspace_weight_floats: usize,
+) -> Result<IvfPqChunk, FormatError> {
+    let short = |need: usize| FormatError::Truncated {
+        need,
+        got: bytes.len(),
+    };
+    if bytes.len() < 16 || word_size == 0 {
+        return Err(short(16));
+    }
+    let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+    let header = IvfChunkHeader {
+        row_count: u32_at(0),
+        embedding_count: u32_at(4),
+        dimension: u32_at(8),
+        centroid_count: u32_at(12),
+    };
+    let dim = header.dimension as usize;
+    let centroid_floats = header.centroid_count as usize * dim;
+    let mut at = 16;
+    let read_f32 = |from: &mut usize, n: usize| -> Vec<f32> {
+        let out = (0..n)
+            .map(|i| {
+                f32::from_le_bytes(bytes[*from + i * 4..*from + i * 4 + 4].try_into().unwrap())
+            })
+            .collect();
+        *from += n * 4;
+        out
+    };
+    if bytes.len() < at + centroid_floats * 4 {
+        return Err(short(at + centroid_floats * 4));
+    }
+    let centroids = read_f32(&mut at, centroid_floats);
+    if bytes.len() < at + 4 {
+        return Err(short(at + 4));
+    }
+    let real_subspace_centroid_num = u32_at(at);
+    at += 4;
+    let need = at + (codeword_floats + subspace_weight_floats) * 4;
+    if bytes.len() < need {
+        return Err(short(need));
+    }
+    let codewords = read_f32(&mut at, codeword_floats);
+    let subspace_weights = read_f32(&mut at, subspace_weight_floats);
+
+    let mut parts = Vec::with_capacity(header.centroid_count as usize);
+    for _ in 0..header.centroid_count {
+        if bytes.len() < at + 4 {
+            return Err(short(at + 4));
+        }
+        let n = u32_at(at) as usize;
+        at += 4;
+        if bytes.len() < at + n * 4 {
+            return Err(short(at + n * 4));
+        }
+        let segment_offsets: Vec<u32> = (0..n).map(|i| u32_at(at + i * 4)).collect();
+        at += n * 4;
+        if bytes.len() < at + 12 {
+            return Err(short(at + 12));
+        }
+        let last_code_id = u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
+        let storage_size = u32_at(at + 8) as usize;
+        at += 12;
+        let code_bytes = storage_size * word_size;
+        if bytes.len() < at + code_bytes {
+            return Err(short(at + code_bytes));
+        }
+        let codes = bytes[at..at + code_bytes].to_vec();
+        at += code_bytes;
+        parts.push(IvfPqPart {
+            segment_offsets,
+            last_code_id,
+            codes,
+            word_size,
+        });
+    }
+    Ok(IvfPqChunk {
+        header,
+        centroids,
+        codebook: IvfPqCodebook {
+            real_subspace_centroid_num,
+            codewords,
+            subspace_weights,
+        },
+        parts,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ivf_pq_chunk_roundtrip() {
+        let header = IvfChunkHeader {
+            row_count: 2,
+            embedding_count: 2,
+            dimension: 2,
+            centroid_count: 1,
+        };
+        let codebook = IvfPqCodebook {
+            real_subspace_centroid_num: 2,
+            codewords: vec![1.0, 2.0, 3.0, 4.0],
+            subspace_weights: vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        };
+        let parts = vec![IvfPqPart {
+            segment_offsets: vec![7, 8],
+            last_code_id: 5,
+            codes: vec![0x12, 0x34, 0x56, 0x78],
+            word_size: 1,
+        }];
+        let bytes = encode_ivf_pq_chunk(&header, &[0.5, 0.5], &codebook, &parts).unwrap();
+        let got = decode_ivf_pq_chunk(&bytes, 1, 4, 6).unwrap();
+        assert_eq!(got.header, header);
+        assert_eq!(got.centroids, vec![0.5, 0.5]);
+        assert_eq!(got.codebook, codebook);
+        assert_eq!(got.parts, parts);
+
+        // 16-bit codes use two bytes per word.
+        let wide = vec![IvfPqPart {
+            segment_offsets: vec![0],
+            last_code_id: 1,
+            codes: vec![0x01, 0x02],
+            word_size: 2,
+        }];
+        let bytes = encode_ivf_pq_chunk(&header, &[0.5, 0.5], &codebook, &wide).unwrap();
+        let got = decode_ivf_pq_chunk(&bytes, 2, 4, 6).unwrap();
+        assert_eq!(got.parts, wide);
+    }
+
+    #[test]
+    fn ivf_pq_chunk_rejects_bad_code_words() {
+        let header = IvfChunkHeader {
+            row_count: 1,
+            embedding_count: 1,
+            dimension: 2,
+            centroid_count: 1,
+        };
+        let codebook = IvfPqCodebook {
+            real_subspace_centroid_num: 1,
+            codewords: vec![0.0, 0.0],
+            subspace_weights: vec![0.0],
+        };
+        // Codes are not a whole number of 2-byte words.
+        let bad = vec![IvfPqPart {
+            segment_offsets: vec![0],
+            last_code_id: 1,
+            codes: vec![1, 2, 3],
+            word_size: 2,
+        }];
+        assert!(encode_ivf_pq_chunk(&header, &[0.0, 0.0], &codebook, &bad).is_err());
+        // A zero word size is meaningless.
+        let zero = vec![IvfPqPart {
+            segment_offsets: vec![0],
+            last_code_id: 1,
+            codes: vec![],
+            word_size: 0,
+        }];
+        assert!(encode_ivf_pq_chunk(&header, &[0.0, 0.0], &codebook, &zero).is_err());
+    }
 
     #[test]
     fn ivf_sq_chunk_roundtrip() {
