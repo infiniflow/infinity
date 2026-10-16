@@ -656,6 +656,8 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
     for k in p.order_by {
         match &k.expr {
             Some(e) if !matches!(e, ExprAst::Column(_)) => expr_cols(e, &mut sort_cols),
+            // `row_id()` sorts by the synthetic `__rowid`.
+            _ if k.column.eq_ignore_ascii_case("row_id") => {}
             _ => add_col(&mut sort_cols, &k.column),
         }
     }
@@ -681,6 +683,16 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
         if !ids.contains_key(c) {
             ids.insert(c.clone(), ids.len());
         }
+    }
+    // `ROW_ID()` / `ORDER BY row_id()` reference the synthetic `__rowid` column.
+    let uses_rowid = p.items.iter().any(
+        |it| matches!(it, SelectItem::Func { name, .. } if name.eq_ignore_ascii_case("row_id")),
+    ) || p
+        .order_by
+        .iter()
+        .any(|k| k.column.eq_ignore_ascii_case("row_id"));
+    if uses_rowid && !ids.contains_key("__rowid") {
+        ids.insert("__rowid".to_string(), ids.len());
     }
 
     // 2. the operator chain from the leaf upward.
@@ -729,7 +741,6 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
         ),
     ));
 
-    let mut child_out = scan_out.clone();
     for (i, op) in ops.iter().enumerate().rev() {
         if i == project_idx {
             continue;
@@ -746,6 +757,12 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                             Some(e) if !matches!(e, ExprAst::Column(_)) => {
                                 render_expr_m(e, &ids, p.logical)
                             }
+                            _ if k.column.eq_ignore_ascii_case("row_id") => {
+                                match ids.get("__rowid") {
+                                    Some(id) => format!("ROW_ID (#{id})"),
+                                    None => "ROW_ID".to_string(),
+                                }
+                            }
                             _ => match ids.get(&k.column) {
                                 Some(id) => format!("{} (#{id})", k.column),
                                 None => k.column.clone(),
@@ -755,12 +772,11 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                     })
                     .collect();
                 lines.push(attr(d, &format!("expressions: [{}]", keys.join(", "))));
-                let mut out = child_out.clone();
+                let mut out = scan_out.clone();
                 for c in &sort_cols {
                     add_col(&mut out, c);
                 }
                 lines.push(attr(d, &format!("output columns: [{}]", out.join(", "))));
-                child_out = out;
             }
             "AGGREGATE" => {
                 lines.push(attr(d, "aggregate table index: #5"));
@@ -781,12 +797,11 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                     .map(|w| render_pred_m(w, &ids, p.logical))
                     .unwrap_or_default();
                 lines.push(attr(d, &format!("filter: {f}")));
-                let mut out = child_out.clone();
+                let mut out = scan_out.clone();
                 for c in &filter_cols {
                     add_col(&mut out, c);
                 }
                 lines.push(attr(d, &format!("output columns: [{}]", out.join(", "))));
-                child_out = out;
             }
             _ => {
                 lines.push(attr(d, &format!("table name: {alias}({db}.{alias})")));
@@ -796,7 +811,7 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                 } else {
                     "output_columns"
                 };
-                lines.push(attr(d, &format!("{key}: [{}]", child_out.join(", "))));
+                lines.push(attr(d, &format!("{key}: [{}]", scan_out.join(", "))));
             }
         }
     }
@@ -825,6 +840,12 @@ fn project_exprs(
                 None => c.clone(),
             }),
             SelectItem::Expr(e) => out.push(render_expr_m(e, ids, logical)),
+            SelectItem::Func { name, args } if name.eq_ignore_ascii_case("row_id") => {
+                out.push(match ids.get("__rowid") {
+                    Some(i) => format!("ROW_ID (#{i})"),
+                    None => "ROW_ID".to_string(),
+                });
+            }
             SelectItem::Func { name, args } => {
                 let inner: Vec<String> = args
                     .iter()
