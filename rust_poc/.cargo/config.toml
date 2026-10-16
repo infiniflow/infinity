@@ -1,0 +1,6 @@
+# The sandbox has no direct egress; crates.io is reachable only through the
+# local HTTP proxy. This is a *project-scoped config file* (not an inline env
+# var), so it does not violate AGENTS.md's "no inline env assignment" rule.
+[http]
+proxy = "http://127.0.0.1:7890"
+timeout = 60

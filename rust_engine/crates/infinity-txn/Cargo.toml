@@ -1,0 +1,18 @@
+[package]
+name = "infinity-txn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+infinity-common.workspace = true
+infinity-storage.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }

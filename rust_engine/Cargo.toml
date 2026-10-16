@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/infinity-common",
+    "crates/infinity-storage",
+    "crates/infinity-catalog",
+    "crates/infinity-txn",
+    "crates/infinity-parser",
+    "crates/infinity-expression",
+    "crates/infinity-planner",
+    "crates/infinity-index",
+    "crates/infinity-executor",
+    "crates/infinity-server",
+    "crates/infinity-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/infiniflow/infinity"
+
+[workspace.dependencies]
+infinity-common = { path = "crates/infinity-common" }
+infinity-storage = { path = "crates/infinity-storage" }
+infinity-catalog = { path = "crates/infinity-catalog" }
+infinity-txn = { path = "crates/infinity-txn" }
+infinity-parser = { path = "crates/infinity-parser" }
+infinity-expression = { path = "crates/infinity-expression" }
+infinity-planner = { path = "crates/infinity-planner" }
+infinity-index = { path = "crates/infinity-index" }
+infinity-executor = { path = "crates/infinity-executor" }
+fjall = "3"
+crc32fast = "1"
+thiserror = "1"
+tempfile = "3"

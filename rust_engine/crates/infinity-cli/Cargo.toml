@@ -1,0 +1,16 @@
+[package]
+name = "infinity-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "infinity"
+path = "src/main.rs"
+
+[dependencies]
+infinity-common.workspace = true
+infinity-storage.workspace = true
+infinity-catalog.workspace = true
+infinity-txn.workspace = true
+infinity-executor.workspace = true

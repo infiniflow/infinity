@@ -1,0 +1,5 @@
+# The sandbox has no direct egress; crates.io is reachable only through the
+# local HTTP proxy. Project-scoped config file (not an inline env var).
+[http]
+proxy = "http://127.0.0.1:7890"
+timeout = 60

@@ -1,0 +1,34 @@
+name: rust_engine
+
+# Build + test the Rust rewrite workspace (RUST_REWRITE_PLAN.md M0 CI).
+on:
+  push:
+    paths:
+      - 'rust_engine/**'
+      - '.github/workflows/rust_engine.yml'
+  pull_request:
+    paths:
+      - 'rust_engine/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust_engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust_engine
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace
+      - name: smoke
+        run: cargo run -q -p infinity-cli -- smoke /tmp/infinity-smoke

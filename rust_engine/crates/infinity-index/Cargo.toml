@@ -1,0 +1,11 @@
+[package]
+name = "infinity-index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+infinity-common.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

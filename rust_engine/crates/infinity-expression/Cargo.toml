@@ -1,0 +1,10 @@
+[package]
+name = "infinity-expression"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+infinity-parser.workspace = true
+
+[dev-dependencies]
