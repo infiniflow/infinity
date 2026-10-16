@@ -461,7 +461,11 @@ fn handle_connection(
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                     read_list_database_args(&mut ip)?
                 };
-                write_list_database_response(&mut writer, seq, &["default_db".to_string()])?;
+                let names = match &engine {
+                    Some(eng) => eng.catalog().list_databases().unwrap_or_default(),
+                    None => vec!["default_db".to_string()],
+                };
+                write_list_database_response(&mut writer, seq, &names)?;
             }
             "Delete" => {
                 let req = {
@@ -532,7 +536,7 @@ fn handle_connection(
             // Database / table / index lifecycle RPCs that return a plain
             // `CommonResponse`.
             "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
-            | "CreateIndex" | "DropIndex" => {
+            | "DropIndex" => {
                 let (sid, fields) = {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                     read_string_request(&mut ip)?
@@ -831,6 +835,53 @@ fn handle_connection(
                 };
                 write_string_list_response(&mut writer, seq, "ListIndex", "index_names", &names)?;
             }
+            "ShowDatabase" => {
+                let (_sid, fields) = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_string_request(&mut ip)?
+                };
+                let db = fields.get(&1).cloned().unwrap_or_default();
+                let prefix = format!("{db}.");
+                let table_count = match &engine {
+                    Some(eng) => eng
+                        .catalog()
+                        .list_tables()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|t| db.is_empty() || t.name.starts_with(&prefix))
+                        .count() as i64,
+                    None => 0,
+                };
+                write_show_database_response(&mut writer, seq, &db, table_count, "")?;
+            }
+            "CreateIndex" => {
+                let req = {
+                    let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                    read_create_index_args(&mut ip)?
+                };
+                let full = if req.db_name.is_empty() {
+                    req.table_name.clone()
+                } else {
+                    format!("{}.{}", req.db_name, req.table_name)
+                };
+                let resp = if req.column.is_empty() {
+                    CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: req.session_id,
+                    }
+                } else {
+                    run_common(
+                        engine.as_ref(),
+                        &format!(
+                            "CREATE INDEX {} ON {} ({});",
+                            req.index_name, full, req.column
+                        ),
+                        req.session_id,
+                    )
+                };
+                write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
+            }
             other => {
                 {
                     let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -869,10 +920,15 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
             dimension,
             element_type,
         } => {
-            return format!(
-                "EMBEDDING({}, {dimension})",
-                element_type_name(*element_type)
-            )
+            // Tensor / TensorArray / MultiVector share the embedding physical
+            // descriptor; the LogicType tells them apart.
+            let head = match c.logic_type {
+                13 => "TENSOR",
+                14 => "TENSORARRAY",
+                16 => "MULTIVECTOR",
+                _ => "EMBEDDING",
+            };
+            return format!("{head}({}, {dimension})", element_type_name(*element_type));
         }
         PhysicalWire::Sparse {
             dimension,
@@ -1085,6 +1141,147 @@ enum ColKind {
         element_type: i32,
         index_type: i32,
     },
+    /// Tensor / TensorArray / MultiVector: per-row length-prefixed element
+    /// streams (`column_type` is 11 (Tensor), 12 (TensorArray) or 14
+    /// (MultiVector)); all share the embedding physical descriptor.
+    Tensor {
+        column_type: i32,
+        dimension: i32,
+        element_type: i32,
+    },
+}
+
+/// Parses `TENSORARRAY(<elem>,<dim>)` / `TENSOR(<elem>,<dim>)` /
+/// `MULTIVECTOR(<elem>,<dim>)` into `(ColumnType, dimension, element_type)`.
+fn tensor_info(type_text: &str) -> Option<(i32, i32, i32)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    // Order matters: `TENSORARRAY(` must be tried before `TENSOR(`.
+    let (column_type, rest) = if let Some(r) = up.strip_prefix("TENSORARRAY(") {
+        (12, r)
+    } else if let Some(r) = up.strip_prefix("MULTIVECTOR(") {
+        (14, r)
+    } else if let Some(r) = up.strip_prefix("TENSOR(") {
+        (11, r)
+    } else {
+        return None;
+    };
+    let inner = rest.trim_end_matches(')');
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    let dim: i32 = parts.get(1)?.parse().ok()?;
+    let elem = (*parts.first()?).to_string();
+    Some((column_type, dim, element_type_code(&elem)))
+}
+
+/// Appends one element of `elem` type (little-endian) to `chunk`.
+fn push_element(chunk: &mut Vec<u8>, elem: i32, f: f64) {
+    match elem {
+        1 => chunk.push(f as u8),
+        2 => chunk.push(f as i8 as u8),
+        3 => chunk.extend_from_slice(&(f as i16).to_le_bytes()),
+        4 => chunk.extend_from_slice(&(f as i32).to_le_bytes()),
+        5 => chunk.extend_from_slice(&(f as i64).to_le_bytes()),
+        7 => chunk.extend_from_slice(&f.to_le_bytes()),
+        8 => chunk.extend_from_slice(&f32_to_f16_bits(f as f32).to_le_bytes()),
+        _ => chunk.extend_from_slice(&(f as f32).to_le_bytes()),
+    }
+}
+
+/// Strips exactly one outer `[ … ]` pair (no-op when absent).
+fn strip_one_bracket(t: &str) -> &str {
+    let t = t.trim();
+    if t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    }
+}
+
+/// Splits array content into its top-level comma-separated segments, keeping
+/// each nested `[…]` group intact (e.g. `[1,2],[3,4]` → `["[1,2]", "[3,4]"]`).
+fn split_top_level(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    for ch in content.chars() {
+        match ch {
+            '[' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            ']' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            ',' if depth == 0 => {
+                let s = cur.trim();
+                if !s.is_empty() {
+                    out.push(s.to_string());
+                }
+                cur.clear();
+            }
+            _ => cur.push(ch),
+        }
+    }
+    let s = cur.trim();
+    if !s.is_empty() {
+        out.push(s.to_string());
+    }
+    out
+}
+
+/// Parses a comma-separated list of numbers.
+fn parse_flat(s: &str) -> Vec<f64> {
+    s.split(',')
+        .filter_map(|x| x.trim().parse::<f64>().ok())
+        .collect()
+}
+
+/// Parses the engine's tensor rendering into a list of vectors.
+/// `[[1,2],[3,4]]` → two vectors; `[1,2]` → one vector.
+fn parse_nested_f64(cell: &str) -> Vec<Vec<f64>> {
+    let content = strip_one_bracket(cell.trim());
+    if content.trim().is_empty() {
+        return Vec::new();
+    }
+    if !content.contains('[') {
+        return vec![parse_flat(content)];
+    }
+    split_top_level(content)
+        .iter()
+        .map(|seg| parse_flat(strip_one_bracket(seg)))
+        .collect()
+}
+
+/// Parses the engine's `TENSORARRAY` rendering into tensors of vectors.
+fn parse_tensorarray_f64(cell: &str) -> Vec<Vec<Vec<f64>>> {
+    let content = strip_one_bracket(cell.trim());
+    if content.trim().is_empty() {
+        return Vec::new();
+    }
+    split_top_level(content)
+        .iter()
+        .map(|tensor| {
+            let tc = strip_one_bracket(tensor);
+            if !tc.contains('[') {
+                return vec![parse_flat(tc)];
+            }
+            split_top_level(tc)
+                .iter()
+                .map(|seg| parse_flat(strip_one_bracket(seg)))
+                .collect()
+        })
+        .collect()
+}
+
+/// Packs one tensor body: each vector padded/truncated to `dim` elements.
+fn pack_tensor_body(vectors: &[Vec<f64>], dim: i32, elem: i32) -> Vec<u8> {
+    let mut body = Vec::new();
+    for v in vectors {
+        for k in 0..dim as usize {
+            push_element(&mut body, elem, v.get(k).copied().unwrap_or(0.0));
+        }
+    }
+    body
 }
 
 /// Parses `SPARSE(<elem>,<bound>[,<index>])`. The index width is derived from
@@ -1122,6 +1319,13 @@ fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
             dimension,
             element_type,
             index_type,
+        };
+    }
+    if let Some((column_type, dimension, element_type)) = tensor_info(declared) {
+        return ColKind::Tensor {
+            column_type,
+            dimension,
+            element_type,
         };
     }
     let up = declared.trim().to_ascii_uppercase();
@@ -1285,6 +1489,47 @@ pub fn rows_to_column_fields_typed(
             });
             continue;
         }
+        if let ColKind::Tensor {
+            column_type,
+            dimension,
+            element_type,
+        } = kind
+        {
+            let mut chunk: Vec<u8> = Vec::new();
+            let mut masks = Vec::with_capacity(rows.len());
+            for r in rows {
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                masks.push(cell.is_some());
+                let cell = cell.unwrap_or("");
+                if column_type == 12 {
+                    // TensorArray: u32 tensor_n, then each tensor length-prefixed.
+                    let tensors = parse_tensorarray_f64(cell);
+                    chunk.extend_from_slice(&(tensors.len() as u32).to_le_bytes());
+                    for t in &tensors {
+                        let body = pack_tensor_body(t, dimension, element_type);
+                        chunk.extend_from_slice(&(body.len() as u32).to_le_bytes());
+                        chunk.extend_from_slice(&body);
+                    }
+                } else {
+                    // Tensor / MultiVector: a single length-prefixed body of
+                    // vectors, each `dimension` elements wide.
+                    let vectors = parse_nested_f64(cell);
+                    let body = pack_tensor_body(&vectors, dimension, element_type);
+                    chunk.extend_from_slice(&(body.len() as u32).to_le_bytes());
+                    chunk.extend_from_slice(&body);
+                }
+            }
+            out.push(ColumnField {
+                column_type,
+                column_name: name.clone(),
+                column_vectors: vec![chunk],
+                bitmasks: masks,
+            });
+            continue;
+        }
         if let ColKind::Embedding(dim, elem) = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
@@ -1305,17 +1550,7 @@ pub fn rows_to_column_fields_typed(
                     })
                     .unwrap_or_default();
                 for k in 0..dim as usize {
-                    let f = vals.get(k).copied().unwrap_or(0.0);
-                    match elem {
-                        1 => chunk.push(f as u8),
-                        2 => chunk.push(f as i8 as u8),
-                        3 => chunk.extend_from_slice(&(f as i16).to_le_bytes()),
-                        4 => chunk.extend_from_slice(&(f as i32).to_le_bytes()),
-                        5 => chunk.extend_from_slice(&(f as i64).to_le_bytes()),
-                        7 => chunk.extend_from_slice(&f.to_le_bytes()),
-                        8 => chunk.extend_from_slice(&f32_to_f16_bits(f as f32).to_le_bytes()),
-                        _ => chunk.extend_from_slice(&(f as f32).to_le_bytes()),
-                    }
+                    push_element(&mut chunk, elem, vals.get(k).copied().unwrap_or(0.0));
                 }
             }
             out.push(ColumnField {
@@ -2329,6 +2564,17 @@ pub fn select_response_from_typed(
                         index_type,
                     },
                 ),
+                ColKind::Tensor {
+                    column_type,
+                    dimension,
+                    element_type,
+                } => (
+                    column_type_to_logic(column_type),
+                    PhysicalWire::Embedding {
+                        dimension,
+                        element_type,
+                    },
+                ),
                 ColKind::Scalar(code) => (column_type_to_logic(code), PhysicalWire::None),
             };
             ColumnDefWire {
@@ -2366,6 +2612,10 @@ pub enum ValueLit {
     IntTensor(Vec<Vec<i64>>),
     /// `[[..],..]` float tensor.
     FloatTensor(Vec<Vec<f64>>),
+    /// `[[[..],..],..]` int tensor array.
+    IntTensorArray(Vec<Vec<Vec<i64>>>),
+    /// `[[[..],..],..]` float tensor array.
+    FloatTensorArray(Vec<Vec<Vec<f64>>>),
     /// Sparse vector `{index: value}` (index/values paired).
     Sparse {
         indices: Vec<i64>,
@@ -2433,6 +2683,44 @@ impl ValueLit {
                     .collect::<Vec<_>>()
                     .join(",")
             ),
+            ValueLit::IntTensorArray(v) => format!(
+                "[{}]",
+                v.iter()
+                    .map(|t| format!(
+                        "[{}]",
+                        t.iter()
+                            .map(|r| format!(
+                                "[{}]",
+                                r.iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            ValueLit::FloatTensorArray(v) => format!(
+                "[{}]",
+                v.iter()
+                    .map(|t| format!(
+                        "[{}]",
+                        t.iter()
+                            .map(|r| format!(
+                                "[{}]",
+                                r.iter()
+                                    .map(|x| x.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             ValueLit::Sparse {
                 indices,
                 ints,
@@ -2474,6 +2762,8 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
     let mut f64_arr: Vec<f64> = Vec::new();
     let mut i64_tensor: Vec<Vec<i64>> = Vec::new();
     let mut f64_tensor: Vec<Vec<f64>> = Vec::new();
+    let mut i64_tensor_array: Vec<Vec<Vec<i64>>> = Vec::new();
+    let mut f64_tensor_array: Vec<Vec<Vec<f64>>> = Vec::new();
     let mut idx_arr: Vec<i64> = Vec::new();
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
@@ -2490,6 +2780,8 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
             Some(7) => f64_arr = read_f64_list(ip)?,
             Some(8) => i64_tensor = read_i64_list_list(ip)?,
             Some(9) => f64_tensor = read_f64_list_list(ip)?,
+            Some(10) => i64_tensor_array = read_i64_list_list_list(ip)?,
+            Some(11) => f64_tensor_array = read_f64_list_list_list(ip)?,
             Some(12) => idx_arr = read_i64_list(ip)?,
             _ => ip.skip(fd.field_type).map_err(tw)?,
         }
@@ -2505,6 +2797,8 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
         6 => ValueLit::FloatArray(f64_arr),     // DoubleArray
         7 => ValueLit::IntTensor(i64_tensor),   // IntegerTensor
         8 => ValueLit::FloatTensor(f64_tensor), // DoubleTensor
+        9 => ValueLit::IntTensorArray(i64_tensor_array), // IntegerTensorArray
+        10 => ValueLit::FloatTensorArray(f64_tensor_array), // DoubleTensorArray
         11 => ValueLit::Sparse {
             indices: idx_arr,
             ints: i64_arr,
@@ -2560,6 +2854,32 @@ fn read_f64_list_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
     let mut out = Vec::with_capacity(l.size.max(0) as usize);
     for _ in 0..l.size {
         out.push(read_f64_list(ip)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// Reads a `list<list<list<i64>>>` (tensor array).
+fn read_i64_list_list_list(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Vec<Vec<Vec<i64>>>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(read_i64_list_list(ip)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// Reads a `list<list<list<double>>>` (tensor array).
+fn read_f64_list_list_list(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Vec<Vec<Vec<f64>>>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(read_f64_list_list(ip)?);
     }
     ip.read_list_end().map_err(tw)?;
     Ok(out)
@@ -2757,6 +3077,75 @@ pub fn read_string_request(
 
 /// Executes `sql` against the bound engine, mapping the outcome to a
 /// `CommonResponse` (`error_code` 0 on success).
+/// A `CreateIndex` request reduced to what the engine needs.
+pub struct CreateIndexReq {
+    pub db_name: String,
+    pub table_name: String,
+    pub index_name: String,
+    pub column: String,
+    pub session_id: i64,
+}
+
+/// Reads the column name out of a nested `IndexInfo` struct.
+fn read_index_info_column(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut col = None;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) if f.field_type == TType::String => col = Some(ip.read_string().map_err(tw)?),
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(col)
+}
+
+/// Reads a `CreateIndex` CALL, extracting `db.table(index_name, column)`.
+pub fn read_create_index_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<CreateIndexReq> {
+    ip.read_struct_begin().map_err(tw)?; // CreateIndex_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request (Struct)
+    ip.read_struct_begin().map_err(tw)?; // CreateIndexRequest
+    let mut r = CreateIndexReq {
+        db_name: String::new(),
+        table_name: String::new(),
+        index_name: String::new(),
+        column: String::new(),
+        session_id: 0,
+    };
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) if f.field_type == TType::String => r.db_name = ip.read_string().map_err(tw)?,
+            Some(2) if f.field_type == TType::String => {
+                r.table_name = ip.read_string().map_err(tw)?;
+            }
+            Some(3) if f.field_type == TType::String => {
+                r.index_name = ip.read_string().map_err(tw)?;
+            }
+            Some(5) if f.field_type == TType::Struct => {
+                if let Some(c) = read_index_info_column(ip)? {
+                    r.column = c;
+                }
+            }
+            Some(6) => r.session_id = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(r)
+}
+
 fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> CommonResponse {
     match engine {
         Some(eng) => match eng.execute(sql) {
@@ -2871,6 +3260,60 @@ pub fn write_string_list_response(
     o.write_field_end().map_err(tw)?;
     o.write_field_stop().map_err(tw)?;
     o.write_struct_end().map_err(tw)?;
+    o.flush().map_err(tw)?;
+    Ok(())
+}
+
+/// Writes a `ShowDatabase` REPLY (`ShowDatabaseResponse` fields 1..=6).
+pub fn write_show_database_response(
+    w: &mut impl Write,
+    seq: i32,
+    name: &str,
+    table_count: i64,
+    comment: &str,
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ShowDatabase",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowDatabase_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowDatabaseResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(0).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string("OK").map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("database_name", TType::String, 3i16))
+        .map_err(tw)?;
+    o.write_string(name).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("store_dir", TType::String, 4i16))
+        .map_err(tw)?;
+    o.write_string("").map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("table_count", TType::I64, 5i16))
+        .map_err(tw)?;
+    o.write_i64(table_count).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("comment", TType::String, 6i16))
+        .map_err(tw)?;
+    o.write_string(comment).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?; // ShowDatabaseResponse
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?; // ShowDatabase_result
     o.flush().map_err(tw)?;
     Ok(())
 }
@@ -3435,5 +3878,44 @@ mod tests {
         let erows = vec![vec!["(empty)".to_string()]];
         let ef = rows_to_column_fields_typed(&scols, &stypes, &erows);
         assert_eq!(ef[0].column_vectors[0], vec![0, 0, 0, 0]);
+
+        // Tensor: u32 byte-length + dim*rows little-endian elements per row.
+        let tcols = vec!["t".to_string()];
+        let ttypes = vec!["TENSOR(FLOAT,3)".to_string()];
+        let trows = vec![vec!["[[1,2,3],[4,5,6]]".to_string()]];
+        let tf = rows_to_column_fields_typed(&tcols, &ttypes, &trows);
+        assert_eq!(tf[0].column_type, 11); // ColumnTensor
+        let b = &tf[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 24); // 2*3*4 bytes
+        let vals: Vec<f32> = (0..6)
+            .map(|i| f32::from_le_bytes(b[4 + i * 4..8 + i * 4].try_into().unwrap()))
+            .collect();
+        assert_eq!(vals, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        let tresp = select_response_from_typed(&tcols, &ttypes, &trows);
+        assert_eq!(tresp.column_defs[0].logic_type, 13); // Tensor
+        assert_eq!(
+            tresp.column_defs[0].physical,
+            PhysicalWire::Embedding {
+                dimension: 3,
+                element_type: 6, // Float32
+            }
+        );
+
+        // TensorArray: u32 tensor_n, then each tensor length-prefixed.
+        let acols = vec!["a".to_string()];
+        let atypes = vec!["TENSORARRAY(FLOAT,3)".to_string()];
+        let arows = vec![vec!["[[[1,2,3],[5,7,8]],[[9,9,9]]]".to_string()]];
+        let af = rows_to_column_fields_typed(&acols, &atypes, &arows);
+        assert_eq!(af[0].column_type, 12); // ColumnTensorArray
+        let b = &af[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // tensor_n
+        assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 24); // first tensor
+        let second = 8 + 24;
+        assert_eq!(
+            u32::from_le_bytes(b[second..second + 4].try_into().unwrap()),
+            12
+        );
+        let aresp = select_response_from_typed(&acols, &atypes, &arows);
+        assert_eq!(aresp.column_defs[0].logic_type, 14); // TensorArray
     }
 }
