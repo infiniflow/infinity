@@ -3152,7 +3152,11 @@ impl Engine {
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
         // Per-term boosts (`term^2.0`) are stripped before tokenising.
+        // Quoted phrases: the analyzer decides what a `"a b"` group tokenises
+        // to (a single token for `whitespace-<chars>`, several for `standard`),
+        // so the quote marks themselves are stripped before tokenising.
         let query_clean = query
+            .replace('"', "")
             .split_whitespace()
             .map(|w| w.split('^').next().unwrap_or(w))
             .collect::<Vec<_>>()
@@ -3197,7 +3201,10 @@ impl Engine {
         let tokenize = |s: &str| -> Vec<String> {
             let parts: Vec<String> = match &delims {
                 Some(d) if d.is_empty() => s.split_whitespace().map(str::to_string).collect(),
-                Some(d) => s.split(|c: char| d.contains(&c)).map(str::to_string).collect(),
+                Some(d) => s
+                    .split(|c: char| d.contains(&c))
+                    .map(str::to_string)
+                    .collect(),
                 None => s
                     .split(|c: char| !c.is_alphanumeric() && c != '_')
                     .map(str::to_string)
