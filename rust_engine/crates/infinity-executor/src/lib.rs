@@ -937,6 +937,30 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// True when a statement can change data or metadata and therefore invalidates
+/// cached `SELECT` results.
+fn invalidates_result_cache(stmt: &Statement) -> bool {
+    matches!(
+        stmt,
+        Statement::Insert { .. }
+            | Statement::Delete { .. }
+            | Statement::Update { .. }
+            | Statement::CreateTable { .. }
+            | Statement::DropTable { .. }
+            | Statement::AlterTableAdd { .. }
+            | Statement::AlterTableDropColumn { .. }
+            | Statement::RenameTable { .. }
+            | Statement::CreateIndex { .. }
+            | Statement::DropIndex { .. }
+            | Statement::CreateDatabase { .. }
+            | Statement::DropDatabase { .. }
+            | Statement::CreateSnapshot { .. }
+            | Statement::DropSnapshot { .. }
+            | Statement::RestoreSnapshot { .. }
+            | Statement::Copy { from: true, .. }
+    )
+}
+
 /// Evaluates a Lucene `minimum_should_match` spec against the number of
 /// optional clauses, returning how many terms a document must match.
 ///
@@ -1181,6 +1205,8 @@ pub struct Engine {
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
     index_analyzers: Mutex<HashMap<String, String>>,
+    /// cached `SELECT` results keyed by the statement text
+    result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// the database new unqualified table names are resolved against
     current_db: Mutex<String>,
 }
@@ -1214,6 +1240,7 @@ impl Engine {
             indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
+            result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
         };
         engine.rebuild_indexes()?;
@@ -1290,6 +1317,27 @@ impl Engine {
                 continue;
             }
             let qualified = self.qualify_tables(&s);
+            // Result cache: `SELECT` results are reused verbatim when the cache
+            // is active; any data-modifying statement invalidates it.
+            if matches!(qualified, Statement::Select { .. }) && self.result_cache_active() {
+                let key = sql.trim().to_string();
+                if let Some(hit) = self.result_cache.lock().unwrap().get(&key).cloned() {
+                    out.extend(hit);
+                    continue;
+                }
+                let res = self.execute_stmt(&qualified)?;
+                if self.result_cache.lock().unwrap().len() < self.result_cache_capacity() {
+                    self.result_cache
+                        .lock()
+                        .unwrap()
+                        .insert(key, vec![res.clone()]);
+                }
+                out.push(res);
+                continue;
+            }
+            if invalidates_result_cache(&qualified) {
+                self.result_cache.lock().unwrap().clear();
+            }
             out.push(self.execute_stmt(&qualified)?);
         }
         Ok(out)
@@ -1716,6 +1764,10 @@ impl Engine {
                     .lock()
                     .unwrap()
                     .insert(key.to_ascii_lowercase(), value.clone());
+                // `SET CONFIG result_cache "clear"` empties the cache.
+                if key.eq_ignore_ascii_case("result_cache") && value.eq_ignore_ascii_case("clear") {
+                    self.result_cache.lock().unwrap().clear();
+                }
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -1728,13 +1780,16 @@ impl Engine {
                         "variable '{key}' is unavailable while result_cache is off"
                     )));
                 }
-                let v = self
-                    .config
-                    .lock()
-                    .unwrap()
-                    .get(&key.to_ascii_lowercase())
-                    .cloned()
-                    .unwrap_or_else(|| "0".to_string());
+                let v = if cache_var == "cache_result_num" {
+                    self.result_cache.lock().unwrap().len().to_string()
+                } else {
+                    self.config
+                        .lock()
+                        .unwrap()
+                        .get(&key.to_ascii_lowercase())
+                        .cloned()
+                        .unwrap_or_else(|| "0".to_string())
+                };
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![vec![v]],
@@ -2461,6 +2516,24 @@ impl Engine {
             Some(v) => !v.eq_ignore_ascii_case("off"),
             None => true,
         }
+    }
+
+    /// Whether new results are being cached (`off`/`suspend` disable it).
+    fn result_cache_active(&self) -> bool {
+        match self.config.lock().unwrap().get("result_cache") {
+            Some(v) => !(v.eq_ignore_ascii_case("off") || v.eq_ignore_ascii_case("suspend")),
+            None => true,
+        }
+    }
+
+    /// Maximum cached entries (`cache_result_capacity`); unbounded by default.
+    fn result_cache_capacity(&self) -> usize {
+        self.config
+            .lock()
+            .unwrap()
+            .get("cache_result_capacity")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(usize::MAX)
     }
 
     /// Validates `CREATE INDEX … USING <kind> WITH (…)`: the index kind must
