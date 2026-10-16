@@ -1769,6 +1769,27 @@ impl Engine {
                         items,
                         from: Some(t),
                         join,
+                        group_by,
+                        order_by,
+                        search,
+                        ..
+                    } if join.is_none()
+                        && search.is_none()
+                        && crate::explain::is_distinct_agg_plan(items, group_by) =>
+                    {
+                        Some(crate::explain::explain_distinct_agg(
+                            &crate::explain::DistinctAggPlan {
+                                items,
+                                table: t,
+                                group_by,
+                                order_by,
+                            },
+                        ))
+                    }
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
                         where_pred,
                         group_by,
                         order_by,
