@@ -12,4 +12,4 @@ pub use ast::{
     AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
     Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
-pub use parser::parse;
+pub use parser::{normalize_datetime, parse};

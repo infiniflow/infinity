@@ -1789,7 +1789,7 @@ fn expr_text(e: &ExprAst) -> String {
     }
 }
 
-fn normalize_datetime(kind: &str, raw: &str) -> String {
+pub fn normalize_datetime(kind: &str, raw: &str) -> String {
     // INTERVAL and JSON payloads are kept verbatim
     if kind == "INTERVAL" || kind == "JSON" {
         return raw.trim().to_string();

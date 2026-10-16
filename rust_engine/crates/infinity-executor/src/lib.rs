@@ -493,6 +493,12 @@ fn is_json_type(type_text: &str) -> bool {
     type_text.eq_ignore_ascii_case("JSON")
 }
 
+/// Whether a column type renders as a canonical date/time string.
+fn is_datetime_type(type_text: &str) -> bool {
+    let u = type_text.to_ascii_uppercase();
+    matches!(u.as_str(), "DATE" | "TIME" | "DATETIME" | "TIMESTAMP")
+}
+
 /// Renders a `Value` as a JSON field value (strings quoted, arrays/objects raw).
 fn json_value(v: &Value) -> String {
     match v {
@@ -761,6 +767,9 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                     Some(j) => j.compact(),
                     None => s,
                 },
+                Some(t) if is_datetime_type(t) => {
+                    infinity_parser::normalize_datetime(&t.to_ascii_uppercase(), &s)
+                }
                 Some(t) if is_sparse_type(t) => {
                     let float = t.to_ascii_uppercase().contains("FLOAT")
                         || t.to_ascii_uppercase().contains("DOUBLE");

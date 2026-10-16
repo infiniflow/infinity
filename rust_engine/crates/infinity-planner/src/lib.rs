@@ -666,7 +666,7 @@ pub fn plan_select(
             };
             out_names = names;
         }
-    } else if !is_star {
+    } else if !is_star || schema.iter().any(|c| c.starts_with("#_")) {
         let mut exprs = Vec::new();
         let mut names = Vec::new();
         for it in items {
@@ -693,6 +693,9 @@ pub fn plan_select(
                 }
                 SelectItem::Star => {
                     for (i, c) in schema.iter().enumerate() {
+                        if c.starts_with("#_") {
+                            continue;
+                        }
                         exprs.push(Expr::Column(i));
                         names.push(c.clone());
                     }
