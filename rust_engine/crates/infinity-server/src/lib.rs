@@ -765,8 +765,10 @@ pub fn rows_to_column_fields(columns: &[String], rows: &[Vec<String>]) -> Vec<Co
                 }
             }
         }
+        // Values are UTF-8 text, so the SDK must decode them as `ColumnVarchar`
+        // (9). Reporting a binary type here would make it mis-parse the payload.
         out.push(ColumnField {
-            column_type: 25,
+            column_type: 9,
             column_name: name.clone(),
             column_vectors: vecs,
             bitmasks: masks,
