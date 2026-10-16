@@ -100,12 +100,11 @@ impl Parser {
             "CREATE" => {
                 self.advance();
                 if self.eat_kw("SNAPSHOT") {
-                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
-                        self.advance();
-                    }
-                    return Ok(Statement::Utility {
-                        text: "CREATE SNAPSHOT".into(),
-                    });
+                    let name = self.expect_ident()?;
+                    self.expect_kw("ON")?;
+                    self.expect_kw("TABLE")?;
+                    let table = self.expect_ident()?;
+                    return Ok(Statement::CreateSnapshot { name, table });
                 }
                 if self.eat_kw("DATABASE") {
                     // tolerate: CREATE DATABASE [IF NOT EXISTS] name
@@ -155,6 +154,10 @@ impl Parser {
                     self.eat_if_exists();
                     let name = self.expect_ident()?;
                     Ok(Statement::DropDatabase { name })
+                } else if self.eat_kw("SNAPSHOT") {
+                    self.eat_if_exists();
+                    let name = self.expect_ident()?;
+                    Ok(Statement::DropSnapshot { name })
                 } else if self.eat_kw("INDEX") {
                     self.eat_if_exists();
                     let name = self.expect_ident()?;
@@ -170,7 +173,14 @@ impl Parser {
                     Ok(Statement::DropTable { name })
                 }
             }
-            "SET" | "RESTORE" | "SNAPSHOT" | "USE" | "DUMP" | "PRAGMA" | "COMPACT" => {
+            "RESTORE" => {
+                self.advance();
+                self.expect_kw("TABLE")?;
+                self.expect_kw("SNAPSHOT")?;
+                let name = self.expect_ident()?;
+                Ok(Statement::RestoreSnapshot { name })
+            }
+            "SET" | "SNAPSHOT" | "USE" | "DUMP" | "PRAGMA" | "COMPACT" => {
                 self.advance();
                 let mut parts: Vec<String> = Vec::new();
                 while !matches!(self.peek(), Token::Semicolon | Token::Eof) {

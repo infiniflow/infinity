@@ -252,9 +252,19 @@ pub enum Statement {
     DropIndex {
         name: String,
     },
-    /// A tolerated session/utility statement (`SET …`, `RESTORE …`, `SNAPSHOT …`).
+    /// A tolerated session/utility statement (`SET …`, `PRAGMA …`).
     Utility {
         text: String,
+    },
+    CreateSnapshot {
+        name: String,
+        table: String,
+    },
+    DropSnapshot {
+        name: String,
+    },
+    RestoreSnapshot {
+        name: String,
     },
     Delete {
         table: String,

@@ -117,6 +117,12 @@ fn del_key(table: &str, seq: usize) -> Vec<u8> {
 fn del_prefix(table: &str) -> Vec<u8> {
     format!("del:{table}:").into_bytes()
 }
+fn snap_key(name: &str) -> Vec<u8> {
+    format!("snap:{name}").into_bytes()
+}
+/// Record / field separators used inside a snapshot blob.
+const SNAP_REC: char = '\u{1d}';
+const SNAP_FLD: char = '\u{1c}';
 
 /// The declared dimension of a `TENSOR(FLOAT,d)` / `EMBEDDING(FLOAT,d)` column.
 fn type_dim(type_text: &str) -> Option<usize> {
@@ -512,6 +518,120 @@ impl Engine {
                 columns: vec![],
                 rows: vec![],
             }),
+            Statement::CreateSnapshot { name, table } => {
+                let meta = self
+                    .catalog
+                    .get_table_by_name(table)?
+                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+                let rows = self.fetch_rows_with_ids(table)?;
+                let mut out = String::new();
+                out.push_str(&meta.name);
+                out.push(SNAP_REC);
+                out.push_str(&meta.columns.join(&SNAP_FLD.to_string()));
+                out.push(SNAP_REC);
+                let defs: Vec<String> = meta
+                    .defaults
+                    .iter()
+                    .map(|d| match d {
+                        Some(v) => format!("1{v}"),
+                        None => "0".to_string(),
+                    })
+                    .collect();
+                out.push_str(&defs.join(&SNAP_FLD.to_string()));
+                out.push(SNAP_REC);
+                let nns: Vec<String> = meta
+                    .not_nulls
+                    .iter()
+                    .map(|b| if *b { "1" } else { "0" }.to_string())
+                    .collect();
+                out.push_str(&nns.join(&SNAP_FLD.to_string()));
+                out.push(SNAP_REC);
+                out.push_str(&meta.types.join(&SNAP_FLD.to_string()));
+                out.push(SNAP_REC);
+                for (_, row) in &rows {
+                    out.push_str(
+                        &row.iter()
+                            .map(|v| v.to_slt_string())
+                            .collect::<Vec<_>>()
+                            .join(&SNAP_FLD.to_string()),
+                    );
+                    out.push(SNAP_REC);
+                }
+                self.store.put(&snap_key(name), out.as_bytes())?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::DropSnapshot { name } => {
+                if self.store.get(&snap_key(name))?.is_none() {
+                    return Err(Error::NotFound(format!("snapshot '{name}'")));
+                }
+                self.store.delete(&snap_key(name))?;
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::RestoreSnapshot { name } => {
+                let data = self
+                    .store
+                    .get(&snap_key(name))?
+                    .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
+                let text = String::from_utf8_lossy(&data).to_string();
+                let mut recs = text.split(SNAP_REC);
+                let table = recs.next().unwrap_or_default().to_string();
+                let columns: Vec<String> = recs
+                    .next()
+                    .unwrap_or_default()
+                    .split(SNAP_FLD)
+                    .map(|s| s.to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                let defaults: Vec<Option<String>> = recs
+                    .next()
+                    .unwrap_or_default()
+                    .split(SNAP_FLD)
+                    .map(|s| match s.strip_prefix('1') {
+                        Some(v) => Some(v.to_string()),
+                        None => None,
+                    })
+                    .collect();
+                let not_nulls: Vec<bool> = recs
+                    .next()
+                    .unwrap_or_default()
+                    .split(SNAP_FLD)
+                    .map(|s| s == "1")
+                    .collect();
+                let types: Vec<String> = recs
+                    .next()
+                    .unwrap_or_default()
+                    .split(SNAP_FLD)
+                    .map(|s| s.to_string())
+                    .collect();
+                let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
+                // replace any current incarnation of the table
+                if self.catalog.get_table_by_name(&table)?.is_some() {
+                    self.catalog.drop_table(&table)?;
+                    for (k, _) in self.store.scan_prefix(&row_prefix(&table))? {
+                        self.store.delete(&k)?;
+                    }
+                    for (k, _) in self.store.scan_prefix(&del_prefix(&table))? {
+                        self.store.delete(&k)?;
+                    }
+                }
+                self.catalog
+                    .create_table_typed(&table, &columns, &defaults, &not_nulls, &types)?;
+                for (i, r) in rows.iter().enumerate() {
+                    if !r.is_empty() {
+                        self.store.put(&row_key(&table, i), r.as_bytes())?;
+                    }
+                }
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
             Statement::Insert {
                 table,
                 columns,
