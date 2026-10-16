@@ -160,8 +160,16 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 **结论**：当前的 Rust 引擎满足的是 **SQL 语义 / 协议 / 打分公式**级一致（Gate A 的 statement 面已达 100%，query 面 1378/1532），**但不满足磁盘格式兼容**。要达到本要求，需按上表逐项替换为「读 C++ 格式、写 C++ 格式」的实现（存储内核 M1 需重做列/段编码；M3 需落盘 HNSW/IVF/PGM/倒排；KV 需切到 RocksDB）。**该要求已登记为阻塞项（任务 #67），并覆盖 §3 D2 的旧表述。**
 
-**任务 #67/#68 进展（2026-10-17）**：已产出 `rust_engine/docs/CPP_FORMAT_SPEC.md`，冻结**已核对**的字节级事实：①数据文件/快照文件通用布局（`magic=0x00dd3344`(u64) + `buffer_size`(size_t) + 补零数据区 + `checksum`(u64)，`data_file_worker_impl.cpp:68-116/119-155`，读取侧断言 `:160-172`）；②Catalog KV = RocksDB + 自定义 MergeOperator（`kv_store*.cppm/impl`、`rocksdb_merge_operator*`）；③倒排索引的模块构成与 FST 校验和结论（PoC F）；④BM25 统计量来源（`term_doc_iterator_impl.cpp:57-70`，决定索引必须持久化 `df/column_len/doc_cnt/tf`）；⑤SEARCH 语义（删除文档仍计入统计等）。**§6 清单的 #1/#2/#3 已冻结**（见该文件 §8）：目录/文件命名（`db_{id}/tbl_{id}/seg_{id}/blk_{id}`、`{col_id}.col`、`col_{id}_out`、`version`、`idx_{id}/seg_{sid}/chunk_{n}.idx`、`ft_{rowid:016x}.{pos,dic,len}`）、段块元数据（**不存在** `SegmentEntry/BlockEntry` 文件；元数据在 RocksDB KV，行数由块 `version` 文件推导）、块内列式编码（`[data_region (capacity*slot)][null_bitmap ((capacity+7)/8, bit=1 非空)]`、Varchar 两字 slot）。#4（HNSW/IVF 文件头与图布局）与 #5（倒排各文件布局）正在冻结。
-**已落地的实现（任务 #68 第一片）**：新增 `infinity-storage::cpp_format`，按上述冻结规格实现并**逐字节单测**：数据文件框架（写/读 + magic 校验）、块 `version` 文件（u16 create_size + (u64 create_ts,i64 cum_rows)×n + u16 capacity + u64 delete_ts×capacity，无头无校验和）、列体 `[data_region][null_bitmap]`（容量补齐、bit=1 非空）、`ColumnLayout`/`pack_column`（布尔 compact-bit、定宽 LE、Varchar/Json 两字 slot + outline 偏移）、以及**整块目录的读写**（列文件按 id 升序、`version` 最后写、outline 仅变长列存在）。**尚未落地**：把该格式接入执行器的表数据读写路径（当前执行器仍以行文本存 fjall），以及 #69–#71。
+**任务 #67/#68 进展（2026-10-17）**：已产出 `rust_engine/docs/CPP_FORMAT_SPEC.md`，冻结**已核对**的字节级事实：①数据文件/快照文件通用布局（`magic=0x00dd3344`(u64) + `buffer_size`(size_t) + 补零数据区 + `checksum`(u64)，`data_file_worker_impl.cpp:68-116/119-155`，读取侧断言 `:160-172`）；②Catalog KV = RocksDB + 自定义 MergeOperator（`kv_store*.cppm/impl`、`rocksdb_merge_operator*`）；③倒排索引的模块构成与 FST 校验和结论（PoC F）；④BM25 统计量来源（`term_doc_iterator_impl.cpp:57-70`）；⑤SEARCH 语义。**§6 清单的 #1–#5 已全部冻结**（见该文件 §8、§9）：目录/文件命名、段块元数据（**不存在** `SegmentEntry/BlockEntry` 文件；元数据在 RocksDB KV，行数由块 `version` 文件推导）、块内列式编码（`[data_region (capacity*slot)][null_bitmap ((capacity+7)/8, bit=1 非空)]`、Varchar 两字 slot）、HNSW/IVF `chunk_{id}.idx`（**无 magic/version/checksum**）、全文 `.dic`(TermMeta+FST)/`.pos`(逐 term 块)/`.len`(裸 `u32[]`)。#6 的**键空间**亦已冻结（值编码/MergeOperator 待）；#7（WAL）、#8（PGM）仍待。
+
+**已落地的实现**（`infinity-storage` 新模块 + `infinity-executor::cpp_blocks`，均带逐字节单测）：
+- `cpp_format`：数据文件框架、块 `version` 文件、列体 `[data_region][null_bitmap]`、`ColumnLayout`/`pack_column`（含 Varchar 两字 slot 与 embedding 内联定宽）、**整块目录读写**、日期时间与 f16/bf16 编解码。
+- `cpp_blocks`（执行器）：**把真实表数据镜像成 C++ 块文件**（`{data_dir}/blocks/db_{db}/tbl_{id}/seg_0/blk_{n}/`，每 8192 行一块），`Engine::flush()` 自动对每张可打包的表做镜像，并可**脱离 KV** 从块文件读回。实测：`INT` 列 `0.col`=33816、`BOOL` 列 `2.col`=2072、`EMBEDDING(FLOAT,3)` 列 `1.col`=**99352**（= 16 + 8192·3·4 + 1024 + 8）、`version`=65556，均为冻结布局算出的精确字节数。
+- `inverted_format`：LEB128、TermMeta（`.dic` 记录区，含 tf/payload 选项位）、`.len` 裸 `u32[]`、`.pos` 每 term 框架、`fst_len_from_trailer`。
+- `knn_format`：HNSW 头部（56 字节定偏移）、`labels`、整块块文件组装/解析（用 `layer_sum` 与顶点 stride 校验图区长度，对应 C++ 的「读到文件尾」断言）、`get_mmax`/level0/levelx stride。
+- `catalog_format`：**全部 catalog 键**（`catalog|db|…`、`tbl|col|…`、`catalog|blk|…`、`idx_chunk|…` 等）与对应前缀、drop 墓碑、全局系统键，逐字符串断言。
+
+**尚未落地**：#68 剩余（tensor/array/sparse/multivector 列的 outline 编码；执行器仍以 fjall 行文本为主存储，块文件是镜像）；#69（RocksDB 基底 + 值编码 + MergeOperator）；#70（HNSW 图区 padding 需实测、IVF 块布局）；#71（FST 状态机、FastPFor SIMD-BP128、NewPForDelta）。
 
 ### 2.7 测试资产（验收面）
 
