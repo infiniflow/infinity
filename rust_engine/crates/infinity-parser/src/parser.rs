@@ -1232,18 +1232,19 @@ impl Parser {
             }
             let next_is_match = self.peek() == &Token::Comma
                 && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("MATCH"));
-            let next_is_fusion =
-                matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("FUSION"));
             if next_is_match {
                 self.advance(); // comma
                 continue;
             }
-            if next_is_fusion
-                || (self.peek() == &Token::Comma
-                    && {
-                        matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("FUSION"))
-                    })
-            {
+            // Zero or more `FUSION(…)` tails; `… , FUSION('rrf'), FUSION('match_tensor', …)`
+            // chains them. The last one decides the final score in the executor.
+            loop {
+                let fusion_here = matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("FUSION"));
+                let comma_fusion = self.peek() == &Token::Comma
+                    && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("FUSION"));
+                if !fusion_here && !comma_fusion {
+                    break;
+                }
                 if self.peek() == &Token::Comma {
                     self.advance();
                 }
@@ -1261,6 +1262,8 @@ impl Parser {
                         ExprAst::Column(c) => c,
                         _ => String::new(),
                     });
+                } else {
+                    out.fusion_params = None;
                 }
                 self.expect(Token::RParen)?;
             }
