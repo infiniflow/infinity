@@ -113,6 +113,31 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             // `filter_text(col, '…')` / `filter_fulltext(col, '…')` resolve the
             // column name at compile time.
             let up = name.to_ascii_uppercase();
+            // a CAST between a scalar and a vector type is invalid
+            if up == "CAST" {
+                if let Some(ExprAst::Literal(Literal::Str(ty))) = args.get(1) {
+                    let ty_up = ty.to_ascii_uppercase();
+                    let vector_target = [
+                        "VECTOR",
+                        "TENSOR",
+                        "TENSORARRAY",
+                        "MULTIVECTOR",
+                        "SPARSE",
+                        "EMBEDDING",
+                    ]
+                    .iter()
+                    .any(|k| ty_up.starts_with(k));
+                    match args.first() {
+                        Some(ExprAst::Literal(Literal::Array(_))) if !vector_target => {
+                            return Err(Error::Invalid(format!("cannot cast an array to '{ty}'")))
+                        }
+                        Some(ExprAst::Literal(_)) if vector_target => {
+                            return Err(Error::Invalid(format!("cannot cast a scalar to '{ty}'")))
+                        }
+                        _ => {}
+                    }
+                }
+            }
             if up == "FILTER_TEXT" || up == "FILTER_FULLTEXT" {
                 if let (Some(ExprAst::Literal(Literal::Str(col))), Some(q)) =
                     (args.first(), args.get(1))

@@ -549,7 +549,7 @@ fn declares_dimension(type_text: &str) -> bool {
         "SPARSE",
     ]
     .iter()
-    .any(|k| t.starts_with(k))
+    .any(|k| t.starts_with(k) || (t.starts_with("ARRAY(") && t.contains(k)))
 }
 
 fn is_bit_type(type_text: &str) -> bool {
@@ -1330,11 +1330,17 @@ impl Engine {
                 columns: vec![],
                 rows: vec![],
             }),
-            // EXPLAIN only describes a plan; it must not execute the statement.
-            Statement::Explain { .. } => Ok(QueryResult::Rows {
-                columns: vec![],
-                rows: vec![],
-            }),
+            // EXPLAIN only describes a plan; it must not execute the statement,
+            // but binding the plan surfaces a missing relation.
+            Statement::Explain { inner } => {
+                if let Statement::Select { from: Some(t), .. } = inner.as_ref() {
+                    self.table_schema(t)?;
+                }
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
             Statement::Copy {
                 table,
                 from,

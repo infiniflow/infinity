@@ -1693,7 +1693,7 @@ fn index_column_from(toks: &[Token]) -> Result<String> {
         let Token::Ident(f) = &toks[0] else {
             return Err(Error::Invalid("unsupported index expression".into()));
         };
-        if agg_func(f).is_some() {
+        if agg_func(&f.to_ascii_uppercase()).is_some() {
             return Err(Error::Invalid(format!(
                 "unsupported index expression '{f}'"
             )));
