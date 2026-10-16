@@ -78,8 +78,8 @@ score     += smooth_idf * smooth_tf * weight
 | 1 | 数据库/表/索引的**目录与文件命名**（表目录下有哪些文件、扩展名） | **已冻结 → §8.1** |
 | 2 | 段/块元数据（segment entry、block entry、`block_count`、版本号、行数） | **已冻结 → §8.2**（元数据在 RocksDB KV + `version` 文件，**不存在** `SegmentEntry/BlockEntry` 结构文件） |
 | 3 | 列式数据的**编码**（列块内的定长/变长编码、NULL 位图、向量/张量列布局） | **已冻结 → §8.3** |
-| 4 | HNSW/IVF 索引**文件头与图数据布局** | `src/storage/index_hnsw.cpp(m)`、`index_ivf.cpp(m)`、`src/storage/index_base.cppm`、`src/storage/buffer/buffer_manager.cppm` |
-| 5 | 倒排索引各文件（term dict / postings / block-max / column-length）**文件头、PForDelta 段布局、块边界** | `src/storage/invertedindex/format/*`（逐文件）、`src/storage/invertedindex/dict_reader_impl.cpp` |
+| 4 | HNSW/IVF 索引**文件头与图数据布局** | **已冻结 → §9.1 / §9.2**（两文件均**无 magic/version/checksum**，靠 IndexBase JSON + 列定义解释） |
+| 5 | 倒排索引各文件（term dict / postings / block-max / column-length）**文件头、PForDelta 段布局、块边界** | **已冻结 → §9.3**（`.dic`=TermMeta+FST、`.pos`=逐 term 块、`.len`=裸 `u32[]`；无 magic/checksum） |
 | 6 | Catalog KV 的**键前缀 / 值编码 / MergeOperator 语义**、RocksDB 选项与 CF 集合 | **键空间已冻结 → §8.2**（值编码 / MergeOperator 仍待） |
 | 7 | WAL/redo 记录格式与 checkpoint（跨底座恢复的契约） | `src/storage/wal/*`（若存在）、`src/storage/txn/*` |
 | 8 | 二级索引（PGM-index）文件布局 | `src/storage/index_secondary.cpp(m)`、`third_party/pgm/` |
@@ -289,8 +289,210 @@ outline 文件（`col_{id}_out`）：内容 = 各次 `Append` 的原始字节按
 | 项 | 状态 | 需读/验证 |
 |---|---|---|
 | 变长 slot 的 16/48 位域在 u64 中的位序（`{count:16; offset:48}`） | **VERIFY**：源码未断言，依赖编译器位域分配；Clang/GCC x86_64 小端通常低 16 位=count、高 48 位=offset。Rust 侧应以 C++ 实际写出的文件回读校验 | `multi_vector_type.h:23-24` 等 |
-| `.pos/.dic/.len` 内部格式 | 属 §6-5，**未核** | `src/storage/invertedindex/format/*`、`dict_reader_impl.cpp` |
-| `chunk_{id}.idx` 内部头/图布局 | 属 §6-4，**未核** | `src/storage/index_hnsw*`、`*_file_worker_impl.cpp` |
+| `.pos/.dic/.len` 内部格式 | **已冻结 → §9.3** | — |
+| `chunk_{id}.idx` 内部头/图布局 | **已冻结 → §9.1（HNSW）/ §9.2（IVF）** | — |
 | `ColumnMeta` 分别传 `column_idx`（`block_meta_impl.cpp:340`）与 `column_id`（`new_catalog_static_impl.cpp:1345,1354`） | **潜在不一致**：文件按 `col_def->id()` 命名；当 id==序号时无碍。格式本身不受影响 | 确认列 id 是否恒等于定义顺序 |
 | 快照文件布局 | 与运行期同布局（`data_file_worker_impl.cpp:120-150`） | 若需支持快照再读 `snapshot_info.*` |
 | WAL / checkpoint 记录格式 | 属 §6-7，**未核**（`wal_dir`、`wal.log` 前缀见 `default_values.cppm:132-133`） | `src/storage/wal/*` |
+
+---
+
+# 9. 已验证：HNSW / IVF 索引与全文倒排索引的字节布局（关闭 §6 的 4/5）
+
+> 由 `src/storage/knn_index/**`、`src/storage/invertedindex/**`、`src/storage/buffer/file_worker/**` 逐行核对产出。**多字节定宽整数**除注明 `WriteInt`（大端）者外均为**本机小端（x86_64 LE）**、按 `struct` 字段原样 `memcpy`/`Append`；**变长整数为 LEB128**（无符号，7 位组，低位在前）。
+
+## 9.0 通用读写约定
+
+| 约定 | 实现 | 依据 |
+|---|---|---|
+| 定宽整数 | `Append(&x, sizeof(x))` / `memcpy`，**本机 LE**，无对齐填充 | `serialize.h:37-49` |
+| 变长整数 `WriteVInt/WriteVLong` | **LEB128** | `file_writer_impl.cpp:55-76`；`vbyte_compressor.cppm:60-127` |
+| `WriteInt/WriteLong` | **大端**（仅少数 spilling 字段） | `file_writer_impl.cpp:48-53,64-67` |
+| `size_t` | 8 字节（x86_64），格式中当 `u64` LE | §1 |
+
+> **陷阱**：索引 chunk 文件走 `*FileWorker::WriteToFileImpl`（**无外层头/尾包装**，`index_file_worker.cppm:30-53`、`file_worker_impl.cpp:142-204`），文件内容 = 序列化函数的直接输出。
+
+## 9.1 清单 4a：HNSW `chunk_{chunk_id}.idx`
+
+入口：`chunk_index_meta_impl.cpp:55`（文件名 `chunk_{}.idx`）、`:176-188`（kHnsw → `HnswFileWorker`）。写出 = `HnswHandler::SaveToPtr`（`hnsw_file_worker_impl.cpp:95-103`），读入断言读到文件尾（`hnsw_alg.cppm:541-543`）→ **无 magic/checksum/版本号，内容须精确等于下述布局**。
+
+顶层布局（顺序即偏移）：
+
+| # | 类型 | 字段 | 依据 |
+|---|---|---|---|
+| 1 | `u64` | `M_` | `hnsw_alg.cppm:99-103` |
+| 2 | `u64` | `ef_construction_` (= max(M, ef_construction)) | `:99-103,507` |
+| 3 | `u64` | `cur_vec_num` | `data_store.cppm:180-189` |
+| 4 | `u64` | `VecStoreMeta`：**plain = `dim`** | `plain_vec_store.cppm:63-74` |
+| 5 | `u64,u64,i32,i32` | `GraphStoreMeta`：`Mmax0`,`Mmax`,`max_layer_`,`enterpoint_` | `graph_store.cppm:74-80` |
+| 6 | VecStoreInner | 向量数据（9.1.2） | `plain_vec_store.cppm:103-113` |
+| 7 | GraphStoreInner | 图数据（9.1.3） | `graph_store.cppm:172-219` |
+| 8 | `u32[cur]` | `labels_`（= SegmentOffset = rowid.segment_offset） | `data_store.cppm:555-558`；`infinity_type.cppm:35` |
+
+- `Mmax0/Mmax = GetMmax(M) = {2*M, M}`（`hnsw_alg.cppm:69`）。
+- `SaveToPtr`/`LoadFromPtr` **不含** `chunk_size_`/`max_chunk_n_`（仅内存 spill 路径 `Save/Load` 有，`data_store.cppm:164-178` vs `:180-189`）；Rust 按 `cur_vec_num` 推导。
+- **单 inner 不变式**：`LoadFromPtr` 只读 1 个 inner，其 `chunk_size = 2^ceil(log2(cur_vec_num))`（`data_store.cppm:219-235`），数据量按 `cur_vec_num` 计算 → 仅当 `cur_vec_num ≤ block_size_` 时可正确回读。默认 `HNSW_BLOCK_SIZE = 8192`（`default_values.cppm:180`；`index_hnsw_impl.cpp:164,180-181`）。**VERIFY**：确认 chunk 行数恒 ≤ `block_size_`。
+
+### 9.1.2 向量区 `VecStoreInner`
+
+`DataStoreInner::SaveToPtr`（`data_store.cppm:540-559`）逐 chunk：`VecStoreInner::SaveToPtr` → `GraphStoreInner::SaveToPtr` → append `labels`。
+
+| encode | Meta 额外字段 | 向量体 | 依据 |
+|---|---|---|---|
+| plain (`kPlain`) | 仅 `dim(u64)` | 每 chunk：`chunk_size × dim × sizeof(elem)` 原始 elem | `plain_vec_store.cppm:63-74,103-113` |
+| LVQ (`kLVQ`) | `dim(u64)` + `double mean[dim]`(+可选 cache) | 每 chunk：`chunk_size × compress_data_size` | `lvq_vec_store.cppm:104-110,340-350` |
+| Rabitq | `origin_dim(u64)` + `elem[dim*dim]`(旋转矩阵) + `elem[dim]`(rot centroid) | 每 chunk 同上 | `rabitq_vec_store.cppm:182-185,522-534` |
+| sparse | `max_dim(u64)` 等 | 见文件 | `sparse_vec_store.cppm:30-88` |
+
+### 9.1.3 图区 `GraphStoreInner`（关键字节结构）
+
+```
+struct VertexL0 { LayerSize layer_n_; char* layers_p_; VertexListSize neighbor_n_; VertexType neighbors_[]; }
+struct VertexLX { VertexListSize neighbor_n_; VertexType neighbors_[]; }
+```
+（`LayerSize=VertexListSize=i32`，`VertexType=i32`；`graph_store.cppm:31-40`）
+
+- 步长：`level0_size_ = sizeof(VertexL0) + 4*Mmax0`、`levelx_size_ = sizeof(VertexLX) + 4*Mmax`（`graph_store.cppm:45-46`）。**VERIFY（字节级）**：`sizeof` 依赖编译器布局（x86_64 SysV 下 `VertexL0` 通常 = **24**（4+pad4+8+4+pad4）、`VertexLX` = **4**）；须用真实 `.idx` 回读校验。
+- 顶点按 `vertex_i` 密集排列；顶点 `v` 第 `l≥1` 层邻居紧跟 `v->layers_p_`，偏移 `(l-1)*levelx_size`（`graph_store.cppm:244-256,440-446`）。
+- 写盘（`graph_store.cppm:172-219`）：先 `u64 layer_sum = Σ_v layer_n_`；再逐 chunk 写 `chunk_size*level0_size` 的 level0 区——写前把 `layer_n_>0` 的顶点的 `layers_p_` **原地替换为 u64 字节偏移**（相对 layerx 拼接区）；最后逐 chunk 追加 layerx 段。
+- 读盘（mmap 路径 `graph_store.cppm:459-471`）：`layer_start_ = ptr + cur_vertex_n*level0_size`。
+- 邻接表：level0 邻居 = `i32[neighbor_n_]`（≤`Mmax0`），高层 = `i32[neighbor_n_]`（≤`Mmax`）；邻居是**顶点 id**，rowid 由末尾 `labels_` 给出。
+
+## 9.2 清单 4b：IVF `chunk_{chunk_id}.idx`
+
+同样无 magic/checksum；文件名同为 `chunk_{}.idx`（`chunk_index_meta_impl.cpp:55,163-173`）。读写 = `IVFIndexInChunk::SaveIndexInner/ReadIndexInner` → `IVF_Index_Storage::Save/Load`（`ivf_index_file_worker_impl.cpp:55-76`；`ivf_index_storage.cpp:99-114`）。
+
+| # | 类型 | 字段 |
+|---|---|---|
+| 1 | `u32` | `row_count_` |
+| 2 | `u32` | `embedding_count_` |
+| 3 | `u32` | `embedding_dimension` |
+| 4 | `u32` | `centroids_num` |
+| 5 | `f32[num*dim]` | 质心（始终 f32，行主序） |
+| 6 | parts | 见下 |
+
+（`ivf_index_storage.cpp:52-57,100-104`）
+
+- **文件不自描述**：`column_logical_type_`、`embedding_data_type_`、`ivf_option_`（metric/storage/bits/subspace）**不落盘**，读时由 IndexBase JSON + 列定义提供（`:107-114`）。
+
+parts 区（先写 base 的 `IVF_Parts_Storage_Info::Save`，再逐 part 写）：
+
+| storage | base | 每 part（0..num-1） |
+|---|---|---|
+| kPlain | 无 | `PartStorage::Save` + `chunk_num × dim × sizeof(elem)` 原始向量 |
+| kScalarQuantization | `f32[dim] common_vec_a` + `f32[dim] common_vec_b` | `PartStorage::Save` + `sq_data(embedding_num*sq_bytes)` + `dot_v_e(embedding_num*f32)`；`sq_bytes = dim`(8bit) 或 `(dim+1)/2`(4bit) |
+| kProductQuantization | `u32 real_subspace_centroid_num` + `f32[dim*that]` + `f32[that*subspace_num]` | `PartStorage::Save` + `PQ_Code_Storage::Save` |
+
+（`ivf_index_storage_parts_impl.cpp:96-107,162-163,256-263,355-367,485-497,521-540,560-571,672-688,904-916`）
+
+`IVF_Part_Storage::Save` 通用前缀 = `u32 embedding_num_` → `u32[embedding_num_]`（各向量的 `SegmentOffset`）。`PQ_Code_StorageB<T>::Save` = `u64 last_code_id_` → `u32 storage_size` → `T[storage_size]`。
+
+## 9.3 清单 5：全文倒排 `.pos` / `.dic` / `.len`
+
+文件集与命名：`{base_name}.{dic,pos,len}`，`base_name = ft_{rowid:016x}`（合并后加 `_{row_count:x}`）；后缀常量见 `index_defines.cppm:55-58`。写出 `MemoryIndexer::Save`（`memory_indexer_impl.cpp:491-544`）/ `TupleListToIndexFile`（`:661-778`）；读入 `DiskIndexSegmentReader`（`disk_segment_reader_impl.cpp:45-93`）、`.len` 由 `FullTextColumnLengthReader`（`column_length_io_impl.cpp:40-67`）。
+
+### 9.3.1 全局
+
+| 项 | 结论 |
+|---|---|
+| magic/checksum/版本 | **三个文件都没有**（`memory_indexer_impl.cpp:491-544`） |
+| `optionflag_t`（term/doc payload、position、tf、block_max、realtime） | **不落盘**，在 catalog 的 **IndexBase JSON** 里，读时经 `IndexFullText::flag_` 传入（`index_defines.cppm:13-38`；`index_full_text.cppm:42,73`） |
+| 常量 | `MAX_DOC_PER_RECORD=128`、`MAX_POS_PER_RECORD=128`、`MAX_DOC_PER_BITMAP_BLOCK=256`、`SKIP_LIST_BUFFER_SIZE=32`（`index_defines.cppm:43-53`） |
+
+### 9.3.2 `.dic`（term 词典）
+
+```
+[ TermMeta 记录区（按 term 字典序、可变长）... ][ FST 区（term -> u64 TermMeta 偏移）... ]
+```
+- 写：先写 TermMeta 记录，再用 `FstBuilder` 构造临时 `.fst`，最后 `VirtualStore::Merge` **把 FST 追加到 .dic 尾部**（`memory_indexer_impl.cpp:516-543`）。
+- 读：取**文件最后 12 字节** —— `len-12` 处 `u64 root_addr`；`fst_len = (root_addr==0) ? 36 : root_addr+21`；FST 在 `[len-fst_len, len)`；之前全是 TermMeta 记录（`dict_reader_impl.cpp:46-67`）。
+- Lookup：FST `Get(term)` → `u64 offset` → 从 `dict+offset` 解析 TermMeta（`:80-90`）。
+
+**TermMeta 编码**（`term_meta_impl.cpp:92-104`，字段见 `term_meta.cppm:44-49`）：
+
+| # | 编码 | 字段 | 条件 |
+|---|---|---|---|
+| 1 | `VInt(u32)` LEB128 | `doc_freq_` | 总是 |
+| 2 | `VInt(u32)` | `total_tf_` | 仅 `of_term_frequency` |
+| 3 | `u32` LE **raw** | `payload_` | 仅 `of_term_payload` |
+| 4 | `VLong(u64)` | `doc_start_`（.pos 偏移） | 总是 |
+| 5 | `VLong(u64)` | `pos_start_` | 总是 |
+| 6 | `VLong(u64)` | `pos_end_` | 总是 |
+
+### 9.3.3 FST 区
+
+| 偏移 | 类型 | 值 |
+|---|---|---|
+| 0 | `u64` LE | `VERSION = 3`（`node.cppm:40`） |
+| 8 | `u64` LE | `FstType`（默认 `0`） |
+| … | 节点数据（逆序编译） | |
+| len-20 | `u64` LE | `len_`（key 数） |
+| len-12 | `u64` LE | `root_addr` |
+| len-4 | `u32` LE | checksum = 掩码化 **CRC-32/IEEE**（`mask = ((crc>>15)|(crc<<17)) + 0xa282ead8`） |
+
+（`fst.cppm:64-112,134-144`；`writer.cppm:80-83`；`crc.cppm:48-50`）
+
+- 空 FST：`root_addr=0`，总长 36。
+- 节点编码见 `fst/node.cppm:255-814`（每 state 首字节高 2 位区分 `StateOneTransNext/StateOneTrans/StateAnyTrans`，`COMMON_INPUTS` 为固定 256 字节表 `fst/common_inputs.cppm`，转移地址用相对 delta 打包 `Pack/UnpackDelta` `:303-337`）。FST 的 `u64` value = 该 term 的 TermMeta 在 `.dic` 的**绝对字节偏移**。
+- 校验：C++ = CRC32/IEEE + Snappy 掩码；Rust `fst` crate = CRC32C → **不兼容**（呼应 §3 / PoC F）。
+
+### 9.3.4 `.pos`（postings）
+
+`.pos` 是 term 的有序串联（顺序 = `.dic` 的字典序 = FST 迭代序）。每 term 片段由 TermMeta 的 `doc_start_/pos_start_/pos_end_` 界定（`disk_segment_reader_impl.cpp:120-131`）。
+
+```
+VInt  doc_skiplist_len
+VInt  doc_list_len
+u8[doc_skiplist_len]
+u8[doc_list_len]
+VInt  pos_skiplist_len
+VInt  pos_list_len
+u8[pos_skiplist_len]
+u8[pos_list_len]
+```
+（`column_index_iterator_impl.cpp:86-116`；写出 `doc_list_encoder_impl.cpp:77-113`、`position_list_encoder_impl.cpp:66-91`）
+
+### 9.3.5 postings 块编码（PForDelta / SIMD-BP128）
+
+- **Doc list** 字段顺序（`doc_list_format_option.cppm:144-175`）：`doc_id`(u32, `Int32Encoder`) → `tf`(u32, 若 `of_term_frequency`) → `doc_payload`(u16, 若 `of_doc_payload`)。每 **128** 条一块（`posting_byte_slice.cppm:48`）。
+- **Position list**（`position_list_format_option.cppm:71-84`）：`pos`(u32)，每 128 个一块。
+- **Doc skip list**（`doc_list_format_option.cppm:67-127`）：`doc_id`(u32)、`tf`(u32)、`block_max_tf`(u32)、`block_max_percentage`(u16)、`offset`(u32)，每 **32** 项一块（`skiplist_writer_impl.cpp:37`）。
+- **Pos skip list**（`position_list_format_option.cppm:27-54`）：`total_pos`(u32)、`compressed_pos_size`(u32)。
+- 块字节格式：①**u32 字段 = SIMD-BP128**（`CompositeCodec<SIMDBinaryPacking, VariableByte>`，`fastpfor_impl.cpp:54-57`）：每块 = `u8 word_cnt` + `word_cnt*4` 字节；②**u16 字段 = NewPForDelta**（IndexLib 移植，`third_party/newpfor/`）：每块自描述，首 `u32` header = `isLastBlock:1 | exceptionIntRange:11 | frameBits:5 | firstExceptionPos:8 | dataNum:7`（`new_pfordelta_compressor.h:30-42`），长度由 `GetCompressedLength(header)` 推出。读取侧靠各编码器自描述长度逐块前进（`posting_decoder_impl.cpp:57-104`）。
+
+### 9.3.6 `.len`（列长 / BM25 统计）
+
+- **裸 `u32[row_cnt]`，无头无尾**：写 `Append(column_length_array.data(), sizeof(u32)*size)`（`memory_indexer_impl.cpp:550-552,777-778`）；读直接 cast（`column_length_io_impl.cpp:62-66`）。承载者 `RawFileWorker`（无头，`raw_file_worker_impl.cpp:65-73`）。
+
+### 9.3.7 BM25 统计量落点
+
+| 统计量 | 位置 |
+|---|---|
+| 每词 `df` | `.dic` TermMeta 字段 1（也隐含于 doc list 条数） |
+| 每词 `total_tf` | `.dic` TermMeta 字段 2（`of_term_frequency` 时） |
+| 每文档 `column_len` | `.len`（`u32[row_cnt]`） |
+| chunk `doc_cnt`/`term_cnt` | **RocksDB KV** 的 `chunk_info` JSON（§8.2），非索引文件内 |
+| `total_df` | = 段 doc_cnt（`column_length_io_impl.cpp:69-78`） |
+| block-max（WAND 上界） | doc skip list 的 `block_max_tf`(u32) + `block_max_percentage`(u16) |
+
+## 9.4 Byte-level 实现清单（Rust 照此读写）
+
+**HNSW `chunk_{id}.idx`**：①`u64 M`；②`u64 ef_construction`；③`u64 cur_vec_num`；④VecStoreMeta（plain=`u64 dim`）；⑤GraphStoreMeta（`u64 Mmax0`,`u64 Mmax`,`i32 max_layer`,`i32 enterpoint`）；⑥向量区 `cur_vec_num × dim × elem_size`；⑦图区：`u64 layer_sum` + `cur_vec_num × level0_size` + `layer_sum × levelx_size`；⑧`u32[cur_vec_num]` labels。节点内 `layers_p_` 是 **u64 字节偏移**（相对 layerx 区起点），邻居为 i32 数组。全部本机 LE。
+
+**IVF `chunk_{id}.idx`**：①`u32 row_count`；②`u32 embedding_count`；③`u32 dim`；④`u32 num`；⑤`f32[num*dim]`；⑥parts：先 base（SQ=`f32[2*dim]`、PQ=`u32 real_num`+`f32[dim*real_num]`+`f32[real_num*subsp]`、Plain 空），再逐 part 写 `u32 embedding_num` + `u32[embedding_num]` + 向量/SQ/码本。metric/dtype/option 不在文件内。
+
+**全文 `.dic`/`.pos`/`.len`**：①`.dic` = `[TermMeta…][FST]`，FST 位置由 `len-12` 的 `root_addr` 推出；②TermMeta = `VInt df` [`VInt ttf`][`u32 payload`]`VLong doc_start``VLong pos_start``VLong pos_end`；③`.pos` 每 term = `VInt doc_skip_len, VInt doc_len, doc_skip, doc_list, VInt pos_skip_len, VInt pos_len, pos_skip, pos_list`；④u32 字段块 = `u8 word_cnt` + `word_cnt*4B`（SIMD-BP128），u16 字段块 = NewPForDelta 自描述块；⑤`.len` = 裸 `u32[row_cnt]`；⑥`doc_cnt/term_cnt` 从 KV 的 `chunk_info` JSON 取；⑦FST 校验 = 掩码 CRC-32/IEEE（**非 CRC32C**）。
+
+**实现要点（易错项）**：①两个向量索引文件**均无 magic/version/checksum**，靠外部（IndexBase JSON + 列定义）解释，写出的字节必须精确等于 `SaveToPtr` 输出，否则 `LoadFromPtr` 的尾部断言失败；②全文 `optionflag` 不在文件内，读 `.dic/.pos` 前必须先取得它；③全文 postings 的 u32 块是 **FastPFor SIMD-BP128 + VariableByte**（带 1 字节长度前缀），u16 块是 **NewPForDelta**（自描述 header）——这是逐位兼容的最大工作量点，已定位到 `third_party/newpfor/`。
+
+## 9.5 未核实 / 存疑
+
+| 项 | 状态 | 需读/验证 |
+|---|---|---|
+| `sizeof(VertexL0)/sizeof(VertexLX)` 的精确 padding | **VERIFY**（公式已定：`level0_size=sizeof(VertexL0)+4*Mmax0`） | 用真实 `.idx` 回读或加 C++ `sizeof` 打印；`graph_store.cppm:31-46` |
+| HNSW chunk 行数恒 ≤ `block_size_`（单 inner 不变式） | **VERIFY** | `new_txn_index_impl.cpp` |
+| HNSW/IVF 是否存在“追加写”优化路径 | **UNKNOWN** | `new_txn_index_impl.cpp`、`segment_index_meta*` |
+| FST 节点状态机/`COMMON_INPUTS` 逐位表 | **未逐位冻结**（结构已给） | `fst/node.cppm:255-814`、`fst/common_inputs.cppm` |
+| LVQ/Rabitq/Sparse 的 Meta 完整字段与 `compress_data_size` | **部分**（字段顺序已给） | `lvq_vec_store.cppm`、`rabitq_vec_store.cppm`、`sparse_vec_store.cppm` |
+| 全文跨段合并后的 base_name/row_count 后缀语义 | **UNKNOWN** | `new_txn_index_impl.cpp:2239`、`column_index_merger_impl.cpp` |
+| FastPForLib 版本（影响 SIMD-BP128 逐位一致） | **VERIFY** | `cmake/`、`vcpkg.json` 中的 pin |
