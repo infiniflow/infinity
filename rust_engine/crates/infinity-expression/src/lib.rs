@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod json;
+pub mod md5;
 pub mod regex;
 
 use std::cmp::Ordering;
@@ -104,8 +105,8 @@ pub enum Expr {
     /// `filter_text(col, '…')` / `filter_fulltext(col, '…')`: term matching over
     /// the given column's text.
     FullText(usize, String),
-    /// `regex(col, '…')`: regular-expression search over a column's text.
-    Regex(usize, String),
+    /// `regex(col, pattern)`: regular-expression search over a column's text.
+    Regex(usize, Box<Expr>),
 }
 
 impl Expr {
@@ -209,7 +210,11 @@ impl Expr {
                     Some(other) => other.to_slt_string(),
                     None => String::new(),
                 };
-                Value::Bool(regex::is_match(&text, pat))
+                let pattern = match pat.eval(row) {
+                    Value::Str(s) => s,
+                    other => other.to_slt_string(),
+                };
+                Value::Bool(regex::is_match(&text, &pattern))
             }
         }
     }
@@ -657,6 +662,10 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             let target = args.get(2).map(|e| e.eval(row)).unwrap_or(Value::Null);
             json::contains(&doc, &path, &target)
         }
+        "MD5" => match a0() {
+            Value::Str(s) => Value::Str(md5::md5_hex(&s)),
+            other => Value::Str(md5::md5_hex(&other.to_slt_string())),
+        },
         "ISNAN" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_nan())),
         "ISINF" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_infinite())),
         "ISFINITE" => Value::Bool(

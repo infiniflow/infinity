@@ -125,11 +125,9 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             }
             // `regex(col, '…')` resolves the column at compile time.
             if up == "REGEX" {
-                if let (Some(ExprAst::Column(col)), Some(ExprAst::Literal(Literal::Str(pat)))) =
-                    (args.first(), args.get(1))
-                {
+                if let (Some(ExprAst::Column(col)), Some(pat)) = (args.first(), args.get(1)) {
                     if let Some(i) = schema.iter().position(|c| c == col) {
-                        return Ok(Expr::Regex(i, pat.clone()));
+                        return Ok(Expr::Regex(i, Box::new(compile_expr(pat, schema)?)));
                     }
                 }
             }
