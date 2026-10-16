@@ -4,7 +4,7 @@
 
 | 脚本 | 关卡 | 内容 | 当前状态（2026-10-17 复验） |
 |---|---|---|---|
-| `run_gate_a.sh` | Gate A — SQL 功能 | 现有 174 个 `.slt` 全量比对 | **未达标**：`statement ok` 1752/1752、`statement error` 129/129、`query` **1470/1536**（要求 100%；口径对齐 `sqllogictest-rs v0.28.4`：折叠空白 + 默认按行序）。剩余为全文/FUSION 打分 |
+| `run_gate_a.sh` | Gate A — SQL 功能 | 现有 174 个 `.slt` 全量比对 | **未达标**：`statement ok` 1752/1752、`statement error` 129/129、`query` **1474/1536**（要求 100%；口径对齐 `sqllogictest-rs v0.28.4`：折叠空白 + 默认按行序）。剩余为全文/FUSION 打分 |
 | `run_gate_b.sh` | Gate B — SDK/协议 | `python/test_pysdk`、`go/tests`、HTTP（`tools/run_http_api.py`），**不改 SDK** | **部分**：`infinity-server` 二进制已就位（`cargo build -p infinity-server`），未改动的 Python SDK 可连上 Rust 服务，`test_pysdk`（全量未改动 SDK，2259 例）**1448 passed / 212 failed / 598 errors / 7 skipped**（598 error 多为 `/var/infinity` 夹具权限） |
 | `run_gate_c.sh` | Gate C — 持久化/恢复 | workspace 测试、`test/sql/snapshot`、`python/restart_test`、MinIO | **部分**：`test/sql/snapshot` **171/171**、`8/8` error，workspace 测试全绿；MinIO 需 CI 服务；`python/restart_test` 的 runner 以 `<binary> --config=…` 启动并写 `/var/infinity`，需适配 Rust 服务 CLI，且当前环境不可写 |
 | `run_gate_d.sh` | Gate D — 并发/稳定性 | loom 模型、miri（纯 Rust 核心）、`python/parallel_test` | **部分**：loom `commit_ts` 唯一性已通过；miri 已在 `nightly-2025-04-04` 上通过（parser/expression/planner 共 38 个用例）；`python/parallel_test`（对 Rust 服务）**18/18**（含并发 INSERT 行号冲突修复） |
