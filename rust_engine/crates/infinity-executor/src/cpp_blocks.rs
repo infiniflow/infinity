@@ -22,20 +22,10 @@ use infinity_storage::cpp_format::{
 
 use crate::Engine;
 
-/// `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` → `(dimension, ElementType code)`.
-///
-/// Bit elements are rejected (`None`) because their rows are bit-packed, which
-/// this writer does not cover yet.
-pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
-    let up = type_text.trim().to_ascii_uppercase();
-    if !(up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(")) {
-        return None;
-    }
-    let inner = up.split_once('(')?.1.trim_end_matches(')');
-    let mut parts = inner.split(',');
-    let elem = parts.next()?.trim().to_string();
-    let dim: usize = parts.next()?.trim().parse().ok()?;
-    let code = if elem.contains("UINT8") {
+/// Maps an element-type name to the SDK `ElementType` code. `None` for bit
+/// elements, which this writer does not pack.
+fn element_code(elem: &str) -> Option<i32> {
+    Some(if elem.contains("UINT8") {
         1
     } else if elem.contains("INT8") || elem.contains("TINYINT") {
         2
@@ -55,8 +45,46 @@ pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
         return None;
     } else {
         6 // Float32
+    })
+}
+
+/// `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` → `(dimension, ElementType code)`.
+///
+/// Bit elements are rejected (`None`) because their rows are bit-packed, which
+/// this writer does not cover yet.
+pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    if !(up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(")) {
+        return None;
+    }
+    let inner = up.split_once('(')?.1.trim_end_matches(')');
+    let mut parts = inner.split(',');
+    let elem = parts.next()?.trim().to_string();
+    let dim: usize = parts.next()?.trim().parse().ok()?;
+    Some((dim, element_code(&elem)?))
+}
+
+/// `TENSOR(<elem>,<dim>)` / `MULTIVECTOR(<elem>,<dim>)` →
+/// `(ColumnType, dimension, ElementType)`.
+///
+/// `TENSORARRAY` is excluded: its outline body is a concatenation of tensors
+/// whose per-tensor length is not recorded in the slot (§8.3 records only a
+/// total count), so the split point is ambiguous. Bit elements are excluded for
+/// the same reason as embeddings.
+pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let (column_type, rest) = if let Some(r) = up.strip_prefix("MULTIVECTOR(") {
+        (14, r)
+    } else if let Some(r) = up.strip_prefix("TENSOR(") {
+        (11, r)
+    } else {
+        return None;
     };
-    Some((dim, code))
+    let inner = rest.trim_end_matches(')');
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    let dim: usize = parts.get(1)?.parse().ok()?;
+    let code = element_code(parts.first()?)?;
+    Some((column_type, dim, code))
 }
 
 /// Maps a declared type text to the `ColumnType` code this writer packs.
@@ -84,6 +112,14 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
             embedding_shape(type_text)?;
             10
         }
+        "TENSOR" | "MULTIVECTOR" => {
+            tensor_shape(type_text)?;
+            if base == "TENSOR" {
+                11
+            } else {
+                14
+            }
+        }
         _ => return None,
     })
 }
@@ -94,7 +130,52 @@ fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
     if let Some((dim, elem)) = embedding_shape(type_text) {
         return Some(embedding_column_layout(dim, element_width(elem)));
     }
+    if tensor_shape(type_text).is_some() {
+        // Tensor / MultiVector: a `{count:16; offset:48}` slot into the outline.
+        return Some(ColumnLayout::VarLen(8));
+    }
     cpp_format::column_layout(column_type)
+}
+
+/// Encodes one tensor value: appends the element bytes to `outline` and returns
+/// the `{count:16; offset:48}` slot.
+fn encode_tensor_slot(
+    type_text: &str,
+    value: &str,
+    outline: &mut Vec<u8>,
+) -> Result<Option<Vec<u8>>> {
+    if value.eq_ignore_ascii_case("null") {
+        return Ok(None);
+    }
+    let (_, dim, elem) = tensor_shape(type_text)
+        .ok_or_else(|| Error::Invalid(format!("not a tensor type: '{type_text}'")))?;
+    let vectors = cpp_format::parse_nested_f64(value);
+    let offset = outline.len() as u64;
+    let body = cpp_format::pack_tensor_body(&vectors, dim, elem);
+    outline.extend_from_slice(&body);
+    Ok(Some(
+        cpp_format::varlen_count_offset_slot(vectors.len() as u64, offset).to_vec(),
+    ))
+}
+
+/// Decodes one tensor slot, reading its body out of the outline.
+fn decode_tensor_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<String> {
+    let (_, dim, elem) = tensor_shape(type_text)?;
+    let word = u64::from_le_bytes(slot.try_into().ok()?);
+    let count = (word & 0xffff) as usize;
+    let offset = (word >> 16) as usize;
+    let width = element_width(elem);
+    let mut parts = Vec::with_capacity(count);
+    for v in 0..count {
+        let at = offset + v * dim * width;
+        let mut elems = Vec::with_capacity(dim);
+        for k in 0..dim {
+            let s = outline.get(at + k * width..at + (k + 1) * width)?;
+            elems.push(cpp_format::read_embedding_element(s, elem)?.to_string());
+        }
+        parts.push(format!("[{}]", elems.join(",")));
+    }
+    Some(format!("[{}]", parts.join(",")))
 }
 
 /// Encodes one text value into the bytes its `.col` slot holds.
@@ -290,19 +371,36 @@ impl Engine {
         for (block_index, chunk) in rows.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
             let mut block_columns = Vec::with_capacity(types.len());
             for (col, column_type) in types.iter().enumerate() {
+                let is_tensor = tensor_shape(&meta.types[col]).is_some();
                 let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
+                // Tensor columns build their own outline; the generic packer
+                // produces one for varchar/json.
+                let mut tensor_outline = Vec::new();
                 for (_, row) in chunk {
                     let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-                    slots.push(encode_value(&meta.types[col], *column_type, &text)?);
+                    if is_tensor {
+                        slots.push(encode_tensor_slot(
+                            &meta.types[col],
+                            &text,
+                            &mut tensor_outline,
+                        )?);
+                    } else {
+                        slots.push(encode_value(&meta.types[col], *column_type, &text)?);
+                    }
                 }
                 let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
-                let (body, outline) = pack_column_with_layout(
+                let (body, packed_outline) = pack_column_with_layout(
                     *column_type,
                     layouts[col],
                     &bytes,
                     DEFAULT_BLOCK_CAPACITY,
                 )
                 .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
+                let outline = if is_tensor {
+                    tensor_outline
+                } else {
+                    packed_outline
+                };
                 block_columns.push(BlockColumn {
                     column_id: col as u64,
                     body,
@@ -406,6 +504,12 @@ impl Engine {
                         && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
                     {
                         "null".to_string()
+                    } else if tensor_shape(&meta.types[col]).is_some() {
+                        // Tensor slots point into the column's outline file.
+                        let at = row * 8;
+                        let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                        decode_tensor_value(&meta.types[col], slot, &raw.outline)
+                            .unwrap_or_else(|| "null".into())
                     } else {
                         decode_value(&meta.types[col], *column_type, &body.data, row)
                             .unwrap_or_else(|| "null".into())
@@ -443,9 +547,11 @@ mod tests {
         assert_eq!(column_type_of("JSON"), Some(22));
         assert_eq!(column_type_of("EMBEDDING(FLOAT,4)"), Some(10));
         assert_eq!(column_type_of("VECTOR(FLOAT,4)"), Some(10));
-        // Bit embeddings and tensors are not packable yet.
+        assert_eq!(column_type_of("TENSOR(FLOAT,4)"), Some(11));
+        assert_eq!(column_type_of("MULTIVECTOR(FLOAT,4)"), Some(14));
+        // Bit embeddings and tensor arrays are not packable yet.
         assert_eq!(column_type_of("EMBEDDING(BIT,8)"), None);
-        assert_eq!(column_type_of("TENSOR(FLOAT,4)"), None);
+        assert_eq!(column_type_of("TENSORARRAY(FLOAT,4)"), None);
     }
 
     #[test]
@@ -540,11 +646,60 @@ mod tests {
     }
 
     #[test]
+    fn tensor_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE ts (id INT, t TENSOR(FLOAT,3));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO ts VALUES (1, [[1,2,3],[4,5,6]]);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO ts VALUES (2, [[7,8,9]]);")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("ts").unwrap(), 2);
+        // The outline holds the raw element bytes: 3 vectors * dim 3 * 4 bytes.
+        let db_dir = dir.path().join("blocks").join("db_0");
+        let tbl_dir = std::fs::read_dir(&db_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("tbl_"))
+            })
+            .expect("table directory");
+        // The outline holds the raw element bytes: row 1 has 2 vectors, row 2
+        // has 1, so 3 * dim 3 * 4 bytes.
+        let outline = std::fs::read(tbl_dir.join("seg_0/blk_0/col_1_out")).unwrap();
+        assert_eq!(outline.len(), 3 * 3 * 4);
+
+        let (_, rows) = engine.read_cpp_blocks("ts").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "[[1,2,3],[4,5,6]]".to_string()],
+                vec!["2".to_string(), "[[7,8,9]]".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn tensor_shape_parsing() {
+        assert_eq!(tensor_shape("TENSOR(FLOAT,3)"), Some((11, 3, 6)));
+        assert_eq!(tensor_shape("MULTIVECTOR(FLOAT,3)"), Some((14, 3, 6)));
+        assert_eq!(tensor_shape("TENSORARRAY(FLOAT,3)"), None);
+        assert_eq!(tensor_shape("TENSOR(BIT,8)"), None);
+    }
+
+    #[test]
     fn blocks_reject_unsupported_column_types() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE v (id INT, t TENSOR(FLOAT,2));")
+            .execute("CREATE TABLE v (id INT, a ARRAY(INT));")
             .unwrap();
         let err = engine.write_cpp_blocks("v").unwrap_err();
         assert!(err.to_string().contains("not supported"), "{err}");

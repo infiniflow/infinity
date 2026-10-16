@@ -483,6 +483,124 @@ pub fn datetime_to_pair(s: &str) -> Option<(i32, i32)> {
     Some((date_to_days(d)?, time_to_secs(t)?))
 }
 
+// ---------------------------------------------------------------------------
+// Outline-backed (variable-length) value parsing/encoding
+// ---------------------------------------------------------------------------
+
+/// Strips exactly one outer `[ … ]` pair (no-op when absent).
+pub fn strip_one_bracket(t: &str) -> &str {
+    let t = t.trim();
+    if t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    }
+}
+
+/// Splits array content into its top-level comma-separated segments, keeping
+/// nested `[…]` groups intact (`[1,2],[3,4]` → `["[1,2]", "[3,4]"]`).
+pub fn split_top_level(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    for ch in content.chars() {
+        match ch {
+            '[' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            ']' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            ',' if depth == 0 => {
+                let s = cur.trim();
+                if !s.is_empty() {
+                    out.push(s.to_string());
+                }
+                cur.clear();
+            }
+            _ => cur.push(ch),
+        }
+    }
+    let s = cur.trim();
+    if !s.is_empty() {
+        out.push(s.to_string());
+    }
+    out
+}
+
+/// Parses a comma-separated list of numbers.
+pub fn parse_flat(s: &str) -> Vec<f64> {
+    s.split(',')
+        .filter_map(|x| x.trim().parse::<f64>().ok())
+        .collect()
+}
+
+/// Parses a tensor rendering into its vectors (`[[1,2],[3,4]]` → two).
+pub fn parse_nested_f64(cell: &str) -> Vec<Vec<f64>> {
+    let content = strip_one_bracket(cell);
+    if content.trim().is_empty() {
+        return Vec::new();
+    }
+    if !content.contains('[') {
+        return vec![parse_flat(content)];
+    }
+    split_top_level(content)
+        .iter()
+        .map(|seg| parse_flat(strip_one_bracket(seg)))
+        .collect()
+}
+
+/// Parses a `TENSORARRAY` rendering into tensors of vectors.
+pub fn parse_tensorarray_f64(cell: &str) -> Vec<Vec<Vec<f64>>> {
+    let content = strip_one_bracket(cell);
+    if content.trim().is_empty() {
+        return Vec::new();
+    }
+    split_top_level(content)
+        .iter()
+        .map(|tensor| {
+            let tc = strip_one_bracket(tensor);
+            if !tc.contains('[') {
+                return vec![parse_flat(tc)];
+            }
+            split_top_level(tc)
+                .iter()
+                .map(|seg| parse_flat(strip_one_bracket(seg)))
+                .collect()
+        })
+        .collect()
+}
+
+/// Packs one tensor body: each vector padded/truncated to `dim` elements.
+pub fn pack_tensor_body(vectors: &[Vec<f64>], dim: usize, element_type: i32) -> Vec<u8> {
+    let mut body = Vec::new();
+    for v in vectors {
+        for k in 0..dim {
+            push_embedding_element(&mut body, element_type, v.get(k).copied().unwrap_or(0.0));
+        }
+    }
+    body
+}
+
+/// The `(count, outline offset)` slot of a `Tensor`/`TensorArray`/`MultiVector`
+/// /`Array` column: `u64 { count : 16; file_offset : 48 }`.
+///
+/// §9.5 flags the bit order as **VERIFY** (it follows the compiler's bit-field
+/// allocation on x86_64: the low 16 bits hold the count).
+pub fn varlen_count_offset_slot(count: u64, offset: u64) -> [u8; 8] {
+    ((count & 0xffff) | (offset << 16)).to_le_bytes()
+}
+
+/// The `(nnz, outline offset)` slot of a `Sparse` column: `i64 nnz` + `i64 offset`.
+pub fn sparse_slot(nnz: i64, offset: u64) -> [u8; 16] {
+    let mut out = [0u8; 16];
+    out[..8].copy_from_slice(&nnz.to_le_bytes());
+    out[8..].copy_from_slice(&offset.to_le_bytes());
+    out
+}
+
 /// How a column's values occupy the `.col` data region (spec §8.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnLayout {
@@ -727,6 +845,24 @@ pub fn pack_column_with_layout(
                 data.extend_from_slice(&offset.to_le_bytes());
             }
             Ok((ColumnBody::build(capacity, 16, &data, &valid)?, outline))
+        }
+        ColumnLayout::VarLen(width) if !matches!(column_type, 9 | 22) => {
+            // Tensor / Sparse and friends: the caller has already built the
+            // count/offset slots and the outline, so the slots are copied
+            // verbatim and no outline is produced here.
+            let mut data = Vec::with_capacity(slots.len() * width);
+            for v in slots {
+                valid.push(v.is_some());
+                match v {
+                    Some(bytes) if bytes.len() == width => data.extend_from_slice(bytes),
+                    Some(_) => return Err(err()),
+                    None => data.extend_from_slice(&vec![0u8; width]),
+                }
+            }
+            Ok((
+                ColumnBody::build(capacity, width, &data, &valid)?,
+                Vec::new(),
+            ))
         }
         _ => Err(err()),
     }
@@ -997,5 +1133,89 @@ mod tests {
         // Arrays need an element count the byte-level API does not have.
         assert!(pack_column(21, &[Some(b"")], 4).is_err());
         assert!(pack_column(13, &[Some(b"")], 4).is_err());
+    }
+
+    #[test]
+    fn tensor_text_parsing() {
+        assert_eq!(
+            parse_nested_f64("[[1,2],[3,4]]"),
+            vec![vec![1.0, 2.0], vec![3.0, 4.0]]
+        );
+        // A flat vector is one row.
+        assert_eq!(parse_nested_f64("[1,2,3]"), vec![vec![1.0, 2.0, 3.0]]);
+        assert!(parse_nested_f64("[]").is_empty());
+        assert_eq!(
+            parse_tensorarray_f64("[[[1,2],[3,4]],[[5,6]]]"),
+            vec![vec![vec![1.0, 2.0], vec![3.0, 4.0]], vec![vec![5.0, 6.0]]]
+        );
+        assert_eq!(parse_tensorarray_f64("[[[9]]]"), vec![vec![vec![9.0]]]);
+    }
+
+    #[test]
+    fn tensor_body_pads_to_dimension() {
+        let body = pack_tensor_body(
+            &[vec![1.0, 2.0], vec![3.0]],
+            3,
+            6, // Float32
+        );
+        assert_eq!(body.len(), 24); // 2 vectors * dim 3 * 4 bytes
+        let vals: Vec<f32> = body
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect();
+        // The short vector is zero-padded to the declared dimension.
+        assert_eq!(vals, vec![1.0, 2.0, 0.0, 3.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn varlen_slot_encodings() {
+        // `u64 { count : 16; file_offset : 48 }`.
+        let slot = varlen_count_offset_slot(3, 40);
+        assert_eq!(u64::from_le_bytes(slot), 3 | (40 << 16));
+        assert_eq!(slot.len(), 8);
+        let max = varlen_count_offset_slot(0xffff, (1u64 << 48) - 1);
+        assert_eq!(u64::from_le_bytes(max), u64::MAX);
+        // Sparse: i64 nnz + i64 offset.
+        let sparse = sparse_slot(5, 1234);
+        assert_eq!(i64::from_le_bytes(sparse[..8].try_into().unwrap()), 5);
+        assert_eq!(u64::from_le_bytes(sparse[8..].try_into().unwrap()), 1234);
+    }
+
+    #[test]
+    fn embedding_element_roundtrip() {
+        for (code, values) in [
+            (1, vec![1.0, 255.0]),    // UInt8
+            (3, vec![-5.0, 300.0]),   // Int16
+            (4, vec![-5.0, 70000.0]), // Int32
+            (6, vec![1.5, -2.25]),    // Float32
+            (7, vec![1.5, -2.25]),    // Float64
+            (8, vec![1.5, -2.25]),    // Float16
+        ] {
+            let mut bytes = Vec::new();
+            for v in &values {
+                push_embedding_element(&mut bytes, code, *v);
+            }
+            let width = element_width(code);
+            assert_eq!(bytes.len(), values.len() * width, "code {code}");
+            for (i, v) in values.iter().enumerate() {
+                let got = read_embedding_element(&bytes[i * width..(i + 1) * width], code).unwrap();
+                // int8/int16/int32 truncate to the element width; f16 rounds.
+                let expect = match code {
+                    1 => v.rem_euclid(256.0),
+                    3 => (*v as i16) as f64,
+                    4 => (*v as i32) as f64,
+                    8 => (*v as f32) as f64,
+                    _ => *v,
+                };
+                if code == 8 {
+                    assert!(
+                        (got - expect).abs() < 0.01,
+                        "code {code} got {got} want {expect}"
+                    );
+                } else {
+                    assert_eq!(got, expect, "code {code}");
+                }
+            }
+        }
     }
 }
