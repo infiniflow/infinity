@@ -89,6 +89,12 @@ fn pred_cols(p: &Predicate, out: &mut Vec<String>) {
             pred_cols(b, out);
         }
         Predicate::Not(a) => pred_cols(a, out),
+        // `filter_fulltext('col', …)` names its column as a string argument.
+        Predicate::IsTrue(e) if fulltext_filter(e).is_some() => {
+            if let Some(c) = fulltext_filter(e) {
+                add_col(out, &c);
+            }
+        }
         Predicate::IsNull(e, _) | Predicate::IsTrue(e) => expr_cols(e, out),
         Predicate::Like(a, b, ..) => {
             expr_cols(a, out);
