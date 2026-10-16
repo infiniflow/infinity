@@ -132,9 +132,27 @@ impl Expr {
                     None => Value::Null,
                 }
             }
-            Expr::And(a, b) => Value::Bool(a.eval_predicate(row) && b.eval_predicate(row)),
-            Expr::Or(a, b) => Value::Bool(a.eval_predicate(row) || b.eval_predicate(row)),
-            Expr::Not(a) => Value::Bool(!a.eval_predicate(row)),
+            // three-valued logic: NULL propagates unless the result is forced
+            Expr::And(a, b) => {
+                let (x, y) = (a.eval(row), b.eval(row));
+                match (x, y) {
+                    (Value::Bool(false), _) | (_, Value::Bool(false)) => Value::Bool(false),
+                    (Value::Bool(true), Value::Bool(true)) => Value::Bool(true),
+                    _ => Value::Null,
+                }
+            }
+            Expr::Or(a, b) => {
+                let (x, y) = (a.eval(row), b.eval(row));
+                match (x, y) {
+                    (Value::Bool(true), _) | (_, Value::Bool(true)) => Value::Bool(true),
+                    (Value::Bool(false), Value::Bool(false)) => Value::Bool(false),
+                    _ => Value::Null,
+                }
+            }
+            Expr::Not(a) => match a.eval(row) {
+                Value::Bool(b) => Value::Bool(!b),
+                _ => Value::Null,
+            },
             Expr::IsNull(a, neg) => {
                 let is_null = matches!(a.eval(row), Value::Null);
                 Value::Bool(is_null != *neg)
@@ -155,17 +173,21 @@ impl Expr {
             Expr::In(a, vals, neg) => {
                 let x = a.eval(row);
                 if matches!(x, Value::Null) {
-                    return Value::Null; // NULL IN (…) is unknown
+                    return Value::Null;
                 }
                 let evaluated: Vec<Value> = vals.iter().map(|v| v.eval(row)).collect();
-                if evaluated.iter().any(|v| matches!(v, Value::Null)) {
-                    return Value::Null; // a NULL in the list makes the result unknown
-                }
                 // Compare with implicit numeric coercion (`'90.5' IN (90.5)`).
                 let found = evaluated
                     .iter()
                     .any(|v| x.partial_cmp_value(v) == Some(std::cmp::Ordering::Equal));
-                Value::Bool(found != *neg)
+                if found {
+                    // a match decides the answer regardless of NULLs in the list
+                    return Value::Bool(!*neg);
+                }
+                if evaluated.iter().any(|v| matches!(v, Value::Null)) {
+                    return Value::Null; // no match + a NULL => unknown
+                }
+                Value::Bool(*neg)
             }
             Expr::Binary(a, op, b) => {
                 let x = a.eval(row);

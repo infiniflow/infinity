@@ -1242,6 +1242,19 @@ impl Parser {
                     SelectItem::Star
                 }
                 Token::LParen => SelectItem::Expr(self.expr()?),
+                Token::Ident(n) if n.eq_ignore_ascii_case("NOT") => {
+                    self.advance();
+                    match select_item_to_expr(&self.select_items().map(|mut v| {
+                        if v.is_empty() {
+                            SelectItem::Literal(Literal::Null)
+                        } else {
+                            v.remove(0)
+                        }
+                    })?) {
+                        Some(inner) => SelectItem::Expr(ExprAst::Not(Box::new(inner))),
+                        None => SelectItem::Literal(Literal::Null),
+                    }
+                }
                 Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                     SelectItem::Literal(self.literal()?)
                 }
@@ -1286,6 +1299,38 @@ impl Parser {
                 }
             } else {
                 item
+            };
+            // Absorb boolean connectives (`expr AND expr` / `expr OR expr`).
+            let item = {
+                let mut acc = item;
+                loop {
+                    let is_and =
+                        matches!(self.peek(), Token::Ident(k) if k.eq_ignore_ascii_case("AND"));
+                    let is_or =
+                        matches!(self.peek(), Token::Ident(k) if k.eq_ignore_ascii_case("OR"));
+                    if !is_and && !is_or {
+                        break;
+                    }
+                    let left = match select_item_to_expr(&acc) {
+                        Some(l) => l,
+                        None => break,
+                    };
+                    self.advance();
+                    let right_item = match self.select_items() {
+                        Ok(mut v) if !v.is_empty() => v.remove(0),
+                        _ => SelectItem::Literal(Literal::Null),
+                    };
+                    let right = match select_item_to_expr(&right_item) {
+                        Some(r) => r,
+                        None => ExprAst::Literal(Literal::Null),
+                    };
+                    acc = SelectItem::Expr(if is_and {
+                        ExprAst::And(Box::new(left), Box::new(right))
+                    } else {
+                        ExprAst::Or(Box::new(left), Box::new(right))
+                    });
+                }
+                acc
             };
             // Absorb a trailing comparison (projected as a boolean expression).
             let item = match self.peek().clone() {

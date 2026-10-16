@@ -95,6 +95,15 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
             *op,
             Box::new(compile_expr(b, schema)?),
         ),
+        ExprAst::Not(a) => Expr::Not(Box::new(compile_expr(a, schema)?)),
+        ExprAst::And(a, b) => Expr::And(
+            Box::new(compile_expr(a, schema)?),
+            Box::new(compile_expr(b, schema)?),
+        ),
+        ExprAst::Or(a, b) => Expr::Or(
+            Box::new(compile_expr(a, schema)?),
+            Box::new(compile_expr(b, schema)?),
+        ),
         ExprAst::Func { name, args } => {
             // `filter_text(col, '…')` / `filter_fulltext(col, '…')` resolve the
             // column name at compile time.
@@ -195,6 +204,8 @@ fn expr_has_agg(e: &ExprAst) -> bool {
         }
         ExprAst::Binary(a, _, b) => expr_has_agg(a) || expr_has_agg(b),
         ExprAst::Cmp(a, _, b) => expr_has_agg(a) || expr_has_agg(b),
+        ExprAst::Not(a) => expr_has_agg(a),
+        ExprAst::And(a, b) | ExprAst::Or(a, b) => expr_has_agg(a) || expr_has_agg(b),
         _ => false,
     }
 }
@@ -237,6 +248,11 @@ fn gather_agg(
             gather_agg(b, schema, aggs, index, base)?;
         }
         ExprAst::Cmp(a, _, b) => {
+            gather_agg(a, schema, aggs, index, base)?;
+            gather_agg(b, schema, aggs, index, base)?;
+        }
+        ExprAst::Not(a) => gather_agg(a, schema, aggs, index, base)?,
+        ExprAst::And(a, b) | ExprAst::Or(a, b) => {
             gather_agg(a, schema, aggs, index, base)?;
             gather_agg(b, schema, aggs, index, base)?;
         }
@@ -312,6 +328,15 @@ fn compile_agg_expr(
         ExprAst::Cmp(a, op, b) => Expr::Cmp(
             Box::new(compile_agg_expr(a, agg_index, group_by)?),
             *op,
+            Box::new(compile_agg_expr(b, agg_index, group_by)?),
+        ),
+        ExprAst::Not(a) => Expr::Not(Box::new(compile_agg_expr(a, agg_index, group_by)?)),
+        ExprAst::And(a, b) => Expr::And(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
+            Box::new(compile_agg_expr(b, agg_index, group_by)?),
+        ),
+        ExprAst::Or(a, b) => Expr::Or(
+            Box::new(compile_agg_expr(a, agg_index, group_by)?),
             Box::new(compile_agg_expr(b, agg_index, group_by)?),
         ),
         ExprAst::Func { name, args } => {

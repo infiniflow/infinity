@@ -49,6 +49,10 @@ pub enum ExprAst {
     Binary(Box<ExprAst>, BinOp, Box<ExprAst>),
     /// A comparison usable as a projected boolean expression.
     Cmp(Box<ExprAst>, CmpOp, Box<ExprAst>),
+    /// Boolean connectives in a projected expression.
+    Not(Box<ExprAst>),
+    And(Box<ExprAst>, Box<ExprAst>),
+    Or(Box<ExprAst>, Box<ExprAst>),
 }
 
 /// A boolean connective.
