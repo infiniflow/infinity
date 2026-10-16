@@ -2572,6 +2572,92 @@ mod tests {
     }
 
     #[test]
+    fn fulltext_dic_and_pos_compose() {
+        // End-to-end: build a `.dic` (TermMeta region + FST + trailer) and a
+        // `.pos` (per-term framing over the u32/u16 codecs), then read both
+        // back through the public API. This exercises the whole chain the
+        // engine will use:
+        //   term -> FST value -> TermMeta offset -> doc_start/pos_start/pos_end
+        //   -> `.pos` slice -> TermPostings framing -> u32/u16 blocks.
+        // (The field-level interleaving *inside* a doc-list body is the
+        // posting_decoder's job and is not modelled here.)
+        let flags = TermMetaFlags {
+            has_term_frequency: true,
+            has_term_payload: true,
+        };
+        let terms = ["apple", "banana", "cat"];
+        let docs: [Vec<u32>; 3] = [vec![1, 5, 9], vec![3], vec![2, 4, 6, 7, 130, 200]];
+        let poss: [Vec<u32>; 3] = [vec![10, 20, 30], vec![5], vec![1, 2, 3, 4, 5, 6]];
+        let tfs: [Vec<u16>; 3] = [vec![2, 1, 1], vec![1], vec![3, 1, 2, 4, 5, 6]];
+
+        // `.pos`: each term's slice is framed by TermPostings; the doc list
+        // holds the u32 doc-id block and the position list the u32 positions,
+        // while the "skiplist" slots carry the u16 tf block.
+        let mut pos = Vec::new();
+        let mut slices = Vec::new();
+        for i in 0..terms.len() {
+            let doc_list = encode_u32_block(&docs[i]);
+            let pos_list = encode_u32_block(&poss[i]);
+            let tf_block = encode_u16_block(&tfs[i]);
+            let tp = TermPostings {
+                doc_skiplist: tf_block,
+                doc_list,
+                pos_skiplist: Vec::new(),
+                pos_list,
+            };
+            let bytes = tp.encode();
+            slices.push((pos.len() as u64, (pos.len() + bytes.len()) as u64));
+            pos.extend_from_slice(&bytes);
+        }
+
+        // `.dic`: TermMeta records (doc/pos offsets point into `.pos`), then an
+        // FST mapping each term to its record's offset.
+        let metas: Vec<TermMeta> = (0..terms.len())
+            .map(|i| TermMeta {
+                doc_freq: docs[i].len() as u32,
+                total_tf: tfs[i].iter().map(|v| *v as u32).sum(),
+                payload: (i as u32) * 7,
+                doc_start: slices[i].0,
+                pos_start: slices[i].0,
+                pos_end: slices[i].1,
+            })
+            .collect();
+        let (region, offsets) = encode_term_meta_region_with_offsets(&metas, flags);
+        let mut fst = FstBuilder::new();
+        for (i, t) in terms.iter().enumerate() {
+            fst.insert(t.as_bytes(), offsets[i]);
+        }
+        let dic = encode_dic(&region, &fst.finish());
+
+        // Read `.dic` back.
+        let (start, _, _) = dic_fst_region(&dic).unwrap();
+        assert_eq!(start, region.len());
+        let fst_bytes = dic_fst(&dic).unwrap();
+        assert_eq!(fst_header(fst_bytes).unwrap().0, FST_VERSION);
+        for (i, t) in terms.iter().enumerate() {
+            let off = fst_get(fst_bytes, t.as_bytes()).unwrap().unwrap();
+            assert_eq!(off, offsets[i]);
+            assert_eq!(decode_dic_meta_at(&dic, off, flags).unwrap(), metas[i]);
+        }
+        assert_eq!(fst_get(fst_bytes, b"zebra").unwrap(), None);
+
+        // Follow a term into `.pos` and decode its blocks.
+        for (i, t) in terms.iter().enumerate() {
+            let off = fst_get(fst_bytes, t.as_bytes()).unwrap().unwrap();
+            let meta = decode_dic_meta_at(&dic, off, flags).unwrap();
+            let slice = &pos[meta.doc_start as usize..meta.pos_end as usize];
+            let (tp, used) = TermPostings::decode(slice).unwrap();
+            assert_eq!(used, slice.len());
+            let (got_docs, _) = decode_u32_block(&tp.doc_list, docs[i].len()).unwrap();
+            assert_eq!(got_docs, docs[i], "{t}: doc ids");
+            let (got_pos, _) = decode_u32_block(&tp.pos_list, poss[i].len()).unwrap();
+            assert_eq!(got_pos, poss[i], "{t}: positions");
+            let (got_tf, _) = decode_u16_block(&tp.doc_skiplist, tfs[i].len()).unwrap();
+            assert_eq!(got_tf, tfs[i], "{t}: term frequencies");
+        }
+    }
+
+    #[test]
     fn common_input_tables_are_inverses() {
         // Both tables are permutations of 0..=255, and `INV[A[b]] == b` holds,
         // which is the relation `CommonIdx`/`CommonInput` rely on.
