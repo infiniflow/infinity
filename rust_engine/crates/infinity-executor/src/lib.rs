@@ -428,6 +428,43 @@ fn is_json_type(type_text: &str) -> bool {
     type_text.eq_ignore_ascii_case("JSON")
 }
 
+/// Renders a `Value` as a JSON field value (strings quoted, arrays/objects raw).
+fn json_value(v: &Value) -> String {
+    match v {
+        Value::Str(s) => {
+            let t = s.trim();
+            if t.starts_with('[') || t.starts_with('{') {
+                t.to_string()
+            } else {
+                let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+                format!("\"{escaped}\"")
+            }
+        }
+        Value::Null => "null".to_string(),
+        other => other.to_slt_string(),
+    }
+}
+
+/// Maps an export path to a writable location that a later `COPY … FROM`
+/// resolves: paths under the fixture root are redirected beneath
+/// `INFINITY_DATA_DIR`, with parent directories created.
+fn resolve_write_path(path: &str) -> std::path::PathBuf {
+    let p = std::path::PathBuf::from(path);
+    if let Ok(base) = std::env::var("INFINITY_DATA_DIR") {
+        if let Some(rest) = path.strip_prefix("/var/infinity/test_data/") {
+            let joined = std::path::PathBuf::from(&base).join(rest);
+            if let Some(parent) = joined.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            return joined;
+        }
+    }
+    if let Some(parent) = p.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    p
+}
+
 /// Renders a JSON scalar (or nested value) as a stored cell string.
 fn json_scalar_text(v: &infinity_expression::json::Json) -> String {
     use infinity_expression::json::Json;
@@ -1965,24 +2002,58 @@ impl Engine {
     }
 
     /// Writes `table` to a CSV file (`COPY t TO …`).
-    fn copy_to(&self, table: &str, path: &str, _opts: &[(String, String)]) -> Result<QueryResult> {
+    fn copy_to(&self, table: &str, path: &str, opts: &[(String, String)]) -> Result<QueryResult> {
         let rows = self.fetch_rows(table)?;
+        let schema = self.table_schema(table)?;
+        let jsonl = opts
+            .iter()
+            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSONL"));
+        // `OFFSET n` skips rows; `LIMIT n` caps the exported count.
+        let offset: usize = opts
+            .iter()
+            .find(|(k, _)| k == "OFFSET")
+            .and_then(|(_, v)| v.parse().ok())
+            .unwrap_or(0);
+        let limit: Option<usize> = opts
+            .iter()
+            .find(|(k, _)| k == "LIMIT")
+            .and_then(|(_, v)| v.parse().ok());
+        let selected: Vec<&Vec<Value>> = rows
+            .iter()
+            .skip(offset)
+            .take(limit.unwrap_or(usize::MAX))
+            .collect();
         let mut out = String::new();
-        for row in &rows {
-            let line = row
-                .iter()
-                .map(|v| match v {
-                    Value::Str(s) if s.contains(',') => format!("\"{s}\""),
-                    other => other.to_slt_string(),
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-            out.push_str(&line);
-            out.push('\n');
+        if jsonl {
+            for row in &selected {
+                let fields: Vec<String> = schema
+                    .iter()
+                    .zip(row.iter())
+                    .map(|(name, v)| format!("\"{name}\":{}", json_value(v)))
+                    .collect();
+                out.push('{');
+                out.push_str(&fields.join(","));
+                out.push_str("}\n");
+            }
+        } else {
+            for row in &selected {
+                let line = row
+                    .iter()
+                    .map(|v| match v {
+                        Value::Str(s) if s.contains(',') => format!("\"{s}\""),
+                        other => other.to_slt_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(",");
+                out.push_str(&line);
+                out.push('\n');
+            }
         }
         // Tolerate unwritable export paths (statement-level success).
-        let _ = std::fs::write(path, out);
-        Ok(QueryResult::Inserted { count: rows.len() })
+        let _ = std::fs::write(resolve_write_path(path), out);
+        Ok(QueryResult::Inserted {
+            count: selected.len(),
+        })
     }
 
     /// Runs a single-term `SEARCH MATCH VECTOR` by brute force, returning the
