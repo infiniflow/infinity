@@ -110,6 +110,16 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                     }
                 }
             }
+            // `regex(col, '…')` resolves the column at compile time.
+            if up == "REGEX" {
+                if let (Some(ExprAst::Column(col)), Some(ExprAst::Literal(Literal::Str(pat)))) =
+                    (args.first(), args.get(1))
+                {
+                    if let Some(i) = schema.iter().position(|c| c == col) {
+                        return Ok(Expr::Regex(i, pat.clone()));
+                    }
+                }
+            }
             // SEARCH MATCH pseudo-columns are exposed as hidden scan columns.
             let hidden = match name.to_ascii_uppercase().as_str() {
                 "ROW_ID" => Some("#_row_id"),

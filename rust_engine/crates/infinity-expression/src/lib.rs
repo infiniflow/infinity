@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 pub mod json;
+pub mod regex;
 
 use std::cmp::Ordering;
 
@@ -94,6 +95,8 @@ pub enum Expr {
     /// `filter_text(col, '…')` / `filter_fulltext(col, '…')`: term matching over
     /// the given column's text.
     FullText(usize, String),
+    /// `regex(col, '…')`: regular-expression search over a column's text.
+    Regex(usize, String),
 }
 
 impl Expr {
@@ -166,6 +169,14 @@ impl Expr {
                     None => String::new(),
                 };
                 Value::Bool(fulltext_match(&text, q))
+            }
+            Expr::Regex(i, pat) => {
+                let text = match row.get(*i) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => String::new(),
+                };
+                Value::Bool(regex::is_match(&text, pat))
             }
         }
     }
