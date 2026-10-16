@@ -394,7 +394,9 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                 .iter()
                 .skip_while(|l| l.trim() != "----")
                 .skip(1)
-                .map(|s| s.trim().to_string())
+                // Only trailing whitespace is insignificant; a leading space can
+                // be part of a VARCHAR value, so it is preserved.
+                .map(|s| s.trim_end().to_string())
                 .collect();
             if let Some(kind) = head.strip_prefix("statement ") {
                 let kind = kind.split_whitespace().next().unwrap_or("");
@@ -428,7 +430,7 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         let mut rows: Vec<String> = Vec::new();
                         if let Some(QueryResult::Rows { rows: r, .. }) = rs.into_iter().next() {
                             for row in r {
-                                rows.push(row.join(" "));
+                                rows.push(row.join(" ").trim_end().to_string());
                             }
                         }
                         let mut got = rows;
