@@ -244,7 +244,12 @@ pub fn default_constant_expr(text: &str) -> Option<infinity_expression::json::Js
     if let Ok(f) = t.parse::<f64>() {
         return Some(value_format::constant_expr_double(f));
     }
-    None
+    // The engine stores a string default in its **unquoted** `.slt` form
+    // (`defaults_and_alter_add_column`), so anything left is a string constant.
+    if t.is_empty() {
+        return None;
+    }
+    Some(value_format::constant_expr_string(t))
 }
 
 /// Whether a C++ `ColumnDef`'s `constraints` mark the column NOT NULL
@@ -277,7 +282,9 @@ pub fn default_text_of(default: &infinity_expression::json::Json) -> Option<Stri
             _ => return None,
         },
         2 => match value {
-            Json::Str(s) => format!("'{}'", s.replace('\'', "''")),
+            // The engine keeps a string default in its unquoted `.slt` form, and
+            // `default_literal` reads it back as a `Str` — so do not re-quote.
+            Json::Str(s) => s.clone(),
             _ => return None,
         },
         3 => match value {
@@ -641,42 +648,15 @@ impl Catalog {
         }
         // Index records, resolved against the tables just imported.
         for def in read_cpp_indexes(store)? {
-            let table = def.base.column_names.first().and_then(|c| {
-                cpp_tables
-                    .iter()
-                    .find(|t| t.columns.iter().any(|col| &col.column_name == c))
-                    .map(|t| format!("{}.{}", t.db_name, t.table_name))
-            });
-            let Some(table) = table else { continue };
-            let column = def.base.column_names.first().cloned().unwrap_or_default();
-            // Carry the options the engine tracks on `IndexMeta`.
-            let opt = |k: &str| {
-                def.extra
-                    .iter()
-                    .find(|(n, _)| n == k)
-                    .map(|(_, v)| match v {
-                        infinity_expression::json::Json::Str(s) => s.clone(),
-                        infinity_expression::json::Json::Bool(b) => b.to_string(),
-                        infinity_expression::json::Json::Int(i) => i.to_string(),
-                        other => other.compact(),
-                    })
+            let Some(meta) = index_meta_of(&def, &cpp_tables) else {
+                continue;
             };
-            let mut options: Vec<(String, String)> = Vec::new();
-            if let Some(a) = opt("analyzer") {
-                options.push(("ANALYZER".to_string(), a));
-            }
-            if let Some(m) = opt("metric_type") {
-                options.push(("METRIC".to_string(), m));
-            }
-            if let Some(c) = opt("cardinality") {
-                options.push(("CARDINALITY".to_string(), c));
-            }
             self.create_index_typed(
-                &def.base.index_name,
-                &table,
-                &column,
-                &def.base.index_type,
-                &options,
+                &meta.name,
+                &meta.table,
+                &meta.column,
+                &meta.index_type,
+                &meta.options,
             )?;
         }
         Ok(imported)
@@ -765,6 +745,47 @@ pub fn read_cpp_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
     }
     out.sort_by(|a, b| a.base.index_name.cmp(&b.base.index_name));
     Ok(out)
+}
+
+/// Maps a C++ index record onto the engine's `IndexMeta`, resolving the owning
+/// table from the C++ tables (which carry db/table names and columns).
+pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<IndexMeta> {
+    let table = def.base.column_names.first().and_then(|c| {
+        cpp_tables
+            .iter()
+            .find(|t| t.columns.iter().any(|col| &col.column_name == c))
+            .map(|t| format!("{}.{}", t.db_name, t.table_name))
+    })?;
+    let column = def.base.column_names.first().cloned().unwrap_or_default();
+    // Carry the options the engine tracks on `IndexMeta`.
+    let opt = |k: &str| {
+        def.extra
+            .iter()
+            .find(|(n, _)| n == k)
+            .map(|(_, v)| match v {
+                infinity_expression::json::Json::Str(s) => s.clone(),
+                infinity_expression::json::Json::Bool(b) => b.to_string(),
+                infinity_expression::json::Json::Int(i) => i.to_string(),
+                other => other.compact(),
+            })
+    };
+    let mut options: Vec<(String, String)> = Vec::new();
+    if let Some(a) = opt("analyzer") {
+        options.push(("ANALYZER".to_string(), a));
+    }
+    if let Some(m) = opt("metric_type") {
+        options.push(("METRIC".to_string(), m));
+    }
+    if let Some(c) = opt("cardinality") {
+        options.push(("CARDINALITY".to_string(), c));
+    }
+    Some(IndexMeta {
+        name: def.base.index_name.clone(),
+        table,
+        column,
+        index_type: def.base.index_type.clone(),
+        options,
+    })
 }
 
 /// Rebuilds `TableMeta`s from a C++-layout catalog (for comparison with the
@@ -955,7 +976,9 @@ mod tests {
         // NOT NULL, comments and defaults come across too.
         assert_eq!(t.not_nulls, vec![true, false, false]);
         assert_eq!(t.comments[1], Some("note".to_string()));
-        assert_eq!(t.defaults[1], Some("'x'".to_string()));
+        // The default comes back in the engine's unquoted `.slt` form, which is
+        // what `default_literal` reads as a string.
+        assert_eq!(t.defaults[1], Some("x".to_string()));
         // The index record is imported with its options.
         let idx = imported.list_indexes().unwrap();
         assert_eq!(idx.len(), 1);
@@ -980,7 +1003,7 @@ mod tests {
             vec!["INTEGER", "VARCHAR", "EMBEDDING(FLOAT32,3)"]
         );
         assert_eq!(meta[0].not_nulls, vec![true, false, false]);
-        assert_eq!(meta[0].defaults[1], Some("'x'".to_string()));
+        assert_eq!(meta[0].defaults[1], Some("x".to_string()));
         assert_eq!(meta[0].comments[1], Some("note".to_string()));
     }
 

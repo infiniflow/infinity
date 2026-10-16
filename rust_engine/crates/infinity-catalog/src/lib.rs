@@ -185,14 +185,39 @@ fn index_key(name: &str) -> Vec<u8> {
 pub struct Catalog {
     store: Arc<dyn MetaStore>,
     counter_lock: Mutex<()>,
+    /// Persist **only** the C++ key space (plan §2.6.1 item ④). The native
+    /// `tbl:`/`tblname:`/`db:`/`idx:` keys are then never written, so the store
+    /// holds nothing but what a C++ engine can read.
+    cpp_only: bool,
 }
+
+/// The C++ key-space prefixes this catalog owns. Sweeping them is how the
+/// [`Catalog`]'s C++-only mode removes everything a drop would otherwise leave
+/// behind (`catalog_format.rs`).
+const CPP_KEY_PREFIXES: [&str; 5] = ["catalog|", "db|", "tbl|", "col|", "idx|"];
 
 impl Catalog {
     pub fn with_store(store: Arc<dyn MetaStore>) -> Self {
         Self {
             store,
             counter_lock: Mutex::new(()),
+            cpp_only: false,
         }
+    }
+
+    /// A catalog whose **sole** persisted representation is the C++ key space
+    /// (plan §2.6.1 item ④).
+    pub fn with_store_cpp_only(store: Arc<dyn MetaStore>) -> Self {
+        Self {
+            store,
+            counter_lock: Mutex::new(()),
+            cpp_only: true,
+        }
+    }
+
+    /// Whether this catalog persists only the C++ key space.
+    pub fn is_cpp_only(&self) -> bool {
+        self.cpp_only
     }
 
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
@@ -200,8 +225,66 @@ impl Catalog {
         Ok(Self::with_store(Arc::new(store)))
     }
 
+    /// Like [`Self::open`] but with the C++ key space as the sole catalog
+    /// (plan §2.6.1 item ④).
+    pub fn open_cpp_only(path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let store = FjallMetaStore::open(path, "catalog")?;
+        Ok(Self::with_store_cpp_only(Arc::new(store)))
+    }
+
     pub fn store(&self) -> &Arc<dyn MetaStore> {
         &self.store
+    }
+
+    /// Databases recorded in the C++ key space. An empty database still has a
+    /// `catalog|db|{name}|{ts}` record, so the scan is authoritative.
+    fn cpp_databases(&self) -> Result<Vec<String>> {
+        let mut out = vec!["default_db".to_string()];
+        for (k, _) in self.store.scan_prefix(b"catalog|db|")? {
+            let text = String::from_utf8_lossy(&k).to_string();
+            if let Some(name) = text.split('|').nth(2) {
+                if !out.iter().any(|d| d == name) {
+                    out.push(name.to_string());
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn cpp_tables(&self) -> Result<Vec<TableMeta>> {
+        crate::cpp_layout::read_cpp_tables_as_meta(self.store.as_ref())
+    }
+
+    fn cpp_indexes(&self) -> Result<Vec<IndexMeta>> {
+        let tables = crate::cpp_layout::read_cpp_layout(self.store.as_ref())?;
+        let mut out = Vec::new();
+        for def in crate::cpp_layout::read_cpp_indexes(self.store.as_ref())? {
+            if let Some(meta) = crate::cpp_layout::index_meta_of(&def, &tables) {
+                out.push(meta);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Republished the whole C++ layout from `dbs`/`tables`/`indexes` after
+    /// first deleting every record the layout owns, so a dropped entity cannot
+    /// survive as a stale key.
+    fn rewrite_cpp(
+        &self,
+        dbs: &[String],
+        tables: &[TableMeta],
+        indexes: &[IndexMeta],
+    ) -> Result<()> {
+        for prefix in CPP_KEY_PREFIXES {
+            for (k, _) in self.store.scan_prefix(prefix.as_bytes())? {
+                self.store.delete(&k)?;
+            }
+        }
+        for k in ["next_database_id", "next_table_id", "meta|version"] {
+            self.store.delete(k.as_bytes())?;
+        }
+        self.write_cpp_layout_from(self.store.as_ref(), dbs, tables, indexes)?;
+        Ok(())
     }
 
     fn read_counter(&self) -> Result<u64> {
@@ -213,6 +296,11 @@ impl Catalog {
     }
 
     fn alloc_id(&self) -> Result<u64> {
+        if self.cpp_only {
+            // No native counter: the id is one past the highest table id, which
+            // is exactly what `write_cpp_layout_from` derives from the tables.
+            return Ok(self.cpp_tables()?.iter().map(|t| t.id).max().unwrap_or(0) + 1);
+        }
         let _g = self.counter_lock.lock().unwrap();
         let next = self.read_counter()? + 1;
         self.store.put(COUNTER_KEY, &next.to_le_bytes())?;
@@ -275,6 +363,12 @@ impl Catalog {
             types: types.to_vec(),
             comments: comments.to_vec(),
         };
+        if self.cpp_only {
+            let mut tables = self.cpp_tables()?;
+            tables.push(meta.clone());
+            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            return Ok(meta);
+        }
         self.store.atomic_write(&[
             (table_key(id), meta.encode()),
             (name_key(name), id.to_le_bytes().to_vec()),
@@ -325,6 +419,14 @@ impl Catalog {
             meta.types.push(types.get(i).cloned().unwrap_or_default());
             meta.comments.push(comments.get(i).cloned().flatten());
         }
+        if self.cpp_only {
+            let mut tables = self.cpp_tables()?;
+            if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
+                *slot = meta.clone();
+            }
+            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            return Ok(meta);
+        }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(meta)
     }
@@ -352,11 +454,22 @@ impl Catalog {
         if idx < meta.comments.len() {
             meta.comments.remove(idx);
         }
+        if self.cpp_only {
+            let mut tables = self.cpp_tables()?;
+            if let Some(slot) = tables.iter_mut().find(|t| t.name == meta.name) {
+                *slot = meta;
+            }
+            self.rewrite_cpp(&self.cpp_databases()?, &tables, &self.cpp_indexes()?)?;
+            return Ok(idx);
+        }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(idx)
     }
 
     pub fn get_table(&self, id: u64) -> Result<Option<TableMeta>> {
+        if self.cpp_only {
+            return Ok(self.cpp_tables()?.into_iter().find(|t| t.id == id));
+        }
         match self.store.get(&table_key(id))? {
             Some(b) => Ok(Some(TableMeta::decode(id, &b)?)),
             None => Ok(None),
@@ -364,6 +477,9 @@ impl Catalog {
     }
 
     pub fn get_table_by_name(&self, name: &str) -> Result<Option<TableMeta>> {
+        if self.cpp_only {
+            return Ok(self.cpp_tables()?.into_iter().find(|t| t.name == name));
+        }
         match self.store.get(&name_key(name))? {
             Some(b) => {
                 let id = u64::from_le_bytes(b[..8].try_into().unwrap());
@@ -374,6 +490,9 @@ impl Catalog {
     }
 
     pub fn list_tables(&self) -> Result<Vec<TableMeta>> {
+        if self.cpp_only {
+            return self.cpp_tables();
+        }
         let mut out = Vec::new();
         for (k, v) in self.store.scan_prefix(b"tbl:")? {
             let id: u64 = String::from_utf8_lossy(&k[4..]).parse().unwrap_or(0);
@@ -384,6 +503,21 @@ impl Catalog {
 
     /// Drops a table by name. Returns `true` if it existed.
     pub fn drop_table(&self, name: &str) -> Result<bool> {
+        if self.cpp_only {
+            let mut tables = self.cpp_tables()?;
+            let before = tables.len();
+            tables.retain(|t| t.name != name);
+            if tables.len() == before {
+                return Ok(false);
+            }
+            let indexes: Vec<IndexMeta> = self
+                .cpp_indexes()?
+                .into_iter()
+                .filter(|i| i.table != name)
+                .collect();
+            self.rewrite_cpp(&self.cpp_databases()?, &tables, &indexes)?;
+            return Ok(true);
+        }
         match self.get_table_by_name(name)? {
             Some(t) => {
                 self.store.delete(&table_key(t.id))?;
@@ -403,6 +537,18 @@ impl Catalog {
             .get_table_by_name(old)?
             .ok_or_else(|| Error::Catalog(format!("table '{old}' does not exist")))?;
         meta.name = new.to_string();
+        if self.cpp_only {
+            let mut tables = self.cpp_tables()?;
+            if let Some(slot) = tables.iter_mut().find(|t| t.id == meta.id) {
+                *slot = meta;
+            }
+            let mut indexes = self.cpp_indexes()?;
+            for i in indexes.iter_mut().filter(|i| i.table == old) {
+                i.table = new.to_string();
+            }
+            self.rewrite_cpp(&self.cpp_databases()?, &tables, &indexes)?;
+            return Ok(());
+        }
         self.store.atomic_write(&[
             (table_key(meta.id), meta.encode()),
             (name_key(new), meta.id.to_le_bytes().to_vec()),
@@ -413,6 +559,19 @@ impl Catalog {
 
     /// Registers a database name. `if_not_exists` tolerates an existing name.
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
+        if self.cpp_only {
+            let mut dbs = self.cpp_databases()?;
+            if dbs.iter().any(|d| d == name) {
+                return if if_not_exists {
+                    Ok(())
+                } else {
+                    Err(Error::Catalog(format!("database '{name}' already exists")))
+                };
+            }
+            dbs.push(name.to_string());
+            self.rewrite_cpp(&dbs, &self.cpp_tables()?, &self.cpp_indexes()?)?;
+            return Ok(());
+        }
         let key = db_key(name);
         if self.store.get(&key)?.is_some() {
             return if if_not_exists {
@@ -427,6 +586,31 @@ impl Catalog {
 
     /// Removes a database registration. `if_exists` tolerates a missing name.
     pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
+        if self.cpp_only {
+            let mut dbs = self.cpp_databases()?;
+            let before = dbs.len();
+            dbs.retain(|d| d != name);
+            let existed = dbs.len() != before;
+            if !existed && !if_exists {
+                return Err(Error::Catalog(format!("database '{name}' does not exist")));
+            }
+            if existed {
+                let prefix = format!("{name}.");
+                let tables: Vec<TableMeta> = self
+                    .cpp_tables()?
+                    .into_iter()
+                    .filter(|t| !t.name.starts_with(&prefix))
+                    .collect();
+                let tables_names: Vec<&str> = tables.iter().map(|t| t.name.as_str()).collect();
+                let indexes: Vec<IndexMeta> = self
+                    .cpp_indexes()?
+                    .into_iter()
+                    .filter(|i| tables_names.contains(&i.table.as_str()))
+                    .collect();
+                self.rewrite_cpp(&dbs, &tables, &indexes)?;
+            }
+            return Ok(existed);
+        }
         let key = db_key(name);
         let existed = self.store.get(&key)?.is_some();
         if !existed && !if_exists {
@@ -438,6 +622,9 @@ impl Catalog {
 
     /// Names of all registered databases, plus the built-in `default_db`.
     pub fn list_databases(&self) -> Result<Vec<String>> {
+        if self.cpp_only {
+            return self.cpp_databases();
+        }
         let mut out = vec!["default_db".to_string()];
         for (k, _) in self.store.scan_prefix(b"db:")? {
             out.push(String::from_utf8_lossy(&k[3..]).to_string());
@@ -467,11 +654,21 @@ impl Catalog {
             index_type: index_type.to_ascii_uppercase(),
             options: options.to_vec(),
         };
+        if self.cpp_only {
+            let mut indexes = self.cpp_indexes()?;
+            indexes.retain(|i| i.name != name);
+            indexes.push(meta.clone());
+            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            return Ok(meta);
+        }
         self.store.put(&index_key(name), meta.encode().as_slice())?;
         Ok(meta)
     }
 
     pub fn list_indexes(&self) -> Result<Vec<IndexMeta>> {
+        if self.cpp_only {
+            return self.cpp_indexes();
+        }
         self.store
             .scan_prefix(INDEX_PREFIX)?
             .into_iter()
@@ -481,6 +678,16 @@ impl Catalog {
 
     /// Drops an index by name. Returns `true` if it existed.
     pub fn drop_index(&self, name: &str) -> Result<bool> {
+        if self.cpp_only {
+            let mut indexes = self.cpp_indexes()?;
+            let before = indexes.len();
+            indexes.retain(|i| i.name != name);
+            if indexes.len() == before {
+                return Ok(false);
+            }
+            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            return Ok(true);
+        }
         let existed = self.store.get(&index_key(name))?.is_some();
         self.store.delete(&index_key(name))?;
         Ok(existed)
@@ -498,6 +705,64 @@ mod tests {
 
     fn cols(names: &[&str]) -> Vec<String> {
         names.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn cpp_only_catalog_writes_only_the_cpp_key_space() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+        let c = Catalog::with_store_cpp_only(store.clone());
+        assert!(c.is_cpp_only());
+        c.create_database("db2", false).unwrap();
+        let t = c
+            .create_table_typed(
+                "db2.t",
+                &cols(&["id", "name"]),
+                &[None, None],
+                &[false, false],
+                &["INT".to_string(), "VARCHAR".to_string()],
+                &[None, None],
+            )
+            .unwrap();
+        c.create_index_typed("i1", "db2.t", "name", "FULLTEXT", &[])
+            .unwrap();
+
+        // Reads come back from the C++ records.
+        assert_eq!(c.list_databases().unwrap(), vec!["default_db", "db2"]);
+        let got = c.get_table_by_name("db2.t").unwrap().unwrap();
+        assert_eq!(got.id, t.id);
+        assert_eq!(got.columns, cols(&["id", "name"]));
+        assert_eq!(c.get_table(t.id).unwrap().unwrap().name, "db2.t");
+        let indexes = c.list_indexes().unwrap();
+        assert_eq!(indexes.len(), 1);
+        assert_eq!(indexes[0].name, "i1");
+        assert_eq!(indexes[0].column, "name");
+        assert_eq!(indexes[0].index_type, "FULLTEXT");
+
+        // Nothing native was left behind: the C++ key space is the sole catalog.
+        for prefix in ["tbl:", "tblname:", "db:", "idx:", "__counter:table"] {
+            assert!(
+                store.scan_prefix(prefix.as_bytes()).unwrap().is_empty(),
+                "native key prefix '{prefix}' is populated"
+            );
+        }
+        // ... and it survives a reopen.
+        let reopened = Catalog::with_store_cpp_only(store.clone());
+        assert_eq!(reopened.list_tables().unwrap().len(), 1);
+        assert_eq!(reopened.list_indexes().unwrap().len(), 1);
+
+        // Drops clean up the records, not just the in-memory view.
+        assert!(reopened.drop_index("i1").unwrap());
+        assert!(!reopened.drop_index("i1").unwrap());
+        assert!(reopened.drop_table("db2.t").unwrap());
+        assert!(!reopened.drop_table("db2.t").unwrap());
+        assert!(reopened.drop_database("db2", false).unwrap());
+        assert_eq!(reopened.list_databases().unwrap(), vec!["default_db"]);
+        assert!(reopened.list_tables().unwrap().is_empty());
+        assert!(reopened.list_indexes().unwrap().is_empty());
+        assert!(store.scan_prefix(b"catalog|idx|").unwrap().is_empty());
+        assert!(store.scan_prefix(b"idx|").unwrap().is_empty());
     }
 
     #[test]
