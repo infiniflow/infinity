@@ -147,6 +147,30 @@ fn is_array_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("ARRAY")
 }
 
+/// Bracket depth at which each numeric leaf of a literal appears.
+fn array_leaf_depths(text: &str) -> Vec<usize> {
+    let mut depths = Vec::new();
+    let mut depth = 0usize;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '[' => depth += 1,
+            ']' => depth = depth.saturating_sub(1),
+            c if c.is_ascii_digit()
+                || ((c == '-' || c == '.')
+                    && matches!(chars.peek(), Some(x) if x.is_ascii_digit())) =>
+            {
+                while matches!(chars.peek(), Some(x) if x.is_ascii_digit() || *x == '.') {
+                    chars.next();
+                }
+                depths.push(depth);
+            }
+            _ => {}
+        }
+    }
+    depths
+}
+
 /// ARRAY columns render with braces: `[1,2]` → `{1,2}`, `[]` → `{}`.
 fn brace_render(s: &str) -> String {
     let t = s.trim();
@@ -944,14 +968,14 @@ impl Engine {
                 }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
                 let types = self.column_types(table)?;
-                // a TENSORARRAY literal must be triple-nested (`[[[…]]]`)
+                // a TENSORARRAY literal must be uniformly triple-nested
                 for row in &rows {
                     for (i, cell) in row.iter().enumerate() {
                         if let Some(t) = types.get(i) {
                             if t.to_ascii_uppercase().starts_with("TENSORARRAY") {
                                 let lit = cell.to_slt_string();
-                                let lit = lit.trim();
-                                if !lit.is_empty() && !lit.starts_with("[[[") {
+                                let depths = array_leaf_depths(lit.trim());
+                                if !depths.is_empty() && depths.iter().any(|d| *d != 3) {
                                     return Err(Error::Invalid(
                                         "TENSORARRAY value must be nested as [[[…]]]".into(),
                                     ));
