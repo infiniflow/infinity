@@ -40,6 +40,10 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
                 return input; // statically true -> drop the filter
             }
             match input {
+                LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
+                    input: Box::new(optimize(*input)),
+                    n,
+                },
                 LogicalPlan::Sort { input, key, asc } => LogicalPlan::Sort {
                     input: Box::new(LogicalPlan::Filter { input, predicate }),
                     key,
@@ -70,6 +74,10 @@ pub fn optimize(plan: LogicalPlan) -> LogicalPlan {
             group_keys,
             group_names,
             aggs,
+        },
+        LogicalPlan::Offset { input, n } => LogicalPlan::Offset {
+            input: Box::new(optimize(*input)),
+            n,
         },
         LogicalPlan::Sort { input, key, asc } => LogicalPlan::Sort {
             input: Box::new(optimize(*input)),
@@ -201,6 +209,7 @@ mod tests {
             None,
             None,
             Some(10),
+            None,
         )
         .unwrap();
         let optimized = optimize(plan);

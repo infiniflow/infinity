@@ -327,6 +327,7 @@ pub enum Statement {
         having: Option<Box<Predicate>>,
         order_by: Option<OrderKey>,
         limit: Option<u64>,
+        offset: Option<u64>,
         search: Option<Box<SearchClause>>,
         distinct: bool,
     },

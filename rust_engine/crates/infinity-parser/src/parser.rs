@@ -461,14 +461,34 @@ impl Parser {
                 } else {
                     None
                 };
-                let limit = if self.eat_kw("LIMIT") {
+                let mut limit = None;
+                let mut offset = None;
+                if self.eat_kw("LIMIT") {
                     match self.advance() {
-                        Token::Int(n) if n >= 0 => Some(n as u64),
+                        Token::Int(n) if n >= 0 => limit = Some(n as u64),
                         _ => return self.err("expected non-negative integer after LIMIT"),
                     }
-                } else {
-                    None
-                };
+                    if self.eat_kw("OFFSET") {
+                        if let Token::Int(n) = self.advance() {
+                            if n >= 0 {
+                                offset = Some(n as u64);
+                            }
+                        }
+                    }
+                } else if self.eat_kw("OFFSET") {
+                    if let Token::Int(n) = self.advance() {
+                        if n >= 0 {
+                            offset = Some(n as u64);
+                        }
+                    }
+                    if self.eat_kw("LIMIT") {
+                        if let Token::Int(n) = self.advance() {
+                            if n >= 0 {
+                                limit = Some(n as u64);
+                            }
+                        }
+                    }
+                }
                 Ok(Statement::Select {
                     items,
                     from,
@@ -478,6 +498,7 @@ impl Parser {
                     having,
                     order_by,
                     limit,
+                    offset,
                     search,
                     distinct,
                 })
@@ -846,7 +867,7 @@ impl Parser {
                 // Typed date/time literals can also appear inside expressions.
                 if matches!(
                     s.to_ascii_uppercase().as_str(),
-                    "DATE" | "TIME" | "TIMESTAMP" | "DATETIME" | "INTERVAL"
+                    "DATE" | "TIME" | "TIMESTAMP" | "DATETIME" | "INTERVAL" | "JSON"
                 ) && matches!(self.toks.get(self.pos + 1), Some(Token::Str(_)))
                 {
                     self.advance();
@@ -1218,7 +1239,7 @@ impl Parser {
             Token::Ident(s)
                 if matches!(
                     s.to_ascii_uppercase().as_str(),
-                    "DATE" | "TIME" | "TIMESTAMP" | "DATETIME" | "INTERVAL"
+                    "DATE" | "TIME" | "TIMESTAMP" | "DATETIME" | "INTERVAL" | "JSON"
                 ) =>
             {
                 self.advance();
@@ -1635,6 +1656,7 @@ mod tests {
                 having: None,
                 order_by: None,
                 limit: None,
+                offset: None,
                 search: None,
                 distinct: false,
             }
@@ -1653,6 +1675,7 @@ mod tests {
                 having: None,
                 order_by: None,
                 limit: None,
+                offset: None,
                 search: None,
                 distinct: false,
             }
@@ -1675,6 +1698,7 @@ mod tests {
                 having: None,
                 order_by: None,
                 limit: Some(10),
+                offset: None,
                 search: None,
                 distinct: false,
             }
@@ -1705,6 +1729,7 @@ mod tests {
                 having: None,
                 order_by: None,
                 limit: None,
+                offset: None,
                 search: None,
                 distinct: false,
             }
@@ -1730,6 +1755,7 @@ mod tests {
                     asc: false
                 }),
                 limit: Some(5),
+                offset: None,
                 search: None,
                 distinct: false,
             }
@@ -1753,6 +1779,7 @@ mod tests {
                 having: None,
                 order_by: None,
                 limit: None,
+                offset: None,
                 search: None,
                 distinct: false,
             }

@@ -82,6 +82,7 @@ enum Stage {
         asc: bool,
     },
     Limit(u64),
+    Offset(u64),
 }
 
 /// The relation that feeds the operator stages.
@@ -1089,6 +1090,7 @@ impl Engine {
                 having,
                 order_by,
                 limit,
+                offset,
                 search,
                 distinct,
             } => {
@@ -1218,6 +1220,7 @@ impl Engine {
                     having.as_deref(),
                     order_by.as_ref(),
                     *limit,
+                    *offset,
                 )?;
                 // index scan: an equality predicate on an indexed single-table
                 // column fetches only the matching rows.
@@ -1248,6 +1251,10 @@ impl Engine {
             match cur {
                 LogicalPlan::Limit { input, n } => {
                     stages.push(Stage::Limit(n));
+                    cur = *input;
+                }
+                LogicalPlan::Offset { input, n } => {
+                    stages.push(Stage::Offset(n));
                     cur = *input;
                 }
                 LogicalPlan::Sort { input, key, asc } => {
@@ -2093,6 +2100,10 @@ async fn pipeline(
             }
             Stage::Sort { key, asc } => sort_rows(&mut data, *key, *asc),
             Stage::Limit(n) => data.truncate(*n as usize),
+            Stage::Offset(n) => {
+                let k = (*n as usize).min(data.len());
+                data.drain(0..k);
+            }
         }
     }
 

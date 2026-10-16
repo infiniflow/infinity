@@ -57,6 +57,10 @@ pub enum LogicalPlan {
         input: Box<LogicalPlan>,
         n: u64,
     },
+    Offset {
+        input: Box<LogicalPlan>,
+        n: u64,
+    },
 }
 
 /// Concatenated schema of all tables in a FROM/JOIN.
@@ -455,6 +459,7 @@ pub fn plan_select(
     having: Option<&Predicate>,
     order_by: Option<&OrderKey>,
     limit: Option<u64>,
+    offset: Option<u64>,
 ) -> Result<LogicalPlan> {
     if tables.is_empty() {
         let mut row = Vec::new();
@@ -629,6 +634,12 @@ pub fn plan_select(
         };
     }
 
+    if let Some(n) = offset {
+        plan = LogicalPlan::Offset {
+            input: Box::new(plan),
+            n,
+        };
+    }
     if let Some(n) = limit {
         plan = LogicalPlan::Limit {
             input: Box::new(plan),
@@ -658,6 +669,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -683,7 +695,7 @@ mod tests {
                 distinct: false,
             }),
         ];
-        let p = plan_select(&items, &tables(), None, None, &[], None, None, None).unwrap();
+        let p = plan_select(&items, &tables(), None, None, &[], None, None, None, None).unwrap();
         match p {
             LogicalPlan::Aggregate {
                 group_keys, aggs, ..
@@ -716,6 +728,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .unwrap();
         match p {
@@ -741,6 +754,7 @@ mod tests {
             &[],
             None,
             None,
+            None,
             None
         )
         .is_err());
@@ -754,6 +768,7 @@ mod tests {
             None,
             None,
             &[],
+            None,
             None,
             None,
             None

@@ -657,6 +657,11 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             let target = args.get(2).map(|e| e.eval(row)).unwrap_or(Value::Null);
             json::contains(&doc, &path, &target)
         }
+        "ISNAN" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_nan())),
+        "ISINF" => Value::Bool(matches!(a0(), Value::Float(f) if f.is_infinite())),
+        "ISFINITE" => Value::Bool(
+            matches!(a0(), Value::Float(f) if f.is_finite() || matches!(a0(), Value::Int(_))),
+        ),
         "IS_NULL" => Value::Bool(matches!(a0(), Value::Null)),
         "IS_NOT_NULL" => Value::Bool(!matches!(a0(), Value::Null)),
         "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND" | "QUARTER" | "ERA" | "CENTURY"
