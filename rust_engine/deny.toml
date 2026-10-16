@@ -30,6 +30,10 @@ allow = [
     "Unicode-3.0",
     "Zlib",
     "MPL-2.0",
+    # permissive, Apache-2.0-compatible licenses used by transitive deps:
+    #   varint-rs -> 0BSD, xxhash-rust -> BSL-1.0
+    "0BSD",
+    "BSL-1.0",
 ]
 confidence-threshold = 0.9
 
