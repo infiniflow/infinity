@@ -142,8 +142,10 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                 if let (Some(ExprAst::Literal(Literal::Str(col))), Some(q)) =
                     (args.first(), args.get(1))
                 {
+                    // `col@index` names the column plus an optional index hint.
+                    let col_name = col.split('@').next().unwrap_or(col);
                     if let (Some(i), ExprAst::Literal(Literal::Str(query))) =
-                        (schema.iter().position(|c| c == col), q)
+                        (schema.iter().position(|c| c == col_name), q)
                     {
                         return Ok(Expr::FullText(i, query.clone()));
                     }

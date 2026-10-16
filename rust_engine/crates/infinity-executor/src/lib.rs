@@ -1066,6 +1066,8 @@ pub struct Engine {
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
+    /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
+    index_analyzers: Mutex<HashMap<String, String>>,
     /// the database new unqualified table names are resolved against
     current_db: Mutex<String>,
 }
@@ -1098,6 +1100,7 @@ impl Engine {
             exchange_capacity: exchange_capacity.max(1),
             indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
+            index_analyzers: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
         };
         engine.rebuild_indexes()?;
@@ -1534,6 +1537,14 @@ impl Engine {
                     return Err(Error::Invalid(format!("index '{name}' already exists")));
                 }
                 self.catalog.create_index(name, table, column)?;
+                // remember the analyzer so fulltext matching can tokenise compatibly
+                if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
+                    let a = a.trim().trim_matches(|c| c == '\'' || c == '"');
+                    self.index_analyzers
+                        .lock()
+                        .unwrap()
+                        .insert(index_key(table, column), a.to_ascii_lowercase());
+                }
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
                 if self.table_schema(table)?.iter().any(|c| c == column) {
@@ -2424,10 +2435,48 @@ impl Engine {
             return Ok((Vec::new(), hidden.to_vec()));
         }
         let query = arg_str(m.args.first()).unwrap_or_default();
-        let terms: Vec<String> = query
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .map(|t| t.to_ascii_lowercase())
-            .filter(|t| !t.is_empty() && t != "or" && t != "and")
+        // Drop per-term boosts (`term^2.0`) before tokenising.
+        let query_clean = query
+            .split_whitespace()
+            .map(|w| w.split('^').next().unwrap_or(w))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let cols: Vec<usize> = match_columns(&m.column)
+            .iter()
+            .filter_map(|c| schema.iter().position(|s| s == c))
+            .collect();
+        if cols.is_empty() {
+            return Ok((Vec::new(), hidden.to_vec()));
+        }
+        // A `whitespace` analyzer keeps punctuation inside a token, so
+        // `2023-01-01` is one term rather than three.
+        let whitespace = match_columns(&m.column).iter().any(|c| {
+            self.index_analyzers
+                .lock()
+                .unwrap()
+                .get(&index_key(table, c))
+                .map(|a| a == "whitespace")
+                .unwrap_or(false)
+        });
+        let tokenize = |s: &str| -> Vec<String> {
+            let split: fn(&str) -> Vec<String> = if whitespace {
+                |x: &str| x.split_whitespace().map(str::to_string).collect()
+            } else {
+                |x: &str| {
+                    x.split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .map(str::to_string)
+                        .collect()
+                }
+            };
+            split(s)
+                .into_iter()
+                .map(|t| t.to_ascii_lowercase())
+                .filter(|t| !t.is_empty())
+                .collect()
+        };
+        let terms: Vec<String> = tokenize(&query_clean)
+            .into_iter()
+            .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
             return Ok((Vec::new(), hidden.to_vec()));
@@ -2448,10 +2497,6 @@ impl Engine {
             })
             .unwrap_or(1);
         let topn = parse_topn_param(&params).unwrap_or(10);
-        let ci = match schema.iter().position(|c| c == &m.column) {
-            Some(i) => i,
-            None => return Ok((Vec::new(), hidden.to_vec())),
-        };
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
             None => None,
@@ -2463,16 +2508,16 @@ impl Engine {
                     continue;
                 }
             }
-            let text = match row.get(ci) {
-                Some(Value::Str(s)) => s.clone(),
-                Some(other) => other.to_slt_string(),
-                None => continue,
-            };
-            let doc: std::collections::HashSet<String> = text
-                .split(|c: char| !c.is_alphanumeric() && c != '_')
-                .map(|t| t.to_ascii_lowercase())
-                .filter(|t| !t.is_empty())
-                .collect();
+            let text: String = cols
+                .iter()
+                .map(|&i| match row.get(i) {
+                    Some(Value::Str(s)) => s.clone(),
+                    Some(other) => other.to_slt_string(),
+                    None => String::new(),
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let doc: std::collections::HashSet<String> = tokenize(&text).into_iter().collect();
             let hits = terms.iter().filter(|t| doc.contains(*t)).count();
             if hits >= min_should && hits > 0 {
                 scored.push((seq, hits as f64));
@@ -2870,7 +2915,10 @@ impl Engine {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
             None => None,
         };
-        let col_idx = match schema.iter().position(|c| c == &m.column) {
+        let col_idx = match match_columns(&m.column)
+            .iter()
+            .find_map(|c| schema.iter().position(|s| s == c))
+        {
             Some(i) => i,
             None => return Ok((Vec::new(), hidden)),
         };
@@ -3243,6 +3291,16 @@ fn arg_str(e: Option<&ExprAst>) -> Option<String> {
         ExprAst::Column(c) => Some(c.clone()),
         _ => None,
     }
+}
+
+/// The bare column names of a `MATCH` target: a comma-separated list whose
+/// entries may carry a `^boost` suffix (e.g. `doctitle,body^5`).
+fn match_columns(target: &str) -> Vec<String> {
+    target
+        .split(',')
+        .map(|c| c.split('^').next().unwrap_or(c).trim().to_string())
+        .filter(|c| !c.is_empty())
+        .collect()
 }
 
 fn arg_int(e: &ExprAst) -> Option<i64> {
