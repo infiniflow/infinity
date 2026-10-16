@@ -2784,6 +2784,21 @@ fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
                 let (n, s) = read_column_expr(ip)?;
                 names = n;
                 star = s;
+            } else if uf.field_type == TType::Struct {
+                // consume the nested expression struct explicitly (a `skip` on
+                // a struct holding lists can under-consume)
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let f2 = ip.read_field_begin().map_err(tw)?;
+                    if f2.field_type == TType::Stop {
+                        break;
+                    }
+                    ip.skip(f2.field_type).map_err(tw)?;
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            } else {
+                ip.skip(uf.field_type).map_err(tw)?;
             }
             let _ = ip.read_field_end();
             let _ = ip.read_field_begin(); // stop of union
