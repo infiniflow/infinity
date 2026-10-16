@@ -352,7 +352,7 @@ struct VertexLX { VertexListSize neighbor_n_; VertexType neighbors_[]; }
 ```
 （`LayerSize=VertexListSize=i32`，`VertexType=i32`；`graph_store.cppm:31-40`）
 
-- 步长：`level0_size_ = sizeof(VertexL0) + 4*Mmax0`、`levelx_size_ = sizeof(VertexLX) + 4*Mmax`（`graph_store.cppm:45-46`）。**VERIFY（字节级）**：`sizeof` 依赖编译器布局（x86_64 SysV 下 `VertexL0` 通常 = **24**（4+pad4+8+4+pad4）、`VertexLX` = **4**）；须用真实 `.idx` 回读校验。
+- 步长：`level0_size_ = sizeof(VertexL0) + 4*Mmax0`、`levelx_size_ = sizeof(VertexLX) + 4*Mmax`（`graph_store.cppm:45-46`）。**已实测确认（不再是 VERIFY）**：用 g++ 按 `graph_store.cppm:32-40` 的字段顺序编译量测得到 `sizeof(VertexL0)=24`（`offsetof`：`layer_n_`=0、`layers_p_`=8、`neighbor_n_`=16、`neighbors_`=20；`layer_n_` 后 4 字节为对齐填充）、`sizeof(VertexLX)=4`。因此 `M=16`（`Mmax0=32, Mmax=16`）时 `level0_size=152`、`levelx_size=68`。Rust 侧常量见 `infinity-storage::knn_format::{VERTEX_L0_SIZE, VERTEX_LX_SIZE}`。
 - 顶点按 `vertex_i` 密集排列；顶点 `v` 第 `l≥1` 层邻居紧跟 `v->layers_p_`，偏移 `(l-1)*levelx_size`（`graph_store.cppm:244-256,440-446`）。
 - 写盘（`graph_store.cppm:172-219`）：先 `u64 layer_sum = Σ_v layer_n_`；再逐 chunk 写 `chunk_size*level0_size` 的 level0 区——写前把 `layer_n_>0` 的顶点的 `layers_p_` **原地替换为 u64 字节偏移**（相对 layerx 拼接区）；最后逐 chunk 追加 layerx 段。
 - 读盘（mmap 路径 `graph_store.cppm:459-471`）：`layer_start_ = ptr + cur_vertex_n*level0_size`。
@@ -489,7 +489,7 @@ u8[pos_list_len]
 
 | 项 | 状态 | 需读/验证 |
 |---|---|---|
-| `sizeof(VertexL0)/sizeof(VertexLX)` 的精确 padding | **VERIFY**（公式已定：`level0_size=sizeof(VertexL0)+4*Mmax0`） | 用真实 `.idx` 回读或加 C++ `sizeof` 打印；`graph_store.cppm:31-46` |
+| `sizeof(VertexL0)/sizeof(VertexLX)` 的精确 padding | **已实测确认**：g++ 量测 `sizeof(VertexL0)=24`、`sizeof(VertexLX)=4`（见 §9.1.3），Rust 常量 `knn_format::{VERTEX_L0_SIZE, VERTEX_LX_SIZE}` + `encode/decode_graph_region` 已按其 stride 实现并有往返测试 | — |
 | HNSW chunk 行数恒 ≤ `block_size_`（单 inner 不变式） | **VERIFY** | `new_txn_index_impl.cpp` |
 | HNSW/IVF 是否存在“追加写”优化路径 | **UNKNOWN** | `new_txn_index_impl.cpp`、`segment_index_meta*` |
 | FST 节点状态机/`COMMON_INPUTS` 逐位表 | **未逐位冻结**（结构已给） | `fst/node.cppm:255-814`、`fst/common_inputs.cppm` |

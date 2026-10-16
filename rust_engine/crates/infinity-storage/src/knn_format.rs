@@ -249,10 +249,142 @@ pub const fn levelx_stride(vertex_lx_size: usize, mmax: u64) -> usize {
     vertex_lx_size + 4 * mmax as usize
 }
 
+/// `sizeof(VertexL0)` on the x86_64 SysV ABI.
+///
+/// Measured with g++ 13 (`offsetof`: layer_n_=0, layers_p_=8, neighbor_n_=16,
+/// neighbors_=20, sizeof=24), which settles the §9.5 VERIFY item: the 4 bytes
+/// after `layer_n_` are alignment padding and the struct rounds up to 24 for the
+/// 8-byte pointer.
+pub const VERTEX_L0_SIZE: usize = 24;
+/// `sizeof(VertexLX)`: a single `i32` followed by the flexible array.
+pub const VERTEX_LX_SIZE: usize = 4;
+
+/// A vertex in the serialized HNSW graph.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HnswGraphVertex {
+    /// `layer_n_` — how many layers above level 0 this vertex appears in.
+    pub layer_count: i32,
+    /// Level-0 neighbours (vertex ids), at most `Mmax0`.
+    pub neighbors_l0: Vec<u32>,
+    /// Upper-layer neighbours, one entry per layer (at most `Mmax` each).
+    pub upper: Vec<Vec<u32>>,
+}
+
+/// Encodes the `GraphStoreInner` region: `u64 layer_sum`, the level-0 vertex
+/// records, then the upper-layer records.
+///
+/// Byte layout per `graph_store.cppm:31-46,172-219` — level-0 records are
+/// `VERTEX_L0_SIZE + 4*Mmax0` bytes with `layers_p_` rewritten from a pointer to
+/// a `u64` byte offset into the upper-layer region; upper-layer records are
+/// `VERTEX_LX_SIZE + 4*Mmax` bytes (neighbour count, then the neighbour ids,
+/// zero-padded to `Mmax`).
+pub fn encode_graph_region(vertices: &[HnswGraphVertex], mmax0: u64, mmax: u64) -> Vec<u8> {
+    let l0 = level0_stride(VERTEX_L0_SIZE, mmax0);
+    let lx = levelx_stride(VERTEX_LX_SIZE, mmax);
+    let layer_sum: u64 = vertices.iter().map(|v| v.layer_count.max(0) as u64).sum();
+
+    let mut upper = Vec::with_capacity(layer_sum as usize * lx);
+    // `layers_p_` for each vertex: the offset of its upper-layer block.
+    let mut layers_p = Vec::with_capacity(vertices.len());
+    for v in vertices {
+        layers_p.push(upper.len() as u64);
+        for nbrs in v.upper.iter().take(v.layer_count.max(0) as usize) {
+            let mut rec = Vec::with_capacity(lx);
+            rec.extend_from_slice(&(nbrs.len() as i32).to_le_bytes());
+            for k in 0..mmax as usize {
+                rec.extend_from_slice(&nbrs.get(k).copied().unwrap_or(0).to_le_bytes());
+            }
+            rec.resize(lx, 0);
+            upper.extend_from_slice(&rec);
+        }
+    }
+
+    let mut out = Vec::with_capacity(8 + vertices.len() * l0 + upper.len());
+    out.extend_from_slice(&layer_sum.to_le_bytes());
+    for (v, layer_p) in vertices.iter().zip(&layers_p) {
+        let mut rec = Vec::with_capacity(l0);
+        rec.extend_from_slice(&v.layer_count.to_le_bytes()); // layer_n_
+        rec.resize(16, 0); // 4 bytes of padding, then the 8-byte layers_p_
+        rec[8..16].copy_from_slice(&layer_p.to_le_bytes());
+        rec.extend_from_slice(&(v.neighbors_l0.len() as i32).to_le_bytes());
+        for k in 0..mmax0 as usize {
+            rec.extend_from_slice(&v.neighbors_l0.get(k).copied().unwrap_or(0).to_le_bytes());
+        }
+        rec.resize(l0, 0);
+        out.extend_from_slice(&rec);
+    }
+    out.extend_from_slice(&upper);
+    out
+}
+
+/// Decodes a `GraphStoreInner` region produced by [`encode_graph_region`].
+pub fn decode_graph_region(
+    bytes: &[u8],
+    vertex_count: usize,
+    mmax0: u64,
+    mmax: u64,
+) -> Result<Vec<HnswGraphVertex>, FormatError> {
+    let l0 = level0_stride(VERTEX_L0_SIZE, mmax0);
+    let lx = levelx_stride(VERTEX_LX_SIZE, mmax);
+    if bytes.len() < 8 {
+        return Err(FormatError::Truncated {
+            need: 8,
+            got: bytes.len(),
+        });
+    }
+    let layer_sum = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
+    let upper_at = 8 + vertex_count * l0;
+    if bytes.len() != upper_at + layer_sum as usize * lx {
+        return Err(FormatError::Truncated {
+            need: upper_at + layer_sum as usize * lx,
+            got: bytes.len(),
+        });
+    }
+
+    let mut out = Vec::with_capacity(vertex_count);
+    for v in 0..vertex_count {
+        let at = 8 + v * l0;
+        let layer_count = i32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+        let layers_p = u64::from_le_bytes(bytes[at + 8..at + 16].try_into().unwrap()) as usize;
+        let neighbor_n = i32::from_le_bytes(bytes[at + 16..at + 20].try_into().unwrap());
+        let mut neighbors_l0 = Vec::with_capacity(neighbor_n.max(0) as usize);
+        for k in 0..neighbor_n.max(0) as usize {
+            let s = at + 20 + k * 4;
+            neighbors_l0.push(u32::from_le_bytes(bytes[s..s + 4].try_into().unwrap()));
+        }
+        let mut upper = Vec::with_capacity(layer_count.max(0) as usize);
+        for l in 0..layer_count.max(0) as usize {
+            let s = upper_at + layers_p + l * lx;
+            let n = i32::from_le_bytes(bytes[s..s + 4].try_into().unwrap());
+            let mut nbrs = Vec::with_capacity(n.max(0) as usize);
+            for k in 0..n.max(0) as usize {
+                let e = s + 4 + k * 4;
+                nbrs.push(u32::from_le_bytes(bytes[e..e + 4].try_into().unwrap()));
+            }
+            upper.push(nbrs);
+        }
+        out.push(HnswGraphVertex {
+            layer_count,
+            neighbors_l0,
+            upper,
+        });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn vertex_struct_sizes_match_the_measured_cpp_layout() {
+        // Measured with g++ on x86_64 SysV (see VERTEX_L0_SIZE).
+        assert_eq!(VERTEX_L0_SIZE, 24);
+        assert_eq!(VERTEX_LX_SIZE, 4);
+        // M = 16 -> Mmax0 = 32, Mmax = 16.
+        assert_eq!(level0_stride(VERTEX_L0_SIZE, 32), 152);
+        assert_eq!(levelx_stride(VERTEX_LX_SIZE, 16), 68);
+    }
     #[test]
     fn mmax_follows_the_cpp_formula() {
         assert_eq!(get_mmax(16), (32, 16));
@@ -260,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn header_is_48_bytes_at_fixed_offsets() {
+    fn header_is_56_bytes_at_fixed_offsets() {
         let h = HnswHeader::plain(16, 200, 3, 4);
         let bytes = h.encode();
         assert_eq!(bytes.len(), HNSW_HEADER_LEN);
@@ -350,5 +482,70 @@ mod tests {
         let h = HnswHeader::plain(16, 200, 1, 4);
         assert_eq!(level0_stride(24, h.mmax0), 24 + 4 * 32);
         assert_eq!(levelx_stride(4, h.mmax), 4 + 4 * 16);
+    }
+
+    #[test]
+    fn graph_region_roundtrip() {
+        let mmax0 = 4u64;
+        let mmax = 2u64;
+        let vertices = vec![
+            HnswGraphVertex {
+                layer_count: 1,
+                neighbors_l0: vec![1, 2],
+                upper: vec![vec![3]],
+            },
+            HnswGraphVertex {
+                layer_count: 0,
+                neighbors_l0: vec![0],
+                upper: vec![],
+            },
+            HnswGraphVertex {
+                layer_count: 2,
+                neighbors_l0: vec![0, 1],
+                upper: vec![vec![1], vec![]],
+            },
+        ];
+        let bytes = encode_graph_region(&vertices, mmax0, mmax);
+        let l0 = level0_stride(VERTEX_L0_SIZE, mmax0);
+        let lx = levelx_stride(VERTEX_LX_SIZE, mmax);
+        // u64 layer_sum + 3 level-0 records + (1 + 2) upper records.
+        assert_eq!(&bytes[0..8], &3u64.to_le_bytes());
+        assert_eq!(bytes.len(), 8 + 3 * l0 + 3 * lx);
+        // Vertex 0's level-0 record: layer_n_ = 1, layers_p_ = 0, neighbor_n_ = 2.
+        assert_eq!(i32::from_le_bytes(bytes[8..12].try_into().unwrap()), 1);
+        assert_eq!(u64::from_le_bytes(bytes[16..24].try_into().unwrap()), 0);
+        assert_eq!(i32::from_le_bytes(bytes[24..28].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(bytes[28..32].try_into().unwrap()), 1);
+        assert_eq!(u32::from_le_bytes(bytes[32..36].try_into().unwrap()), 2);
+        // Vertex 1 has no upper layers; vertex 2's block starts after vertex 0's.
+        let v2_at = 8 + 2 * l0;
+        assert_eq!(
+            u64::from_le_bytes(bytes[v2_at + 8..v2_at + 16].try_into().unwrap()),
+            lx as u64
+        );
+
+        let decoded = decode_graph_region(&bytes, vertices.len(), mmax0, mmax).unwrap();
+        assert_eq!(decoded, vertices);
+    }
+
+    #[test]
+    fn graph_region_rejects_wrong_length() {
+        let bytes = encode_graph_region(&[], 4, 2);
+        assert_eq!(bytes, 0u64.to_le_bytes());
+        // Declaring a vertex that is not there is a corruption.
+        assert!(decode_graph_region(&bytes, 1, 4, 2).is_err());
+    }
+
+    #[test]
+    fn graph_region_pads_neighbour_slots() {
+        let v = vec![HnswGraphVertex {
+            layer_count: 0,
+            neighbors_l0: vec![7],
+            upper: vec![],
+        }];
+        let bytes = encode_graph_region(&v, 4, 2);
+        // The single neighbour is followed by three zeroed slots.
+        assert_eq!(u32::from_le_bytes(bytes[28..32].try_into().unwrap()), 7);
+        assert_eq!(&bytes[32..44], &[0u8; 12]);
     }
 }

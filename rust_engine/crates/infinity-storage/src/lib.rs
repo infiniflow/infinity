@@ -30,6 +30,10 @@ pub use cpp_format::{
     DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY, VERSION_FILE,
 };
 pub use crc::crc32_ieee;
+pub use knn_format::{
+    decode_graph_region, encode_graph_region, HnswChunk, HnswGraphVertex, HnswHeader,
+    HNSW_HEADER_LEN, VERTEX_L0_SIZE, VERTEX_LX_SIZE,
+};
 pub use metastore::{FjallMetaStore, MetaStore};
 pub use mvcc::{BlockVersion, CreateField};
 pub use wal::{WalManager, WalRecord, WAL_MAGIC};
