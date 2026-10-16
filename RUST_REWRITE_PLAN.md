@@ -506,6 +506,7 @@ QueryContext::query(sql)
   - **有界 `loom` 模型**：覆盖调度/通道/取消的核心状态机（容量=1、早停、错误、取消）。
   - **`miri`**：跑**不依赖 native/FFI** 的纯 Rust 核心单测（明确排除 FFI 依赖项）。
   - **native sanitizer**：对含 FFI/SIMD 的模块保留 TSAN/ASAN 覆盖（与 C++ 现状对齐）。
+  - **本轮复验（2026-10-17，`scripts/run_gate_d.sh` 的前四项）**：`cargo test -p infinity-txn --lib loom`（`RUSTFLAGS=--cfg loom`）**1 passed**；`cargo +nightly-2025-04-04 miri test -p infinity-expression -p infinity-parser -p infinity-planner` **13+18+8 = 39 passed**、0 失败；`-Zsanitizer=address`/`-Zsanitizer=thread`（`--target x86_64-unknown-linux-gnu -Zbuild-std`）同一组 **39 passed**、退出码 0、无 `AddressSanitizer`/`ThreadSanitizer` 报告。**Gate D 的 Rust 侧（loom/miri/ASan/TSAN）在本 revision 上全绿**；`python/parallel_test` 见 Gate B–D 证据条（并行会话实测 16 passed / 2 failed）。
   - **压测工作负载**：并行导入/查询/重启混合，明确排除项与已知边界。
 
 ### Gate E — 性能（回归门槛）
