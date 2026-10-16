@@ -150,16 +150,40 @@ enum ElemType {
     Bit,
     Int8,
     UInt8,
+    Int16,
+    Int32,
+    Int64,
+}
+
+impl ElemType {
+    /// Whether the element type is an integer, which selects the integer SIMD
+    /// distance functions (squared L2 without the square root).
+    fn is_integer(self) -> bool {
+        matches!(
+            self,
+            ElemType::Int8 | ElemType::UInt8 | ElemType::Int16 | ElemType::Int32 | ElemType::Int64
+        )
+    }
 }
 
 fn elem_type_of(token: &str) -> ElemType {
-    match token.trim().to_ascii_uppercase().as_str() {
+    // The parser concatenates type tokens without spaces (`UNSIGNEDTINYINT`),
+    // so compare against a whitespace-free uppercase form.
+    let t: String = token
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    match t.as_str() {
         "FLOAT16" | "FP16" | "HALF" => ElemType::Float16,
         "BFLOAT16" | "BF16" => ElemType::BFloat16,
         "DOUBLE" | "FLOAT64" => ElemType::Float64,
         "BIT" => ElemType::Bit,
         "INT8" | "TINYINT" => ElemType::Int8,
-        "UINT8" => ElemType::UInt8,
+        "UINT8" | "UNSIGNEDTINYINT" | "UTINYINT" | "UNSIGNEDINT8" => ElemType::UInt8,
+        "INT16" | "SMALLINT" => ElemType::Int16,
+        "INT32" | "INT" | "INTEGER" => ElemType::Int32,
+        "INT64" | "BIGINT" | "LONG" => ElemType::Int64,
         _ => ElemType::Float32,
     }
 }
@@ -1749,7 +1773,8 @@ impl Engine {
                     if qv.is_empty() || rv.len() != qv.len() {
                         continue;
                     }
-                    let (sim, dist) = vector_score(&qv, &rv, &metric);
+                    let int_elem = vector_col_elem(&types, col_idx);
+                    let (sim, dist) = vector_score(&qv, &rv, &metric, int_elem);
                     scored.push((*seq, sim, dist));
                 }
             }
@@ -2195,7 +2220,7 @@ fn parse_topn_param(p: &str) -> Option<usize> {
 }
 
 /// Returns `(similarity, distance)` for the given metric.
-fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
+fn vector_score(q: &[f64], v: &[f64], metric: &str, int_elem: bool) -> (f64, f64) {
     let dot: f64 = q.iter().zip(v).map(|(a, b)| a * b).sum();
     let nq: f64 = q.iter().map(|a| a * a).sum::<f64>().sqrt();
     let nv: f64 = v.iter().map(|a| a * a).sum::<f64>().sqrt();
@@ -2210,15 +2235,21 @@ fn vector_score(q: &[f64], v: &[f64], metric: &str) -> (f64, f64) {
             (c, 1.0 - c)
         }
         _ => {
-            let d: f64 = q
-                .iter()
-                .zip(v)
-                .map(|(a, b)| (a - b) * (a - b))
-                .sum::<f64>()
-                .sqrt();
+            let sq: f64 = q.iter().zip(v).map(|(a, b)| (a - b) * (a - b)).sum();
+            // Integer element types use the integer L2 kernel, which returns the
+            // squared distance without taking the square root.
+            let d = if int_elem { sq } else { sq.sqrt() };
             (1.0 / (1.0 + d), d)
         }
     }
+}
+
+/// Whether the embedding column at `col_idx` has an integer element type.
+fn vector_col_elem(types: &[String], col_idx: usize) -> bool {
+    types
+        .get(col_idx)
+        .map(|t| tensor_elem_type(t).is_integer())
+        .unwrap_or(false)
 }
 
 /// Runs the operator stages over rows received from a bounded producer/consumer
@@ -2764,5 +2795,28 @@ mod tests {
         let d2 = vec![vec![0.0, 1.0, 0.0, 0.0]];
         let s2 = tensor_maxsim(&q, &d2, ElemType::Bit, ElemType::Float32);
         assert!((s2 - (-10.0)).abs() < 1e-9, "got {s2}");
+    }
+
+    #[test]
+    fn integer_embeddings_report_squared_l2() {
+        // u8/i8 columns use the integer L2 kernel (no square root).
+        let (_, d_int) = vector_score(&[0.0, 0.0, 0.0], &[2.0, 3.0, 4.0], "l2", true);
+        assert!((d_int - 29.0).abs() < 1e-9, "got {d_int}");
+        let (_, d_float) = vector_score(&[0.0, 0.0, 0.0], &[2.0, 3.0, 4.0], "l2", false);
+        assert!((d_float - 29.0f64.sqrt()).abs() < 1e-9, "got {d_float}");
+        // ip is a plain dot product regardless of element type.
+        let (s_int, _) = vector_score(&[3.0, 2.0, 1.0], &[10.0, 11.0, 12.0], "ip", true);
+        assert!((s_int - 64.0).abs() < 1e-9, "got {s_int}");
+    }
+
+    #[test]
+    fn element_type_detection_is_space_insensitive() {
+        assert_eq!(elem_type_of("UNSIGNED TINYINT"), ElemType::UInt8);
+        assert_eq!(elem_type_of("UNSIGNEDTINYINT"), ElemType::UInt8);
+        assert_eq!(
+            tensor_elem_type("EMBEDDING(UNSIGNEDTINYINT,3)"),
+            ElemType::UInt8
+        );
+        assert_eq!(tensor_elem_type("TENSOR(FLOAT16, 4)"), ElemType::Float16);
     }
 }
