@@ -4,6 +4,9 @@
 
 #![forbid(unsafe_code)]
 
+/// C++-compatible value encoding for catalog records (spec §8.6).
+pub mod value_format;
+
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
