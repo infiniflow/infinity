@@ -25,7 +25,7 @@ pub struct SelectPlan<'a> {
 }
 
 /// The node header line: `PROJECT (3)` at the root, `   -> SORT (4)` below it.
-fn header(depth: usize, name: &str, id: u64) -> String {
+pub(crate) fn header(depth: usize, name: &str, id: u64) -> String {
     if depth == 0 {
         format!(" {name} ({id})")
     } else {
@@ -34,12 +34,12 @@ fn header(depth: usize, name: &str, id: u64) -> String {
 }
 
 /// An attribute line: `  - table index: #4`.
-fn attr(depth: usize, text: &str) -> String {
+pub(crate) fn attr(depth: usize, text: &str) -> String {
     format!("{}- {text}", " ".repeat(2 * (depth + 1)))
 }
 
 /// Appends `name` to `out` (unique), keeping `__rowid` last.
-fn add_col(out: &mut Vec<String>, name: &str) {
+pub(crate) fn add_col(out: &mut Vec<String>, name: &str) {
     if out.iter().any(|c| c == name) {
         return;
     }
@@ -53,7 +53,7 @@ fn add_col(out: &mut Vec<String>, name: &str) {
 }
 
 /// Column names referenced by an expression, in order of first appearance.
-fn expr_cols(e: &ExprAst, out: &mut Vec<String>) {
+pub(crate) fn expr_cols(e: &ExprAst, out: &mut Vec<String>) {
     match e {
         ExprAst::Column(c) => add_col(out, c),
         ExprAst::Literal(_) => {}
@@ -99,7 +99,7 @@ fn pred_cols(p: &Predicate, out: &mut Vec<String>) {
     }
 }
 
-fn bin_text(op: BinOp) -> &'static str {
+pub(crate) fn bin_text(op: BinOp) -> &'static str {
     match op {
         BinOp::Add => "+",
         BinOp::Sub => "-",
@@ -109,7 +109,7 @@ fn bin_text(op: BinOp) -> &'static str {
     }
 }
 
-fn cmp_text(op: CmpOp) -> &'static str {
+pub(crate) fn cmp_text(op: CmpOp) -> &'static str {
     match op {
         CmpOp::Eq => "=",
         CmpOp::Ne => "!=",
@@ -120,7 +120,7 @@ fn cmp_text(op: CmpOp) -> &'static str {
     }
 }
 
-fn bool_text(op: BoolOp) -> &'static str {
+pub(crate) fn bool_text(op: BoolOp) -> &'static str {
     match op {
         BoolOp::And => "AND",
         BoolOp::Or => "OR",
@@ -128,7 +128,7 @@ fn bool_text(op: BoolOp) -> &'static str {
 }
 
 /// Renders an expression, annotating each column with `(#id)`.
-fn render_expr(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
+pub(crate) fn render_expr(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
     match e {
         ExprAst::Column(c) => match ids.get(c) {
             Some(i) => format!("{c} (#{i})"),
@@ -158,14 +158,14 @@ fn render_expr(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
 }
 
 /// A comparison operand: a bare column is wrapped in `CAST(… AS BigInt)`.
-fn render_cmp_operand(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
+pub(crate) fn render_cmp_operand(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
     match e {
         ExprAst::Column(_) => format!("CAST({} AS BigInt)", render_expr(e, ids)),
         other => render_expr(other, ids),
     }
 }
 
-fn render_pred(p: &Predicate, ids: &HashMap<String, usize>) -> String {
+pub(crate) fn render_pred(p: &Predicate, ids: &HashMap<String, usize>) -> String {
     match p {
         Predicate::Cmp(a, op, b) => format!(
             "{} {} {}",

@@ -32,6 +32,8 @@ use tokio::sync::mpsc;
 
 mod explain;
 
+mod explain_search;
+
 mod cpp_blocks;
 
 /// Result of executing one statement.
@@ -1517,6 +1519,25 @@ impl Engine {
             .columns)
     }
 
+    fn table_meta(&self, table: &str) -> Result<infinity_catalog::TableMeta> {
+        self.catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))
+    }
+
+    /// Columns of `table` that carry any index, for the `EXPLAIN` index/leftover
+    /// filter split.
+    fn indexed_columns(&self, table: &str) -> Result<Vec<String>> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        Ok(self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .filter(|i| i.table == short || i.table == table)
+            .map(|i| i.column)
+            .collect())
+    }
+
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
@@ -1807,6 +1828,30 @@ impl Engine {
                                 order_by,
                             },
                         ))
+                    }
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
+                        search: Some(s),
+                        where_pred,
+                        limit,
+                        offset,
+                        ..
+                    } if join.is_none() => {
+                        let meta = self.table_meta(t)?;
+                        let indexed = self.indexed_columns(t)?;
+                        crate::explain_search::explain_search(&crate::explain_search::SearchPlan {
+                            items,
+                            table: t,
+                            search: s,
+                            limit: *limit,
+                            offset: *offset,
+                            where_pred: where_pred.as_ref(),
+                            schema: &meta.columns,
+                            types: &meta.types,
+                            indexed: &indexed,
+                        })
                     }
                     Statement::Select {
                         items,
