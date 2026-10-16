@@ -20,7 +20,8 @@ use infinity_common::{Error, Result};
 use infinity_expression::{aggregate, Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::{
-    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, SearchClause, SelectItem, Statement,
+    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, MatchClause, SearchClause, SelectItem,
+    Statement,
 };
 use infinity_planner::{plan_select, LogicalPlan};
 use infinity_storage::{FjallMetaStore, MetaStore};
@@ -2398,6 +2399,96 @@ impl Engine {
         Ok(())
     }
 
+    /// Selects rows for `SEARCH MATCH TEXT` by term presence. This reproduces
+    /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
+    /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
+    /// `threshold` yields no rows rather than wrong ones.
+    fn search_text_terms(
+        &self,
+        table: &str,
+        m: &MatchClause,
+        hidden: &[String],
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let schema = self.table_schema(table)?;
+        let params = arg_str(m.args.get(1)).unwrap_or_default();
+        if params.to_ascii_lowercase().contains("threshold") {
+            return Ok((Vec::new(), hidden.to_vec()));
+        }
+        let query = arg_str(m.args.first()).unwrap_or_default();
+        let terms: Vec<String> = query
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .map(|t| t.to_ascii_lowercase())
+            .filter(|t| !t.is_empty() && t != "or" && t != "and")
+            .collect();
+        if terms.is_empty() {
+            return Ok((Vec::new(), hidden.to_vec()));
+        }
+        let min_should = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
+            .map(|(_, v)| {
+                let v = v.trim();
+                match v.strip_suffix('%') {
+                    Some(num) => {
+                        let pct: f64 = num.trim().parse().unwrap_or(0.0);
+                        ((pct / 100.0) * terms.len() as f64).ceil().max(1.0) as usize
+                    }
+                    None => v.parse::<usize>().unwrap_or(1),
+                }
+            })
+            .unwrap_or(1);
+        let topn = parse_topn_param(&params).unwrap_or(10);
+        let ci = match schema.iter().position(|c| c == &m.column) {
+            Some(i) => i,
+            None => return Ok((Vec::new(), hidden.to_vec())),
+        };
+        let in_filter = match m.filter.as_ref() {
+            Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
+            None => None,
+        };
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        for (seq, row) in self.fetch_rows_with_ids(table)? {
+            if let Some(p) = &in_filter {
+                if !p.eval_predicate(&row) {
+                    continue;
+                }
+            }
+            let text = match row.get(ci) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => continue,
+            };
+            let doc: std::collections::HashSet<String> = text
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .map(|t| t.to_ascii_lowercase())
+                .filter(|t| !t.is_empty())
+                .collect();
+            let hits = terms.iter().filter(|t| doc.contains(*t)).count();
+            if hits >= min_should && hits > 0 {
+                scored.push((seq, hits as f64));
+            }
+        }
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        scored.truncate(topn);
+        let mut by_id: HashMap<usize, Vec<Value>> =
+            self.fetch_rows_with_ids(table)?.into_iter().collect();
+        let mut out = Vec::new();
+        for (seq, score) in scored {
+            let mut row = by_id.remove(&seq).unwrap_or_default();
+            row.push(Value::Int(seq as i64));
+            row.push(Value::Float(score));
+            row.push(Value::Float(0.0));
+            row.push(Value::Float(score));
+            out.push(row);
+        }
+        Ok((out, hidden.to_vec()))
+    }
+
     /// Rejects `SUM`/`AVG` over a non-numeric column.
     fn validate_aggregate_args(&self, table: &str, items: &[SelectItem]) -> Result<()> {
         let schema = self.table_schema(table)?;
@@ -2692,6 +2783,9 @@ impl Engine {
         };
         let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
+        if m.kind.eq_ignore_ascii_case("TEXT") {
+            return self.search_text_terms(table, m, &hidden);
+        }
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
         }
