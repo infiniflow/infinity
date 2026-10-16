@@ -200,11 +200,19 @@ pub(crate) fn render_expr_m(e: &ExprAst, ids: &HashMap<String, usize>, logical: 
     }
 }
 
-/// A comparison operand: a bare column is wrapped in `CAST(… AS BigInt)`.
-pub(crate) fn render_cmp_operand(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
-    match e {
-        ExprAst::Column(_) => format!("CAST({} AS BigInt)", render_expr(e, ids)),
-        other => render_expr(other, ids),
+/// A comparison operand: a column is widened to BigInt only when matched
+/// against an integer literal (`c2 = 5`), not against another column
+/// (`c1 = c2`) or a non-integer literal (`name = 'x'`).
+fn cmp_operand_m(
+    this: &ExprAst,
+    other: &ExprAst,
+    ids: &HashMap<String, usize>,
+    logical: bool,
+) -> String {
+    if matches!(this, ExprAst::Column(_)) && matches!(other, ExprAst::Literal(Literal::Int(_))) {
+        format!("CAST({} AS BigInt)", render_expr_m(this, ids, logical))
+    } else {
+        render_expr_m(this, ids, logical)
     }
 }
 
@@ -212,9 +220,9 @@ pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical
     match p {
         Predicate::Cmp(a, op, b) => format!(
             "{} {} {}",
-            render_cmp_operand(a, ids),
+            cmp_operand_m(a, b, ids, logical),
             cmp_text(*op),
-            render_cmp_operand(b, ids)
+            cmp_operand_m(b, a, ids, logical)
         ),
         Predicate::Bool(a, op, b) => format!(
             "{} {} {}",
