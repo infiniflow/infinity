@@ -259,7 +259,13 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                 Some(t) if is_tensor_type(t) => {
                     let d = type_dim(t).unwrap_or(0);
                     if is_bit_type(t) {
-                        reshape_bit_tensor(&s, d)
+                        let packed = reshape_bit_tensor(&s, d);
+                        // a TENSORARRAY keeps an extra nesting level
+                        if t.to_ascii_uppercase().starts_with("TENSORARRAY") {
+                            format!("[{packed}]")
+                        } else {
+                            packed
+                        }
                     } else {
                         reshape_tensor(&s, d)
                     }
@@ -853,6 +859,22 @@ impl Engine {
                 }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
                 let types = self.column_types(table)?;
+                // a TENSORARRAY literal must be triple-nested (`[[[…]]]`)
+                for row in &rows {
+                    for (i, cell) in row.iter().enumerate() {
+                        if let Some(t) = types.get(i) {
+                            if t.to_ascii_uppercase().starts_with("TENSORARRAY") {
+                                let lit = cell.to_slt_string();
+                                let lit = lit.trim();
+                                if !lit.is_empty() && !lit.starts_with("[[[") {
+                                    return Err(Error::Invalid(
+                                        "TENSORARRAY value must be nested as [[[…]]]".into(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
                 // one transaction -> one WAL record + one KV batch (batched durability)
                 let mut t = self.txn.begin();
                 for (k, row) in rows.iter().enumerate() {
