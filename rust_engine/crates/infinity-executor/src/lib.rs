@@ -296,6 +296,21 @@ fn is_array_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("ARRAY")
 }
 
+/// Whether an `ARRAY(<elem>)` type's element type is a float type.
+fn array_elem_is_float(type_text: &str) -> bool {
+    let t = type_text.to_ascii_uppercase();
+    let inner = t.split('(').nth(1).unwrap_or("").trim_end_matches(')');
+    is_float_type(inner.trim())
+}
+
+/// Renders a numeric token with six decimals, falling back to the raw token.
+fn fmt_float6(token: &str) -> String {
+    match token.trim().parse::<f64>() {
+        Ok(f) => format!("{f:.6}"),
+        Err(_) => token.to_string(),
+    }
+}
+
 /// Bracket depth at which each numeric leaf of a literal appears.
 fn array_leaf_depths(text: &str) -> Vec<usize> {
     let mut depths = Vec::new();
@@ -318,6 +333,22 @@ fn array_leaf_depths(text: &str) -> Vec<usize> {
         }
     }
     depths
+}
+
+/// The elements of a brace array literal `{a,b,c}` (as `.slt` text), in order,
+/// or `None` when the value is not brace-delimited.
+fn brace_array_elems(cell: &str) -> Option<Vec<String>> {
+    let t = cell.trim();
+    let inner = t.strip_prefix('{')?.strip_suffix('}')?;
+    if inner.trim().is_empty() {
+        return Some(Vec::new());
+    }
+    Some(
+        split_top_level(inner)
+            .iter()
+            .map(|s| s.trim().to_string())
+            .collect(),
+    )
 }
 
 /// The innermost numeric groups of an array literal, in order, each as its list
@@ -1325,6 +1356,13 @@ impl Engine {
                         if let Some(ExprAst::Column(col)) = args.first() {
                             let schema = self.table_schema(t)?;
                             if let Some(ci) = schema.iter().position(|c| c == col) {
+                                // Array elements render as six-decimal floats for
+                                // float element types, matching `.slt` output.
+                                let float_elems = self
+                                    .column_types(t)?
+                                    .get(ci)
+                                    .map(|ty| array_elem_is_float(ty))
+                                    .unwrap_or(false);
                                 let pred = match where_pred.as_ref() {
                                     Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
                                     None => None,
@@ -1367,17 +1405,30 @@ impl Engine {
                                     };
                                     match row.get(ci) {
                                         Some(Value::Str(cell)) => {
-                                            match infinity_expression::json::parse(cell) {
-                                                Some(infinity_expression::json::Json::Arr(
-                                                    elems,
-                                                )) => {
-                                                    for e in elems {
-                                                        emit(e.compact());
-                                                    }
+                                            // An `ARRAY` column renders as a brace
+                                            // literal `{a,b,c}`; a JSON column uses
+                                            // `[...]`.
+                                            if let Some(elems) = brace_array_elems(cell) {
+                                                for e in elems {
+                                                    emit(if float_elems {
+                                                        fmt_float6(&e)
+                                                    } else {
+                                                        e
+                                                    });
                                                 }
-                                                // Unnest of an object / scalar yields itself.
-                                                Some(other) => emit(other.compact()),
-                                                None => {}
+                                            } else {
+                                                match infinity_expression::json::parse(cell) {
+                                                    Some(infinity_expression::json::Json::Arr(
+                                                        elems,
+                                                    )) => {
+                                                        for e in elems {
+                                                            emit(e.compact());
+                                                        }
+                                                    }
+                                                    // Unnest of an object / scalar yields itself.
+                                                    Some(other) => emit(other.compact()),
+                                                    None => {}
+                                                }
                                             }
                                         }
                                         Some(other) if !matches!(other, Value::Null) => {

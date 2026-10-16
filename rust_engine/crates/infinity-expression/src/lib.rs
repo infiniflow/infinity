@@ -268,6 +268,49 @@ fn eval_binary(a: &Value, op: BinOp, b: &Value) -> Value {
 }
 
 /// `CAST(value AS type)`; out-of-range / unparseable numeric casts yield NULL.
+/// The leading numeric prefix of `s` (optional sign, digits, optional fraction
+/// and exponent), or `None` when `s` does not start with a number. Mirrors the
+/// implicit string-to-number cast behind `CAST('300test' AS INT)`.
+fn leading_number(s: &str) -> Option<&str> {
+    let t = s.trim_start();
+    let bytes = t.as_bytes();
+    let mut i = 0;
+    if i < bytes.len() && (bytes[i] == b'+' || bytes[i] == b'-') {
+        i += 1;
+    }
+    let digits_start = i;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == digits_start {
+        return None;
+    }
+    if i < bytes.len() && bytes[i] == b'.' {
+        let j = i + 1;
+        let mut k = j;
+        while k < bytes.len() && bytes[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > j {
+            i = k;
+        }
+    }
+    if i < bytes.len() && (bytes[i] == b'e' || bytes[i] == b'E') {
+        let mut k = i + 1;
+        if k < bytes.len() && (bytes[k] == b'+' || bytes[k] == b'-') {
+            k += 1;
+        }
+        let d0 = k;
+        while k < bytes.len() && bytes[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > d0 {
+            i = k;
+        }
+    }
+    Some(&t[..i])
+}
+
 fn cast_value(v: &Value, ty: &str) -> Value {
     if matches!(v, Value::Null) {
         return Value::Null;
@@ -277,7 +320,11 @@ fn cast_value(v: &Value, ty: &str) -> Value {
             Value::Int(i) => Some(*i),
             Value::Float(f) => Some(*f as i64),
             Value::Bool(b) => Some(i64::from(*b)),
-            Value::Str(s) => s.trim().parse::<i64>().ok(),
+            Value::Str(s) => s
+                .trim()
+                .parse::<i64>()
+                .ok()
+                .or_else(|| leading_number(s).and_then(|p| p.parse::<i64>().ok())),
             Value::Null => None,
         }
     };
@@ -286,7 +333,11 @@ fn cast_value(v: &Value, ty: &str) -> Value {
             Value::Int(i) => Some(*i as f64),
             Value::Float(f) => Some(*f),
             Value::Bool(b) => Some(f64::from(u8::from(*b))),
-            Value::Str(s) => s.trim().parse::<f64>().ok(),
+            Value::Str(s) => s
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .or_else(|| leading_number(s).and_then(|p| p.parse::<f64>().ok())),
             Value::Null => None,
         }
     };
@@ -780,11 +831,8 @@ pub fn aggregate(func: AggFunc, cols: &[usize], distinct: bool, rows: &[Vec<Valu
                 }
             }
             if vals.is_empty() {
-                return if func == AggFunc::Avg {
-                    Value::Null
-                } else {
-                    Value::Int(0)
-                };
+                // SUM/AVG over no non-NULL values is NULL, not zero.
+                return Value::Null;
             }
             match func {
                 AggFunc::Sum if all_int => Value::Int(sum as i64),
@@ -832,6 +880,35 @@ mod tests {
     fn column_and_literal() {
         assert_eq!(Expr::Column(1).eval(&row()), Value::Str("alice".into()));
         assert_eq!(Expr::Literal(Value::Int(9)).eval(&row()), Value::Int(9));
+    }
+
+    #[test]
+    fn cast_parses_leading_numeric_prefix() {
+        // A string that starts with digits casts to that prefix; a leading
+        // non-digit yields NULL, as the C++ engine does.
+        assert_eq!(
+            cast_value(&Value::Str("300test".into()), "INT"),
+            Value::Int(300)
+        );
+        assert_eq!(
+            cast_value(&Value::Str("100".into()), "INT"),
+            Value::Int(100)
+        );
+        assert_eq!(cast_value(&Value::Str("Hi200".into()), "INT"), Value::Null);
+        assert_eq!(cast_value(&Value::Str("hello".into()), "INT"), Value::Null);
+        assert_eq!(
+            cast_value(&Value::Str("3.5x".into()), "DOUBLE"),
+            Value::Float(3.5)
+        );
+    }
+
+    #[test]
+    fn sum_over_empty_is_null() {
+        // SUM/AVG over no non-NULL rows is NULL (COUNT is 0).
+        assert_eq!(aggregate(AggFunc::Sum, &[0], false, &[]), Value::Null);
+        assert_eq!(aggregate(AggFunc::Avg, &[0], false, &[]), Value::Null);
+        assert_eq!(aggregate(AggFunc::Count, &[0], false, &[]), Value::Int(0));
+        assert_eq!(aggregate(AggFunc::Min, &[0], false, &[]), Value::Null);
     }
 
     #[test]
