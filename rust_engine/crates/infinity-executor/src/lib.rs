@@ -1315,6 +1315,9 @@ pub struct Engine {
     dir: PathBuf,
     /// secondary indexes keyed by `"<table>.<column>"`
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
+    /// Vector indexes loaded from the C++ block mirror, keyed by
+    /// `"<table>.<column>"` (plan #70: the persisted HNSW graph, on disk).
+    vector_indexes: Mutex<HashMap<String, Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
@@ -1376,6 +1379,7 @@ impl Engine {
             exchange_capacity: exchange_capacity.max(1),
             dir,
             indexes: Mutex::new(HashMap::new()),
+            vector_indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
@@ -1426,6 +1430,17 @@ impl Engine {
                 .any(|c| c == &im.column)
             {
                 self.build_index(&im.table, &im.column)?;
+            }
+            // A vector index's persisted HNSW graph, loaded so the search path
+            // can walk it (best-effort: a table without a mirror just brute
+            // forces).
+            if im.index_type.eq_ignore_ascii_case("HNSW") {
+                if let Ok(loaded) = self.load_vector_index(&im.table, &im.name) {
+                    self.vector_indexes
+                        .lock()
+                        .unwrap()
+                        .insert(index_key(&im.table, &im.column), Arc::new(loaded));
+                }
             }
         }
         Ok(())
@@ -3313,6 +3328,9 @@ impl Engine {
                 / docs.len() as f64
         };
         let avg_len = if avg_len <= 0.0 { 1.0 } else { avg_len };
+        // A `keyword`/`whitespace` field scores constantly: one field-boost
+        // point per matching document (not per query term).
+        let keyword_field = matches!(&delims, Some(d) if d.is_empty());
         let mut scored: Vec<(usize, f64)> = Vec::new();
         for (seq, row, toks, live) in &docs {
             if !live {
@@ -3337,7 +3355,20 @@ impl Engine {
             let len = toks.len().saturating_sub(1) as f64;
             let mut score = 0.0f64;
             let mut hits = 0usize;
+            if keyword_field {
+                for term in &terms {
+                    if counts.contains_key(term.as_str()) {
+                        hits += 1;
+                    }
+                }
+                if hits > 0 {
+                    score = field_boosts.first().copied().unwrap_or(1.0);
+                }
+            }
             for (ti, term) in terms.iter().enumerate() {
+                if keyword_field {
+                    break;
+                }
                 let tf = match counts.get(term.as_str()) {
                     Some(c) => *c as f64,
                     None => continue,
@@ -4015,6 +4046,44 @@ impl Engine {
         let rows = self.fetch_rows_with_ids(table)?;
         // A `bit` sparse column scores and renders as an integer.
         let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
+        // Walk a persisted HNSW graph instead of every row when one is loaded
+        // for this column (plan #70). The candidates are still scored exactly
+        // below, so the ranking equals the exhaustive scan whenever the graph
+        // yields the whole top-`k` — `k` is generous and capped by the row
+        // count, which fully covers a small table.
+        let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
+            if is_sparse || is_tensor || metric != "l2" {
+                return None;
+            }
+            let col_name = match_columns(&m.column).first()?.clone();
+            let loaded = self
+                .vector_indexes
+                .lock()
+                .unwrap()
+                .get(&index_key(table, &col_name))
+                .cloned()?;
+            let col_type = types.get(col_idx)?.to_ascii_uppercase();
+            if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
+                return None; // the graph is a single-vector L2 index
+            }
+            let qv: Vec<f32> = query_items
+                .iter()
+                .filter_map(|x| x.parse::<f64>().ok())
+                .map(|x| x as f32)
+                .collect();
+            if qv.is_empty() || qv.len() != loaded.index.dims() {
+                return None;
+            }
+            let k = (topn * 4).max(64).min(loaded.labels.len());
+            Some(
+                loaded
+                    .index
+                    .search(&qv, k)
+                    .into_iter()
+                    .map(|(node, _)| loaded.labels[node] as usize)
+                    .collect(),
+            )
+        })();
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
         for (seq, row) in &rows {
             // The WHERE predicate filters candidates *before* top-N ranking.
@@ -4025,6 +4094,11 @@ impl Engine {
             }
             if let Some(p) = &in_filter {
                 if !p.eval_predicate(row) {
+                    continue;
+                }
+            }
+            if let Some(cands) = &vector_candidates {
+                if !cands.contains(seq) {
                     continue;
                 }
             }
