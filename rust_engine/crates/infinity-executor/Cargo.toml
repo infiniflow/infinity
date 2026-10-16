@@ -15,5 +15,11 @@ infinity-planner.workspace = true
 infinity-index.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 
+[features]
+default = []
+# Run the engine's MetaStore on RocksDB (C++-compatible catalog substrate,
+# plan §2.6.1 item 4) instead of the pure-Rust fjall store.
+rocksdb-store = ["infinity-storage/rocksdb-store"]
+
 [dev-dependencies]
 tempfile.workspace = true

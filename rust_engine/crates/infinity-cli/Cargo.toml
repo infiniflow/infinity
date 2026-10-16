@@ -15,3 +15,7 @@ infinity-catalog.workspace = true
 infinity-txn.workspace = true
 infinity-executor.workspace = true
 infinity-server.workspace = true
+
+[features]
+default = []
+rocksdb-store = ["infinity-executor/rocksdb-store"]
