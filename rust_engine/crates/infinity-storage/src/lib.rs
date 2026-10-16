@@ -30,6 +30,11 @@ pub use cpp_format::{
     DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY, VERSION_FILE,
 };
 pub use crc::crc32_ieee;
+pub use inverted_format::{
+    append_fst_trailer, decode_column_lengths, decode_term_meta, encode_column_lengths,
+    encode_term_meta, encode_term_meta_region, fst_checksum, read_vint, verify_fst, write_vint,
+    TermMeta, TermMetaFlags, TermPostings, FST_TRAILER_LEN, FST_VERSION,
+};
 pub use knn_format::{
     decode_graph_region, decode_ivf_plain_chunk, encode_graph_region, encode_ivf_plain_chunk,
     HnswChunk, HnswGraphVertex, HnswHeader, IvfChunkHeader, IvfPlainPart, HNSW_HEADER_LEN,

@@ -284,9 +284,97 @@ impl TermPostings {
     }
 }
 
+/// FST format version written by the C++ builder (`fst/node.cppm:40`).
+pub const FST_VERSION: u64 = 3;
+
+/// Bytes of the FST trailer: `u64 len_`, `u64 root_addr`, `u32 checksum`.
+pub const FST_TRAILER_LEN: usize = 20;
+
+/// The masked CRC-32/IEEE the C++ FST writer stores and `Fst::Verify` checks
+/// (`fst/writer.cppm:80-83`; `fst.cppm:134-144`):
+/// `((crc >> 15) | (crc << 17)) + 0xa282ead8`.
+pub fn fst_checksum(bytes: &[u8]) -> u32 {
+    crate::crc::crc32_ieee(bytes)
+        .rotate_right(15)
+        .wrapping_add(0xa282_ead8)
+}
+
+/// Appends the trailer the C++ FST writer puts at the end of an FST region.
+///
+/// `Fst::Verify` computes `CRC32IEEE(data_ptr_, data_len_ - 4)` over the whole
+/// FST buffer, so the checksum covers the `len_` and `root_addr` fields too and
+/// must be computed after they are appended (only the 4-byte checksum itself is
+/// excluded).
+pub fn append_fst_trailer(fst: &mut Vec<u8>, len: u64, root_addr: u64) {
+    fst.extend_from_slice(&len.to_le_bytes());
+    fst.extend_from_slice(&root_addr.to_le_bytes());
+    let checksum = fst_checksum(fst);
+    fst.extend_from_slice(&checksum.to_le_bytes());
+}
+
+/// Reads the FST trailer and verifies the checksum, returning `(len_, root_addr)`.
+pub fn verify_fst(buf: &[u8]) -> Result<(u64, u64), FormatError> {
+    if buf.len() < FST_TRAILER_LEN {
+        return Err(FormatError::Truncated {
+            need: FST_TRAILER_LEN,
+            got: buf.len(),
+        });
+    }
+    let at = buf.len() - FST_TRAILER_LEN;
+    let len = u64::from_le_bytes(buf[at..at + 8].try_into().unwrap());
+    let root_addr = u64::from_le_bytes(buf[at + 8..at + 16].try_into().unwrap());
+    let expected = u32::from_le_bytes(buf[at + 16..at + 20].try_into().unwrap());
+    let got = fst_checksum(&buf[..buf.len() - 4]);
+    if got != expected {
+        return Err(FormatError::Checksum { expected, got });
+    }
+    Ok((len, root_addr))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fst_trailer_roundtrip_and_verification() {
+        // A toy FST body: the version, the FstType and some node bytes.
+        let mut fst = Vec::new();
+        fst.extend_from_slice(&FST_VERSION.to_le_bytes());
+        fst.extend_from_slice(&0u64.to_le_bytes());
+        fst.extend_from_slice(&[0xab; 7]);
+        append_fst_trailer(&mut fst, 42, 0); // 42 keys, root at offset 0
+        assert_eq!(fst.len(), 8 + 8 + 7 + FST_TRAILER_LEN);
+
+        let (len, root_addr) = verify_fst(&fst).unwrap();
+        assert_eq!((len, root_addr), (42, 0));
+        // The trailer fields sit at len-20 / len-12 / len-4.
+        let at = fst.len() - FST_TRAILER_LEN;
+        assert_eq!(&fst[at..at + 8], &42u64.to_le_bytes());
+        assert_eq!(&fst[at + 8..at + 16], &0u64.to_le_bytes());
+        // `fst_len_from_trailer` recovers the whole region from the root addr.
+        assert_eq!(fst_len_from_trailer(root_addr), 36);
+
+        // Any corruption before the checksum fails verification.
+        let mut bad = fst.clone();
+        bad[16] ^= 0xff;
+        assert!(matches!(
+            verify_fst(&bad),
+            Err(FormatError::Checksum { .. })
+        ));
+        assert!(verify_fst(&fst[..8]).is_err());
+    }
+
+    #[test]
+    fn masked_checksum_matches_the_cpp_formula() {
+        // The mask is a 15-bit rotate plus the Snappy constant.
+        let crc = crate::crc::crc32_ieee(b"abc");
+        assert_eq!(
+            fst_checksum(b"abc"),
+            crc.rotate_right(15).wrapping_add(0xa282_ead8)
+        );
+        // Distinct inputs give distinct masked checksums.
+        assert_ne!(fst_checksum(b"abc"), fst_checksum(b"abd"));
+    }
 
     #[test]
     fn vint_matches_leb128() {

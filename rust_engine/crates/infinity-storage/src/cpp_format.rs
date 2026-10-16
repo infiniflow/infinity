@@ -35,6 +35,8 @@ pub enum FormatError {
     Truncated { need: usize, got: usize },
     /// The leading magic did not match [`DATA_FILE_MAGIC`].
     BadMagic(u64),
+    /// A stored checksum did not match the computed one.
+    Checksum { expected: u32, got: u32 },
 }
 
 impl std::fmt::Display for FormatError {
@@ -44,6 +46,12 @@ impl std::fmt::Display for FormatError {
                 write!(f, "truncated: need {need} bytes, got {got}")
             }
             FormatError::BadMagic(m) => write!(f, "bad data-file magic: {m:#x}"),
+            FormatError::Checksum { expected, got } => {
+                write!(
+                    f,
+                    "checksum mismatch: expected {expected:#010x}, got {got:#010x}"
+                )
+            }
         }
     }
 }
