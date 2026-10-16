@@ -160,6 +160,8 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 **结论**：当前的 Rust 引擎满足的是 **SQL 语义 / 协议 / 打分公式**级一致（Gate A 的 statement 面已达 100%，query 面 1378/1532），**但不满足磁盘格式兼容**。要达到本要求，需按上表逐项替换为「读 C++ 格式、写 C++ 格式」的实现（存储内核 M1 需重做列/段编码；M3 需落盘 HNSW/IVF/PGM/倒排；KV 需切到 RocksDB）。**该要求已登记为阻塞项（任务 #67），并覆盖 §3 D2 的旧表述。**
 
+**任务 #67 进展（2026-10-17）**：已产出 `rust_engine/docs/CPP_FORMAT_SPEC.md`，冻结**已核对**的字节级事实：①数据文件/快照文件通用布局（`magic=0x00dd3344`(u64) + `buffer_size`(size_t) + 补零数据区 + `checksum`(u64)，`data_file_worker_impl.cpp:68-116/119-155`，读取侧断言 `:160-172`）；②Catalog KV = RocksDB + 自定义 MergeOperator（`kv_store*.cppm/impl`、`rocksdb_merge_operator*`）；③倒排索引的模块构成与 FST 校验和结论（PoC F）；④BM25 统计量来源（`term_doc_iterator_impl.cpp:57-70`，决定索引必须持久化 `df/column_len/doc_cnt/tf`）；⑤SEARCH 语义（删除文档仍计入统计等）。**尚未冻结**的 8 项（目录/文件命名、段块元数据、列式编码、HNSW/IVF 文件头、倒排各文件布局、KV 键空间、WAL 记录、PGM 布局）已列为 §6 待核对清单，实现 #68–#71 前必须逐项补齐。
+
 ### 2.7 测试资产（验收面）
 
 | 类型 | 位置 | 规模 | 运行方式 |
