@@ -1268,6 +1268,9 @@ pub struct Engine {
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// the database new unqualified table names are resolved against
     current_db: Mutex<String>,
+    /// number of write batches (`COPY`/`INSERT`) per table; a table with more
+    /// than one batch is planned as several segments (a `MERGE` operator).
+    write_batches: Mutex<HashMap<String, usize>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1308,6 +1311,7 @@ impl Engine {
             index_analyzers: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
+            write_batches: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -1523,6 +1527,24 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .columns)
+    }
+
+    /// Records a write batch (`COPY`/`INSERT`) against `table`.
+    fn bump_writes(&self, table: &str) {
+        let key = table.split('.').next_back().unwrap_or(table).to_string();
+        *self.write_batches.lock().unwrap().entry(key).or_insert(0) += 1;
+    }
+
+    /// True when `table` has been written in more than one batch.
+    fn multi_segment(&self, table: &str) -> bool {
+        let key = table.split('.').next_back().unwrap_or(table);
+        self.write_batches
+            .lock()
+            .unwrap()
+            .get(key)
+            .copied()
+            .unwrap_or(0)
+            >= 2
     }
 
     fn table_meta(&self, table: &str) -> Result<infinity_catalog::TableMeta> {
@@ -1841,7 +1863,11 @@ impl Engine {
                         && group_by.is_empty()
                         && crate::explain::is_count_star_only(items) =>
                     {
-                        Some(crate::explain::explain_count_star(t, where_pred.as_ref()))
+                        Some(crate::explain::explain_count_star(
+                            t,
+                            where_pred.as_ref(),
+                            self.multi_segment(t),
+                        ))
                     }
                     Statement::Select {
                         items,
@@ -1908,6 +1934,7 @@ impl Engine {
                             schema: &meta.columns,
                             types: &meta.types,
                             indexed: &indexed,
+                            multi: self.multi_segment(t),
                         })
                     }
                     Statement::Select {
@@ -2001,7 +2028,11 @@ impl Engine {
                 opts,
             } => {
                 if *from {
-                    self.copy_from(table, path, opts)
+                    let r = self.copy_from(table, path, opts);
+                    if r.is_ok() {
+                        self.bump_writes(table);
+                    }
+                    r
                 } else {
                     self.copy_to(table, path, opts)
                 }
@@ -2333,6 +2364,7 @@ impl Engine {
                 for (k, row) in rows.iter().enumerate() {
                     self.update_indexes_on_insert(table, base + k, row)?;
                 }
+                self.bump_writes(table);
                 Ok(QueryResult::Inserted { count: rows.len() })
             }
             Statement::Delete { table, where_pred } => {

@@ -28,6 +28,9 @@ pub struct SearchPlan<'a> {
     pub types: &'a [String],
     /// Columns that have any index (used to split index/leftover filters).
     pub indexed: &'a [String],
+    /// The table was written in more than one batch, so the scan is planned as
+    /// several segments behind a `MERGE` operator.
+    pub multi: bool,
 }
 
 /// C++ `Embedding2String` / `%g`-style float rendering: shortest round-trip.
@@ -341,6 +344,36 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
         Some(w) if !indexed_any => render_pred_ids(w, &leaf_annotation),
         _ => "None".to_string(),
     };
+
+    // A multi-segment table wraps the MatchTensorScan in a `MERGE MatchTensor`.
+    if p.multi && kind == "TENSOR" {
+        let col = m.column.clone();
+        let vals = m.args.first().and_then(arr_arg).unwrap_or_default();
+        let opts = m.args.get(3).and_then(str_arg).unwrap_or_default();
+        let dim = p
+            .schema
+            .iter()
+            .position(|c| c == &col)
+            .and_then(|i| p.types.get(i))
+            .and_then(|t| crate::type_dim_deep(t))
+            .unwrap_or(vals.len());
+        let mut expr = format!("MATCH TENSOR ({col}, {}, MAX_SIM", tensor_text(&vals, dim));
+        if let Some(f) = m.filter.as_ref() {
+            expr.push_str(&format!(", WHERE ({})", render_pred_plain(f)));
+        } else if !opts.is_empty() {
+            expr.push_str(&format!(", '{opts}'"));
+        }
+        expr.push(')');
+        lines.push(header(leaf_d, "MERGE MatchTensor", 5));
+        lines.push(attr(leaf_d, &format!("table name: {alias}({db}.{alias})")));
+        lines.push(attr(leaf_d, "table index: #1"));
+        lines.push(attr(leaf_d, &format!("MatchTensor expression: {expr}")));
+        lines.push(attr(leaf_d, &format!("Top N: {}", top_n_of(&opts))));
+        lines.push(attr(
+            leaf_d,
+            &format!("output columns: [{}]", leaf_out.join(", ")),
+        ));
+    }
 
     if !render_leaf(
         &mut lines,

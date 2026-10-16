@@ -1334,7 +1334,7 @@ pub fn is_count_star_only(items: &[SelectItem]) -> bool {
 
 /// The physical `EXPLAIN` text for `SELECT COUNT(*) FROM t [WHERE …]`, a single
 /// `AGGREGATE` node over an optional `FILTER`.
-pub fn explain_count_star(table: &str, where_pred: Option<&Predicate>) -> Vec<String> {
+pub fn explain_count_star(table: &str, where_pred: Option<&Predicate>, multi: bool) -> Vec<String> {
     let alias = table.split('.').next_back().unwrap_or(table);
     let db = table
         .split_once('.')
@@ -1360,6 +1360,11 @@ pub fn explain_count_star(table: &str, where_pred: Option<&Predicate>) -> Vec<St
     lines.push(header(0, "PROJECT", project_id));
     lines.push(attr(0, "table index: #4"));
     lines.push(attr(0, "expressions: [count(star) (#0)]"));
+    if multi {
+        // A table with several segments merges per-segment aggregates.
+        lines.push(header(1, "Merge aggregate", 7));
+        lines.push(attr(1, "output columns: [COUNT(__rowid)]"));
+    }
     lines.push(header(1, "AGGREGATE", 4));
     lines.push(attr(1, "aggregate table index: #3"));
     lines.push(attr(
