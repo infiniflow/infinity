@@ -771,6 +771,12 @@ impl Parser {
             Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                 Ok(ExprAst::Literal(self.literal()?))
             }
+            Token::LParen => {
+                self.advance();
+                let inner = self.expr()?;
+                self.expect(Token::RParen)?;
+                Ok(inner)
+            }
             Token::LBracket => Ok(ExprAst::Literal(self.array_literal()?)),
             Token::LBrace => Ok(ExprAst::Literal(self.brace_literal()?)),
             Token::Ident(s) => {
@@ -1214,6 +1220,7 @@ impl Parser {
                     self.advance();
                     SelectItem::Star
                 }
+                Token::LParen => SelectItem::Expr(self.expr()?),
                 Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                     SelectItem::Literal(self.literal()?)
                 }

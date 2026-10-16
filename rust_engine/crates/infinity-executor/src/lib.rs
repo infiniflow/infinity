@@ -143,6 +143,10 @@ fn is_float_type(type_text: &str) -> bool {
     )
 }
 
+fn is_json_type(type_text: &str) -> bool {
+    type_text.eq_ignore_ascii_case("JSON")
+}
+
 fn is_sparse_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("SPARSE")
 }
@@ -238,6 +242,11 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
                 Some(t) if is_float_type(t) => match s.parse::<f64>() {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
+                },
+                // JSON columns are stored compactly (sorted keys, no spaces)
+                Some(t) if is_json_type(t) => match infinity_expression::json::parse(&s) {
+                    Some(j) => j.compact(),
+                    None => s,
                 },
                 Some(t) if is_sparse_type(t) => {
                     let float = t.to_ascii_uppercase().contains("FLOAT")
@@ -954,10 +963,26 @@ impl Engine {
             } => {
                 // `SELECT UNNEST(col) FROM t [WHERE …]`: expand a JSON array column
                 // into one output row per element.
-                if let (Some(t), [SelectItem::Func { name, args }]) =
-                    (from.as_ref(), items.as_slice())
-                {
-                    if name.eq_ignore_ascii_case("UNNEST") {
+                if let Some(t) = from.as_ref() {
+                    // `SELECT …, UNNEST(col)` with optional leading plain columns
+                    let unnests: Vec<usize> = items
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, it)| {
+                            matches!(it, SelectItem::Func { name, .. } if name.eq_ignore_ascii_case("UNNEST"))
+                        })
+                        .map(|(i, _)| i)
+                        .collect();
+                    let leading_ok = items
+                        .iter()
+                        .enumerate()
+                        .all(|(i, it)| unnests.contains(&i) || matches!(it, SelectItem::Column(_)));
+                    if unnests.len() == 1 && leading_ok {
+                        let u = unnests[0];
+                        let args = match &items[u] {
+                            SelectItem::Func { args, .. } => args.clone(),
+                            _ => Vec::new(),
+                        };
                         if let Some(ExprAst::Column(col)) = args.first() {
                             let schema = self.table_schema(t)?;
                             if let Some(ci) = schema.iter().position(|c| c == col) {
