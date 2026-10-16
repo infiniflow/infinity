@@ -821,6 +821,39 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// `DISTANCE()` requires a distance metric and `SIMILARITY()` a similarity
+/// metric; reject the mismatch.
+fn validate_search_pseudo_columns(s: &SearchClause, items: &[SelectItem]) -> Result<()> {
+    let Some(m) = s.matches.first() else {
+        return Ok(());
+    };
+    let is_sparse = m.kind.eq_ignore_ascii_case("SPARSE");
+    let is_vector = m.kind.eq_ignore_ascii_case("VECTOR");
+    if !is_vector && !is_sparse {
+        return Ok(());
+    }
+    let metric = arg_str(m.args.get(if is_sparse { 1 } else { 2 }))
+        .unwrap_or_else(|| if is_sparse { "ip".into() } else { "l2".into() })
+        .to_ascii_lowercase();
+    let distance_metric = matches!(metric.as_str(), "l2" | "hamming");
+    for it in items {
+        if let SelectItem::Func { name, .. } = it {
+            let n = name.to_ascii_uppercase();
+            if n == "DISTANCE" && !distance_metric {
+                return Err(Error::Invalid(
+                    "DISTANCE() requires a distance metric".into(),
+                ));
+            }
+            if n == "SIMILARITY" && distance_metric {
+                return Err(Error::Invalid(
+                    "SIMILARITY() requires a similarity metric".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Validates an INSERT value against its declared column type (dimension or
 /// sparse index range).
 fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
@@ -1770,6 +1803,9 @@ impl Engine {
                 if let Some(t) = from.as_ref() {
                     self.validate_aggregate_args(t, items)?;
                 }
+                if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
+                    validate_search_pseudo_columns(s, items)?;
+                }
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
                     tables.push((t.clone(), self.table_schema(t)?));
@@ -2438,6 +2474,22 @@ impl Engine {
             Some(ExprAst::Literal(Literal::Array(items))) => items.clone(),
             _ => Vec::new(),
         };
+        // An integer-element column only accepts a matching query element type.
+        // (For VECTOR/TENSOR the query element type is the argument after the
+        // query array.)
+        if !is_sparse {
+            let col_elem = tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
+            if matches!(col_elem, ElemType::Int8 | ElemType::UInt8) {
+                let q_elem = arg_str(m.args.get(1))
+                    .map(|s| elem_type_of(&s))
+                    .unwrap_or(ElemType::Float32);
+                if q_elem != col_elem {
+                    return Err(Error::Invalid(
+                        "query element type does not match the column's".into(),
+                    ));
+                }
+            }
+        }
         let metric = arg_str(m.args.get(if is_sparse { 1 } else { 2 }))
             .unwrap_or_else(|| if is_sparse { "ip".into() } else { "l2".into() })
             .to_ascii_lowercase();
