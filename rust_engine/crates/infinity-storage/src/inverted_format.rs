@@ -946,6 +946,445 @@ pub fn fst_get(fst: &[u8], key: &[u8]) -> Result<Option<u64>, FormatError> {
     Ok(Some(out.wrapping_add(node.final_output)))
 }
 
+// ---------------------------------------------------------------------------
+// FST building (`fst/build.cppm`, `fst/build_impl.cpp`, `fst/registry.cppm`)
+// ---------------------------------------------------------------------------
+
+/// `NONE_ADDRESS` (`fst/node.cppm:47`): never a real node address.
+const FST_NONE_ADDRESS: usize = 1;
+
+/// An FST output value (a `u64` with the prefix/cat/sub algebra,
+/// `fst/node.cppm:67-98`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, PartialOrd, Ord)]
+struct FstOutput(u64);
+
+impl FstOutput {
+    fn value(self) -> u64 {
+        self.0
+    }
+    fn is_zero(self) -> bool {
+        self.0 == 0
+    }
+    /// `Prefix`: the minimum of the two.
+    fn prefix(self, o: Self) -> Self {
+        Self(self.0.min(o.0))
+    }
+    /// `Cat`: the sum of the two.
+    fn cat(self, o: Self) -> Self {
+        Self(self.0.wrapping_add(o.0))
+    }
+    /// `Sub`: the difference (asserted non-negative in the C++).
+    fn sub(self, o: Self) -> Self {
+        debug_assert!(self.0 >= o.0);
+        Self(self.0.wrapping_sub(o.0))
+    }
+}
+
+/// A transition (`fst/node.cppm:101-111`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FstTransition {
+    inp: u8,
+    out: FstOutput,
+    addr: usize,
+}
+
+impl Default for FstTransition {
+    fn default() -> Self {
+        Self {
+            inp: 0,
+            out: FstOutput::default(),
+            addr: FST_NONE_ADDRESS,
+        }
+    }
+}
+
+/// A node under construction (`fst/node.cppm:143-199`), with the `Hash` the
+/// registry uses.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct BuilderNode {
+    is_final: bool,
+    final_output: FstOutput,
+    trans: Vec<FstTransition>,
+}
+
+impl BuilderNode {
+    /// `BuilderNode::Hash` (`fst/node.cppm:165-183`): FNV-1a.
+    fn hash(&self) -> u64 {
+        const FNV_PRIME: u64 = 1_099_511_628_211;
+        let mut h: u64 = 14_695_981_039_346_656_037;
+        h = (h ^ self.is_final as u64).wrapping_mul(FNV_PRIME);
+        h = (h ^ self.final_output.value()).wrapping_mul(FNV_PRIME);
+        for t in &self.trans {
+            h = (h ^ t.inp as u64).wrapping_mul(FNV_PRIME);
+            h = (h ^ t.out.value()).wrapping_mul(FNV_PRIME);
+            h = (h ^ t.addr as u64).wrapping_mul(FNV_PRIME);
+        }
+        h
+    }
+}
+
+/// A direct-mapped node cache (`fst/registry.cppm:41-68`) used for suffix
+/// sharing. A slot collides destructively, exactly as the C++ does.
+struct Registry {
+    table: Vec<(BuilderNode, usize)>,
+    mask: usize,
+}
+
+impl Registry {
+    fn new(table_size_shift: u32) -> Self {
+        let n = 1usize << table_size_shift;
+        Self {
+            table: vec![(BuilderNode::default(), 0); n],
+            mask: n - 1,
+        }
+    }
+
+    /// `Registry::Find` (`fst/registry.cppm:51-61`): returns the slot and, if
+    /// the slot already holds an equal node, its compiled address.
+    fn find(&self, key: &BuilderNode) -> (usize, Option<usize>) {
+        let slot = (key.hash() as usize) & self.mask;
+        if self.table[slot].0 == *key {
+            (slot, Some(self.table[slot].1))
+        } else {
+            (slot, None)
+        }
+    }
+
+    /// `Registry::Insert` (`fst/registry.cppm:64-67`).
+    fn insert(&mut self, slot: usize, key: BuilderNode, value: usize) {
+        self.table[slot] = (key, value);
+    }
+}
+
+/// One level of the unfinished-node stack (`fst/build.cppm:36-59`).
+#[derive(Debug, Clone, Default)]
+struct UnfinishedNode {
+    node: BuilderNode,
+    /// `last_`: `None` means `present_ == false`.
+    last: Option<(u8, FstOutput)>,
+}
+
+impl UnfinishedNode {
+    /// `LastCompiled`: append the pending transition pointing at `addr`.
+    fn last_compiled(&mut self, addr: usize) {
+        if let Some((inp, out)) = self.last.take() {
+            self.node.trans.push(FstTransition { inp, out, addr });
+        }
+    }
+
+    /// `AddOutputPrefix`: push a prefix onto the node's and its pending
+    /// transition's outputs.
+    fn add_output_prefix(&mut self, prefix: FstOutput) {
+        if self.node.is_final {
+            self.node.final_output = prefix.cat(self.node.final_output);
+        }
+        for t in &mut self.node.trans {
+            t.out = prefix.cat(t.out);
+        }
+        if let Some((_, out)) = &mut self.last {
+            *out = prefix.cat(*out);
+        }
+    }
+}
+
+/// `FstBuilder` (`fst/build.cppm:170-242`, `build_impl.cpp`).
+///
+/// Keys must be inserted in lexicographic order. All I/O goes to an internal
+/// buffer, and the trailer is appended by `finish` (the C++ streams through a
+/// `CountingWriter`; buffering here is equivalent because the trailer's
+/// checksum covers every byte written before it).
+pub struct FstBuilder {
+    buf: Vec<u8>,
+    unfinished: Vec<UnfinishedNode>,
+    registry: Registry,
+    last_key: Vec<u8>,
+    last_addr: usize,
+    len: usize,
+}
+
+impl Default for FstBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FstBuilder {
+    pub fn new() -> Self {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&FST_VERSION.to_le_bytes());
+        buf.extend_from_slice(&0u64.to_le_bytes()); // FstType
+        Self {
+            buf,
+            unfinished: vec![UnfinishedNode::default()],
+            registry: Registry::new(16),
+            last_key: Vec::new(),
+            last_addr: FST_NONE_ADDRESS,
+            len: 0,
+        }
+    }
+
+    /// `FstBuilder::Insert` (`fst/build.cppm:223-226`).
+    pub fn insert(&mut self, key: &[u8], val: u64) {
+        self.check_last_key(key, true);
+        self.insert_output(key, val);
+    }
+
+    /// `FstBuilder::Add` (`fst/build.cppm:209-212`): a key with a zero output.
+    pub fn add(&mut self, key: &[u8]) {
+        self.check_last_key(key, false);
+        self.insert_output(key, 0);
+    }
+
+    /// `FstBuilder::Finish` (`build_impl.cpp:32-43`), returning the bytes.
+    pub fn finish(mut self) -> Vec<u8> {
+        self.compile_from(0);
+        let root = self.unfinished.pop().expect("root node").node;
+        let root_addr = self.compile(root);
+        append_fst_trailer(&mut self.buf, self.len as u64, root_addr as u64);
+        self.buf
+    }
+
+    /// `CheckLastKey` (`build_impl.cpp:106-122`).
+    ///
+    /// Note the C++ returns as soon as `last_` is empty *without storing the
+    /// key*, so in this version `last_` stays empty forever and the ordering
+    /// checks never fire. Reproduced verbatim so the builder's behaviour is
+    /// identical (with a debug assert to catch genuinely bad callers).
+    fn check_last_key(&mut self, key: &[u8], check_dupe: bool) {
+        if self.last_key.is_empty() {
+            return;
+        }
+        assert!(
+            !(check_dupe && self.last_key.len() == key.len() && self.last_key == key),
+            "FST duplicated key"
+        );
+        assert!(self.last_key.as_slice() <= key, "FST out of order key");
+        self.last_key.clear();
+        self.last_key.extend_from_slice(key);
+    }
+
+    /// `InsertOutput` (`build_impl.cpp:45-66`).
+    fn insert_output(&mut self, key: &[u8], val: u64) {
+        let mut out = FstOutput(val);
+        if key.is_empty() {
+            self.len = 1; // must be the first key
+            // SetRootOutput
+            self.unfinished[0].node.is_final = true;
+            self.unfinished[0].node.final_output = out;
+            return;
+        }
+        let prefix_len = self.find_common_prefix_and_set_output(key, &mut out);
+        if prefix_len == key.len() {
+            // Duplicate value with no output.
+            debug_assert!(out.is_zero());
+            return;
+        }
+        self.len += 1;
+        self.compile_from(prefix_len);
+        self.add_suffix(&key[prefix_len..], out);
+    }
+
+    /// `FindCommonPrefixAndSetOutput` (`fst/build.cppm:121-139`).
+    fn find_common_prefix_and_set_output(&mut self, key: &[u8], out: &mut FstOutput) -> usize {
+        let n = self.unfinished.len();
+        let common_len = key.len().min(n - 1);
+        let mut i = 0;
+        while i < common_len {
+            let Some((inp, t_out)) = self.unfinished[i].last else {
+                panic!("registry invariant: last transition must be present");
+            };
+            if inp != key[i] {
+                break;
+            }
+            let common_pre = t_out.prefix(*out);
+            let add_prefix = t_out.sub(common_pre);
+            *out = out.sub(common_pre);
+            if !add_prefix.is_zero() {
+                self.unfinished[i].last = Some((inp, common_pre));
+                self.unfinished[i + 1].add_output_prefix(add_prefix);
+            }
+            i += 1;
+        }
+        i
+    }
+
+    /// `AddSuffix` (`fst/build.cppm:93-107`).
+    fn add_suffix(&mut self, bs: &[u8], out: FstOutput) {
+        if bs.is_empty() {
+            return;
+        }
+        let len = self.unfinished.len();
+        assert!(self.unfinished[len - 1].last.is_none());
+        self.unfinished[len - 1].last = Some((bs[0], out));
+        self.unfinished.resize(len + bs.len() - 1, UnfinishedNode::default());
+        for (i, &b) in bs.iter().enumerate().skip(1) {
+            self.unfinished[len + i - 1].last = Some((b, FstOutput::default()));
+        }
+        // PushEmpty(true)
+        self.unfinished.push(UnfinishedNode {
+            node: BuilderNode {
+                is_final: true,
+                ..BuilderNode::default()
+            },
+            last: None,
+        });
+    }
+
+    /// `TopLastFreeze` (`fst/build.cppm:87-91`).
+    fn top_last_freeze(&mut self, addr: usize) {
+        if let Some(top) = self.unfinished.last_mut() {
+            top.last_compiled(addr);
+        }
+    }
+
+    /// `CompileFrom` (`build_impl.cpp:68-81`).
+    fn compile_from(&mut self, istate: usize) {
+        let mut addr = FST_NONE_ADDRESS;
+        let remained = self.unfinished.len() - (istate + 1);
+        for _ in 0..remained {
+            if addr != FST_NONE_ADDRESS {
+                self.top_last_freeze(addr);
+            }
+            let node = self.unfinished.pop().expect("unfinished node").node;
+            addr = self.compile(node);
+        }
+        self.top_last_freeze(addr);
+    }
+
+    /// `Compile` (`build_impl.cpp:83-95`).
+    fn compile(&mut self, node: BuilderNode) -> usize {
+        if node.is_final && node.trans.is_empty() && node.final_output.is_zero() {
+            return FST_EMPTY_ADDRESS as usize;
+        }
+        let (slot, found) = self.registry.find(&node);
+        if let Some(addr) = found {
+            return addr;
+        }
+        let start_addr = self.buf.len();
+        self.compile_node(&node, start_addr);
+        let last_addr = self.buf.len() - 1;
+        self.last_addr = last_addr;
+        self.registry.insert(slot, node, last_addr);
+        last_addr
+    }
+
+    /// `Node::Compile` (`fst/node.cppm:797-810`).
+    fn compile_node(&mut self, node: &BuilderNode, addr: usize) {
+        let ntrans = node.trans.len();
+        if ntrans == 0 && node.is_final && node.final_output.is_zero() {
+            return;
+        }
+        if ntrans != 1 || node.is_final {
+            self.compile_any_trans(node, addr);
+        } else {
+            let t = node.trans[0];
+            if t.addr == self.last_addr && t.out.is_zero() {
+                self.compile_one_trans_next(t.inp);
+            } else {
+                self.compile_one_trans(addr, t);
+            }
+        }
+    }
+
+    /// `StateOneTransNext::Compile` (`fst/node.cppm:348-355`).
+    fn compile_one_trans_next(&mut self, input: u8) {
+        let idx = fst_common_idx(input, 0b0011_1111);
+        if idx == 0 {
+            self.buf.push(input);
+        }
+        self.buf.push(0b1100_0000 | idx);
+    }
+
+    /// `StateOneTrans::Compile` (`fst/node.cppm:413-432`).
+    fn compile_one_trans(&mut self, addr: usize, trans: FstTransition) {
+        let out = trans.out.value();
+        let output_pack_size = if out != 0 {
+            fst_pack_uint(&mut self.buf, out)
+        } else {
+            0
+        };
+        let trans_pack_size = fst_pack_delta(&mut self.buf, addr as u64, trans.addr as u64);
+        // PackSizes: transition size in the high nibble, output in the low.
+        let pack_sizes = (trans_pack_size << 4) | (output_pack_size & 0x0f);
+        self.buf.push(pack_sizes);
+        let idx = fst_common_idx(trans.inp, 0b0011_1111);
+        if idx == 0 {
+            self.buf.push(trans.inp);
+        }
+        self.buf.push(0b1000_0000 | idx);
+    }
+
+    /// `StateAnyTrans::Compile` (`fst/node.cppm:511-575`).
+    fn compile_any_trans(&mut self, node: &BuilderNode, addr: usize) {
+        let ntrans = node.trans.len();
+        debug_assert!(ntrans <= 256);
+        let mut tsize = 0u8;
+        let mut osize = fst_pack_size(node.final_output.value());
+        let mut any_outs = !node.final_output.is_zero();
+        for t in &node.trans {
+            tsize = tsize.max(fst_pack_delta_size(addr as u64, t.addr as u64));
+            osize = osize.max(fst_pack_size(t.out.value()));
+            any_outs = any_outs || !t.out.is_zero();
+        }
+        if !any_outs {
+            osize = 0;
+        }
+        // state byte bits: final flag + ntrans (0 when > 0x3f)
+        let is_final = node.is_final;
+        let state_val = (if is_final { 0b0100_0000 } else { 0 })
+            | (if ntrans <= 0b0011_1111 {
+                ntrans as u8
+            } else {
+                0
+            });
+
+        if any_outs {
+            if is_final {
+                fst_pack_uint_in(&mut self.buf, node.final_output.value(), osize);
+            }
+            for t in node.trans.iter().rev() {
+                fst_pack_uint_in(&mut self.buf, t.out.value(), osize);
+            }
+        }
+        for t in node.trans.iter().rev() {
+            let delta = if t.addr == FST_EMPTY_ADDRESS as usize {
+                FST_EMPTY_ADDRESS
+            } else {
+                (addr as u64).wrapping_sub(t.addr as u64)
+            };
+            fst_pack_uint_in(&mut self.buf, delta, tsize);
+        }
+        for t in node.trans.iter().rev() {
+            self.buf.push(t.inp);
+        }
+        if ntrans > FST_TRANS_INDEX_THRESHOLD {
+            let mut index = [255u8; 256];
+            for (i, t) in node.trans.iter().enumerate() {
+                index[t.inp as usize] = i as u8;
+            }
+            self.buf.extend_from_slice(&index);
+        }
+        let pack_sizes = (tsize << 4) | (osize & 0x0f);
+        self.buf.push(pack_sizes);
+        if ntrans == 0 || ntrans > 0b0011_1111 {
+            // StateNtrans() == 0, so an explicit count byte follows.
+            let count = if ntrans == 256 { 1 } else { ntrans };
+            fst_pack_uint_in(&mut self.buf, count as u64, 1);
+        }
+        self.buf.push(state_val);
+    }
+}
+
+/// Builds an FST from `(key, value)` pairs, which must be sorted by key and
+/// distinct (`FstBuilder`).
+pub fn build_fst(entries: &[(Vec<u8>, u64)]) -> Vec<u8> {
+    let mut b = FstBuilder::new();
+    for (k, v) in entries {
+        b.insert(k, *v);
+    }
+    b.finish()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1224,6 +1663,65 @@ mod tests {
             if !pairs.is_empty() {
                 assert_eq!(fst_get(&fst, b"\xff\xfe").unwrap(), None);
                 assert_eq!(fst_get(&fst, b"ap").unwrap(), None);
+            }
+        }
+    }
+
+    #[test]
+    fn fst_builder_reproduces_the_cpp_bytes() {
+        // The decisive test: building the same key sets with the Rust port of
+        // `FstBuilder` must yield byte-for-byte the C++ builder's output.
+        #[allow(clippy::type_complexity)]
+        let cases: &[(&str, &[(&str, u64)], &str)] = &[
+            (
+                "empty",
+                &[],
+                "0300000000000000000000000000000000000000000000000000000000000000028ba85c",
+            ),
+            (
+                "one",
+                &[("a", 100)],
+                "0300000000000000000000000000000064001185010000000000000013000000000000003963da13",
+            ),
+            (
+                "two",
+                &[("a", 100), ("b", 200)],
+                "03000000000000000000000000000000c86400006261110202000000000000001700000000000000d16c7686",
+            ),
+            (
+                "words",
+                &[
+                    ("app", 100),
+                    ("apple", 200),
+                    ("apply", 300),
+                    ("banana", 400),
+                    ("band", 500),
+                    ("cat", 600),
+                ],
+                "0300000000000000000000000000000064000000796511020064016c1141c9c9001085cb6400000164611102cbc5001081c5580290016400010513636261120306000000000000003f00000000000000b514bf07",
+            ),
+            (
+                "shared",
+                &[
+                    ("aaaa", 100),
+                    ("aaab", 200),
+                    ("aabb", 300),
+                    ("abbb", 400),
+                    ("baaa", 500),
+                ],
+                "03000000000000000000000000000000640000006261110200109ac80001046261110209109a2c010000010462611202001085c5c5f401640001066261120205000000000000003e00000000000000a7fbf8f8",
+            ),
+        ];
+        for (label, pairs, hex) in cases {
+            let entries: Vec<(Vec<u8>, u64)> =
+                pairs.iter().map(|(k, v)| (k.as_bytes().to_vec(), *v)).collect();
+            let built = build_fst(&entries);
+            let want = unhex(hex);
+            assert_eq!(built.len(), want.len(), "{label}: length");
+            assert_eq!(built, want, "{label}: bytes");
+            // And the result reads back through our own decoder.
+            for (k, v) in *pairs {
+                assert_eq!(fst_get(&built, k.as_bytes()).unwrap(), Some(*v), "{label}/{k}");
             }
         }
     }
