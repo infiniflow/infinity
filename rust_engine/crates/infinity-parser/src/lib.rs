@@ -9,7 +9,7 @@ pub mod lexer;
 pub mod parser;
 
 pub use ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, Literal,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, JoinKind, Literal,
     MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 pub use parser::{normalize_datetime, parse};

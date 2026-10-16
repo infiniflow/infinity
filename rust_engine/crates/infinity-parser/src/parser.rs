@@ -3,7 +3,7 @@
 use infinity_common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, Literal,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, JoinKind, Literal,
     MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 use crate::lexer::{tokenize, Token};
@@ -444,14 +444,34 @@ impl Parser {
                 } else {
                     None
                 };
+                let save = self.pos;
+                let kind = if self.eat_kw("INNER") {
+                    JoinKind::Inner
+                } else if self.eat_kw("LEFT") {
+                    let _ = self.eat_kw("OUTER");
+                    JoinKind::Left
+                } else if self.eat_kw("RIGHT") {
+                    let _ = self.eat_kw("OUTER");
+                    JoinKind::Right
+                } else if self.eat_kw("CROSS") {
+                    JoinKind::Cross
+                } else {
+                    JoinKind::Inner
+                };
                 let join = if self.eat_kw("JOIN") {
                     let table = self.expect_table_name()?;
                     self.expect_kw("ON")?;
                     let left = self.expect_ident()?;
                     self.expect(Token::Op("=".into()))?;
                     let right = self.expect_ident()?;
-                    Some(JoinClause { table, left, right })
+                    Some(JoinClause {
+                        table,
+                        left,
+                        right,
+                        kind,
+                    })
                 } else {
+                    self.pos = save;
                     None
                 };
                 let search = if self.eat_kw("SEARCH") {
@@ -1065,7 +1085,19 @@ impl Parser {
                     Ok(ExprAst::Func { name: s, args })
                 } else {
                     self.advance();
-                    Ok(ExprAst::Column(s))
+                    // A qualified column may be dotted (`t1.c1`).
+                    let mut name = s;
+                    while matches!(self.peek(), Token::Op(o) if o == ".") {
+                        self.advance();
+                        match self.advance() {
+                            Token::Ident(part) => {
+                                name.push('.');
+                                name.push_str(&part);
+                            }
+                            _ => break,
+                        }
+                    }
+                    Ok(ExprAst::Column(name))
                 }
             }
             _ => self.err("expected expression"),
@@ -2157,7 +2189,8 @@ mod tests {
                 join: Some(JoinClause {
                     table: "b".into(),
                     left: "aid".into(),
-                    right: "bid".into()
+                    right: "bid".into(),
+                    kind: JoinKind::Inner,
                 }),
                 where_pred: Some(Predicate::simple("aid", CmpOp::Ge, Literal::Int(1))),
                 group_by: vec![],

@@ -1796,6 +1796,20 @@ impl Engine {
                     Statement::Select {
                         items,
                         from: Some(t),
+                        join: Some(j),
+                        where_pred,
+                        search,
+                        ..
+                    } if logical && search.is_none() => Some(crate::explain::explain_logical_join(
+                        items,
+                        t,
+                        &j.table,
+                        j,
+                        where_pred.as_ref(),
+                    )),
+                    Statement::Select {
+                        items,
+                        from: Some(t),
                         join,
                         group_by,
                         search,

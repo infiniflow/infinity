@@ -825,6 +825,7 @@ mod tests {
             table: "b".into(),
             left: "aid".into(),
             right: "bid".into(),
+            kind: infinity_parser::JoinKind::Inner,
         };
         let p = plan_select(
             &[SelectItem::Star],

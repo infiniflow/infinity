@@ -151,10 +151,14 @@ fn arith_operand(this: &ExprAst, other: &ExprAst, ids: &HashMap<String, usize>) 
 /// cast rule (see [`arith_operand`]).
 pub(crate) fn render_expr_m(e: &ExprAst, ids: &HashMap<String, usize>, logical: bool) -> String {
     match e {
-        ExprAst::Column(c) => match ids.get(c) {
-            Some(i) => format!("{c} (#{i})"),
-            None => c.clone(),
-        },
+        ExprAst::Column(c) => {
+            // The reference plan prints a qualified column by its bare name.
+            let name = c.split('.').next_back().unwrap_or(c);
+            match ids.get(name) {
+                Some(i) => format!("{name} (#{i})"),
+                None => name.to_string(),
+            }
+        }
         ExprAst::Literal(l) => l.to_slt_string(),
         ExprAst::Func { name, args }
             if name.eq_ignore_ascii_case("filter_fulltext")
@@ -1192,6 +1196,106 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
     lines.push(attr(d, &format!("filter: {index_filter}")));
     lines.push(attr(d, "output_columns: [__rowid]"));
     Some(lines)
+}
+
+/// The label of a column with any `table.` qualifier stripped.
+fn bare(c: &str) -> &str {
+    c.split('.').next_back().unwrap_or(c)
+}
+
+/// The logical-plan `JOIN` text (`EXPLAIN LOGICAL SELECT … JOIN …`).
+pub fn explain_logical_join(
+    items: &[SelectItem],
+    left_table: &str,
+    right_table: &str,
+    join: &infinity_parser::JoinClause,
+    where_pred: Option<&Predicate>,
+) -> Vec<String> {
+    let lt = left_table.split('.').next_back().unwrap_or(left_table);
+    let ld = left_table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    let rt = right_table.split('.').next_back().unwrap_or(right_table);
+    let rd = right_table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    let lk = bare(&join.left).to_string();
+    let rk = bare(&join.right).to_string();
+
+    // Column ids: the join's two keys take 0/1; the join output is 4 wide
+    // (`c1, __rowid, c2, __rowid`), so residual filter columns continue at #4.
+    let mut filter_cols: Vec<String> = Vec::new();
+    if let Some(w) = where_pred {
+        pred_cols(w, &mut filter_cols);
+    }
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    ids.insert(lk.clone(), 0);
+    ids.insert(rk.clone(), 1);
+    let mut next = 4usize;
+    for c in &filter_cols {
+        let c = bare(c).to_string();
+        if let std::collections::hash_map::Entry::Vacant(e) = ids.entry(c) {
+            e.insert(next);
+            next += 1;
+        }
+    }
+    let annotate = |c: &str| match ids.get(bare(c)) {
+        Some(i) => format!("{} (#{i})", bare(c)),
+        None => bare(c).to_string(),
+    };
+
+    let join_cols = format!("{lk}, __rowid, {rk}, __rowid");
+    let has_filter = where_pred.is_some();
+    let project_id = if has_filter { 6 } else { 5 };
+
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", project_id));
+    lines.push(attr(0, "table index: #5"));
+    let exprs: Vec<String> = items
+        .iter()
+        .filter_map(|it| match it {
+            SelectItem::Column(c) => Some(annotate(c)),
+            _ => None,
+        })
+        .collect();
+    lines.push(attr(0, &format!("expressions: [{}]", exprs.join(", "))));
+
+    let mut d = 0;
+    if let Some(w) = where_pred {
+        d = 1;
+        lines.push(header(1, "FILTER", 5));
+        lines.push(attr(
+            1,
+            &format!("filter: {}", render_pred_m(w, &ids, true)),
+        ));
+        let mut out = join_cols.clone();
+        for c in &filter_cols {
+            out.push_str(&format!(", {}", bare(c)));
+        }
+        lines.push(attr(1, &format!("output columns: [{out}]")));
+    }
+
+    d += 1;
+    lines.push(format!(
+        "{}-> {}(4)",
+        " ".repeat(2 * d - 1),
+        join.kind.label()
+    ));
+    lines.push(attr(1, &format!("filters: [{} (#0) = {} (#1)", lk, rk)));
+    lines.push(attr(1, &format!("output columns: [{join_cols}]")));
+
+    d += 1;
+    lines.push(header(d, "TABLE SCAN", 2));
+    lines.push(attr(d, &format!("table name: {lt}({ld}.{lt})")));
+    lines.push(attr(d, "table index: #1"));
+    lines.push(attr(d, &format!("output columns: [{lk}, __rowid]")));
+    lines.push(header(d, "TABLE SCAN", 3));
+    lines.push(attr(d, &format!("table name: {rt}({rd}.{rt})")));
+    lines.push(attr(d, "table index: #2"));
+    lines.push(attr(d, &format!("output columns: [{rk}, __rowid]")));
+    lines
 }
 
 /// True when `items` is exactly one `COUNT(*)` (an unrenderable-by-the-generic

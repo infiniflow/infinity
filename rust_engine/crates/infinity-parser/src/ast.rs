@@ -182,6 +182,28 @@ pub struct OrderKey {
     pub expr: Option<ExprAst>,
 }
 
+/// The join flavour named before `JOIN`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum JoinKind {
+    #[default]
+    Inner,
+    Left,
+    Right,
+    Cross,
+}
+
+impl JoinKind {
+    /// The upper-case label used by `EXPLAIN` (`INNER JOIN`, `LEFT JOIN`, …).
+    pub fn label(self) -> &'static str {
+        match self {
+            JoinKind::Inner => "INNER JOIN",
+            JoinKind::Left => "LEFT JOIN",
+            JoinKind::Right => "RIGHT JOIN",
+            JoinKind::Cross => "CROSS JOIN",
+        }
+    }
+}
+
 /// `JOIN <table> ON <left> = <right>`. Keys are unqualified and resolved within
 /// their own table (left key against the left table, right key against the right).
 #[derive(Debug, Clone, PartialEq)]
@@ -189,6 +211,7 @@ pub struct JoinClause {
     pub table: String,
     pub left: String,
     pub right: String,
+    pub kind: JoinKind,
 }
 
 /// A column definition.
