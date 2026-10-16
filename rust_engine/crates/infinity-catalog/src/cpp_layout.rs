@@ -753,9 +753,19 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
             id: t.table_id,
             name: format!("{}.{}", t.db_name, t.table_name),
             columns: t.columns.iter().map(|c| c.column_name.clone()).collect(),
-            defaults: vec![None; t.columns.len()],
-            not_nulls: vec![false; t.columns.len()],
-            types: Vec::new(),
+            // Carry everything the record holds, so a reader comparing views
+            // sees the same schema (types, NOT NULL, defaults, comments).
+            defaults: t
+                .columns
+                .iter()
+                .map(|c| c.default.as_ref().and_then(default_text_of))
+                .collect(),
+            not_nulls: t.columns.iter().map(is_not_null).collect(),
+            types: t
+                .columns
+                .iter()
+                .map(|c| type_text_of(&c.column_type).unwrap_or_default())
+                .collect(),
             comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
         });
     }
@@ -933,6 +943,16 @@ mod tests {
 
         // Importing again is a no-op (the tables already exist).
         assert_eq!(imported.import_cpp_layout(store.as_ref()).unwrap(), 0);
+
+        // The direct reader agrees with the import: types, NOT NULL, defaults
+        // and comments all survive the C++ round trip.
+        let meta = read_cpp_tables_as_meta(store.as_ref()).unwrap();
+        assert_eq!(meta.len(), 1);
+        assert_eq!(meta[0].name, "default_db.t");
+        assert_eq!(meta[0].types, vec!["INTEGER", "VARCHAR", "EMBEDDING(FLOAT32,3)"]);
+        assert_eq!(meta[0].not_nulls, vec![true, false, false]);
+        assert_eq!(meta[0].defaults[1], Some("'x'".to_string()));
+        assert_eq!(meta[0].comments[1], Some("note".to_string()));
     }
 
     #[test]
