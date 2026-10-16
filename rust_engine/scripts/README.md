@@ -4,7 +4,7 @@
 
 | 脚本 | 关卡 | 内容 | 当前状态（2026-10-16） |
 |---|---|---|---|
-| `run_gate_a.sh` | Gate A — SQL 功能 | 现有 173 个 `.slt` 全量比对 | **未达标**：`statement ok` 1745/1746、`query` 1300/1532、`statement error` 45/129（要求 100%） |
+| `run_gate_a.sh` | Gate A — SQL 功能 | 现有 173 个 `.slt` 全量比对 | **未达标**：`statement ok` 1746/1746、`query` 1341/1532、`statement error` 129/129（要求 100%） |
 | `run_gate_b.sh` | Gate B — SDK/协议 | `python/test_pysdk`、`go/tests`、HTTP（`tools/run_http_api.py`），**不改 SDK** | **未运行**：需先补齐 Thrift 全量 RPC；脚本会在缺依赖时明确报 `SKIP/MISSING` |
 | `run_gate_c.sh` | Gate C — 持久化/恢复 | workspace 测试、`test/sql/snapshot`、`python/restart_test`、MinIO | **部分**：快照 `.slt` 与重启测试已在 Rust 引擎上通过；MinIO 需 CI 服务 |
 | `run_gate_d.sh` | Gate D — 并发/稳定性 | loom 模型、miri（纯 Rust 核心）、`python/parallel_test` | **部分**：loom `commit_ts` 唯一性已通过；miri 需 nightly 组件 |
