@@ -466,6 +466,18 @@ u8[pos_list_len]
 - **Doc skip list**（`doc_list_format_option.cppm:67-127`）：`doc_id`(u32)、`tf`(u32)、`block_max_tf`(u32)、`block_max_percentage`(u16)、`offset`(u32)，每 **32** 项一块（`skiplist_writer_impl.cpp:37`）。
 - **Pos skip list**（`position_list_format_option.cppm:27-54`）：`total_pos`(u32)、`compressed_pos_size`(u32)。
 - 块字节格式：①**u32 字段 = SIMD-BP128**（`CompositeCodec<SIMDBinaryPacking, VariableByte>`，`fastpfor_impl.cpp:54-57`）：每块 = `u8 word_cnt` + `word_cnt*4` 字节；②**u16 字段 = NewPForDelta**（IndexLib 移植，`third_party/newpfor/`）：每块自描述，首 `u32` header = `isLastBlock:1 | exceptionIntRange:11 | frameBits:5 | firstExceptionPos:8 | dataNum:7`（`new_pfordelta_compressor.h:30-42`），长度由 `GetCompressedLength(header)` 推出。读取侧靠各编码器自描述长度逐块前进（`posting_decoder_impl.cpp:57-104`）。
+- **framing 已核对（`src/storage/common/int_encoder.cppm`）**：u32 路径 `IntEncoder<u32, FastPForWrapper<Codec>>::Encode` 写 **`u8 encode_len`（单位是 u32 word 数）** + `encode_len*4` 字节（`:91-99`）；u16 路径 `IntEncoder<u16, NewPForDeltaCompressor>::Encode` **不写长度前缀**，只写 `Compress()` 返回的 `len*4` 字节，解码时先 `PeekInt32()` 取 header 再 `GetCompressedLength(header)`（`:46-68`）。注意 u32 是用 `CompositeCodec<SIMDBinaryPacking, VariableByte>`（`fastpfor_impl.cpp:55-57`），而 `fastpfor.cppm` 里的 `SIMDFastPFor<8>` 走的是另一条 `IntEncoder<u32, FastPForWrapper<...>>` 特化——**两条路都存在**，实际用哪条由字段的 `Encoder` typedef 决定（`posting_field.cppm:44,61` 取 `SIMDBitPacking`）。
+- **C++ 真值（已生成，供 Rust 逐位实现比对）**——把 FastPForLib（C++ 构建拉取的 `third_party/fastpfor`，headers+src）与仓库自带的 `third_party/newpfor` 一起用 clang++ 编成小 harness 后实测：
+  - u32 `CompositeCodec<SIMDBinaryPacking, VariableByte>`：
+    - `{1,2,3,4,5}`（5 个）→ 3 words = `00000000 81828384 85000000`
+    - `{0}×128` → 5 words = `80000000 00000000 00000000 00000000 00000000`
+    - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `00000000 81818182 8385888d95a2b7d9`
+    - `{100000,200000,300000,400000}` → 4 words = `00000000 200d8640 1a8c6027 92003598`
+  - u16 `indexlib::NewPForDeltaCompressor`：
+    - `{1,2,3,4,5}` → 1 word = `0300fa09`
+    - `{1,1,1,2,3,5,8,13,21,34,55,89}` → 4 words = `01700016 81404030 28201a15 d12d0b00`
+  - **复现配方**：`clang++-23 -std=c++23 -O2 -march=native -I<fastpfor>/headers -I<repo>/third_party/newpfor main.cpp <fastpfor>/src/{bitpacking,bitpackingaligned,bitpackingunaligned,simdbitpacking,simdunalignedbitpacking,horizontalbitpacking}.cpp <repo>/third_party/newpfor/{new_pfordelta_compressor,decompress_sse4}.cpp`，其中 `main.cpp` 用 `encodeArray`（u32）/ `Compress(...,true)`（u16）并打印字节。**注意**：FastPForLib 不在仓库内（由 C++ 构建拉取），故未随仓库提交生成器；上述字节已固定在本节。同理注意 `-O2` 与 `-march` 必须与目标一致（SIMD 路径按位宽分派，但字节输出与 -O 无关——已核）。
+- **Rust 侧状态**：`TermPostings` 目前把 skip/list 体当作**不透明字节**（`inverted_format.rs`），u32/u16 块编解码**尚未实现**——这是全文格式兼容最后一项待落地工作，有了上面的真值即可逐位实现并断言。
 
 ### 9.3.6 `.len`（列长 / BM25 统计）
 
