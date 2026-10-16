@@ -1798,6 +1798,20 @@ impl Engine {
                         from: Some(t),
                         join,
                         group_by,
+                        search,
+                        ..
+                    } if logical
+                        && join.is_none()
+                        && search.is_none()
+                        && crate::explain::has_aggregate(items) =>
+                    {
+                        crate::explain::explain_logical_agg(items, t, group_by)
+                    }
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
+                        group_by,
                         order_by,
                         search,
                         ..

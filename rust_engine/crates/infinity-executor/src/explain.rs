@@ -10,7 +10,9 @@
 
 use std::collections::HashMap;
 
-use infinity_parser::{BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem};
+use infinity_parser::{
+    AggFunc, BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem,
+};
 
 /// A single-table `SELECT` reduced to what the printer needs.
 pub struct SelectPlan<'a> {
@@ -1156,6 +1158,114 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
     lines.push(attr(d, "table index: #1"));
     lines.push(attr(d, &format!("filter: {index_filter}")));
     lines.push(attr(d, "output_columns: [__rowid]"));
+    Some(lines)
+}
+
+/// The logical-plan `AGGREGATE` text (`EXPLAIN LOGICAL SELECT <agg> …`).
+///
+/// Handles the `MIN/MAX/SUM/COUNT/FIRST/LAST` and `AVG` (expanded to
+/// `SUM/COUNT`) shapes over a single column or computed expression. Returns
+/// `None` for anything else.
+pub fn explain_logical_agg(
+    items: &[SelectItem],
+    table: &str,
+    group_by: &[ExprAst],
+) -> Option<Vec<String>> {
+    // Group keys must be plain columns.
+    let keys: Vec<String> = group_by
+        .iter()
+        .map(|e| match e {
+            ExprAst::Column(c) => Some(c.clone()),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()?;
+
+    // Input columns: group keys first, then the aggregate arguments.
+    let mut in_cols = keys.clone();
+    for it in items {
+        if let SelectItem::Aggregate(a) = it {
+            let expr =
+                a.arg_exprs.first().cloned().flatten().unwrap_or_else(|| {
+                    ExprAst::Column(a.args.first().cloned().unwrap_or_default())
+                });
+            expr_cols(&expr, &mut in_cols);
+        }
+    }
+    let mut in_ids: HashMap<String, usize> = HashMap::new();
+    for c in &in_cols {
+        if !in_ids.contains_key(c) {
+            in_ids.insert(c.clone(), in_ids.len());
+        }
+    }
+
+    // Output ids: group keys first, then each aggregate's expansion.
+    let mut next_out = keys.len();
+    let mut agg_list: Vec<String> = Vec::new();
+    // The projection lists only the aggregate select items (group keys are not
+    // re-projected), but the group keys still occupy the first output ids.
+    let mut proj_exprs: Vec<String> = Vec::new();
+    for it in items {
+        if let SelectItem::Aggregate(a) = it {
+            let expr =
+                a.arg_exprs.first().cloned().flatten().unwrap_or_else(|| {
+                    ExprAst::Column(a.args.first().cloned().unwrap_or_default())
+                });
+            // The argument as shown inside the projection: a bare column keeps
+            // its name, a computed expression is wrapped in parentheses.
+            let arg_bare = match &expr {
+                ExprAst::Column(c) => c.clone(),
+                other => format!("({})", render_expr_m(other, &HashMap::new(), false)),
+            };
+            let arg_id = render_expr_m(&expr, &in_ids, true);
+            let upper = |f: AggFunc| f.as_str().to_ascii_uppercase();
+            if matches!(a.func, AggFunc::Avg) {
+                agg_list.push(format!("{}({})", upper(AggFunc::Sum), arg_id));
+                agg_list.push(format!("{}({})", upper(AggFunc::Count), arg_id));
+                let (s, c) = (next_out, next_out + 1);
+                next_out += 2;
+                proj_exprs.push(format!("sum({arg_bare}) (#{s}) / count({arg_bare}) (#{c})"));
+            } else {
+                agg_list.push(format!("{}({})", upper(a.func), arg_id));
+                let o = next_out;
+                next_out += 1;
+                proj_exprs.push(format!("{}({arg_bare}) (#{o})", a.func.as_str()));
+            }
+        }
+    }
+
+    let alias = table.split('.').next_back().unwrap_or(table);
+    let db = table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", 4));
+    lines.push(attr(0, "table index: #4"));
+    lines.push(attr(
+        0,
+        &format!("expressions: [{}]", proj_exprs.join(", ")),
+    ));
+    lines.push(header(1, "AGGREGATE", 3));
+    lines.push(attr(1, "aggregate table index: #3"));
+    lines.push(attr(1, &format!("aggregate: [{}]", agg_list.join(", "))));
+    if !keys.is_empty() {
+        lines.push(attr(1, "group by table index: #2"));
+        let kt: Vec<String> = keys
+            .iter()
+            .map(|k| match in_ids.get(k) {
+                Some(i) => format!("{k} (#{i})"),
+                None => k.clone(),
+            })
+            .collect();
+        lines.push(attr(1, &format!("group by: [{}]", kt.join(", "))));
+    }
+    lines.push(header(2, "TABLE SCAN", 2));
+    lines.push(attr(2, &format!("table name: {alias}({db}.{alias})")));
+    lines.push(attr(2, "table index: #1"));
+    let mut out = in_cols.clone();
+    add_col(&mut out, "__rowid");
+    lines.push(attr(2, &format!("output columns: [{}]", out.join(", "))));
     Some(lines)
 }
 

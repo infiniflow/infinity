@@ -1583,23 +1583,20 @@ impl Parser {
             saw_star = true;
         } else {
             loop {
-                match self.peek().clone() {
-                    // a function-call argument is a computed expression
-                    Token::Ident(_)
-                        if matches!(self.toks.get(self.pos + 1), Some(Token::LParen)) =>
-                    {
-                        let e = self.expr()?;
-                        args.push(expr_text(&e));
-                        arg_exprs.push(Some(e));
-                    }
-                    Token::Ident(_) => {
-                        args.push(self.expect_ident()?);
+                if self.peek() == &Token::RParen {
+                    break;
+                }
+                // A plain column becomes an `args` name; anything else (e.g.
+                // `c1 + 1`, `CAST(c2 AS INTEGER)`) is kept as an expression.
+                let e = self.expr()?;
+                match e {
+                    ExprAst::Column(c) => {
+                        args.push(c);
                         arg_exprs.push(None);
                     }
-                    Token::RParen => break,
-                    _ => {
-                        self.advance();
-                        continue;
+                    other => {
+                        args.push(expr_text(&other));
+                        arg_exprs.push(Some(other));
                     }
                 }
                 if self.peek() == &Token::Comma {
