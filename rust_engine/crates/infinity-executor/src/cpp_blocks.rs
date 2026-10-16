@@ -190,6 +190,94 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
     Some(format!("[{}]", parts.join(",")))
 }
 
+/// `ARRAY(<scalar>)` → the element's `ColumnType`.
+///
+/// Only one level of fixed-width scalar elements is supported: the slot records
+/// just the outer element count (§8.3), so a nested array's inner counts or a
+/// variable-length element's payload offsets would be unrecoverable. Those
+/// return `None` and are reported as unsupported by the caller.
+pub fn array_shape(type_text: &str) -> Option<i32> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let rest = up.strip_prefix("ARRAY(")?;
+    let inner = rest.trim_end_matches(')').trim();
+    if inner.starts_with("ARRAY(") {
+        return None; // nested arrays: the inner counts are not recorded
+    }
+    let elem = column_type_of(inner)?;
+    // Variable-length or nested elements are out of scope for this writer.
+    match cpp_format::column_layout(elem) {
+        Some(ColumnLayout::Fixed(_)) | Some(ColumnLayout::CompactBit) => Some(elem),
+        _ => None,
+    }
+}
+
+/// Width of one array element slot.
+fn array_element_width(elem_col: i32) -> Option<usize> {
+    match cpp_format::column_layout(elem_col)? {
+        ColumnLayout::Fixed(w) => Some(w),
+        ColumnLayout::CompactBit => Some(1),
+        ColumnLayout::VarLen(_) => None,
+    }
+}
+
+/// Parses the engine's array rendering `{1,2,3}` into its elements.
+pub fn parse_braces(cell: &str) -> Vec<String> {
+    let t = cell.trim();
+    let inner = if t.starts_with('{') && t.ends_with('}') && t.len() >= 2 {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    };
+    if inner.trim().is_empty() {
+        return Vec::new();
+    }
+    inner.split(',').map(|s| s.trim().to_string()).collect()
+}
+
+/// Encodes one array value: appends the elements to `outline` and returns the
+/// `{count:16; offset:48}` slot.
+fn encode_array_slot(
+    type_text: &str,
+    value: &str,
+    outline: &mut Vec<u8>,
+) -> Result<Option<Vec<u8>>> {
+    if value.eq_ignore_ascii_case("null") {
+        return Ok(None);
+    }
+    let elem_col = array_shape(type_text)
+        .ok_or_else(|| Error::Invalid(format!("not a supported array type: '{type_text}'")))?;
+    let width = array_element_width(elem_col)
+        .ok_or_else(|| Error::Invalid("array element is not fixed-width".into()))?;
+    let elems = parse_braces(value);
+    let offset = outline.len() as u64;
+    for e in &elems {
+        match encode_value("", elem_col, e)? {
+            Some(bytes) => outline.extend_from_slice(&bytes),
+            // A NULL element is a zeroed slot (the element bitmap lives in the
+            // inner column, which the C++ reader supplies for nested arrays).
+            None => outline.extend_from_slice(&vec![0u8; width]),
+        }
+    }
+    Ok(Some(
+        cpp_format::varlen_count_offset_slot(elems.len() as u64, offset).to_vec(),
+    ))
+}
+
+/// Decodes one array slot out of the outline.
+fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<String> {
+    let elem_col = array_shape(type_text)?;
+    let word = u64::from_le_bytes(slot.try_into().ok()?);
+    let count = (word & 0xffff) as usize;
+    let offset = (word >> 16) as usize;
+    let width = array_element_width(elem_col)?;
+    let tail = outline.get(offset..offset + count * width)?;
+    let mut parts = Vec::with_capacity(count);
+    for k in 0..count {
+        parts.push(decode_value("", elem_col, tail, k)?);
+    }
+    Some(format!("{{{}}}", parts.join(",")))
+}
+
 /// Maps a declared type text to the `ColumnType` code this writer packs.
 ///
 /// Returns `None` for shapes the packer does not cover yet
@@ -227,6 +315,10 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
             sparse_shape(type_text)?;
             13
         }
+        "ARRAY" => {
+            array_shape(type_text)?;
+            21
+        }
         _ => return None,
     })
 }
@@ -238,6 +330,7 @@ enum OutlineKind {
     None,
     Tensor,
     Sparse,
+    Array,
 }
 
 fn outline_kind(type_text: &str) -> OutlineKind {
@@ -245,6 +338,8 @@ fn outline_kind(type_text: &str) -> OutlineKind {
         OutlineKind::Tensor
     } else if sparse_shape(type_text).is_some() {
         OutlineKind::Sparse
+    } else if array_shape(type_text).is_some() {
+        OutlineKind::Array
     } else {
         OutlineKind::None
     }
@@ -263,6 +358,10 @@ fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
     if sparse_shape(type_text).is_some() {
         // Sparse: `i64 nnz` + `i64 offset`.
         return Some(ColumnLayout::VarLen(16));
+    }
+    if array_shape(type_text).is_some() {
+        // Array: a `{count:16; offset:48}` slot into the outline.
+        return Some(ColumnLayout::VarLen(8));
     }
     cpp_format::column_layout(column_type)
 }
@@ -519,6 +618,11 @@ impl Engine {
                             &text,
                             &mut self_outline,
                         )?),
+                        OutlineKind::Array => slots.push(encode_array_slot(
+                            &meta.types[col],
+                            &text,
+                            &mut self_outline,
+                        )?),
                         OutlineKind::None => {
                             slots.push(encode_value(&meta.types[col], *column_type, &text)?)
                         }
@@ -653,6 +757,12 @@ impl Engine {
                                 let at = row * 16;
                                 let slot = body.data.get(at..at + 16).unwrap_or(&[]);
                                 decode_sparse_value(&meta.types[col], slot, &raw.outline)
+                                    .unwrap_or_else(|| "null".into())
+                            }
+                            OutlineKind::Array => {
+                                let at = row * 8;
+                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                                decode_array_value(&meta.types[col], slot, &raw.outline)
                                     .unwrap_or_else(|| "null".into())
                             }
                             OutlineKind::None => {
@@ -837,6 +947,39 @@ mod tests {
     }
 
     #[test]
+    fn array_shape_parsing() {
+        assert_eq!(array_shape("ARRAY(INT)"), Some(3));
+        assert_eq!(array_shape("ARRAY(DOUBLE)"), Some(6));
+        // Nested arrays and variable-length elements are out of scope: the slot
+        // records only the outer count.
+        assert_eq!(array_shape("ARRAY(ARRAY(INT))"), None);
+        assert_eq!(array_shape("ARRAY(VARCHAR)"), None);
+    }
+
+    #[test]
+    fn array_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE ar (id INT, a ARRAY(INT));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO ar VALUES (1, {1,2,3});")
+            .unwrap();
+        engine.execute("INSERT INTO ar VALUES (2, {7});").unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("ar").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("ar").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "{1,2,3}".to_string()],
+                vec!["2".to_string(), "{7}".to_string()],
+            ]
+        );
+    }
+
+    #[test]
     fn tensor_blocks_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
@@ -890,7 +1033,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE v (id INT, a ARRAY(INT));")
+            .execute("CREATE TABLE v (id INT, ta TENSORARRAY(FLOAT,2));")
             .unwrap();
         let err = engine.write_cpp_blocks("v").unwrap_err();
         assert!(err.to_string().contains("not supported"), "{err}");
