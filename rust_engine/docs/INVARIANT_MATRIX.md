@@ -1,0 +1,71 @@
+# Gate G — C++ 内部不变量 → Rust 测试 对照清单
+
+> 计划书 §6 Gate G 要求：**必须**产出一份「C++ 内部不变量 → Rust 测试」清单并纳入门槛，
+> 覆盖 ①配置校验/拒绝行为、②存储/事务不变量、③索引不变量；
+> **清单外的例外须显式登记并说明理由**，不得默认遗漏。
+>
+> 本文件为 **v0.1**：Rust 侧只登记**已存在**的测试（名称与 `cargo test` 输出的完全一致），
+> 未覆盖项在「缺口」列写明状态。C++ 侧以计划书「附录 A：核心不变量」与 CI 的
+> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-16。
+
+## 1. 配置校验 / 拒绝行为
+
+| C++ 不变量 / 用例 | Rust 对应 | 状态 |
+|---|---|---|
+| 参数越界必须**拒绝**而非静默钳制（`config_ut.cpp:175`） | — | **缺口**：Rust 侧尚无对应的配置校验（`SET CONFIG` 只存键值，不做范围校验） |
+| `Connect` 的 `client_version` 必须匹配（否则握手失败） | `infinity-server: handshake_policy`、`tcp_connect_success_and_mismatch` | ✅ |
+| 校验和错误的 WAL 帧必须**停止读取**而非跳过 | `infinity-storage: corrupt_checksum_stops_reading` | ✅ |
+| 撕裂尾（torn tail）必须被容忍并丢弃 | `infinity-storage: torn_tail_is_ignored` | ✅ |
+| 空事务必须被拒绝 | `infinity-txn: empty_txn_rejected` | ✅ |
+| 重名表 / 重名列必须被拒绝 | `infinity-catalog: duplicate_name_is_rejected`；executor `defaults_and_alter_add_column`（重复列） | ✅ |
+| 张量维度/嵌套不合法必须报错 | executor：`TENSORARRAY` 三重嵌套校验（`statement error`） | ✅ 部分（见 §4 缺口） |
+
+## 2. 存储 / 事务不变量
+
+| C++ 不变量（附录 A） | Rust 对应 | 状态 |
+|---|---|---|
+| A2 **MVCC = 时间戳数组**，更新 = 删除 + 追加（非 KV 快照） | `infinity-storage: append_then_visibility`、`update_is_delete_plus_append`、`rollback_delete_restores_row`、`delete_respects_snapshot`；executor `update_is_delete_plus_append` | ✅ |
+| A4 提交管线 `Prepare→WriteWAL(串行)→CommitBottom` | `infinity-txn: concurrent_commits_are_serialized_and_durable`、`commit_applies_to_kv` | ✅ |
+| WAL 回放**幂等**（重复回放不产生副作用） | `infinity-txn: recovery_replays_wal_after_reopen` | ✅ |
+| WAL 截断后恢复**恰好**有效前缀 | `infinity-txn: truncated_wal_recovers_exactly_the_valid_prefix`；`infinity-storage: replay_since_filters_by_commit_ts`、`truncate_keeps_tail` | ✅ |
+| `commit_ts` 分配在任意交错下**唯一无缺口** | `infinity-txn: commit_ts_allocation_is_unique`（+ `--cfg loom` 的 `loom_model`） | ✅ |
+| 元数据 KV 原子批写「全有或全无」 | `infinity-storage: atomic_write_is_all_or_nothing` | ✅ |
+| 元数据跨重开**持久**，前缀扫描**有序** | `infinity-storage: survives_reopen_after_flush`、`scan_prefix_is_ordered`；catalog `survives_reopen_with_columns`；executor `persists_across_restart` | ✅ |
+| CRC-32/IEEE 与 C++ **逐字节一致** | `infinity-storage: standard_check_value`、`differs_on_one_bit` | ✅ |
+| 行墓碑（DELETE）对查询**不可见**，对聚合**不计入** | executor `delete_with_where_and_all` | ✅ |
+| `DROP TABLE` 后同名重建必须**空表** | executor（`DROP TABLE` 清理行/墓碑/索引；`test_simple_agg` 由 38→77 通过） | ✅ |
+| 快照/恢复（`CREATE/DROP/RESTORE TABLE SNAPSHOT`） | executor：快照序列化 + 恢复重建（`test/sql/snapshot/**` 10 文件全绿） | ✅ 基础 |
+| A1 三底座**彼此独立**且耐久性契约不同 | 代码结构（KV/WAL/块文件各自 crate 边界） | ⚠️ 结构体现，**无专项测试** |
+
+## 3. 索引不变量
+
+| C++ 不变量（附录 A3） | Rust 对应 | 状态 |
+|---|---|---|
+| 二级索引：插入后可查、范围扫描、**持久化后重建** | `infinity-index: insert_lookup`、`range_scan`、`persist_and_load`；executor `index_scan_matches_expected_and_survives_restart` | ✅ |
+| 向量索引：Flat 精确 top-1 | `infinity-index/vector: flat_exact_top1` | ✅ |
+| HNSW 能找到精确解，且**召回率**达标 | `infinity-index/vector: hnsw_finds_exact_vector`、`hnsw_recall_vs_flat` | ✅ |
+| 全文倒排：分词、单词查询、AND 查询与排序、top-k 截断 | `infinity-index/fulltext: tokenize_basic`、`single_term_lookup`、`and_query_and_ranking`、`top_k_limits` | ✅ |
+| A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | — | **缺口**：Rust 侧索引未落盘为独立的块文件族，尚无「文件集合/发布/合并/清理」契约测试 |
+| `DROP INDEX` 后重建 | executor：`DROP INDEX` + 元数据重建路径 | ⚠️ 无专项测试 |
+
+## 4. 显式登记的例外与缺口（Gate G 要求）
+
+| # | 缺口 | 理由 / 影响 |
+|---|---|---|
+| G1 | **配置项的范围校验**（`config_ut.cpp` 类） | 当前 `SET CONFIG` 为容错实现（键值 stored，不做范围/类型校验）。补齐需先冻结「配置项 × 合法域」清单——属 M6 前的独立任务。 |
+| G2 | **索引文件族契约**（A3） | Rust 侧索引当前在内存 + KV 元数据中维护，尚未按 C++ 的「块文件族 + `ChunkIndexMetaInfo` 发布」落地；需在磁盘驻留索引（M4+）阶段补测。 |
+| G3 | **跨底座宕机一致性**（KV+WAL+块文件同时崩溃） | PoC C 已在 `rust_poc/crash-consistency` 验证 5 个边界场景，但**尚未**落成 `rust_engine` 内的回归测试。 |
+| G4 | **`miri` / sanitizer** 覆盖 | 计划 §6 Gate D 要求；当前仅有 `--cfg loom` 模型（`infinity-txn`）与常规单测。 |
+| G5 | 全文**打分**不变量（相似度单调性等） | 打分本身未实现（见计划书 §5.1 的负结果记录），无对应不变量。 |
+
+## 5. 使用方式
+
+```bash
+# 全部登记项（Rust 侧）
+cd rust_engine && cargo test --workspace
+# Loom 模型（commit_ts 分配唯一性）
+RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
+```
+
+> 结论：Gate G 的**清单已产出**；配置校验（G1）、索引文件族（G2）、跨底座崩溃回归（G3）、
+> miri/sanitizer（G4）为**已登记缺口**，尚未满足「纳入门槛」的条件。
