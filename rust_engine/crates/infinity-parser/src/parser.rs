@@ -946,6 +946,25 @@ impl Parser {
             }
             Token::LParen => {
                 self.advance();
+                // A parenthesised expression may be a *predicate*
+                // (`(a > 1 OR b < 2)`, `(filter_text(...) OR num > 2)`), not
+                // just arithmetic, so try a predicate first and fall back to a
+                // scalar expression.
+                let save = self.pos;
+                if let Ok(p) = self.predicate() {
+                    if self.peek() == &Token::RParen {
+                        // A bare value comes back as `IsTrue(expr)`.
+                        let e = match &p {
+                            Predicate::IsTrue(e) => Some(e.clone()),
+                            other => predicate_to_expr(other),
+                        };
+                        if let Some(e) = e {
+                            self.advance();
+                            return Ok(e);
+                        }
+                    }
+                }
+                self.pos = save;
                 let inner = self.expr()?;
                 self.expect(Token::RParen)?;
                 Ok(inner)
@@ -1733,6 +1752,8 @@ fn predicate_to_expr(p: &Predicate) -> Option<ExprAst> {
             Box::new(predicate_to_expr(b)?),
         ),
         Predicate::Not(a) => ExprAst::Not(Box::new(predicate_to_expr(a)?)),
+        // A bare value is a "truthy" predicate; its expression is the value.
+        Predicate::IsTrue(e) => e.clone(),
         _ => return None,
     })
 }
@@ -2089,6 +2110,40 @@ mod tests {
                 search: None,
                 distinct: false,
             }
+        );
+    }
+
+    #[test]
+    fn parenthesized_predicate_is_an_expression() {
+        // A parenthesised item may be a predicate, not just arithmetic:
+        // `(num > 2 OR num < 1)` and `(filter_text(...) OR num > 2)`.
+        let Statement::Select { items, .. } = one("SELECT num, (num > 2 OR num < 1) FROM t")
+        else {
+            panic!("expected a SELECT");
+        };
+        assert!(
+            matches!(items[1], SelectItem::Expr(ExprAst::Or(..))),
+            "got {:?}",
+            items[1]
+        );
+        let Statement::Select { items, .. } =
+            one("SELECT (filter_text('doc', 'x') OR num > 2) FROM t")
+        else {
+            panic!("expected a SELECT");
+        };
+        assert!(
+            matches!(items[0], SelectItem::Expr(ExprAst::Or(..))),
+            "got {:?}",
+            items[0]
+        );
+        // Arithmetic parentheses still parse as before.
+        let Statement::Select { items, .. } = one("SELECT (1 + 2) FROM t") else {
+            panic!("expected a SELECT");
+        };
+        assert!(
+            matches!(items[0], SelectItem::Expr(ExprAst::Binary(..))),
+            "got {:?}",
+            items[0]
         );
     }
 
