@@ -566,11 +566,13 @@ mod tests {
         let items = vec![
             SelectItem::Aggregate(SelectAgg {
                 func: AggFunc::Count,
-                arg: None,
+                args: vec![],
+                distinct: false,
             }),
             SelectItem::Aggregate(SelectAgg {
                 func: AggFunc::Sum,
-                arg: Some("id".into()),
+                args: vec!["id".into()],
+                distinct: false,
             }),
         ];
         let p = plan_select(&items, &tables(), None, None, None, None, None).unwrap();
@@ -580,7 +582,7 @@ mod tests {
             } => {
                 assert!(group_key.is_none());
                 assert_eq!(aggs.len(), 2);
-                assert_eq!(aggs[1].2, "sum(id)");
+                assert_eq!(aggs[1].3, "sum(id)");
             }
             other => panic!("expected aggregate, got {other:?}"),
         }

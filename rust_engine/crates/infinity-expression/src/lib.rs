@@ -642,7 +642,15 @@ pub fn aggregate(func: AggFunc, cols: &[usize], distinct: bool, rows: &[Vec<Valu
     };
 
     match func {
-        AggFunc::Count => Value::Int(tuples.len() as i64),
+        AggFunc::Count => {
+            // COUNT(col) ignores NULLs; COUNT(DISTINCT a, b) counts tuples.
+            let n = if cols.len() == 1 {
+                vals.len()
+            } else {
+                tuples.len()
+            };
+            Value::Int(n as i64)
+        }
         AggFunc::Sum | AggFunc::Avg => {
             let mut sum = 0f64;
             let mut all_int = true;
