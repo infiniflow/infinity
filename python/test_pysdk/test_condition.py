@@ -46,3 +46,26 @@ class TestInfinity:
             res = traverse_conditions(cond)
             print(res)
             assert res
+
+    def test_match_dense_knn_params_non_string_thrift(self):
+        # Regression test (thrift SDK): match_dense crashed with
+        # AttributeError: 'int' object has no attribute 'lower' when a
+        # knn_params value was not a string (e.g. {"ef": 200}).
+        from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+        qb = InfinityThriftQueryBuilder(table=None)
+        qb.match_dense("v", [1.0, 2.0], "float", "l2", 5, {"ef": 200})
+        params = qb._search.match_exprs[0].match_vector_expr.opt_params
+        assert [(p.param_name, p.param_value) for p in params] == [("ef", "200")]
+
+    def test_match_dense_knn_params_non_string_embedded(self, request):
+        # Regression test (embedded SDK): same AttributeError on non-string
+        # knn_params values.
+        if not request.config.getoption("--local-infinity"):
+            pytest.skip("embedded-only regression test")
+        from infinity_embedded.local_infinity.query_builder import InfinityLocalQueryBuilder
+
+        qb = InfinityLocalQueryBuilder(table=None)
+        qb.match_dense("v", [1.0, 2.0], "float", "l2", 5, {"ef": 200})
+        params = qb._search.match_exprs[0].knn_expr.opt_params
+        assert [(p.param_name, p.param_value) for p in params] == [("ef", "200")]
