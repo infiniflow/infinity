@@ -422,6 +422,10 @@ fn handle_connection(
                 Err(_) => break, // client closed the connection
             }
         };
+        // Handle the request, but never let a decode/execute error kill the
+        // connection: reply with a Thrift exception instead of dropping the
+        // socket (the SDK reports `connection reset` otherwise).
+        let handled: Result<()> = (|| {
         match name.as_str() {
             "Connect" => {
                 let cv = {
@@ -890,6 +894,11 @@ fn handle_connection(
                 write_app_exception(&mut writer, other, seq, &format!("unknown method: {other}"))?;
             }
         }
+        Ok(())
+        })();
+        if let Err(e) = handled {
+            let _ = write_app_exception(&mut writer, &name, seq, &format!("{e}"));
+        }
     }
     Ok(())
 }
@@ -911,33 +920,9 @@ fn element_type_name(elem: i32) -> &'static str {
     }
 }
 
-/// Renders a declared `ColumnDef` back into the engine's SQL type text, so a
-/// `CreateTable` RPC preserves the column's real type (embedding included)
-/// instead of flattening everything to `VARCHAR`.
-fn column_sql_type(c: &ColumnDefWire) -> String {
-    match &c.physical {
-        PhysicalWire::Embedding {
-            dimension,
-            element_type,
-        } => {
-            // Tensor / TensorArray / MultiVector share the embedding physical
-            // descriptor; the LogicType tells them apart.
-            let head = match c.logic_type {
-                13 => "TENSOR",
-                14 => "TENSORARRAY",
-                16 => "MULTIVECTOR",
-                _ => "EMBEDDING",
-            };
-            return format!("{head}({}, {dimension})", element_type_name(*element_type));
-        }
-        PhysicalWire::Sparse {
-            dimension,
-            element_type,
-            ..
-        } => return format!("SPARSE({}, {dimension})", element_type_name(*element_type)),
-        PhysicalWire::None => {}
-    }
-    match c.logic_type {
+/// Renders a scalar `LogicType` back into the engine's SQL type name.
+fn scalar_sql(logic_type: i32) -> String {
+    match logic_type {
         0 => "BOOLEAN".into(),
         1 => "TINYINT".into(),
         2 => "SMALLINT".into(),
@@ -957,6 +942,44 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
         23 => "JSON".into(),
         _ => "VARCHAR".into(),
     }
+}
+
+/// Renders a `(LogicType, PhysicalType)` pair back into the engine's SQL type
+/// text, recursing for array element types.
+fn type_sql(logic_type: i32, physical: &PhysicalWire) -> String {
+    match physical {
+        PhysicalWire::Array {
+            element_logic_type,
+            element,
+        } => format!("ARRAY({})", type_sql(*element_logic_type, element)),
+        PhysicalWire::Embedding {
+            dimension,
+            element_type,
+        } => {
+            // Tensor / TensorArray / MultiVector share the embedding physical
+            // descriptor; the LogicType tells them apart.
+            let head = match logic_type {
+                13 => "TENSOR",
+                14 => "TENSORARRAY",
+                16 => "MULTIVECTOR",
+                _ => "EMBEDDING",
+            };
+            format!("{head}({}, {dimension})", element_type_name(*element_type))
+        }
+        PhysicalWire::Sparse {
+            dimension,
+            element_type,
+            ..
+        } => format!("SPARSE({}, {dimension})", element_type_name(*element_type)),
+        PhysicalWire::None => scalar_sql(logic_type),
+    }
+}
+
+/// Renders a declared `ColumnDef` back into the engine's SQL type text, so a
+/// `CreateTable` RPC preserves the column's real type (embedding included)
+/// instead of flattening everything to `VARCHAR`.
+fn column_sql_type(c: &ColumnDefWire) -> String {
+    type_sql(c.logic_type, &c.physical)
 }
 
 /// Applies a `CreateTable` request to the engine (or errors if no engine bound).
@@ -1091,6 +1114,9 @@ const LOGIC_EMBEDDING: i32 = 12;
 /// `LogicType.Sparse` (SDK ordinal) — announced for sparse columns.
 const LOGIC_SPARSE: i32 = 15;
 
+/// `LogicType.Array` (SDK ordinal) — announced for array columns.
+const LOGIC_ARRAY: i32 = 22;
+
 // -------- date/time helpers (the SDK expects epoch days/seconds) --------
 
 /// Days from 1970-01-01 for a proleptic-Gregorian civil date (Hinnant's algorithm).
@@ -1149,6 +1175,8 @@ enum ColKind {
         dimension: i32,
         element_type: i32,
     },
+    /// Array: a per-row `u32 count` + elements packed for `element_column_type`.
+    Array { element_column_type: i32 },
 }
 
 /// Parses `TENSORARRAY(<elem>,<dim>)` / `TENSOR(<elem>,<dim>)` /
@@ -1328,6 +1356,11 @@ fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
             element_type,
         };
     }
+    if let Some((_logic, element_column_type, _physical)) = array_info(declared) {
+        return ColKind::Array {
+            element_column_type,
+        };
+    }
     let up = declared.trim().to_ascii_uppercase();
     let base = up.split('(').next().unwrap_or("").trim();
     match base {
@@ -1391,6 +1424,207 @@ fn column_type_to_logic(column_type: i32) -> i32 {
     }
 }
 
+/// The inverse of [`column_type_to_logic`]: the `ColumnType` the SDK unpacks an
+/// element of the given `LogicType` with.
+fn logic_to_column_type(logic_type: i32) -> i32 {
+    match logic_type {
+        0 => 0,   // Boolean
+        1 => 1,   // TinyInt
+        2 => 2,   // SmallInt
+        3 => 3,   // Integer
+        4 => 4,   // BigInt
+        7 => 5,   // Float
+        8 => 6,   // Double
+        9 => 7,   // Float16
+        10 => 8,  // BFloat16
+        11 => 9,  // Varchar
+        12 => 10, // Embedding
+        13 => 11, // Tensor
+        14 => 12, // TensorArray
+        15 => 13, // Sparse
+        16 => 14, // MultiVector
+        17 => 16, // Date
+        18 => 17, // Time
+        19 => 18, // DateTime
+        20 => 19, // Timestamp
+        21 => 20, // Interval
+        22 => 21, // Array
+        23 => 22, // Json
+        _ => 9,   // Varchar
+    }
+}
+
+/// Maps a *type name* to its `(LogicType, ColumnType)`. Accepts both the SQL
+/// spelling (`INT`) and the `SHOW TABLE … COLUMNS` rendering (`Integer`).
+fn named_type(text: &str) -> (i32, i32) {
+    let up = text.trim().to_ascii_uppercase();
+    let base = up.split('(').next().unwrap_or("").trim();
+    let col = match base {
+        "BOOL" | "BOOLEAN" => 0,
+        "TINYINT" | "INT8" => 1,
+        "SMALLINT" | "INT16" => 2,
+        "INT" | "INTEGER" | "INT32" => 3,
+        "BIGINT" | "INT64" => 4,
+        "FLOAT" | "REAL" | "FLOAT32" => 5,
+        "DOUBLE" | "FLOAT64" => 6,
+        "FLOAT16" => 7,
+        "BFLOAT16" => 8,
+        "VARCHAR" | "TEXT" | "STRING" => 9,
+        "DATE" => 16,
+        "TIME" => 17,
+        "DATETIME" | "TIMESTAMP" => 18,
+        "ARRAY" => 21,
+        "JSON" => 22,
+        _ => 9,
+    };
+    (column_type_to_logic(col), col)
+}
+
+/// The `PhysicalType` for an element type *text* (embedding/tensor/sparse), or
+/// `None` for scalars.
+fn element_physical(text: &str) -> PhysicalWire {
+    let up = text.trim().to_ascii_uppercase();
+    if up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(") {
+        if let Some((dim, elem)) = embedding_info(text) {
+            return PhysicalWire::Embedding {
+                dimension: dim,
+                element_type: elem,
+            };
+        }
+    }
+    if let Some((_, dim, elem)) = tensor_info(text) {
+        return PhysicalWire::Embedding {
+            dimension: dim,
+            element_type: elem,
+        };
+    }
+    if let Some((dimension, element_type, index_type)) = sparse_info(text) {
+        return PhysicalWire::Sparse {
+            dimension,
+            element_type,
+            index_type,
+        };
+    }
+    PhysicalWire::None
+}
+
+/// The `(LogicType, PhysicalType)` of an element type text.
+fn element_type_meta(text: &str) -> (i32, PhysicalWire) {
+    let up = text.trim().to_ascii_uppercase();
+    let logic = if up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(") {
+        12
+    } else if up.starts_with("TENSORARRAY(") {
+        14
+    } else if up.starts_with("MULTIVECTOR(") {
+        16
+    } else if up.starts_with("TENSOR(") {
+        13
+    } else if up.starts_with("SPARSE(") {
+        15
+    } else if up.starts_with("ARRAY(") {
+        22
+    } else {
+        named_type(text).0
+    };
+    (logic, element_physical(text))
+}
+
+/// Parses `ARRAY(<inner>)` into `(element_logic_type, element_column_type,
+/// element_physical)`, recursing for nested arrays.
+fn array_info(text: &str) -> Option<(i32, i32, PhysicalWire)> {
+    let t = text.trim();
+    if !t.to_ascii_uppercase().starts_with("ARRAY(") {
+        return None;
+    }
+    let inner = t[t.find('(')? + 1..].trim_end_matches(')').trim();
+    if inner.to_ascii_uppercase().starts_with("ARRAY(") {
+        let (l, _c, p) = array_info(inner)?;
+        return Some((
+            22,
+            21,
+            PhysicalWire::Array {
+                element_logic_type: l,
+                element: Box::new(p),
+            },
+        ));
+    }
+    let (logic, physical) = element_type_meta(inner);
+    let col = logic_to_column_type(logic);
+    Some((logic, col, physical))
+}
+
+/// Splits an engine-rendered array (`{1,2,3}` / `{{1,2},{3}}`) into its
+/// top-level elements, keeping nested `{…}` groups intact.
+fn parse_array_elements(cell: &str) -> Vec<String> {
+    let t = cell.trim();
+    let inner = if t.starts_with('{') && t.ends_with('}') && t.len() >= 2 {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    };
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    for ch in inner.chars() {
+        match ch {
+            '{' => {
+                depth += 1;
+                cur.push(ch);
+            }
+            '}' => {
+                depth -= 1;
+                cur.push(ch);
+            }
+            ',' if depth == 0 => {
+                out.push(cur.trim().to_string());
+                cur.clear();
+            }
+            _ => cur.push(ch),
+        }
+    }
+    if !cur.trim().is_empty() {
+        out.push(cur.trim().to_string());
+    }
+    out
+}
+
+/// Appends one array element packed for its `ColumnType`, recursing into nested
+/// arrays.
+fn pack_array_element(chunk: &mut Vec<u8>, element_column_type: i32, text: &str) {
+    if element_column_type == 21 {
+        let elems = parse_array_elements(text);
+        chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
+        for e in &elems {
+            // Nested arrays only appear for `array,array,…`; their elements are
+            // packed as strings here (the SDK recurses with the same rule).
+            let s = e.trim();
+            chunk.extend_from_slice(&(s.len() as u32).to_le_bytes());
+            chunk.extend_from_slice(s.as_bytes());
+        }
+        return;
+    }
+    let t = text.trim();
+    match element_column_type {
+        0 => chunk.push(if t.eq_ignore_ascii_case("true") { 1 } else { 0 }),
+        3 => chunk.extend_from_slice(&t.parse::<i32>().unwrap_or(0).to_le_bytes()),
+        4 => chunk.extend_from_slice(&t.parse::<i64>().unwrap_or(0).to_le_bytes()),
+        5 => chunk.extend_from_slice(&t.parse::<f32>().unwrap_or(0.0).to_le_bytes()),
+        6 => chunk.extend_from_slice(&t.parse::<f64>().unwrap_or(0.0).to_le_bytes()),
+        16 => chunk.extend_from_slice(&date_to_days(t).unwrap_or(0).to_le_bytes()),
+        17 => chunk.extend_from_slice(&time_to_secs(t).unwrap_or(0).to_le_bytes()),
+        18 => {
+            let (d, secs) = datetime_to_pair(t).unwrap_or((0, 0));
+            chunk.extend_from_slice(&d.to_le_bytes());
+            chunk.extend_from_slice(&secs.to_le_bytes());
+        }
+        // Varchar / Json: u32 length prefix + UTF-8.
+        _ => {
+            chunk.extend_from_slice(&(t.len() as u32).to_le_bytes());
+            chunk.extend_from_slice(t.as_bytes());
+        }
+    }
+}
+
 /// Infers the wire `ColumnType` for a column from its values (the response path
 /// has no declared types available): ints, floats, bools, otherwise varchar.
 fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
@@ -1443,6 +1677,32 @@ pub fn rows_to_column_fields_typed(
     for (ci, name) in columns.iter().enumerate() {
         let declared = types.get(ci).map(String::as_str).unwrap_or("");
         let kind = classify_column(declared, rows, ci);
+        if let ColKind::Array {
+            element_column_type,
+        } = kind
+        {
+            let mut chunk: Vec<u8> = Vec::new();
+            let mut masks = Vec::with_capacity(rows.len());
+            for r in rows {
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                masks.push(cell.is_some());
+                let elems = cell.map(parse_array_elements).unwrap_or_default();
+                chunk.extend_from_slice(&(elems.len() as u32).to_le_bytes());
+                for e in &elems {
+                    pack_array_element(&mut chunk, element_column_type, e);
+                }
+            }
+            out.push(ColumnField {
+                column_type: 21, // ColumnArray
+                column_name: name.clone(),
+                column_vectors: vec![chunk],
+                bitmasks: masks,
+            });
+            continue;
+        }
         if let ColKind::Sparse {
             dimension: _,
             element_type,
@@ -1738,6 +1998,12 @@ pub enum PhysicalWire {
         element_type: i32,
         index_type: i32,
     },
+    /// `PhysicalType{5: ArrayType{1: element_data_type}}` — the element's own
+    /// `DataType` nests here.
+    Array {
+        element_logic_type: i32,
+        element: Box<PhysicalWire>,
+    },
 }
 
 /// A minimal `ColumnDef` (`thrift` field ids: 1 id, 2 name, 3 data_type).
@@ -1805,85 +2071,10 @@ pub fn write_select_response(
         o.write_field_end().map_err(tw)?;
         o.write_field_begin(&TFieldIdentifier::new("data_type", TType::Struct, 3i16))
             .map_err(tw)?;
-        o.write_struct_begin(&TStructIdentifier::new("DataType"))
-            .map_err(tw)?;
-        o.write_field_begin(&TFieldIdentifier::new("logic_type", TType::I32, 1i16))
-            .map_err(tw)?;
-        o.write_i32(cd.logic_type).map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
-        match cd.physical {
-            PhysicalWire::None => {}
-            PhysicalWire::Embedding {
-                dimension,
-                element_type,
-            } => {
-                // physical_type{ 3: embedding_type{ 1: dimension, 2: element_type } }
-                o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
-                    .map_err(tw)?;
-                o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
-                    .map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new(
-                    "embedding_type",
-                    TType::Struct,
-                    3i16,
-                ))
-                .map_err(tw)?;
-                o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
-                    .map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
-                    .map_err(tw)?;
-                o.write_i32(dimension).map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
-                    .map_err(tw)?;
-                o.write_i32(element_type).map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_stop().map_err(tw)?;
-                o.write_struct_end().map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_stop().map_err(tw)?;
-                o.write_struct_end().map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-            }
-            PhysicalWire::Sparse {
-                dimension,
-                element_type,
-                index_type,
-            } => {
-                // physical_type{ 4: sparse_type{ 1: dimension, 2: element_type, 3: index_type } }
-                o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
-                    .map_err(tw)?;
-                o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
-                    .map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("sparse_type", TType::Struct, 4i16))
-                    .map_err(tw)?;
-                o.write_struct_begin(&TStructIdentifier::new("SparseType"))
-                    .map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I64, 1i16))
-                    .map_err(tw)?;
-                o.write_i64(dimension).map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
-                    .map_err(tw)?;
-                o.write_i32(element_type).map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_begin(&TFieldIdentifier::new("index_type", TType::I32, 3i16))
-                    .map_err(tw)?;
-                o.write_i32(index_type).map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_stop().map_err(tw)?;
-                o.write_struct_end().map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-                o.write_field_stop().map_err(tw)?;
-                o.write_struct_end().map_err(tw)?;
-                o.write_field_end().map_err(tw)?;
-            }
-        }
-        o.write_field_stop().map_err(tw)?;
-        o.write_struct_end().map_err(tw)?;
+        write_data_type(&mut o, cd.logic_type, &cd.physical)?;
         o.write_field_end().map_err(tw)?;
         o.write_field_stop().map_err(tw)?;
-        o.write_struct_end().map_err(tw)?;
+        o.write_struct_end().map_err(tw)?; // ColumnDef
     }
     o.write_list_end().map_err(tw)?;
     o.write_field_end().map_err(tw)?;
@@ -1910,6 +2101,113 @@ pub fn write_select_response(
     o.write_field_stop().map_err(tw)?;
     o.write_struct_end().map_err(tw)?; // Select_result
     o.flush().map_err(tw)?;
+    Ok(())
+}
+
+/// Writes a `DataType` value (`{1: logic_type, 2: physical_type}`), recursing
+/// into the element for array types.
+fn write_data_type(
+    o: &mut TBinaryOutputProtocol<&mut impl Write>,
+    logic_type: i32,
+    physical: &PhysicalWire,
+) -> Result<()> {
+    o.write_struct_begin(&TStructIdentifier::new("DataType"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("logic_type", TType::I32, 1i16))
+        .map_err(tw)?;
+    o.write_i32(logic_type).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    match physical {
+        PhysicalWire::None => {}
+        PhysicalWire::Embedding {
+            dimension,
+            element_type,
+        } => {
+            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("embedding_type", TType::Struct, 3i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
+                .map_err(tw)?;
+            o.write_i32(*dimension).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
+                .map_err(tw)?;
+            o.write_i32(*element_type).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
+        PhysicalWire::Sparse {
+            dimension,
+            element_type,
+            index_type,
+        } => {
+            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("sparse_type", TType::Struct, 4i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("SparseType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I64, 1i16))
+                .map_err(tw)?;
+            o.write_i64(*dimension).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
+                .map_err(tw)?;
+            o.write_i32(*element_type).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("index_type", TType::I32, 3i16))
+                .map_err(tw)?;
+            o.write_i32(*index_type).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
+        PhysicalWire::Array {
+            element_logic_type,
+            element,
+        } => {
+            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new("array_type", TType::Struct, 5i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("ArrayType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new(
+                "element_data_type",
+                TType::Struct,
+                1i16,
+            ))
+            .map_err(tw)?;
+            write_data_type(o, *element_logic_type, element)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
+    }
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?; // DataType
     Ok(())
 }
 
@@ -2063,12 +2361,61 @@ fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<P
                     index_type: idx,
                 };
             }
+            Some(5) if f.field_type == TType::Struct => {
+                // ArrayType{1: element_data_type}
+                ip.read_struct_begin().map_err(tw)?;
+                let mut element_logic_type = 0i32;
+                let mut element = PhysicalWire::None;
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    if g.id == Some(1) && g.field_type == TType::Struct {
+                        let dt = read_data_type(ip)?;
+                        element_logic_type = dt.0;
+                        element = dt.1;
+                    } else {
+                        ip.skip(g.field_type).map_err(tw)?;
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+                out = PhysicalWire::Array {
+                    element_logic_type,
+                    element: Box::new(element),
+                };
+            }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
     Ok(out)
+}
+
+/// Reads a `DataType` (`{1: logic_type, 2: physical_type}`), recursing for
+/// array element types.
+fn read_data_type(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(i32, PhysicalWire)> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut logic = 0i32;
+    let mut physical = PhysicalWire::None;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => logic = ip.read_i32().map_err(tw)?,
+            Some(2) if f.field_type == TType::Struct => physical = read_physical_type(ip)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok((logic, physical))
 }
 
 /// Consumes the trailing `stop` of a `<Method>_args` struct.
@@ -2575,6 +2922,15 @@ pub fn select_response_from_typed(
                         element_type,
                     },
                 ),
+                ColKind::Array { .. } => (
+                    LOGIC_ARRAY,
+                    array_info(declared)
+                        .map(|(logic, _col, physical)| PhysicalWire::Array {
+                            element_logic_type: logic,
+                            element: Box::new(physical),
+                        })
+                        .unwrap_or(PhysicalWire::None),
+                ),
                 ColKind::Scalar(code) => (column_type_to_logic(code), PhysicalWire::None),
             };
             ColumnDefWire {
@@ -2623,6 +2979,9 @@ pub enum ValueLit {
         floats: Vec<f64>,
         is_float: bool,
     },
+    /// `{…}` brace-bracketed array (the SDK's `Array(...)` wrapper); nested
+    /// arrays nest here.
+    Brackets(Vec<ValueLit>),
 }
 
 impl ValueLit {
@@ -2721,6 +3080,14 @@ impl ValueLit {
                     .collect::<Vec<_>>()
                     .join(",")
             ),
+            ValueLit::Brackets(items) => format!(
+                "{{{}}}",
+                items
+                    .iter()
+                    .map(|v| v.to_sql())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             ValueLit::Sparse {
                 indices,
                 ints,
@@ -2765,6 +3132,7 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
     let mut i64_tensor_array: Vec<Vec<Vec<i64>>> = Vec::new();
     let mut f64_tensor_array: Vec<Vec<Vec<f64>>> = Vec::new();
     let mut idx_arr: Vec<i64> = Vec::new();
+    let mut brackets: Vec<ValueLit> = Vec::new();
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
         if fd.field_type == TType::Stop {
@@ -2783,6 +3151,7 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
             Some(10) => i64_tensor_array = read_i64_list_list_list(ip)?,
             Some(11) => f64_tensor_array = read_f64_list_list_list(ip)?,
             Some(12) => idx_arr = read_i64_list(ip)?,
+            Some(13) => brackets = read_constant_expr_list(ip)?,
             _ => ip.skip(fd.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -2811,8 +3180,20 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
             floats: f64_arr,
             is_float: true,
         },
+        18 => ValueLit::Brackets(brackets), // CurlyBracketsArray
         _ => ValueLit::Null,
     })
+}
+
+/// Reads a `list<ConstantExpr>` (the brace-bracketed `Array(...)` payload).
+fn read_constant_expr_list(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<ValueLit>> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out = Vec::with_capacity(l.size.max(0) as usize);
+    for _ in 0..l.size {
+        out.push(read_constant_expr(ip)?);
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out)
 }
 
 /// Reads a `list<i64>`.
@@ -3143,6 +3524,7 @@ pub fn read_create_index_args(
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?; // CreateIndex_args
     Ok(r)
 }
 
@@ -3917,5 +4299,36 @@ mod tests {
         );
         let aresp = select_response_from_typed(&acols, &atypes, &arows);
         assert_eq!(aresp.column_defs[0].logic_type, 14); // TensorArray
+
+        // Array: u32 element count + each element packed for its ColumnType.
+        let rcols = vec!["r".to_string()];
+        let rtypes = vec!["ARRAY(INT)".to_string()];
+        let rrows = vec![vec!["{1,2,3}".to_string()]];
+        let rf = rows_to_column_fields_typed(&rcols, &rtypes, &rrows);
+        assert_eq!(rf[0].column_type, 21); // ColumnArray
+        let b = &rf[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 3);
+        assert_eq!(i32::from_le_bytes(b[4..8].try_into().unwrap()), 1);
+        assert_eq!(i32::from_le_bytes(b[8..12].try_into().unwrap()), 2);
+        assert_eq!(i32::from_le_bytes(b[12..16].try_into().unwrap()), 3);
+        let rresp = select_response_from_typed(&rcols, &rtypes, &rrows);
+        assert_eq!(rresp.column_defs[0].logic_type, 22); // Array
+        assert_eq!(
+            rresp.column_defs[0].physical,
+            PhysicalWire::Array {
+                element_logic_type: 3, // Integer
+                element: Box::new(PhysicalWire::None),
+            }
+        );
+
+        // Varchar arrays are length-prefixed per element.
+        let vcols = vec!["s".to_string()];
+        let vtypes = vec!["ARRAY(VARCHAR)".to_string()];
+        let vrows = vec![vec!["{ab,cd}".to_string()]];
+        let vf = rows_to_column_fields_typed(&vcols, &vtypes, &vrows);
+        let b = &vf[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(b[4..8].try_into().unwrap()), 2); // "ab"
+        assert_eq!(&b[8..10], b"ab");
     }
 }
