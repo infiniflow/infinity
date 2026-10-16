@@ -87,6 +87,109 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     Some((column_type, dim, code))
 }
 
+/// `SPARSE(<elem>,<bound>)` → `(element_type, index_type, index_width)`.
+///
+/// The index width is derived from the bound, exactly as the engine's
+/// `describe_type` does (spec §8.3): ≤127 int8, ≤32767 int16, ≤2^31-1 int32,
+/// otherwise int64.
+pub fn sparse_shape(type_text: &str) -> Option<(i32, i32, usize)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let rest = up.strip_prefix("SPARSE(")?;
+    let inner = rest.trim_end_matches(')');
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    let elem = element_code(parts.first()?)?;
+    let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let (index_type, width) = if bound <= 127 {
+        (2, 1)
+    } else if bound <= 32767 {
+        (3, 2)
+    } else if bound <= 2_147_483_647 {
+        (4, 4)
+    } else {
+        (5, 8)
+    };
+    Some((elem, index_type, width))
+}
+
+/// Parses the engine's sparse rendering `[i:val,…]` / `(empty)`.
+pub fn parse_sparse_literal(cell: &str) -> (Vec<i64>, Vec<f64>) {
+    let inner = cell.trim();
+    if inner == "(empty)" || inner.is_empty() || inner == "[]" {
+        return (Vec::new(), Vec::new());
+    }
+    let inner = inner.trim_start_matches('[').trim_end_matches(']');
+    let mut idx = Vec::new();
+    let mut val = Vec::new();
+    for part in inner.split(',') {
+        if let Some((i, v)) = part.split_once(':') {
+            if let (Ok(i), Ok(v)) = (i.trim().parse::<i64>(), v.trim().parse::<f64>()) {
+                idx.push(i);
+                val.push(v);
+            }
+        }
+    }
+    (idx, val)
+}
+
+/// Encodes one sparse value: appends `indices` then `values` to `outline` and
+/// returns the `i64 nnz + i64 offset` slot.
+fn encode_sparse_slot(
+    type_text: &str,
+    value: &str,
+    outline: &mut Vec<u8>,
+) -> Result<Option<Vec<u8>>> {
+    if value.eq_ignore_ascii_case("null") {
+        return Ok(None);
+    }
+    let (elem, _index_type, index_width) = sparse_shape(type_text)
+        .ok_or_else(|| Error::Invalid(format!("not a sparse type: '{type_text}'")))?;
+    let (indices, values) = parse_sparse_literal(value);
+    let offset = outline.len() as u64;
+    for i in &indices {
+        match index_width {
+            1 => outline.push(*i as i8 as u8),
+            2 => outline.extend_from_slice(&(*i as i16).to_le_bytes()),
+            4 => outline.extend_from_slice(&(*i as i32).to_le_bytes()),
+            _ => outline.extend_from_slice(&i.to_le_bytes()),
+        }
+    }
+    for v in &values {
+        cpp_format::push_embedding_element(outline, elem, *v);
+    }
+    Ok(Some(
+        cpp_format::sparse_slot(indices.len() as i64, offset).to_vec(),
+    ))
+}
+
+/// Decodes one sparse slot out of the outline.
+fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<String> {
+    let (elem, _index_type, index_width) = sparse_shape(type_text)?;
+    let nnz = i64::from_le_bytes(slot.get(..8)?.try_into().ok()?) as usize;
+    let offset = u64::from_le_bytes(slot.get(8..16)?.try_into().ok()?) as usize;
+    let elem_width = element_width(elem);
+    let mut idx_at = offset;
+    let mut val_at = offset + nnz * index_width;
+    let mut parts = Vec::with_capacity(nnz);
+    for _ in 0..nnz {
+        let i = match index_width {
+            1 => f64::from(*outline.get(idx_at)? as i8),
+            2 => f64::from(i16::from_le_bytes(
+                outline.get(idx_at..idx_at + 2)?.try_into().ok()?,
+            )),
+            4 => f64::from(i32::from_le_bytes(
+                outline.get(idx_at..idx_at + 4)?.try_into().ok()?,
+            )),
+            _ => i64::from_le_bytes(outline.get(idx_at..idx_at + 8)?.try_into().ok()?) as f64,
+        };
+        idx_at += index_width;
+        let v =
+            cpp_format::read_embedding_element(outline.get(val_at..val_at + elem_width)?, elem)?;
+        val_at += elem_width;
+        parts.push(format!("{}:{}", i as i64, v));
+    }
+    Some(format!("[{}]", parts.join(",")))
+}
+
 /// Maps a declared type text to the `ColumnType` code this writer packs.
 ///
 /// Returns `None` for shapes the packer does not cover yet
@@ -120,8 +223,31 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
                 14
             }
         }
+        "SPARSE" => {
+            sparse_shape(type_text)?;
+            13
+        }
         _ => return None,
     })
+}
+
+/// Which self-outlining encoder a column needs (its outline is built by the
+/// caller rather than by the generic var-length packer).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OutlineKind {
+    None,
+    Tensor,
+    Sparse,
+}
+
+fn outline_kind(type_text: &str) -> OutlineKind {
+    if tensor_shape(type_text).is_some() {
+        OutlineKind::Tensor
+    } else if sparse_shape(type_text).is_some() {
+        OutlineKind::Sparse
+    } else {
+        OutlineKind::None
+    }
 }
 
 /// The `.col` layout of a column, including embedding columns whose fixed width
@@ -133,6 +259,10 @@ fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
     if tensor_shape(type_text).is_some() {
         // Tensor / MultiVector: a `{count:16; offset:48}` slot into the outline.
         return Some(ColumnLayout::VarLen(8));
+    }
+    if sparse_shape(type_text).is_some() {
+        // Sparse: `i64 nnz` + `i64 offset`.
+        return Some(ColumnLayout::VarLen(16));
     }
     cpp_format::column_layout(column_type)
 }
@@ -371,21 +501,27 @@ impl Engine {
         for (block_index, chunk) in rows.chunks(DEFAULT_BLOCK_CAPACITY).enumerate() {
             let mut block_columns = Vec::with_capacity(types.len());
             for (col, column_type) in types.iter().enumerate() {
-                let is_tensor = tensor_shape(&meta.types[col]).is_some();
+                let kind = outline_kind(&meta.types[col]);
                 let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
-                // Tensor columns build their own outline; the generic packer
-                // produces one for varchar/json.
-                let mut tensor_outline = Vec::new();
+                // Self-outlining columns build their own outline; the generic
+                // packer produces one for varchar/json.
+                let mut self_outline = Vec::new();
                 for (_, row) in chunk {
                     let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-                    if is_tensor {
-                        slots.push(encode_tensor_slot(
+                    match kind {
+                        OutlineKind::Tensor => slots.push(encode_tensor_slot(
                             &meta.types[col],
                             &text,
-                            &mut tensor_outline,
-                        )?);
-                    } else {
-                        slots.push(encode_value(&meta.types[col], *column_type, &text)?);
+                            &mut self_outline,
+                        )?),
+                        OutlineKind::Sparse => slots.push(encode_sparse_slot(
+                            &meta.types[col],
+                            &text,
+                            &mut self_outline,
+                        )?),
+                        OutlineKind::None => {
+                            slots.push(encode_value(&meta.types[col], *column_type, &text)?)
+                        }
                     }
                 }
                 let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
@@ -396,10 +532,10 @@ impl Engine {
                     DEFAULT_BLOCK_CAPACITY,
                 )
                 .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
-                let outline = if is_tensor {
-                    tensor_outline
-                } else {
+                let outline = if kind == OutlineKind::None {
                     packed_outline
+                } else {
+                    self_outline
                 };
                 block_columns.push(BlockColumn {
                     column_id: col as u64,
@@ -504,15 +640,26 @@ impl Engine {
                         && body.null_bitmap[row / 8] & (1 << (row % 8)) == 0
                     {
                         "null".to_string()
-                    } else if tensor_shape(&meta.types[col]).is_some() {
-                        // Tensor slots point into the column's outline file.
-                        let at = row * 8;
-                        let slot = body.data.get(at..at + 8).unwrap_or(&[]);
-                        decode_tensor_value(&meta.types[col], slot, &raw.outline)
-                            .unwrap_or_else(|| "null".into())
                     } else {
-                        decode_value(&meta.types[col], *column_type, &body.data, row)
-                            .unwrap_or_else(|| "null".into())
+                        // Tensor / sparse slots point into the column's outline.
+                        match outline_kind(&meta.types[col]) {
+                            OutlineKind::Tensor => {
+                                let at = row * 8;
+                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                                decode_tensor_value(&meta.types[col], slot, &raw.outline)
+                                    .unwrap_or_else(|| "null".into())
+                            }
+                            OutlineKind::Sparse => {
+                                let at = row * 16;
+                                let slot = body.data.get(at..at + 16).unwrap_or(&[]);
+                                decode_sparse_value(&meta.types[col], slot, &raw.outline)
+                                    .unwrap_or_else(|| "null".into())
+                            }
+                            OutlineKind::None => {
+                                decode_value(&meta.types[col], *column_type, &body.data, row)
+                                    .unwrap_or_else(|| "null".into())
+                            }
+                        }
                     };
                     out.push(value);
                 }
@@ -641,6 +788,50 @@ mod tests {
             vec![
                 vec!["1".to_string(), "a".to_string(), "true".to_string()],
                 vec!["2".to_string(), "bb".to_string(), "false".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn sparse_shape_parsing() {
+        // Index width follows the bound, as the engine's describe_type does.
+        assert_eq!(sparse_shape("SPARSE(FLOAT,100)"), Some((6, 2, 1)));
+        assert_eq!(sparse_shape("SPARSE(FLOAT,30000)"), Some((6, 3, 2)));
+        assert_eq!(sparse_shape("SPARSE(DOUBLE,30000)"), Some((7, 3, 2)));
+        assert_eq!(sparse_shape("INT"), None);
+    }
+
+    #[test]
+    fn sparse_literal_parsing() {
+        assert_eq!(
+            parse_sparse_literal("[0:1.5,3:2.5]"),
+            (vec![0, 3], vec![1.5, 2.5])
+        );
+        assert_eq!(parse_sparse_literal("(empty)"), (Vec::new(), Vec::new()));
+        assert_eq!(parse_sparse_literal("[]"), (Vec::new(), Vec::new()));
+    }
+
+    #[test]
+    fn sparse_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO sp VALUES (1, [0:1.5,3:2.5]);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO sp VALUES (2, [7:3.5]);")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("sp").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("sp").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "[0:1.5,3:2.5]".to_string()],
+                vec!["2".to_string(), "[7:3.5]".to_string()],
             ]
         );
     }
