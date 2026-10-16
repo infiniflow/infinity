@@ -136,6 +136,155 @@ fn element_code(elem: &str) -> Option<i64> {
     })
 }
 
+/// `EmbeddingDataType` ordinal -> the element name `data_type_of_text` accepts
+/// (the inverse of [`element_code`]).
+fn element_name(code: i64) -> Option<&'static str> {
+    Some(match code {
+        value_format::element::BIT => "BIT",
+        value_format::element::UINT8 => "UINT8",
+        value_format::element::INT8 => "INT8",
+        value_format::element::INT16 => "INT16",
+        value_format::element::INT32 => "INT32",
+        value_format::element::INT64 => "INT64",
+        value_format::element::FLOAT32 => "FLOAT32",
+        value_format::element::FLOAT64 => "FLOAT64",
+        value_format::element::FLOAT16 => "FLOAT16",
+        value_format::element::BFLOAT16 => "BFLOAT16",
+        _ => return None,
+    })
+}
+
+/// The `LogicalType` ordinal -> the type name `data_type_of_text` accepts
+/// (the inverse of the plain-type half of [`data_type_of_text`]).
+fn logical_name(code: i64) -> Option<&'static str> {
+    Some(match code {
+        value_format::logical::BOOLEAN => "BOOLEAN",
+        value_format::logical::TINYINT => "TINYINT",
+        value_format::logical::SMALLINT => "SMALLINT",
+        value_format::logical::INTEGER => "INTEGER",
+        value_format::logical::BIGINT => "BIGINT",
+        value_format::logical::FLOAT => "FLOAT",
+        value_format::logical::DOUBLE => "DOUBLE",
+        value_format::logical::FLOAT16 => "FLOAT16",
+        value_format::logical::BFLOAT16 => "BFLOAT16",
+        value_format::logical::VARCHAR => "VARCHAR",
+        value_format::logical::JSON => "JSON",
+        value_format::logical::DATE => "DATE",
+        value_format::logical::TIME => "TIME",
+        value_format::logical::DATETIME => "DATETIME",
+        _ => return None,
+    })
+}
+
+/// The engine's declared-type text for a serialized C++ `DataType` — the
+/// inverse of [`data_type_of_text`] for the shapes it covers.
+pub fn type_text_of(column_type: &infinity_expression::json::Json) -> Option<String> {
+    let code = value_format::data_type_code(column_type)?;
+    if let Some(name) = logical_name(code) {
+        return Some(name.to_string());
+    }
+    match code {
+        value_format::logical::DECIMAL => {
+            let p = value_format::type_info_int(column_type, "precision")?;
+            let s = value_format::type_info_int(column_type, "scale")?;
+            Some(format!("DECIMAL({p},{s})"))
+        }
+        value_format::logical::ARRAY => {
+            // The ARRAY `type_info` is the element's whole DataType object.
+            let inner = match column_type {
+                infinity_expression::json::Json::Obj(entries) => entries
+                    .iter()
+                    .find(|(k, _)| k == "type_info")
+                    .map(|(_, v)| v)?,
+                _ => return None,
+            };
+            Some(format!("ARRAY({})", type_text_of(inner)?))
+        }
+        value_format::logical::EMBEDDING
+        | value_format::logical::TENSOR
+        | value_format::logical::TENSORARRAY
+        | value_format::logical::MULTIVECTOR
+        | value_format::logical::SPARSE => {
+            let (base, elem_key) = match code {
+                value_format::logical::EMBEDDING => ("EMBEDDING", "embedding_type"),
+                value_format::logical::TENSOR => ("TENSOR", "embedding_type"),
+                value_format::logical::TENSORARRAY => ("TENSORARRAY", "embedding_type"),
+                value_format::logical::MULTIVECTOR => ("MULTIVECTOR", "embedding_type"),
+                // A SPARSE `type_info` *is* the SparseInfo object, whose
+                // `data_type` field is the element.
+                _ => ("SPARSE", "data_type"),
+            };
+            let elem = value_format::type_info_int(column_type, elem_key)?;
+            let dim = value_format::type_info_int(column_type, "dimension")?;
+            Some(format!("{base}({},{})", element_name(elem)?, dim))
+        }
+        _ => None,
+    }
+}
+
+/// The `ConstantExpr::Serialize()` object for an engine default literal
+/// (a SQL literal text, e.g. `'x'`, `42`, `true`); the scalar cases only.
+pub fn default_constant_expr(text: &str) -> Option<infinity_expression::json::Json> {
+    let t = text.trim();
+    if t.eq_ignore_ascii_case("true") {
+        return Some(value_format::constant_expr_bool(true));
+    }
+    if t.eq_ignore_ascii_case("false") {
+        return Some(value_format::constant_expr_bool(false));
+    }
+    if let Some(inner) = t.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
+        return Some(value_format::constant_expr_string(&inner.replace("''", "'")));
+    }
+    if let Ok(i) = t.parse::<i64>() {
+        return Some(value_format::constant_expr_int(i));
+    }
+    if let Ok(f) = t.parse::<f64>() {
+        return Some(value_format::constant_expr_double(f));
+    }
+    None
+}
+
+/// Whether a C++ `ColumnDef`'s `constraints` mark the column NOT NULL
+/// (`ConstraintType::kNotNull == 1`, `src/parser/definition/column_def.h:37-43`).
+pub fn is_not_null(col: &ColumnDefValue) -> bool {
+    col.constraints.contains(&1)
+}
+
+/// The engine's default-literal text for a `ConstantExpr::Serialize()` value,
+/// for the scalar cases; `None` for shapes not modelled.
+pub fn default_text_of(default: &infinity_expression::json::Json) -> Option<String> {
+    use infinity_expression::json::Json;
+    let Json::Obj(entries) = default else {
+        return None;
+    };
+    let get = |k: &str| entries.iter().find(|(n, _)| n == k).map(|(_, v)| v);
+    let ty = match get("type")? {
+        Json::Int(i) => *i,
+        _ => return None,
+    };
+    let value = get("value")?;
+    Some(match ty {
+        0 => match value {
+            Json::Bool(b) => b.to_string(),
+            _ => return None,
+        },
+        1 => match value {
+            Json::Float(f) => f.to_string(),
+            Json::Int(i) => i.to_string(),
+            _ => return None,
+        },
+        2 => match value {
+            Json::Str(s) => format!("'{}'", s.replace('\'', "''")),
+            _ => return None,
+        },
+        3 => match value {
+            Json::Int(i) => i.to_string(),
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
+
 /// The database a qualified table name belongs to (`default_db` when bare).
 fn db_of(table: &str) -> &str {
     if table.contains('.') {
@@ -343,6 +492,19 @@ impl Catalog {
                 };
                 let mut value = ColumnDefValue::new(data_type, i as i64, col.clone());
                 value.column_comment = t.comments.get(i).cloned().flatten();
+                // The C++ records NOT NULL as the `kNotNull` constraint and a
+                // default as a `ConstantExpr::Serialize()` object, so carry
+                // both across.
+                if t.not_nulls.get(i).copied().unwrap_or(false) {
+                    value.constraints = vec![1]; // ConstraintType::kNotNull
+                }
+                value.default = t
+                    .defaults
+                    .get(i)
+                    .cloned()
+                    .flatten()
+                    .as_deref()
+                    .and_then(default_constant_expr);
                 store.put(
                     key::table_column_key(&db_str, &tbl_str, col, ts).as_bytes(),
                     &value_format::column_def_bytes(&value),
@@ -422,6 +584,79 @@ impl Catalog {
         written += 2;
         store.flush()?;
         Ok(written)
+    }
+
+    /// Materializes a **C++-layout** catalog (as written by
+    /// [`Catalog::write_cpp_layout`], or by the C++ engine itself) into this
+    /// native catalog, so the engine can open a directory the C++ engine wrote
+    /// (§2.6.1 item 4, the read direction).
+    ///
+    /// Databases, tables, columns (with declared type text, comments, defaults
+    /// for the scalar cases and NOT NULL) and index records are imported;
+    /// returns how many tables were created. A table that already exists under
+    /// the same name is skipped.
+    pub fn import_cpp_layout(&self, store: &dyn MetaStore) -> Result<usize> {
+        let cpp_tables = read_cpp_layout(store)?;
+        let mut imported = 0usize;
+        for t in &cpp_tables {
+            let qualified = format!("{}.{}", t.db_name, t.table_name);
+            if self.get_table_by_name(&qualified)?.is_some() {
+                continue;
+            }
+            self.create_database(&t.db_name, true)?;
+            let columns: Vec<String> = t.columns.iter().map(|c| c.column_name.clone()).collect();
+            let types: Vec<String> = t
+                .columns
+                .iter()
+                .map(|c| type_text_of(&c.column_type).unwrap_or_default())
+                .collect();
+            let comments: Vec<Option<String>> =
+                t.columns.iter().map(|c| c.column_comment.clone()).collect();
+            let defaults: Vec<Option<String>> =
+                t.columns.iter().map(|c| c.default.as_ref().and_then(default_text_of)).collect();
+            let not_nulls: Vec<bool> = t.columns.iter().map(is_not_null).collect();
+            self.create_table_typed(&qualified, &columns, &defaults, &not_nulls, &types, &comments)?;
+            imported += 1;
+        }
+        // Index records, resolved against the tables just imported.
+        for def in read_cpp_indexes(store)? {
+            let table = def.base.column_names.first().and_then(|c| {
+                cpp_tables
+                    .iter()
+                    .find(|t| {
+                        t.columns
+                            .iter()
+                            .any(|col| &col.column_name == c)
+                    })
+                    .map(|t| format!("{}.{}", t.db_name, t.table_name))
+            });
+            let Some(table) = table else { continue };
+            let column = def.base.column_names.first().cloned().unwrap_or_default();
+            // Carry the options the engine tracks on `IndexMeta`.
+            let opt = |k: &str| {
+                def.extra
+                    .iter()
+                    .find(|(n, _)| n == k)
+                    .map(|(_, v)| match v {
+                        infinity_expression::json::Json::Str(s) => s.clone(),
+                        infinity_expression::json::Json::Bool(b) => b.to_string(),
+                        infinity_expression::json::Json::Int(i) => i.to_string(),
+                        other => other.compact(),
+                    })
+            };
+            let mut options: Vec<(String, String)> = Vec::new();
+            if let Some(a) = opt("analyzer") {
+                options.push(("ANALYZER".to_string(), a));
+            }
+            if let Some(m) = opt("metric_type") {
+                options.push(("METRIC".to_string(), m));
+            }
+            if let Some(c) = opt("cardinality") {
+                options.push(("CARDINALITY".to_string(), c));
+            }
+            self.create_index_typed(&def.base.index_name, &table, &column, &def.base.index_type, &options)?;
+        }
+        Ok(imported)
     }
 }
 
@@ -618,6 +853,86 @@ mod tests {
             r#"{"data_type":12,"type_info":{"dimension":3,"embedding_type":6}}"#
         );
         assert_eq!(got.next_column_id, 3);
+    }
+
+    #[test]
+    fn type_text_of_inverts_data_type_of_text() {
+        for text in [
+            "INTEGER",
+            "VARCHAR",
+            "EMBEDDING(FLOAT32,4)",
+            "TENSOR(FLOAT32,3)",
+            "ARRAY(INTEGER)",
+            "DECIMAL(18,2)",
+            "SPARSE(FLOAT32,100)",
+        ] {
+            let j = data_type_of_text(text).unwrap();
+            assert_eq!(type_text_of(&j).unwrap(), text, "{text}");
+        }
+    }
+
+    #[test]
+    fn import_cpp_layout_rebuilds_a_native_catalog() {
+        // Write a catalog into the C++ key space (as the C++ engine would),
+        // then import it into a fresh native catalog and compare.
+        let src = tempfile::tempdir().unwrap();
+        let cat = Catalog::open(src.path()).unwrap();
+        let columns = ["id", "name", "v"].map(String::from).to_vec();
+        let types = ["INTEGER", "VARCHAR", "EMBEDDING(FLOAT,3)"]
+            .map(String::from)
+            .to_vec();
+        cat.create_table_typed(
+            "default_db.t",
+            &columns,
+            &[None, Some("'x'".to_string()), None],
+            &[true, false, false],
+            &types,
+            &[None, Some("note".to_string()), None],
+        )
+        .unwrap();
+        cat.create_index_typed(
+            "idx_ft",
+            "default_db.t",
+            "name",
+            "FULLTEXT",
+            &[("ANALYZER".to_string(), "standard".to_string())],
+        )
+        .unwrap();
+
+        let cpp = tempfile::tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(cpp.path(), "cpp").unwrap());
+        cat.write_cpp_layout(store.as_ref()).unwrap();
+
+        // A fresh, empty native catalog imports it.
+        let dst = tempfile::tempdir().unwrap();
+        let imported = Catalog::open(dst.path()).unwrap();
+        let n = imported.import_cpp_layout(store.as_ref()).unwrap();
+        assert_eq!(n, 1);
+
+        assert!(imported.list_databases().unwrap().contains(&"default_db".to_string()));
+        let t = imported.get_table_by_name("default_db.t").unwrap().unwrap();
+        assert_eq!(t.columns, columns);
+        // Types round-trip through the reverse mapping.
+        assert_eq!(t.types[0], "INTEGER");
+        assert_eq!(t.types[1], "VARCHAR");
+        assert_eq!(t.types[2], "EMBEDDING(FLOAT32,3)");
+        // NOT NULL, comments and defaults come across too.
+        assert_eq!(t.not_nulls, vec![true, false, false]);
+        assert_eq!(t.comments[1], Some("note".to_string()));
+        assert_eq!(t.defaults[1], Some("'x'".to_string()));
+        // The index record is imported with its options.
+        let idx = imported.list_indexes().unwrap();
+        assert_eq!(idx.len(), 1);
+        assert_eq!(idx[0].name, "idx_ft");
+        assert_eq!(idx[0].index_type, "FULLTEXT");
+        assert_eq!(idx[0].table, "default_db.t");
+        assert!(idx[0]
+            .options
+            .iter()
+            .any(|(k, v)| k == "ANALYZER" && v == "standard"));
+
+        // Importing again is a no-op (the tables already exist).
+        assert_eq!(imported.import_cpp_layout(store.as_ref()).unwrap(), 0);
     }
 
     #[test]
