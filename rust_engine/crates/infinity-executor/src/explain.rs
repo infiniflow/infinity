@@ -1068,16 +1068,24 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
         None => false,
     };
     // index filter: one conjunct at top level, several `(a) AND (b)`.
-    let index_filter =
+    let rendered: Vec<String> = idx.iter().map(|c| idx_pred(c, &ann, &cast)).collect();
+    // One conjunct is left bare; several are joined by ` AND `, each wrapped in
+    // parentheses except a bare full-text filter.
+    let index_filter = if rendered.len() == 1 {
+        rendered[0].clone()
+    } else {
         idx.iter()
-            .map(|c| idx_pred(c, &ann, &cast))
-            .fold(String::new(), |acc, s| {
-                if acc.is_empty() {
+            .zip(rendered)
+            .map(|(c, s)| {
+                if is_fulltext_pred(c) {
                     s
                 } else {
-                    format!("({acc}) AND ({s})")
+                    format!("({s})")
                 }
-            });
+            })
+            .collect::<Vec<_>>()
+            .join(" AND ")
+    };
 
     // 1. column ids (bottom-up): leftover-filter columns, sort keys, projection.
     let mut leftover_cols = Vec::new();
