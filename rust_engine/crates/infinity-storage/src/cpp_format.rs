@@ -676,6 +676,19 @@ pub fn embedding_column_layout(dimension: usize, element_width: usize) -> Column
     ColumnLayout::Fixed(dimension * element_width)
 }
 
+/// `EmbeddingType::EmbeddingSize` (`embedding_type.h:129-137`): a vector of
+/// `dimension` elements takes `dimension * width` bytes, **except** a `BIT`
+/// element, which packs to `ceil(dimension / 8)` bytes with value `j` at byte
+/// `j / 8`, bit `j % 8` (LSB-first; `:253-262`). The C++ additionally requires
+/// a BIT dimension to be a multiple of 8.
+pub fn embedding_size(element_code: i32, dimension: usize) -> usize {
+    if element_code == 0 {
+        dimension.div_ceil(8)
+    } else {
+        dimension * element_width(element_code)
+    }
+}
+
 /// IEEE-754 binary16 of an `f32` (round to nearest even).
 pub fn f32_to_f16_bits(f: f32) -> u16 {
     let bits = f.to_bits();

@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 use infinity_common::{Error, Result};
 use infinity_storage::cpp_format::{
-    self, date_to_days, datetime_to_pair, element_width, embedding_column_layout,
+    self, date_to_days, datetime_to_pair, element_width, embedding_size,
     pack_column_with_layout, push_embedding_element, read_embedding_element, time_to_secs,
     BlockColumn, BlockId, BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
 };
@@ -42,16 +42,13 @@ fn element_code(elem: &str) -> Option<i32> {
     } else if elem.contains("FLOAT16") {
         8
     } else if elem.contains("BIT") {
-        return None;
+        0 // Bit (packed to ceil(dim/8) bytes; see `embedding_size`)
     } else {
         6 // Float32
     })
 }
 
 /// `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` → `(dimension, ElementType code)`.
-///
-/// Bit elements are rejected (`None`) because their rows are bit-packed, which
-/// this writer does not cover yet.
 pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
     let up = type_text.trim().to_ascii_uppercase();
     if !(up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(")) {
@@ -84,6 +81,10 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
     let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
     let dim: usize = parts.get(1)?.parse().ok()?;
     let code = element_code(parts.first()?)?;
+    if code == 0 {
+        // Bit-packed *tensors* are not covered here (only embeddings are).
+        return None;
+    }
     Some((column_type, dim, code))
 }
 
@@ -373,7 +374,8 @@ fn outline_kind(type_text: &str) -> OutlineKind {
 /// depends on the declared dimension.
 fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
     if let Some((dim, elem)) = embedding_shape(type_text) {
-        return Some(embedding_column_layout(dim, element_width(elem)));
+        // A BIT vector packs to `ceil(dim/8)` bytes, not `dim` (`:253-262`).
+        return Some(ColumnLayout::Fixed(embedding_size(elem, dim)));
     }
     if tensor_shape(type_text).is_some() {
         // Tensor / MultiVector: a `{count:16; offset:48}` slot into the outline.
@@ -445,15 +447,35 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
         ))
     };
     if let Some((dim, elem)) = embedding_shape(type_text) {
+        let inner = value.trim().trim_start_matches('[').trim_end_matches(']');
+        if elem == 0 {
+            // BIT: the engine (and the C++ `ToString`, `embedding_type.h:253-262`)
+            // renders the vector as a bit string like `[10110001]`; also accept
+            // the comma-separated numeric form. Pack to `ceil(dim/8)` bytes with
+            // value `j` at byte `j/8`, bit `j%8` (LSB-first).
+            let bits: Vec<bool> = if inner.contains(',') {
+                inner
+                    .split(',')
+                    .filter_map(|x| x.trim().parse::<f64>().ok())
+                    .map(|v| v != 0.0)
+                    .collect()
+            } else {
+                inner.chars().map(|c| c == '1').collect()
+            };
+            let mut bytes = vec![0u8; embedding_size(elem, dim)];
+            for k in 0..dim.min(bits.len()) {
+                if bits[k] {
+                    bytes[k / 8] |= 1 << (k % 8);
+                }
+            }
+            return Ok(Some(bytes));
+        }
         // `[a,b,c]` → `dim` elements, zero-padded/truncated, raw little-endian.
-        let nums: Vec<f64> = value
-            .trim()
-            .trim_start_matches('[')
-            .trim_end_matches(']')
+        let nums: Vec<f64> = inner
             .split(',')
             .filter_map(|x| x.trim().parse::<f64>().ok())
             .collect();
-        let mut bytes = Vec::with_capacity(dim * element_width(elem));
+        let mut bytes = Vec::with_capacity(embedding_size(elem, dim));
         for k in 0..dim {
             push_embedding_element(&mut bytes, elem, nums.get(k).copied().unwrap_or(0.0));
         }
@@ -516,6 +538,18 @@ fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option
 /// Decodes a slot back into the text form the engine renders.
 fn decode_value(type_text: &str, column_type: i32, body: &[u8], row: usize) -> Option<String> {
     if let Some((dim, elem)) = embedding_shape(type_text) {
+        if elem == 0 {
+            // BIT: emit the comma-separated form the engine's SQL accepts
+            // (its *display* form is the bit string `[10110001]`, which
+            // `encode_value` also accepts). Bit `j` at byte `j/8`, bit `j%8`.
+            let at = row * embedding_size(elem, dim);
+            let mut parts = Vec::with_capacity(dim);
+            for k in 0..dim {
+                let byte = body.get(at + k / 8)?;
+                parts.push(if byte & (1 << (k % 8)) != 0 { "1" } else { "0" });
+            }
+            return Some(format!("[{}]", parts.join(",")));
+        }
         // Inline `dim` elements per row.
         let width = element_width(elem);
         let at = row * dim * width;
@@ -895,8 +929,9 @@ mod tests {
         assert_eq!(column_type_of("VECTOR(FLOAT,4)"), Some(10));
         assert_eq!(column_type_of("TENSOR(FLOAT,4)"), Some(11));
         assert_eq!(column_type_of("MULTIVECTOR(FLOAT,4)"), Some(14));
-        // Bit embeddings and tensor arrays are not packable yet.
-        assert_eq!(column_type_of("EMBEDDING(BIT,8)"), None);
+        // Bit embeddings pack to `ceil(dim/8)` bytes; tensor arrays are not
+        // packable yet.
+        assert_eq!(column_type_of("EMBEDDING(BIT,8)"), Some(10));
         assert_eq!(column_type_of("TENSORARRAY(FLOAT,4)"), None);
     }
 
@@ -1173,6 +1208,53 @@ mod tests {
     }
 
     #[test]
+    fn bit_embedding_packs_and_unpacks() {
+        // `EMBEDDING(BIT,8)` is one byte per row, bit `j` at bit `j%8`
+        // (`embedding_type.h:129-137,253-262`), not eight bytes.
+        assert_eq!(embedding_size(0, 8), 1);
+        assert_eq!(embedding_size(0, 16), 2);
+        assert_eq!(embedding_size(6, 3), 12); // FLOAT32
+        assert_eq!(
+            layout_of("EMBEDDING(BIT,8)", 10),
+            Some(ColumnLayout::Fixed(1))
+        );
+        let Some(bytes) = encode_value("EMBEDDING(BIT,8)", 10, "[10110001]").unwrap() else {
+            panic!("expected bytes");
+        };
+        assert_eq!(bytes, vec![0b1000_1101], "bit 0,2,3,7");
+        // The comma form parses to the same bytes.
+        assert_eq!(
+            encode_value("EMBEDDING(BIT,8)", 10, "[1,0,1,1,0,0,0,1]")
+                .unwrap()
+                .unwrap(),
+            bytes
+        );
+        assert_eq!(
+            decode_value("EMBEDDING(BIT,8)", 10, &bytes, 0).unwrap(),
+            "[1,0,1,1,0,0,0,1]"
+        );
+    }
+
+    #[test]
+    fn bit_embedding_survives_a_block_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE b (id INT, v EMBEDDING(BIT,16));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO b VALUES (1, [1,0,1,1,0,0,0,1,1,1,0,0,0,0,1,1]);")
+            .unwrap();
+        assert_eq!(engine.write_cpp_blocks("b").unwrap(), 1);
+        engine.execute("DELETE FROM b;").unwrap();
+        assert_eq!(engine.load_cpp_blocks("b").unwrap(), 1);
+        let rows = row_strings(&engine, "SELECT * FROM b;");
+        assert_eq!(rows.len(), 1);
+        // The engine displays a BIT embedding as a bit string.
+        assert_eq!(rows[0][1], "[1011000111000011]");
+    }
+
+    #[test]
     fn blocks_reject_unsupported_column_types() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
@@ -1196,7 +1278,7 @@ mod tests {
         assert_eq!(embedding_shape("EMBEDDING(FLOAT,4)"), Some((4, 6)));
         assert_eq!(embedding_shape("EMBEDDING(FLOAT16,8)"), Some((8, 8)));
         assert_eq!(embedding_shape("EMBEDDING(DOUBLE,2)"), Some((2, 7)));
-        assert_eq!(embedding_shape("EMBEDDING(BIT,8)"), None);
+        assert_eq!(embedding_shape("EMBEDDING(BIT,8)"), Some((8, 0)));
         assert_eq!(embedding_shape("INT"), None);
     }
 
