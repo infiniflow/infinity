@@ -1277,7 +1277,7 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
                 .map(|(_, n)| n.clone());
             if let Some(iname) = iname {
                 let mut runs = regex_literal_runs(&pat);
-                runs.sort_by(|a, b| b.len().cmp(&a.len()));
+                runs.sort_by_key(|r| std::cmp::Reverse(r.len()));
                 runs.truncate(4);
                 if !runs.is_empty() {
                     for r in runs {
