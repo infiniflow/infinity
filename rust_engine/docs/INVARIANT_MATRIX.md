@@ -35,6 +35,7 @@
 | 行墓碑（DELETE）对查询**不可见**，对聚合**不计入** | executor `delete_with_where_and_all` | ✅ |
 | `DROP TABLE` 后同名重建必须**空表** | executor（`DROP TABLE` 清理行/墓碑/索引；`test_simple_agg` 由 38→77 通过） | ✅ |
 | 快照/恢复（`CREATE/DROP/RESTORE TABLE SNAPSHOT`） | executor：快照序列化 + 恢复重建（`test/sql/snapshot/**` 10 文件全绿） | ✅ 基础 |
+| **检查点/compaction 后恢复**（WAL 截断后仍可恢复；恢复后的写入再次重启仍在） | `infinity-executor: restart_checkpoint`（①WAL 全截断后重启仍完整；②删掉已 compact 的 WAL 文件仍完整；③恢复后的新写入再重启不丢） | ✅ |
 | A1 三底座**彼此独立**且耐久性契约不同 | 代码结构（KV/WAL/块文件各自 crate 边界）；**跨底座宕机一致性**：`infinity-storage: crash_consistency`（5 用例，见 §4） | ✅ |
 
 ## 3. 索引不变量
