@@ -190,20 +190,65 @@ fn is_bit_type(type_text: &str) -> bool {
 
 /// Packs a bit tensor into rows of `dim` `0`/`1` characters.
 fn reshape_bit_tensor(s: &str, dim: usize) -> String {
-    let flat = parse_vec_str(s);
-    if flat.is_empty() {
-        return s.trim().to_string();
+    let t = s.trim();
+    if !t.starts_with('[') {
+        return t.to_string();
     }
-    let d = if dim == 0 { flat.len() } else { dim };
-    let groups: Vec<String> = flat
-        .chunks(d)
-        .map(|c| {
-            c.iter()
-                .map(|v| if *v != 0.0 { '1' } else { '0' })
-                .collect()
-        })
-        .collect();
-    format!("[[{}]]", groups.join("],["))
+    // A flat input is first chunked into `dim`-sized rows; an already-nested
+    // input keeps its structure.
+    let text = if t[1..].starts_with('[') {
+        t.to_string()
+    } else {
+        let flat = parse_vec_str(t);
+        if flat.is_empty() {
+            return "(empty)".to_string();
+        }
+        let d = if dim == 0 { flat.len() } else { dim };
+        let groups: Vec<String> = flat
+            .chunks(d)
+            .map(|c| {
+                format!(
+                    "[{}]",
+                    c.iter().map(|v| fmt_num(*v)).collect::<Vec<_>>().join(",")
+                )
+            })
+            .collect();
+        format!("[{}]", groups.join(","))
+    };
+    pack_bit_leaves(&text)
+}
+
+/// Replaces every numeric leaf list with a bracketed bit string, keeping nesting.
+fn pack_bit_leaves(text: &str) -> String {
+    let t = text.trim();
+    let inner = t
+        .strip_prefix('[')
+        .unwrap_or(t)
+        .strip_suffix(']')
+        .unwrap_or(t);
+    if inner.trim().is_empty() {
+        return "[]".to_string();
+    }
+    if inner.trim_start().starts_with('[') {
+        let groups: Vec<String> = split_top_level(inner)
+            .iter()
+            .map(|g| pack_bit_leaves(g))
+            .collect();
+        format!("[{}]", groups.join(","))
+    } else {
+        let bits: String = inner
+            .split([',', ' '])
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| {
+                if x.trim().parse::<f64>().map(|f| f != 0.0).unwrap_or(false) {
+                    '1'
+                } else {
+                    '0'
+                }
+            })
+            .collect();
+        format!("[{bits}]")
+    }
 }
 
 /// Reshapes a flat tensor literal (`[a,b,c,d,e,f,g,h]`) into `[[a,b,c,d],[e,f,g,h]]`.
