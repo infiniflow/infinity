@@ -647,3 +647,24 @@ codex round 3 给出 **`VERDICT: APPROVE`**，判定 B4 已在设计层正确解
 | 摘要仍把子串计数当作可执行用例数 | **已改** | 摘要标注「313 个定义，308 有效」，并指向冻结收集清单 |
 
 **双方一致结论**：计划书在**设计层**已达成一致（owner 修订 ↔ reviewer 复核 共 3 轮，1 BLOCKER + 3 MAJOR→MINOR 全部闭合）。**注意**：批准对象是**计划**，不代表其 §附录 B 的 PoC 已完成；M0 的 PoC/原型是人月估算与授权 M1 的前置门槛。
+
+## 附录 D：EXPLAIN 打印器规则（2026-10-17 逐行读源码得出，供后续移植）
+
+Gate A 的 `query` 残余中约 50 条是 `EXPLAIN`。当前 Rust 侧 `Statement::Explain` 是**桩**：只做 `table_schema` 校验后返回空 `Rows`（`infinity-executor/src/lib.rs` 的 `Statement::Explain` 分支），因此这些记录全部 `got []`。要达标必须移植打印器；规则已在 C++ 源码中确认，记录如下以免重复摸索。
+
+**来源**：`src/planner/explain_logical_plan_impl.cpp`（`ExplainLogicalPlan::Explain` 的各 overload）。
+
+**缩进与箭头（关键）**：每个节点一个 `intent_size`，根为 `0`，子节点为 `intent_size + 2`。
+- 节点行：`intent_size == 0` → `"{NAME} ({node_id})"`（**无箭头、无前导空格**）；否则 → `"{(intent_size-2) 个空格}-> {NAME} ({node_id})"`。
+- 属性行：`"{(intent_size) 个空格} - {attr}: {value}"`（注意属性行在 `intent_size` 个空格**之后还有一个空格**，所以 `-` 出现在第 `intent_size+1` 列）。
+- 例：`PROJECT (4)` / ` - table index: #4` / ` - expressions: [x (#1)]` / `-> SORT (3)` / `    - expressions: [y (#0) ASC]` / `   -> TABLE SCAN (2)` / `      - table name: explain2(default_db.explain2)`。
+
+**节点名与属性（已见）**：`CREATE TABLE`/`CREATE SCHEMA`/`DROP TABLE`/`INSERT`/`PROJECT`/`FILTER`/`SORT`/`LIMIT`/`AGGREGATE`/`TABLE SCAN`/`INDEX SCAN`/`MATCH`/`Merge aggregate`/`UNNEST` 等；属性含 `table name: {name}({db}.{name})`、`table index: #{n}`、`output_columns: […]`（扫描侧，带 `__rowid`）、`output columns: […]`（算子侧）、`expressions: […]`、`filter: …`、`aggregate: […]`、`aggregate table index: #{n}`、`limit: {n}`、`match expression: …`、`index filter: None`/`leftover filter: None` 等。
+
+**节点 id**：由 binder 的 `GetNewLogicalNodeId()` 单调计数，**自底向上**：先给绑定阶段的基础节点（通常是 1），再给扫描（2），然后每个上层算子 +1。实测：`SELECT * FROM t` → `TABLE SCAN (2)`、`PROJECT (3)`；`SELECT COUNT(*) … WHERE c2=5` → `TABLE SCAN (2)`、`FILTER (3)`、`AGGREGATE (4)`、`PROJECT (5)`。**但**用到索引时会跳号（`INDEX SCAN (6)` 与 `PROJECT (4)` 并存），说明绑定索引会额外占用 id——**不能用「层数+1」线性外推**。
+
+**两处已记录的不一致（移植时需留意，不能靠猜）**：
+1. `explain/explain.slt` 的期望块像是 C++ 输出**整体加了一个前导空格**（` PROJECT (3)`、`  - table index: #4`、` -> TABLE SCAN (2)`、`    - table name: …`），而 `dql/aggregate/test_agg_load_meta.slt`、`dql/rbo_rule/column_pruner.slt` 等与源码规则**逐字节一致**（`PROJECT (5)`、` - table index: #4`）。按源码规则实现只能与其一相符。
+2. 搜索结果类计划的期望块在部分文件里是**自底向上**书写的（`dql/result_cache/cached_limit.slt`、`test_agg_load_meta.slt` 的 MISMATCH 摘要即按文件顺序列出，首行为最深属性行），而 `explain.slt` 是自顶向下；harness 按文件顺序比较，故同一打印器在两类文件里都需要不同的行序。
+
+**结论（与 §6 一致）**：EXPLAIN 需**整体移植 binder 的节点 id 分配 + `explain_logical_plan_impl.cpp` 的打印器**（含表达式渲染 `x (#1)`、`CAST(c2 (#0) AS BigInt) = 5`、列裁剪后的 `output_columns`）才可能达标；本阶段未实现，故这 ~50 条至今为失败。
