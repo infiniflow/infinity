@@ -447,7 +447,7 @@ QueryContext::query(sql)
 | **D** | loom `commit_ts` 唯一性 → `test result: ok`；`miri` 未安装 → SKIP；`python/parallel_test` 缺 `infinity` 模块 | **部分**：Rust 侧并发模型有证据，SDK 侧与 miri 无证据 |
 | **E** | `run_gate_e.sh` → **PASS**：Rust 基准驱动输出 `Total cost : <t> s`，脚本直接以位置参数调用 `check_benchmark_result.py`（<7%）；无 C++ golden 时以**自基线**（两次运行互比）判定。insert ~72–80k rows/s、select 2000 行 ~3.9 ms | **部分**：驱动与门限已打通，缺与 C++ golden 的可比硬件对照 |
 | **F** | `cargo fmt --check` / `clippy --all-targets -D warnings` / `cargo test --workspace`（**32 套件全绿**） | **达标（本地）**：CI 六作业 + cargo-deny 见 `.github/workflows` |
-| **G** | `docs/INVARIANT_MATRIX.md`：5 项缺口（G1–G5）登记 | **清单已产出**，尚未纳入门槛 |
+| **G** | `docs/INVARIANT_MATRIX.md`：G1–G5 缺口 | **部分**：**G1/G3/G5 已闭合**（`config_validation`、`crash_consistency`、`fulltext_score` 各带回归测试）；G2（索引文件族契约，依赖 #68/#70/#71 的磁盘格式）与 G4 的 sanitizer 部分仍待 |
 
 > 复现：`cd rust_engine && ./scripts/run_gate_{a,b,c,d,e}.sh`（B/C/D 需 SDK 与外部服务，脚本会明确报 `SKIP/MISSING`）。
 
