@@ -1566,6 +1566,18 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))
     }
 
+    /// `(column, index name)` pairs of `table`, for the EXPLAIN regex rewrite.
+    fn index_name_pairs(&self, table: &str) -> Result<Vec<(String, String)>> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        Ok(self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .filter(|i| i.table == short || i.table == table)
+            .map(|i| (i.column, i.name))
+            .collect())
+    }
+
     /// Columns of `table` that carry any index, for the `EXPLAIN` index/leftover
     /// filter split.
     fn indexed_columns(&self, table: &str) -> Result<Vec<String>> {
@@ -1972,6 +1984,7 @@ impl Engine {
                         let index_plan = match where_pred.as_ref() {
                             Some(w) if !logical && !*distinct => {
                                 let indexed = self.indexed_columns(t)?;
+                                let index_names = self.index_name_pairs(t)?;
                                 crate::explain::explain_index_scan(&crate::explain::IndexScanPlan {
                                     items,
                                     table: t,
@@ -1980,6 +1993,7 @@ impl Engine {
                                     schema,
                                     types: &meta.types,
                                     indexed: &indexed,
+                                    index_names: &index_names,
                                 })
                             }
                             _ => None,
@@ -3881,9 +3895,7 @@ impl Engine {
         // C++ engine can read this directory. Best effort: a column type the
         // C++ encoding does not cover yet leaves the previous layout in place
         // rather than failing the flush.
-        let _ = self
-            .catalog
-            .write_cpp_layout(self.catalog.store().as_ref());
+        let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
         Ok(())
     }
 }

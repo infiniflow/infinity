@@ -89,12 +89,6 @@ fn pred_cols(p: &Predicate, out: &mut Vec<String>) {
             pred_cols(b, out);
         }
         Predicate::Not(a) => pred_cols(a, out),
-        // `filter_fulltext('col', …)` names its column as a string argument.
-        Predicate::IsTrue(e) if fulltext_filter(e).is_some() => {
-            if let Some(c) = fulltext_filter(e) {
-                add_col(out, &c);
-            }
-        }
         Predicate::IsNull(e, _) | Predicate::IsTrue(e) => expr_cols(e, out),
         Predicate::Like(a, b, ..) => {
             expr_cols(a, out);
@@ -246,6 +240,16 @@ pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical
             render_expr_m(e, ids, logical),
             if *neg { "NOT " } else { "" }
         ),
+        Predicate::IsTrue(ExprAst::Func { name, args })
+            if name.eq_ignore_ascii_case("regex") && args.len() == 2 =>
+        {
+            let col = render_expr_m(&args[0], ids, logical);
+            let pat = match &args[1] {
+                ExprAst::Literal(Literal::Str(s)) => s.clone(),
+                other => render_expr_m(other, ids, logical),
+            };
+            format!("{col} regex {pat}")
+        }
         Predicate::IsTrue(e) => render_expr_m(e, ids, logical),
         Predicate::Like(a, b, _, neg) => format!(
             "{} {}LIKE {}",
@@ -869,6 +873,137 @@ fn project_exprs(
     out
 }
 
+/// The literal runs a `regex` pattern requires, in order of first appearance.
+///
+/// Mirrors the C++ `ExtractRegexLiteralRuns`: alternation branches are dropped
+/// (the whole group), a quantifier removes the character it applies to
+/// (`colou?r` → `colo`), and character classes / escapes are handled.
+pub fn regex_literal_runs(pattern: &str) -> Vec<String> {
+    fn push(run: &mut String, out: &mut Vec<String>) {
+        if !run.is_empty() {
+            out.push(std::mem::take(run));
+        }
+    }
+    /// True when `inner` has a top-level `|` (an alternation).
+    fn has_top_alt(inner: &[char]) -> bool {
+        let mut d = 0i32;
+        for &c in inner {
+            match c {
+                '(' => d += 1,
+                ')' => d -= 1,
+                '|' if d == 0 => return true,
+                _ => {}
+            }
+        }
+        false
+    }
+    /// Strips a leading `?:` / `?flags:` group prefix.
+    fn strip_prefix(inner: &[char]) -> &[char] {
+        if inner.first() == Some(&'?') {
+            let mut i = 1;
+            while i < inner.len() && inner[i] != ':' && inner[i].is_ascii_alphabetic() {
+                i += 1;
+            }
+            if i < inner.len() && inner[i] == ':' {
+                return &inner[i + 1..];
+            }
+        }
+        inner
+    }
+    fn walk(p: &[char], out: &mut Vec<String>) {
+        let mut run = String::new();
+        let mut i = 0;
+        while i < p.len() {
+            let c = p[i];
+            match c {
+                '(' => {
+                    push(&mut run, out);
+                    let mut depth = 1i32;
+                    let mut j = i + 1;
+                    while j < p.len() && depth > 0 {
+                        if p[j] == '(' {
+                            depth += 1;
+                        } else if p[j] == ')' {
+                            depth -= 1;
+                        }
+                        j += 1;
+                    }
+                    let end = j.saturating_sub(1);
+                    let inner = &p[i + 1..end];
+                    if !has_top_alt(inner) {
+                        walk(strip_prefix(inner), out);
+                    }
+                    i = j;
+                }
+                '|' | ')' => {
+                    push(&mut run, out);
+                    i += 1;
+                }
+                '?' | '*' | '+' => {
+                    run.pop();
+                    push(&mut run, out);
+                    i += 1;
+                }
+                '{' => {
+                    run.pop();
+                    push(&mut run, out);
+                    while i < p.len() && p[i] != '}' {
+                        i += 1;
+                    }
+                    i += 1;
+                }
+                '[' => {
+                    push(&mut run, out);
+                    while i < p.len() && p[i] != ']' {
+                        i += 1;
+                    }
+                    i += 1;
+                }
+                '\\' => {
+                    if i + 1 < p.len() {
+                        run.push(p[i + 1]);
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                '.' | '^' | '$' => {
+                    push(&mut run, out);
+                    i += 1;
+                }
+                _ => {
+                    run.push(c);
+                    i += 1;
+                }
+            }
+        }
+        push(&mut run, out);
+    }
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut out = Vec::new();
+    walk(&chars, &mut out);
+    out
+}
+
+/// The column and pattern of a `regex(col, pattern)` predicate.
+fn regex_pred(p: &Predicate) -> Option<(String, String)> {
+    let Predicate::IsTrue(ExprAst::Func { name, args }) = p else {
+        return None;
+    };
+    if !name.eq_ignore_ascii_case("regex") || args.len() != 2 {
+        return None;
+    }
+    let col = match &args[0] {
+        ExprAst::Column(c) => c.clone(),
+        _ => return None,
+    };
+    let pat = match &args[1] {
+        ExprAst::Literal(Literal::Str(s)) => s.clone(),
+        _ => return None,
+    };
+    Some((col, pat))
+}
+
 /// A `SELECT` whose `WHERE` can be pushed into an index scan.
 pub struct IndexScanPlan<'a> {
     pub items: &'a [SelectItem],
@@ -880,6 +1015,8 @@ pub struct IndexScanPlan<'a> {
     pub types: &'a [String],
     /// Columns carrying any index.
     pub indexed: &'a [String],
+    /// `(column, index name)` for every index, used by the regex rewrite.
+    pub index_names: &'a [(String, String)],
 }
 
 /// True for the integer column types that a comparison implicitly widens to
@@ -947,6 +1084,11 @@ fn is_index_eligible(p: &Predicate, indexed: &[String]) -> bool {
     if has_neg(p) {
         return false;
     }
+    // `regex(col, pattern)` is only ever pushed through the literal-run rewrite,
+    // never as a plain index filter.
+    if regex_pred(p).is_some() {
+        return false;
+    }
     // A full-text filter over an indexed column is directly pushable.
     if let Predicate::IsTrue(e) = p {
         if let Some(col) = fulltext_filter(e) {
@@ -955,7 +1097,29 @@ fn is_index_eligible(p: &Predicate, indexed: &[String]) -> bool {
     }
     let mut cols = Vec::new();
     pred_cols(p, &mut cols);
+    // `filter_fulltext('col', …)` names its column as a string argument; it does
+    // not appear in the operator's output columns, but does drive eligibility.
+    let mut ft_cols = Vec::new();
+    fulltext_cols(p, &mut ft_cols);
+    cols.extend(ft_cols);
     !cols.is_empty() && cols.iter().all(|c| indexed.iter().any(|x| x == c))
+}
+
+/// Columns named inside `filter_fulltext`/`filter_text` calls (for eligibility).
+fn fulltext_cols(p: &Predicate, out: &mut Vec<String>) {
+    match p {
+        Predicate::IsTrue(e) => {
+            if let Some(c) = fulltext_filter(e) {
+                add_col(out, &c);
+            }
+        }
+        Predicate::Bool(a, _, b) => {
+            fulltext_cols(a, out);
+            fulltext_cols(b, out);
+        }
+        Predicate::Not(a) => fulltext_cols(a, out),
+        _ => {}
+    }
 }
 
 /// A `.slt` literal rendered the way the index filter shows it: strings and
@@ -1048,6 +1212,19 @@ fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> 
             wrap_bool_operand(b, idx_pred(b, ann, cast))
         ),
         Predicate::Not(a) => format!("NOT({})", idx_pred(a, ann, cast)),
+        Predicate::IsTrue(ExprAst::Func { name, args })
+            if name.eq_ignore_ascii_case("regex") && args.len() == 2 =>
+        {
+            let col = match &args[0] {
+                ExprAst::Column(c) => ann(c),
+                other => render_expr(other, &HashMap::new()),
+            };
+            let pat = match &args[1] {
+                ExprAst::Literal(Literal::Str(s)) => s.clone(),
+                other => render_expr(other, &HashMap::new()),
+            };
+            format!("{col} regex {pat}")
+        }
         Predicate::IsTrue(e) => {
             if let ExprAst::Func { args, .. } = e {
                 if fulltext_filter(e).is_some() {
@@ -1069,20 +1246,6 @@ fn idx_pred(p: &Predicate, ann: &dyn Fn(&str) -> String, cast: &dyn Fn(&str) -> 
 /// scan (`PROJECT [-> SORT] [-> FILTER] -> INDEX SCAN`). Returns `None` when no
 /// conjunct is index-eligible.
 pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
-    let conjuncts = split_and(p.where_pred);
-    let mut idx: Vec<&Predicate> = Vec::new();
-    let mut left: Vec<&Predicate> = Vec::new();
-    for c in conjuncts {
-        if is_index_eligible(c, p.indexed) {
-            idx.push(c);
-        } else {
-            left.push(c);
-        }
-    }
-    if idx.is_empty() {
-        return None;
-    }
-
     let alias = p.table.split('.').next_back().unwrap_or(p.table);
     let db = p
         .table
@@ -1098,18 +1261,57 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
         Some(i) => p.types.get(i).map(|t| is_integer_type(t)).unwrap_or(false),
         None => false,
     };
-    // index filter: one conjunct at top level, several `(a) AND (b)`.
-    let rendered: Vec<String> = idx.iter().map(|c| idx_pred(c, &ann, &cast)).collect();
+
+    let conjuncts = split_and(p.where_pred);
+    // index-filter parts: `(rendered, is_bare_fulltext)`.
+    let mut idx_parts: Vec<(String, bool)> = Vec::new();
+    let mut left: Vec<&Predicate> = Vec::new();
+    for c in conjuncts {
+        // A `regex(col, pattern)` over a full-text-indexed column is rewritten
+        // into `filter_fulltext` conjuncts plus the residual regex.
+        if let Some((col, pat)) = regex_pred(c) {
+            let iname = p
+                .index_names
+                .iter()
+                .find(|(cc, _)| cc == bare(&col))
+                .map(|(_, n)| n.clone());
+            if let Some(iname) = iname {
+                let mut runs = regex_literal_runs(&pat);
+                runs.sort_by(|a, b| b.len().cmp(&a.len()));
+                runs.truncate(4);
+                if !runs.is_empty() {
+                    for r in runs {
+                        idx_parts.push((
+                            format!(
+                                "FILTER_FULLTEXT('{col}@{iname}', '{r}', 'operator=and;similarity=boolean')"
+                            ),
+                            true,
+                        ));
+                    }
+                    left.push(c);
+                    continue;
+                }
+            }
+        }
+        if is_index_eligible(c, p.indexed) {
+            idx_parts.push((idx_pred(c, &ann, &cast), is_fulltext_pred(c)));
+        } else {
+            left.push(c);
+        }
+    }
+    if idx_parts.is_empty() {
+        return None;
+    }
     // One conjunct is left bare; several are joined by ` AND `, each wrapped in
     // parentheses except a bare full-text filter.
-    let index_filter = if rendered.len() == 1 {
-        rendered[0].clone()
+    let index_filter = if idx_parts.len() == 1 {
+        idx_parts[0].0.clone()
     } else {
-        idx.iter()
-            .zip(rendered)
-            .map(|(c, s)| {
-                if is_fulltext_pred(c) {
-                    s
+        idx_parts
+            .iter()
+            .map(|(s, bare_ft)| {
+                if *bare_ft {
+                    s.clone()
                 } else {
                     format!("({s})")
                 }
