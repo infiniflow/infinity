@@ -1790,6 +1790,28 @@ impl Engine {
                         items,
                         from: Some(t),
                         join,
+                        group_by,
+                        order_by,
+                        search,
+                        ..
+                    } if join.is_none()
+                        && search.is_none()
+                        && crate::explain::has_aggregate(items)
+                        && crate::explain::aggregates_renderable(items) =>
+                    {
+                        Some(crate::explain::explain_hash_agg(
+                            &crate::explain::HashAggPlan {
+                                items,
+                                table: t,
+                                group_by,
+                                order_by,
+                            },
+                        ))
+                    }
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
                         where_pred,
                         group_by,
                         order_by,

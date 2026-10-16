@@ -211,6 +211,17 @@ pub fn has_aggregate(items: &[SelectItem]) -> bool {
         .any(|it| matches!(it, SelectItem::Aggregate(_)))
 }
 
+/// True when every aggregate has a single plain-column argument (the shapes the
+/// printer renders). `COUNT(*)` and computed arguments are left unhandled.
+pub fn aggregates_renderable(items: &[SelectItem]) -> bool {
+    items.iter().all(|it| match it {
+        SelectItem::Aggregate(a) => {
+            a.args.len() == 1 && a.arg_exprs.first().map(|o| o.is_none()).unwrap_or(true)
+        }
+        _ => true,
+    })
+}
+
 /// A `SELECT … COUNT(DISTINCT col) … [GROUP BY keys]` plan: the C++ engine
 /// builds two stacked aggregates (inner dedup, outer aggregate).
 pub struct DistinctAggPlan<'a> {
@@ -233,7 +244,7 @@ pub fn is_distinct_agg_plan(items: &[SelectItem], group_by: &[ExprAst]) -> bool 
     if keys.len() != group_by.len() {
         return false;
     }
-    let mut seen_agg = false;
+    let mut n_agg = 0;
     for it in items {
         match it {
             SelectItem::Aggregate(a) => {
@@ -241,7 +252,7 @@ pub fn is_distinct_agg_plan(items: &[SelectItem], group_by: &[ExprAst]) -> bool 
                 if !a.distinct || a.args.len() != 1 || !plain {
                     return false;
                 }
-                seen_agg = true;
+                n_agg += 1;
             }
             SelectItem::Column(c) => {
                 if !keys.iter().any(|k| k == c) {
@@ -251,7 +262,8 @@ pub fn is_distinct_agg_plan(items: &[SelectItem], group_by: &[ExprAst]) -> bool 
             _ => return false,
         }
     }
-    seen_agg
+    // the stacked-AGGREGATE form only applies to a single distinct aggregate
+    n_agg == 1
 }
 
 fn func_label(f: infinity_parser::AggFunc) -> String {
@@ -386,6 +398,172 @@ pub fn explain_distinct_agg(p: &DistinctAggPlan) -> Vec<String> {
     lines.push(attr(scan_d, "table index: #1"));
     let mut out = keys.clone();
     for (_, c) in &aggs {
+        add_col(&mut out, c);
+    }
+    add_col(&mut out, "__rowid");
+    lines.push(attr(
+        scan_d,
+        &format!("output_columns: [{}]", out.join(", ")),
+    ));
+    lines
+}
+
+/// Physical `EXPLAIN` for the hash/merge-hash aggregate plan (several
+/// aggregates, or any non-distinct aggregate).
+pub struct HashAggPlan<'a> {
+    pub items: &'a [SelectItem],
+    pub table: &'a str,
+    pub group_by: &'a [ExprAst],
+    pub order_by: &'a [OrderKey],
+}
+
+pub fn explain_hash_agg(p: &HashAggPlan) -> Vec<String> {
+    let alias = p.table.split('.').next_back().unwrap_or(p.table);
+    let db = p
+        .table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    let keys: Vec<String> = p
+        .group_by
+        .iter()
+        .filter_map(|e| match e {
+            ExprAst::Column(c) => Some(c.clone()),
+            _ => None,
+        })
+        .collect();
+    let aggs: Vec<(infinity_parser::AggFunc, String, bool)> = p
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            SelectItem::Aggregate(a) => Some((a.func, a.args[0].clone(), a.distinct)),
+            _ => None,
+        })
+        .collect();
+
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    for k in &keys {
+        if !ids.contains_key(k) {
+            ids.insert(k.clone(), ids.len());
+        }
+    }
+    for it in p.items {
+        let c = match it {
+            SelectItem::Column(c) => Some(c.clone()),
+            SelectItem::Aggregate(a) => Some(a.args[0].clone()),
+            _ => None,
+        };
+        if let Some(c) = c {
+            if !ids.contains_key(&c) {
+                ids.insert(c.clone(), ids.len());
+            }
+        }
+    }
+    let anno = |c: &str| match ids.get(c) {
+        Some(i) => format!("{c} (#{i})"),
+        None => c.to_string(),
+    };
+
+    let has_sort = !p.order_by.is_empty();
+    let mut lines = Vec::new();
+    lines.push(header(0, "PROJECT", if has_sort { 6 } else { 5 }));
+    lines.push(attr(0, "table index: #8"));
+    let exprs: Vec<String> = p
+        .items
+        .iter()
+        .map(|it| match it {
+            SelectItem::Column(c) => anno(c),
+            SelectItem::Aggregate(a) => {
+                let id = ids.get(&a.args[0]).copied().unwrap_or(0);
+                if a.distinct {
+                    format!("{}(DISTINCT {}) (#{id})", a.func.as_str(), a.args[0])
+                } else {
+                    format!("{}({}) (#{id})", a.func.as_str(), a.args[0])
+                }
+            }
+            _ => String::new(),
+        })
+        .collect();
+    lines.push(attr(0, &format!("expressions: [{}]", exprs.join(", "))));
+
+    if has_sort {
+        lines.push(header(1, "SORT", 5));
+        let skeys: Vec<String> = p
+            .order_by
+            .iter()
+            .map(|k| format!("{} {}", anno(&k.column), if k.asc { "ASC" } else { "DESC" }))
+            .collect();
+        lines.push(attr(1, &format!("expressions: [{}]", skeys.join(", "))));
+        let mut labels: Vec<String> = keys.clone();
+        for it in p.items {
+            if let SelectItem::Aggregate(a) = it {
+                let l = if a.distinct {
+                    format!("{}(DISTINCT {})", func_label(a.func), a.args[0])
+                } else {
+                    format!("{}({})", func_label(a.func), a.args[0])
+                };
+                labels.push(l);
+            }
+        }
+        lines.push(attr(1, &format!("output columns: [{}]", labels.join(", "))));
+    }
+
+    let merge_d = if has_sort { 2 } else { 1 };
+    lines.push(header(merge_d, "MERGE HASH AGGREGATE", 4));
+    if !keys.is_empty() {
+        let kt: Vec<String> = keys.iter().map(|k| anno(k)).collect();
+        lines.push(attr(merge_d, &format!("group by: [{}]", kt.join(", "))));
+    }
+    let agg_txt: Vec<String> = aggs
+        .iter()
+        .map(|(f, c, d)| {
+            if *d {
+                format!("{}(DISTINCT {})", func_label(*f), anno(c))
+            } else {
+                format!("{}({})", func_label(*f), anno(c))
+            }
+        })
+        .collect();
+    lines.push(attr(
+        merge_d,
+        &format!("aggregates: [{}]", agg_txt.join(", ")),
+    ));
+
+    let hash_d = merge_d + 1;
+    lines.push(header(hash_d, "HASH AGGREGATE", 3));
+    if !keys.is_empty() {
+        let kt: Vec<String> = keys.iter().map(|k| anno(k)).collect();
+        lines.push(attr(hash_d, &format!("group by: [{}]", kt.join(", "))));
+    }
+    let distinct_cols: Vec<String> = aggs
+        .iter()
+        .filter(|(_, _, d)| *d)
+        .map(|(_, c, _)| anno(c))
+        .collect();
+    if !distinct_cols.is_empty() {
+        lines.push(attr(
+            hash_d,
+            &format!("distinct columns: [{}]", distinct_cols.join(", ")),
+        ));
+    }
+    let non_distinct: Vec<String> = aggs
+        .iter()
+        .filter(|(_, _, d)| !*d)
+        .map(|(_, c, _)| anno(c))
+        .collect();
+    if !non_distinct.is_empty() {
+        lines.push(attr(
+            hash_d,
+            &format!("non-distinct columns: [{}]", non_distinct.join(", ")),
+        ));
+    }
+
+    let scan_d = hash_d + 1;
+    lines.push(header(scan_d, "TABLE SCAN", 2));
+    lines.push(attr(scan_d, &format!("table name: {alias}({db}.{alias})")));
+    lines.push(attr(scan_d, "table index: #1"));
+    let mut out = keys.clone();
+    for (_, c, _) in &aggs {
         add_col(&mut out, c);
     }
     add_col(&mut out, "__rowid");
