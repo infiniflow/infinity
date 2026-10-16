@@ -6,7 +6,7 @@
 >
 > 本文件为 **v0.1**：Rust 侧只登记**已存在**的测试（名称与 `cargo test` 输出的完全一致），
 > 未覆盖项在「缺口」列写明状态。C++ 侧以计划书「附录 A：核心不变量」与 CI 的
-> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-16。
+> `src/unit_test/main/config_ut.cpp:175` 为锚点。最后更新：2026-10-17（G3 闭合）。
 
 ## 1. 配置校验 / 拒绝行为
 
@@ -35,7 +35,7 @@
 | 行墓碑（DELETE）对查询**不可见**，对聚合**不计入** | executor `delete_with_where_and_all` | ✅ |
 | `DROP TABLE` 后同名重建必须**空表** | executor（`DROP TABLE` 清理行/墓碑/索引；`test_simple_agg` 由 38→77 通过） | ✅ |
 | 快照/恢复（`CREATE/DROP/RESTORE TABLE SNAPSHOT`） | executor：快照序列化 + 恢复重建（`test/sql/snapshot/**` 10 文件全绿） | ✅ 基础 |
-| A1 三底座**彼此独立**且耐久性契约不同 | 代码结构（KV/WAL/块文件各自 crate 边界） | ⚠️ 结构体现，**无专项测试** |
+| A1 三底座**彼此独立**且耐久性契约不同 | 代码结构（KV/WAL/块文件各自 crate 边界）；**跨底座宕机一致性**：`infinity-storage: crash_consistency`（5 用例，见 §4） | ✅ |
 
 ## 3. 索引不变量
 
@@ -54,7 +54,7 @@
 |---|---|---|
 | G1 | **配置项的范围校验**（`config_ut.cpp` 类） | 当前 `SET CONFIG` 为容错实现（键值 stored，不做范围/类型校验）。补齐需先冻结「配置项 × 合法域」清单——属 M6 前的独立任务。 |
 | G2 | **索引文件族契约**（A3） | Rust 侧索引当前在内存 + KV 元数据中维护，尚未按 C++ 的「块文件族 + `ChunkIndexMetaInfo` 发布」落地；需在磁盘驻留索引（M4+）阶段补测。 |
-| G3 | **跨底座宕机一致性**（KV+WAL+块文件同时崩溃） | PoC C 已在 `rust_poc/crash-consistency` 验证 5 个边界场景，但**尚未**落成 `rust_engine` 内的回归测试。 |
+| G3 | ~~**跨底座宕机一致性**（KV+WAL+块文件同时崩溃）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/crash_consistency.rs` 把 PoC C 的边界场景落成回归测试 —— ①块写后崩溃→事务不可见；②WAL 落盘后崩溃→回放可见；③完整提交→无需回放即可见；④块文件丢失→由 WAL 载荷重建；⑤WAL 撕裂尾→回放在有效前缀处停止。 |
 | G4 | **`miri` / sanitizer** 覆盖 | 计划 §6 Gate D 要求；当前仅有 `--cfg loom` 模型（`infinity-txn`）与常规单测。 |
 | G5 | 全文**打分**不变量（相似度单调性等） | 打分本身未实现（见计划书 §5.1 的负结果记录），无对应不变量。 |
 
