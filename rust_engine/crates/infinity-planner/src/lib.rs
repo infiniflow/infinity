@@ -51,8 +51,8 @@ pub enum LogicalPlan {
     },
     Sort {
         input: Box<LogicalPlan>,
-        /// sort keys in priority order, each `(column, ascending)`
-        keys: Vec<(usize, bool)>,
+        /// sort keys in priority order, each `(key expression, ascending)`
+        keys: Vec<(Expr, bool)>,
     },
     Limit {
         input: Box<LogicalPlan>,
@@ -718,9 +718,15 @@ pub fn plan_select(
     }
 
     if !order_by.is_empty() {
-        let keys: Vec<(usize, bool)> = order_by
+        let keys: Vec<(Expr, bool)> = order_by
             .iter()
-            .map(|ok| Ok((resolve_column(&out_names, &ok.column)?, ok.asc)))
+            .map(|ok| {
+                let e = match &ok.expr {
+                    Some(e) if !matches!(e, ExprAst::Column(_)) => compile_expr(e, &out_names)?,
+                    _ => Expr::Column(resolve_column(&out_names, &ok.column)?),
+                };
+                Ok((e, ok.asc))
+            })
             .collect::<Result<Vec<_>>>()?;
         plan = LogicalPlan::Sort {
             input: Box::new(plan),

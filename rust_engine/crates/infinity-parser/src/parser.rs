@@ -486,13 +486,37 @@ impl Parser {
                     let mut keys: Vec<OrderKey> = Vec::new();
                     loop {
                         let column = self.expect_ident()?;
+                        // Capture a trailing arithmetic expression (`c1 + c2`).
+                        let mut expr = ExprAst::Column(column.clone());
+                        loop {
+                            let op = match self.peek() {
+                                Token::Op(s) if s == "+" => Some(BinOp::Add),
+                                Token::Op(s) if s == "-" => Some(BinOp::Sub),
+                                Token::Star => Some(BinOp::Mul),
+                                Token::Op(s) if s == "/" => Some(BinOp::Div),
+                                Token::Op(s) if s == "%" => Some(BinOp::Mod),
+                                _ => None,
+                            };
+                            match op {
+                                Some(op) => {
+                                    self.advance();
+                                    let right = self.term()?;
+                                    expr = ExprAst::Binary(Box::new(expr), op, Box::new(right));
+                                }
+                                None => break,
+                            }
+                        }
                         let asc = if self.eat_kw("DESC") {
                             false
                         } else {
                             let _ = self.eat_kw("ASC");
                             true
                         };
-                        keys.push(OrderKey { column, asc });
+                        keys.push(OrderKey {
+                            column,
+                            asc,
+                            expr: Some(expr),
+                        });
                         // tolerate a trailing expression after the leading column
                         while !matches!(self.peek(), Token::Comma | Token::Semicolon | Token::Eof)
                             && !matches!(self.peek(), Token::Ident(k)
@@ -2113,6 +2137,7 @@ mod tests {
                 order_by: vec![OrderKey {
                     column: "name".into(),
                     asc: false,
+                    expr: Some(ExprAst::Column("name".into())),
                 }],
                 limit: Some(5),
                 offset: None,

@@ -648,7 +648,13 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
             ids.insert(c.clone(), ids.len());
         }
     }
-    let sort_cols: Vec<String> = p.order_by.iter().map(|k| k.column.clone()).collect();
+    let mut sort_cols: Vec<String> = Vec::new();
+    for k in p.order_by {
+        match &k.expr {
+            Some(e) if !matches!(e, ExprAst::Column(_)) => expr_cols(e, &mut sort_cols),
+            _ => add_col(&mut sort_cols, &k.column),
+        }
+    }
     for c in &sort_cols {
         if !ids.contains_key(c) {
             ids.insert(c.clone(), ids.len());
@@ -732,9 +738,14 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                     .order_by
                     .iter()
                     .map(|k| {
-                        let col = match ids.get(&k.column) {
-                            Some(id) => format!("{} (#{id})", k.column),
-                            None => k.column.clone(),
+                        let col = match &k.expr {
+                            Some(e) if !matches!(e, ExprAst::Column(_)) => {
+                                render_expr_m(e, &ids, p.logical)
+                            }
+                            _ => match ids.get(&k.column) {
+                                Some(id) => format!("{} (#{id})", k.column),
+                                None => k.column.clone(),
+                            },
                         };
                         format!("{col} {}", if k.asc { "ASC" } else { "DESC" })
                     })
@@ -1079,7 +1090,13 @@ pub fn explain_index_scan(p: &IndexScanPlan) -> Option<Vec<String>> {
             ids.insert(c.clone(), ids.len());
         }
     }
-    let sort_cols: Vec<String> = p.order_by.iter().map(|k| k.column.clone()).collect();
+    let mut sort_cols: Vec<String> = Vec::new();
+    for k in p.order_by {
+        match &k.expr {
+            Some(e) if !matches!(e, ExprAst::Column(_)) => expr_cols(e, &mut sort_cols),
+            _ => add_col(&mut sort_cols, &k.column),
+        }
+    }
     for c in &sort_cols {
         if !ids.contains_key(c) {
             ids.insert(c.clone(), ids.len());

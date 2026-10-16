@@ -87,7 +87,7 @@ enum Stage {
         aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
-        keys: Vec<(usize, bool)>,
+        keys: Vec<(infinity_expression::Expr, bool)>,
     },
     Limit(u64),
     Offset(u64),
@@ -4368,11 +4368,12 @@ fn apply_aggregate(
     (names, out)
 }
 
-fn sort_rows(rows: &mut [Vec<Value>], keys: &[(usize, bool)]) {
+fn sort_rows(rows: &mut [Vec<Value>], keys: &[(infinity_expression::Expr, bool)]) {
     rows.sort_by(|a, b| {
         for (key, asc) in keys {
-            let x = a.get(*key).unwrap_or(&Value::Null);
-            let y = b.get(*key).unwrap_or(&Value::Null);
+            let x = key.eval(a);
+            let y = key.eval(b);
+            let (x, y) = (&x, &y);
             // NULLs order before every non-NULL (so ASC → NULLS FIRST, and the
             // reverse below gives DESC → NULLS LAST).
             let mut ord = match (x, y) {

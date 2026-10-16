@@ -162,7 +162,7 @@ mod tests {
         let plan = LogicalPlan::Filter {
             input: Box::new(LogicalPlan::Sort {
                 input: Box::new(scan()),
-                keys: vec![(0, true)],
+                keys: vec![(Expr::Column(0), true)],
             }),
             predicate: pred,
         };

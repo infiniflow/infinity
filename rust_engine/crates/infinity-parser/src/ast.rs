@@ -175,8 +175,11 @@ pub struct SelectAgg {
 /// `ORDER BY col [ASC|DESC]`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrderKey {
+    /// The leading identifier (`ORDER BY c1 + c2` → `c1`).
     pub column: String,
     pub asc: bool,
+    /// The full sort expression when it is more than a plain column.
+    pub expr: Option<ExprAst>,
 }
 
 /// `JOIN <table> ON <left> = <right>`. Keys are unqualified and resolved within
