@@ -1311,6 +1311,12 @@ impl Engine {
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
+        // If this directory was written by the C++ engine (its catalog keys are
+        // in the store, but the native catalog is empty), take over its
+        // schema so the engine can open a C++-produced directory (§2.6.1).
+        if engine.catalog.list_tables()?.is_empty() {
+            let _ = engine.catalog.import_cpp_layout(engine.store.as_ref());
+        }
         Ok(engine)
     }
 
@@ -3804,6 +3810,12 @@ impl Engine {
         &self.catalog
     }
 
+    /// The underlying row/meta store (exposed for tests and tooling that need to
+    /// inspect the on-disk key space).
+    pub fn store(&self) -> &std::sync::Arc<dyn MetaStore> {
+        &self.store
+    }
+
     /// Number of live (non-deleted) rows in `table`.
     pub fn row_count(&self, table: &str) -> Result<usize> {
         let db = self.db();
@@ -3818,7 +3830,13 @@ impl Engine {
     pub fn flush(&self) -> Result<()> {
         self.catalog.flush()?;
         self.txn.flush()?;
-        self.flush_cpp_blocks()
+        self.flush_cpp_blocks()?;
+        // Mirror the catalog into the C++ key space / value encoding so a C++
+        // engine can read this directory. Best effort: a column type the C++
+        // encoding does not cover yet leaves the previous layout in place
+        // rather than failing the flush.
+        let _ = self.catalog.write_cpp_layout(self.store.as_ref());
+        Ok(())
     }
 }
 
@@ -4435,6 +4453,65 @@ mod tests {
                 .unwrap();
         }
         e.flush().unwrap();
+    }
+
+    #[test]
+    fn flush_mirrors_the_catalog_into_the_cpp_key_space() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        seed(&e);
+        // The C++ keys the C++ engine reads are present in the engine's store.
+        let cpp = infinity_catalog::cpp_layout::read_cpp_layout(e.store().as_ref()).unwrap();
+        assert_eq!(cpp.len(), 1, "expected one C++ table record");
+        assert_eq!(cpp[0].table_name, "t");
+        assert_eq!(cpp[0].db_name, "default_db");
+        assert_eq!(
+            cpp[0].columns.iter().map(|c| c.column_name.clone()).collect::<Vec<_>>(),
+            vec!["id", "name"]
+        );
+        assert_eq!(
+            infinity_catalog::cpp_layout::type_text_of(&cpp[0].columns[0].column_type).unwrap(),
+            "INTEGER"
+        );
+    }
+
+    #[test]
+    fn opens_a_directory_written_by_the_cpp_engine() {
+        // A C++ engine's schema, dropped into an otherwise empty directory's
+        // store with no native catalog: opening it must import the schema.
+        let src = tempdir().unwrap();
+        let cat = Catalog::open(src.path()).unwrap();
+        cat.create_table_typed(
+            "default_db.cpp_t",
+            &["id".to_string(), "v".to_string()],
+            &[None, None],
+            &[true, false],
+            &["INTEGER".to_string(), "EMBEDDING(FLOAT,3)".to_string()],
+            &[None, None],
+        )
+        .unwrap();
+
+        let dir = tempdir().unwrap();
+        {
+            let store: std::sync::Arc<dyn MetaStore> = std::sync::Arc::new(
+                FjallMetaStore::open(dir.path().join("kv"), "default").unwrap(),
+            );
+            cat.write_cpp_layout(store.as_ref()).unwrap();
+        } // release the store lock before the engine opens it
+
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(
+            e.table_schema("default_db.cpp_t").unwrap(),
+            vec!["id".to_string(), "v".to_string()]
+        );
+        assert_eq!(e.column_types("default_db.cpp_t").unwrap()[0], "INTEGER");
+        // The imported table is usable.
+        e.execute("INSERT INTO default_db.cpp_t VALUES (7, [1.0, 2.0, 3.0]);")
+            .unwrap();
+        match &e.execute("SELECT id FROM default_db.cpp_t;").unwrap()[0] {
+            QueryResult::Rows { rows, .. } => assert_eq!(rows.len(), 1),
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]
