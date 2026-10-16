@@ -115,6 +115,60 @@ fn del_key(table: &str, seq: usize) -> Vec<u8> {
     format!("del:{table}:{seq:016}").into_bytes()
 }
 
+/// The declared dimension of a `TENSOR(FLOAT,d)` / `EMBEDDING(FLOAT,d)` column.
+fn type_dim(type_text: &str) -> Option<usize> {
+    let t = type_text.to_ascii_uppercase();
+    let inner = t.split('(').nth(1)?.trim_end_matches(')');
+    inner.split(',').rev().find_map(|s| s.trim().parse().ok())
+}
+
+fn is_tensor_type(type_text: &str) -> bool {
+    type_text.to_ascii_uppercase().starts_with("TENSOR")
+}
+
+/// Reshapes a flat tensor literal (`[a,b,c,d,e,f,g,h]`) into `[[a,b,c,d],[e,f,g,h]]`.
+fn reshape_tensor(s: &str, dim: usize) -> String {
+    let t = s.trim();
+    if dim == 0 || !t.starts_with('[') {
+        return t.to_string();
+    }
+    if t[1..].starts_with('[') {
+        return t.to_string(); // already nested
+    }
+    let flat: Vec<f64> = parse_vec_str(t);
+    if flat.is_empty() || !flat.len().is_multiple_of(dim) {
+        return t.to_string();
+    }
+    let groups: Vec<String> = flat
+        .chunks(dim)
+        .map(|c| {
+            format!(
+                "[{}]",
+                c.iter().map(|f| fmt_num(*f)).collect::<Vec<_>>().join(",")
+            )
+        })
+        .collect();
+    format!("[{}]", groups.join(","))
+}
+
+/// Encodes a row for storage, reshaping tensor columns by their declared dim.
+fn encode_row(row: &[Literal], types: &[String]) -> String {
+    row.iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let s = v.to_slt_string();
+            match types.get(i) {
+                Some(t) if is_tensor_type(t) => match type_dim(t) {
+                    Some(d) => reshape_tensor(&s, d),
+                    None => s,
+                },
+                _ => s,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\t")
+}
+
 /// Reconstructs a `Literal` from a stored default's text form.
 fn default_literal(s: &str) -> Literal {
     if s.eq_ignore_ascii_case("NULL") {
@@ -298,9 +352,10 @@ impl Engine {
                     .map(|c| c.default.as_ref().map(|l| l.to_slt_string()))
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
+                let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
                 let t = self
                     .catalog
-                    .create_table_full(name, &names, &defaults, &not_nulls)?;
+                    .create_table_typed(name, &names, &defaults, &not_nulls, &types)?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -370,8 +425,9 @@ impl Engine {
                     .map(|c| c.default.as_ref().map(|l| l.to_slt_string()))
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
+                let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
                 self.catalog
-                    .add_columns(table, &names, &defaults, &not_nulls)?;
+                    .add_columns_typed(table, &names, &defaults, &not_nulls, &types)?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
                     name: table.clone(),
@@ -454,14 +510,11 @@ impl Engine {
                     }
                 }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
+                let types = self.column_types(table)?;
                 // one transaction -> one WAL record + one KV batch (batched durability)
                 let mut t = self.txn.begin();
                 for (k, row) in rows.iter().enumerate() {
-                    let encoded = row
-                        .iter()
-                        .map(|v| v.to_slt_string())
-                        .collect::<Vec<_>>()
-                        .join("\t");
+                    let encoded = encode_row(row, &types);
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
                 self.txn.commit(t)?;
@@ -829,6 +882,15 @@ impl Engine {
         Ok(rows)
     }
 
+    /// Per-column declared type text for `table`.
+    fn column_types(&self, table: &str) -> Result<Vec<String>> {
+        Ok(self
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
+            .types)
+    }
+
     /// Per-column defaults (as `.slt` text) for `table`.
     fn table_defaults(&self, table: &str) -> Result<Vec<Option<String>>> {
         Ok(self
@@ -875,13 +937,10 @@ impl Engine {
             );
         }
         let base = self.store.scan_prefix(&row_prefix(table))?.len();
+        let types = self.column_types(table)?;
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
-            let encoded = row
-                .iter()
-                .map(|v| v.to_slt_string())
-                .collect::<Vec<_>>()
-                .join("\t");
+            let encoded = encode_row(row, &types);
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
         self.txn.commit(t)?;
@@ -934,6 +993,7 @@ impl Engine {
             return Ok((Vec::new(), hidden));
         }
         let schema = self.table_schema(table)?;
+        let types = self.column_types(table)?;
         // An in-parenthesis `WHERE` filter also prunes candidates before ranking.
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
@@ -959,7 +1019,12 @@ impl Engine {
         } else {
             m.args.iter().rev().find_map(arg_int).unwrap_or(10).max(0) as usize
         };
-        let threshold = s.with_opts.as_deref().and_then(parse_threshold);
+        let params = arg_str(m.args.get(3)).unwrap_or_default();
+        let threshold = s
+            .with_opts
+            .as_deref()
+            .and_then(parse_threshold)
+            .or_else(|| parse_threshold(&params));
 
         let rows = self.fetch_rows_with_ids(table)?;
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
@@ -977,11 +1042,21 @@ impl Engine {
             }
             if let Some(Value::Str(v)) = row.get(col_idx) {
                 if is_tensor {
-                    let q = parse_tensor_leaves(&format!("[{}]", query_items.join(",")));
-                    let bit = arg_str(m.args.get(1))
-                        .map(|d| d.eq_ignore_ascii_case("bit"))
-                        .unwrap_or(false);
-                    let score = tensor_score(&q, v, bit);
+                    let qtext = format!("[{}]", query_items.join(","));
+                    let qtext = match type_dim(&types[col_idx]) {
+                        Some(d) => reshape_tensor(&qtext, d),
+                        None => qtext,
+                    };
+                    let q = parse_tensor_leaves(&qtext);
+                    // The column's declared element type drives precision.
+                    let col_ty = types
+                        .get(col_idx)
+                        .cloned()
+                        .unwrap_or_default()
+                        .to_ascii_uppercase();
+                    let bit = col_ty.contains("BIT");
+                    let f32_mode = !bit && !col_ty.contains("DOUBLE");
+                    let score = tensor_score(&q, v, bit, f32_mode);
                     scored.push((*seq, score, -score));
                 } else if is_sparse {
                     let (qv, rv) = (parse_sparse(&query_items), parse_sparse_str(v));
@@ -1313,8 +1388,9 @@ fn split_top_level(s: &str) -> Vec<String> {
 
 /// MaxSim: sum over query vectors of the best (max) dot (or `-hamming` for bit
 /// tensors) against the doc vectors of one tensor.
-fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], bit: bool) -> f64 {
-    let mut sum = 0.0;
+fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], bit: bool, f32_mode: bool) -> f64 {
+    let mut sum = 0.0f64;
+    let mut sum32 = 0f32;
     for qv in q {
         let mut best = f64::NEG_INFINITY;
         for dv in d {
@@ -1328,6 +1404,13 @@ fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], bit: bool) -> f64 {
                     .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
                     .count();
                 -(diff as f64)
+            } else if f32_mode {
+                // float / float16 columns accumulate in f32 (matches the C++ engine)
+                let mut acc = 0f32;
+                for (a, b) in qv.iter().zip(dv) {
+                    acc += (*a as f32) * (*b as f32);
+                }
+                acc as f64
             } else {
                 qv.iter().zip(dv).map(|(a, b)| a * b).sum()
             };
@@ -1337,15 +1420,20 @@ fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], bit: bool) -> f64 {
         }
         if best.is_finite() {
             sum += best;
+            sum32 += best as f32;
         }
     }
-    sum
+    if f32_mode {
+        sum32 as f64
+    } else {
+        sum
+    }
 }
 
 /// Scores one stored tensor value against the query. A column holding a
 /// `TensorArray` (top-level groups are themselves bracketed) scores by the max
 /// over its component tensors; a plain tensor uses MaxSim directly.
-fn tensor_score(q: &[Vec<f64>], doc_text: &str, bit: bool) -> f64 {
+fn tensor_score(q: &[Vec<f64>], doc_text: &str, bit: bool, f32_mode: bool) -> f64 {
     let t = doc_text.trim();
     let inner = t
         .strip_prefix('[')
@@ -1365,10 +1453,10 @@ fn tensor_score(q: &[Vec<f64>], doc_text: &str, bit: bool) -> f64 {
     if is_array {
         groups
             .iter()
-            .map(|g| tensor_maxsim(q, &parse_tensor_leaves(g), bit))
+            .map(|g| tensor_maxsim(q, &parse_tensor_leaves(g), bit, f32_mode))
             .fold(f64::NEG_INFINITY, f64::max)
     } else {
-        tensor_maxsim(q, &parse_tensor_leaves(doc_text), bit)
+        tensor_maxsim(q, &parse_tensor_leaves(doc_text), bit, f32_mode)
     }
 }
 

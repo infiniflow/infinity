@@ -21,6 +21,8 @@ pub struct TableMeta {
     pub defaults: Vec<Option<String>>,
     /// Per-column `NOT NULL` flag.
     pub not_nulls: Vec<bool>,
+    /// Per-column declared type text (e.g. `TENSOR(FLOAT,4)`).
+    pub types: Vec<String>,
 }
 
 /// Field/record separators for the encoded table metadata.
@@ -44,7 +46,8 @@ impl TableMeta {
                 } else {
                     "0"
                 };
-                format!("{c}{FSEP}{d}{FSEP}{n}")
+                let ty = self.types.get(i).cloned().unwrap_or_default();
+                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}")
             })
             .collect();
         format!("{}{RSEP}{}", self.name, cols.join(&RSEP.to_string())).into_bytes()
@@ -58,11 +61,13 @@ impl TableMeta {
         let mut columns = Vec::new();
         let mut defaults = Vec::new();
         let mut not_nulls = Vec::new();
+        let mut types = Vec::new();
         for part in cols.split(RSEP).filter(|c| !c.is_empty()) {
             let mut f = part.split(FSEP);
             let n = f.next().unwrap_or(part);
             let d = f.next().unwrap_or("");
             let nn = f.next().unwrap_or("0");
+            let ty = f.next().unwrap_or("");
             columns.push(n.to_string());
             defaults.push(if d.is_empty() {
                 None
@@ -70,6 +75,7 @@ impl TableMeta {
                 Some(d.to_string())
             });
             not_nulls.push(nn == "1");
+            types.push(ty.to_string());
         }
         Ok(Self {
             id,
@@ -77,6 +83,7 @@ impl TableMeta {
             columns,
             defaults,
             not_nulls,
+            types,
         })
     }
 }
@@ -181,6 +188,24 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
     ) -> Result<TableMeta> {
+        self.create_table_typed(
+            name,
+            columns,
+            defaults,
+            not_nulls,
+            &vec![String::new(); columns.len()],
+        )
+    }
+
+    /// Creates a table with full column metadata including type text.
+    pub fn create_table_typed(
+        &self,
+        name: &str,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+    ) -> Result<TableMeta> {
         if self.get_table_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
         }
@@ -191,6 +216,7 @@ impl Catalog {
             columns: columns.to_vec(),
             defaults: defaults.to_vec(),
             not_nulls: not_nulls.to_vec(),
+            types: types.to_vec(),
         };
         self.store.atomic_write(&[
             (table_key(id), meta.encode()),
@@ -208,6 +234,24 @@ impl Catalog {
         defaults: &[Option<String>],
         not_nulls: &[bool],
     ) -> Result<TableMeta> {
+        self.add_columns_typed(
+            name,
+            columns,
+            defaults,
+            not_nulls,
+            &vec![String::new(); columns.len()],
+        )
+    }
+
+    /// Appends columns with type text.
+    pub fn add_columns_typed(
+        &self,
+        name: &str,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+    ) -> Result<TableMeta> {
         let mut meta = self
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
@@ -219,6 +263,7 @@ impl Catalog {
             meta.defaults.push(defaults.get(i).cloned().flatten());
             meta.not_nulls
                 .push(not_nulls.get(i).copied().unwrap_or(false));
+            meta.types.push(types.get(i).cloned().unwrap_or_default());
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(meta)
@@ -240,6 +285,9 @@ impl Catalog {
         }
         if idx < meta.not_nulls.len() {
             meta.not_nulls.remove(idx);
+        }
+        if idx < meta.types.len() {
+            meta.types.remove(idx);
         }
         self.store.put(&table_key(meta.id), &meta.encode())?;
         Ok(idx)

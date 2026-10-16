@@ -854,7 +854,7 @@ impl Parser {
         let mut cols = Vec::new();
         loop {
             let name = self.expect_ident()?;
-            let ty = self.parse_type()?;
+            let (ty, type_text) = self.parse_type()?;
             let mut default = None;
             let mut not_null = false;
             // Tolerate column constraints (NOT NULL, PRIMARY KEY, DEFAULT …, COMMENT …).
@@ -895,6 +895,7 @@ impl Parser {
             cols.push(ColumnDef {
                 name,
                 ty,
+                type_text,
                 default,
                 not_null,
             });
@@ -907,7 +908,7 @@ impl Parser {
         Ok(cols)
     }
 
-    fn parse_type(&mut self) -> Result<LogicalType> {
+    fn parse_type(&mut self) -> Result<(LogicalType, String)> {
         let t = self.expect_ident()?.to_ascii_uppercase();
         let base = match t.as_str() {
             "BOOL" | "BOOLEAN" => LogicalType::Boolean,
@@ -920,24 +921,42 @@ impl Parser {
             "VARCHAR" | "TEXT" | "STRING" => LogicalType::Varchar,
             _ => LogicalType::Invalid, // tolerate unknown/extra types
         };
+        let mut text = t.clone();
         // Consume a balanced parameter list, e.g. `TENSOR(FLOAT,16)` or `VARCHAR(20)`.
         if self.peek() == &Token::LParen {
             let mut depth = 0i32;
+            let mut inner = String::new();
             loop {
                 match self.advance() {
-                    Token::LParen => depth += 1,
+                    Token::LParen => {
+                        depth += 1;
+                        if depth > 1 {
+                            inner.push('(');
+                        }
+                    }
                     Token::RParen => {
                         depth -= 1;
                         if depth == 0 {
                             break;
                         }
+                        inner.push(')');
                     }
                     Token::Eof | Token::Semicolon => break,
+                    Token::Comma => inner.push(','),
+                    Token::Ident(s) => inner.push_str(&s.to_ascii_uppercase()),
+                    Token::Int(i) => inner.push_str(&i.to_string()),
+                    Token::Star => inner.push('*'),
+                    Token::LBracket => inner.push('['),
+                    Token::RBracket => inner.push(']'),
+                    Token::Str(s) => inner.push_str(&s),
+                    Token::Op(o) => inner.push_str(&o),
+                    Token::Float(f) => inner.push_str(&format!("{f}")),
                     _ => {}
                 }
             }
+            text = format!("{t}({inner})");
         }
-        Ok(base)
+        Ok((base, text))
     }
 
     fn literals(&mut self) -> Result<Vec<Literal>> {
@@ -1210,18 +1229,21 @@ mod tests {
                     ColumnDef {
                         name: "id".into(),
                         ty: LogicalType::Integer,
+                        type_text: "INT".into(),
                         default: None,
                         not_null: false
                     },
                     ColumnDef {
                         name: "name".into(),
                         ty: LogicalType::Varchar,
+                        type_text: "VARCHAR".into(),
                         default: None,
                         not_null: false
                     },
                     ColumnDef {
                         name: "v".into(),
                         ty: LogicalType::Double,
+                        type_text: "DOUBLE".into(),
                         default: None,
                         not_null: false
                     },
@@ -1519,18 +1541,21 @@ mod tests {
                     ColumnDef {
                         name: "a".into(),
                         ty: LogicalType::Integer,
+                        type_text: "INT".into(),
                         default: None,
                         not_null: false
                     },
                     ColumnDef {
                         name: "b".into(),
                         ty: LogicalType::Invalid,
+                        type_text: "TENSOR(FLOAT,16)".into(),
                         default: None,
                         not_null: false
                     },
                     ColumnDef {
                         name: "c".into(),
                         ty: LogicalType::Invalid,
+                        type_text: "EMBEDDING(FLOAT,4)".into(),
                         default: None,
                         not_null: false
                     },

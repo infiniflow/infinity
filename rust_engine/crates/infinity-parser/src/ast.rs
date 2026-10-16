@@ -179,6 +179,8 @@ pub struct JoinClause {
 pub struct ColumnDef {
     pub name: String,
     pub ty: LogicalType,
+    /// Raw declared type text, e.g. `TENSOR(FLOAT,4)` (uppercased, no spaces).
+    pub type_text: String,
     pub default: Option<Literal>,
     pub not_null: bool,
 }
