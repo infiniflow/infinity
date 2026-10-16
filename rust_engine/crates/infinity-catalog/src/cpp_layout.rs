@@ -114,43 +114,52 @@ pub fn data_type_of_text(type_text: &str) -> Option<Json> {
 
 /// Element type name -> `EmbeddingDataType` ordinal.
 fn element_code(elem: &str) -> Option<i64> {
-    Some(if elem.contains("UINT8") {
-        value_format::element::UINT8
-    } else if elem.contains("INT8") || elem.contains("TINYINT") {
-        value_format::element::INT8
-    } else if elem.contains("INT16") {
-        value_format::element::INT16
-    } else if elem.contains("INT32") || elem == "INT" {
-        value_format::element::INT32
-    } else if elem.contains("INT64") {
-        value_format::element::INT64
-    } else if elem.contains("FLOAT64") || elem.contains("DOUBLE") {
-        value_format::element::FLOAT64
-    } else if elem.contains("BFLOAT16") {
-        value_format::element::BFLOAT16
-    } else if elem.contains("FLOAT16") {
-        value_format::element::FLOAT16
-    } else if elem.contains("BIT") {
-        value_format::element::BIT
-    } else {
-        value_format::element::FLOAT32
-    })
+    Some(
+        if elem.contains("UINT8")
+            || (elem.contains("UNSIGNED") && (elem.contains("TINYINT") || elem.contains("INT8")))
+        {
+            value_format::element::UINT8
+        } else if elem.contains("INT8") || elem.contains("TINYINT") {
+            value_format::element::INT8
+        } else if elem.contains("INT16") {
+            value_format::element::INT16
+        } else if elem.contains("INT32") || elem == "INT" {
+            value_format::element::INT32
+        } else if elem.contains("INT64") {
+            value_format::element::INT64
+        } else if elem.contains("FLOAT64") || elem.contains("DOUBLE") {
+            value_format::element::FLOAT64
+        } else if elem.contains("BFLOAT16") {
+            value_format::element::BFLOAT16
+        } else if elem.contains("FLOAT16") {
+            value_format::element::FLOAT16
+        } else if elem.contains("BIT") {
+            value_format::element::BIT
+        } else {
+            value_format::element::FLOAT32
+        },
+    )
 }
 
 /// `EmbeddingDataType` ordinal -> the element name `data_type_of_text` accepts
 /// (the inverse of [`element_code`]).
+///
+/// The spellings are the **engine's** (lower-case `float`/`double`/`int32`/…),
+/// which is what `SHOW TABLE … COLUMNS` prints and the `.slt` fixtures expect —
+/// not the C++ `FLOAT32`/`FLOAT64` names, which would leak into the engine's
+/// type text.
 fn element_name(code: i64) -> Option<&'static str> {
     Some(match code {
-        value_format::element::BIT => "BIT",
-        value_format::element::UINT8 => "UINT8",
-        value_format::element::INT8 => "INT8",
-        value_format::element::INT16 => "INT16",
-        value_format::element::INT32 => "INT32",
-        value_format::element::INT64 => "INT64",
-        value_format::element::FLOAT32 => "FLOAT32",
-        value_format::element::FLOAT64 => "FLOAT64",
-        value_format::element::FLOAT16 => "FLOAT16",
-        value_format::element::BFLOAT16 => "BFLOAT16",
+        value_format::element::BIT => "bit",
+        value_format::element::UINT8 => "uint8",
+        value_format::element::INT8 => "int8",
+        value_format::element::INT16 => "int16",
+        value_format::element::INT32 => "int32",
+        value_format::element::INT64 => "int64",
+        value_format::element::FLOAT32 => "float",
+        value_format::element::FLOAT64 => "double",
+        value_format::element::FLOAT16 => "float16",
+        value_format::element::BFLOAT16 => "bfloat16",
         _ => return None,
     })
 }
@@ -911,17 +920,22 @@ mod tests {
 
     #[test]
     fn type_text_of_inverts_data_type_of_text() {
-        for text in [
-            "INTEGER",
-            "VARCHAR",
-            "EMBEDDING(FLOAT32,4)",
-            "TENSOR(FLOAT32,3)",
-            "ARRAY(INTEGER)",
-            "DECIMAL(18,2)",
-            "SPARSE(FLOAT32,100)",
+        // `type_text_of` emits the **engine's** spellings, so a C++-style source
+        // text canonicalises to it (and the canonical form is a fixed point).
+        for (text, canonical) in [
+            ("INTEGER", "INTEGER"),
+            ("VARCHAR", "VARCHAR"),
+            ("EMBEDDING(FLOAT32,4)", "EMBEDDING(float,4)"),
+            ("TENSOR(FLOAT32,3)", "TENSOR(float,3)"),
+            ("ARRAY(INTEGER)", "ARRAY(INTEGER)"),
+            ("DECIMAL(18,2)", "DECIMAL(18,2)"),
+            ("SPARSE(FLOAT32,100)", "SPARSE(float,100)"),
+            ("SPARSE(DOUBLE,30000)", "SPARSE(double,30000)"),
         ] {
             let j = data_type_of_text(text).unwrap();
-            assert_eq!(type_text_of(&j).unwrap(), text, "{text}");
+            assert_eq!(type_text_of(&j).unwrap(), canonical, "{text}");
+            let j2 = data_type_of_text(canonical).unwrap();
+            assert_eq!(type_text_of(&j2).unwrap(), canonical, "{canonical}");
         }
     }
 
@@ -972,7 +986,7 @@ mod tests {
         // Types round-trip through the reverse mapping.
         assert_eq!(t.types[0], "INTEGER");
         assert_eq!(t.types[1], "VARCHAR");
-        assert_eq!(t.types[2], "EMBEDDING(FLOAT32,3)");
+        assert_eq!(t.types[2], "EMBEDDING(float,3)");
         // NOT NULL, comments and defaults come across too.
         assert_eq!(t.not_nulls, vec![true, false, false]);
         assert_eq!(t.comments[1], Some("note".to_string()));
@@ -1000,7 +1014,7 @@ mod tests {
         assert_eq!(meta[0].name, "default_db.t");
         assert_eq!(
             meta[0].types,
-            vec!["INTEGER", "VARCHAR", "EMBEDDING(FLOAT32,3)"]
+            vec!["INTEGER", "VARCHAR", "EMBEDDING(float,3)"]
         );
         assert_eq!(meta[0].not_nulls, vec![true, false, false]);
         assert_eq!(meta[0].defaults[1], Some("x".to_string()));
