@@ -1,0 +1,47 @@
+# cargo-deny configuration (plan §6 Gate F):
+#   `cargo deny check` — 许可证 / 漏洞 / yanked / 来源
+#
+# 运行（需已安装 cargo-deny）：
+#   cd rust_engine && cargo deny check
+
+[graph]
+# 只检查 workspace 成员的实际依赖图
+all-features = false
+no-default-features = false
+
+[advisories]
+# 漏洞库：以 RustSec 为准；发现漏洞即失败
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# 允许的许可证白名单（与 C++ 侧 Apache-2.0 兼容）
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+# 传递性 native/FFI 依赖登记（plan §6 Gate F："对传递性 native 代码分类登记
+# FFI 归属、许可证与回退资格"）
+deny = []
+skip = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

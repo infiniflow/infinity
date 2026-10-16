@@ -438,6 +438,7 @@ QueryContext::query(sql)
 - `cargo clippy -D warnings`；`cargo fmt --check`；`cargo deny`（许可证/漏洞）。
 - 核心 crate `#![forbid(unsafe_code)]`，`unsafe` 仅存于 FFI/SIMD 模块并集中审计。
 - **依赖与工具链固定（codex 第 1 轮 #16）**：固定 rustc/edition、codegen 版本、全部依赖版本（`Cargo.lock`）、支持的 target（x86_64 v2/v3/v4、aarch64）；对**传递性 native 代码**（`rust-rocksdb`/`fst`/simsimd 等）分类登记 FFI 归属、许可证与回退资格。
+- **产物（2026-10-16）**：`rust_engine/rust-toolchain.toml`（钉住 `1.94.1` + rustfmt/clippy）、`rust_engine/deny.toml`（`cargo deny check`：许可证白名单 / RustSec 漏洞 / yanked / 来源限制）、`Cargo.lock` 入库；CI（`.github/workflows/rust_engine.yml`）已含 **fmt / clippy -D warnings / test / loom / smoke / gate-A 基线（信息性）/ cargo-deny** 六个作业。核心 crate **全部 `#![forbid(unsafe_code)]`**（9/9）。
 
 ### Gate G — 内部不变量与配置校验覆盖（codex 第 2 轮 #3）
 - **必须**产出一份「**C++ 内部不变量 → Rust 测试**」清单并纳入门槛，至少覆盖：

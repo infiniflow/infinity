@@ -1,0 +1,6 @@
+[toolchain]
+# Pin the compiler/toolchain for reproducible builds (plan §6 Gate F:
+# "固定 rustc/edition、codegen 版本、全部依赖版本（Cargo.lock）").
+channel = "1.94.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

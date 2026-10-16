@@ -1,6 +1,9 @@
 name: rust_engine
 
-# Build + test the Rust rewrite workspace (RUST_REWRITE_PLAN.md M0 CI).
+# Build + test the Rust rewrite workspace (RUST_REWRITE_PLAN.md M0/M6 CI).
+# Gate F (engineering quality): fmt + clippy(-D warnings) + test + cargo-deny.
+# Gate A baseline: the conformance harness over the real 173-file `.slt` suite
+# is run and reported (informational until Gate A reaches 100%).
 on:
   push:
     paths:
@@ -18,8 +21,10 @@ jobs:
         working-directory: rust_engine
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # the toolchain is pinned by rust_engine/rust-toolchain.toml
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.94.1"
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -30,5 +35,20 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: test
         run: cargo test --workspace
+      - name: loom (commit_ts uniqueness)
+        run: RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
       - name: smoke
         run: cargo run -q -p infinity-cli -- smoke /tmp/infinity-smoke
+      - name: Gate A baseline (informational)
+        run: cargo run -q --release -p infinity-cli -- conformance ../test/sql
+        continue-on-error: true
+
+  deny:
+    # Gate F: licenses / advisories / bans / sources (rust_engine/deny.toml)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: rust_engine/Cargo.toml
+          command: check
