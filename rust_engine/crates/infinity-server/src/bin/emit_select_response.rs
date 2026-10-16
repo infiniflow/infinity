@@ -4,7 +4,7 @@
 use std::io::Write;
 
 use infinity_server::{
-    rows_to_column_fields, write_select_response, ColumnDefWire, SelectResponseWire,
+    rows_to_column_fields, write_select_response, ColumnDefWire, PhysicalWire, SelectResponseWire,
 };
 
 fn main() {
@@ -21,13 +21,13 @@ fn main() {
                 id: 0,
                 name: "id".into(),
                 logic_type: 5,
-                embedding: None,
+                physical: PhysicalWire::None,
             },
             ColumnDefWire {
                 id: 1,
                 name: "name".into(),
                 logic_type: 2,
-                embedding: None,
+                physical: PhysicalWire::None,
             },
         ],
         column_fields: rows_to_column_fields(&columns, &rows),

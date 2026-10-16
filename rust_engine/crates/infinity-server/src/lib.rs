@@ -815,8 +815,27 @@ fn element_type_name(elem: i32) -> &'static str {
 /// `CreateTable` RPC preserves the column's real type (embedding included)
 /// instead of flattening everything to `VARCHAR`.
 fn column_sql_type(c: &ColumnDefWire) -> String {
-    if let Some((dim, elem)) = c.embedding {
-        return format!("EMBEDDING({}, {dim})", element_type_name(elem));
+    match &c.physical {
+        PhysicalWire::Embedding {
+            dimension,
+            element_type,
+        } => {
+            return format!(
+                "EMBEDDING({}, {dimension})",
+                element_type_name(*element_type)
+            )
+        }
+        PhysicalWire::Sparse {
+            dimension,
+            element_type,
+            ..
+        } => {
+            return format!(
+                "SPARSE({}, {dimension})",
+                element_type_name(*element_type)
+            )
+        }
+        PhysicalWire::None => {}
     }
     match c.logic_type {
         0 => "BOOLEAN".into(),
@@ -829,7 +848,13 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
         8 => "DOUBLE".into(),
         9 => "FLOAT16".into(),
         10 => "BFLOAT16".into(),
-        13 => "TENSOR(FLOAT, 0)".into(),
+        11 => "VARCHAR".into(),
+        17 => "DATE".into(),
+        18 => "TIME".into(),
+        19 => "DATETIME".into(),
+        20 => "TIMESTAMP".into(),
+        22 => "ARRAY(VARCHAR)".into(),
+        23 => "JSON".into(),
         _ => "VARCHAR".into(),
     }
 }
@@ -920,18 +945,10 @@ fn f32_to_f16_bits(f: f32) -> u16 {
     }
 }
 
-/// Parses `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` into the wire descriptor
-/// `(dimension, element_type)` using the SDK's `ElementType` codes.
-fn embedding_info(type_text: &str) -> Option<(i32, i32)> {
-    let up = type_text.to_ascii_uppercase();
-    if !(up.starts_with("EMBEDDING") || up.starts_with("VECTOR")) {
-        return None;
-    }
-    let inner = up.split_once('(')?.1.trim_end_matches(')').to_string();
-    let mut parts = inner.split(',');
-    let elem = parts.next()?.trim().to_string();
-    let dim: i32 = parts.next()?.trim().parse().ok()?;
-    let elem_code = if elem.contains("UINT8") {
+/// Maps an element-type name (`FLOAT`, `INT8`, `DOUBLE`, …) to the SDK's
+/// `ElementType` ordinal.
+fn element_type_code(elem: &str) -> i32 {
+    if elem.contains("UINT8") {
         1
     } else if elem.contains("INT8") || elem.contains("TINYINT") {
         2
@@ -951,12 +968,28 @@ fn embedding_info(type_text: &str) -> Option<(i32, i32)> {
         0
     } else {
         6 // Float32
-    };
-    Some((dim, elem_code))
+    }
+}
+
+/// Parses `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` into the wire descriptor
+/// `(dimension, element_type)` using the SDK's `ElementType` codes.
+fn embedding_info(type_text: &str) -> Option<(i32, i32)> {
+    let up = type_text.to_ascii_uppercase();
+    if !(up.starts_with("EMBEDDING") || up.starts_with("VECTOR")) {
+        return None;
+    }
+    let inner = up.split_once('(')?.1.trim_end_matches(')').to_string();
+    let mut parts = inner.split(',');
+    let elem = parts.next()?.trim().to_string();
+    let dim: i32 = parts.next()?.trim().parse().ok()?;
+    Some((dim, element_type_code(&elem)))
 }
 
 /// `LogicType.Embedding` (SDK ordinal) — announced for vector columns.
 const LOGIC_EMBEDDING: i32 = 12;
+
+/// `LogicType.Sparse` (SDK ordinal) — announced for sparse columns.
+const LOGIC_SPARSE: i32 = 15;
 
 // -------- date/time helpers (the SDK expects epoch days/seconds) --------
 
@@ -1002,6 +1035,36 @@ enum ColKind {
     Scalar(i32),
     /// Vector column: `(dimension, element_type)` as a raw element stream.
     Embedding(i32, i32),
+    /// Sparse column: a per-row `nnz` + indices + values stream.
+    Sparse {
+        dimension: i64,
+        element_type: i32,
+        index_type: i32,
+    },
+}
+
+/// Parses `SPARSE(<elem>,<bound>[,<index>])`. The index width is derived from
+/// the bound (matching the engine's `describe_type`), not the declared index
+/// name.
+fn sparse_info(type_text: &str) -> Option<(i64, i32, i32)> {
+    let up = type_text.to_ascii_uppercase();
+    if !up.starts_with("SPARSE(") {
+        return None;
+    }
+    let inner = up.split_once('(')?.1.trim_end_matches(')');
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    let elem = (*parts.first()?).to_string();
+    let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let index_code = if bound <= 127 {
+        2 // ElementInt8
+    } else if bound <= 32767 {
+        3 // ElementInt16
+    } else if bound <= 2_147_483_647 {
+        4 // ElementInt32
+    } else {
+        5 // ElementInt64
+    };
+    Some((bound as i64, element_type_code(&elem), index_code))
 }
 
 /// Classifies a column from its declared type text, falling back to value
@@ -1009,6 +1072,13 @@ enum ColKind {
 fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
     if let Some((dim, elem)) = embedding_info(declared) {
         return ColKind::Embedding(dim, elem);
+    }
+    if let Some((dimension, element_type, index_type)) = sparse_info(declared) {
+        return ColKind::Sparse {
+            dimension,
+            element_type,
+            index_type,
+        };
     }
     let up = declared.trim().to_ascii_uppercase();
     let base = up.split('(').next().unwrap_or("").trim();
@@ -1019,6 +1089,26 @@ fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
         "DATETIME" | "TIMESTAMP" => ColKind::Scalar(18), // ColumnDateTime
         _ => ColKind::Scalar(infer_column_type(rows, ci)),
     }
+}
+
+/// Parses the engine's sparse rendering `[i:val,…]` / `(empty)`.
+fn parse_sparse_literal(cell: &str) -> (Vec<i64>, Vec<f64>) {
+    let inner = cell.trim();
+    if inner == "(empty)" || inner.is_empty() || inner == "[]" {
+        return (Vec::new(), Vec::new());
+    }
+    let inner = inner.trim_start_matches('[').trim_end_matches(']');
+    let mut idx = Vec::new();
+    let mut val = Vec::new();
+    for part in inner.split(',') {
+        if let Some((i, v)) = part.split_once(':') {
+            if let (Ok(i), Ok(v)) = (i.trim().parse::<i64>(), v.trim().parse::<f64>()) {
+                idx.push(i);
+                val.push(v);
+            }
+        }
+    }
+    (idx, val)
 }
 
 /// Maps a wire `ColumnType` (how the column bytes are packed) to the SDK's
@@ -1105,6 +1195,52 @@ pub fn rows_to_column_fields_typed(
     for (ci, name) in columns.iter().enumerate() {
         let declared = types.get(ci).map(String::as_str).unwrap_or("");
         let kind = classify_column(declared, rows, ci);
+        if let ColKind::Sparse {
+            dimension: _,
+            element_type,
+            index_type,
+        } = kind
+        {
+            let mut chunk: Vec<u8> = Vec::new();
+            let mut masks = Vec::with_capacity(rows.len());
+            for r in rows {
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                masks.push(cell.is_some());
+                let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
+                let nnz = idx.len() as u32;
+                chunk.extend_from_slice(&nnz.to_le_bytes());
+                for i in &idx {
+                    match index_type {
+                        2 => chunk.push(*i as i8 as u8),
+                        3 => chunk.extend_from_slice(&(*i as i16).to_le_bytes()),
+                        5 => chunk.extend_from_slice(&i.to_le_bytes()),
+                        _ => chunk.extend_from_slice(&(*i as i32).to_le_bytes()),
+                    }
+                }
+                for v in &val {
+                    match element_type {
+                        1 => chunk.push(*v as u8),
+                        2 => chunk.push(*v as i8 as u8),
+                        3 => chunk.extend_from_slice(&(*v as i16).to_le_bytes()),
+                        4 => chunk.extend_from_slice(&(*v as i32).to_le_bytes()),
+                        5 => chunk.extend_from_slice(&(*v as i64).to_le_bytes()),
+                        7 => chunk.extend_from_slice(&v.to_le_bytes()),
+                        8 => chunk.extend_from_slice(&f32_to_f16_bits(*v as f32).to_le_bytes()),
+                        _ => chunk.extend_from_slice(&(*v as f32).to_le_bytes()),
+                    }
+                }
+            }
+            out.push(ColumnField {
+                column_type: 13, // ColumnSparse
+                column_name: name.clone(),
+                column_vectors: vec![chunk],
+                bitmasks: masks,
+            });
+            continue;
+        }
         if let ColKind::Embedding(dim, elem) = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
@@ -1310,15 +1446,30 @@ pub fn read_column_fields(r: &mut impl Read) -> Result<Vec<ColumnField>> {
     Ok(out)
 }
 
-/// A minimal `ColumnDef` (`thrift` field ids: 1 id, 2 name, 3 data_type{1 logic_type}`).
+/// The `PhysicalType` variant a non-scalar column carries (`DataType.physical_type`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum PhysicalWire {
+    /// No physical descriptor (scalars).
+    None,
+    /// `PhysicalType{3: EmbeddingType{1: dimension, 2: element_type}}`.
+    Embedding { dimension: i32, element_type: i32 },
+    /// `PhysicalType{4: SparseType{1: dimension, 2: element_type, 3: index_type}}`.
+    Sparse {
+        dimension: i64,
+        element_type: i32,
+        index_type: i32,
+    },
+}
+
+/// A minimal `ColumnDef` (`thrift` field ids: 1 id, 2 name, 3 data_type).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDefWire {
     pub id: i32,
     pub name: String,
     /// `LogicType` enum ordinal (caller-supplied).
     pub logic_type: i32,
-    /// `Some((dimension, element_type))` for embedding/vector columns.
-    pub embedding: Option<(i32, i32)>,
+    /// The physical descriptor for non-scalar columns (embedding/sparse).
+    pub physical: PhysicalWire,
 }
 
 /// A minimal `SelectResponse` (fields 1..=5).
@@ -1381,34 +1532,73 @@ pub fn write_select_response(
             .map_err(tw)?;
         o.write_i32(cd.logic_type).map_err(tw)?;
         o.write_field_end().map_err(tw)?;
-        if let Some((dim, elem)) = cd.embedding {
-            // physical_type{ 3: embedding_type{ 1: dimension, 2: element_type } }
-            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+        match cd.physical {
+            PhysicalWire::None => {}
+            PhysicalWire::Embedding {
+                dimension,
+                element_type,
+            } => {
+                // physical_type{ 3: embedding_type{ 1: dimension, 2: element_type } }
+                o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                    .map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new(
+                    "embedding_type",
+                    TType::Struct,
+                    3i16,
+                ))
                 .map_err(tw)?;
-            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
-                .map_err(tw)?;
-            o.write_field_begin(&TFieldIdentifier::new(
-                "embedding_type",
-                TType::Struct,
-                3i16,
-            ))
-            .map_err(tw)?;
-            o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
-                .map_err(tw)?;
-            o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
-                .map_err(tw)?;
-            o.write_i32(dim).map_err(tw)?;
-            o.write_field_end().map_err(tw)?;
-            o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
-                .map_err(tw)?;
-            o.write_i32(elem).map_err(tw)?;
-            o.write_field_end().map_err(tw)?;
-            o.write_field_stop().map_err(tw)?;
-            o.write_struct_end().map_err(tw)?;
-            o.write_field_end().map_err(tw)?;
-            o.write_field_stop().map_err(tw)?;
-            o.write_struct_end().map_err(tw)?;
-            o.write_field_end().map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("EmbeddingType"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I32, 1i16))
+                    .map_err(tw)?;
+                o.write_i32(dimension).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
+                    .map_err(tw)?;
+                o.write_i32(element_type).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+            }
+            PhysicalWire::Sparse {
+                dimension,
+                element_type,
+                index_type,
+            } => {
+                // physical_type{ 4: sparse_type{ 1: dimension, 2: element_type, 3: index_type } }
+                o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                    .map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("sparse_type", TType::Struct, 4i16))
+                    .map_err(tw)?;
+                o.write_struct_begin(&TStructIdentifier::new("SparseType"))
+                    .map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("dimension", TType::I64, 1i16))
+                    .map_err(tw)?;
+                o.write_i64(dimension).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("element_type", TType::I32, 2i16))
+                    .map_err(tw)?;
+                o.write_i32(element_type).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_begin(&TFieldIdentifier::new("index_type", TType::I32, 3i16))
+                    .map_err(tw)?;
+                o.write_i32(index_type).map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+                o.write_field_stop().map_err(tw)?;
+                o.write_struct_end().map_err(tw)?;
+                o.write_field_end().map_err(tw)?;
+            }
         }
         o.write_field_stop().map_err(tw)?;
         o.write_struct_end().map_err(tw)?;
@@ -1498,7 +1688,7 @@ pub struct CreateTableReq {
 fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ColumnDefWire> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut id, mut name, mut lt) = (0i32, String::new(), 0i32);
-    let mut embedding: Option<(i32, i32)> = None;
+    let mut physical = PhysicalWire::None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -1516,9 +1706,9 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                     }
                     match g.id {
                         Some(1) => lt = ip.read_i32().map_err(tw)?,
-                        // physical_type (a struct): carries the embedding descriptor.
+                        // physical_type (a struct): embedding / sparse descriptor.
                         Some(2) if g.field_type == TType::Struct => {
-                            embedding = read_physical_type(ip)?;
+                            physical = read_physical_type(ip)?;
                         }
                         _ => ip.skip(g.field_type).map_err(tw)?,
                     }
@@ -1535,15 +1725,15 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
         id,
         name,
         logic_type: lt,
-        embedding,
+        physical,
     })
 }
 
-/// Reads `PhysicalType`, returning the `(dimension, element_type)` embedding
-/// descriptor when field 3 is present.
-fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<(i32, i32)>> {
+/// Reads `PhysicalType`, extracting the embedding (`field 3`) or sparse
+/// (`field 4`) descriptor.
+fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PhysicalWire> {
     ip.read_struct_begin().map_err(tw)?;
-    let mut emb = None;
+    let mut out = PhysicalWire::None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -1566,14 +1756,40 @@ fn read_physical_type(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<O
                     ip.read_field_end().map_err(tw)?;
                 }
                 ip.read_struct_end().map_err(tw)?;
-                emb = Some((dim, elem));
+                out = PhysicalWire::Embedding {
+                    dimension: dim,
+                    element_type: elem,
+                };
+            }
+            Some(4) if f.field_type == TType::Struct => {
+                ip.read_struct_begin().map_err(tw)?; // SparseType
+                let (mut dim, mut elem, mut idx) = (0i64, 0i32, 0i32);
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    match g.id {
+                        Some(1) => dim = ip.read_i64().map_err(tw)?,
+                        Some(2) => elem = ip.read_i32().map_err(tw)?,
+                        Some(3) => idx = ip.read_i32().map_err(tw)?,
+                        _ => ip.skip(g.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+                out = PhysicalWire::Sparse {
+                    dimension: dim,
+                    element_type: elem,
+                    index_type: idx,
+                };
             }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    Ok(emb)
+    Ok(out)
 }
 
 /// Consumes the trailing `stop` of a `<Method>_args` struct.
@@ -2049,15 +2265,33 @@ pub fn select_response_from_typed(
         .enumerate()
         .map(|(i, name)| {
             let declared = types.get(i).map(String::as_str).unwrap_or("");
-            let (logic_type, embedding) = match classify_column(declared, rows, i) {
-                ColKind::Embedding(dim, elem) => (LOGIC_EMBEDDING, Some((dim, elem))),
-                ColKind::Scalar(code) => (column_type_to_logic(code), None),
+            let (logic_type, physical) = match classify_column(declared, rows, i) {
+                ColKind::Embedding(dim, elem) => (
+                    LOGIC_EMBEDDING,
+                    PhysicalWire::Embedding {
+                        dimension: dim,
+                        element_type: elem,
+                    },
+                ),
+                ColKind::Sparse {
+                    dimension,
+                    element_type,
+                    index_type,
+                } => (
+                    LOGIC_SPARSE,
+                    PhysicalWire::Sparse {
+                        dimension,
+                        element_type,
+                        index_type,
+                    },
+                ),
+                ColKind::Scalar(code) => (column_type_to_logic(code), PhysicalWire::None),
             };
             ColumnDefWire {
                 id: i as i32,
                 name: name.clone(),
                 logic_type,
-                embedding,
+                physical,
             }
         })
         .collect();
@@ -2907,7 +3141,7 @@ mod tests {
                 id: 0,
                 name: "id".into(),
                 logic_type: 5,
-                embedding: None,
+                physical: PhysicalWire::None,
             }],
             session_id: 1,
         };
@@ -3081,6 +3315,36 @@ mod tests {
         let resp = select_response_from_typed(&cols, &types, &rows);
         let logic: Vec<i32> = resp.column_defs.iter().map(|c| c.logic_type).collect();
         assert_eq!(logic, vec![17, 18, 19, 23]); // Date, Time, DateTime, Json
-        assert!(resp.column_defs.iter().all(|c| c.embedding.is_none()));
+        assert!(resp
+            .column_defs
+            .iter()
+            .all(|c| c.physical == PhysicalWire::None));
+
+        // Sparse: `u32 nnz` + i8 indices (bound 100) + f32 values.
+        let scols = vec!["v".to_string()];
+        let stypes = vec!["SPARSE(FLOAT,100)".to_string()];
+        let srows = vec![vec!["[0:1.5,3:2.5]".to_string()]];
+        let sf = rows_to_column_fields_typed(&scols, &stypes, &srows);
+        assert_eq!(sf[0].column_type, 13); // ColumnSparse
+        let b = &sf[0].column_vectors[0];
+        assert_eq!(u32::from_le_bytes(b[..4].try_into().unwrap()), 2); // nnz
+        assert_eq!(&b[4..6], &[0u8, 3u8]); // indices as i8
+        assert_eq!(f32::from_le_bytes(b[6..10].try_into().unwrap()), 1.5);
+        assert_eq!(f32::from_le_bytes(b[10..14].try_into().unwrap()), 2.5);
+        let sresp = select_response_from_typed(&scols, &stypes, &srows);
+        assert_eq!(sresp.column_defs[0].logic_type, 15); // Sparse
+        assert_eq!(
+            sresp.column_defs[0].physical,
+            PhysicalWire::Sparse {
+                dimension: 100,
+                element_type: 6, // Float32
+                index_type: 2,   // Int8
+            }
+        );
+
+        // An empty sparse vector still emits an `nnz = 0` prefix.
+        let erows = vec![vec!["(empty)".to_string()]];
+        let ef = rows_to_column_fields_typed(&scols, &stypes, &erows);
+        assert_eq!(ef[0].column_vectors[0], vec![0, 0, 0, 0]);
     }
 }
