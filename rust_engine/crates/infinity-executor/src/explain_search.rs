@@ -47,6 +47,35 @@ fn vec_text(items: &[String]) -> String {
     format!("[{}]", parts.join(","))
 }
 
+/// Renders a sparse vector literal as `[i:v,i:v,…]` with 6-decimal values.
+fn sparse_vec_text(items: &[String]) -> String {
+    let parts: Vec<String> = items
+        .iter()
+        .map(|s| match s.split_once(':') {
+            Some((i, v)) => {
+                let f = v
+                    .trim()
+                    .parse::<f64>()
+                    .map(|f| format!("{f:.6}"))
+                    .unwrap_or_else(|_| v.to_string());
+                format!("{i}:{f}")
+            }
+            None => s.clone(),
+        })
+        .collect();
+    format!("[{}]", parts.join(","))
+}
+
+/// The lower-case element name of a `SPARSE(<elem>,<dim>)` type (`float`).
+fn sparse_elem(type_text: &str) -> String {
+    type_text
+        .to_ascii_uppercase()
+        .strip_prefix("SPARSE(")
+        .and_then(|inner| inner.split(',').next())
+        .map(|e| e.trim().to_ascii_lowercase())
+        .unwrap_or_else(|| "float".to_string())
+}
+
 /// Renders a flat tensor literal as `[[row],[row],…]` with the given row width.
 fn tensor_text(items: &[String], dim: usize) -> String {
     if dim == 0 || !items.len().is_multiple_of(dim) {
@@ -369,6 +398,48 @@ pub fn explain_search(p: &SearchPlan) -> Option<Vec<String>> {
         lines.push(attr(leaf_d, "table index: #1"));
         lines.push(attr(leaf_d, &format!("MatchTensor expression: {expr}")));
         lines.push(attr(leaf_d, &format!("Top N: {}", top_n_of(&opts))));
+        lines.push(attr(
+            leaf_d,
+            &format!("output columns: [{}]", leaf_out.join(", ")),
+        ));
+    }
+
+    // A multi-segment table wraps the MatchSparseScan in a `MERGE MatchSparse`.
+    if p.multi && kind == "SPARSE" {
+        let col = m.column.clone();
+        let vals = m.args.first().and_then(arr_arg).unwrap_or_default();
+        let metric = m.args.get(1).and_then(str_arg).unwrap_or_default();
+        let topn = match m.args.get(2) {
+            Some(ExprAst::Literal(Literal::Int(i))) => *i,
+            _ => 3,
+        };
+        let dim = p
+            .schema
+            .iter()
+            .position(|c| c == &col)
+            .and_then(|i| p.types.get(i))
+            .and_then(|t| crate::type_dim_deep(t))
+            .unwrap_or(0);
+        let elem = p
+            .schema
+            .iter()
+            .position(|c| c == &col)
+            .and_then(|i| p.types.get(i))
+            .map(|t| sparse_elem(t))
+            .unwrap_or_else(|| "float".to_string());
+        let metric_name = match metric.to_ascii_lowercase().as_str() {
+            "ip" | "inner_product" => "INNER_PRODUCT".to_string(),
+            other => other.to_ascii_uppercase(),
+        };
+        let expr = format!(
+            "MATCH SPARSE ({col}, [Cast({} AS Sparse({elem},int8,{dim}))], {metric_name}, {topn}) WITH () USING INDEX ()",
+            sparse_vec_text(&vals)
+        );
+        lines.push(header(leaf_d, "MERGE MatchSparse", 5));
+        lines.push(attr(leaf_d, &format!("table name: {alias}({db}.{alias})")));
+        lines.push(attr(leaf_d, "table index: #1"));
+        lines.push(attr(leaf_d, &format!("MatchSparse expression: {expr}")));
+        lines.push(attr(leaf_d, &format!("Top N: {topn}")));
         lines.push(attr(
             leaf_d,
             &format!("output columns: [{}]", leaf_out.join(", ")),
