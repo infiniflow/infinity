@@ -156,11 +156,12 @@ impl AggFunc {
     }
 }
 
-/// An aggregate call, e.g. `COUNT(*)` (arg `None`) or `SUM(col)`.
+/// An aggregate call, e.g. `COUNT(*)` (no args), `SUM(col)` or `COUNT(DISTINCT a, b)`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectAgg {
     pub func: AggFunc,
-    pub arg: Option<String>,
+    pub args: Vec<String>,
+    pub distinct: bool,
 }
 
 /// `ORDER BY col [ASC|DESC]`.

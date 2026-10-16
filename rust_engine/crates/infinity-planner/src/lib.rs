@@ -44,7 +44,7 @@ pub enum LogicalPlan {
         input: Box<LogicalPlan>,
         group_key: Option<usize>,
         group_name: Option<String>,
-        aggs: Vec<(AggFunc, Option<usize>, String)>,
+        aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
         input: Box<LogicalPlan>,
@@ -151,10 +151,11 @@ pub fn predicate_expr(pred: &Predicate, schema: &[String]) -> Result<Expr> {
     })
 }
 
-fn agg_label(func: AggFunc, arg: &Option<String>) -> String {
-    match arg {
-        Some(c) => format!("{}({})", func.as_str(), c),
-        None => format!("{}(*)", func.as_str()),
+fn agg_label(func: AggFunc, args: &[String]) -> String {
+    if args.is_empty() {
+        format!("{}(*)", func.as_str())
+    } else {
+        format!("{}({})", func.as_str(), args.join(","))
     }
 }
 
@@ -174,25 +175,28 @@ fn expr_has_agg(e: &ExprAst) -> bool {
 fn gather_agg(
     e: &ExprAst,
     schema: &[String],
-    aggs: &mut Vec<(AggFunc, Option<usize>, String)>,
+    aggs: &mut Vec<(AggFunc, Vec<usize>, bool, String)>,
     index: &mut std::collections::HashMap<String, usize>,
     base: usize,
 ) -> Result<()> {
     match e {
         ExprAst::Func { name, args } => {
             if let Some(f) = AggFunc::from_name(name) {
-                let arg = match args.first() {
-                    Some(ExprAst::Column(c)) => Some(c.clone()),
-                    _ => None,
-                };
-                let label = agg_label(f, &arg);
+                let arg_vec: Vec<String> = args
+                    .iter()
+                    .filter_map(|a| match a {
+                        ExprAst::Column(c) => Some(c.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                let label = agg_label(f, &arg_vec);
                 if !index.contains_key(&label) {
-                    let arg_idx = match &arg {
-                        Some(c) => Some(resolve_column(schema, c)?),
-                        None => None,
-                    };
+                    let idxs: Vec<usize> = arg_vec
+                        .iter()
+                        .map(|c| resolve_column(schema, c))
+                        .collect::<Result<Vec<_>>>()?;
                     index.insert(label.clone(), base + aggs.len());
-                    aggs.push((f, arg_idx, label));
+                    aggs.push((f, idxs, false, label));
                 }
             } else {
                 for a in args {
@@ -243,11 +247,14 @@ fn compile_agg_expr(
         ),
         ExprAst::Func { name, args } => {
             if let Some(f) = AggFunc::from_name(name) {
-                let arg = match args.first() {
-                    Some(ExprAst::Column(c)) => Some(c.clone()),
-                    _ => None,
-                };
-                let label = agg_label(f, &arg);
+                let arg_vec: Vec<String> = args
+                    .iter()
+                    .filter_map(|a| match a {
+                        ExprAst::Column(c) => Some(c.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                let label = agg_label(f, &arg_vec);
                 let idx = *agg_index
                     .get(&label)
                     .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
@@ -274,7 +281,7 @@ fn item_agg_expr(
 ) -> Result<Expr> {
     match it {
         SelectItem::Aggregate(a) => {
-            let label = agg_label(a.func, &a.arg);
+            let label = agg_label(a.func, &a.args);
             let idx = *agg_index
                 .get(&label)
                 .ok_or_else(|| Error::Invalid(format!("aggregate '{label}' not collected")))?;
@@ -305,7 +312,7 @@ fn item_agg_expr(
 /// A display name for a select item (used for post-aggregate projection).
 fn item_label(it: &SelectItem) -> String {
     match it {
-        SelectItem::Aggregate(a) => agg_label(a.func, &a.arg),
+        SelectItem::Aggregate(a) => agg_label(a.func, &a.args),
         SelectItem::Column(c) => c.clone(),
         SelectItem::Func { name, .. } => name.to_ascii_lowercase(),
         SelectItem::Literal(_) => "c0".to_string(),
@@ -409,20 +416,21 @@ pub fn plan_select(
             None => None,
         };
         let base = usize::from(group_by.is_some());
-        let mut aggs: Vec<(AggFunc, Option<usize>, String)> = Vec::new();
+        let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
         let mut agg_index: std::collections::HashMap<String, usize> = Default::default();
         let mut needs_projection = false;
         for it in items {
             match it {
                 SelectItem::Aggregate(a) => {
-                    let label = agg_label(a.func, &a.arg);
+                    let label = agg_label(a.func, &a.args);
                     if !agg_index.contains_key(&label) {
-                        let arg_idx = match &a.arg {
-                            Some(c) => Some(resolve_column(&schema, c)?),
-                            None => None,
-                        };
+                        let idxs: Vec<usize> = a
+                            .args
+                            .iter()
+                            .map(|c| resolve_column(&schema, c))
+                            .collect::<Result<Vec<_>>>()?;
                         agg_index.insert(label.clone(), base + aggs.len());
-                        aggs.push((a.func, arg_idx, label));
+                        aggs.push((a.func, idxs, a.distinct, label));
                     }
                 }
                 SelectItem::Expr(e) => {
@@ -450,7 +458,7 @@ pub fn plan_select(
         if let Some(g) = group_by {
             agg_names.push(g.to_string());
         }
-        agg_names.extend(aggs.iter().map(|(_, _, l)| l.clone()));
+        agg_names.extend(aggs.iter().map(|(_, _, _, l)| l.clone()));
         plan = LogicalPlan::Aggregate {
             input: Box::new(plan),
             group_key,

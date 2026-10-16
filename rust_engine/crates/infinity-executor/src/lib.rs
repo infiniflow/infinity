@@ -75,7 +75,7 @@ enum Stage {
     Aggregate {
         group_key: Option<usize>,
         group_name: Option<String>,
-        aggs: Vec<(AggFunc, Option<usize>, String)>,
+        aggs: Vec<(AggFunc, Vec<usize>, bool, String)>,
     },
     Sort {
         key: usize,
@@ -1571,13 +1571,13 @@ fn apply_aggregate(
     rows: &[Vec<Value>],
     group_key: Option<usize>,
     group_name: Option<&str>,
-    aggs: &[(AggFunc, Option<usize>, String)],
+    aggs: &[(AggFunc, Vec<usize>, bool, String)],
 ) -> (Vec<String>, Vec<Vec<Value>>) {
     let mut names = Vec::new();
     if let Some(g) = group_name {
         names.push(g.to_string());
     }
-    for (_, _, label) in aggs {
+    for (_, _, _, label) in aggs {
         names.push(label.clone());
     }
 
@@ -1585,7 +1585,7 @@ fn apply_aggregate(
         None => {
             let row: Vec<Value> = aggs
                 .iter()
-                .map(|(f, c, _)| aggregate(*f, *c, rows))
+                .map(|(f, cols, distinct, _)| aggregate(*f, cols, *distinct, rows))
                 .collect();
             (names, vec![row])
         }
@@ -1608,8 +1608,8 @@ fn apply_aggregate(
                 .into_iter()
                 .map(|(key, grp)| {
                     let mut row = vec![key];
-                    for (f, c, _) in aggs {
-                        row.push(aggregate(*f, *c, &grp));
+                    for (f, cols, distinct, _) in aggs {
+                        row.push(aggregate(*f, cols, *distinct, &grp));
                     }
                     row
                 })

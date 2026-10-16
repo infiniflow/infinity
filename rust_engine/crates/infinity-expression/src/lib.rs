@@ -596,24 +596,53 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
     }
 }
 
-/// Computes an aggregate over `rows`. `col = None` means `COUNT(*)`.
+/// Computes an aggregate over `rows`. Empty `cols` means `COUNT(*)`.
+/// `distinct` deduplicates the gathered value tuples first.
 /// NULLs are ignored for `SUM/AVG/MIN/MAX` and for `COUNT(col)`.
-pub fn aggregate(func: AggFunc, col: Option<usize>, rows: &[Vec<Value>]) -> Value {
-    if func == AggFunc::Count && col.is_none() {
+pub fn aggregate(func: AggFunc, cols: &[usize], distinct: bool, rows: &[Vec<Value>]) -> Value {
+    if func == AggFunc::Count && cols.is_empty() {
         return Value::Int(rows.len() as i64);
     }
-    let idx = match col {
-        Some(i) => i,
-        None => return Value::Int(0),
+    if cols.is_empty() {
+        return Value::Int(0);
+    }
+    let mut tuples: Vec<Vec<Value>> = Vec::new();
+    for r in rows {
+        let mut t = Vec::with_capacity(cols.len());
+        let mut ok = true;
+        for &c in cols {
+            match r.get(c) {
+                Some(v) => t.push(v.clone()),
+                None => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok {
+            tuples.push(t);
+        }
+    }
+    if distinct {
+        // Values may hold floats (not `Hash`), so dedupe on their text form.
+        let mut seen = std::collections::HashSet::new();
+        tuples.retain(|t| {
+            let key: Vec<String> = t.iter().map(|v| v.to_slt_string()).collect();
+            seen.insert(key)
+        });
+    }
+    let vals: Vec<&Value> = if cols.len() == 1 {
+        tuples
+            .iter()
+            .map(|t| &t[0])
+            .filter(|v| **v != Value::Null)
+            .collect()
+    } else {
+        tuples.iter().map(|t| &t[0]).collect()
     };
-    let vals: Vec<&Value> = rows
-        .iter()
-        .filter_map(|r| r.get(idx))
-        .filter(|v| **v != Value::Null)
-        .collect();
 
     match func {
-        AggFunc::Count => Value::Int(vals.len() as i64),
+        AggFunc::Count => Value::Int(tuples.len() as i64),
         AggFunc::Sum | AggFunc::Avg => {
             let mut sum = 0f64;
             let mut all_int = true;
@@ -733,15 +762,23 @@ mod tests {
             vec![Value::Int(2), Value::Str("b".into())],
             vec![Value::Int(3), Value::Null],
         ];
-        assert_eq!(aggregate(Count, None, &rows), Value::Int(3));
-        assert_eq!(aggregate(Count, Some(1), &rows), Value::Int(2));
-        assert_eq!(aggregate(Sum, Some(0), &rows), Value::Int(6));
-        assert_eq!(aggregate(Avg, Some(0), &rows), Value::Float(2.0));
-        assert_eq!(aggregate(Min, Some(0), &rows), Value::Int(1));
-        assert_eq!(aggregate(Max, Some(0), &rows), Value::Int(3));
-        assert_eq!(aggregate(Max, Some(1), &rows), Value::Str("b".into()));
-        assert_eq!(aggregate(First, Some(0), &rows), Value::Int(1));
-        assert_eq!(aggregate(Last, Some(0), &rows), Value::Int(3));
+        assert_eq!(aggregate(Count, &[], false, &rows), Value::Int(3));
+        assert_eq!(aggregate(Count, &[1], false, &rows), Value::Int(2));
+        assert_eq!(aggregate(Sum, &[0], false, &rows), Value::Int(6));
+        assert_eq!(aggregate(Avg, &[0], false, &rows), Value::Float(2.0));
+        assert_eq!(aggregate(Min, &[0], false, &rows), Value::Int(1));
+        assert_eq!(aggregate(Max, &[0], false, &rows), Value::Int(3));
+        assert_eq!(aggregate(Max, &[1], false, &rows), Value::Str("b".into()));
+        assert_eq!(aggregate(First, &[0], false, &rows), Value::Int(1));
+        assert_eq!(aggregate(Last, &[0], false, &rows), Value::Int(3));
+        // DISTINCT over a multi-column tuple
+        let dup = vec![
+            vec![Value::Int(1), Value::Int(9)],
+            vec![Value::Int(1), Value::Int(9)],
+            vec![Value::Int(2), Value::Int(9)],
+        ];
+        assert_eq!(aggregate(Count, &[0, 1], true, &dup), Value::Int(2));
+        assert_eq!(aggregate(Count, &[0, 1], false, &dup), Value::Int(3));
     }
 
     #[test]

@@ -323,6 +323,15 @@ impl Parser {
                         let _ = self.eat_kw("ASC");
                         true
                     };
+                    // tolerate extra ORDER BY keys
+                    while self.peek() == &Token::Comma {
+                        self.advance();
+                        if matches!(self.peek(), Token::Ident(_)) {
+                            self.advance();
+                            let _ = self.eat_kw("DESC");
+                            let _ = self.eat_kw("ASC");
+                        }
+                    }
                     Some(OrderKey { column, asc })
                 } else {
                     None
@@ -1130,26 +1139,36 @@ impl Parser {
         let func =
             agg_func(&name).ok_or_else(|| Error::Invalid(format!("unknown aggregate {name}")))?;
         self.expect(Token::LParen)?;
-        // tolerate DISTINCT / leading operator
-        let _ = self.eat_kw("DISTINCT");
-        let arg = if self.peek() == &Token::Star {
+        let distinct = self.eat_kw("DISTINCT");
+        let mut args: Vec<String> = Vec::new();
+        if self.peek() == &Token::Star {
             self.advance();
-            None
         } else {
-            match self.advance() {
-                Token::Ident(s) => Some(s),
-                Token::RParen => {
-                    return Ok(SelectAgg { func, arg: None });
+            loop {
+                match self.peek() {
+                    Token::Ident(_) => args.push(self.expect_ident()?),
+                    Token::RParen => break,
+                    _ => {
+                        self.advance();
+                    }
                 }
-                _ => None,
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
             }
-        };
+        }
         // tolerate trailing tokens before the closing paren
         while !matches!(self.peek(), Token::RParen | Token::Eof) {
             self.advance();
         }
         self.expect(Token::RParen)?;
-        Ok(SelectAgg { func, arg })
+        Ok(SelectAgg {
+            func,
+            args,
+            distinct,
+        })
     }
 
     /// Continues a binary expression from an already-parsed left operand.
@@ -1200,7 +1219,7 @@ fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
         }),
         SelectItem::Aggregate(a) => Some(ExprAst::Func {
             name: a.func.as_str().to_ascii_uppercase(),
-            args: a.arg.clone().map(ExprAst::Column).into_iter().collect(),
+            args: a.args.iter().cloned().map(ExprAst::Column).collect(),
         }),
         _ => None,
     }
@@ -1428,11 +1447,13 @@ mod tests {
                 items: vec![
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Count,
-                        arg: None
+                        args: vec![],
+                        distinct: false
                     }),
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Sum,
-                        arg: Some("id".into())
+                        args: vec!["id".into()],
+                        distinct: false
                     }),
                 ],
                 from: Some("t".into()),
@@ -1452,7 +1473,8 @@ mod tests {
                     SelectItem::Column("name".into()),
                     SelectItem::Aggregate(SelectAgg {
                         func: AggFunc::Count,
-                        arg: None
+                        args: vec![],
+                        distinct: false
                     }),
                 ],
                 from: Some("t".into()),
