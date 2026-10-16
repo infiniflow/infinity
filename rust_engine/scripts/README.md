@@ -5,7 +5,7 @@
 | 脚本 | 关卡 | 内容 | 当前状态（2026-10-16） |
 |---|---|---|---|
 | `run_gate_a.sh` | Gate A — SQL 功能 | 现有 173 个 `.slt` 全量比对 | **未达标**：`statement ok` 1746/1746、`query` 1351/1532、`statement error` 129/129（要求 100%） |
-| `run_gate_b.sh` | Gate B — SDK/协议 | `python/test_pysdk`、`go/tests`、HTTP（`tools/run_http_api.py`），**不改 SDK** | **部分**：`infinity-server` 二进制已就位（`cargo build -p infinity-server`），未改动的 Python SDK 可连上 Rust 服务，`test_pysdk` 通过 **361/1672**；其余多为 `unknown method`（`Select`/`Insert`/`GetDatabase` 等 RPC 未实现） |
+| `run_gate_b.sh` | Gate B — SDK/协议 | `python/test_pysdk`、`go/tests`、HTTP（`tools/run_http_api.py`），**不改 SDK** | **部分**：`infinity-server` 二进制已就位（`cargo build -p infinity-server`），未改动的 Python SDK 可连上 Rust 服务，`test_pysdk` 通过 **1031/1672**；已派发 `GetDatabase/CreateDatabase/DropDatabase/GetTable/DropTable/CreateIndex/DropIndex/Insert/Select`，其余仍多为 `unknown method` |
 | `run_gate_c.sh` | Gate C — 持久化/恢复 | workspace 测试、`test/sql/snapshot`、`python/restart_test`、MinIO | **部分**：`test/sql/snapshot` **171/171**、`8/8` error，workspace 测试全绿；MinIO 需 CI 服务；`python/restart_test` 需 SDK 环境 |
 | `run_gate_d.sh` | Gate D — 并发/稳定性 | loom 模型、miri（纯 Rust 核心）、`python/parallel_test` | **部分**：loom `commit_ts` 唯一性已通过；miri 需 nightly 组件；`python/parallel_test` 需 SDK 环境 |
 | `run_gate_e.sh` | Gate E — 性能 | `infinity bench` + `tools/ci_tools/check_benchmark_result.py`（<7% 门限） | **部分（2026-10-16 实测 PASS）**：insert 79,604 rows/s、select 2000 行 3.55 ms；<7% 比对需 `--golden` |
