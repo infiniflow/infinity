@@ -28,6 +28,8 @@ use infinity_storage::{FjallMetaStore, MetaStore};
 use infinity_txn::TxnManager;
 use tokio::sync::mpsc;
 
+mod explain;
+
 mod cpp_blocks;
 
 /// Result of executing one statement.
@@ -1754,13 +1756,65 @@ impl Engine {
             // EXPLAIN only describes a plan; it must not execute the statement,
             // but binding the plan surfaces a missing relation.
             Statement::Explain { inner } => {
-                if let Statement::Select { from: Some(t), .. } = inner.as_ref() {
-                    self.table_schema(t)?;
+                let text = match inner.as_ref() {
+                    Statement::Select {
+                        items,
+                        from: Some(t),
+                        join,
+                        where_pred,
+                        group_by,
+                        order_by,
+                        distinct,
+                        search,
+                        limit: _,
+                        ..
+                    } if join.is_none()
+                        && group_by.is_empty()
+                        && !*distinct
+                        && search.is_none() => {
+                        let schema = self.table_schema(t)?;
+                        Some(crate::explain::explain_select(&crate::explain::SelectPlan {
+                            items,
+                            table: t,
+                            where_pred: where_pred.as_ref(),
+                            order_by,
+                            schema: &schema,
+                        }))
+                    }
+                    Statement::CreateTable { name, columns } => {
+                        let (db, tbl) = match name.split_once('.') {
+                            Some((d, t)) => (d.to_string(), t.to_string()),
+                            None => ("default_db".to_string(), name.clone()),
+                        };
+                        let cols: Vec<(String, String, Option<String>)> = columns
+                            .iter()
+                            .map(|c| {
+                                (
+                                    c.name.clone(),
+                                    describe_type(&c.type_text),
+                                    c.default.as_ref().map(|l| l.to_slt_string()),
+                                )
+                            })
+                            .collect();
+                        Some(crate::explain::explain_create_table(&db, &tbl, &cols))
+                    }
+                    _ => None,
+                };
+                match text {
+                    Some(lines) => Ok(QueryResult::Rows {
+                        columns: vec![],
+                        rows: lines.into_iter().map(|l| vec![l]).collect(),
+                    }),
+                    None => {
+                        if let Statement::Select { from: Some(t), .. } = inner.as_ref() {
+                            self.table_schema(t)?;
+                        }
+                        Ok(QueryResult::Rows {
+                            columns: vec![],
+                            rows: vec![],
+                        })
+                    }
                 }
-                Ok(QueryResult::Rows {
-                    columns: vec![],
-                    rows: vec![],
-                })
             }
             Statement::Copy {
                 table,
