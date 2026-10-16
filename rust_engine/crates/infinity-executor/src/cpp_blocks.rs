@@ -28,6 +28,13 @@ use crate::Engine;
 /// `(row id, vector)` pairs read back from a vector index mirror.
 type VectorRows = Vec<(u32, Vec<f32>)>;
 
+/// An HNSW graph read back from the C++ mirror, so a query can walk the graph
+/// that is on disk (plan #70). `labels[i]` is the row id of node `i`.
+pub struct LoadedVectorIndex {
+    pub index: HnswIndex,
+    pub labels: Vec<u32>,
+}
+
 /// Maps an element-type name to the SDK `ElementType` code. `None` for bit
 /// elements, which this writer does not pack.
 fn element_code(elem: &str) -> Option<i32> {
@@ -1338,6 +1345,23 @@ impl Engine {
     /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning
     /// `(row id, vector)` pairs **without** consulting the index metadata.
     pub fn read_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<VectorRows> {
+        let (_, labels, vectors, _) = self.read_cpp_hnsw_parts(table, index_name)?;
+        Ok(labels.into_iter().zip(vectors).collect())
+    }
+
+    /// The decoded pieces of an HNSW chunk: header, one row id per vector (in
+    /// node order), the vectors themselves, and the graph.
+    #[allow(clippy::type_complexity)]
+    fn read_cpp_hnsw_parts(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Result<(
+        knn_format::HnswHeader,
+        Vec<u32>,
+        Vec<Vec<f32>>,
+        Vec<knn_format::HnswGraphVertex>,
+    )> {
         let table = self.qualified_table(table);
         let meta = self
             .catalog
@@ -1359,16 +1383,68 @@ impl Engine {
         )
         .map_err(|e| Error::Invalid(format!("bad HNSW chunk: {e}")))?;
         let dim = chunk.header.dim as usize;
-        let mut out = Vec::with_capacity(chunk.header.cur_vec_num as usize);
-        for (i, label) in chunk.labels.iter().enumerate() {
+        let mut vectors = Vec::with_capacity(chunk.header.cur_vec_num as usize);
+        for i in 0..chunk.header.cur_vec_num as usize {
             let at = i * dim * 4;
-            let v = chunk.vectors[at..at + dim * 4]
-                .chunks_exact(4)
-                .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
-                .collect();
-            out.push((*label, v));
+            vectors.push(
+                chunk.vectors[at..at + dim * 4]
+                    .chunks_exact(4)
+                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                    .collect(),
+            );
         }
-        Ok(out)
+        let vertices = knn_format::decode_graph_region(
+            &chunk.graph,
+            chunk.header.cur_vec_num as usize,
+            chunk.header.mmax0,
+            chunk.header.mmax,
+        )
+        .map_err(|e| Error::Invalid(format!("bad HNSW graph: {e}")))?;
+        Ok((chunk.header, chunk.labels, vectors, vertices))
+    }
+
+    /// Loads `index_name`'s persisted HNSW graph into an in-memory index, so
+    /// `SEARCH MATCH VECTOR` can walk the graph that is on disk (plan #70).
+    pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
+        let (header, labels, vectors, vertices) = self.read_cpp_hnsw_parts(table, index_name)?;
+        let levels: Vec<usize> = vertices
+            .iter()
+            .map(|v| v.layer_count.max(0) as usize)
+            .collect();
+        let mut links: Vec<Vec<Vec<usize>>> = vec![Vec::new()];
+        for (node, v) in vertices.iter().enumerate() {
+            while links[0].len() <= node {
+                links[0].push(Vec::new());
+            }
+            links[0][node] = v.neighbors_l0.iter().map(|&x| x as usize).collect();
+            for (l, nbrs) in v.upper.iter().enumerate() {
+                let layer = l + 1;
+                while links.len() <= layer {
+                    links.push(Vec::new());
+                }
+                while links[layer].len() <= node {
+                    links[layer].push(Vec::new());
+                }
+                links[layer][node] = nbrs.iter().map(|&x| x as usize).collect();
+            }
+        }
+        if vectors.is_empty() {
+            return Err(Error::Invalid(format!(
+                "index '{index_name}' mirror has no vectors"
+            )));
+        }
+        let entry = Some((header.enterpoint.max(0) as usize).min(vectors.len() - 1));
+        let index = HnswIndex::from_parts(
+            header.dim as usize,
+            header.m.max(1) as usize,
+            (header.ef_construction as usize).max(64),
+            vectors,
+            levels,
+            links,
+            entry,
+            header.max_layer.max(0) as usize,
+        );
+        Ok(LoadedVectorIndex { index, labels })
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
@@ -2059,6 +2135,37 @@ mod tests {
         assert_eq!(back[0], (0, vec![1.0, 2.0, 3.0]));
         assert_eq!(back[1], (1, vec![4.0, 5.0, 6.0]));
         assert_eq!(back[2], (2, vec![7.0, 8.0, 9.0]));
+    }
+
+    #[test]
+    fn a_persisted_hnsw_index_answers_vector_search() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,3));")
+                .unwrap();
+            e.execute("INSERT INTO hv VALUES (1,[1,2,3]), (2,[4,5,6]), (3,[7,8,9]);")
+                .unwrap();
+            e.execute("CREATE INDEX hv_idx ON hv (v) USING HNSW;")
+                .unwrap();
+            // A flush writes the rows and the HNSW chunk file.
+            e.flush().unwrap();
+        }
+        // Reopening loads the persisted graph, so the search walks what is on
+        // disk rather than scanning every row (plan #70).
+        let e = Engine::open(dir.path()).unwrap();
+        assert!(
+            e.vector_indexes
+                .lock()
+                .unwrap()
+                .contains_key(&crate::index_key("default_db.hv", "v")),
+            "the HNSW graph was not loaded from the mirror"
+        );
+        let rows = row_strings(
+            &e,
+            "SELECT id FROM hv SEARCH MATCH VECTOR (v, [1,2,3], 'float', 'l2', 2);",
+        );
+        assert_eq!(rows, vec![vec!["1".to_string()], vec!["2".to_string()]]);
     }
 
     #[test]

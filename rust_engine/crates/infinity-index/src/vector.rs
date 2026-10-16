@@ -154,6 +154,49 @@ impl HnswIndex {
         self.max_level
     }
 
+    /// Rebuilds an index from a serialized graph (the C++ HNSW chunk's header,
+    /// vector region, graph region and labels), so a query can run over the
+    /// graph that is actually on disk.
+    ///
+    /// `levels[i]` is how many layers above level 0 node `i` appears in,
+    /// `links[layer][node]` its neighbours on that layer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_parts(
+        dims: usize,
+        m: usize,
+        ef_search: usize,
+        data: Vec<Vec<f32>>,
+        levels: Vec<usize>,
+        mut links: Vec<Vec<Vec<usize>>>,
+        entry: Option<usize>,
+        max_level: usize,
+    ) -> Self {
+        // Every node must exist on every layer it claims, so `search`'s
+        // bounds-checked lookups find an empty slice rather than nothing.
+        for (node, level) in levels.iter().enumerate() {
+            for layer in 0..=*level {
+                while links.len() <= layer {
+                    links.push(Vec::new());
+                }
+                while links[layer].len() <= node {
+                    links[layer].push(Vec::new());
+                }
+            }
+        }
+        Self {
+            dims,
+            m,
+            ef_search,
+            ml: 1.0 / (m as f64).ln(),
+            data,
+            levels,
+            links,
+            entry,
+            max_level,
+            rng: Rng::new(0x9E37_79B9_7F4A_7C15),
+        }
+    }
+
     fn random_level(&mut self) -> usize {
         let u = self.rng.unit().max(1e-12);
         (-u.ln() * self.ml) as usize

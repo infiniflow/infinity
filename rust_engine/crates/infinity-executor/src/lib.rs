@@ -3329,7 +3329,7 @@ impl Engine {
             1.0
         } else {
             docs.iter()
-                .map(|(_, _, toks, _)| toks.len().saturating_sub(1) as f64)
+                .map(|(_, _, toks, _)| toks.len() as f64)
                 .sum::<f64>()
                 / docs.len() as f64
         };
@@ -3358,7 +3358,7 @@ impl Engine {
             for t in toks {
                 *counts.entry(t.as_str()).or_insert(0) += 1;
             }
-            let len = toks.len().saturating_sub(1) as f64;
+            let len = toks.len() as f64;
             let mut score = 0.0f64;
             let mut hits = 0usize;
             if keyword_field {
