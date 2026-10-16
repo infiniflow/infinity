@@ -15,17 +15,55 @@ use std::path::PathBuf;
 
 use infinity_common::{Error, Result};
 use infinity_storage::cpp_format::{
-    self, date_to_days, datetime_to_pair, pack_column, time_to_secs, BlockColumn, BlockId,
-    BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
+    self, date_to_days, datetime_to_pair, element_width, embedding_column_layout,
+    pack_column_with_layout, push_embedding_element, read_embedding_element, time_to_secs,
+    BlockColumn, BlockId, BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
 };
 
 use crate::Engine;
 
+/// `EMBEDDING(<elem>,<dim>)` / `VECTOR(...)` → `(dimension, ElementType code)`.
+///
+/// Bit elements are rejected (`None`) because their rows are bit-packed, which
+/// this writer does not cover yet.
+pub fn embedding_shape(type_text: &str) -> Option<(usize, i32)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    if !(up.starts_with("EMBEDDING(") || up.starts_with("VECTOR(")) {
+        return None;
+    }
+    let inner = up.split_once('(')?.1.trim_end_matches(')');
+    let mut parts = inner.split(',');
+    let elem = parts.next()?.trim().to_string();
+    let dim: usize = parts.next()?.trim().parse().ok()?;
+    let code = if elem.contains("UINT8") {
+        1
+    } else if elem.contains("INT8") || elem.contains("TINYINT") {
+        2
+    } else if elem.contains("INT16") {
+        3
+    } else if elem.contains("INT32") || elem == "INT" {
+        4
+    } else if elem.contains("INT64") {
+        5
+    } else if elem.contains("FLOAT64") || elem.contains("DOUBLE") {
+        7
+    } else if elem.contains("BFLOAT16") {
+        9
+    } else if elem.contains("FLOAT16") {
+        8
+    } else if elem.contains("BIT") {
+        return None;
+    } else {
+        6 // Float32
+    };
+    Some((dim, code))
+}
+
 /// Maps a declared type text to the `ColumnType` code this writer packs.
 ///
-/// Returns `None` for shapes the scalar packer does not cover yet
-/// (array/tensor/sparse/embedding); callers report those instead of writing a
-/// mis-encoded file.
+/// Returns `None` for shapes the packer does not cover yet
+/// (array/tensor/sparse, and bit embeddings); callers report those instead of
+/// writing a mis-encoded file.
 pub fn column_type_of(type_text: &str) -> Option<i32> {
     let t = type_text.trim().to_ascii_uppercase();
     let base = t.split('(').next().unwrap_or("").trim();
@@ -42,15 +80,28 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
         "TIME" => 17,
         "DATETIME" | "TIMESTAMP" => 18,
         "JSON" => 22,
+        "EMBEDDING" | "VECTOR" => {
+            embedding_shape(type_text)?;
+            10
+        }
         _ => return None,
     })
+}
+
+/// The `.col` layout of a column, including embedding columns whose fixed width
+/// depends on the declared dimension.
+fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
+    if let Some((dim, elem)) = embedding_shape(type_text) {
+        return Some(embedding_column_layout(dim, element_width(elem)));
+    }
+    cpp_format::column_layout(column_type)
 }
 
 /// Encodes one text value into the bytes its `.col` slot holds.
 ///
 /// NULL is represented by `None` (the caller writes a zeroed slot and clears
 /// the null bit).
-fn encode_value(column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
+fn encode_value(type_text: &str, column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
     if value.eq_ignore_ascii_case("null") {
         return Ok(None);
     }
@@ -59,6 +110,21 @@ fn encode_value(column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
             "value '{value}' is not valid for column type {column_type}"
         ))
     };
+    if let Some((dim, elem)) = embedding_shape(type_text) {
+        // `[a,b,c]` → `dim` elements, zero-padded/truncated, raw little-endian.
+        let nums: Vec<f64> = value
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .filter_map(|x| x.trim().parse::<f64>().ok())
+            .collect();
+        let mut bytes = Vec::with_capacity(dim * element_width(elem));
+        for k in 0..dim {
+            push_embedding_element(&mut bytes, elem, nums.get(k).copied().unwrap_or(0.0));
+        }
+        return Ok(Some(bytes));
+    }
     let bytes = match column_type {
         0 => {
             // `pack_column`'s compact-bit path keys off these textual forms.
@@ -114,8 +180,19 @@ fn encode_value(column_type: i32, value: &str) -> Result<Option<Vec<u8>>> {
 }
 
 /// Decodes a slot back into the text form the engine renders.
-fn decode_value(column_type: i32, body: &[u8], row: usize) -> Option<String> {
-    match cpp_format::column_layout(column_type)? {
+fn decode_value(type_text: &str, column_type: i32, body: &[u8], row: usize) -> Option<String> {
+    if let Some((dim, elem)) = embedding_shape(type_text) {
+        // Inline `dim` elements per row.
+        let width = element_width(elem);
+        let at = row * dim * width;
+        let mut parts = Vec::with_capacity(dim);
+        for k in 0..dim {
+            let s = body.get(at + k * width..at + (k + 1) * width)?;
+            parts.push(read_embedding_element(s, elem)?.to_string());
+        }
+        return Some(format!("[{}]", parts.join(",")));
+    }
+    match layout_of(type_text, column_type)? {
         ColumnLayout::CompactBit => {
             let bit = body.get(row / 8).map(|b| b & (1 << (row % 8)) != 0)?;
             // The engine renders booleans as `true`/`false`.
@@ -191,6 +268,15 @@ impl Engine {
                 })
             })
             .collect::<Result<_>>()?;
+        let layouts: Vec<ColumnLayout> = meta
+            .types
+            .iter()
+            .zip(&types)
+            .map(|(t, ct)| {
+                layout_of(t, *ct)
+                    .ok_or_else(|| Error::Invalid(format!("no .col layout for column type '{t}'")))
+            })
+            .collect::<Result<_>>()?;
 
         let rows = self.fetch_rows_with_ids(&table)?;
         let db_id = self.database_id_of(&table);
@@ -207,14 +293,16 @@ impl Engine {
                 let mut slots: Vec<Option<Vec<u8>>> = Vec::with_capacity(chunk.len());
                 for (_, row) in chunk {
                     let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
-                    slots.push(encode_value(*column_type, &text)?);
+                    slots.push(encode_value(&meta.types[col], *column_type, &text)?);
                 }
-                // The scalar packer wants unchanged width, so keep the encoded
-                // column body (never the fixed `capacity` length) here: the
-                // block writer pads to capacity itself.
                 let bytes: Vec<Option<&[u8]>> = slots.iter().map(|s| s.as_deref()).collect();
-                let (body, outline) = pack_column(*column_type, &bytes, DEFAULT_BLOCK_CAPACITY)
-                    .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
+                let (body, outline) = pack_column_with_layout(
+                    *column_type,
+                    layouts[col],
+                    &bytes,
+                    DEFAULT_BLOCK_CAPACITY,
+                )
+                .map_err(|e| Error::Storage(format!("pack column {col}: {e}")))?;
                 block_columns.push(BlockColumn {
                     column_id: col as u64,
                     body,
@@ -307,7 +395,7 @@ impl Engine {
                     let Some(raw) = columns.iter().find(|c| c.column_id == col as u64) else {
                         return Err(Error::Invalid(format!("block is missing column {col}")));
                     };
-                    let layout = cpp_format::column_layout(*column_type)
+                    let layout = layout_of(&meta.types[col], *column_type)
                         .ok_or_else(|| Error::Invalid("unsupported column layout".into()))?;
                     let body = cpp_format::split_body_for_layout(
                         &raw.body,
@@ -319,7 +407,8 @@ impl Engine {
                     {
                         "null".to_string()
                     } else {
-                        decode_value(*column_type, &body.data, row).unwrap_or_else(|| "null".into())
+                        decode_value(&meta.types[col], *column_type, &body.data, row)
+                            .unwrap_or_else(|| "null".into())
                     };
                     out.push(value);
                 }
@@ -352,28 +441,46 @@ mod tests {
         assert_eq!(column_type_of("VARCHAR"), Some(9));
         assert_eq!(column_type_of("DOUBLE"), Some(6));
         assert_eq!(column_type_of("JSON"), Some(22));
-        assert_eq!(column_type_of("EMBEDDING(FLOAT,4)"), None);
+        assert_eq!(column_type_of("EMBEDDING(FLOAT,4)"), Some(10));
+        assert_eq!(column_type_of("VECTOR(FLOAT,4)"), Some(10));
+        // Bit embeddings and tensors are not packable yet.
+        assert_eq!(column_type_of("EMBEDDING(BIT,8)"), None);
         assert_eq!(column_type_of("TENSOR(FLOAT,4)"), None);
     }
 
     #[test]
     fn scalar_values_encode() {
-        assert_eq!(encode_value(3, "42").unwrap().unwrap(), 42i32.to_le_bytes());
-        assert_eq!(encode_value(4, "42").unwrap().unwrap(), 42i64.to_le_bytes());
         assert_eq!(
-            encode_value(6, "1.5").unwrap().unwrap(),
+            encode_value("INT", 3, "42").unwrap().unwrap(),
+            42i32.to_le_bytes()
+        );
+        assert_eq!(
+            encode_value("BIGINT", 4, "42").unwrap().unwrap(),
+            42i64.to_le_bytes()
+        );
+        assert_eq!(
+            encode_value("DOUBLE", 6, "1.5").unwrap().unwrap(),
             1.5f64.to_le_bytes()
         );
         // Booleans go through `pack_column`'s compact-bit path, which keys off
         // the textual forms `1`/`0`.
-        assert_eq!(encode_value(0, "true").unwrap().unwrap(), b"1".to_vec());
-        assert_eq!(encode_value(0, "false").unwrap().unwrap(), b"0".to_vec());
-        assert_eq!(encode_value(9, "hi").unwrap().unwrap(), b"hi".to_vec());
-        assert!(encode_value(3, "null").unwrap().is_none());
-        assert!(encode_value(3, "abc").is_err());
+        assert_eq!(
+            encode_value("BOOL", 0, "true").unwrap().unwrap(),
+            b"1".to_vec()
+        );
+        assert_eq!(
+            encode_value("BOOL", 0, "false").unwrap().unwrap(),
+            b"0".to_vec()
+        );
+        assert_eq!(
+            encode_value("VARCHAR", 9, "hi").unwrap().unwrap(),
+            b"hi".to_vec()
+        );
+        assert!(encode_value("INT", 3, "null").unwrap().is_none());
+        assert!(encode_value("INT", 3, "abc").is_err());
         // 1970-01-02 is one day after the epoch.
         assert_eq!(
-            encode_value(16, "1970-01-02").unwrap().unwrap(),
+            encode_value("DATE", 16, "1970-01-02").unwrap().unwrap(),
             1i32.to_le_bytes()
         );
     }
@@ -437,7 +544,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
         engine
-            .execute("CREATE TABLE v (id INT, e EMBEDDING(FLOAT,2));")
+            .execute("CREATE TABLE v (id INT, t TENSOR(FLOAT,2));")
             .unwrap();
         let err = engine.write_cpp_blocks("v").unwrap_err();
         assert!(err.to_string().contains("not supported"), "{err}");
@@ -449,5 +556,60 @@ mod tests {
         let engine = Engine::open(dir.path()).unwrap();
         engine.execute("CREATE TABLE t (id INT);").unwrap();
         assert!(engine.read_cpp_blocks("t").is_err());
+    }
+
+    #[test]
+    fn embedding_shape_parsing() {
+        assert_eq!(embedding_shape("EMBEDDING(FLOAT,4)"), Some((4, 6)));
+        assert_eq!(embedding_shape("EMBEDDING(FLOAT16,8)"), Some((8, 8)));
+        assert_eq!(embedding_shape("EMBEDDING(DOUBLE,2)"), Some((2, 7)));
+        assert_eq!(embedding_shape("EMBEDDING(BIT,8)"), None);
+        assert_eq!(embedding_shape("INT"), None);
+    }
+
+    #[test]
+    fn embedding_values_encode() {
+        let bytes = encode_value("EMBEDDING(FLOAT,3)", 10, "[1,2,3]")
+            .unwrap()
+            .unwrap();
+        assert_eq!(bytes.len(), 12); // 3 * 4 bytes
+        assert_eq!(&bytes[0..4], &1.0f32.to_le_bytes());
+        assert_eq!(&bytes[8..12], &3.0f32.to_le_bytes());
+        // Short input is zero-padded to the declared dimension.
+        let bytes = encode_value("EMBEDDING(FLOAT,3)", 10, "[1]")
+            .unwrap()
+            .unwrap();
+        assert_eq!(bytes.len(), 12);
+        assert_eq!(&bytes[4..8], &0.0f32.to_le_bytes());
+        // Int8 elements are one byte wide.
+        let bytes = encode_value("EMBEDDING(INT8,2)", 10, "[1,2]")
+            .unwrap()
+            .unwrap();
+        assert_eq!(bytes, vec![1u8, 2u8]);
+    }
+
+    #[test]
+    fn embedding_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE v (id INT, e EMBEDDING(FLOAT,3));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO v VALUES (1, [1,2,3]);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO v VALUES (2, [4,5,6]);")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("v").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("v").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "[1,2,3]".to_string()],
+                vec!["2".to_string(), "[4,5,6]".to_string()],
+            ]
+        );
     }
 }

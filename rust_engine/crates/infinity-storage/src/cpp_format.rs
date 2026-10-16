@@ -522,6 +522,105 @@ pub fn column_layout(column_type: i32) -> Option<ColumnLayout> {
     })
 }
 
+/// The `.col` layout of an embedding/vector column: `dimension * element_width`
+/// inline bytes per row (`kStandard`, no outline — spec §8.3).
+pub fn embedding_column_layout(dimension: usize, element_width: usize) -> ColumnLayout {
+    ColumnLayout::Fixed(dimension * element_width)
+}
+
+/// IEEE-754 binary16 of an `f32` (round to nearest even).
+pub fn f32_to_f16_bits(f: f32) -> u16 {
+    let bits = f.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exp = ((bits >> 23) & 0xff) as i32 - 127 + 15;
+    let mant = bits & 0x007f_ffff;
+    if exp <= 0 {
+        return sign;
+    }
+    if exp >= 31 {
+        return sign | 0x7c00;
+    }
+    let half = sign | ((exp as u16) << 10) | ((mant >> 13) as u16);
+    let rest = mant & 0x1fff;
+    if rest > 0x1000 || (rest == 0x1000 && half & 1 == 1) {
+        half + 1
+    } else {
+        half
+    }
+}
+
+/// Appends one embedding element, little-endian, for the SDK `ElementType` code.
+pub fn push_embedding_element(out: &mut Vec<u8>, element_type: i32, value: f64) {
+    match element_type {
+        0 | 1 => out.push(value as u8),   // Bit / UInt8
+        2 => out.push(value as i8 as u8), // Int8
+        3 => out.extend_from_slice(&(value as i16).to_le_bytes()),
+        4 => out.extend_from_slice(&(value as i32).to_le_bytes()),
+        5 => out.extend_from_slice(&(value as i64).to_le_bytes()),
+        7 => out.extend_from_slice(&value.to_le_bytes()),
+        8 => out.extend_from_slice(&f32_to_f16_bits(value as f32).to_le_bytes()),
+        9 => out.extend_from_slice(&((value as f32).to_bits() >> 16).to_le_bytes()),
+        _ => out.extend_from_slice(&(value as f32).to_le_bytes()), // Float32
+    }
+}
+
+/// Reads one embedding element, little-endian, for the SDK `ElementType` code.
+pub fn read_embedding_element(bytes: &[u8], element_type: i32) -> Option<f64> {
+    Some(match element_type {
+        0 | 1 => f64::from(bytes[0]),
+        2 => f64::from(bytes[0] as i8),
+        3 => f64::from(i16::from_le_bytes(bytes.try_into().ok()?)),
+        4 => f64::from(i32::from_le_bytes(bytes.try_into().ok()?)),
+        5 => i64::from_le_bytes(bytes.try_into().ok()?) as f64,
+        7 => f64::from_le_bytes(bytes.try_into().ok()?),
+        8 => f64::from(f16_bits_to_f32(u16::from_le_bytes(bytes.try_into().ok()?))),
+        9 => {
+            let hi = u16::from_le_bytes(bytes.try_into().ok()?) as u32;
+            f64::from(f32::from_bits(hi << 16))
+        }
+        _ => f64::from(f32::from_le_bytes(bytes.try_into().ok()?)),
+    })
+}
+
+/// IEEE-754 binary16 bits back to `f32`.
+fn f16_bits_to_f32(half: u16) -> f32 {
+    let sign = u32::from(half & 0x8000) << 16;
+    let exp = (half >> 10) & 0x1f;
+    let mant = u32::from(half & 0x03ff);
+    let bits = if exp == 0 {
+        if mant == 0 {
+            sign
+        } else {
+            // Subnormal: normalise into a f32 exponent.
+            let mut e = -1i32;
+            let mut m = mant;
+            while m & 0x400 == 0 {
+                m <<= 1;
+                e -= 1;
+            }
+            sign | (((127 - 15 + e + 1) as u32) << 23) | ((m & 0x3ff) << 13)
+        }
+    } else if exp == 0x1f {
+        sign | 0x7f80_0000 | (mant << 13)
+    } else {
+        sign | ((u32::from(exp) + 127 - 15) << 23) | (mant << 13)
+    };
+    f32::from_bits(bits)
+}
+
+/// Byte width of one embedding element (bit elements are handled by the caller,
+/// which packs `dimension / 8` bytes per row).
+pub fn element_width(element_type: i32) -> usize {
+    match element_type {
+        0 => 1, // Bit (packed bit-by-bit; see the caller)
+        1 | 2 => 1,
+        3 | 8 | 9 => 2, // Int16 / Float16 / BFloat16
+        4 | 6 => 4,     // Int32 / Float32
+        5 | 7 => 8,     // Int64 / Float64
+        _ => 4,
+    }
+}
+
 /// Packs a **scalar** column into its `.col` body plus outline contents.
 ///
 /// `slots[i]` is the row's already-encoded value; `None` marks a NULL (the slot
@@ -540,11 +639,25 @@ pub fn pack_column(
     slots: &[Option<&[u8]>],
     capacity: usize,
 ) -> Result<(ColumnBody, Vec<u8>), FormatError> {
+    let layout = column_layout(column_type).ok_or(FormatError::Truncated {
+        need: 0,
+        got: slots.len(),
+    })?;
+    pack_column_with_layout(column_type, layout, slots, capacity)
+}
+
+/// Like [`pack_column`] but with an explicit layout, which embedding columns
+/// need because their fixed width depends on the declared dimension.
+pub fn pack_column_with_layout(
+    column_type: i32,
+    layout: ColumnLayout,
+    slots: &[Option<&[u8]>],
+    capacity: usize,
+) -> Result<(ColumnBody, Vec<u8>), FormatError> {
     let err = || FormatError::Truncated {
         need: 0,
         got: slots.len(),
     };
-    let layout = column_layout(column_type).ok_or_else(err)?;
     let mut valid = Vec::with_capacity(slots.len());
 
     match layout {
