@@ -1178,11 +1178,18 @@ impl Engine {
             Statement::CreateTable { name, columns } => {
                 // A vector-like column's declared dimension must be positive.
                 for c in columns {
-                    if declares_dimension(&c.type_text) && type_dim(&c.type_text) == Some(0) {
-                        return Err(Error::Invalid(format!(
-                            "Embedding dimension column_type.width is 0, shall be positive: '{}'",
-                            c.name
-                        )));
+                    if !declares_dimension(&c.type_text) {
+                        continue;
+                    }
+                    if let Some(d) = type_dim(&c.type_text) {
+                        let up = c.type_text.to_ascii_uppercase();
+                        let embedding = up.contains("EMBEDDING") || up.contains("VECTOR");
+                        if d == 0 || (embedding && d > 16384) {
+                            return Err(Error::Invalid(format!(
+                                "invalid embedding dimension {d} for column '{}'",
+                                c.name
+                            )));
+                        }
                     }
                 }
                 let names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
@@ -1337,8 +1344,15 @@ impl Engine {
                 opts,
                 if_not_exists,
             } => {
-                let _ = if_not_exists;
                 self.validate_index(table, column, index_type, opts)?;
+                let duplicate = self
+                    .catalog
+                    .list_indexes()?
+                    .iter()
+                    .any(|im| im.name == *name && im.table == *table);
+                if duplicate && !*if_not_exists {
+                    return Err(Error::Invalid(format!("index '{name}' already exists")));
+                }
                 self.catalog.create_index(name, table, column)?;
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
@@ -2182,6 +2196,14 @@ impl Engine {
                     )));
                 }
             }
+            "SECONDARY" => {
+                // the cardinality hint does not apply to a JSON index
+                if is_json_type(&ty) && opts.iter().any(|(k, _)| k == "CARDINALITY") {
+                    return Err(Error::Invalid(
+                        "cardinality is not supported for a JSON secondary index".into(),
+                    ));
+                }
+            }
             "FULLTEXT" => {
                 for (k, v) in opts {
                     if k == "ANALYZER" {
@@ -2489,6 +2511,26 @@ impl Engine {
         let is_tensor = m.kind.eq_ignore_ascii_case("TENSOR");
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
+        }
+        // `USING INDEX (name)` must reference an existing index
+        if let Some(list) = s.using_index.as_deref() {
+            for name in list
+                .trim()
+                .trim_start_matches('(')
+                .trim_end_matches(')')
+                .split(',')
+                .map(|n| n.trim())
+                .filter(|n| !n.is_empty())
+            {
+                if !self
+                    .catalog
+                    .list_indexes()?
+                    .iter()
+                    .any(|im| im.name == name)
+                {
+                    return Err(Error::Invalid(format!("index '{name}' does not exist")));
+                }
+            }
         }
         let schema = self.table_schema(table)?;
         let types = self.column_types(table)?;
