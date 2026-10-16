@@ -176,7 +176,10 @@ fn row_score(row: &[Value]) -> f64 {
 fn match_is_min_heap(m: &MatchClause) -> bool {
     if m.kind.eq_ignore_ascii_case("VECTOR") {
         let metric = arg_str(m.args.get(2)).unwrap_or_default();
-        !matches!(metric.trim().to_ascii_lowercase().as_str(), "l2" | "hamming")
+        !matches!(
+            metric.trim().to_ascii_lowercase().as_str(),
+            "l2" | "hamming"
+        )
     } else {
         true
     }
@@ -1323,9 +1326,9 @@ pub struct Engine {
     /// number of write batches (`COPY`/`INSERT`) per table; a table with more
     /// than one batch is planned as several segments (a `MERGE` operator).
     write_batches: Mutex<HashMap<String, usize>>,
-    /// Serialises row-id assignment + writes so concurrent inserts do not
-    /// collide on the same base sequence.
-    insert_lock: Mutex<()>,
+    /// Next free row id per table; reserved in blocks so concurrent inserts do
+    /// not collide on the same base sequence.
+    row_counters: Mutex<HashMap<String, usize>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1378,7 +1381,7 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
-            insert_lock: Mutex::new(()),
+            row_counters: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -1570,6 +1573,10 @@ impl Engine {
     /// entries and index declarations, so a later CREATE TABLE with the same
     /// name starts empty.
     fn drop_table_all(&self, name: &str) -> Result<bool> {
+        self.row_counters
+            .lock()
+            .unwrap()
+            .remove(name.split('.').next_back().unwrap_or(name));
         let existed = self.catalog.drop_table(name)?;
         for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
             self.store.delete(&k)?;
@@ -1596,6 +1603,27 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .columns)
+    }
+
+    /// Reserves a contiguous block of `n` row ids for `table`.
+    fn reserve_rows(&self, table: &str, n: usize) -> Result<usize> {
+        let mut counters = self.row_counters.lock().unwrap();
+        let key = table.split('.').next_back().unwrap_or(table).to_string();
+        let next = match counters.get(&key) {
+            Some(v) => *v,
+            None => self.next_row_seq(table)?,
+        };
+        counters.insert(key, next + n);
+        Ok(next)
+    }
+
+    /// Forgets any cached row-id counter for `table` (used after an operation
+    /// that re-keys rows outside `reserve_rows`).
+    fn reset_row_counter(&self, table: &str) {
+        self.row_counters
+            .lock()
+            .unwrap()
+            .remove(table.split('.').next_back().unwrap_or(table));
     }
 
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
@@ -1793,6 +1821,7 @@ impl Engine {
                     next += 1;
                 }
                 self.txn.commit(t)?;
+                self.reset_row_counter(table);
                 self.catalog.drop_column(table, column)?;
                 if let Some(im) = self
                     .catalog
@@ -2427,10 +2456,9 @@ impl Engine {
                 if rows.is_empty() {
                     return Ok(QueryResult::Inserted { count: 0 });
                 }
-                // Serialise row-id assignment and the write batch: two sessions
-                // inserting concurrently must not pick the same base sequence.
-                let _guard = self.insert_lock.lock().unwrap();
-                let base = self.next_row_seq(table)?;
+                // Reserve a contiguous block of row ids: two sessions inserting
+                // concurrently must not pick the same base sequence.
+                let base = self.reserve_rows(table, rows.len())?;
                 let types = self.column_types(table)?;
                 // tensor-like values must match the declared dimension, and
                 // sparse values must be in range
@@ -3467,7 +3495,7 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let base = self.store.scan_prefix(&row_prefix(table))?.len();
+        let base = self.reserve_rows(table, rows.len())?;
         let types = self.column_types(table)?;
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
@@ -3595,7 +3623,7 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let base = self.store.scan_prefix(&row_prefix(table))?.len();
+        let base = self.reserve_rows(table, rows.len())?;
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
             let encoded = encode_row(row, types);
@@ -3797,7 +3825,11 @@ impl Engine {
         } else {
             // `weights` (default 1.0 each) and `normalize` (default `minmax`).
             let mut weights: Vec<f64> = opt("weights")
-                .map(|w| w.split(',').filter_map(|x| x.trim().parse::<f64>().ok()).collect())
+                .map(|w| {
+                    w.split(',')
+                        .filter_map(|x| x.trim().parse::<f64>().ok())
+                        .collect()
+                })
                 .unwrap_or_default();
             weights.resize(num_children, 1.0);
             let normalize = opt("normalize")
