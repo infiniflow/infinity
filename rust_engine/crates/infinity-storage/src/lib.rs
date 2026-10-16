@@ -12,6 +12,7 @@
 
 pub mod cpp_format;
 pub mod crc;
+pub mod inverted_format;
 pub mod metastore;
 pub mod mvcc;
 pub mod wal;
