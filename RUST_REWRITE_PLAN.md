@@ -435,6 +435,20 @@ QueryContext::query(sql)
 > 核心口径：**以现有 sqllogictest + Python SDK + Go SDK 测试用例为准**（用户要求），并补充持久化/并发/性能关卡。
 > **统一原则（codex 第 1 轮 #10）**：所有门槛以**冻结后的执行清单**为准——冻结「收集到的 test ID + marker/skip + 数据集 + 生成的 `.slt` manifest」，报告**执行/通过/跳过**总数，而非引用易变的静态数字。
 
+### Gate 现状（2026-10-16 本地实测，可复现）
+
+| 关卡 | 本次实测结果 | 结论 |
+|---|---|---|
+| **A** | `statement ok` **1746/1746（100%）**、`statement error` **129/129（100%）**、`query` **1378/1532（90.0%）** | **未达标**：缺口集中在 `EXPLAIN` 计划文本（≈50，需复刻 C++ binder 的 `GetNewLogicalNodeId()` 编号）与全文/FUSION 打分（≈120，已复刻 `BM25Ranker` 公式且单段用例逐位一致，多段用例需 C++ 的**段级统计**） |
+| **B** | `run_gate_b.sh` → **FAIL**：pysdk/HTTP 用例报 `An error occurred: None`（缺 `infinity` Python 模块 / 未构建 SDK 与服务） | **无证据**：需先补齐 Thrift 全量 RPC + 构建 SDK |
+| **C** | 快照 `.slt` 通过；`python/restart_test` → `ModuleNotFoundError: No module named 'infinity'`；`INFINITY_MINIO_ENDPOINT` 未设 → SKIP | **部分**：Rust 侧快照/重启路径有覆盖，SDK 侧与 MinIO 无证据 |
+| **D** | loom `commit_ts` 唯一性 → `test result: ok`；`miri` 未安装 → SKIP；`python/parallel_test` 缺 `infinity` 模块 | **部分**：Rust 侧并发模型有证据，SDK 侧与 miri 无证据 |
+| **E** | `run_gate_e.sh` → **PASS**：insert **79,604 rows/s**、select 2000 行 **3.55 ms**；<7% golden 比对需 `--golden` 目录 | **部分**：有基准数字，缺 golden 对照 |
+| **F** | `cargo fmt --check` / `clippy --all-targets -D warnings` / `cargo test --workspace`（**32 套件全绿**） | **达标（本地）**：CI 六作业 + cargo-deny 见 `.github/workflows` |
+| **G** | `docs/INVARIANT_MATRIX.md`：5 项缺口（G1–G5）登记 | **清单已产出**，尚未纳入门槛 |
+
+> 复现：`cd rust_engine && ./scripts/run_gate_{a,b,c,d,e}.sh`（B/C/D 需 SDK 与外部服务，脚本会明确报 `SKIP/MISSING`）。
+
 ### Gate A — SQL 功能（硬门槛）
 - **全部 `test/sql/**/*.slt` 通过**（内联 `----` 字面量比对，`rowsort` 等修饰符语义一致）；无静默放宽、无 skip 新增。
 - 关键点：浮点格式化（如 `ROUND(SCORE(),4)`）、`rowsort` 排序稳定、`statement error`（仅需报错）、`explain` 计划文本结构（含 operator id/内部列，见 Gate D 与 §附录 C）。
