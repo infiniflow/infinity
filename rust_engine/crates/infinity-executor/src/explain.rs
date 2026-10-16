@@ -19,6 +19,8 @@ pub struct SelectPlan<'a> {
     pub table: &'a str,
     pub where_pred: Option<&'a Predicate>,
     pub order_by: &'a [OrderKey],
+    /// `SELECT DISTINCT …` over plain columns (no aggregates).
+    pub distinct: bool,
     pub schema: &'a [String],
 }
 
@@ -202,6 +204,13 @@ fn render_pred(p: &Predicate, ids: &HashMap<String, usize>) -> String {
     }
 }
 
+/// True when any select item is an aggregate (those plans are not handled here).
+pub fn has_aggregate(items: &[SelectItem]) -> bool {
+    items
+        .iter()
+        .any(|it| matches!(it, SelectItem::Aggregate(_)))
+}
+
 /// Produces the physical `EXPLAIN` text for a single-table `SELECT`.
 pub fn explain_select(p: &SelectPlan) -> Vec<String> {
     let alias = p.table.split('.').next_back().unwrap_or(p.table);
@@ -250,9 +259,13 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
     // 2. the operator chain from the leaf upward.
     let has_filter = p.where_pred.is_some();
     let has_sort = !p.order_by.is_empty();
+    let has_distinct = p.distinct && !has_filter && !has_sort;
     let mut ops: Vec<&str> = vec!["TABLE SCAN"];
     if has_filter {
         ops.push("FILTER");
+    }
+    if has_distinct {
+        ops.push("AGGREGATE");
     }
     if has_sort {
         ops.push("SORT");
@@ -265,6 +278,8 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
     let mut scan_out: Vec<String> = Vec::new();
     let required_by_parent: Vec<String> = if has_filter {
         filter_cols.clone()
+    } else if has_distinct {
+        project_cols.clone()
     } else if has_sort {
         sort_cols.clone()
     } else {
@@ -311,6 +326,19 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
                 }
                 lines.push(attr(d, &format!("output columns: [{}]", out.join(", "))));
                 child_out = out;
+            }
+            "AGGREGATE" => {
+                lines.push(attr(d, "aggregate table index: #5"));
+                lines.push(attr(d, "aggregate: []"));
+                lines.push(attr(d, "group by table index: #5"));
+                let gb: Vec<String> = project_cols
+                    .iter()
+                    .map(|c| match ids.get(c) {
+                        Some(id) => format!("{c} (#{id})"),
+                        None => c.clone(),
+                    })
+                    .collect();
+                lines.push(attr(d, &format!("group by: [{}]", gb.join(", "))));
             }
             "FILTER" => {
                 let f = p

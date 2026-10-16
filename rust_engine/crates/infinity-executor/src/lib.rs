@@ -24,7 +24,9 @@ use infinity_parser::{
     Statement,
 };
 use infinity_planner::{plan_select, LogicalPlan};
-use infinity_storage::{FjallMetaStore, MetaStore};
+#[cfg(not(feature = "rocksdb-store"))]
+use infinity_storage::FjallMetaStore;
+use infinity_storage::MetaStore;
 use infinity_txn::TxnManager;
 use tokio::sync::mpsc;
 
@@ -1278,6 +1280,12 @@ impl Engine {
     pub fn open_with_capacity(dir: impl AsRef<Path>, exchange_capacity: usize) -> Result<Self> {
         let dir: PathBuf = dir.as_ref().to_path_buf();
         let catalog = Catalog::open(dir.join("catalog"))?;
+        // The row/meta store: RocksDB when the `rocksdb-store` feature is on
+        // (the substrate the C++ engine's catalog uses), fjall otherwise.
+        #[cfg(feature = "rocksdb-store")]
+        let store: Arc<dyn MetaStore> =
+            Arc::new(infinity_storage::RocksMetaStore::open(dir.join("kv"))?);
+        #[cfg(not(feature = "rocksdb-store"))]
         let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir.join("kv"), "default")?);
         let txn = TxnManager::open(dir.join("wal.log"), store.clone())?;
         txn.recover(0)?;
@@ -1770,7 +1778,7 @@ impl Engine {
                         ..
                     } if join.is_none()
                         && group_by.is_empty()
-                        && !*distinct
+                        && !crate::explain::has_aggregate(items)
                         && search.is_none() =>
                     {
                         let schema = self.table_schema(t)?;
@@ -1780,6 +1788,7 @@ impl Engine {
                                 table: t,
                                 where_pred: where_pred.as_ref(),
                                 order_by,
+                                distinct: *distinct,
                                 schema: &schema,
                             },
                         ))
