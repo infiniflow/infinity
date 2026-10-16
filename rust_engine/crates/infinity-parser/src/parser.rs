@@ -236,6 +236,23 @@ impl Parser {
                     Ok(Statement::DropTable { name })
                 }
             }
+            "SET" if matches!(self.toks.get(self.pos + 1), Some(Token::Ident(k)) if k.eq_ignore_ascii_case("CONFIG")) =>
+            {
+                self.advance(); // SET
+                self.advance(); // CONFIG
+                let key = self.expect_ident()?;
+                let value = match self.advance() {
+                    Token::Ident(v) => v,
+                    Token::Int(i) => i.to_string(),
+                    Token::Float(f) => f.to_string(),
+                    Token::Str(v) => v,
+                    _ => String::new(),
+                };
+                while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                    self.advance();
+                }
+                Ok(Statement::SetConfig { key, value })
+            }
             "RESTORE" => {
                 self.advance();
                 self.expect_kw("TABLE")?;
@@ -505,6 +522,23 @@ impl Parser {
             }
             "SHOW" => {
                 self.advance();
+                // SHOW TABLE <t> COLUMNS
+                let is_table = self.eat_kw("TABLE");
+                if is_table && matches!(self.peek(), Token::Ident(_)) {
+                    if let Ok(t) = self.expect_ident() {
+                        if self.eat_kw("COLUMNS") {
+                            return Ok(Statement::ShowTableColumns { table: t });
+                        }
+                    }
+                }
+                // SHOW GLOBAL VARIABLE <key>
+                let is_global = self.eat_kw("GLOBAL");
+                if is_global && self.eat_kw("VARIABLE") {
+                    if let Token::Ident(k) = self.peek().clone() {
+                        self.advance();
+                        return Ok(Statement::ShowVariable { key: k });
+                    }
+                }
                 let mut parts: Vec<String> = Vec::new();
                 while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
                     parts.push(match self.advance() {
@@ -1765,7 +1799,7 @@ mod tests {
             }
             other => panic!("expected copy, got {other:?}"),
         }
-        assert!(matches!(one("SET CONFIG a 1"), Statement::Utility { .. }));
+        assert!(matches!(one("SET CONFIG a 1"), Statement::SetConfig { .. }));
     }
 
     #[test]

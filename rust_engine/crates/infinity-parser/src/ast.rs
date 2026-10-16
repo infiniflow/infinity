@@ -278,6 +278,19 @@ pub enum Statement {
     Show {
         text: String,
     },
+    /// `SHOW TABLE <t> COLUMNS`
+    ShowTableColumns {
+        table: String,
+    },
+    /// `SET CONFIG <key> <value>`
+    SetConfig {
+        key: String,
+        value: String,
+    },
+    /// `SHOW GLOBAL VARIABLE <key>`
+    ShowVariable {
+        key: String,
+    },
     Copy {
         table: String,
         from: bool,

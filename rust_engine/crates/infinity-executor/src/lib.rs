@@ -262,6 +262,52 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
         .join("\t")
 }
 
+/// Human-readable column type, e.g. `Integer` or `Sparse(float,int16,30000)`.
+fn describe_type(type_text: &str) -> String {
+    let t = type_text.trim();
+    if t.is_empty() {
+        return "Invalid".to_string();
+    }
+    let up = t.to_ascii_uppercase();
+    if up.starts_with("SPARSE(") {
+        let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
+        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        let elem = parts
+            .first()
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_default();
+        let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let idx = if bound <= 127 {
+            "int8"
+        } else if bound <= 32767 {
+            "int16"
+        } else if bound <= 2_147_483_647 {
+            "int32"
+        } else {
+            "int64"
+        };
+        return format!("Sparse({elem},{idx},{bound})");
+    }
+    let base = up.split('(').next().unwrap_or(&up);
+    match base {
+        "BOOL" | "BOOLEAN" => "Boolean".to_string(),
+        "TINYINT" => "TinyInt".to_string(),
+        "SMALLINT" => "SmallInt".to_string(),
+        "INT" | "INTEGER" => "Integer".to_string(),
+        "BIGINT" => "BigInt".to_string(),
+        "FLOAT" => "Float".to_string(),
+        "DOUBLE" => "Double".to_string(),
+        "VARCHAR" | "TEXT" | "STRING" => "Varchar".to_string(),
+        _ => {
+            let mut c = base.to_ascii_lowercase();
+            if let Some(f) = c.get_mut(0..1) {
+                f.make_ascii_uppercase();
+            }
+            c
+        }
+    }
+}
+
 /// Reconstructs a `Literal` from a stored default's text form.
 fn default_literal(s: &str) -> Literal {
     if s.eq_ignore_ascii_case("NULL") {
@@ -346,6 +392,8 @@ pub struct Engine {
     exchange_capacity: usize,
     /// secondary indexes keyed by `"<table>.<column>"`
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
+    /// session/global configuration set via `SET CONFIG …`
+    config: Mutex<HashMap<String, String>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -375,6 +423,7 @@ impl Engine {
             rt,
             exchange_capacity: exchange_capacity.max(1),
             indexes: Mutex::new(HashMap::new()),
+            config: Mutex::new(HashMap::new()),
         };
         engine.rebuild_indexes()?;
         Ok(engine)
@@ -606,6 +655,57 @@ impl Engine {
                 columns: vec![],
                 rows: vec![],
             }),
+            Statement::SetConfig { key, value } => {
+                self.config
+                    .lock()
+                    .unwrap()
+                    .insert(key.to_ascii_lowercase(), value.clone());
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
+            Statement::ShowVariable { key } => {
+                let v = self
+                    .config
+                    .lock()
+                    .unwrap()
+                    .get(&key.to_ascii_lowercase())
+                    .cloned()
+                    .unwrap_or_else(|| "0".to_string());
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![vec![v]],
+                })
+            }
+            Statement::ShowTableColumns { table } => {
+                let meta = self
+                    .catalog
+                    .get_table_by_name(table)?
+                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+                let rows: Vec<Vec<String>> = (0..meta.columns.len())
+                    .map(|i| {
+                        let ty = meta.types.get(i).cloned().unwrap_or_default();
+                        vec![
+                            meta.columns[i].clone(),
+                            describe_type(&ty),
+                            if meta.not_nulls.get(i).copied().unwrap_or(false) {
+                                "Not Null".to_string()
+                            } else {
+                                "Null".to_string()
+                            },
+                            match meta.defaults.get(i).and_then(|d| d.clone()) {
+                                Some(d) => d,
+                                None => "(empty)".to_string(),
+                            },
+                        ]
+                    })
+                    .collect();
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows,
+                })
+            }
             Statement::CreateSnapshot { name, table } => {
                 let meta = self
                     .catalog
