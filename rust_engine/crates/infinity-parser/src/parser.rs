@@ -159,37 +159,26 @@ impl Parser {
                     let table = self.expect_table_name()?;
                     self.expect(Token::LParen)?;
                     // a plain column, or a functional-index expression
-                    let mut column = String::new();
+                    let mut toks: Vec<Token> = Vec::new();
                     let mut depth = 0i32;
                     while !matches!(self.peek(), Token::Eof) {
                         match self.peek().clone() {
                             Token::RParen if depth == 0 => break,
                             Token::LParen => {
                                 depth += 1;
-                                self.advance();
+                                toks.push(self.advance());
                             }
                             Token::RParen => {
                                 depth -= 1;
-                                self.advance();
+                                toks.push(self.advance());
                             }
-                            Token::Ident(n)
-                                if column.is_empty()
-                                    && !matches!(
-                                        self.toks.get(self.pos + 1),
-                                        Some(Token::LParen)
-                                    ) =>
-                            {
-                                column = n;
-                                self.advance();
-                            }
+                            Token::Comma if depth == 0 => break,
                             _ => {
-                                if depth == 0 && self.peek() == &Token::Comma {
-                                    break;
-                                }
-                                self.advance();
+                                toks.push(self.advance());
                             }
                         }
                     }
+                    let column = index_column_from(&toks)?;
                     // tolerate additional index columns
                     while !matches!(self.peek(), Token::RParen | Token::Eof) {
                         self.advance();
@@ -726,8 +715,11 @@ impl Parser {
             let pat = self.expr()?;
             let mut escape = None;
             if self.eat_kw("ESCAPE") {
-                if let Token::Str(c) = self.advance() {
-                    escape = c.chars().next();
+                match self.advance() {
+                    Token::Str(c) if c.chars().count() == 1 => escape = c.chars().next(),
+                    _ => {
+                        return self.err("ESCAPE must be a single-character string");
+                    }
                 }
             }
             return Ok(Predicate::Like(left, pat, escape, like_neg));
@@ -1571,6 +1563,79 @@ fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
 }
 
 /// Normalises a typed date/time literal to Infinity's zero-padded text form.
+/// Validates the parenthesised CREATE INDEX target. Supported forms:
+/// a plain column; a function call whose first argument is a column and whose
+/// remaining arguments are atoms; or a top-level expression over a single
+/// column. Aggregates, multi-column and function-of-expression forms fail.
+fn index_column_from(toks: &[Token]) -> Result<String> {
+    if toks.is_empty() {
+        return Err(Error::Invalid("empty index expression".into()));
+    }
+    if toks.len() == 1 {
+        return match &toks[0] {
+            Token::Ident(n) => Ok(n.clone()),
+            _ => Err(Error::Invalid("invalid index column".into())),
+        };
+    }
+    let is_func = matches!(
+        (toks.first(), toks.get(1)),
+        (Some(Token::Ident(_)), Some(Token::LParen))
+    ) && toks.last() == Some(&Token::RParen);
+    if is_func {
+        let Token::Ident(f) = &toks[0] else {
+            return Err(Error::Invalid("unsupported index expression".into()));
+        };
+        if agg_func(f).is_some() {
+            return Err(Error::Invalid(format!(
+                "unsupported index expression '{f}'"
+            )));
+        }
+        let inner = &toks[2..toks.len() - 1];
+        let mut depth = 0i32;
+        let mut has_column = false;
+        for (i, t) in inner.iter().enumerate() {
+            match t {
+                Token::LParen => depth += 1,
+                Token::RParen => depth -= 1,
+                Token::Ident(_) if depth == 0 => {
+                    // a bare identifier (not a nested call) is a column
+                    if !matches!(inner.get(i + 1), Some(Token::LParen)) {
+                        has_column = true;
+                    }
+                }
+                Token::Op(_) | Token::Star if depth == 0 => {
+                    return Err(Error::Invalid(format!(
+                        "unsupported index expression '{f}'"
+                    )))
+                }
+                _ => {}
+            }
+        }
+        return if has_column {
+            Ok(f.clone())
+        } else {
+            Err(Error::Invalid(format!(
+                "unsupported index expression '{f}'"
+            )))
+        };
+    }
+    // a top-level expression is supported only over a single column
+    let columns = toks
+        .iter()
+        .enumerate()
+        .filter(|(i, t)| {
+            matches!(t, Token::Ident(s) if !s.eq_ignore_ascii_case("AS")
+                && !matches!(toks.get(i + 1), Some(Token::LParen)))
+        })
+        .count();
+    if columns == 1 {
+        // no materialised index for an expression target
+        Ok(String::new())
+    } else {
+        Err(Error::Invalid("unsupported index expression".into()))
+    }
+}
+
 /// A canonical text for an expression (used to label aggregate arguments).
 fn expr_text(e: &ExprAst) -> String {
     match e {

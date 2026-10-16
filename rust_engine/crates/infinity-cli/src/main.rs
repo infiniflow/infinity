@@ -363,6 +363,8 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     let mut stmt_fail: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     let mut file_fail: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut stmt_err_missing: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     for (idx, f) in files.iter().enumerate() {
         let d = std::env::temp_dir().join(format!("infconf-{}-{idx}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
@@ -419,6 +421,12 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                         stmt_err += 1;
                         if !ok {
                             stmt_err_pass += 1;
+                        } else {
+                            // the engine accepted a statement the suite expects to fail
+                            stmt_err_missing
+                                .entry(first_word(&sql))
+                                .or_default()
+                                .push(sql.clone());
                         }
                     }
                     _ => {}
@@ -475,6 +483,15 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     for (reason, samples) in sranked.iter().take(15) {
         println!("{:>5}  {}", samples.len(), reason);
         for s in samples.iter().take(2) {
+            println!("        {}", s.replace('\n', " "));
+        }
+    }
+    println!("-- statements that should error but did not --");
+    let mut eranked: Vec<_> = stmt_err_missing.iter().collect();
+    eranked.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+    for (word, samples) in eranked.iter().take(15) {
+        println!("{:>5}  {}", samples.len(), word);
+        for s in samples.iter().take(6) {
             println!("        {}", s.replace('\n', " "));
         }
     }

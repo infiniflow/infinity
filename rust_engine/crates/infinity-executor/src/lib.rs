@@ -369,7 +369,8 @@ fn innermost_groups(text: &str) -> Vec<Vec<String>> {
 /// whole multiple of `dim`. Non tensor-like columns always pass.
 fn validate_tensor_dimension(type_text: &str, lit: &str) -> Result<()> {
     let up = type_text.to_ascii_uppercase();
-    if !is_tensor_type(&up) {
+    let embedding = up.starts_with("EMBEDDING") || up.starts_with("VECTOR");
+    if !is_tensor_type(&up) && !embedding {
         return Ok(());
     }
     // Only array literals carry a dimension; NULL/default padding is left alone.
@@ -820,6 +821,49 @@ fn render_column_default(def: Option<&String>, type_text: &str) -> String {
     }
 }
 
+/// Validates an INSERT value against its declared column type (dimension or
+/// sparse index range).
+fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
+    if is_sparse_type(type_text) {
+        return validate_sparse_literal(type_text, lit);
+    }
+    validate_tensor_dimension(type_text, lit)
+}
+
+/// A sparse vector's indices must be `< bound`, non-negative and distinct.
+fn validate_sparse_literal(type_text: &str, lit: &str) -> Result<()> {
+    let t = lit.trim();
+    if !t.starts_with('[') {
+        return Ok(());
+    }
+    let bound = type_dim(type_text).unwrap_or(0);
+    let inner = t.trim_start_matches('[').trim_end_matches(']');
+    let mut seen: Vec<i64> = Vec::new();
+    for item in inner.split(',') {
+        let item = item.trim();
+        if item.is_empty() {
+            continue;
+        }
+        let idx_txt = item.split(':').next().unwrap_or(item).trim();
+        let Ok(i) = idx_txt.parse::<i64>() else {
+            return Err(Error::Invalid(format!("invalid sparse index '{idx_txt}'")));
+        };
+        if i < 0 {
+            return Err(Error::Invalid(format!("sparse index {i} is negative")));
+        }
+        if bound > 0 && i >= bound as i64 {
+            return Err(Error::Invalid(format!(
+                "sparse index {i} is out of range (bound {bound})"
+            )));
+        }
+        if seen.contains(&i) {
+            return Err(Error::Invalid(format!("duplicate sparse index {i}")));
+        }
+        seen.push(i);
+    }
+    Ok(())
+}
+
 /// Reconstructs a `Literal` from a stored default's text form.
 fn default_literal(s: &str) -> Literal {
     if s.eq_ignore_ascii_case("NULL") {
@@ -947,7 +991,14 @@ impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     fn rebuild_indexes(&self) -> Result<()> {
         for im in self.catalog.list_indexes()? {
-            self.build_index(&im.table, &im.column)?;
+            // skip functional-index targets (not plain columns)
+            if self
+                .table_schema(&im.table)?
+                .iter()
+                .any(|c| c == &im.column)
+            {
+                self.build_index(&im.table, &im.column)?;
+            }
         }
         Ok(())
     }
@@ -1251,7 +1302,11 @@ impl Engine {
                 column,
             } => {
                 self.catalog.create_index(name, table, column)?;
-                self.build_index(table, column)?;
+                // a functional-index target is not a plain column, so there is
+                // no materialised index to build
+                if self.table_schema(table)?.iter().any(|c| c == column) {
+                    self.build_index(table, column)?;
+                }
                 Ok(QueryResult::CreatedIndex {
                     name: name.clone(),
                     table: table.clone(),
@@ -1464,11 +1519,12 @@ impl Engine {
                 }
                 let base = self.store.scan_prefix(&row_prefix(table))?.len();
                 let types = self.column_types(table)?;
-                // tensor-like values must match the declared dimension
+                // tensor-like values must match the declared dimension, and
+                // sparse values must be in range
                 for row in &rows {
                     for (i, cell) in row.iter().enumerate() {
                         if let Some(t) = types.get(i) {
-                            validate_tensor_dimension(t, cell.to_slt_string().trim())?;
+                            validate_insert_value(t, cell.to_slt_string().trim())?;
                         }
                     }
                 }
@@ -1704,6 +1760,10 @@ impl Engine {
                             }
                         }
                     }
+                }
+                // SUM/AVG require a numeric argument.
+                if let Some(t) = from.as_ref() {
+                    self.validate_aggregate_args(t, items)?;
                 }
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
@@ -1958,6 +2018,56 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .types)
+    }
+
+    /// Rejects `SUM`/`AVG` over a non-numeric column.
+    fn validate_aggregate_args(&self, table: &str, items: &[SelectItem]) -> Result<()> {
+        let schema = self.table_schema(table)?;
+        let types = self.column_types(table)?;
+        for it in items {
+            let SelectItem::Aggregate(a) = it else {
+                continue;
+            };
+            if !matches!(a.func, AggFunc::Sum | AggFunc::Avg) {
+                continue;
+            }
+            for (j, name) in a.args.iter().enumerate() {
+                // a computed argument is validated by its own expression path
+                if a.arg_exprs.get(j).map(|o| o.is_some()).unwrap_or(false) {
+                    continue;
+                }
+                let Some(ci) = schema.iter().position(|c| c == name) else {
+                    continue;
+                };
+                let ty = types
+                    .get(ci)
+                    .cloned()
+                    .unwrap_or_default()
+                    .to_ascii_uppercase();
+                let numeric = matches!(
+                    ty.as_str(),
+                    "TINYINT"
+                        | "SMALLINT"
+                        | "INT"
+                        | "INTEGER"
+                        | "BIGINT"
+                        | "FLOAT"
+                        | "DOUBLE"
+                        | "REAL"
+                        | "TINYINT8"
+                        | "UINT8"
+                        | "FLOAT16"
+                        | "BFLOAT16"
+                );
+                if !numeric {
+                    return Err(Error::Invalid(format!(
+                        "{}({name}): argument type '{ty}' is not numeric",
+                        a.func.as_str()
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Per-column defaults (as `.slt` text) for `table`.
