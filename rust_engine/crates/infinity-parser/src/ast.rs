@@ -241,8 +241,14 @@ pub enum Statement {
     },
     CreateDatabase {
         name: String,
+        if_not_exists: bool,
     },
     DropDatabase {
+        name: String,
+        if_exists: bool,
+    },
+    /// `USE <database>`
+    Use {
         name: String,
     },
     CreateIndex {

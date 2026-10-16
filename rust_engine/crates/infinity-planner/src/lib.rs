@@ -514,7 +514,6 @@ pub fn plan_select(
         let base = group_by.len();
         let mut aggs: Vec<(AggFunc, Vec<usize>, bool, String)> = Vec::new();
         let mut agg_index: std::collections::HashMap<String, usize> = Default::default();
-        let mut needs_projection = false;
         for it in items {
             match it {
                 SelectItem::Aggregate(a) => {
@@ -530,7 +529,6 @@ pub fn plan_select(
                     }
                 }
                 SelectItem::Expr(e) => {
-                    needs_projection = true;
                     gather_agg(e, &schema, &mut aggs, &mut agg_index, base)?;
                 }
                 SelectItem::Column(c) => {
@@ -567,7 +565,9 @@ pub fn plan_select(
                 predicate: pred,
             };
         }
-        if needs_projection {
+        // Always project the select list so duplicate aggregates and column
+        // order are preserved one output column per select item.
+        if !items.is_empty() {
             let mut exprs = Vec::new();
             let mut names = Vec::new();
             for it in items {
@@ -694,7 +694,12 @@ mod tests {
             }),
         ];
         let p = plan_select(&items, &tables(), None, None, &[], None, None, None, None).unwrap();
-        match p {
+        // the select list is always projected over the aggregate output
+        let inner = match p {
+            LogicalPlan::Projection { input, .. } => *input,
+            other => panic!("expected projection, got {other:?}"),
+        };
+        match inner {
             LogicalPlan::Aggregate {
                 group_keys, aggs, ..
             } => {

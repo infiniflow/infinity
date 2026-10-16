@@ -85,6 +85,26 @@ impl Parser {
             _ => self.err("expected identifier"),
         }
     }
+
+    /// Reads a (possibly `db.table`-qualified) table name, keeping the dotted
+    /// form so the executor can resolve it against the current database.
+    fn expect_table_name(&mut self) -> Result<String> {
+        match self.advance() {
+            Token::Ident(mut s) => {
+                while self.peek() == &Token::Op(".".into()) {
+                    self.advance();
+                    if let Token::Ident(next) = self.advance() {
+                        s.push('.');
+                        s.push_str(&next);
+                    } else {
+                        break;
+                    }
+                }
+                Ok(s)
+            }
+            _ => self.err("expected table name"),
+        }
+    }
     fn expect(&mut self, t: Token) -> Result<()> {
         if self.peek() == &t {
             self.advance();
@@ -95,10 +115,13 @@ impl Parser {
     }
 
     /// Consumes `[IF] [NOT] EXISTS` if present.
-    fn eat_if_exists(&mut self) {
+    fn eat_if_exists(&mut self) -> bool {
         if self.eat_kw("IF") {
             let _ = self.eat_kw("NOT");
             let _ = self.eat_kw("EXISTS");
+            true
+        } else {
+            false
         }
     }
 
@@ -114,23 +137,26 @@ impl Parser {
                     let name = self.expect_ident()?;
                     self.expect_kw("ON")?;
                     self.expect_kw("TABLE")?;
-                    let table = self.expect_ident()?;
+                    let table = self.expect_table_name()?;
                     return Ok(Statement::CreateSnapshot { name, table });
                 }
                 if self.eat_kw("DATABASE") {
-                    // tolerate: CREATE DATABASE [IF NOT EXISTS] name
-                    let _ = self.eat_kw("IF");
+                    // CREATE DATABASE [IF NOT EXISTS] name
+                    let ine = self.eat_kw("IF");
                     let _ = self.eat_kw("NOT");
                     let _ = self.eat_kw("EXISTS");
                     let name = self.expect_ident()?;
-                    Ok(Statement::CreateDatabase { name })
+                    Ok(Statement::CreateDatabase {
+                        name,
+                        if_not_exists: ine,
+                    })
                 } else if self.eat_kw("INDEX") {
                     let _ = self.eat_kw("IF");
                     let _ = self.eat_kw("NOT");
                     let _ = self.eat_kw("EXISTS");
                     let name = self.expect_ident()?;
                     self.expect_kw("ON")?;
-                    let table = self.expect_ident()?;
+                    let table = self.expect_table_name()?;
                     self.expect(Token::LParen)?;
                     // a plain column, or a functional-index expression
                     let mut column = String::new();
@@ -183,7 +209,7 @@ impl Parser {
                     let _ = self.eat_kw("NOT");
                     let _ = self.eat_kw("EXISTS");
                     self.expect_kw("TABLE")?;
-                    let name = self.expect_ident()?;
+                    let name = self.expect_table_name()?;
                     self.expect(Token::LParen)?;
                     let columns = self.column_defs()?;
                     self.expect(Token::RParen)?;
@@ -214,9 +240,9 @@ impl Parser {
             "DROP" => {
                 self.advance();
                 if self.eat_kw("DATABASE") {
-                    self.eat_if_exists();
+                    let if_exists = self.eat_if_exists();
                     let name = self.expect_ident()?;
-                    Ok(Statement::DropDatabase { name })
+                    Ok(Statement::DropDatabase { name, if_exists })
                 } else if self.eat_kw("SNAPSHOT") {
                     self.eat_if_exists();
                     let name = self.expect_ident()?;
@@ -232,7 +258,7 @@ impl Parser {
                 } else {
                     self.expect_kw("TABLE")?;
                     self.eat_if_exists();
-                    let name = self.expect_ident()?;
+                    let name = self.expect_table_name()?;
                     Ok(Statement::DropTable { name })
                 }
             }
@@ -260,8 +286,12 @@ impl Parser {
                 let name = self.expect_ident()?;
                 Ok(Statement::RestoreSnapshot { name })
             }
-            "SET" | "SNAPSHOT" | "USE" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH"
-            | "CHECK" => {
+            "USE" => {
+                self.advance();
+                let name = self.expect_ident()?;
+                Ok(Statement::Use { name })
+            }
+            "SET" | "SNAPSHOT" | "DUMP" | "PRAGMA" | "COMPACT" | "OPTIMIZE" | "FLUSH" | "CHECK" => {
                 self.advance();
                 let mut parts: Vec<String> = Vec::new();
                 while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
@@ -285,7 +315,7 @@ impl Parser {
             "INSERT" => {
                 self.advance();
                 self.expect_kw("INTO")?;
-                let table = self.expect_ident()?;
+                let table = self.expect_table_name()?;
                 // an explicit column list: INSERT INTO t (a, b) VALUES …
                 let columns = if self.peek() == &Token::LParen {
                     self.advance();
@@ -325,7 +355,7 @@ impl Parser {
             "ALTER" => {
                 self.advance();
                 if self.eat_kw("TABLE") {
-                    let table = self.expect_ident()?;
+                    let table = self.expect_table_name()?;
                     // tolerate `ADD COLUMN (...)`; other ALTER forms are no-ops.
                     if self.eat_kw("ADD") {
                         let _ = self.eat_kw("COLUMN");
@@ -375,12 +405,12 @@ impl Parser {
                 let distinct = self.eat_kw("DISTINCT");
                 let items = self.select_items()?;
                 let from = if self.eat_kw("FROM") {
-                    Some(self.expect_ident()?)
+                    Some(self.expect_table_name()?)
                 } else {
                     None
                 };
                 let join = if self.eat_kw("JOIN") {
-                    let table = self.expect_ident()?;
+                    let table = self.expect_table_name()?;
                     self.expect_kw("ON")?;
                     let left = self.expect_ident()?;
                     self.expect(Token::Op("=".into()))?;
@@ -506,7 +536,7 @@ impl Parser {
             "DELETE" => {
                 self.advance();
                 self.expect_kw("FROM")?;
-                let table = self.expect_ident()?;
+                let table = self.expect_table_name()?;
                 let where_pred = if self.eat_kw("WHERE") {
                     Some(self.predicate()?)
                 } else {
@@ -516,7 +546,7 @@ impl Parser {
             }
             "UPDATE" => {
                 self.advance();
-                let table = self.expect_ident()?;
+                let table = self.expect_table_name()?;
                 self.expect_kw("SET")?;
                 let mut assignments = Vec::new();
                 loop {
@@ -546,7 +576,7 @@ impl Parser {
                 // SHOW TABLE <t> COLUMNS
                 let is_table = self.eat_kw("TABLE");
                 if is_table && matches!(self.peek(), Token::Ident(_)) {
-                    if let Ok(t) = self.expect_ident() {
+                    if let Ok(t) = self.expect_table_name() {
                         if self.eat_kw("COLUMNS") {
                             return Ok(Statement::ShowTableColumns { table: t });
                         }
@@ -588,7 +618,7 @@ impl Parser {
             }
             "COPY" => {
                 self.advance();
-                let table = self.expect_ident()?;
+                let table = self.expect_table_name()?;
                 let from = if self.eat_kw("FROM") {
                     true
                 } else {

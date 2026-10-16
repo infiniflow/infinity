@@ -890,6 +890,8 @@ pub struct Engine {
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
+    /// the database new unqualified table names are resolved against
+    current_db: Mutex<String>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -920,6 +922,7 @@ impl Engine {
             exchange_capacity: exchange_capacity.max(1),
             indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
+            current_db: Mutex::new("default_db".to_string()),
         };
         engine.rebuild_indexes()?;
         Ok(engine)
@@ -976,7 +979,90 @@ impl Engine {
     }
 
     pub fn execute(&self, sql: &str) -> Result<Vec<QueryResult>> {
-        parse(sql)?.iter().map(|s| self.execute_stmt(s)).collect()
+        let mut out = Vec::new();
+        for s in parse(sql)? {
+            // `USE <db>` switches the session database for later statements.
+            if let Statement::Use { name } = &s {
+                *self.current_db.lock().unwrap() = name.clone();
+                out.push(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                });
+                continue;
+            }
+            let qualified = self.qualify_tables(&s);
+            out.push(self.execute_stmt(&qualified)?);
+        }
+        Ok(out)
+    }
+
+    /// The session's current database.
+    fn db(&self) -> String {
+        self.current_db.lock().unwrap().clone()
+    }
+
+    /// Resolves unqualified table names to `<current_db>.<name>`; a name that
+    /// already contains a `.` is taken as fully qualified.
+    fn qualify_tables(&self, stmt: &Statement) -> Statement {
+        let db = self.db();
+        let q = |t: &str| -> String {
+            if t.is_empty() || t.contains('.') {
+                t.to_string()
+            } else {
+                format!("{db}.{t}")
+            }
+        };
+        let mut s = stmt.clone();
+        match &mut s {
+            Statement::CreateTable { name, .. } | Statement::DropTable { name } => *name = q(name),
+            Statement::Insert { table, .. }
+            | Statement::Delete { table, .. }
+            | Statement::Update { table, .. }
+            | Statement::AlterTableAdd { table, .. }
+            | Statement::AlterTableDropColumn { table, .. }
+            | Statement::ShowTableColumns { table }
+            | Statement::Copy { table, .. }
+            | Statement::CreateIndex { table, .. }
+            | Statement::CreateSnapshot { table, .. } => *table = q(table),
+            Statement::Select { from, join, .. } => {
+                if let Some(t) = from.as_mut() {
+                    *t = q(t);
+                }
+                if let Some(j) = join.as_mut() {
+                    j.table = q(&j.table);
+                }
+            }
+            Statement::Explain { inner } => {
+                let inner_q = self.qualify_tables(inner.as_ref());
+                **inner = inner_q;
+            }
+            _ => {}
+        }
+        s
+    }
+
+    /// Drops a table and purges its stored rows, tombstones, secondary-index
+    /// entries and index declarations, so a later CREATE TABLE with the same
+    /// name starts empty.
+    fn drop_table_all(&self, name: &str) -> Result<bool> {
+        let existed = self.catalog.drop_table(name)?;
+        for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
+            self.store.delete(&k)?;
+        }
+        for (k, _) in self.store.scan_prefix(&del_prefix(name))? {
+            self.store.delete(&k)?;
+        }
+        let key_prefix = format!("{name}.");
+        self.indexes
+            .lock()
+            .unwrap()
+            .retain(|k, _| !k.starts_with(&key_prefix));
+        for im in self.catalog.list_indexes()? {
+            if im.table == name {
+                let _ = self.catalog.drop_index(&im.name);
+            }
+        }
+        Ok(existed)
     }
 
     fn table_schema(&self, table: &str) -> Result<Vec<String>> {
@@ -1088,10 +1174,29 @@ impl Engine {
                     name: table.clone(),
                 })
             }
-            Statement::CreateDatabase { name } => {
+            // `USE` is handled by `execute`; reaching here is a no-op.
+            Statement::Use { .. } => Ok(QueryResult::Rows {
+                columns: vec![],
+                rows: vec![],
+            }),
+            Statement::CreateDatabase {
+                name,
+                if_not_exists,
+            } => {
+                self.catalog.create_database(name, *if_not_exists)?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
-            Statement::DropDatabase { name } => {
+            Statement::DropDatabase { name, if_exists } => {
+                let existed = self.catalog.drop_database(name, *if_exists)?;
+                if existed || *if_exists {
+                    // drop every table registered under this database
+                    let prefix = format!("{name}.");
+                    for t in self.catalog.list_tables()? {
+                        if t.name.starts_with(&prefix) {
+                            self.drop_table_all(&t.name)?;
+                        }
+                    }
+                }
                 Ok(QueryResult::DroppedDatabase { name: name.clone() })
             }
             Statement::Show { .. } => Ok(QueryResult::Rows {
@@ -1129,25 +1234,7 @@ impl Engine {
                 })
             }
             Statement::DropTable { name } => {
-                let existed = self.catalog.drop_table(name)?;
-                // Purge the table's stored rows and tombstones so a later
-                // CREATE TABLE with the same name starts empty.
-                for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
-                    self.store.delete(&k)?;
-                }
-                for (k, _) in self.store.scan_prefix(&del_prefix(name))? {
-                    self.store.delete(&k)?;
-                }
-                let key_prefix = format!("{name}.");
-                self.indexes
-                    .lock()
-                    .unwrap()
-                    .retain(|k, _| !k.starts_with(&key_prefix));
-                for im in self.catalog.list_indexes()? {
-                    if im.table == *name {
-                        let _ = self.catalog.drop_index(&im.name);
-                    }
-                }
+                let existed = self.drop_table_all(name)?;
                 Ok(QueryResult::DroppedTable {
                     name: name.clone(),
                     existed,
@@ -2246,7 +2333,13 @@ impl Engine {
 
     /// Number of live (non-deleted) rows in `table`.
     pub fn row_count(&self, table: &str) -> Result<usize> {
-        Ok(self.fetch_rows(table)?.len())
+        let db = self.db();
+        let name = if table.contains('.') {
+            table.to_string()
+        } else {
+            format!("{db}.{table}")
+        };
+        Ok(self.fetch_rows(&name)?.len())
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -3254,6 +3347,32 @@ mod tests {
             ElemType::UInt8
         );
         assert_eq!(tensor_elem_type("TENSOR(FLOAT16, 4)"), ElemType::Float16);
+    }
+
+    #[test]
+    fn databases_are_namespaced() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE DATABASE db1;").unwrap();
+        // a duplicate without IF NOT EXISTS is an error
+        assert!(e.execute("CREATE DATABASE db1;").is_err());
+        e.execute("CREATE DATABASE IF NOT EXISTS db1;").unwrap();
+        e.execute("USE db1;").unwrap();
+        e.execute("CREATE TABLE t (a INT);").unwrap();
+        e.execute("INSERT INTO t VALUES (1);").unwrap();
+        e.execute("USE default_db;").unwrap();
+        e.execute("CREATE TABLE t (a INT);").unwrap();
+        e.execute("INSERT INTO t VALUES (2);").unwrap();
+        let rows = |sql: &str| match &e.execute(sql).unwrap()[0] {
+            QueryResult::Rows { rows, .. } => rows.clone(),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
+        assert_eq!(rows("SELECT * FROM db1.t;"), vec![vec!["1".to_string()]]);
+        // dropping the database removes its tables
+        e.execute("DROP DATABASE db1;").unwrap();
+        assert!(e.execute("SELECT * FROM db1.t;").is_err());
+        assert_eq!(rows("SELECT * FROM t;"), vec![vec!["2".to_string()]]);
     }
 
     #[test]

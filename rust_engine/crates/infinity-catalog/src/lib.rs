@@ -94,6 +94,9 @@ fn table_key(id: u64) -> Vec<u8> {
 fn name_key(name: &str) -> Vec<u8> {
     format!("tblname:{name}").into_bytes()
 }
+fn db_key(name: &str) -> Vec<u8> {
+    format!("db:{name}").into_bytes()
+}
 
 const INDEX_PREFIX: &[u8] = b"idx:";
 
@@ -329,6 +332,40 @@ impl Catalog {
             }
             None => Ok(false),
         }
+    }
+
+    /// Registers a database name. `if_not_exists` tolerates an existing name.
+    pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
+        let key = db_key(name);
+        if self.store.get(&key)?.is_some() {
+            return if if_not_exists {
+                Ok(())
+            } else {
+                Err(Error::Catalog(format!("database '{name}' already exists")))
+            };
+        }
+        self.store.put(&key, b"1")?;
+        Ok(())
+    }
+
+    /// Removes a database registration. `if_exists` tolerates a missing name.
+    pub fn drop_database(&self, name: &str, if_exists: bool) -> Result<bool> {
+        let key = db_key(name);
+        let existed = self.store.get(&key)?.is_some();
+        if !existed && !if_exists {
+            return Err(Error::Catalog(format!("database '{name}' does not exist")));
+        }
+        self.store.delete(&key)?;
+        Ok(existed)
+    }
+
+    /// Names of all registered databases, plus the built-in `default_db`.
+    pub fn list_databases(&self) -> Result<Vec<String>> {
+        let mut out = vec!["default_db".to_string()];
+        for (k, _) in self.store.scan_prefix(b"db:")? {
+            out.push(String::from_utf8_lossy(&k[3..]).to_string());
+        }
+        Ok(out)
     }
 
     /// Creates an index on `table(column)`; returns its metadata.
