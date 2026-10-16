@@ -158,8 +158,13 @@ fn encode_sparse_slot(
             _ => outline.extend_from_slice(&i.to_le_bytes()),
         }
     }
-    for v in &values {
-        cpp_format::push_embedding_element(outline, elem, *v);
+    // A BIT data type stores no values (`SparseInfo::DataSize` returns 0 for
+    // `kElemBit`, `sparse_info.h:61-66`): the column is a bitmap of the
+    // present indices and the value is implicitly 1.
+    if elem != 0 {
+        for v in &values {
+            cpp_format::push_embedding_element(outline, elem, *v);
+        }
     }
     Ok(Some(
         cpp_format::sparse_slot(indices.len() as i64, offset).to_vec(),
@@ -171,7 +176,8 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
     let (elem, _index_type, index_width) = sparse_shape(type_text)?;
     let nnz = i64::from_le_bytes(slot.get(..8)?.try_into().ok()?) as usize;
     let offset = u64::from_le_bytes(slot.get(8..16)?.try_into().ok()?) as usize;
-    let elem_width = element_width(elem);
+    // A BIT data type stores no value bytes; the value is implicitly 1.
+    let elem_width = if elem == 0 { 0 } else { element_width(elem) };
     let mut idx_at = offset;
     let mut val_at = offset + nnz * index_width;
     let mut parts = Vec::with_capacity(nnz);
@@ -187,8 +193,11 @@ fn decode_sparse_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
             _ => i64::from_le_bytes(outline.get(idx_at..idx_at + 8)?.try_into().ok()?) as f64,
         };
         idx_at += index_width;
-        let v =
-            cpp_format::read_embedding_element(outline.get(val_at..val_at + elem_width)?, elem)?;
+        let v = if elem == 0 {
+            1.0
+        } else {
+            cpp_format::read_embedding_element(outline.get(val_at..val_at + elem_width)?, elem)?
+        };
         val_at += elem_width;
         parts.push(format!("{}:{}", i as i64, v));
     }
@@ -1070,6 +1079,34 @@ mod tests {
             vec![
                 vec!["1".to_string(), "[0:1.5,3:2.5]".to_string()],
                 vec!["2".to_string(), "[7:3.5]".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn sparse_bit_blocks_roundtrip() {
+        // `SPARSE(BIT, d)` stores no value bytes (`SparseInfo::DataSize` returns
+        // 0 for `kElemBit`): the column is a bitmap of the present indices and
+        // the value is implicitly 1.
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE spb (id INT, v SPARSE(BIT,100));")
+            .unwrap();
+        engine
+            .execute("INSERT INTO spb VALUES (1, [0:1,20:1,80:1]);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO spb VALUES (2, [7:1]);")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("spb").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("spb").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "[0:1,20:1,80:1]".to_string()],
+                vec!["2".to_string(), "[7:1]".to_string()],
             ]
         );
     }
