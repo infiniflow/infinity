@@ -15,9 +15,9 @@ use std::path::PathBuf;
 
 use infinity_common::{Error, Result};
 use infinity_storage::cpp_format::{
-    self, date_to_days, datetime_to_pair, element_width, embedding_size,
-    pack_column_with_layout, push_embedding_element, read_embedding_element, time_to_secs,
-    BlockColumn, BlockId, BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
+    self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
+    push_embedding_element, read_embedding_element, time_to_secs, BlockColumn, BlockId,
+    BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
 };
 
 use crate::Engine;
@@ -90,6 +90,29 @@ pub fn tensor_shape(type_text: &str) -> Option<(i32, usize, i32)> {
         return None;
     }
     Some((column_type, dim, code))
+}
+
+/// `TENSORARRAY(<elem>,<dim>)` → `(ColumnType, dimension, ElementType)`.
+///
+/// The slot (`TensorArrayT`, `tensor_array_type.h:28-36`) is the same
+/// `{tensor_num:16; file_offset:48}` word as a tensor's, but `file_offset_`
+/// points at `tensor_num` 8-byte `TensorT` records (`SetTensorArray`,
+/// `column_vector_impl.cpp:2792-2805`; `GetTensorArrayMeta`, `:2784-2790`),
+/// each of which carries that tensor's own element count and data offset. The
+/// mirror therefore writes every tensor's body first and their meta array last.
+/// Bit elements are excluded for the same reason as tensors.
+pub fn tensorarray_shape(type_text: &str) -> Option<(i32, usize, i32)> {
+    let up = type_text.trim().to_ascii_uppercase();
+    let rest = up.strip_prefix("TENSORARRAY(")?;
+    let inner = rest.trim_end_matches(')');
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    let dim: usize = parts.get(1)?.parse().ok()?;
+    let code = element_code(parts.first()?)?;
+    if code == 0 {
+        // Bit-packed tensors are not covered here (only embeddings are).
+        return None;
+    }
+    Some((12, dim, code))
 }
 
 /// `SPARSE(<elem>,<bound>)` → `(element_type, index_type, index_width)`.
@@ -349,6 +372,10 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
                 14
             }
         }
+        "TENSORARRAY" => {
+            tensorarray_shape(type_text)?;
+            12
+        }
         "SPARSE" => {
             sparse_shape(type_text)?;
             13
@@ -367,12 +394,15 @@ pub fn column_type_of(type_text: &str) -> Option<i32> {
 enum OutlineKind {
     None,
     Tensor,
+    TensorArray,
     Sparse,
     Array,
 }
 
 fn outline_kind(type_text: &str) -> OutlineKind {
-    if tensor_shape(type_text).is_some() {
+    if tensorarray_shape(type_text).is_some() {
+        OutlineKind::TensorArray
+    } else if tensor_shape(type_text).is_some() {
         OutlineKind::Tensor
     } else if sparse_shape(type_text).is_some() {
         OutlineKind::Sparse
@@ -392,6 +422,11 @@ fn layout_of(type_text: &str, column_type: i32) -> Option<ColumnLayout> {
     }
     if tensor_shape(type_text).is_some() {
         // Tensor / MultiVector: a `{count:16; offset:48}` slot into the outline.
+        return Some(ColumnLayout::VarLen(8));
+    }
+    if tensorarray_shape(type_text).is_some() {
+        // TensorArray: the same slot; the outline holds every tensor's body and
+        // their `TensorT` meta array.
         return Some(ColumnLayout::VarLen(8));
     }
     if sparse_shape(type_text).is_some() {
@@ -444,6 +479,65 @@ fn decode_tensor_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<S
         parts.push(format!("[{}]", elems.join(",")));
     }
     Some(format!("[{}]", parts.join(",")))
+}
+
+/// Encodes one tensor-array value: appends every tensor's body to `outline`,
+/// then their `TensorT` meta array, and returns the `{count:16; offset:48}` slot
+/// (`SetTensorArray`, `column_vector_impl.cpp:2792-2805`).
+fn encode_tensorarray_slot(
+    type_text: &str,
+    value: &str,
+    outline: &mut Vec<u8>,
+) -> Result<Option<Vec<u8>>> {
+    if value.eq_ignore_ascii_case("null") {
+        return Ok(None);
+    }
+    let (_, dim, elem) = tensorarray_shape(type_text)
+        .ok_or_else(|| Error::Invalid(format!("not a tensor-array type: '{type_text}'")))?;
+    // `[[[a,b],[c,d]], …]`: one entry per tensor, each a list of rows.
+    let tensors = cpp_format::parse_tensorarray_f64(value);
+    let mut metas: Vec<[u8; 8]> = Vec::with_capacity(tensors.len());
+    for rows in &tensors {
+        let offset = outline.len() as u64;
+        outline.extend_from_slice(&cpp_format::pack_tensor_body(rows, dim, elem));
+        metas.push(cpp_format::varlen_count_offset_slot(rows.len() as u64, offset));
+    }
+    let offset = outline.len() as u64;
+    for meta in &metas {
+        outline.extend_from_slice(meta);
+    }
+    Ok(Some(
+        cpp_format::varlen_count_offset_slot(metas.len() as u64, offset).to_vec(),
+    ))
+}
+
+/// Decodes one tensor-array slot, reading each tensor's `TensorT` meta and its
+/// body out of the outline (`GetTensorArray`, `column_vector_impl.cpp:2808-2818`).
+fn decode_tensorarray_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<String> {
+    let (_, dim, elem) = tensorarray_shape(type_text)?;
+    let word = u64::from_le_bytes(slot.try_into().ok()?);
+    let tensor_num = (word & 0xffff) as usize;
+    let meta_offset = (word >> 16) as usize;
+    let width = element_width(elem);
+    let mut tensors = Vec::with_capacity(tensor_num);
+    for t in 0..tensor_num {
+        let at = meta_offset + t * 8;
+        let meta = u64::from_le_bytes(outline.get(at..at + 8)?.try_into().ok()?);
+        let rows = (meta & 0xffff) as usize;
+        let offset = (meta >> 16) as usize;
+        let mut vecs = Vec::with_capacity(rows);
+        for v in 0..rows {
+            let base = offset + v * dim * width;
+            let mut elems = Vec::with_capacity(dim);
+            for k in 0..dim {
+                let s = outline.get(base + k * width..base + (k + 1) * width)?;
+                elems.push(cpp_format::read_embedding_element(s, elem)?.to_string());
+            }
+            vecs.push(format!("[{}]", elems.join(",")));
+        }
+        tensors.push(format!("[{}]", vecs.join(",")));
+    }
+    Some(format!("[{}]", tensors.join(",")))
 }
 
 /// Encodes one text value into the bytes its `.col` slot holds.
@@ -697,6 +791,11 @@ impl Engine {
                             &text,
                             &mut self_outline,
                         )?),
+                        OutlineKind::TensorArray => slots.push(encode_tensorarray_slot(
+                            &meta.types[col],
+                            &text,
+                            &mut self_outline,
+                        )?),
                         OutlineKind::Sparse => slots.push(encode_sparse_slot(
                             &meta.types[col],
                             &text,
@@ -889,6 +988,12 @@ impl Engine {
                                 decode_tensor_value(&meta.types[col], slot, &raw.outline)
                                     .unwrap_or_else(|| "null".into())
                             }
+                            OutlineKind::TensorArray => {
+                                let at = row * 8;
+                                let slot = body.data.get(at..at + 8).unwrap_or(&[]);
+                                decode_tensorarray_value(&meta.types[col], slot, &raw.outline)
+                                    .unwrap_or_else(|| "null".into())
+                            }
                             OutlineKind::Sparse => {
                                 let at = row * 16;
                                 let slot = body.data.get(at..at + 16).unwrap_or(&[]);
@@ -942,10 +1047,12 @@ mod tests {
         assert_eq!(column_type_of("VECTOR(FLOAT,4)"), Some(10));
         assert_eq!(column_type_of("TENSOR(FLOAT,4)"), Some(11));
         assert_eq!(column_type_of("MULTIVECTOR(FLOAT,4)"), Some(14));
-        // Bit embeddings pack to `ceil(dim/8)` bytes; tensor arrays are not
-        // packable yet.
+        assert_eq!(column_type_of("TENSORARRAY(FLOAT,4)"), Some(12));
+        // Bit embeddings pack to `ceil(dim/8)` bytes; bit *tensors* (and hence
+        // bit tensor arrays) are not covered by the block writer.
         assert_eq!(column_type_of("EMBEDDING(BIT,8)"), Some(10));
-        assert_eq!(column_type_of("TENSORARRAY(FLOAT,4)"), None);
+        assert_eq!(column_type_of("TENSOR(BIT,8)"), None);
+        assert_eq!(column_type_of("TENSORARRAY(BIT,8)"), None);
     }
 
     #[test]
@@ -1194,6 +1301,41 @@ mod tests {
     }
 
     #[test]
+    fn tensorarray_shape_parsing() {
+        assert_eq!(tensorarray_shape("TENSORARRAY(FLOAT,3)"), Some((12, 3, 6)));
+        assert_eq!(tensorarray_shape("TENSORARRAY(DOUBLE,2)"), Some((12, 2, 7)));
+        assert_eq!(tensorarray_shape("TENSOR(FLOAT,3)"), None);
+        assert_eq!(tensorarray_shape("TENSORARRAY(BIT,8)"), None);
+    }
+
+    #[test]
+    fn tensor_array_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE ta (id INT, t TENSORARRAY(FLOAT,2));")
+            .unwrap();
+        // Two tensors (one with two rows, one with a single row) and a single
+        // tensor, so both the tensor count and each row count vary.
+        engine
+            .execute("INSERT INTO ta VALUES (1, [[[1,2],[3,4]],[[5,6]]]);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO ta VALUES (2, [[[7,8]]]);")
+            .unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("ta").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("ta").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), "[[[1,2],[3,4]],[[5,6]]]".to_string()],
+                vec!["2".to_string(), "[[[7,8]]]".to_string()],
+            ]
+        );
+    }
+
+    #[test]
     fn blocks_reconstruct_a_table_after_its_rows_are_deleted() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
@@ -1299,8 +1441,9 @@ mod tests {
     fn blocks_reject_unsupported_column_types() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open(dir.path()).unwrap();
+        // A bit tensor array: bit tensors are outside the block writer's scope.
         engine
-            .execute("CREATE TABLE v (id INT, ta TENSORARRAY(FLOAT,2));")
+            .execute("CREATE TABLE v (id INT, ta TENSORARRAY(BIT,8));")
             .unwrap();
         let err = engine.write_cpp_blocks("v").unwrap_err();
         assert!(err.to_string().contains("not supported"), "{err}");
