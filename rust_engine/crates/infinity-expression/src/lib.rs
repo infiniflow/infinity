@@ -79,6 +79,8 @@ pub enum Expr {
     IsNull(Box<Expr>, bool),
     /// `expr LIKE pattern`.
     Like(Box<Expr>, Box<Expr>),
+    /// `expr [NOT] IN (…)`.
+    In(Box<Expr>, Vec<Expr>, bool),
     /// A scalar function call; unknown functions evaluate to NULL.
     Func {
         name: String,
@@ -124,6 +126,14 @@ impl Expr {
                     other => other.to_slt_string(),
                 };
                 Value::Bool(like_match(&text, &pattern))
+            }
+            Expr::In(a, vals, neg) => {
+                let x = a.eval(row);
+                // Compare with implicit numeric coercion (`'90.5' IN (90.5)`).
+                let found = vals
+                    .iter()
+                    .any(|v| x.partial_cmp_value(&v.eval(row)) == Some(std::cmp::Ordering::Equal));
+                Value::Bool(found != *neg)
             }
             Expr::Func { name, args } => eval_func(name, args, row),
         }

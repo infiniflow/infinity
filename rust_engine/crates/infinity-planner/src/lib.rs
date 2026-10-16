@@ -122,6 +122,13 @@ pub fn predicate_expr(pred: &Predicate, schema: &[String]) -> Result<Expr> {
             Box::new(compile_expr(a, schema)?),
             Box::new(compile_expr(pat, schema)?),
         ),
+        Predicate::In(a, vals, neg) => Expr::In(
+            Box::new(compile_expr(a, schema)?),
+            vals.iter()
+                .map(|v| compile_expr(v, schema))
+                .collect::<Result<Vec<_>>>()?,
+            *neg,
+        ),
         Predicate::Bool(a, BoolOp::And, b) => Expr::And(
             Box::new(predicate_expr(a, schema)?),
             Box::new(predicate_expr(b, schema)?),

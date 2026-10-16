@@ -20,7 +20,7 @@ use infinity_common::{Error, Result};
 use infinity_expression::{aggregate, Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::{
-    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, SearchClause, Statement,
+    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, SearchClause, SelectItem, Statement,
 };
 use infinity_planner::{plan_select, LogicalPlan};
 use infinity_storage::{FjallMetaStore, MetaStore};
@@ -516,6 +516,44 @@ impl Engine {
                 limit,
                 search,
             } => {
+                // `SELECT UNNEST(col) FROM t [WHERE …]`: expand a JSON array column
+                // into one output row per element.
+                if let (Some(t), [SelectItem::Func { name, args }]) =
+                    (from.as_ref(), items.as_slice())
+                {
+                    if name.eq_ignore_ascii_case("UNNEST") {
+                        if let Some(ExprAst::Column(col)) = args.first() {
+                            let schema = self.table_schema(t)?;
+                            if let Some(ci) = schema.iter().position(|c| c == col) {
+                                let pred = match where_pred.as_ref() {
+                                    Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
+                                    None => None,
+                                };
+                                let mut out = Vec::new();
+                                for (_seq, row) in self.fetch_rows_with_ids(t)? {
+                                    if let Some(p) = &pred {
+                                        if !p.eval_predicate(&row) {
+                                            continue;
+                                        }
+                                    }
+                                    if let Some(Value::Str(cell)) = row.get(ci) {
+                                        if let Some(infinity_expression::json::Json::Arr(items)) =
+                                            infinity_expression::json::parse(cell)
+                                        {
+                                            for e in items {
+                                                out.push(vec![e.compact()]);
+                                            }
+                                        }
+                                    }
+                                }
+                                return Ok(QueryResult::Rows {
+                                    columns: vec![],
+                                    rows: out,
+                                });
+                            }
+                        }
+                    }
+                }
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
                     tables.push((t.clone(), self.table_schema(t)?));

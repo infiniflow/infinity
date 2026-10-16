@@ -491,6 +491,33 @@ impl Parser {
             let pat = self.expr()?;
             return Ok(Predicate::Like(left, pat));
         }
+        let neg_in = if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("NOT")) {
+            let save = self.pos;
+            self.advance();
+            if !matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IN")) {
+                self.pos = save;
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+        if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IN")) {
+            self.advance();
+            self.expect(Token::LParen)?;
+            let mut values = Vec::new();
+            while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                values.push(self.expr()?);
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            self.expect(Token::RParen)?;
+            return Ok(Predicate::In(left, values, neg_in));
+        }
         if let Token::Op(s) = self.peek().clone() {
             if let Some(op) = cmp_op(&s) {
                 self.advance();
