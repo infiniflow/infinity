@@ -1790,7 +1790,8 @@ fn expr_text(e: &ExprAst) -> String {
 }
 
 fn normalize_datetime(kind: &str, raw: &str) -> String {
-    if kind == "INTERVAL" {
+    // INTERVAL and JSON payloads are kept verbatim
+    if kind == "INTERVAL" || kind == "JSON" {
         return raw.trim().to_string();
     }
     // accept `/` as a date separator, e.g. `DATE '2222/11/11'`

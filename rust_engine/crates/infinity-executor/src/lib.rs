@@ -3077,15 +3077,35 @@ fn csv_fields(line: &str) -> Vec<String> {
 fn normalize_cell(s: &str) -> String {
     let t = s.trim();
     if t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
-        let parts: Vec<String> = t[1..t.len() - 1]
+        // Split on commas/spaces, but peel any bracket characters off each token
+        // first so numbers adjacent to a bracket are normalised too
+        // (`[[0.0, 0.2]]` → `[[0,0.2]]`).
+        let mut out = String::from("[");
+        let mut first = true;
+        for token in t[1..t.len() - 1]
             .split([',', ' '])
             .filter(|x| !x.is_empty())
-            .map(|x| match x.parse::<f64>() {
-                Ok(f) => fmt_num(f),
-                Err(_) => x.to_string(),
-            })
-            .collect();
-        return format!("[{}]", parts.join(","));
+        {
+            if !first {
+                out.push(',');
+            }
+            first = false;
+            let lead = token.len() - token.trim_start_matches('[').len();
+            let trail = token.len() - token.trim_end_matches(']').len();
+            let core = &token[lead..token.len() - trail];
+            for _ in 0..lead {
+                out.push('[');
+            }
+            match core.parse::<f64>() {
+                Ok(f) => out.push_str(&fmt_num(f)),
+                Err(_) => out.push_str(core),
+            }
+            for _ in 0..trail {
+                out.push(']');
+            }
+        }
+        out.push(']');
+        return out;
     }
     t.to_string()
 }
