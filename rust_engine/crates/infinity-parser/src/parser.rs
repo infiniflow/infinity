@@ -1479,13 +1479,19 @@ impl Parser {
                         None => break,
                     };
                     self.advance();
-                    let right_item = match self.select_items() {
-                        Ok((mut v, _)) if !v.is_empty() => v.remove(0),
-                        _ => SelectItem::Literal(Literal::Null),
-                    };
-                    let right = match select_item_to_expr(&right_item) {
-                        Some(r) => r,
-                        None => ExprAst::Literal(Literal::Null),
+                    // the right-hand side is a predicate (`num > 2`) or a value
+                    let save = self.pos;
+                    let right = match self.comparison().ok().and_then(|p| predicate_to_expr(&p)) {
+                        Some(e) => e,
+                        None => {
+                            self.pos = save;
+                            let right_item = match self.select_items() {
+                                Ok((mut v, _)) if !v.is_empty() => v.remove(0),
+                                _ => SelectItem::Literal(Literal::Null),
+                            };
+                            select_item_to_expr(&right_item)
+                                .unwrap_or(ExprAst::Literal(Literal::Null))
+                        }
                     };
                     acc = SelectItem::Expr(if is_and {
                         ExprAst::And(Box::new(left), Box::new(right))
@@ -1638,6 +1644,24 @@ impl Parser {
 }
 
 /// Converts a select item into an expression so a binary tail can be parsed.
+/// Converts a parsed predicate back into an expression (for projected
+/// `expr AND/OR predicate` terms).
+fn predicate_to_expr(p: &Predicate) -> Option<ExprAst> {
+    Some(match p {
+        Predicate::Cmp(a, op, b) => ExprAst::Cmp(Box::new(a.clone()), *op, Box::new(b.clone())),
+        Predicate::Bool(a, BoolOp::And, b) => ExprAst::And(
+            Box::new(predicate_to_expr(a)?),
+            Box::new(predicate_to_expr(b)?),
+        ),
+        Predicate::Bool(a, BoolOp::Or, b) => ExprAst::Or(
+            Box::new(predicate_to_expr(a)?),
+            Box::new(predicate_to_expr(b)?),
+        ),
+        Predicate::Not(a) => ExprAst::Not(Box::new(predicate_to_expr(a)?)),
+        _ => return None,
+    })
+}
+
 fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
     match item {
         SelectItem::Column(c) => Some(ExprAst::Column(c.clone())),

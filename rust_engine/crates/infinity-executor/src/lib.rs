@@ -459,7 +459,7 @@ fn truncate_numbers(s: &str) -> String {
         }
         if !num.is_empty() {
             match num.parse::<f64>() {
-                Ok(f) => out.push_str(&(f as i64).to_string()),
+                Ok(f) => out.push_str(&(f.round() as i64).to_string()),
                 Err(_) => out.push_str(&num),
             }
             num.clear();
@@ -468,7 +468,7 @@ fn truncate_numbers(s: &str) -> String {
     }
     if !num.is_empty() {
         match num.parse::<f64>() {
-            Ok(f) => out.push_str(&(f as i64).to_string()),
+            Ok(f) => out.push_str(&(f.round() as i64).to_string()),
             Err(_) => out.push_str(&num),
         }
     }
@@ -740,6 +740,19 @@ fn reshape_tensor(s: &str, dim: usize) -> String {
         })
         .collect();
     format!("[{}]", groups.join(","))
+}
+
+/// Normalises a column default to its stored form: an integer-element
+/// array/embedding default keeps integer values (`[1.3,4.1,33.7]` → `[1,4,34]`).
+fn normalize_default(type_text: &str, raw: &str) -> String {
+    if (is_array_type(type_text) || is_embedding_type(type_text))
+        && (array_elem_is_int(type_text) || declared_elem_is_int(type_text))
+    {
+        let types = vec![type_text.to_string()];
+        encode_row(&[Literal::Str(raw.to_string())], &types)
+    } else {
+        raw.to_string()
+    }
 }
 
 /// Encodes a row for storage, reshaping tensor columns by their declared dim.
@@ -1366,7 +1379,11 @@ impl Engine {
                 let names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
                 let defaults: Vec<Option<String>> = columns
                     .iter()
-                    .map(|c| c.default.as_ref().map(|l| l.to_slt_string()))
+                    .map(|c| {
+                        c.default
+                            .as_ref()
+                            .map(|l| normalize_default(&c.type_text, &l.to_slt_string()))
+                    })
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
