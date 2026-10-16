@@ -2598,26 +2598,30 @@ impl Engine {
             return Ok((Vec::new(), hidden.to_vec()));
         }
         // A `whitespace` analyzer keeps punctuation inside a token, so
-        // `2023-01-01` is one term rather than three.
-        let whitespace = match_columns(&m.column).iter().any(|c| {
-            self.index_analyzers
+        // `2023-01-01` is one term rather than three. A `whitespace-<chars>`
+        // analyzer additionally splits on each listed delimiter character.
+        let delims: Option<Vec<char>> = match_columns(&m.column).iter().find_map(|c| {
+            let a = self
+                .index_analyzers
                 .lock()
                 .unwrap()
-                .get(&index_key(table, c))
-                .map(|a| a == "whitespace")
-                .unwrap_or(false)
+                .get(&index_key(table, c))?
+                .to_ascii_lowercase();
+            a.strip_prefix("whitespace")
+                .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
         });
         let tokenize = |s: &str| -> Vec<String> {
-            let split: fn(&str) -> Vec<String> = if whitespace {
-                |x: &str| x.split_whitespace().map(str::to_string).collect()
-            } else {
-                |x: &str| {
-                    x.split(|c: char| !c.is_alphanumeric() && c != '_')
-                        .map(str::to_string)
-                        .collect()
-                }
+            let parts: Vec<String> = match &delims {
+                Some(d) => s
+                    .split(|c: char| c.is_whitespace() || d.contains(&c))
+                    .map(str::to_string)
+                    .collect(),
+                None => s
+                    .split(|c: char| !c.is_alphanumeric() && c != '_')
+                    .map(str::to_string)
+                    .collect(),
             };
-            split(s)
+            parts
                 .into_iter()
                 .map(|t| t.to_ascii_lowercase())
                 .filter(|t| !t.is_empty())
