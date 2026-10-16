@@ -1725,15 +1725,16 @@ pub fn decode_u16_block(
                 }
             }
             NPF_DECREASE_INLINE => {
-                for (i, v) in block.iter_mut().enumerate() {
-                    *v = (header.exception_range as u16).wrapping_sub(i as u16);
+                // `dest[dataNum-1-i] = value + i`, i.e. the last value is the base.
+                for (i, v) in block.iter_mut().rev().enumerate() {
+                    *v = (header.exception_range as u16).wrapping_add(i as u16);
                 }
             }
             NPF_DECREASE_ALONE => {
                 let v = word(0)? as u16;
                 pos += 4;
-                for (i, d) in block.iter_mut().enumerate() {
-                    *d = v.wrapping_sub(i as u16);
+                for (i, d) in block.iter_mut().rev().enumerate() {
+                    *d = v.wrapping_add(i as u16);
                 }
             }
             fep => {
@@ -1805,6 +1806,292 @@ fn unpack_n_u16(buf: &[u8], bits: u32, n: usize, out: &mut [u16]) -> Result<(), 
         *o = (v & ((1u32 << bits) - 1)) as u16;
     }
     Ok(())
+}
+
+/// `HighBitIdx` (`new_pfordelta_compressor.h`): the number of significant bits
+/// (`0` for zero).
+fn npf_high_bit(value: u16) -> u32 {
+    16 - value.leading_zeros()
+}
+
+/// `MakeHeader` (`:670-687`).
+fn npf_make_header(
+    frame_bits: u32,
+    first_exception_pos: u32,
+    code_len: usize,
+    exception_int_range: u32,
+    is_last_block: bool,
+) -> u32 {
+    let fb = if frame_bits >= 32 { 31 } else { frame_bits };
+    ((code_len as u32 - 1) & 0x7f) << 25
+        | (first_exception_pos & 0xff) << 17
+        | (fb & 0x1f) << 12
+        | (exception_int_range & 0x7ff) << 1
+        | u32::from(is_last_block)
+}
+
+/// `SelectCompressBits` (`:228-309`): the frame width and either the exception
+/// count or a special-frame marker.
+fn npf_select_bits(block: &[u16]) -> (u32, u32) {
+    // `FRAME_BIT_MAP[i] == i` except for 31/32 which map to 32.
+    let frame_bit_map = |i: usize| -> u32 { if i >= 31 { 32 } else { i as u32 } };
+    let mut num_bit_array = [0u32; 33];
+    let first_value = block[0];
+    let mut is_all_same = true;
+    let mut is_increase = true;
+    let mut is_decrease = true;
+    let mut max_bits = 0u32;
+    for (i, &v) in block.iter().enumerate() {
+        is_all_same &= v == first_value;
+        is_increase &= v == first_value.wrapping_add(i as u16);
+        is_decrease &= v == first_value.wrapping_sub(i as u16);
+        let hb = npf_high_bit(v);
+        max_bits = max_bits.max(hb);
+        num_bit_array[hb as usize] += 1;
+    }
+    if max_bits == 0 {
+        return (0, 0);
+    }
+    let inline = |v: u16| -> u32 { if (v as u32) <= 2047 { 0 } else { 1 } };
+    if is_all_same {
+        return (0, NPF_SAME_INLINE - inline(first_value));
+    }
+    if is_increase {
+        return (0, NPF_INCREASE_INLINE - inline(first_value));
+    }
+    if is_decrease {
+        let base = block[block.len() - 1];
+        return (0, NPF_DECREASE_INLINE - inline(base));
+    }
+    for j in 1..33 {
+        num_bit_array[j] += num_bit_array[j - 1];
+    }
+    let max_exception_num = (block.len() as u32 * 10) / 100;
+    let mut num_exceptions = 0u32;
+    let mut best_frame_bits = 32u32;
+    let mut best_total_bytes = 4 * block.len() as u32;
+    let mut i = frame_bit_map(max_bits as usize) as i32;
+    while i >= 0 {
+        if frame_bit_map(i as usize) != i as u32 {
+            i -= 1;
+            continue;
+        }
+        let frame_bits = i as u32;
+        let exception_num = block.len() as u32 - num_bit_array[i as usize];
+        if exception_num > max_exception_num || max_bits > frame_bits + 28 {
+            break;
+        }
+        let exception_bits = max_bits - frame_bits;
+        let bytes_per_exception = if exception_bits <= 7 {
+            2
+        } else if exception_bits <= 9 {
+            3
+        } else if exception_bits <= 14 {
+            4
+        } else {
+            8
+        };
+        let bytes_for_frame = (block.len() as u32 * frame_bits).div_ceil(32) * 4;
+        let bytes_for_exception = (exception_num * bytes_per_exception).div_ceil(4) * 4;
+        if bytes_for_exception + bytes_for_frame < best_total_bytes {
+            best_total_bytes = bytes_for_exception + bytes_for_frame;
+            best_frame_bits = frame_bits;
+            num_exceptions = exception_num;
+        }
+        i -= 1;
+    }
+    (best_frame_bits, num_exceptions)
+}
+
+/// `Pack` (`:453-466`) / `pack_N<T>`: the LSB-first sequential inverse of
+/// [`unpack_n_u16`].
+fn npf_pack(out: &mut Vec<u8>, code: &[u16], frame_bits: u32) {
+    if frame_bits == 0 {
+        return;
+    }
+    let nwords = (code.len() * frame_bits as usize).div_ceil(32);
+    let mut words = vec![0u32; nwords];
+    let mask = if frame_bits >= 32 {
+        u32::MAX
+    } else {
+        (1u32 << frame_bits) - 1
+    };
+    for (j, &v) in code.iter().enumerate() {
+        let bit = j as u64 * frame_bits as u64;
+        let w = (bit / 32) as usize;
+        let off = (bit % 32) as u32;
+        let masked = (v as u32) & mask;
+        words[w] |= masked << off;
+        if off + frame_bits > 32 && w + 1 < nwords {
+            words[w + 1] |= masked >> (32 - off);
+        }
+    }
+    for w in words {
+        out.extend_from_slice(&w.to_le_bytes());
+    }
+}
+
+/// `S9Compressor::Encode` (`s9compressor.h:68-110`).
+fn s9_encode(src: &[u32]) -> Vec<u32> {
+    let mut out = Vec::new();
+    let mut cur = 0usize;
+    while cur < src.len() {
+        for k in 0..9usize {
+            let cur_size = S9_CODE_NUM[k];
+            if src.len() < cur + cur_size {
+                continue;
+            }
+            let b = S9_BIT_LENGTH[k];
+            let mut res = 0u32;
+            let mut i = 0usize;
+            while i < cur_size && src[cur + i] < (1u32 << b) {
+                res = (res << b) + src[cur + i];
+                i += 1;
+            }
+            if i == cur_size {
+                out.push(res | ((k as u32) << 28));
+                cur += cur_size;
+                break;
+            }
+            assert!(k < 8, "S9 exception value exceeds 28 bits");
+        }
+    }
+    out
+}
+
+/// `TransformToFrame` (`:414-451`).
+#[allow(clippy::too_many_arguments)]
+fn npf_transform_to_frame(
+    out: &mut Vec<u8>,
+    frame_bits: u32,
+    first_exception_pos: usize,
+    code: &[u16],
+    exceptions: &[u32],
+    exception_offsets: &[u32],
+    num_exceptions: usize,
+    is_last_block: bool,
+) {
+    let header = |exc_range: u32| {
+        npf_make_header(frame_bits, first_exception_pos as u32, code.len(), exc_range, is_last_block)
+    };
+    if first_exception_pos == 0 {
+        out.extend_from_slice(&header(0).to_le_bytes());
+        npf_pack(out, code, frame_bits);
+        return;
+    }
+    // Interleave exception values and offsets, then S9-encode them.
+    let mut datum = vec![0u32; num_exceptions * 2 - 1];
+    for i in 0..num_exceptions {
+        datum[2 * i] = exceptions[i];
+    }
+    for i in 0..num_exceptions - 1 {
+        datum[2 * i + 1] = exception_offsets[i];
+    }
+    let exc_words = s9_encode(&datum);
+    out.extend_from_slice(&header(exc_words.len() as u32).to_le_bytes());
+    npf_pack(out, code, frame_bits);
+    for w in exc_words {
+        out.extend_from_slice(&w.to_le_bytes());
+    }
+}
+
+/// `TransformToSpecialFrame` (`:380-405`).
+fn npf_transform_to_special_frame(
+    out: &mut Vec<u8>,
+    block: &[u16],
+    marker: u32,
+    is_last_block: bool,
+) {
+    let store_alone = matches!(marker, NPF_SAME_ALONE | NPF_INCREASE_ALONE | NPF_DECREASE_ALONE);
+    let mut value = block[0];
+    if matches!(marker, NPF_DECREASE_INLINE | NPF_DECREASE_ALONE) {
+        value = block[block.len() - 1];
+    }
+    let header = npf_make_header(
+        0,
+        marker,
+        block.len(),
+        if store_alone { 0 } else { value as u32 },
+        is_last_block,
+    );
+    out.extend_from_slice(&header.to_le_bytes());
+    if store_alone {
+        out.extend_from_slice(&(value as u32).to_le_bytes());
+    }
+}
+
+/// `CompressBlock` (`:321-368`).
+fn npf_compress_block(
+    out: &mut Vec<u8>,
+    block: &[u16],
+    frame_bits: u32,
+    num_exceptions: u32,
+    is_last_block: bool,
+) {
+    if num_exceptions == 0 {
+        npf_transform_to_frame(out, frame_bits, 0, block, &[], &[], 0, is_last_block);
+        return;
+    }
+    if matches!(
+        num_exceptions,
+        NPF_SAME_ALONE | NPF_SAME_INLINE | NPF_INCREASE_ALONE | NPF_INCREASE_INLINE | NPF_DECREASE_ALONE
+            | NPF_DECREASE_INLINE
+    ) {
+        npf_transform_to_special_frame(out, block, num_exceptions, is_last_block);
+        return;
+    }
+    // Split each value into the low `frame_bits` (the frame) and the rest (the
+    // exception), recording the positions that need patching.
+    let mask = if frame_bits >= 32 {
+        u32::MAX
+    } else {
+        (1u32 << frame_bits) - 1
+    };
+    let max = (1u32 << frame_bits) as u16;
+    let n = block.len();
+    let mut code = block.to_vec();
+    let mut miss = Vec::new();
+    for (i, &v) in block.iter().enumerate() {
+        if max <= v {
+            miss.push(i);
+        }
+    }
+    debug_assert_eq!(miss.len(), num_exceptions as usize);
+    let mut exceptions = vec![0u32; num_exceptions as usize];
+    let mut offsets = vec![0u32; num_exceptions.saturating_sub(1) as usize];
+    for (k, &m) in miss.iter().enumerate() {
+        exceptions[k] = (code[m] as u32) >> frame_bits;
+        code[m] = ((code[m] as u32) & mask) as u16;
+        if k > 0 {
+            offsets[k - 1] = (m - miss[k - 1] - 1) as u32;
+        }
+    }
+    let first_exception_pos = miss[0] + 1;
+    let _ = n;
+    npf_transform_to_frame(
+        out,
+        frame_bits,
+        first_exception_pos,
+        &code,
+        &exceptions,
+        &offsets,
+        num_exceptions as usize,
+        is_last_block,
+    );
+}
+
+/// Encodes a u16 posting field (`NewPForDeltaCompressor::Compress(..., true)`).
+pub fn encode_u16_block(values: &[u16]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let total = values.len().div_ceil(NPF_BLOCK_SIZE);
+    for blk in 0..total {
+        let off = blk * NPF_BLOCK_SIZE;
+        let len = (values.len() - off).min(NPF_BLOCK_SIZE);
+        let block = &values[off..off + len];
+        let (frame_bits, num_exceptions) = npf_select_bits(block);
+        npf_compress_block(&mut out, block, frame_bits, num_exceptions, blk + 1 == total);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -2279,6 +2566,8 @@ mod tests {
             let (got, used) = decode_u16_block(&bytes, values.len()).unwrap();
             assert_eq!(got, values, "{label}: decode");
             assert_eq!(used, bytes.len(), "{label}: bytes consumed");
+            // And the encoder must reproduce the C++ bytes.
+            assert_eq!(encode_u16_block(&values), bytes, "{label}: encode");
         }
     }
 
