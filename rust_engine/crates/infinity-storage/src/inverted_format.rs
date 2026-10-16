@@ -427,6 +427,108 @@ pub fn decode_dic_meta_at(
     Ok(meta)
 }
 
+// ---------------------------------------------------------------------------
+// FST byte packing (`fst/bytes.cppm`, `fst/node.cppm`)
+// ---------------------------------------------------------------------------
+//
+// These are the integer-packing primitives the FST node state machine builds
+// on. They are self-contained and fully specified, unlike the node encoders
+// themselves (which the spec still marks as not frozen).
+
+/// The FST sentinel for "no address" (`fst/node.cppm:43`).
+pub const FST_EMPTY_ADDRESS: u64 = 0;
+
+/// `PackSize`: the smallest number of bytes that can encode `n`
+/// (`fst/bytes.cppm:107-128`).
+pub fn fst_pack_size(n: u64) -> u8 {
+    if n < 1 << 8 {
+        1
+    } else if n < 1 << 16 {
+        2
+    } else if n < 1 << 24 {
+        3
+    } else if n < 1 << 32 {
+        4
+    } else if n < 1 << 40 {
+        5
+    } else if n < 1 << 48 {
+        6
+    } else if n < 1 << 56 {
+        7
+    } else {
+        8
+    }
+}
+
+/// `PackUintIn`: append `n` as exactly `nbytes` little-endian bytes
+/// (`fst/bytes.cppm:130-141`). `nbytes` must be in `1..=8`.
+pub fn fst_pack_uint_in(out: &mut Vec<u8>, n: u64, nbytes: u8) {
+    debug_assert!((1..=8).contains(&nbytes));
+    out.extend_from_slice(&n.to_le_bytes()[..nbytes as usize]);
+}
+
+/// `PackUint`: append `n` in the smallest number of bytes, returning how many
+/// were written (`fst/bytes.cppm:143-150`).
+pub fn fst_pack_uint(out: &mut Vec<u8>, n: u64) -> u8 {
+    let nbytes = fst_pack_size(n);
+    fst_pack_uint_in(out, n, nbytes);
+    nbytes
+}
+
+/// `UnpackUint`: read a little-endian integer of `nbytes` bytes
+/// (`fst/bytes.cppm:152-...`). `nbytes` must be in `1..=8`.
+pub fn fst_unpack_uint(buf: &[u8], nbytes: u8) -> Result<u64, FormatError> {
+    let n = nbytes as usize;
+    if !(1..=8).contains(&n) {
+        return Err(FormatError::Truncated { need: n, got: 0 });
+    }
+    if buf.len() < n {
+        return Err(FormatError::Truncated {
+            need: n,
+            got: buf.len(),
+        });
+    }
+    let mut bytes = [0u8; 8];
+    bytes[..n].copy_from_slice(&buf[..n]);
+    Ok(u64::from_le_bytes(bytes))
+}
+
+/// `State::PackDeltaSize`: bytes needed to store `node_addr - trans_addr`
+/// (`fst/node.cppm:319-327`). An empty transition address packs as the
+/// sentinel `0`.
+pub fn fst_pack_delta_size(node_addr: u64, trans_addr: u64) -> u8 {
+    let delta = if trans_addr == FST_EMPTY_ADDRESS {
+        FST_EMPTY_ADDRESS
+    } else {
+        node_addr.wrapping_sub(trans_addr)
+    };
+    fst_pack_size(delta)
+}
+
+/// `State::PackDelta` (`fst/node.cppm:303-307`): append the relative address
+/// `node_addr - trans_addr`, returning the number of bytes written.
+pub fn fst_pack_delta(out: &mut Vec<u8>, node_addr: u64, trans_addr: u64) -> u8 {
+    let nbytes = fst_pack_delta_size(node_addr, trans_addr);
+    let delta = if trans_addr == FST_EMPTY_ADDRESS {
+        FST_EMPTY_ADDRESS
+    } else {
+        node_addr.wrapping_sub(trans_addr)
+    };
+    fst_pack_uint_in(out, delta, nbytes);
+    nbytes
+}
+
+/// `State::UnpackDelta` (`fst/node.cppm:329-337`): recover an absolute address
+/// from a packed relative one. The sentinel `0` maps back to `EMPTY_ADDRESS`.
+pub fn fst_unpack_delta(buf: &[u8], nbytes: u8, node_addr: u64) -> Result<u64, FormatError> {
+    let delta = fst_unpack_uint(buf, nbytes)?;
+    if delta == FST_EMPTY_ADDRESS {
+        Ok(FST_EMPTY_ADDRESS)
+    } else {
+        Ok(node_addr.wrapping_sub(delta))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,6 +618,82 @@ mod tests {
         // An out-of-range offset is reported, not panicked.
         assert!(decode_dic_meta_at(&dic, dic.len() as u64 + 1, flags).is_err());
         assert!(dic_fst_region(&dic[..8]).is_err());
+    }
+
+    #[test]
+    fn fst_pack_size_picks_the_smallest_width() {
+        // Boundaries from `fst/bytes.cppm:108-128`.
+        let cases: &[(u64, u8)] = &[
+            (0, 1),
+            (0xff, 1),
+            (0x100, 2),
+            (0xffff, 2),
+            (0x1_0000, 3),
+            (0x00ff_ffff, 3),
+            (0x100_0000, 4),
+            (0xffff_ffff, 4),
+            (0x1_0000_0000, 5),
+            (0xff_ffff_ffff, 5),
+            (0x100_0000_0000, 6),
+            (0xffff_ffff_ffff, 6),
+            (0x1_0000_0000_0000, 7),
+            (0x00ff_ffff_ffff_ffff, 7),
+            (0x100_0000_0000_0000, 8),
+            (u64::MAX, 8),
+        ];
+        for (n, w) in cases {
+            assert_eq!(fst_pack_size(*n), *w, "pack_size({n:#x})");
+        }
+    }
+
+    #[test]
+    fn fst_pack_uint_is_little_endian_and_round_trips() {
+        // `PackUint` writes the low `PackSize(n)` LE bytes.
+        let mut out = Vec::new();
+        assert_eq!(fst_pack_uint(&mut out, 0x0102), 2);
+        assert_eq!(out, vec![0x02, 0x01]);
+        assert_eq!(fst_unpack_uint(&out, 2).unwrap(), 0x0102);
+
+        // `PackUintIn` honours an explicit (larger) width.
+        let mut wide = Vec::new();
+        fst_pack_uint_in(&mut wide, 0x0102, 4);
+        assert_eq!(wide, vec![0x02, 0x01, 0x00, 0x00]);
+        assert_eq!(fst_unpack_uint(&wide, 4).unwrap(), 0x0102);
+
+        // A full-width value round-trips.
+        let mut full = Vec::new();
+        assert_eq!(fst_pack_uint(&mut full, u64::MAX), 8);
+        assert_eq!(fst_unpack_uint(&full, 8).unwrap(), u64::MAX);
+
+        // Truncated input and an out-of-range width are reported.
+        assert!(fst_unpack_uint(&[0x01], 2).is_err());
+        assert!(fst_unpack_uint(&[], 0).is_err());
+    }
+
+    #[test]
+    fn fst_delta_is_node_minus_transition() {
+        // A forward transition packs `node_addr - trans_addr`.
+        let mut out = Vec::new();
+        let n = fst_pack_delta(&mut out, 1000, 940);
+        assert_eq!(n, 1);
+        assert_eq!(out, vec![60]);
+        assert_eq!(fst_unpack_delta(&out, n, 1000).unwrap(), 940);
+
+        // The empty-address sentinel round-trips to `EMPTY_ADDRESS`.
+        let mut empty = Vec::new();
+        let n = fst_pack_delta(&mut empty, 1000, FST_EMPTY_ADDRESS);
+        assert_eq!(empty, vec![0]);
+        assert_eq!(
+            fst_unpack_delta(&empty, n, 1000).unwrap(),
+            FST_EMPTY_ADDRESS
+        );
+
+        // A larger delta widens the encoding.
+        let mut big = Vec::new();
+        let n = fst_pack_delta(&mut big, 100_000, 1);
+        assert_eq!(fst_pack_delta_size(100_000, 1), 3);
+        assert_eq!(n, 3);
+        assert_eq!(fst_unpack_delta(&big, n, 100_000).unwrap(), 1);
     }
 
     #[test]

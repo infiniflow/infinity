@@ -435,6 +435,7 @@ parts 区（先写 base 的 `IVF_Parts_Storage_Info::Save`，再逐 part 写）�
 - 空 FST：`root_addr=0`，总长 36。
 - **Rust 侧 `.dic` 组装/读取已实现**（`infinity-storage::inverted_format`）：`encode_dic`（`[TermMeta…][FST]` 拼接）、`encode_term_meta_region_with_offsets`（同时返回每条记录的绝对偏移，即 FST 的 value）、`dic_fst_region`/`dic_fst`（由末尾 12 字节的 `root_addr` 反推 FST 区间：`root_addr==0` → 36，否则 `root_addr+21`）、`fst_header`（读 `VERSION`/`FstType`）、`decode_dic_meta_at`（按绝对偏移解析 TermMeta）。FST 的**节点状态机本身仍是不可读的**（见下），所以这些函数把 FST 当作**不透明字节**；一旦节点编解码落地即可直接接上。
 - 节点编码见 `fst/node.cppm:255-814`（每 state 首字节高 2 位区分 `StateOneTransNext/StateOneTrans/StateAnyTrans`，`COMMON_INPUTS` 为固定 256 字节表 `fst/common_inputs.cppm`，转移地址用相对 delta 打包 `Pack/UnpackDelta` `:303-337`）。FST 的 `u64` value = 该 term 的 TermMeta 在 `.dic` 的**绝对字节偏移**。
+- **Rust 侧整数打包原语已实现**（`infinity-storage::inverted_format`，语义无歧义、可单测）：`fst_pack_size`/`fst_pack_uint`/`fst_pack_uint_in`/`fst_unpack_uint`（`fst/bytes.cppm:107-170` 的 `Pack*`/`UnpackUint`，均为**小端**、低位在前）与 `fst_pack_delta`/`fst_pack_delta_size`/`fst_unpack_delta`（`fst/node.cppm:303-337`，存 `node_addr - trans_addr`，`trans_addr==0` 时存哨兵 `0`；`EMPTY_ADDRESS=0`）。**节点状态机本身仍未移植**（三种 state 的位域 + `COMMON_INPUTS` 索引）——这是全文格式兼容的最后一个大件，需要 C++ 端 ground truth 才能保证逐位一致。
 - 校验：C++ = CRC32/IEEE + Snappy 掩码；Rust `fst` crate = CRC32C → **不兼容**（呼应 §3 / PoC F）。
 
 ### 9.3.4 `.pos`（postings）
