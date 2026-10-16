@@ -898,6 +898,20 @@ fn handle_connection(
                     };
                     write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
                 }
+                "ShowCurrentNode" => {
+                    {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        skip_struct(&mut ip)?;
+                    }
+                    write_show_current_node_response(&mut writer, seq, "leader", "alive")?;
+                }
+                "ListSnapshots" => {
+                    {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        skip_struct(&mut ip)?;
+                    }
+                    write_list_snapshots_response(&mut writer, seq)?;
+                }
                 other => {
                     {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -3752,6 +3766,90 @@ pub fn write_show_database_response(
     o.write_field_end().map_err(tw)?;
     o.write_field_stop().map_err(tw)?;
     o.write_struct_end().map_err(tw)?; // ShowDatabase_result
+    o.flush().map_err(tw)?;
+    Ok(())
+}
+
+/// Writes a `ShowCurrentNode` REPLY (`ShowCurrentNodeResponse` fields 1..=4).
+pub fn write_show_current_node_response(
+    w: &mut impl Write,
+    seq: i32,
+    node_role: &str,
+    server_status: &str,
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ShowCurrentNode",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowCurrentNode_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowCurrentNodeResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(0).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string("OK").map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("node_role", TType::String, 3i16))
+        .map_err(tw)?;
+    o.write_string(node_role).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("server_status", TType::String, 4i16))
+        .map_err(tw)?;
+    o.write_string(server_status).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.flush().map_err(tw)?;
+    Ok(())
+}
+
+/// Writes a `ListSnapshots` REPLY with the given snapshot names
+/// (`ListSnapshotsResponse.snapshots` is a list of `Snapshot` structs).
+pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ListSnapshots",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ListSnapshots_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ListSnapshotsResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(0).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string("OK").map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("snapshots", TType::List, 3i16))
+        .map_err(tw)?;
+    o.write_list_begin(&TListIdentifier::new(TType::Struct, 0))
+        .map_err(tw)?;
+    o.write_list_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
     o.flush().map_err(tw)?;
     Ok(())
 }
