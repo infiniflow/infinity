@@ -676,13 +676,16 @@ fn explain_fusion(p: &SearchPlan) -> Option<Vec<String>> {
     });
 
     let fusion_name = p.search.fusion.clone().unwrap_or_default();
-    let fusion_params = p.search.fusion_params.clone().unwrap_or_default();
+    let fusion_params = canonical_fusion_params(p.search.fusion_params.as_deref().unwrap_or(""));
 
     let mut lines = Vec::new();
-    lines.push(header(0, "PROJECT", 5));
+    // Planner-assigned node ids: leaves are numbered 2, 3, … in creation
+    // order; the FUSION sits above them and the PROJECT above that.
+    let n = matches.len() as u64;
+    lines.push(header(0, "PROJECT", 3 + n));
     lines.push(attr(0, "table index: #4"));
     lines.push(attr(0, &format!("expressions: [{}]", proj.join(", "))));
-    lines.push(header(1, "FUSION", 4));
+    lines.push(header(1, "FUSION", 2 + n));
     lines.push(attr(
         1,
         &format!("fusion: #FUSION('{fusion_name}', '{fusion_params}')"),
@@ -712,6 +715,24 @@ fn explain_fusion(p: &SearchPlan) -> Option<Vec<String>> {
         }
     }
     Some(lines)
+}
+
+/// Canonicalises a FUSION option string the way the C++ planner stores it: the
+/// `k=v` pairs are kept in a sorted map, so `EXPLAIN` prints them ordered by key
+/// and joined with commas (`a=1;b=2` -> `a=1,b=2`). A bare value (no `=`) is
+/// passed through unchanged.
+fn canonical_fusion_params(params: &str) -> String {
+    if params.is_empty() {
+        return String::new();
+    }
+    let parts: Vec<&str> = params.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
+    if parts.iter().all(|p| p.contains('=')) {
+        let mut pairs: Vec<&str> = parts.clone();
+        pairs.sort_by_key(|p| p.split_once('=').map(|(k, _)| k).unwrap_or(*p));
+        pairs.join(",")
+    } else {
+        params.to_string()
+    }
 }
 
 /// Collects the column names referenced by a predicate (first-appearance order).
