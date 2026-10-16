@@ -894,6 +894,48 @@ impl Parser {
                         ],
                     });
                 }
+                // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.
+                if s.eq_ignore_ascii_case("INTERVAL")
+                    && !matches!(self.toks.get(self.pos + 1), Some(Token::Str(_)))
+                {
+                    self.advance();
+                    let mut sign = 1i64;
+                    if let Token::Op(op) = self.peek().clone() {
+                        if op == "-" {
+                            self.advance();
+                            sign = -1;
+                        } else if op == "+" {
+                            self.advance();
+                        }
+                    }
+                    let n = match self.advance() {
+                        Token::Int(i) => i,
+                        Token::Float(f) => f as i64,
+                        _ => 0,
+                    };
+                    let unit = self.expect_ident()?.to_ascii_uppercase();
+                    return Ok(ExprAst::Func {
+                        name: "INTERVAL".to_string(),
+                        args: vec![ExprAst::Literal(Literal::Str(format!(
+                            "{} {}",
+                            sign * n,
+                            unit
+                        )))],
+                    });
+                }
+                // `EXTRACT(<field> FROM <expr>)`
+                if s.eq_ignore_ascii_case("EXTRACT") {
+                    self.advance();
+                    self.expect(Token::LParen)?;
+                    let field = self.expr()?;
+                    self.expect_kw("FROM")?;
+                    let src = self.expr()?;
+                    self.expect(Token::RParen)?;
+                    return Ok(ExprAst::Func {
+                        name: "EXTRACT".to_string(),
+                        args: vec![field, src],
+                    });
+                }
                 // Typed date/time literals can also appear inside expressions.
                 if matches!(
                     s.to_ascii_uppercase().as_str(),

@@ -226,7 +226,172 @@ impl Expr {
 }
 
 /// Evaluates `a <op> b` with numeric promotion; NULL propagates.
+/// Sentinel prefix marking an encoded interval string (`<tag><n> <unit>`).
+const INTERVAL_TAG: char = '\u{1}';
+
+fn parse_interval(s: &str) -> Option<(i64, String)> {
+    let rest = s.strip_prefix(INTERVAL_TAG)?;
+    let (n, unit) = rest.split_once(' ')?;
+    Some((n.trim().parse().ok()?, unit.trim().to_ascii_uppercase()))
+}
+
+fn is_leap(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+fn days_in_month(y: i64, m: i64) -> i64 {
+    match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if is_leap(y) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 30,
+    }
+}
+
+/// A parsed date / time / datetime, used for `± INTERVAL` arithmetic.
+struct Dt {
+    y: i64,
+    mo: i64,
+    d: i64,
+    h: i64,
+    mi: i64,
+    s: i64,
+    has_date: bool,
+    has_time: bool,
+}
+
+fn parse_dt(s: &str) -> Option<Dt> {
+    let s = s.trim();
+    let (dp, tp) = if let Some((a, b)) = s.split_once(' ') {
+        (Some(a), Some(b))
+    } else if s.contains(':') {
+        (None, Some(s))
+    } else {
+        (Some(s), None)
+    };
+    let (y, mo, d) = match dp {
+        Some(dp) => {
+            let p: Vec<&str> = dp.split('-').collect();
+            if p.len() != 3 {
+                return None;
+            }
+            (p[0].parse().ok()?, p[1].parse().ok()?, p[2].parse().ok()?)
+        }
+        None => (1970, 1, 1),
+    };
+    let (h, mi, sec) = match tp {
+        Some(tp) => {
+            let p: Vec<&str> = tp.split(':').collect();
+            let g = |i: usize| -> i64 {
+                p.get(i)
+                    .map(|v| v.split('.').next().unwrap_or(v).trim().parse().unwrap_or(0))
+                    .unwrap_or(0)
+            };
+            (g(0), g(1), g(2))
+        }
+        None => (0, 0, 0),
+    };
+    Some(Dt {
+        y,
+        mo,
+        d,
+        h,
+        mi,
+        s: sec,
+        has_date: dp.is_some(),
+        has_time: tp.is_some(),
+    })
+}
+
+impl Dt {
+    fn clamp_day(&mut self) {
+        let dim = days_in_month(self.y, self.mo);
+        if self.d > dim {
+            self.d = dim;
+        }
+    }
+
+    fn add_days(&mut self, n: i64) {
+        let (y, m, d) = civil_from_days(days_from_civil(self.y, self.mo, self.d) + n);
+        self.y = y;
+        self.mo = m;
+        self.d = d;
+    }
+
+    fn add_seconds(&mut self, secs: i64) {
+        let total = self.h * 3600 + self.mi * 60 + self.s + secs;
+        let days = total.div_euclid(86400);
+        let rem = total.rem_euclid(86400);
+        if days != 0 && self.has_date {
+            self.add_days(days);
+        }
+        self.h = rem / 3600;
+        self.mi = (rem % 3600) / 60;
+        self.s = rem % 60;
+    }
+
+    fn add(&mut self, n: i64, unit: &str) -> Option<()> {
+        match unit {
+            "YEAR" | "YEARS" => {
+                self.y += n;
+                self.clamp_day();
+            }
+            "MONTH" | "MONTHS" => {
+                let total = (self.y * 12 + (self.mo - 1)) + n;
+                self.y = total.div_euclid(12);
+                self.mo = total.rem_euclid(12) + 1;
+                self.clamp_day();
+            }
+            "WEEK" | "WEEKS" => self.add_days(n * 7),
+            "DAY" | "DAYS" => self.add_days(n),
+            "HOUR" | "HOURS" => self.add_seconds(n * 3600),
+            "MINUTE" | "MINUTES" => self.add_seconds(n * 60),
+            "SECOND" | "SECONDS" => self.add_seconds(n),
+            _ => return None,
+        }
+        Some(())
+    }
+
+    fn render(&self) -> String {
+        if self.has_date && self.has_time {
+            format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                self.y, self.mo, self.d, self.h, self.mi, self.s
+            )
+        } else if self.has_date {
+            format!("{:04}-{:02}-{:02}", self.y, self.mo, self.d)
+        } else {
+            format!("{:02}:{:02}:{:02}", self.h, self.mi, self.s)
+        }
+    }
+}
+
+/// Applies `date/time ± interval`; returns `None` when neither operand is a
+/// date/time paired with an interval.
+fn datetime_arith(x: &str, op: BinOp, y: &str) -> Option<Value> {
+    let (base, n, unit, sub) = match (parse_interval(x), parse_interval(y)) {
+        (None, Some((n, u))) => (x, n, u, op == BinOp::Sub),
+        (Some((n, u)), None) if op == BinOp::Add => (y, n, u, false),
+        _ => return None,
+    };
+    let mut dt = parse_dt(base)?;
+    dt.add(if sub { -n } else { n }, &unit)?;
+    Some(Value::Str(dt.render()))
+}
+
 fn eval_binary(a: &Value, op: BinOp, b: &Value) -> Value {
+    // date/time ± interval, or interval + date/time
+    if let (Value::Str(x), Value::Str(y)) = (a, b) {
+        if let Some(v) = datetime_arith(x, op, y) {
+            return v;
+        }
+    }
     let (x, y) = match (a, b) {
         (Value::Int(x), Value::Int(y)) if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul) => {
             let v = match op {
@@ -599,6 +764,28 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
     let a0 = || args.first().map(|e| e.eval(row)).unwrap_or(Value::Null);
     let a1 = || args.get(1).map(|e| e.eval(row)).unwrap_or(Value::Null);
     match name.to_ascii_uppercase().as_str() {
+        // An interval literal is carried as a tagged string.
+        "INTERVAL" => match a0() {
+            Value::Str(s) => {
+                let (n, unit) = s.trim().split_once(' ').unwrap_or((s.trim(), ""));
+                match n.parse::<i64>() {
+                    Ok(v) => Value::Str(format!("{INTERVAL_TAG}{v} {unit}")),
+                    Err(_) => Value::Null,
+                }
+            }
+            _ => Value::Null,
+        },
+        "EXTRACT" => {
+            let field = match a0() {
+                Value::Str(s) => s.to_ascii_uppercase(),
+                _ => return Value::Null,
+            };
+            let src = match a1() {
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            dt_component(&src, &field)
+        }
         "SQRT" => a0()
             .as_f64()
             .map(|v| Value::Float(v.sqrt()))
@@ -932,6 +1119,50 @@ mod tests {
         assert_eq!(aggregate(AggFunc::Avg, &[0], false, &[]), Value::Null);
         assert_eq!(aggregate(AggFunc::Count, &[0], false, &[]), Value::Int(0));
         assert_eq!(aggregate(AggFunc::Min, &[0], false, &[]), Value::Null);
+    }
+
+    #[test]
+    fn interval_arithmetic_and_extract() {
+        let f = |name: &str, args: Vec<Expr>| Expr::Func {
+            name: name.into(),
+            args,
+        };
+        let iv = |spec: &str| f("INTERVAL", vec![Expr::Literal(Value::Str(spec.into()))]);
+        let r: Vec<Value> = vec![];
+        // date + year + month
+        let e = Expr::Binary(
+            Box::new(Expr::Binary(
+                Box::new(Expr::Literal(Value::Str("1970-01-01".into()))),
+                BinOp::Add,
+                Box::new(iv("-100 YEAR")),
+            )),
+            BinOp::Add,
+            Box::new(iv("10 MONTH")),
+        );
+        assert_eq!(e.eval(&r), Value::Str("1870-11-01".into()));
+        // month addition clamps to the last valid day
+        let e2 = Expr::Binary(
+            Box::new(Expr::Literal(Value::Str("2022-01-31".into()))),
+            BinOp::Add,
+            Box::new(iv("1 MONTH")),
+        );
+        assert_eq!(e2.eval(&r), Value::Str("2022-02-28".into()));
+        // timestamp - hours
+        let e3 = Expr::Binary(
+            Box::new(Expr::Literal(Value::Str("6570-12-31 00:00:00".into()))),
+            BinOp::Sub,
+            Box::new(iv("12 HOURS")),
+        );
+        assert_eq!(e3.eval(&r), Value::Str("6570-12-30 12:00:00".into()));
+        // EXTRACT reads the field
+        let ex = f(
+            "EXTRACT",
+            vec![
+                Expr::Literal(Value::Str("hour".into())),
+                Expr::Literal(Value::Str("12:34:56".into())),
+            ],
+        );
+        assert_eq!(ex.eval(&r), Value::Int(12));
     }
 
     #[test]
