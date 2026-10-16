@@ -641,6 +641,20 @@ impl Parser {
                         ],
                     });
                 }
+                // Typed date/time literals can also appear inside expressions.
+                if matches!(
+                    s.to_ascii_uppercase().as_str(),
+                    "DATE" | "TIME" | "TIMESTAMP" | "DATETIME" | "INTERVAL"
+                ) && matches!(self.toks.get(self.pos + 1), Some(Token::Str(_)))
+                {
+                    self.advance();
+                    let kind = s.to_ascii_uppercase();
+                    let inner = self.literal()?;
+                    return Ok(ExprAst::Literal(match inner {
+                        Literal::Str(v) => Literal::Str(normalize_datetime(&kind, &v)),
+                        other => other,
+                    }));
+                }
                 if matches!(self.toks.get(self.pos + 1), Some(Token::LParen)) {
                     self.advance();
                     self.expect(Token::LParen)?;
@@ -1006,7 +1020,12 @@ impl Parser {
                 ) =>
             {
                 self.advance();
-                self.literal()
+                let kind = s.to_ascii_uppercase();
+                let inner = self.literal()?;
+                match inner {
+                    Literal::Str(v) => Ok(Literal::Str(normalize_datetime(&kind, &v))),
+                    other => Ok(other),
+                }
             }
             _ => self.err("expected literal"),
         }
@@ -1171,6 +1190,51 @@ fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
             args: a.arg.clone().map(ExprAst::Column).into_iter().collect(),
         }),
         _ => None,
+    }
+}
+
+/// Normalises a typed date/time literal to Infinity's zero-padded text form.
+fn normalize_datetime(kind: &str, raw: &str) -> String {
+    if kind == "INTERVAL" {
+        return raw.trim().to_string();
+    }
+    let s = raw.trim();
+    let (date_part, time_part) = if let Some((a, b)) = s.split_once(' ') {
+        (Some(a.to_string()), Some(b.to_string()))
+    } else if s.contains(':') {
+        (None, Some(s.to_string()))
+    } else {
+        (Some(s.to_string()), None)
+    };
+    let date_norm = date_part.map(|d| {
+        let parts: Vec<&str> = d.split('-').collect();
+        if parts.len() == 3 {
+            let y: i64 = parts[0].parse().unwrap_or(0);
+            let m: i64 = parts[1].parse().unwrap_or(0);
+            let dd: i64 = parts[2].parse().unwrap_or(0);
+            format!("{y:04}-{m:02}-{dd:02}")
+        } else {
+            d
+        }
+    });
+    let time_norm = time_part.map(|t| {
+        let parts: Vec<&str> = t.split(':').collect();
+        let get = |i: usize| -> i64 {
+            parts
+                .get(i)
+                .map(|v| v.split('.').next().unwrap_or(v).trim().parse().unwrap_or(0))
+                .unwrap_or(0)
+        };
+        format!("{:02}:{:02}:{:02}", get(0), get(1), get(2))
+    });
+    match kind {
+        "DATE" => date_norm.unwrap_or_default(),
+        "TIME" => time_norm.unwrap_or_else(|| "00:00:00".to_string()),
+        _ => format!(
+            "{} {}",
+            date_norm.unwrap_or_default(),
+            time_norm.unwrap_or_else(|| "00:00:00".to_string())
+        ),
     }
 }
 

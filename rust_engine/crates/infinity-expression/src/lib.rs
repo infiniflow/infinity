@@ -258,6 +258,149 @@ fn cast_value(v: &Value, ty: &str) -> Value {
     }
 }
 
+/// Parsed date/time components (`None` when absent from the text form).
+#[derive(Default)]
+struct DtFields {
+    year: Option<i64>,
+    month: Option<i64>,
+    day: Option<i64>,
+    hour: Option<i64>,
+    minute: Option<i64>,
+    second: Option<i64>,
+}
+
+fn dt_fields(s: &str) -> DtFields {
+    let mut f = DtFields::default();
+    let s = s.trim();
+    let (date_part, time_part) = if let Some((a, b)) = s.split_once(' ') {
+        (Some(a), Some(b))
+    } else if s.contains(':') {
+        (None, Some(s))
+    } else {
+        (Some(s), None)
+    };
+    if let Some(d) = date_part {
+        // a leading '-' denotes a BC year
+        let (neg, dd) = match d.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, d),
+        };
+        let mut it = dd.split('-');
+        if let Some(y) = it.next().and_then(|x| x.parse::<i64>().ok()) {
+            f.year = Some(if neg { -y } else { y });
+        }
+        f.month = it.next().and_then(|x| x.parse().ok());
+        f.day = it.next().and_then(|x| x.parse().ok());
+    }
+    if let Some(t) = time_part {
+        let mut it = t.split(':');
+        f.hour = it.next().and_then(|x| x.parse().ok());
+        f.minute = it.next().and_then(|x| x.parse().ok());
+        f.second = it
+            .next()
+            .and_then(|x| x.split('.').next().unwrap_or(x).parse().ok());
+    }
+    f
+}
+
+/// Days since 1970-01-01 (Howard Hinnant's civil algorithm).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Evaluates a date/time component function.
+fn dt_component(s: &str, field: &str) -> Value {
+    let f = dt_fields(s);
+    let int = |o: Option<i64>| o.map(Value::Int).unwrap_or(Value::Null);
+    match field {
+        "YEAR" => int(f.year),
+        "MONTH" | "MON" => int(f.month),
+        "DAY" | "DAYOFMONTH" => int(f.day),
+        "HOUR" => int(f.hour.or(Some(0))),
+        "MINUTE" => int(f.minute.or(Some(0))),
+        "SECOND" => int(f.second.or(Some(0))),
+        "QUARTER" => int(f.month.map(|m| (m - 1) / 3 + 1)),
+        "ERA" => int(f.year.map(|y| i64::from(y > 0))),
+        "CENTURY" => int(f.year.map(|y| {
+            if y > 0 {
+                (y - 1) / 100 + 1
+            } else {
+                -((-y) / 100 + 1)
+            }
+        })),
+        "EPOCH" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                let days = days_from_civil(y, m, d);
+                if f.hour.is_some() {
+                    Value::Int(
+                        days * 86400
+                            + f.hour.unwrap_or(0) * 3600
+                            + f.minute.unwrap_or(0) * 60
+                            + f.second.unwrap_or(0),
+                    )
+                } else {
+                    Value::Int(days)
+                }
+            }
+            _ => Value::Null,
+        },
+        "WEEKOFYEAR" | "WEEK" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => Value::Int(iso_week(y, m, d)),
+            _ => Value::Null,
+        },
+        "DAYOFYEAR" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                Value::Int(days_from_civil(y, m, d) - days_from_civil(y, 1, 1) + 1)
+            }
+            _ => Value::Null,
+        },
+        // weekday: 0 = Sunday … 6 = Saturday
+        "WEEKDAY" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => Value::Int((days_from_civil(y, m, d) + 4).rem_euclid(7)),
+            _ => Value::Null,
+        },
+        // day of week: ISO-8601, 1 = Monday … 7 = Sunday
+        "DAYOFWEEK" => match (f.year, f.month, f.day) {
+            (Some(y), Some(m), Some(d)) => {
+                Value::Int((days_from_civil(y, m, d) + 3).rem_euclid(7) + 1)
+            }
+            _ => Value::Null,
+        },
+        _ => Value::Null,
+    }
+}
+
+/// ISO-8601 week number.
+fn iso_week(y: i64, m: i64, d: i64) -> i64 {
+    let days = days_from_civil(y, m, d);
+    // ISO weekdays: Monday = 1 … Sunday = 7 (1970-01-01 was a Thursday = 4).
+    let dow = (days.rem_euclid(7)) + 4;
+    let dow = if dow > 7 { dow - 7 } else { dow };
+    let thursday = days - (dow - 4);
+    let (ty, _, _) = civil_from_days(thursday);
+    let jan1 = days_from_civil(ty, 1, 1);
+    ((thursday - jan1) / 7 + 1) as i64
+}
+
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
 /// SQL `LIKE`: `%` matches any run of characters, `_` a single character.
 fn like_match(text: &str, pattern: &str) -> bool {
     let t: Vec<char> = text.chars().collect();
@@ -401,6 +544,26 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
         }
         "IS_NULL" => Value::Bool(matches!(a0(), Value::Null)),
         "IS_NOT_NULL" => Value::Bool(!matches!(a0(), Value::Null)),
+        "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND" | "QUARTER" | "ERA" | "CENTURY"
+        | "EPOCH" | "WEEKOFYEAR" | "WEEK" | "DAYOFMONTH" | "DAYOFYEAR" | "WEEKDAY"
+        | "DAYOFWEEK" => {
+            let s = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            dt_component(&s, &name.to_ascii_uppercase())
+        }
+        "DATEPART" | "DATE_PART" => {
+            let field = match a0() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            let val = match a1() {
+                Value::Str(s) => s,
+                _ => return Value::Null,
+            };
+            dt_component(&val, &field.to_ascii_uppercase())
+        }
         "CAST" => {
             let ty = match a1() {
                 Value::Str(s) => s.to_ascii_uppercase(),
