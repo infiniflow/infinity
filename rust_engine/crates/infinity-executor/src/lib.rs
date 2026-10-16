@@ -439,6 +439,18 @@ fn is_json_type(type_text: &str) -> bool {
     type_text.eq_ignore_ascii_case("JSON")
 }
 
+/// Renders a JSON scalar (or nested value) as a stored cell string.
+fn json_scalar_text(v: &infinity_expression::json::Json) -> String {
+    use infinity_expression::json::Json;
+    match v {
+        Json::Str(s) => s.clone(),
+        Json::Int(i) => i.to_string(),
+        Json::Float(f) => fmt_num(*f),
+        Json::Bool(b) => b.to_string(),
+        other => other.compact(),
+    }
+}
+
 fn is_sparse_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("SPARSE")
 }
@@ -448,15 +460,36 @@ fn is_sparse_type(type_text: &str) -> bool {
 /// duplicated indices).
 fn reshape_sparse(s: &str, float: bool) -> Option<String> {
     let t = s.trim();
+    if t.is_empty() || t == "[]" {
+        return Some("(empty)".to_string());
+    }
+    // A `bit` sparse vector (and any index-only literal) carries just the
+    // non-zero positions, e.g. `[10000,20000]`, with no `:` values.
+    let inner = t.trim_start_matches('[').trim_end_matches(']');
+    if !inner.contains(':') {
+        let mut idx: Vec<usize> = Vec::new();
+        for it in inner.split(',') {
+            let it = it.trim();
+            if it.is_empty() {
+                continue;
+            }
+            idx.push(it.parse::<usize>().ok()?);
+        }
+        if idx.is_empty() {
+            return None;
+        }
+        idx.sort_unstable();
+        if idx.windows(2).any(|w| w[0] == w[1]) {
+            return None; // duplicate index
+        }
+        let body: Vec<String> = idx.iter().map(|i| i.to_string()).collect();
+        return Some(format!("[{}]", body.join(",")));
+    }
     let pairs = parse_sparse_str(t);
     if pairs.is_empty() {
-        // an empty vector is valid; a non-empty literal that parses to nothing
-        // (e.g. a negative index) is not
-        return if t.is_empty() || t == "[]" {
-            Some("(empty)".to_string())
-        } else {
-            None
-        };
+        // a non-empty literal that parses to nothing (e.g. a negative index)
+        // is invalid
+        return None;
     }
     let mut sorted = pairs.clone();
     sorted.sort_by_key(|(i, _)| *i);
@@ -626,10 +659,18 @@ fn describe_type(type_text: &str) -> String {
     if up.starts_with("SPARSE(") {
         let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-        let elem = parts
+        let raw = parts
             .first()
             .map(|s| s.to_ascii_lowercase())
             .unwrap_or_default();
+        // Integer element names are printed with their width suffix.
+        let elem = match raw.as_str() {
+            "int" | "integer" => "int32",
+            "tinyint" => "int8",
+            "smallint" => "int16",
+            "bigint" => "int64",
+            _ => raw.as_str(),
+        };
         let bound: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
         let idx = if bound <= 127 {
             "int8"
@@ -641,6 +682,16 @@ fn describe_type(type_text: &str) -> String {
             "int64"
         };
         return format!("Sparse({elem},{idx},{bound})");
+    }
+    if up.starts_with("EMBEDDING(") {
+        let inner = t[t.find('(').unwrap() + 1..].trim_end_matches(')');
+        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        let elem = parts
+            .first()
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_default();
+        let dim = parts.get(1).map(|s| s.trim()).unwrap_or("");
+        return format!("Embedding({elem},{dim})");
     }
     let base = up.split('(').next().unwrap_or(&up);
     match base {
@@ -659,6 +710,36 @@ fn describe_type(type_text: &str) -> String {
             }
             c
         }
+    }
+}
+
+/// Renders a column default for `SHOW TABLE … COLUMNS`, mirroring the C++
+/// `default_expr_->ToString()`. An absent default prints as `Null`; a sparse
+/// default reproduces the C++ renderer, which (for float sparses) prints the
+/// value before the index.
+fn render_column_default(def: Option<&String>, type_text: &str) -> String {
+    let Some(d) = def else {
+        return "Null".to_string();
+    };
+    if !is_sparse_type(type_text) {
+        return d.clone();
+    }
+    let t = d.trim();
+    if t.is_empty() || t == "[]" {
+        return "(empty)".to_string();
+    }
+    let inner = t.trim_start_matches('[').trim_end_matches(']');
+    if inner.contains(':') {
+        let pairs = parse_sparse_str(t);
+        let body: Vec<String> = pairs.iter().map(|(i, v)| format!("{v:.6}:{i}")).collect();
+        format!("[{}]", body.join(","))
+    } else {
+        let idx: Vec<String> = inner
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        format!("[{}]", idx.join(","))
     }
 }
 
@@ -1056,15 +1137,11 @@ impl Engine {
                         vec![
                             meta.columns[i].clone(),
                             describe_type(&ty),
-                            if meta.not_nulls.get(i).copied().unwrap_or(false) {
-                                "Not Null".to_string()
-                            } else {
-                                "Null".to_string()
-                            },
-                            match meta.defaults.get(i).and_then(|d| d.clone()) {
-                                Some(d) => d,
-                                None => "(empty)".to_string(),
-                            },
+                            render_column_default(
+                                meta.defaults.get(i).and_then(|d| d.as_ref()),
+                                &ty,
+                            ),
+                            "(empty)".to_string(),
                         ]
                     })
                     .collect();
@@ -1714,6 +1791,14 @@ impl Engine {
             .map(|(_, v)| decode_delimiter(v))
             .unwrap_or(',');
         let types_for_scan = self.column_types(table)?;
+        let defaults = self.table_defaults(table)?;
+        // A `FORMAT JSONL` copy reads one JSON object per line.
+        let is_jsonl = opts
+            .iter()
+            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSONL"));
+        if is_jsonl {
+            return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
+        }
         let mut rows: Vec<Vec<Literal>> = Vec::new();
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
@@ -1725,7 +1810,15 @@ impl Engine {
             } else {
                 line.split(delim).map(|s| s.to_string()).collect()
             };
-            let cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+            let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+            // an empty CSV cell takes the column default when one is declared
+            for (i, c) in cells.iter_mut().enumerate() {
+                if c.is_empty() {
+                    if let Some(Some(d)) = defaults.get(i) {
+                        *c = d.clone();
+                    }
+                }
+            }
             // skip rows whose typed (sparse) cells are malformed
             let mut ok = true;
             for (i, c) in cells.iter().enumerate() {
@@ -1753,6 +1846,89 @@ impl Engine {
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
             let encoded = encode_row(row, &types);
+            t.put(row_key(table, base + k), encoded.into_bytes());
+        }
+        self.txn.commit(t)?;
+        for (k, row) in rows.iter().enumerate() {
+            self.update_indexes_on_insert(table, base + k, row)?;
+        }
+        Ok(QueryResult::Inserted { count: rows.len() })
+    }
+
+    /// Loads a `FORMAT JSONL` copy: one JSON object per line, keyed by column
+    /// name. Sparse columns come as `{index: value}` objects (float) or index
+    /// arrays (bit); everything else is a scalar.
+    fn copy_from_jsonl(
+        &self,
+        table: &str,
+        text: &str,
+        types: &[String],
+        defaults: &[Option<String>],
+    ) -> Result<QueryResult> {
+        use infinity_expression::json::Json;
+        let schema = self.table_schema(table)?;
+        let mut rows: Vec<Vec<Literal>> = Vec::new();
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let Some(Json::Obj(fields)) = infinity_expression::json::parse(line) else {
+                continue;
+            };
+            let mut cells: Vec<Literal> = Vec::with_capacity(schema.len());
+            for (i, name) in schema.iter().enumerate() {
+                let ty = types.get(i).cloned().unwrap_or_default();
+                let value = fields.iter().find(|(k, _)| k == name).map(|(_, v)| v);
+                let cell = match value {
+                    Some(Json::Obj(pairs)) if is_sparse_type(&ty) => {
+                        let mut ps: Vec<(i64, f64)> = pairs
+                            .iter()
+                            .filter_map(|(k, v)| {
+                                let idx = k.trim().parse::<i64>().ok()?;
+                                let val = match v {
+                                    Json::Int(x) => *x as f64,
+                                    Json::Float(x) => *x,
+                                    _ => return None,
+                                };
+                                Some((idx, val))
+                            })
+                            .collect();
+                        ps.sort_by_key(|(i, _)| *i);
+                        let body: Vec<String> =
+                            ps.iter().map(|(i, v)| format!("{i}:{v:.6}")).collect();
+                        Literal::Str(format!("[{}]", body.join(",")))
+                    }
+                    Some(Json::Arr(items)) if is_sparse_type(&ty) => {
+                        let idx: Vec<String> = items
+                            .iter()
+                            .filter_map(|x| match x {
+                                Json::Int(i) => Some(i.to_string()),
+                                Json::Float(f) => Some((*f as i64).to_string()),
+                                _ => None,
+                            })
+                            .collect();
+                        Literal::Str(format!("[{}]", idx.join(",")))
+                    }
+                    // an absent / null field takes the column default
+                    Some(Json::Null) | None => defaults
+                        .get(i)
+                        .and_then(|d| d.as_deref())
+                        .map(default_literal)
+                        .unwrap_or(Literal::Null),
+                    Some(other) => Literal::Str(json_scalar_text(other)),
+                };
+                cells.push(cell);
+            }
+            rows.push(cells);
+        }
+        if rows.is_empty() {
+            return Ok(QueryResult::Inserted { count: 0 });
+        }
+        let base = self.store.scan_prefix(&row_prefix(table))?.len();
+        let mut t = self.txn.begin();
+        for (k, row) in rows.iter().enumerate() {
+            let encoded = encode_row(row, types);
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
         self.txn.commit(t)?;
@@ -2952,5 +3128,47 @@ mod tests {
         // scalars / NULL padding are not dimension-checked
         assert!(validate_tensor_dimension(t, "null").is_ok());
         assert!(validate_tensor_dimension("VARCHAR", "'no tensor'").is_ok());
+    }
+
+    #[test]
+    fn describe_type_names() {
+        assert_eq!(describe_type("INT"), "Integer");
+        assert_eq!(describe_type("ARRAY(VARCHAR)"), "Array(Varchar)");
+        assert_eq!(
+            describe_type("EMBEDDING(FLOAT,1024)"),
+            "Embedding(float,1024)"
+        );
+        assert_eq!(
+            describe_type("ARRAY(EMBEDDING(FLOAT,1024))"),
+            "Array(Embedding(float,1024))"
+        );
+        assert_eq!(
+            describe_type("SPARSE(INT,30000)"),
+            "Sparse(int32,int16,30000)"
+        );
+        assert_eq!(
+            describe_type("SPARSE(FLOAT,10000000000)"),
+            "Sparse(float,int64,10000000000)"
+        );
+    }
+
+    #[test]
+    fn column_default_rendering() {
+        assert_eq!(render_column_default(None, "INT"), "Null");
+        assert_eq!(render_column_default(Some(&"0".to_string()), "INT"), "0");
+        // an empty sparse default prints as `(empty)`
+        assert_eq!(
+            render_column_default(Some(&"[]".to_string()), "SPARSE(FLOAT,30000)"),
+            "(empty)"
+        );
+        // the C++ renderer prints the value before the index for float sparses
+        assert_eq!(
+            render_column_default(Some(&"[0:0.0]".to_string()), "SPARSE(FLOAT,30000)"),
+            "[0.000000:0]"
+        );
+        assert_eq!(
+            render_column_default(Some(&"[0]".to_string()), "SPARSE(BIT,30000)"),
+            "[0]"
+        );
     }
 }
