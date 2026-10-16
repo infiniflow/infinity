@@ -1881,16 +1881,14 @@ impl Engine {
                         let index_plan = match where_pred.as_ref() {
                             Some(w) if !logical && !*distinct => {
                                 let indexed = self.indexed_columns(t)?;
-                                crate::explain::explain_index_scan(
-                                    &crate::explain::IndexScanPlan {
-                                        items,
-                                        table: t,
-                                        where_pred: w,
-                                        order_by,
-                                        schema: &schema,
-                                        indexed: &indexed,
-                                    },
-                                )
+                                crate::explain::explain_index_scan(&crate::explain::IndexScanPlan {
+                                    items,
+                                    table: t,
+                                    where_pred: w,
+                                    order_by,
+                                    schema: &schema,
+                                    indexed: &indexed,
+                                })
                             }
                             _ => None,
                         };
