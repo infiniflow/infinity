@@ -307,6 +307,11 @@ pub enum Statement {
     ShowTableColumns {
         table: String,
     },
+    /// `SHOW TABLE <t> INDEX <name>`
+    ShowTableIndex {
+        table: String,
+        index: String,
+    },
     /// `SET CONFIG <key> <value>`
     SetConfig {
         key: String,
@@ -338,6 +343,11 @@ pub enum Statement {
     AlterTableDropColumn {
         table: String,
         column: String,
+    },
+    /// `ALTER TABLE <t> RENAME TO <new>`
+    RenameTable {
+        table: String,
+        new_name: String,
     },
     Select {
         items: Vec<SelectItem>,

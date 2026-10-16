@@ -393,6 +393,16 @@ impl Parser {
                             columns = self.column_defs()?;
                         }
                         Ok(Statement::AlterTableAdd { table, columns })
+                    } else if self.eat_kw("RENAME") {
+                        let _ = self.eat_kw("TO");
+                        while !matches!(self.peek(), Token::Semicolon | Token::Eof)
+                            && !matches!(self.peek(), Token::Ident(v) if v.eq_ignore_ascii_case("TO"))
+                        {
+                            self.advance();
+                        }
+                        let _ = self.eat_kw("TO");
+                        let new_name = self.expect_table_name()?;
+                        Ok(Statement::RenameTable { table, new_name })
                     } else if self.eat_kw("DROP") {
                         let _ = self.eat_kw("COLUMN");
                         let column = if self.peek() == &Token::LParen {
@@ -597,6 +607,24 @@ impl Parser {
                     if let Ok(t) = self.expect_table_name() {
                         if self.eat_kw("COLUMNS") {
                             return Ok(Statement::ShowTableColumns { table: t });
+                        }
+                        // SHOW TABLE <t> INDEX <name>
+                        {
+                            let save = self.pos;
+                            if self.eat_kw("INDEX") {
+                                if let Token::Ident(name) = self.peek().clone() {
+                                    self.advance();
+                                    // tolerate a trailing `SEGMENT n [CHUNKS]`
+                                    while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                                        self.advance();
+                                    }
+                                    return Ok(Statement::ShowTableIndex {
+                                        table: t,
+                                        index: name,
+                                    });
+                                }
+                                self.pos = save;
+                            }
                         }
                     }
                 }

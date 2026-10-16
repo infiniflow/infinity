@@ -132,6 +132,17 @@ fn type_dim(type_text: &str) -> Option<usize> {
     inner.split(',').rev().find_map(|s| s.trim().parse().ok())
 }
 
+/// The declared dimension of a (possibly nested) parameterised type, e.g.
+/// `ARRAY(EMBEDDING(FLOAT,16385))` -> 16385.
+fn type_dim_deep(type_text: &str) -> Option<usize> {
+    let t = type_text.to_ascii_uppercase();
+    let after = t.rsplit_once('(').map(|(_, r)| r).unwrap_or(&t);
+    after
+        .split(',')
+        .rev()
+        .find_map(|s| s.trim().trim_end_matches(')').trim().parse().ok())
+}
+
 fn is_tensor_type(type_text: &str) -> bool {
     let t = type_text.to_ascii_uppercase();
     t.starts_with("TENSOR") || t.starts_with("TENSORARRAY") || t.starts_with("MULTIVECTOR")
@@ -1121,9 +1132,14 @@ impl Engine {
             | Statement::AlterTableAdd { table, .. }
             | Statement::AlterTableDropColumn { table, .. }
             | Statement::ShowTableColumns { table }
+            | Statement::ShowTableIndex { table, .. }
             | Statement::Copy { table, .. }
             | Statement::CreateIndex { table, .. }
             | Statement::CreateSnapshot { table, .. } => *table = q(table),
+            Statement::RenameTable { table, new_name } => {
+                *table = q(table);
+                *new_name = q(new_name);
+            }
             Statement::Select { from, join, .. } => {
                 if let Some(t) = from.as_mut() {
                     *t = q(t);
@@ -1181,7 +1197,7 @@ impl Engine {
                     if !declares_dimension(&c.type_text) {
                         continue;
                     }
-                    if let Some(d) = type_dim(&c.type_text) {
+                    if let Some(d) = type_dim_deep(&c.type_text) {
                         let up = c.type_text.to_ascii_uppercase();
                         let embedding = up.contains("EMBEDDING") || up.contains("VECTOR");
                         if d == 0 || (embedding && d > 16384) {
@@ -1205,6 +1221,32 @@ impl Engine {
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
+                })
+            }
+            Statement::RenameTable { table, new_name } => {
+                self.catalog.rename_table(table, new_name)?;
+                // move the table's rows to the new name
+                let prefix = row_prefix(table);
+                for (k, v) in self.store.scan_prefix(&prefix)? {
+                    let seq = &k[prefix.len()..];
+                    let mut nk = row_prefix(new_name);
+                    nk.extend_from_slice(seq);
+                    self.store.put(&nk, &v)?;
+                    self.store.delete(&k)?;
+                }
+                // indexes follow the table
+                for im in self.catalog.list_indexes()? {
+                    if im.table == *table {
+                        self.catalog.create_index(&im.name, new_name, &im.column)?;
+                    }
+                }
+                self.indexes
+                    .lock()
+                    .unwrap()
+                    .retain(|k, _| !k.starts_with(&format!("{table}.")));
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
                 })
             }
             Statement::AlterTableDropColumn { table, column } => {
@@ -1330,6 +1372,22 @@ impl Engine {
                 columns: vec![],
                 rows: vec![],
             }),
+            Statement::ShowTableIndex { table, index } => {
+                if !self
+                    .catalog
+                    .list_indexes()?
+                    .iter()
+                    .any(|im| im.name == *index && im.table == *table)
+                {
+                    return Err(Error::Invalid(format!(
+                        "index '{index}' does not exist on '{table}'"
+                    )));
+                }
+                Ok(QueryResult::Rows {
+                    columns: vec![],
+                    rows: vec![],
+                })
+            }
             // EXPLAIN only describes a plan; it must not execute the statement,
             // but binding the plan surfaces a missing relation.
             Statement::Explain { inner } => {

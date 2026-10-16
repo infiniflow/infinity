@@ -334,6 +334,23 @@ impl Catalog {
         }
     }
 
+    /// Renames a table, keeping its id and metadata.
+    pub fn rename_table(&self, old: &str, new: &str) -> Result<()> {
+        if self.get_table_by_name(new)?.is_some() {
+            return Err(Error::Catalog(format!("table '{new}' already exists")));
+        }
+        let mut meta = self
+            .get_table_by_name(old)?
+            .ok_or_else(|| Error::Catalog(format!("table '{old}' does not exist")))?;
+        meta.name = new.to_string();
+        self.store.atomic_write(&[
+            (table_key(meta.id), meta.encode()),
+            (name_key(new), meta.id.to_le_bytes().to_vec()),
+        ])?;
+        self.store.delete(&name_key(old))?;
+        Ok(())
+    }
+
     /// Registers a database name. `if_not_exists` tolerates an existing name.
     pub fn create_database(&self, name: &str, if_not_exists: bool) -> Result<()> {
         let key = db_key(name);
