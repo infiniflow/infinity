@@ -482,6 +482,12 @@ pub fn plan_select(
                     names.push("expr".to_string());
                     exprs.push(compile_expr(e, &schema)?);
                 }
+                SelectItem::Star => {
+                    for (i, c) in schema.iter().enumerate() {
+                        exprs.push(Expr::Column(i));
+                        names.push(c.clone());
+                    }
+                }
                 _ => return Err(Error::Invalid("projection must reference columns".into())),
             }
         }

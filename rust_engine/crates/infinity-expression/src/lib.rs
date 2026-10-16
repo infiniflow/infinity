@@ -131,10 +131,17 @@ impl Expr {
             }
             Expr::In(a, vals, neg) => {
                 let x = a.eval(row);
+                if matches!(x, Value::Null) {
+                    return Value::Null; // NULL IN (…) is unknown
+                }
+                let evaluated: Vec<Value> = vals.iter().map(|v| v.eval(row)).collect();
+                if evaluated.iter().any(|v| matches!(v, Value::Null)) {
+                    return Value::Null; // a NULL in the list makes the result unknown
+                }
                 // Compare with implicit numeric coercion (`'90.5' IN (90.5)`).
-                let found = vals
+                let found = evaluated
                     .iter()
-                    .any(|v| x.partial_cmp_value(&v.eval(row)) == Some(std::cmp::Ordering::Equal));
+                    .any(|v| x.partial_cmp_value(v) == Some(std::cmp::Ordering::Equal));
                 Value::Bool(found != *neg)
             }
             Expr::Binary(a, op, b) => {
@@ -326,6 +333,42 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             Value::Str(s) => Value::Int(s.chars().count() as i64),
             _ => Value::Null,
         },
+        "REVERSE" => match a0() {
+            Value::Str(s) => Value::Str(s.chars().rev().collect()),
+            _ => Value::Null,
+        },
+        "TRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim().to_string()),
+            _ => Value::Null,
+        },
+        "LTRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim_start().to_string()),
+            _ => Value::Null,
+        },
+        "RTRIM" => match a0() {
+            Value::Str(s) => Value::Str(s.trim_end().to_string()),
+            _ => Value::Null,
+        },
+        "SUBSTRING" | "SUBSTR" => match a0() {
+            Value::Str(s) => {
+                let chars: Vec<char> = s.chars().collect();
+                let start = match a1() {
+                    Value::Int(i) if i >= 0 => i as usize,
+                    Value::Int(i) => chars.len().saturating_sub((-i) as usize),
+                    _ => 0,
+                };
+                let len = match args.get(2).map(|e| e.eval(row)) {
+                    Some(Value::Int(i)) if i >= 0 => Some(i as usize),
+                    _ => None,
+                };
+                let end = len
+                    .map(|l| (start + l).min(chars.len()))
+                    .unwrap_or(chars.len());
+                let start = start.min(chars.len());
+                Value::Str(chars[start..end].iter().collect())
+            }
+            _ => Value::Null,
+        },
         "JSON_EXTRACT"
         | "JSON_EXTRACT_STRING"
         | "JSON_EXTRACT_INT"
@@ -356,6 +399,8 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             let target = args.get(2).map(|e| e.eval(row)).unwrap_or(Value::Null);
             json::contains(&doc, &path, &target)
         }
+        "IS_NULL" => Value::Bool(matches!(a0(), Value::Null)),
+        "IS_NOT_NULL" => Value::Bool(!matches!(a0(), Value::Null)),
         "CAST" => {
             let ty = match a1() {
                 Value::Str(s) => s.to_ascii_uppercase(),

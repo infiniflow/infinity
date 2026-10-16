@@ -281,6 +281,7 @@ impl Parser {
             }
             "SELECT" => {
                 self.advance();
+                let distinct = self.eat_kw("DISTINCT");
                 let items = self.select_items()?;
                 let from = if self.eat_kw("FROM") {
                     Some(self.expect_ident()?)
@@ -343,6 +344,7 @@ impl Parser {
                     order_by,
                     limit,
                     search,
+                    distinct,
                 })
             }
             "DELETE" => {
@@ -993,13 +995,12 @@ impl Parser {
 
     fn select_items(&mut self) -> Result<Vec<SelectItem>> {
         let mut items = Vec::new();
-        if self.peek() == &Token::Star {
-            self.advance();
-            items.push(SelectItem::Star);
-            return Ok(items);
-        }
         loop {
             let item = match self.peek() {
+                Token::Star => {
+                    self.advance();
+                    SelectItem::Star
+                }
                 Token::Int(_) | Token::Float(_) | Token::Str(_) => {
                     SelectItem::Literal(self.literal()?)
                 }
@@ -1027,6 +1028,23 @@ impl Parser {
                     }
                 }
                 _ => return self.err("expected select item"),
+            };
+            // Absorb a trailing `IS [NOT] NULL` (projected as a boolean expression).
+            let item = if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IS")) {
+                match select_item_to_expr(&item) {
+                    Some(inner) => {
+                        self.advance(); // IS
+                        let neg = self.eat_kw("NOT");
+                        self.expect_kw("NULL")?;
+                        SelectItem::Func {
+                            name: if neg { "IS_NOT_NULL" } else { "IS_NULL" }.to_string(),
+                            args: vec![inner],
+                        }
+                    }
+                    None => item,
+                }
+            } else {
+                item
             };
             // Absorb a trailing arithmetic expression (`MAX(c1)+SUM(c2)`).
             let needs_more = match self.peek() {
@@ -1057,6 +1075,7 @@ impl Parser {
     }
 
     fn aggregate_name(&mut self, name: String) -> Result<SelectAgg> {
+        let name = name.to_ascii_uppercase();
         let func =
             agg_func(&name).ok_or_else(|| Error::Invalid(format!("unknown aggregate {name}")))?;
         self.expect(Token::LParen)?;
@@ -1259,6 +1278,7 @@ mod tests {
                 order_by: None,
                 limit: None,
                 search: None,
+                distinct: false,
             }
         );
         assert_eq!(
@@ -1275,6 +1295,7 @@ mod tests {
                 order_by: None,
                 limit: None,
                 search: None,
+                distinct: false,
             }
         );
     }
@@ -1295,6 +1316,7 @@ mod tests {
                 order_by: None,
                 limit: Some(10),
                 search: None,
+                distinct: false,
             }
         );
     }
@@ -1321,6 +1343,7 @@ mod tests {
                 order_by: None,
                 limit: None,
                 search: None,
+                distinct: false,
             }
         );
         assert_eq!(
@@ -1343,6 +1366,7 @@ mod tests {
                 }),
                 limit: Some(5),
                 search: None,
+                distinct: false,
             }
         );
     }
@@ -1364,6 +1388,7 @@ mod tests {
                 order_by: None,
                 limit: None,
                 search: None,
+                distinct: false,
             }
         );
     }

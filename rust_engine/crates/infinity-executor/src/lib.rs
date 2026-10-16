@@ -563,6 +563,7 @@ impl Engine {
                 order_by,
                 limit,
                 search,
+                distinct,
             } => {
                 // `SELECT UNNEST(col) FROM t [WHERE …]`: expand a JSON array column
                 // into one output row per element.
@@ -645,7 +646,11 @@ impl Engine {
                         }
                     }
                 }
-                let (columns, rows) = self.run_plan(plan, override_rows)?;
+                let (columns, mut rows) = self.run_plan(plan, override_rows)?;
+                if *distinct {
+                    let mut seen = std::collections::HashSet::new();
+                    rows.retain(|r| seen.insert(r.clone()));
+                }
                 Ok(QueryResult::Rows { columns, rows })
             }
         }
