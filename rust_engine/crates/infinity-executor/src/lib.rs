@@ -135,6 +135,13 @@ fn is_tensor_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().starts_with("TENSOR")
 }
 
+fn is_float_type(type_text: &str) -> bool {
+    matches!(
+        type_text.to_ascii_uppercase().as_str(),
+        "FLOAT" | "DOUBLE" | "REAL" | "FP16" | "BF16" | "FLOAT16" | "BFLOAT16"
+    )
+}
+
 fn is_bit_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().contains("BIT")
 }
@@ -189,6 +196,11 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
         .map(|(i, v)| {
             let s = v.to_slt_string();
             match types.get(i) {
+                // float columns render with six decimals in `.slt` output
+                Some(t) if is_float_type(t) => match s.parse::<f64>() {
+                    Ok(f) => format!("{f:.6}"),
+                    Err(_) => s,
+                },
                 Some(t) if is_tensor_type(t) => {
                     let d = type_dim(t).unwrap_or(0);
                     if is_bit_type(t) {

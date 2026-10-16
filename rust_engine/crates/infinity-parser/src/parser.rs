@@ -416,6 +416,21 @@ impl Parser {
                         let _ = self.eat_kw("ASC");
                         true
                     };
+                    // tolerate an expression key (`ORDER BY c2 + c3 DESC`)
+                    while !matches!(
+                        self.peek(),
+                        Token::Comma | Token::Semicolon | Token::Eof | Token::Ident(_)
+                    ) || matches!(self.peek(), Token::Ident(k) if !k.eq_ignore_ascii_case("LIMIT"))
+                    {
+                        if matches!(self.peek(), Token::Comma | Token::Semicolon | Token::Eof)
+                            || matches!(self.peek(), Token::Ident(k) if k.eq_ignore_ascii_case("LIMIT"))
+                        {
+                            break;
+                        }
+                        self.advance();
+                        let _ = self.eat_kw("ASC");
+                        let _ = self.eat_kw("DESC");
+                    }
                     // tolerate extra ORDER BY keys
                     while self.peek() == &Token::Comma {
                         self.advance();
