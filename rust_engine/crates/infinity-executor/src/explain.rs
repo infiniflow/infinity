@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use infinity_parser::{BinOp, BoolOp, CmpOp, ExprAst, OrderKey, Predicate, SelectItem};
+use infinity_parser::{BinOp, BoolOp, CmpOp, ExprAst, Literal, OrderKey, Predicate, SelectItem};
 
 /// A single-table `SELECT` reduced to what the printer needs.
 pub struct SelectPlan<'a> {
@@ -22,6 +22,8 @@ pub struct SelectPlan<'a> {
     /// `SELECT DISTINCT …` over plain columns (no aggregates).
     pub distinct: bool,
     pub schema: &'a [String],
+    /// `EXPLAIN LOGICAL`: enables the logical-plan arithmetic cast rule.
+    pub logical: bool,
 }
 
 /// The node header line: `PROJECT (3)` at the root, `   -> SORT (4)` below it.
@@ -129,6 +131,23 @@ pub(crate) fn bool_text(op: BoolOp) -> &'static str {
 
 /// Renders an expression, annotating each column with `(#id)`.
 pub(crate) fn render_expr(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
+    render_expr_m(e, ids, false)
+}
+
+/// An arithmetic operand. In the *logical* plan an `INTEGER` column that meets a
+/// `BIGINT` literal is cast to BigInt (`CAST(c AS BigInt) + 1`); a column met by
+/// another column is not (`c1 + c2`).
+fn arith_operand(this: &ExprAst, other: &ExprAst, ids: &HashMap<String, usize>) -> String {
+    if matches!(this, ExprAst::Column(_)) && matches!(other, ExprAst::Literal(Literal::Int(_))) {
+        format!("CAST({} AS BigInt)", render_expr(this, ids))
+    } else {
+        render_expr_m(this, ids, true)
+    }
+}
+
+/// Renders an expression, with `logical` enabling the logical-plan arithmetic
+/// cast rule (see [`arith_operand`]).
+pub(crate) fn render_expr_m(e: &ExprAst, ids: &HashMap<String, usize>, logical: bool) -> String {
     match e {
         ExprAst::Column(c) => match ids.get(c) {
             Some(i) => format!("{c} (#{i})"),
@@ -136,24 +155,40 @@ pub(crate) fn render_expr(e: &ExprAst, ids: &HashMap<String, usize>) -> String {
         },
         ExprAst::Literal(l) => l.to_slt_string(),
         ExprAst::Func { name, args } => {
-            let inner: Vec<String> = args.iter().map(|a| render_expr(a, ids)).collect();
+            let inner: Vec<String> = args
+                .iter()
+                .map(|a| render_expr_m(a, ids, logical))
+                .collect();
             format!("{}({})", name.to_ascii_lowercase(), inner.join(", "))
         }
-        ExprAst::Binary(a, op, b) => format!(
-            "{} {} {}",
-            render_expr(a, ids),
-            bin_text(*op),
-            render_expr(b, ids)
-        ),
+        ExprAst::Binary(a, op, b) => {
+            let (ra, rb) = if logical {
+                (arith_operand(a, b, ids), arith_operand(b, a, ids))
+            } else {
+                (
+                    render_expr_m(a, ids, logical),
+                    render_expr_m(b, ids, logical),
+                )
+            };
+            format!("{ra} {} {rb}", bin_text(*op))
+        }
         ExprAst::Cmp(a, op, b) => format!(
             "{} {} {}",
-            render_expr(a, ids),
+            render_expr_m(a, ids, logical),
             cmp_text(*op),
-            render_expr(b, ids)
+            render_expr_m(b, ids, logical)
         ),
-        ExprAst::Not(a) => format!("NOT {}", render_expr(a, ids)),
-        ExprAst::And(a, b) => format!("{} AND {}", render_expr(a, ids), render_expr(b, ids)),
-        ExprAst::Or(a, b) => format!("{} OR {}", render_expr(a, ids), render_expr(b, ids)),
+        ExprAst::Not(a) => format!("NOT {}", render_expr_m(a, ids, logical)),
+        ExprAst::And(a, b) => format!(
+            "{} AND {}",
+            render_expr_m(a, ids, logical),
+            render_expr_m(b, ids, logical)
+        ),
+        ExprAst::Or(a, b) => format!(
+            "{} OR {}",
+            render_expr_m(a, ids, logical),
+            render_expr_m(b, ids, logical)
+        ),
     }
 }
 
@@ -165,7 +200,7 @@ pub(crate) fn render_cmp_operand(e: &ExprAst, ids: &HashMap<String, usize>) -> S
     }
 }
 
-pub(crate) fn render_pred(p: &Predicate, ids: &HashMap<String, usize>) -> String {
+pub(crate) fn render_pred_m(p: &Predicate, ids: &HashMap<String, usize>, logical: bool) -> String {
     match p {
         Predicate::Cmp(a, op, b) => format!(
             "{} {} {}",
@@ -175,28 +210,31 @@ pub(crate) fn render_pred(p: &Predicate, ids: &HashMap<String, usize>) -> String
         ),
         Predicate::Bool(a, op, b) => format!(
             "({}) {} ({})",
-            render_pred(a, ids),
+            render_pred_m(a, ids, logical),
             bool_text(*op),
-            render_pred(b, ids)
+            render_pred_m(b, ids, logical)
         ),
-        Predicate::Not(a) => format!("NOT ({})", render_pred(a, ids)),
+        Predicate::Not(a) => format!("NOT ({})", render_pred_m(a, ids, logical)),
         Predicate::IsNull(e, neg) => format!(
             "{} IS {}NULL",
-            render_expr(e, ids),
+            render_expr_m(e, ids, logical),
             if *neg { "NOT " } else { "" }
         ),
-        Predicate::IsTrue(e) => render_expr(e, ids),
+        Predicate::IsTrue(e) => render_expr_m(e, ids, logical),
         Predicate::Like(a, b, _, neg) => format!(
             "{} {}LIKE {}",
-            render_expr(a, ids),
+            render_expr_m(a, ids, logical),
             if *neg { "NOT " } else { "" },
-            render_expr(b, ids)
+            render_expr_m(b, ids, logical)
         ),
         Predicate::In(a, list, neg) => {
-            let items: Vec<String> = list.iter().map(|e| render_expr(e, ids)).collect();
+            let items: Vec<String> = list
+                .iter()
+                .map(|e| render_expr_m(e, ids, logical))
+                .collect();
             format!(
                 "{} {}IN ({})",
-                render_expr(a, ids),
+                render_expr_m(a, ids, logical),
                 if *neg { "NOT " } else { "" },
                 items.join(", ")
             )
@@ -706,7 +744,7 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
             "FILTER" => {
                 let f = p
                     .where_pred
-                    .map(|w| render_pred(w, &ids))
+                    .map(|w| render_pred_m(w, &ids, p.logical))
                     .unwrap_or_default();
                 lines.push(attr(d, &format!("filter: {f}")));
                 let mut out = child_out.clone();
@@ -719,10 +757,12 @@ pub fn explain_select(p: &SelectPlan) -> Vec<String> {
             _ => {
                 lines.push(attr(d, &format!("table name: {alias}({db}.{alias})")));
                 lines.push(attr(d, "table index: #1"));
-                lines.push(attr(
-                    d,
-                    &format!("output_columns: [{}]", child_out.join(", ")),
-                ));
+                let key = if p.logical {
+                    "output columns"
+                } else {
+                    "output_columns"
+                };
+                lines.push(attr(d, &format!("{key}: [{}]", child_out.join(", "))));
             }
         }
     }
@@ -745,9 +785,12 @@ fn project_exprs(p: &SelectPlan, ids: &HashMap<String, usize>) -> Vec<String> {
                 Some(i) => format!("{c} (#{i})"),
                 None => c.clone(),
             }),
-            SelectItem::Expr(e) => out.push(render_expr(e, ids)),
+            SelectItem::Expr(e) => out.push(render_expr_m(e, ids, p.logical)),
             SelectItem::Func { name, args } => {
-                let inner: Vec<String> = args.iter().map(|a| render_expr(a, ids)).collect();
+                let inner: Vec<String> = args
+                    .iter()
+                    .map(|a| render_expr_m(a, ids, p.logical))
+                    .collect();
                 out.push(format!(
                     "{}({})",
                     name.to_ascii_lowercase(),
@@ -758,6 +801,60 @@ fn project_exprs(p: &SelectPlan, ids: &HashMap<String, usize>) -> Vec<String> {
         }
     }
     out
+}
+
+/// The logical-plan `DELETE` text (`EXPLAIN LOGICAL DELETE …`).
+pub fn explain_logical_delete(table: &str, where_pred: Option<&Predicate>) -> Vec<String> {
+    let qualified = if table.contains('.') {
+        table.to_string()
+    } else {
+        format!("default_db.{table}")
+    };
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    let mut cols: Vec<String> = Vec::new();
+    if let Some(w) = where_pred {
+        pred_cols(w, &mut cols);
+    }
+    for c in &cols {
+        if !ids.contains_key(c) {
+            ids.insert(c.clone(), ids.len());
+        }
+    }
+    let mut out = cols.clone();
+    add_col(&mut out, "__rowid");
+
+    let mut lines = vec![format!("DELETE FROM {qualified}")];
+    if let Some(w) = where_pred {
+        lines.push(header(1, "FILTER", 4));
+        lines.push(attr(
+            1,
+            &format!("filter: {}", render_pred_m(w, &ids, true)),
+        ));
+        lines.push(attr(1, &format!("output columns: [{}]", out.join(", "))));
+    }
+    lines.push(header(
+        if where_pred.is_some() { 2 } else { 1 },
+        "TABLE SCAN",
+        2,
+    ));
+    let alias = qualified.split('.').next_back().unwrap_or(&qualified);
+    let db = qualified
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+    lines.push(attr(
+        if where_pred.is_some() { 2 } else { 1 },
+        &format!("table name: {alias}({db}.{alias})"),
+    ));
+    lines.push(attr(
+        if where_pred.is_some() { 2 } else { 1 },
+        "table index: #1",
+    ));
+    lines.push(attr(
+        if where_pred.is_some() { 2 } else { 1 },
+        &format!("output columns: [{}]", out.join(", ")),
+    ));
+    lines
 }
 
 /// The `EXPLAIN CREATE TABLE` block.

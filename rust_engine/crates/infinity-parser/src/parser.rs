@@ -3,8 +3,8 @@
 use infinity_common::{Error, LogicalType, Result};
 
 use crate::ast::{
-    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, OrderKey,
-    Predicate, SearchClause, SelectAgg, SelectItem, Statement,
+    AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, ExplainKind, ExprAst, JoinClause, Literal,
+    MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
 };
 use crate::lexer::{tokenize, Token};
 
@@ -652,8 +652,21 @@ impl Parser {
             }
             "EXPLAIN" => {
                 self.advance();
+                // `EXPLAIN [LOGICAL|PHYSICAL] <statement>` — the plan kind.
+                let kind = match self.peek() {
+                    Token::Ident(s) if s.eq_ignore_ascii_case("logical") => {
+                        self.advance();
+                        ExplainKind::Logical
+                    }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("physical") => {
+                        self.advance();
+                        ExplainKind::Physical
+                    }
+                    _ => ExplainKind::Physical,
+                };
                 let inner = self.statement()?;
                 Ok(Statement::Explain {
+                    kind,
                     inner: Box::new(inner),
                 })
             }

@@ -242,6 +242,14 @@ pub struct SearchClause {
 ///
 /// `Select` is intentionally the largest variant; it is a short-lived parse
 /// tree, so boxing its fields would only complicate matching.
+/// The plan flavour named by `EXPLAIN <kind> …`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExplainKind {
+    #[default]
+    Physical,
+    Logical,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -330,6 +338,7 @@ pub enum Statement {
         opts: Vec<(String, String)>,
     },
     Explain {
+        kind: ExplainKind,
         inner: Box<Statement>,
     },
     Insert {

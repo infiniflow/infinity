@@ -1478,7 +1478,7 @@ impl Engine {
                     j.table = q(&j.table);
                 }
             }
-            Statement::Explain { inner } => {
+            Statement::Explain { inner, .. } => {
                 let inner_q = self.qualify_tables(inner.as_ref());
                 **inner = inner_q;
             }
@@ -1784,7 +1784,8 @@ impl Engine {
             }
             // EXPLAIN only describes a plan; it must not execute the statement,
             // but binding the plan surfaces a missing relation.
-            Statement::Explain { inner } => {
+            Statement::Explain { kind, inner } => {
+                let logical = matches!(kind, infinity_parser::ExplainKind::Logical);
                 let text = match inner.as_ref() {
                     Statement::Select {
                         items,
@@ -1878,9 +1879,13 @@ impl Engine {
                                 order_by,
                                 distinct: *distinct,
                                 schema: &schema,
+                                logical,
                             },
                         ))
                     }
+                    Statement::Delete { table, where_pred } if logical => Some(
+                        crate::explain::explain_logical_delete(table, where_pred.as_ref()),
+                    ),
                     Statement::CreateTable { name, columns } => {
                         let (db, tbl) = match name.split_once('.') {
                             Some((d, t)) => (d.to_string(), t.to_string()),
