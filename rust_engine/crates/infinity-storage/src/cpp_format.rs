@@ -491,6 +491,28 @@ pub fn datetime_to_pair(s: &str) -> Option<(i32, i32)> {
     Some((date_to_days(d)?, time_to_secs(t)?))
 }
 
+/// Formats epoch days as `YYYY-MM-DD` (the inverse of [`date_to_days`]).
+pub fn days_to_date(days: i32) -> String {
+    // Hinnant's `civil_from_days`.
+    let z = i64::from(days) + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// Formats seconds since midnight as `HH:MM:SS` (the inverse of [`time_to_secs`]).
+pub fn secs_to_time(secs: i32) -> String {
+    let s = secs.rem_euclid(86_400);
+    format!("{:02}:{:02}:{:02}", s / 3600, (s % 3600) / 60, s % 60)
+}
+
 // ---------------------------------------------------------------------------
 // Outline-backed (variable-length) value parsing/encoding
 // ---------------------------------------------------------------------------

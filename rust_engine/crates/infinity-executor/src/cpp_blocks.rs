@@ -278,6 +278,30 @@ fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<St
     Some(format!("{{{}}}", parts.join(",")))
 }
 
+/// Renders an engine-rendered value as a SQL literal for re-insertion.
+///
+/// Text-valued columns (varchar/json/date/time/datetime/timestamp) must be
+/// quoted; numbers, booleans, arrays, tensors and sparse vectors are already in
+/// literal form. Single quotes are doubled, which is correct SQL — note our own
+/// parser does not currently accept `''`, so values containing an apostrophe
+/// cannot be re-inserted until it does.
+fn sql_literal(type_text: &str, value: &str) -> String {
+    if value.eq_ignore_ascii_case("null") {
+        return "NULL".to_string();
+    }
+    let up = type_text.to_ascii_uppercase();
+    let base = up.split('(').next().unwrap_or("").trim();
+    let quoted = matches!(
+        base,
+        "VARCHAR" | "TEXT" | "STRING" | "JSON" | "DATE" | "TIME" | "DATETIME" | "TIMESTAMP"
+    );
+    if quoted {
+        format!("'{}'", value.replace('\'', "''"))
+    } else {
+        value.to_string()
+    }
+}
+
 /// Maps a declared type text to the `ColumnType` code this writer packs.
 ///
 /// Returns `None` for shapes the packer does not cover yet
@@ -514,10 +538,23 @@ fn decode_value(type_text: &str, column_type: i32, body: &[u8], row: usize) -> O
             Some(match column_type {
                 1 => (slot[0] as i8).to_string(),
                 2 => i16::from_le_bytes(slot.try_into().unwrap()).to_string(),
-                3 | 16 | 17 => i32::from_le_bytes(slot.try_into().unwrap()).to_string(),
+                3 => i32::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 4 => i64::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 5 => f32::from_le_bytes(slot.try_into().unwrap()).to_string(),
                 6 => f64::from_le_bytes(slot.try_into().unwrap()).to_string(),
+                // Date/time values are stored as integers but must come back as
+                // text, matching how the engine renders them.
+                16 => cpp_format::days_to_date(i32::from_le_bytes(slot.try_into().unwrap())),
+                17 => cpp_format::secs_to_time(i32::from_le_bytes(slot.try_into().unwrap())),
+                18 => {
+                    let d = i32::from_le_bytes(slot[..4].try_into().unwrap());
+                    let t = i32::from_le_bytes(slot[4..8].try_into().unwrap());
+                    format!(
+                        "{} {}",
+                        cpp_format::days_to_date(d),
+                        cpp_format::secs_to_time(t)
+                    )
+                }
                 _ => return None,
             })
         }
@@ -678,6 +715,58 @@ impl Engine {
         for meta in self.catalog.list_tables()? {
             if meta.types.iter().all(|t| column_type_of(t).is_some()) {
                 self.write_cpp_blocks(&meta.name)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Loads a table's rows back **from its C++ block files** into the engine's
+    /// own row store, returning how many rows were inserted.
+    ///
+    /// This is the interop direction §2.6.1 cares about: a `db_*/tbl_*/seg_*/
+    /// blk_*` directory written by the C++ engine (or by [`Self::write_cpp_blocks`])
+    /// reconstructs the table. Values are inserted through the normal `INSERT`
+    /// path, so declared types, defaults and indexes all behave as usual.
+    pub fn load_cpp_blocks(&self, table: &str) -> Result<usize> {
+        let qualified = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&qualified)?
+            .ok_or_else(|| Error::NotFound(format!("table '{qualified}'")))?;
+        let (columns, rows) = self.read_cpp_blocks(table)?;
+        if rows.is_empty() {
+            return Ok(0);
+        }
+        let mut values = Vec::with_capacity(rows.len());
+        for row in &rows {
+            let cells: Vec<String> = row
+                .iter()
+                .enumerate()
+                .map(|(i, v)| sql_literal(meta.types.get(i).map(String::as_str).unwrap_or(""), v))
+                .collect();
+            values.push(format!("({})", cells.join(",")));
+        }
+        let sql = format!(
+            "INSERT INTO {qualified} ({}) VALUES {};",
+            columns.join(", "),
+            values.join(",")
+        );
+        self.execute(&sql)?;
+        Ok(rows.len())
+    }
+
+    /// Best-effort recovery on startup: for every table with **no rows** but an
+    /// existing block mirror, load the mirror back.
+    ///
+    /// A table whose columns the block format cannot express simply has no
+    /// mirror; that (and only that) is skipped silently.
+    pub fn recover_cpp_blocks(&self) -> Result<()> {
+        for meta in self.catalog.list_tables()? {
+            if !self.fetch_rows_with_ids(&meta.name)?.is_empty() {
+                continue;
+            }
+            if self.read_cpp_blocks(&meta.name).is_ok() {
+                self.load_cpp_blocks(&meta.name)?;
             }
         }
         Ok(())
@@ -1026,6 +1115,61 @@ mod tests {
         assert_eq!(tensor_shape("MULTIVECTOR(FLOAT,3)"), Some((14, 3, 6)));
         assert_eq!(tensor_shape("TENSORARRAY(FLOAT,3)"), None);
         assert_eq!(tensor_shape("TENSOR(BIT,8)"), None);
+    }
+
+    #[test]
+    fn blocks_reconstruct_a_table_after_its_rows_are_deleted() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE t (id INT, name VARCHAR, ok BOOL);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO t VALUES (1, 'a', true), (2, 'bb', false);")
+            .unwrap();
+        assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
+
+        // Drop the engine's own rows, leaving only the C++ block mirror.
+        engine.execute("DELETE FROM t;").unwrap();
+        assert_eq!(row_strings(&engine, "SELECT * FROM t;").len(), 0);
+
+        // The mirror reconstructs them (this is what a C++-written directory
+        // gives us on startup).
+        assert_eq!(engine.load_cpp_blocks("t").unwrap(), 2);
+        assert_eq!(
+            row_strings(&engine, "SELECT * FROM t;"),
+            vec![
+                vec!["1".to_string(), "a".to_string(), "true".to_string()],
+                vec!["2".to_string(), "bb".to_string(), "false".to_string()],
+            ]
+        );
+
+        // A fresh engine over the same directory recovers the rows on open
+        // (kv rows are present here, so recovery is a no-op, but it must not
+        // duplicate them).
+        drop(engine);
+        let engine = Engine::open(dir.path()).unwrap();
+        assert_eq!(row_strings(&engine, "SELECT * FROM t;").len(), 2);
+    }
+
+    #[test]
+    fn embedded_column_values_survive_a_block_round_trip_through_sql() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE t (id INT, v EMBEDDING(FLOAT,3), d DATE, s VARCHAR);")
+            .unwrap();
+        engine
+            .execute("INSERT INTO t VALUES (1, [1.5,2.5,3.5], DATE '2024-01-22', 'alpha');")
+            .unwrap();
+        assert_eq!(engine.write_cpp_blocks("t").unwrap(), 1);
+        engine.execute("DELETE FROM t;").unwrap();
+        assert_eq!(engine.load_cpp_blocks("t").unwrap(), 1);
+        let rows = row_strings(&engine, "SELECT * FROM t;");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0][2], "2024-01-22");
+        assert_eq!(rows[0][3], "alpha");
+        assert!(rows[0][1].starts_with("[1.5,2.5,3.5]"), "{}", rows[0][1]);
     }
 
     #[test]

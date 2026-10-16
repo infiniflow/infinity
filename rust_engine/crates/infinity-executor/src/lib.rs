@@ -1297,6 +1297,7 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
         };
+        engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
         Ok(engine)
     }
