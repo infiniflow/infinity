@@ -631,6 +631,40 @@ pub fn sparse_slot(nnz: i64, offset: u64) -> [u8; 16] {
     out
 }
 
+/// Inline length of a `Varchar`/`Json` slot (`VARCHAR_INLINE_LENGTH`, `varchar.h`).
+pub const VARCHAR_INLINE_LENGTH: usize = 13;
+
+/// Encodes one `Varchar`/`Json` slot (`varchar.h`): a 24-bit length plus a union
+/// of an inline payload (at most [`VARCHAR_INLINE_LENGTH`] bytes) or a 5-byte
+/// prefix and an outline offset. The payload is appended to `outline` only when
+/// it does not fit inline.
+pub fn encode_varchar_slot(payload: &[u8], outline: &mut Vec<u8>) -> [u8; 16] {
+    let len = payload.len() as u64 & 0x00ff_ffff;
+    let mut slot = [0u8; 16];
+    slot[0..3].copy_from_slice(&len.to_le_bytes()[..3]);
+    if payload.len() <= VARCHAR_INLINE_LENGTH {
+        slot[3..3 + payload.len()].copy_from_slice(payload);
+    } else {
+        let offset = outline.len() as u64;
+        outline.extend_from_slice(payload);
+        slot[3..8].copy_from_slice(&payload[..5]);
+        slot[8..16].copy_from_slice(&offset.to_le_bytes());
+    }
+    slot
+}
+
+/// Decodes one `Varchar`/`Json` slot, following the outline for a long payload.
+pub fn decode_varchar_slot(slot: &[u8], outline: &[u8]) -> Option<Vec<u8>> {
+    let s: &[u8; 16] = slot.try_into().ok()?;
+    let len = (u64::from_le_bytes(s[0..8].try_into().ok()?) & 0x00ff_ffff) as usize;
+    if len <= VARCHAR_INLINE_LENGTH {
+        Some(s[3..3 + len].to_vec())
+    } else {
+        let offset = u64::from_le_bytes(s[8..16].try_into().ok()?) as usize;
+        Some(outline.get(offset..offset + len)?.to_vec())
+    }
+}
+
 /// How a column's values occupy the `.col` data region (spec §8.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnLayout {
@@ -875,17 +909,7 @@ pub fn pack_column_with_layout(
                     data.extend_from_slice(&[0u8; 16]);
                     continue;
                 };
-                let len = payload.len() as u64 & 0x00ff_ffff;
-                let mut slot = [0u8; 16];
-                slot[0..3].copy_from_slice(&len.to_le_bytes()[..3]);
-                if payload.len() <= 13 {
-                    slot[3..3 + payload.len()].copy_from_slice(payload);
-                } else {
-                    let offset = outline.len() as u64;
-                    outline.extend_from_slice(payload);
-                    slot[3..8].copy_from_slice(&payload[..5]);
-                    slot[8..16].copy_from_slice(&offset.to_le_bytes());
-                }
+                let slot = encode_varchar_slot(payload, &mut outline);
                 data.extend_from_slice(&slot);
             }
             Ok((ColumnBody::build(capacity, 16, &data, &valid)?, outline))

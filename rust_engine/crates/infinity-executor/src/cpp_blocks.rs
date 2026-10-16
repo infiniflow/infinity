@@ -237,6 +237,9 @@ pub enum ArrayElem {
     /// outline, each pointing at its own elements — `ArrayInfo::ElemSize` is the
     /// inner `DataType::Size()`, which for an array is the 8-byte slot.
     Nested(i32),
+    /// A `Varchar`/`Json` element; the outer elements are 16-byte `VarcharT`
+    /// slots into the outline (their payload inlines or outlines as usual).
+    VarLen(i32),
 }
 
 /// Width of a fixed-width scalar's slot, `None` for variable-length ones.
@@ -250,9 +253,9 @@ fn fixed_scalar_width(col: i32) -> Option<usize> {
 
 /// `ARRAY(<scalar>)` / `ARRAY(ARRAY(<scalar>))` → its element shape.
 ///
-/// Only fixed-width scalar leaves are supported. A variable-length element
-/// (varchar/json) or a second nesting level returns `None` and is reported as
-/// unsupported by the caller.
+/// Scalar leaves may be fixed-width or `Varchar`/`Json`; a second nesting level
+/// must bottom out in a fixed-width scalar. Anything else returns `None` and is
+/// reported as unsupported by the caller.
 pub fn array_shape(type_text: &str) -> Option<ArrayElem> {
     let up = type_text.trim().to_ascii_uppercase();
     let rest = up.strip_prefix("ARRAY(")?;
@@ -263,8 +266,11 @@ pub fn array_shape(type_text: &str) -> Option<ArrayElem> {
         return Some(ArrayElem::Nested(col));
     }
     let col = column_type_of(inner)?;
-    fixed_scalar_width(col)?;
-    Some(ArrayElem::Fixed(col))
+    match cpp_format::column_layout(col)? {
+        ColumnLayout::Fixed(_) | ColumnLayout::CompactBit => Some(ArrayElem::Fixed(col)),
+        ColumnLayout::VarLen(16) if matches!(col, 9 | 22) => Some(ArrayElem::VarLen(col)),
+        ColumnLayout::VarLen(_) => None,
+    }
 }
 
 /// Parses the engine's array rendering `{1,2,3}` into its elements.
@@ -382,6 +388,23 @@ fn encode_array_slot(
                 cpp_format::varlen_count_offset_slot(groups.len() as u64, slots_offset).to_vec(),
             ))
         }
+        ArrayElem::VarLen(_) => {
+            // Each element is a 16-byte `VarcharT` slot; its payload inlines or
+            // moves to the outline per `encode_varchar_slot`. The outer slot
+            // points at the run of element slots.
+            let elems = parse_braces(value);
+            let mut slots: Vec<[u8; 16]> = Vec::with_capacity(elems.len());
+            for e in &elems {
+                slots.push(cpp_format::encode_varchar_slot(e.as_bytes(), outline));
+            }
+            let slots_offset = outline.len() as u64;
+            for s in &slots {
+                outline.extend_from_slice(s);
+            }
+            Ok(Some(
+                cpp_format::varlen_count_offset_slot(slots.len() as u64, slots_offset).to_vec(),
+            ))
+        }
     }
 }
 
@@ -417,6 +440,15 @@ fn decode_array_value(type_text: &str, slot: &[u8], outline: &[u8]) -> Option<St
                 groups.push(format!("{{{}}}", parts.join(",")));
             }
             Some(format!("{{{}}}", groups.join(",")))
+        }
+        ArrayElem::VarLen(_) => {
+            let mut parts = Vec::with_capacity(count);
+            for k in 0..count {
+                let at = offset + k * 16;
+                let bytes = cpp_format::decode_varchar_slot(outline.get(at..at + 16)?, outline)?;
+                parts.push(String::from_utf8_lossy(&bytes).to_string());
+            }
+            Some(format!("{{{}}}", parts.join(",")))
         }
     }
 }
@@ -1343,7 +1375,35 @@ mod tests {
             Some(ArrayElem::Nested(3))
         );
         assert_eq!(array_shape("ARRAY(ARRAY(ARRAY(INT)))"), None);
-        assert_eq!(array_shape("ARRAY(VARCHAR)"), None);
+        assert_eq!(array_shape("ARRAY(VARCHAR)"), Some(ArrayElem::VarLen(9)));
+        // A tensor/sparse element is not an array element.
+        assert_eq!(array_shape("ARRAY(TENSOR(FLOAT,3))"), None);
+    }
+
+    #[test]
+    fn varchar_array_blocks_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE va (id INT, a ARRAY(VARCHAR));")
+            .unwrap();
+        // A short (inlined) element next to a long (outlined) one, and an empty
+        // array.
+        let long = "this element is definitely longer than thirteen bytes";
+        engine
+            .execute(&format!("INSERT INTO va VALUES (1, {{ab,'{long}'}});"))
+            .unwrap();
+        engine.execute("INSERT INTO va VALUES (2, {});").unwrap();
+
+        assert_eq!(engine.write_cpp_blocks("va").unwrap(), 2);
+        let (_, rows) = engine.read_cpp_blocks("va").unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["1".to_string(), format!("{{ab,{long}}}")],
+                vec!["2".to_string(), "{}".to_string()],
+            ]
+        );
     }
 
     #[test]
