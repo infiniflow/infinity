@@ -137,6 +137,130 @@ fn is_tensor_type(type_text: &str) -> bool {
     t.starts_with("TENSOR") || t.starts_with("TENSORARRAY") || t.starts_with("MULTIVECTOR")
 }
 
+/// The numeric element type of a `TENSOR(...)` / `TENSORARRAY(...)` column or of
+/// a `MATCH TENSOR` query. The C++ engine casts both the stored and query tensor
+/// values into a common aligned `f32` buffer before the MaxSim dot products, so
+/// the element type only matters for the precision each value is rounded to.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ElemType {
+    Float32,
+    Float64,
+    Float16,
+    BFloat16,
+    Bit,
+    Int8,
+    UInt8,
+}
+
+fn elem_type_of(token: &str) -> ElemType {
+    match token.trim().to_ascii_uppercase().as_str() {
+        "FLOAT16" | "FP16" | "HALF" => ElemType::Float16,
+        "BFLOAT16" | "BF16" => ElemType::BFloat16,
+        "DOUBLE" | "FLOAT64" => ElemType::Float64,
+        "BIT" => ElemType::Bit,
+        "INT8" | "TINYINT" => ElemType::Int8,
+        "UINT8" => ElemType::UInt8,
+        _ => ElemType::Float32,
+    }
+}
+
+/// The element type declared inside a `TENSOR(<elem>, <dim>)` type text.
+fn tensor_elem_type(type_text: &str) -> ElemType {
+    let t = type_text.to_ascii_uppercase();
+    let inner = t.split('(').nth(1).unwrap_or("");
+    elem_type_of(inner.split(',').next().unwrap_or(""))
+}
+
+/// Rounds an `f64` to the element type's precision, widened back to `f32` — the
+/// conversion the C++ engine performs when filling its `f32` arithmetic buffer.
+fn quantize_elem(x: f64, e: ElemType) -> f32 {
+    let v = x as f32;
+    match e {
+        ElemType::Float16 => round_f16(v),
+        ElemType::BFloat16 => round_bf16(v),
+        _ => v,
+    }
+}
+
+/// Round-to-nearest-even conversion of an `f32` to the nearest `f16` value,
+/// returned as `f32`.
+fn round_f16(x: f32) -> f32 {
+    f16_bits_to_f32(f32_to_f16_bits(x))
+}
+
+fn f32_to_f16_bits(x: f32) -> u16 {
+    let b = x.to_bits();
+    let sign = ((b >> 16) & 0x8000) as u16;
+    let exp = ((b >> 23) & 0xff) as i32;
+    let mant = b & 0x007f_ffff;
+    if exp == 0xff {
+        let m = if mant != 0 { 0x200 } else { 0 };
+        return sign | 0x7c00 | m;
+    }
+    let new_exp = exp - 127 + 15;
+    if new_exp >= 31 {
+        return sign | 0x7c00;
+    }
+    if new_exp <= 0 {
+        if new_exp < -10 {
+            return sign;
+        }
+        let m = mant | 0x0080_0000;
+        let shift = (14 - new_exp) as u32;
+        let half = 1u32 << (shift - 1);
+        let mut q = m >> shift;
+        let rem = m & ((1u32 << shift) - 1);
+        if rem > half || (rem == half && (q & 1) == 1) {
+            q += 1;
+        }
+        return sign | q as u16;
+    }
+    let mut m = mant >> 13;
+    let rem = mant & 0x1fff;
+    let mut e = new_exp;
+    if rem > 0x1000 || (rem == 0x1000 && (m & 1) == 1) {
+        m += 1;
+        if m == 0x400 {
+            m = 0;
+            e += 1;
+            if e >= 31 {
+                return sign | 0x7c00;
+            }
+        }
+    }
+    sign | ((e as u16) << 10) | (m as u16)
+}
+
+fn f16_bits_to_f32(h: u16) -> f32 {
+    let sign = ((h & 0x8000) as u32) << 16;
+    let exp = ((h >> 10) & 0x1f) as u32;
+    let mant = (h & 0x3ff) as u32;
+    if exp == 0 {
+        if mant == 0 {
+            return f32::from_bits(sign);
+        }
+        let mut e: i32 = -14;
+        let mut m = mant;
+        while m & 0x400 == 0 {
+            m <<= 1;
+            e -= 1;
+        }
+        m &= 0x3ff;
+        return f32::from_bits(sign | (((e + 127) as u32) << 23) | (m << 13));
+    }
+    if exp == 0x1f {
+        return f32::from_bits(sign | 0x7f80_0000 | (mant << 13));
+    }
+    f32::from_bits(sign | ((exp + 127 - 15) << 23) | (mant << 13))
+}
+
+/// Conversion of an `f32` to `bfloat16` by dropping the low 16 mantissa bits.
+/// The C++ `bfloat16_t` conversion used by the tensor scan truncates rather than
+/// rounding to nearest, so this deliberately truncates to match its scores.
+fn round_bf16(x: f32) -> f32 {
+    f32::from_bits(x.to_bits() & 0xffff_0000)
+}
+
 fn is_float_type(type_text: &str) -> bool {
     matches!(
         type_text.to_ascii_uppercase().as_str(),
@@ -1603,15 +1727,14 @@ impl Engine {
                         None => qtext,
                     };
                     let q = parse_tensor_leaves(&qtext);
-                    // The column's declared element type drives precision.
-                    let col_ty = types
-                        .get(col_idx)
-                        .cloned()
-                        .unwrap_or_default()
-                        .to_ascii_uppercase();
-                    let bit = col_ty.contains("BIT");
-                    let f32_mode = !bit && !col_ty.contains("DOUBLE");
-                    let score = tensor_score(&q, v, bit, f32_mode);
+                    // The column's declared element type and the query's
+                    // declared element type both drive the rounding precision.
+                    let col_elem =
+                        tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
+                    let qry_elem = arg_str(m.args.get(1))
+                        .map(|s| elem_type_of(&s))
+                        .unwrap_or(ElemType::Float32);
+                    let score = tensor_score(&q, v, col_elem, qry_elem);
                     scored.push((*seq, score, -score));
                 } else if is_sparse {
                     let (qv, rv) = (parse_sparse(&query_items), parse_sparse_str(v));
@@ -1916,6 +2039,38 @@ fn parse_tensor_leaves(text: &str) -> Vec<Vec<f64>> {
     }
 }
 
+/// Parses a stored bit tensor (`[[01110111],[11011011]]`) into per-embedding
+/// `0.0`/`1.0` vectors, one per bracketed bit string.
+fn parse_bit_leaves(text: &str) -> Vec<Vec<f64>> {
+    let t = text.trim();
+    let inner = t
+        .strip_prefix('[')
+        .unwrap_or(t)
+        .strip_suffix(']')
+        .unwrap_or(t);
+    if inner.trim().is_empty() {
+        return Vec::new();
+    }
+    if inner.trim_start().starts_with('[') {
+        let mut out = Vec::new();
+        for g in split_top_level(inner) {
+            out.extend(parse_bit_leaves(&g));
+        }
+        out
+    } else {
+        let v: Vec<f64> = inner
+            .chars()
+            .filter(|c| *c == '0' || *c == '1')
+            .map(|c| if c == '1' { 1.0 } else { 0.0 })
+            .collect();
+        if v.is_empty() {
+            Vec::new()
+        } else {
+            vec![v]
+        }
+    }
+}
+
 /// Splits `a,[b,c],d` on top-level commas (ignoring commas inside brackets).
 fn split_top_level(s: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -1941,54 +2096,65 @@ fn split_top_level(s: &str) -> Vec<String> {
     out
 }
 
-/// MaxSim: sum over query vectors of the best (max) dot (or `-hamming` for bit
-/// tensors) against the doc vectors of one tensor.
-fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], bit: bool, f32_mode: bool) -> f64 {
-    let mut sum = 0.0f64;
-    let mut sum32 = 0f32;
+/// MaxSim: sum over query vectors of the best (max) dot against the doc vectors
+/// of one tensor. Both operands are rounded to their declared element type and
+/// accumulated in `f32`, mirroring the C++ engine's aligned-`f32` arithmetic.
+/// For a `bit` column the query dot is an inner product over the set bits.
+fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: ElemType) -> f64 {
+    let mut sum = 0f32;
     for qv in q {
-        let mut best = f64::NEG_INFINITY;
+        let mut best = f32::NEG_INFINITY;
         for dv in d {
             if dv.len() != qv.len() {
                 continue;
             }
-            let m = if bit {
-                let diff = qv
-                    .iter()
-                    .zip(dv)
-                    .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
-                    .count();
-                -(diff as f64)
-            } else if f32_mode {
-                // float / float16 columns accumulate in f32 (matches the C++ engine)
+            let score = if col == ElemType::Bit {
+                if qry == ElemType::Bit {
+                    // Hamming distance: higher score means more different.
+                    let diff = qv
+                        .iter()
+                        .zip(dv)
+                        .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
+                        .count();
+                    -(diff as f32)
+                } else {
+                    let mut acc = 0f32;
+                    for (a, b) in qv.iter().zip(dv) {
+                        if *b != 0.0 {
+                            acc += quantize_elem(*a, qry);
+                        }
+                    }
+                    acc
+                }
+            } else {
                 let mut acc = 0f32;
                 for (a, b) in qv.iter().zip(dv) {
-                    acc += (*a as f32) * (*b as f32);
+                    acc += quantize_elem(*a, qry) * quantize_elem(*b, col);
                 }
-                acc as f64
-            } else {
-                qv.iter().zip(dv).map(|(a, b)| a * b).sum()
+                acc
             };
-            if m > best {
-                best = m;
+            if score > best {
+                best = score;
             }
         }
         if best.is_finite() {
             sum += best;
-            sum32 += best as f32;
         }
     }
-    if f32_mode {
-        sum32 as f64
-    } else {
-        sum
-    }
+    sum as f64
 }
 
 /// Scores one stored tensor value against the query. A column holding a
 /// `TensorArray` (top-level groups are themselves bracketed) scores by the max
 /// over its component tensors; a plain tensor uses MaxSim directly.
-fn tensor_score(q: &[Vec<f64>], doc_text: &str, bit: bool, f32_mode: bool) -> f64 {
+fn tensor_score(q: &[Vec<f64>], doc_text: &str, col: ElemType, qry: ElemType) -> f64 {
+    let leaves = |g: &str| {
+        if col == ElemType::Bit {
+            parse_bit_leaves(g)
+        } else {
+            parse_tensor_leaves(g)
+        }
+    };
     let t = doc_text.trim();
     let inner = t
         .strip_prefix('[')
@@ -2008,10 +2174,10 @@ fn tensor_score(q: &[Vec<f64>], doc_text: &str, bit: bool, f32_mode: bool) -> f6
     if is_array {
         groups
             .iter()
-            .map(|g| tensor_maxsim(q, &parse_tensor_leaves(g), bit, f32_mode))
+            .map(|g| tensor_maxsim(q, &leaves(g), col, qry))
             .fold(f64::NEG_INFINITY, f64::max)
     } else {
-        tensor_maxsim(q, &parse_tensor_leaves(doc_text), bit, f32_mode)
+        tensor_maxsim(q, &leaves(doc_text), col, qry)
     }
 }
 
@@ -2553,5 +2719,50 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn f16_round_trip_is_nearest_even() {
+        // Exact halves round to even; ordinary values round to the nearest f16.
+        assert_eq!(round_f16(1.0), 1.0);
+        assert_eq!(round_f16(0.5), 0.5);
+        // 0.1 is not representable in f16; the nearest value is 0.0999755859375.
+        assert!((round_f16(0.1) - 0.099_975_586).abs() < 1e-9);
+        // 65504 is the largest finite f16; beyond it rounds to infinity.
+        assert_eq!(round_f16(65504.0), 65504.0);
+        assert!(round_f16(1.0e30).is_infinite());
+    }
+
+    #[test]
+    fn bf16_truncates_low_bits() {
+        // bfloat16 keeps the top 16 bits of an f32 by truncation.
+        assert_eq!(round_bf16(1.0).to_bits(), 0x3f80_0000);
+        assert_eq!(round_bf16(0.1).to_bits(), 0.1f32.to_bits() & 0xffff_0000);
+        // The truncated value is slightly below the rounded-to-nearest value.
+        assert!(round_bf16(0.1) < 0.1f32);
+    }
+
+    #[test]
+    fn tensor_maxsim_quantizes_by_element_type() {
+        // Two query vectors against two doc vectors; MaxSim sums the per-query
+        // row maxima. A float16 doc rounds each stored value before the dot.
+        let q = vec![vec![0.0, -10.0, 0.0, 0.7], vec![9.2, 45.6, -55.8, 3.5]];
+        let d = vec![vec![0.1, 0.2, 0.3, -0.2], vec![0.3, -0.2, 0.2, 0.3]];
+        let f32_score = tensor_maxsim(&q, &d, ElemType::Float32, ElemType::Float32);
+        assert!((f32_score - (-5.19)).abs() < 1e-6, "got {f32_score}");
+        let f16_score = tensor_maxsim(&q, &d, ElemType::Float16, ElemType::Float32);
+        assert!((f16_score - (-5.1955)).abs() < 1e-3, "got {f16_score}");
+    }
+
+    #[test]
+    fn bit_tensor_scores_over_set_bits() {
+        // `bit` columns contribute the query component where the doc bit is set.
+        let q = vec![vec![0.0, -10.0, 0.0, 0.7]];
+        let d = vec![vec![1.0, 0.0, 0.0, 0.0]];
+        let s = tensor_maxsim(&q, &d, ElemType::Bit, ElemType::Float32);
+        assert!((s - 0.0).abs() < 1e-9, "got {s}");
+        let d2 = vec![vec![0.0, 1.0, 0.0, 0.0]];
+        let s2 = tensor_maxsim(&q, &d2, ElemType::Bit, ElemType::Float32);
+        assert!((s2 - (-10.0)).abs() < 1e-9, "got {s2}");
     }
 }

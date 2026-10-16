@@ -296,6 +296,14 @@ fn run_smoke(dir: &Path) -> infinity_common::Result<()> {
 }
 
 fn walk_slt(dir: &Path, out: &mut Vec<PathBuf>) {
+    // A single `.slt` file is accepted directly, which makes it easy to focus
+    // the conformance report on one file while iterating.
+    if dir.is_file() {
+        if dir.extension().and_then(|s| s.to_str()) == Some("slt") {
+            out.push(dir.to_path_buf());
+        }
+        return;
+    }
     if let Ok(entries) = std::fs::read_dir(dir) {
         let mut es: Vec<_> = entries.filter_map(|e| e.ok()).collect();
         es.sort_by_key(|e| e.path());
@@ -335,11 +343,15 @@ fn split_records(text: &str) -> Vec<Vec<String>> {
 /// Runs the existing `.slt` suite against the Rust engine and prints a baseline.
 fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
     // Fixture data (`/var/infinity/test_data/…`) resolves under `test/data`.
-    if let Some(root) = Path::new(slt_dir).parent() {
-        let data = root.join("data");
+    // Walk parent directories so a single-file run still finds the fixtures.
+    let mut probe = Path::new(slt_dir).parent();
+    while let Some(p) = probe {
+        let data = p.join("data");
         if data.is_dir() {
-            std::env::set_var("INFINITY_DATA_DIR", data);
+            std::env::set_var("INFINITY_DATA_DIR", &data);
+            break;
         }
+        probe = p.parent();
     }
     let mut files = Vec::new();
     walk_slt(Path::new(slt_dir), &mut files);

@@ -1,9 +1,9 @@
 //! Minimal MD5 (RFC 1321) used by the `md5(x)` scalar function.
 
 const S: [u32; 64] = [
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14,
-    20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6,
-    10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9,
+    14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15,
+    21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
 ];
 
 /// Lowercase hex MD5 digest of `input`.
@@ -27,7 +27,7 @@ pub fn md5_hex(input: &str) -> String {
             m[i] = u32::from_le_bytes([w[0], w[1], w[2], w[3]]);
         }
         let (mut a, mut b, mut c, mut d) = (a0, b0, c0, d0);
-        for i in 0..64 {
+        for (i, &s) in S.iter().enumerate() {
             let (f, g) = match i {
                 0..=15 => ((b & c) | (!b & d), i),
                 16..=31 => ((d & b) | (!d & c), (5 * i + 1) % 16),
@@ -38,11 +38,8 @@ pub fn md5_hex(input: &str) -> String {
             let tmp = d;
             d = c;
             c = b;
-            let x = a
-                .wrapping_add(f)
-                .wrapping_add(k)
-                .wrapping_add(m[g]);
-            b = b.wrapping_add(x.rotate_left(S[i]));
+            let x = a.wrapping_add(f).wrapping_add(k).wrapping_add(m[g]);
+            b = b.wrapping_add(x.rotate_left(s));
             a = tmp;
         }
         a0 = a0.wrapping_add(a);
