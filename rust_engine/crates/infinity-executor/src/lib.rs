@@ -882,7 +882,10 @@ impl Engine {
                     .create_table_typed(&table, &columns, &defaults, &not_nulls, &types)?;
                 for (i, r) in rows.iter().enumerate() {
                     if !r.is_empty() {
-                        self.store.put(&row_key(&table, i), r.as_bytes())?;
+                        // the snapshot blob separates cells with SNAP_FLD; the row
+                        // store uses tabs
+                        let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
+                        self.store.put(&row_key(&table, i), &encoded.into_bytes())?;
                     }
                 }
                 Ok(QueryResult::Rows {
