@@ -10,11 +10,17 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cpp_format;
 pub mod crc;
 pub mod metastore;
 pub mod mvcc;
 pub mod wal;
 
+pub use cpp_format::{
+    block_dir, chunk_index_file, column_file, column_outline_file, decode_data_file,
+    encode_data_file, fulltext_base_name, fulltext_files, segment_index_dir, BlockVersionFile,
+    ColumnBody, FormatError, DATA_FILE_MAGIC, DEFAULT_BLOCK_CAPACITY, VERSION_FILE,
+};
 pub use crc::crc32_ieee;
 pub use metastore::{FjallMetaStore, MetaStore};
 pub use mvcc::{BlockVersion, CreateField};

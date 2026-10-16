@@ -1,0 +1,431 @@
+//! C++-compatible on-disk layouts (RUST_REWRITE_PLAN.md §2.6.1, task #68).
+//!
+//! The byte-level facts implemented here are frozen in
+//! `rust_engine/docs/CPP_FORMAT_SPEC.md` (§1, §8.2, §8.3) with `file:line`
+//! citations into the C++ tree. Nothing in this module invents a layout: every
+//! field below is copied from that spec so a file written by this crate is
+//! byte-identical to one written by the C++ engine.
+//!
+//! Layouts:
+//!   * **data file** (`.col`, data blocks, snapshots): `u64 magic` +
+//!     `u64 buffer_size` + `buffer_size` body bytes + `u64 checksum`.
+//!   * **block `version` file**: raw, *no* magic/checksum —
+//!     `u16 create_size` + `create_size × (u64 create_ts, i64 cumulative_row_count)`
+//!     + `u16 capacity` + `capacity × u64 delete_ts`.
+//!   * **column body inside `.col`**: `[data_region (data_cap_size bytes)]
+//!     [null_bitmap ((capacity+7)/8 bytes)]` with **bit = 1 meaning non-NULL**.
+//!   * **outline file** (`col_{id}_out`): the raw concatenation of the chunks
+//!     referenced by variable-length slots; no header at all.
+
+use infinity_common::TxnTimeStamp;
+
+/// Data-file magic (`magic` in `src/storage/buffer/file_worker/data_file_worker_impl.cpp`).
+pub const DATA_FILE_MAGIC: u64 = 0x00dd_3344;
+
+/// Rows per block (`DEFAULT_BLOCK_CAPACITY` in `src/storage/definition/default_values.cppm`).
+pub const DEFAULT_BLOCK_CAPACITY: usize = 8192;
+
+/// Size of the C++ `size_t` on the 64-bit target the format is defined for.
+const SIZE_OF_SIZE_T: usize = 8;
+
+/// Errors from decoding an on-disk structure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormatError {
+    /// The buffer is shorter than the structure requires.
+    Truncated { need: usize, got: usize },
+    /// The leading magic did not match [`DATA_FILE_MAGIC`].
+    BadMagic(u64),
+}
+
+impl std::fmt::Display for FormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FormatError::Truncated { need, got } => {
+                write!(f, "truncated: need {need} bytes, got {got}")
+            }
+            FormatError::BadMagic(m) => write!(f, "bad data-file magic: {m:#x}"),
+        }
+    }
+}
+
+impl std::error::Error for FormatError {}
+
+// ---------------------------------------------------------------------------
+// §1 — generic data file (`DataFileWorker`)
+// ---------------------------------------------------------------------------
+
+/// Frames `body` as a C++ data file: `magic` + `buffer_size` + body + `checksum`.
+///
+/// The C++ writer sets the data size to exactly `buffer_size` (no padding), and
+/// the checksum field is written as `0`.
+pub fn encode_data_file(body: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 + SIZE_OF_SIZE_T + body.len() + 8);
+    out.extend_from_slice(&DATA_FILE_MAGIC.to_le_bytes());
+    out.extend_from_slice(&(body.len() as u64).to_le_bytes());
+    out.extend_from_slice(body);
+    out.extend_from_slice(&0u64.to_le_bytes());
+    out
+}
+
+/// Returns the body of a data file written by [`encode_data_file`] (or by C++).
+pub fn decode_data_file(buf: &[u8]) -> Result<Vec<u8>, FormatError> {
+    let header = 8 + SIZE_OF_SIZE_T;
+    if buf.len() < header + 8 {
+        return Err(FormatError::Truncated {
+            need: header + 8,
+            got: buf.len(),
+        });
+    }
+    let magic = u64::from_le_bytes(buf[0..8].try_into().unwrap());
+    if magic != DATA_FILE_MAGIC {
+        return Err(FormatError::BadMagic(magic));
+    }
+    let buffer_size = u64::from_le_bytes(buf[8..header].try_into().unwrap()) as usize;
+    if buf.len() < header + buffer_size + 8 {
+        return Err(FormatError::Truncated {
+            need: header + buffer_size + 8,
+            got: buf.len(),
+        });
+    }
+    Ok(buf[header..header + buffer_size].to_vec())
+}
+
+// ---------------------------------------------------------------------------
+// §8.2 — per-block `version` file (`BlockVersion`)
+// ---------------------------------------------------------------------------
+
+/// One append batch in the `version` file: the commit timestamp plus the
+/// **cumulative** row count after that append.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VersionCreate {
+    pub create_ts: TxnTimeStamp,
+    pub cumulative_row_count: i64,
+}
+
+/// The serialized form of a block's `version` file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BlockVersionFile {
+    pub created: Vec<VersionCreate>,
+    /// One entry per block slot (length = block capacity); `0` = live row.
+    pub deleted: Vec<TxnTimeStamp>,
+}
+
+impl BlockVersionFile {
+    /// Builds the file from `(create_ts, batch_rows)` pairs and the capacity the
+    /// block was created with (the C++ `deleted_` array is always that long).
+    pub fn new(batches: &[(TxnTimeStamp, u32)], capacity: usize) -> Self {
+        let mut created = Vec::with_capacity(batches.len());
+        let mut cumulative = 0i64;
+        for (ts, rows) in batches {
+            cumulative += i64::from(*rows);
+            created.push(VersionCreate {
+                create_ts: *ts,
+                cumulative_row_count: cumulative,
+            });
+        }
+        Self {
+            created,
+            deleted: vec![0; capacity],
+        }
+    }
+
+    /// Marks `offset` deleted at `ts` (the block capacity already sized `deleted`).
+    pub fn delete(&mut self, offset: usize, ts: TxnTimeStamp) {
+        if offset < self.deleted.len() {
+            self.deleted[offset] = ts;
+        }
+    }
+
+    /// Serializes exactly as C++ `BlockVersion::SaveToFile` does.
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(2 + self.created.len() * 16 + 2 + self.deleted.len() * 8);
+        // `BlockOffset create_size` (u16 LE).
+        out.extend_from_slice(&(self.created.len() as u16).to_le_bytes());
+        for c in &self.created {
+            out.extend_from_slice(&c.create_ts.to_le_bytes()); // TxnTimeStamp = u64
+            out.extend_from_slice(&c.cumulative_row_count.to_le_bytes()); // i64
+        }
+        // `BlockOffset capacity` (u16 LE) then one u64 per slot.
+        out.extend_from_slice(&(self.deleted.len() as u16).to_le_bytes());
+        for ts in &self.deleted {
+            out.extend_from_slice(&ts.to_le_bytes());
+        }
+        out
+    }
+
+    /// Parses a `version` file. Note there is no magic or checksum to validate.
+    pub fn decode(buf: &[u8]) -> Result<Self, FormatError> {
+        let mut pos = 0usize;
+        let take = |pos: &mut usize, n: usize| -> Result<usize, FormatError> {
+            if buf.len() < *pos + n {
+                return Err(FormatError::Truncated {
+                    need: *pos + n,
+                    got: buf.len(),
+                });
+            }
+            let at = *pos;
+            *pos += n;
+            Ok(at)
+        };
+
+        let at = take(&mut pos, 2)?;
+        let create_size = u16::from_le_bytes(buf[at..at + 2].try_into().unwrap()) as usize;
+        let mut created = Vec::with_capacity(create_size);
+        for _ in 0..create_size {
+            let at = take(&mut pos, 8)?;
+            let create_ts = u64::from_le_bytes(buf[at..at + 8].try_into().unwrap());
+            let at = take(&mut pos, 8)?;
+            let cumulative_row_count = i64::from_le_bytes(buf[at..at + 8].try_into().unwrap());
+            created.push(VersionCreate {
+                create_ts,
+                cumulative_row_count,
+            });
+        }
+        let at = take(&mut pos, 2)?;
+        let capacity = u16::from_le_bytes(buf[at..at + 2].try_into().unwrap()) as usize;
+        let mut deleted = Vec::with_capacity(capacity);
+        for _ in 0..capacity {
+            let at = take(&mut pos, 8)?;
+            deleted.push(u64::from_le_bytes(buf[at..at + 8].try_into().unwrap()));
+        }
+        Ok(Self { created, deleted })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §8.3 — column body inside `.col` (`[data_region][null_bitmap]`)
+// ---------------------------------------------------------------------------
+
+/// A column's body as stored inside `{column_id}.col`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnBody {
+    /// The fixed-width data region (`data_cap_size` bytes; shorter when fewer
+    /// rows are present — the C++ buffer is capacity-sized but only the written
+    /// prefix is meaningful here).
+    pub data: Vec<u8>,
+    /// `(capacity + 7) / 8` bytes; **bit = 1 means the row is non-NULL**.
+    pub null_bitmap: Vec<u8>,
+}
+
+impl ColumnBody {
+    /// Number of bytes the *capacity-sized* data region occupies.
+    pub fn data_capacity_bytes(capacity: usize, slot_size: usize) -> usize {
+        capacity * slot_size
+    }
+
+    /// Length of the null bitmap for `capacity` rows.
+    pub fn null_bitmap_len(capacity: usize) -> usize {
+        capacity.div_ceil(8)
+    }
+
+    /// Builds a body, padding the data region to `capacity * slot_size` and
+    /// setting the null bitmap (bit = 1 for rows flagged `true` in `valid`).
+    ///
+    /// `data` must be exactly `rows * slot_size` bytes.
+    pub fn build(
+        capacity: usize,
+        slot_size: usize,
+        data: &[u8],
+        valid: &[bool],
+    ) -> Result<Self, FormatError> {
+        let cap_bytes = Self::data_capacity_bytes(capacity, slot_size);
+        if cap_bytes < data.len() {
+            return Err(FormatError::Truncated {
+                need: data.len(),
+                got: cap_bytes,
+            });
+        }
+        let mut region = vec![0u8; cap_bytes];
+        region[..data.len()].copy_from_slice(data);
+
+        let mut null_bitmap = vec![0u8; Self::null_bitmap_len(capacity)];
+        for (row, ok) in valid.iter().enumerate() {
+            if *ok {
+                null_bitmap[row / 8] |= 1 << (row % 8);
+            }
+        }
+        Ok(Self {
+            data: region,
+            null_bitmap,
+        })
+    }
+
+    /// Serializes as `[data_region][null_bitmap]`.
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.data.len() + self.null_bitmap.len());
+        out.extend_from_slice(&self.data);
+        out.extend_from_slice(&self.null_bitmap);
+        out
+    }
+
+    /// Is row `row` non-NULL?
+    pub fn is_valid(&self, row: usize) -> bool {
+        self.null_bitmap
+            .get(row / 8)
+            .is_some_and(|b| b & (1 << (row % 8)) != 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §8.1 — path helpers
+// ---------------------------------------------------------------------------
+
+/// `db_{db_id}/tbl_{table_id}/seg_{segment_id}/blk_{block_id}` (decimal ids, no
+/// zero padding).
+pub fn block_dir(db_id: u64, table_id: u64, segment_id: u32, block_id: u16) -> String {
+    format!("db_{db_id}/tbl_{table_id}/seg_{segment_id}/blk_{block_id}")
+}
+
+/// `{column_id}.col` inside a block directory.
+pub fn column_file(column_id: u64) -> String {
+    format!("{column_id}.col")
+}
+
+/// `col_{column_id}_out` (outline for variable-length columns).
+pub fn column_outline_file(column_id: u64) -> String {
+    format!("col_{column_id}_out")
+}
+
+/// The block's `version` file name (written last).
+pub const VERSION_FILE: &str = "version";
+
+/// `db_{db_id}/tbl_{table_id}/idx_{index_id}/seg_{segment_id}`.
+pub fn segment_index_dir(db_id: u64, table_id: u64, index_id: u64, segment_id: u32) -> String {
+    format!("db_{db_id}/tbl_{table_id}/idx_{index_id}/seg_{segment_id}")
+}
+
+/// `chunk_{chunk_id}.idx` inside a segment-index directory.
+pub fn chunk_index_file(chunk_id: u64) -> String {
+    format!("chunk_{chunk_id}.idx")
+}
+
+/// A full-text index chunk base name: `ft_{rowid:016x}` (16 lowercase hex
+/// digits), suffixed by the row count once chunks are merged.
+pub fn fulltext_base_name(row_id: u64, merged_row_count: Option<u64>) -> String {
+    match merged_row_count {
+        Some(n) => format!("ft_{row_id:016x}_{n:x}"),
+        None => format!("ft_{row_id:016x}"),
+    }
+}
+
+/// The three full-text index files for a chunk base name.
+pub fn fulltext_files(base_name: &str) -> [String; 3] {
+    [
+        format!("{base_name}.pos"),
+        format!("{base_name}.dic"),
+        format!("{base_name}.len"),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn data_file_header_and_trailer() {
+        let body = vec![1u8, 2, 3, 4, 5];
+        let file = encode_data_file(&body);
+        // 8 (magic) + 8 (size_t buffer_size) + 5 (body) + 8 (checksum)
+        assert_eq!(file.len(), 8 + 8 + 5 + 8);
+        assert_eq!(&file[0..8], &DATA_FILE_MAGIC.to_le_bytes());
+        assert_eq!(&file[8..16], &5u64.to_le_bytes());
+        assert_eq!(&file[16..21], &body[..]);
+        assert_eq!(&file[21..29], &0u64.to_le_bytes());
+        assert_eq!(decode_data_file(&file).unwrap(), body);
+    }
+
+    #[test]
+    fn data_file_rejects_bad_magic_and_truncation() {
+        let mut file = encode_data_file(b"abc");
+        file[0] ^= 0xff;
+        assert!(matches!(
+            decode_data_file(&file),
+            Err(FormatError::BadMagic(_))
+        ));
+        assert!(matches!(
+            decode_data_file(&file[..10]),
+            Err(FormatError::Truncated { .. })
+        ));
+    }
+
+    #[test]
+    fn block_version_file_layout() {
+        // Two appends (3 then 2 rows) into an 8-row block, row 1 deleted at 30.
+        let mut v = BlockVersionFile::new(&[(10, 3), (20, 2)], 8);
+        v.delete(1, 30);
+        let bytes = v.encode();
+
+        // u16 create_size
+        assert_eq!(&bytes[0..2], &2u16.to_le_bytes());
+        // (u64 create_ts, i64 cumulative_row_count) × 2
+        assert_eq!(&bytes[2..10], &10u64.to_le_bytes());
+        assert_eq!(&bytes[10..18], &3i64.to_le_bytes());
+        assert_eq!(&bytes[18..26], &20u64.to_le_bytes());
+        assert_eq!(&bytes[26..34], &5i64.to_le_bytes());
+        // u16 capacity
+        assert_eq!(&bytes[34..36], &8u16.to_le_bytes());
+        // u64 delete_ts × capacity
+        assert_eq!(bytes.len(), 36 + 8 * 8);
+        assert_eq!(&bytes[36..44], &0u64.to_le_bytes());
+        assert_eq!(&bytes[44..52], &30u64.to_le_bytes());
+
+        assert_eq!(BlockVersionFile::decode(&bytes).unwrap(), v);
+    }
+
+    #[test]
+    fn block_version_roundtrip_empty() {
+        let v = BlockVersionFile::new(&[], DEFAULT_BLOCK_CAPACITY);
+        let bytes = v.encode();
+        assert_eq!(bytes.len(), 2 + 2 + 8 * DEFAULT_BLOCK_CAPACITY);
+        assert_eq!(BlockVersionFile::decode(&bytes).unwrap(), v);
+    }
+
+    #[test]
+    fn column_body_pads_data_and_sets_null_bits() {
+        // capacity 4, slot 4 bytes, 3 rows with row 1 NULL.
+        let data = [1u8, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0];
+        let body = ColumnBody::build(4, 4, &data, &[true, false, true]).unwrap();
+        assert_eq!(body.data.len(), 16); // padded to capacity * slot
+        assert_eq!(ColumnBody::null_bitmap_len(4), 1);
+        assert_eq!(body.null_bitmap, vec![0b0000_0101]);
+        assert!(body.is_valid(0));
+        assert!(!body.is_valid(1));
+        assert!(body.is_valid(2));
+        assert!(!body.is_valid(3));
+
+        let encoded = body.encode();
+        assert_eq!(encoded.len(), 16 + 1);
+        // data region first, then the bitmap
+        assert_eq!(&encoded[16..17], &[0b0000_0101]);
+    }
+
+    #[test]
+    fn column_body_rejects_oversized_data() {
+        let data = vec![0u8; 20];
+        assert!(ColumnBody::build(4, 4, &data, &[true, true, true, true]).is_err());
+    }
+
+    #[test]
+    fn path_layout_matches_cpp() {
+        assert_eq!(block_dir(1, 2, 3, 4), "db_1/tbl_2/seg_3/blk_4");
+        assert_eq!(column_file(0), "0.col");
+        assert_eq!(column_file(12), "12.col");
+        assert_eq!(column_outline_file(12), "col_12_out");
+        assert_eq!(VERSION_FILE, "version");
+        assert_eq!(segment_index_dir(1, 2, 5, 3), "db_1/tbl_2/idx_5/seg_3");
+        assert_eq!(chunk_index_file(7), "chunk_7.idx");
+        assert_eq!(fulltext_base_name(0x1f, None), "ft_000000000000001f");
+        assert_eq!(
+            fulltext_base_name(0x1f, Some(0x2a)),
+            "ft_000000000000001f_2a"
+        );
+        assert_eq!(
+            fulltext_files("ft_000000000000001f"),
+            [
+                "ft_000000000000001f.pos".to_string(),
+                "ft_000000000000001f.dic".to_string(),
+                "ft_000000000000001f.len".to_string()
+            ]
+        );
+    }
+}
