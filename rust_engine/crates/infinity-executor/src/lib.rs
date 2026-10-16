@@ -1916,129 +1916,79 @@ impl Engine {
                 search,
                 distinct,
             } => {
-                // `SELECT UNNEST(col) FROM t [WHERE …]`: expand a JSON array column
-                // into one output row per element.
-                if let Some(t) = from.as_ref() {
-                    // `SELECT …, UNNEST(col)` with optional leading plain columns
-                    let unnests: Vec<usize> = items
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, it)| {
-                            matches!(it, SelectItem::Func { name, .. } if name.eq_ignore_ascii_case("UNNEST"))
-                        })
-                        .map(|(i, _)| i)
-                        .collect();
-                    let leading_ok = items
-                        .iter()
-                        .enumerate()
-                        .all(|(i, it)| unnests.contains(&i) || matches!(it, SelectItem::Column(_)));
-                    if unnests.len() == 1 && leading_ok {
-                        let u = unnests[0];
-                        let args = match &items[u] {
-                            SelectItem::Func { args, .. } => args.clone(),
-                            _ => Vec::new(),
-                        };
-                        if let Some(ExprAst::Column(col)) = args.first() {
-                            let schema = self.table_schema(t)?;
-                            if let Some(ci) = schema.iter().position(|c| c == col) {
-                                // Array elements render as six-decimal floats for
-                                // float element types, matching `.slt` output.
-                                let col_ty =
-                                    self.column_types(t)?.get(ci).cloned().unwrap_or_default();
-                                let float_elems = array_elem_is_float(&col_ty);
-                                let is_json_col = is_json_type(&col_ty);
-                                let pred = match where_pred.as_ref() {
-                                    Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
-                                    None => None,
+                // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
+                // row per element, then let the normal planner handle WHERE,
+                // GROUP BY and aggregates over the expanded relation.
+                let mut items_owned: Vec<SelectItem> = items.to_vec();
+                let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
+                let unnest_idx = items_owned.iter().position(|it| {
+                    matches!(it, SelectItem::Func { name, .. }
+                        if name.eq_ignore_ascii_case("UNNEST"))
+                });
+                if let (Some(t), Some(ui)) = (from.as_ref(), unnest_idx) {
+                    let (arg_col, alias) = match &items_owned[ui] {
+                        SelectItem::Func { args, .. } => (
+                            match args.first() {
+                                Some(ExprAst::Column(c)) => Some(c.clone()),
+                                _ => None,
+                            },
+                            aliases.get(ui).cloned().flatten(),
+                        ),
+                        _ => (None, None),
+                    };
+                    if let Some(col) = arg_col {
+                        let schema = self.table_schema(t)?;
+                        if let Some(ci) = schema.iter().position(|c| c == &col) {
+                            let col_ty = self.column_types(t)?.get(ci).cloned().unwrap_or_default();
+                            let float_elems = array_elem_is_float(&col_ty);
+                            let is_json_col = is_json_type(&col_ty);
+                            let new_name = alias.unwrap_or_else(|| format!("__unnest_{col}"));
+                            let mut out: Vec<Vec<Value>> = Vec::new();
+                            for (_seq, row) in self.fetch_rows_with_ids(t)? {
+                                let mut elements: Vec<Value> = Vec::new();
+                                // a JSON column's stored text may have been read as
+                                // a number, so re-render it before parsing
+                                let cell: Option<String> = match row.get(ci) {
+                                    Some(Value::Str(c)) => Some(c.clone()),
+                                    Some(other) if is_json_col => Some(other.to_slt_string()),
+                                    _ => None,
                                 };
-                                let mut out = Vec::new();
-                                for (_seq, row) in self.fetch_rows_with_ids(t)? {
-                                    if let Some(p) = &pred {
-                                        if !p.eval_predicate(&row) {
-                                            continue;
-                                        }
-                                    }
-                                    // values of the leading plain columns, in SELECT order
-                                    let lead: Vec<String> = items
-                                        .iter()
-                                        .filter_map(|it| match it {
-                                            SelectItem::Column(c) => Some(c),
-                                            _ => None,
-                                        })
-                                        .map(|c| {
-                                            schema
-                                                .iter()
-                                                .position(|s| s == c)
-                                                .and_then(|i| row.get(i))
-                                                .map(|v| v.to_slt_string())
-                                                .unwrap_or_default()
-                                        })
-                                        .collect();
-                                    let mut emit = |val: String| {
-                                        let mut r: Vec<String> =
-                                            (0..items.len()).map(|_| String::new()).collect();
-                                        r[u] = val;
-                                        let mut li = 0usize;
-                                        for (i, slot) in r.iter_mut().enumerate() {
-                                            if i != u {
-                                                *slot = lead.get(li).cloned().unwrap_or_default();
-                                                li += 1;
+                                if let Some(cell) = cell {
+                                    if !is_json_col {
+                                        if let Some(elems) = brace_array_elems(&cell) {
+                                            for e in elems {
+                                                let text =
+                                                    if float_elems { fmt_float6(&e) } else { e };
+                                                elements.push(parse_value(&text));
                                             }
                                         }
-                                        out.push(r);
-                                    };
-                                    match row.get(ci) {
-                                        Some(Value::Str(cell)) => {
-                                            // A JSON column unnests its array
-                                            // elements (or yields the whole value
-                                            // for an object/scalar); an `ARRAY`
-                                            // column uses the brace literal form.
-                                            if !is_json_col && !cell.trim_start().starts_with('[') {
-                                                if let Some(elems) = brace_array_elems(cell) {
-                                                    for e in elems {
-                                                        emit(if float_elems {
-                                                            fmt_float6(&e)
-                                                        } else {
-                                                            e
-                                                        });
-                                                    }
-                                                    continue;
+                                    } else {
+                                        // JSON elements keep their textual form
+                                        match infinity_expression::json::parse(&cell) {
+                                            Some(infinity_expression::json::Json::Arr(items)) => {
+                                                for v in items {
+                                                    elements.push(Value::Str(v.compact()));
                                                 }
                                             }
-                                            match infinity_expression::json::parse(cell) {
-                                                Some(infinity_expression::json::Json::Arr(
-                                                    elems,
-                                                )) => {
-                                                    for e in elems {
-                                                        emit(e.compact());
-                                                    }
-                                                }
-                                                // Unnest of an object / scalar yields itself.
-                                                Some(other) => emit(other.compact()),
-                                                None => {}
+                                            Some(other) => {
+                                                elements.push(Value::Str(other.compact()))
                                             }
-                                        }
-                                        Some(other) if !matches!(other, Value::Null) => {
-                                            emit(other.to_slt_string())
-                                        }
-                                        // A JSON `null` is indistinguishable from
-                                        // SQL NULL in text storage; both yield
-                                        // one `null` row.
-                                        _ => {
-                                            if is_json_col {
-                                                emit("null".to_string());
-                                            }
+                                            None => {}
                                         }
                                     }
                                 }
-                                return Ok(QueryResult::Rows {
-                                    columns: vec![],
-                                    rows: out,
-                                });
+                                for v in elements {
+                                    let mut r = row.clone();
+                                    r.push(v);
+                                    out.push(r);
+                                }
                             }
+                            items_owned[ui] = SelectItem::Column(new_name.clone());
+                            unnest_expansion = Some((new_name, out));
                         }
                     }
                 }
+                let items: &[SelectItem] = &items_owned;
                 // SUM/AVG require a numeric argument.
                 if let Some(t) = from.as_ref() {
                     self.validate_aggregate_args(t, items)?;
@@ -2055,6 +2005,13 @@ impl Engine {
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
                     tables.push((t.clone(), self.table_schema(t)?));
+                }
+                let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
+                if let Some((name, rows)) = unnest_expansion {
+                    if let Some(entry) = tables.first_mut() {
+                        entry.1.push(name);
+                    }
+                    unnest_rows = Some(rows);
                 }
                 if let Some(JoinClause { table, .. }) = join {
                     tables.push((table.clone(), self.table_schema(table)?));
@@ -2092,6 +2049,9 @@ impl Engine {
                         ok
                     })
                     .collect();
+                if unnest_rows.is_some() {
+                    override_rows = unnest_rows;
+                }
                 let plan = plan_select(
                     items,
                     &tables,
