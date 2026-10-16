@@ -986,6 +986,22 @@ impl Parser {
                         }
                     }
                     self.expect(Token::RParen)?;
+                    if (s.eq_ignore_ascii_case("FILTER_FULLTEXT")
+                        || s.eq_ignore_ascii_case("FILTER_TEXT"))
+                        && args.len() >= 3
+                    {
+                        if let ExprAst::Literal(Literal::Str(opts)) = &args[2] {
+                            let has_topn = opts.split(';').any(|p| {
+                                p.split_once('=')
+                                    .map(|(k, _)| k.trim().eq_ignore_ascii_case("topn"))
+                                    .unwrap_or(false)
+                            });
+                            if has_topn {
+                                return self.err("topn is not a valid filter_fulltext option");
+                            }
+                            validate_fulltext_options(opts)?;
+                        }
+                    }
                     Ok(ExprAst::Func { name: s, args })
                 } else {
                     self.advance();
@@ -1081,6 +1097,11 @@ impl Parser {
                 args.push(self.expr()?);
             }
             self.expect(Token::RParen)?;
+            if kind.eq_ignore_ascii_case("TEXT") && args.len() >= 2 {
+                if let ExprAst::Literal(Literal::Str(opts)) = &args[1] {
+                    validate_fulltext_options(opts)?;
+                }
+            }
             out.matches.push(MatchClause {
                 kind: kind.clone(),
                 column: column.clone(),
@@ -1599,6 +1620,49 @@ fn select_item_to_expr(item: &SelectItem) -> Option<ExprAst> {
 }
 
 /// Normalises a typed date/time literal to Infinity's zero-padded text form.
+/// Validates fulltext option strings. `minimum_should_match` follows the
+/// Lucene spec: whitespace-separated `<int>` / `<int>%` / `<int><<int>%`
+/// clauses, with percentages within -100..=100.
+fn validate_fulltext_options(opts: &str) -> Result<()> {
+    for part in opts.split(';') {
+        let Some((k, v)) = part.split_once('=') else {
+            continue;
+        };
+        if !k.trim().eq_ignore_ascii_case("minimum_should_match") {
+            continue;
+        }
+        for clause in v.split_whitespace() {
+            // an optional `n<` conditional prefix
+            let spec = match clause.split_once('<') {
+                Some((prefix, rest)) => {
+                    if prefix.trim().parse::<i64>().is_err() {
+                        return Err(Error::Invalid(
+                            "minimum_should_match prefix must be an integer".into(),
+                        ));
+                    }
+                    rest
+                }
+                None => clause,
+            };
+            let (num, pct) = match spec.strip_suffix('%') {
+                Some(num) => (num, true),
+                None => (spec, false),
+            };
+            let Ok(n) = num.trim().parse::<i64>() else {
+                return Err(Error::Invalid(
+                    "minimum_should_match must be an integer count or percentage".into(),
+                ));
+            };
+            if pct && !(-100..=100).contains(&n) {
+                return Err(Error::Invalid(
+                    "minimum_should_match percentage must be within -100..=100%".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Validates the parenthesised CREATE INDEX target. Supported forms:
 /// a plain column; a function call whose first argument is a column and whose
 /// remaining arguments are atoms; or a top-level expression over a single
