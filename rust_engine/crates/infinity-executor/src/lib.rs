@@ -2584,6 +2584,13 @@ impl Engine {
         if is_jsonl {
             return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
         }
+        // A `FORMAT JSON` copy is a single JSON array of objects.
+        let is_json = opts
+            .iter()
+            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSON"));
+        if is_json {
+            return self.copy_from_json(table, &text, &types_for_scan, &defaults);
+        }
         let mut rows: Vec<Vec<Literal>> = Vec::new();
         for line in text.lines() {
             let line = line.trim_end_matches('\r');
@@ -2641,16 +2648,54 @@ impl Engine {
         defaults: &[Option<String>],
     ) -> Result<QueryResult> {
         use infinity_expression::json::Json;
-        let schema = self.table_schema(table)?;
-        let mut rows: Vec<Vec<Literal>> = Vec::new();
+        let mut objects: Vec<Vec<(String, Json)>> = Vec::new();
         for line in text.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            let Some(Json::Obj(fields)) = infinity_expression::json::parse(line) else {
-                continue;
-            };
+            if let Some(Json::Obj(fields)) = infinity_expression::json::parse(line) {
+                objects.push(fields);
+            }
+        }
+        self.insert_json_objects(table, &objects, types, defaults)
+    }
+
+    /// Loads a `FORMAT JSON` copy: the whole file is one JSON array whose
+    /// elements are objects keyed by column name.
+    fn copy_from_json(
+        &self,
+        table: &str,
+        text: &str,
+        types: &[String],
+        defaults: &[Option<String>],
+    ) -> Result<QueryResult> {
+        use infinity_expression::json::Json;
+        let mut objects: Vec<Vec<(String, Json)>> = Vec::new();
+        if let Some(Json::Arr(items)) = infinity_expression::json::parse(text.trim()) {
+            for it in items {
+                if let Json::Obj(fields) = it {
+                    objects.push(fields);
+                }
+            }
+        }
+        self.insert_json_objects(table, &objects, types, defaults)
+    }
+
+    /// Inserts one row per JSON object (keyed by column name). Sparse columns
+    /// come as `{index: value}` objects (float) or index arrays (bit);
+    /// everything else is a scalar.
+    fn insert_json_objects(
+        &self,
+        table: &str,
+        objects: &[Vec<(String, infinity_expression::json::Json)>],
+        types: &[String],
+        defaults: &[Option<String>],
+    ) -> Result<QueryResult> {
+        use infinity_expression::json::Json;
+        let schema = self.table_schema(table)?;
+        let mut rows: Vec<Vec<Literal>> = Vec::new();
+        for fields in objects {
             let mut cells: Vec<Literal> = Vec::with_capacity(schema.len());
             for (i, name) in schema.iter().enumerate() {
                 let ty = types.get(i).cloned().unwrap_or_default();

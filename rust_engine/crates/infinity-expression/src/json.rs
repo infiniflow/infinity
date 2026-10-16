@@ -310,14 +310,18 @@ fn json_matches(a: &Json, target: &Value) -> bool {
         },
         Value::Bool(b) => matches!(a, Json::Bool(j) if j == b),
         Value::Str(s) => {
-            let bare = s
-                .strip_prefix('"')
-                .and_then(|x| x.strip_suffix('"'))
-                .unwrap_or(s);
-            match a {
-                Json::Str(v) => v == bare || v == s,
-                Json::Null => bare == "null",
-                other => other.compact() == *s || other.compact() == *bare,
+            // An explicitly quoted target (`'"1"'`) is a JSON string and only
+            // matches a JSON string; an unquoted one also matches numbers and
+            // booleans through their compact text.
+            if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
+                let bare = &s[1..s.len() - 1];
+                matches!(a, Json::Str(v) if v == bare)
+            } else {
+                match a {
+                    Json::Str(v) => v == s,
+                    Json::Null => s == "null",
+                    other => other.compact() == *s,
+                }
             }
         }
         Value::Null => matches!(a, Json::Null),
