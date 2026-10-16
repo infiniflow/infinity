@@ -263,6 +263,31 @@ impl Catalog {
                 out.push(meta);
             }
         }
+        // Name-only indexes — the engine does not materialise an expression
+        // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name lives
+        // under a supplementary table tag (`write_cpp_layout_from`).
+        for t in &tables {
+            let tag = infinity_storage::catalog_format::catalog_table_tag_key(
+                &t.db_id.to_string(),
+                &t.table_id.to_string(),
+                "rust_name_only_indexes",
+            );
+            let Some(bytes) = self.store.get(tag.as_bytes())? else {
+                continue;
+            };
+            for name in String::from_utf8_lossy(&bytes).split(',') {
+                let name = name.trim();
+                if !name.is_empty() {
+                    out.push(IndexMeta {
+                        name: name.to_string(),
+                        table: format!("{}.{}", t.db_name, t.table_name),
+                        column: String::new(),
+                        index_type: String::new(),
+                        options: Vec::new(),
+                    });
+                }
+            }
+        }
         Ok(out)
     }
 

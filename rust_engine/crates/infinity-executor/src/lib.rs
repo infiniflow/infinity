@@ -3175,9 +3175,11 @@ impl Engine {
         if cols.is_empty() {
             return Ok((Vec::new(), hidden.to_vec()));
         }
-        // A `whitespace` analyzer keeps punctuation inside a token, so
-        // `2023-01-01` is one term rather than three. A `whitespace-<chars>`
-        // analyzer additionally splits on each listed delimiter character.
+        // `whitespace`/`keyword` split only on whitespace (so `2023-01-01` stays
+        // one token); `whitespace-<chars>` splits **only** on the listed
+        // delimiters (the C++ `WhitespaceAnalyzer` does not also split on
+        // whitespace — see `whitespace_analyzer_impl.cpp`); anything else uses
+        // the standard tokenizer.
         let delims: Option<Vec<char>> = match_columns(&m.column).iter().find_map(|c| {
             let a = self
                 .index_analyzers
@@ -3185,15 +3187,17 @@ impl Engine {
                 .unwrap()
                 .get(&index_key(table, c))?
                 .to_ascii_lowercase();
-            a.strip_prefix("whitespace")
-                .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
+            if a == "keyword" || a == "whitespace" {
+                Some(Vec::new())
+            } else {
+                a.strip_prefix("whitespace")
+                    .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
+            }
         });
         let tokenize = |s: &str| -> Vec<String> {
             let parts: Vec<String> = match &delims {
-                Some(d) => s
-                    .split(|c: char| c.is_whitespace() || d.contains(&c))
-                    .map(str::to_string)
-                    .collect(),
+                Some(d) if d.is_empty() => s.split_whitespace().map(str::to_string).collect(),
+                Some(d) => s.split(|c: char| d.contains(&c)).map(str::to_string).collect(),
                 None => s
                     .split(|c: char| !c.is_alphanumeric() && c != '_')
                     .map(str::to_string)

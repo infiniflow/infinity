@@ -42,6 +42,7 @@ pub fn data_type_of_text(type_text: &str) -> Option<Json> {
         "SMALLINT" | "INT16" => plain(logical::SMALLINT),
         "INT" | "INTEGER" | "INT32" => plain(logical::INTEGER),
         "BIGINT" | "INT64" => plain(logical::BIGINT),
+        "HUGEINT" | "INT128" => plain(logical::HUGEINT),
         "FLOAT" | "REAL" | "FLOAT32" => plain(logical::FLOAT),
         "DOUBLE" | "FLOAT64" => plain(logical::DOUBLE),
         "FLOAT16" => plain(logical::FLOAT16),
@@ -173,6 +174,7 @@ fn logical_name(code: i64) -> Option<&'static str> {
         value_format::logical::SMALLINT => "SMALLINT",
         value_format::logical::INTEGER => "INTEGER",
         value_format::logical::BIGINT => "BIGINT",
+        value_format::logical::HUGEINT => "HUGEINT",
         value_format::logical::FLOAT => "FLOAT",
         value_format::logical::DOUBLE => "DOUBLE",
         value_format::logical::FLOAT16 => "FLOAT16",
@@ -324,7 +326,10 @@ fn table_of(table: &str) -> &str {
 /// column that vanished); the caller then leaves no record rather than write a
 /// half-formed one.
 fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
-    let col = table.columns.iter().find(|c| c.column_name == im.column)?;
+    // A functional index (`CREATE INDEX … (sqrt(c1))`) names an *expression*, so
+    // there is no such column; the `SECONDARY` arm below turns it into a
+    // `SECONDARYFUNCTIONAL` record instead of dropping it.
+    let col = table.columns.iter().find(|c| c.column_name == im.column);
     let opt = |k: &str| -> Option<String> {
         im.options
             .iter()
@@ -360,21 +365,26 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
             &opt_word("ANALYZER", "standard"),
         )),
         // An index with no `USING` kind is the C++ default, a secondary index.
-        "SECONDARY" | "" => {
-            let is_json =
-                value_format::data_type_code(&col.column_type) == Some(value_format::logical::JSON);
-            let low = opt("CARDINALITY")
-                .map(|v| v.eq_ignore_ascii_case("low"))
-                .unwrap_or(false);
-            Some(IndexDefValue::secondary(
-                &im.name,
-                &table.table_name,
-                &im.column,
-                low,
-                is_json,
-            ))
-        }
+        "SECONDARY" | "" => match col {
+            Some(col) => {
+                let is_json = value_format::data_type_code(&col.column_type)
+                    == Some(value_format::logical::JSON);
+                let low = opt("CARDINALITY")
+                    .map(|v| v.eq_ignore_ascii_case("low"))
+                    .unwrap_or(false);
+                Some(IndexDefValue::secondary(
+                    &im.name,
+                    &table.table_name,
+                    &im.column,
+                    low,
+                    is_json,
+                ))
+            }
+            // No column of that name: a functional secondary index.
+            None => functional_index_def(im, table),
+        },
         "IVF" | "FLAT" => {
+            let col = col?;
             let elem = value_format::type_info_int(&col.column_type, "embedding_type")
                 .unwrap_or(value_format::element::FLOAT32);
             Some(IndexDefValue::ivf_plain(
@@ -433,6 +443,51 @@ fn index_def_for(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
         )),
         _ => None,
     }
+}
+
+/// Builds the C++ `SECONDARYFUNCTIONAL` record for a functional index such as
+/// `CREATE INDEX i ON t (sqrt(c1))`, where the engine keeps the *expression* in
+/// `IndexMeta::column` rather than a column name.
+///
+/// C++ splits it into the base column(s) (`column_names`), the function's info
+/// string (`func_col_params`) and the expression as JSON (`function_expression`,
+/// which the C++ re-parses) plus the return type
+/// (`index_secondary_functional_impl.cpp:67-77`;
+/// `logical_planner_impl.cpp:970-979`). `func_col_params` carries the engine's
+/// expression text verbatim, so reading the record back restores
+/// `IndexMeta::column`. `func_return_type` is approximated from the base
+/// column's type — this engine does not type-analyse the expression here.
+fn functional_index_def(im: &IndexMeta, table: &CppTable) -> Option<IndexDefValue> {
+    let expr = im.column.trim();
+    // The base column the expression references: the longest matching name first,
+    // so `c1` cannot match inside `c11`.
+    let mut names: Vec<&str> = table
+        .columns
+        .iter()
+        .map(|c| c.column_name.as_str())
+        .collect();
+    names.sort_by_key(|n| std::cmp::Reverse(n.len()));
+    let base = *names.iter().find(|n| expr.contains(**n))?;
+    let col = table.columns.iter().find(|c| c.column_name == base)?;
+    let func = expr.split('(').next().unwrap_or(expr).trim();
+    let low = im
+        .options
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("CARDINALITY"))
+        .map(|(_, v)| v.eq_ignore_ascii_case("low"))
+        .unwrap_or(false);
+    Some(IndexDefValue::secondary_functional(
+        &im.name,
+        &table.table_name,
+        base,
+        expr,
+        col.column_type.clone(),
+        infinity_expression::json::Json::Obj(vec![(
+            "name".to_string(),
+            infinity_expression::json::Json::Str(func.to_string()),
+        )]),
+        low,
+    ))
 }
 
 impl Catalog {
@@ -602,6 +657,30 @@ impl Catalog {
                     key::catalog_table_tag_key(db_str, tbl_str, "next_index_id").as_bytes(),
                     count.to_string().as_bytes(),
                 )?;
+            }
+        }
+        // An index whose target is an expression this engine does not
+        // materialise (`CREATE INDEX … (c1 + 5)`) has an **empty** `column`, so
+        // there is no C++ `IndexBase` to write. Record just its name under a
+        // table tag, so it still exists in the C++ key space (and can be
+        // dropped); the C++ engine ignores an unknown tag.
+        for (db_str, tbl_str, _, cpp) in &resolved {
+            let names: Vec<&str> = indexes
+                .iter()
+                .filter(|im| {
+                    im.column.is_empty()
+                        && table_of(&im.table) == cpp.table_name
+                        && db_of(&im.table) == cpp.db_name
+                })
+                .map(|im| im.name.as_str())
+                .collect();
+            if !names.is_empty() {
+                store.put(
+                    key::catalog_table_tag_key(db_str, tbl_str, "rust_name_only_indexes")
+                        .as_bytes(),
+                    names.join(",").as_bytes(),
+                )?;
+                written += 1;
             }
         }
 
@@ -778,6 +857,18 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
                 other => other.compact(),
             })
     };
+    // A functional index keeps the whole expression in `func_col_params`
+    // (`IndexSecondaryFunctional::Serialize`), and that is what the engine's
+    // planner matches a predicate against — so it is the `IndexMeta::column`.
+    let functional = def
+        .base
+        .index_type
+        .eq_ignore_ascii_case("SECONDARYFUNCTIONAL");
+    let column = if functional {
+        opt("func_col_params").unwrap_or(column)
+    } else {
+        column
+    };
     let mut options: Vec<(String, String)> = Vec::new();
     if let Some(a) = opt("analyzer") {
         options.push(("ANALYZER".to_string(), a));
@@ -792,7 +883,13 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
         name: def.base.index_name.clone(),
         table,
         column,
-        index_type: def.base.index_type.clone(),
+        // The engine's `USING` kind: a functional index is a plain secondary one,
+        // and `index_def_for` must recognise it to write it back.
+        index_type: if functional {
+            "SECONDARY".to_string()
+        } else {
+            def.base.index_type.clone()
+        },
         options,
     })
 }
@@ -857,6 +954,43 @@ mod tests {
             data_type_of_text("SPARSE(FLOAT,100)").unwrap().compact(),
             r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
         );
+    }
+
+    #[test]
+    fn functional_indexes_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cat = Catalog::open(tmp.path()).unwrap();
+        let cols = ["c1".to_string(), "c2".to_string()];
+        let types = ["INTEGER".to_string(), "VARCHAR".to_string()];
+        cat.create_table_typed(
+            "default_db.t",
+            &cols,
+            &[None, None],
+            &[false, false],
+            &types,
+            &[None, None],
+        )
+        .unwrap();
+        // A functional index keeps the expression in `IndexMeta::column`.
+        cat.create_index_typed("idx1", "default_db.t", "sqrt(c1)", "", &[])
+            .unwrap();
+
+        let out = tempfile::tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        cat.write_cpp_layout(store.as_ref()).unwrap();
+
+        let defs = read_cpp_indexes(store.as_ref()).unwrap();
+        assert_eq!(defs.len(), 1, "the functional index must not be dropped");
+        assert_eq!(defs[0].base.index_type, "SECONDARYFUNCTIONAL");
+        assert_eq!(defs[0].base.column_names, vec!["c1".to_string()]);
+
+        // Reading it back restores the expression the planner matches on.
+        let tables = read_cpp_layout(store.as_ref()).unwrap();
+        let meta = index_meta_of(&defs[0], &tables).unwrap();
+        assert_eq!(meta.name, "idx1");
+        assert_eq!(meta.table, "default_db.t");
+        assert_eq!(meta.column, "sqrt(c1)");
+        assert_eq!(meta.index_type, "SECONDARY");
     }
 
     #[test]
