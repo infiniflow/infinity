@@ -1300,7 +1300,12 @@ impl Engine {
                 name,
                 table,
                 column,
+                index_type,
+                opts,
+                if_not_exists,
             } => {
+                let _ = if_not_exists;
+                self.validate_index(table, column, index_type, opts)?;
                 self.catalog.create_index(name, table, column)?;
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
@@ -2018,6 +2023,103 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .types)
+    }
+
+    /// Validates `CREATE INDEX … USING <kind> WITH (…)`: the index kind must
+    /// suit the column type and the options must be in range.
+    fn validate_index(
+        &self,
+        table: &str,
+        column: &str,
+        index_type: &str,
+        opts: &[(String, String)],
+    ) -> Result<()> {
+        let schema = self.table_schema(table)?;
+        let Some(ci) = schema.iter().position(|c| c == column) else {
+            // a functional-index target is validated separately
+            return Ok(());
+        };
+        let ty = self
+            .column_types(table)?
+            .get(ci)
+            .cloned()
+            .unwrap_or_default()
+            .to_ascii_uppercase();
+        match index_type.to_ascii_uppercase().as_str() {
+            "" => {}
+            "BMP" => {
+                if !is_sparse_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "BMP index requires a sparse column, got '{ty}'"
+                    )));
+                }
+                for (k, v) in opts {
+                    match k.as_str() {
+                        "BLOCK_SIZE" => {
+                            let n: i64 = v.parse().unwrap_or(-1);
+                            if !(1..=256).contains(&n) {
+                                return Err(Error::Invalid(format!(
+                                    "block_size {v} is out of range 1..=256"
+                                )));
+                            }
+                        }
+                        "COMPRESS_TYPE" => {
+                            let v = v.to_ascii_uppercase();
+                            if v != "COMPRESS" && v != "RAWW" {
+                                return Err(Error::Invalid(format!(
+                                    "unsupported compress_type '{v}'"
+                                )));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            "HNSW" => {
+                if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "{index_type} index requires a vector column, got '{ty}'"
+                    )));
+                }
+                // LVQ encoding is unsupported for integer element types
+                let int_elem = matches!(
+                    tensor_elem_type(&ty),
+                    ElemType::Int8
+                        | ElemType::UInt8
+                        | ElemType::Int16
+                        | ElemType::Int32
+                        | ElemType::Int64
+                );
+                for (k, v) in opts {
+                    if k == "ENCODE" && v.eq_ignore_ascii_case("lvq") && int_elem {
+                        return Err(Error::Invalid(
+                            "LVQ encoding is not supported for integer embeddings".into(),
+                        ));
+                    }
+                }
+            }
+            "IVF" | "FLAT" | "EMVB" | "PLAID" => {
+                if !is_embedding_type(&ty) && !is_tensor_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "{index_type} index requires a vector column, got '{ty}'"
+                    )));
+                }
+            }
+            "FULLTEXT" => {
+                for (k, v) in opts {
+                    if k == "ANALYZER" {
+                        let v = v.to_ascii_uppercase();
+                        if v == "JIEBA" || v == "NGRAM" {
+                            return Err(Error::Invalid(format!(
+                                "unsupported fulltext analyzer '{v}'"
+                            )));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Rejects `SUM`/`AVG` over a non-numeric column.

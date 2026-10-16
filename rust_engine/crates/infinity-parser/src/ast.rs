@@ -263,6 +263,12 @@ pub enum Statement {
         name: String,
         table: String,
         column: String,
+        /// `USING <kind>` (e.g. `Hnsw`, `Bmp`), empty when unspecified.
+        index_type: String,
+        /// `WITH (k = v, …)` options, keys upper-cased.
+        opts: Vec<(String, String)>,
+        /// `CREATE INDEX IF NOT EXISTS …`
+        if_not_exists: bool,
     },
     DropTable {
         name: String,

@@ -151,7 +151,7 @@ impl Parser {
                         if_not_exists: ine,
                     })
                 } else if self.eat_kw("INDEX") {
-                    let _ = self.eat_kw("IF");
+                    let ine = self.eat_kw("IF");
                     let _ = self.eat_kw("NOT");
                     let _ = self.eat_kw("EXISTS");
                     let name = self.expect_ident()?;
@@ -184,14 +184,50 @@ impl Parser {
                         self.advance();
                     }
                     self.expect(Token::RParen)?;
-                    // tolerate trailing `USING …` / `WITH (…)`
+                    // trailing `USING <kind>` / `WITH (k = v, …)`
+                    let mut index_type = String::new();
+                    let mut opts: Vec<(String, String)> = Vec::new();
                     while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
+                        if self.eat_kw("USING") {
+                            index_type = self.expect_ident()?;
+                            continue;
+                        }
+                        if self.eat_kw("WITH") {
+                            self.expect(Token::LParen)?;
+                            while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                                let k = match self.advance() {
+                                    Token::Ident(k) => k,
+                                    _ => continue,
+                                };
+                                if self.peek() == &Token::Op("=".into()) {
+                                    self.advance();
+                                }
+                                let v = match self.advance() {
+                                    Token::Ident(v) => v,
+                                    Token::Int(i) => i.to_string(),
+                                    Token::Float(f) => f.to_string(),
+                                    Token::Str(v) => v,
+                                    _ => String::new(),
+                                };
+                                opts.push((k.to_ascii_uppercase(), v));
+                                if self.peek() == &Token::Comma {
+                                    self.advance();
+                                } else {
+                                    break;
+                                }
+                            }
+                            self.expect(Token::RParen)?;
+                            continue;
+                        }
                         self.advance();
                     }
                     Ok(Statement::CreateIndex {
                         name,
                         table,
                         column,
+                        index_type,
+                        opts,
+                        if_not_exists: ine,
                     })
                 } else {
                     let _ = self.eat_kw("IF");
@@ -1970,7 +2006,10 @@ mod tests {
             Statement::CreateIndex {
                 name: "idx_name".into(),
                 table: "t".into(),
-                column: "name".into()
+                column: "name".into(),
+                index_type: String::new(),
+                opts: vec![],
+                if_not_exists: false,
             }
         );
     }
