@@ -958,6 +958,69 @@ fn embedding_info(type_text: &str) -> Option<(i32, i32)> {
 /// `LogicType.Embedding` (SDK ordinal) — announced for vector columns.
 const LOGIC_EMBEDDING: i32 = 12;
 
+// -------- date/time helpers (the SDK expects epoch days/seconds) --------
+
+/// Days from 1970-01-01 for a proleptic-Gregorian civil date (Hinnant's algorithm).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
+/// Parses `YYYY-MM-DD` into days since the epoch (`ColumnDate`'s wire form).
+fn date_to_days(s: &str) -> Option<i32> {
+    let mut it = s.trim().split(['-', '/']);
+    let y: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next()?.parse().ok()?;
+    let d: i64 = it.next()?.parse().ok()?;
+    i32::try_from(days_from_civil(y, m, d)).ok()
+}
+
+/// Parses `HH:MM:SS` into seconds since midnight (`ColumnTime`'s wire form).
+fn time_to_secs(s: &str) -> Option<i32> {
+    let mut it = s.trim().split(':');
+    let h: i64 = it.next()?.parse().ok()?;
+    let m: i64 = it.next().unwrap_or("0").parse().ok()?;
+    let sec: i64 = it.next().unwrap_or("0").parse().ok()?;
+    i32::try_from(h * 3600 + m * 60 + sec).ok()
+}
+
+/// Splits `YYYY-MM-DD HH:MM:SS` into (epoch days, seconds of day).
+fn datetime_to_pair(s: &str) -> Option<(i32, i32)> {
+    let (d, t) = s.trim().split_once([' ', 'T'])?;
+    Some((date_to_days(d)?, time_to_secs(t)?))
+}
+
+/// The wire shape of one result column, resolved from its declared type text.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ColKind {
+    /// Packed as the given `ColumnType` (scalars, JSON, date/time).
+    Scalar(i32),
+    /// Vector column: `(dimension, element_type)` as a raw element stream.
+    Embedding(i32, i32),
+}
+
+/// Classifies a column from its declared type text, falling back to value
+/// inference when the type is unknown.
+fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
+    if let Some((dim, elem)) = embedding_info(declared) {
+        return ColKind::Embedding(dim, elem);
+    }
+    let up = declared.trim().to_ascii_uppercase();
+    let base = up.split('(').next().unwrap_or("").trim();
+    match base {
+        "JSON" => ColKind::Scalar(22),                   // ColumnJson
+        "DATE" => ColKind::Scalar(16),                   // ColumnDate
+        "TIME" => ColKind::Scalar(17),                   // ColumnTime
+        "DATETIME" | "TIMESTAMP" => ColKind::Scalar(18), // ColumnDateTime
+        _ => ColKind::Scalar(infer_column_type(rows, ci)),
+    }
+}
+
 /// Maps a wire `ColumnType` (how the column bytes are packed) to the SDK's
 /// `LogicType` ordinal (`ColumnDef.data_type.logic_type`), which the SDK turns
 /// into a Polars dtype via `logic_type_to_dtype`.
@@ -1040,11 +1103,16 @@ pub fn rows_to_column_fields_typed(
 ) -> Vec<ColumnField> {
     let mut out = Vec::new();
     for (ci, name) in columns.iter().enumerate() {
-        if let Some((dim, elem)) = types.get(ci).and_then(|t| embedding_info(t)) {
+        let declared = types.get(ci).map(String::as_str).unwrap_or("");
+        let kind = classify_column(declared, rows, ci);
+        if let ColKind::Embedding(dim, elem) = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "NULL");
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -1078,11 +1146,16 @@ pub fn rows_to_column_fields_typed(
             });
             continue;
         }
-        let code = infer_column_type(rows, ci);
+        let ColKind::Scalar(code) = kind else {
+            unreachable!()
+        };
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "NULL");
+            let cell = r
+                .get(ci)
+                .map(String::as_str)
+                .filter(|v| !v.eq_ignore_ascii_case("null"));
             let valid = cell.is_some();
             match code {
                 3 => {
@@ -1111,7 +1184,23 @@ pub fn rows_to_column_fields_typed(
                         0
                     },
                 ),
-                // strings are `u32` little-endian length prefixed
+                16 => {
+                    // ColumnDate: i32 days since the epoch.
+                    let n = cell.and_then(date_to_days).unwrap_or(0);
+                    chunk.extend_from_slice(&n.to_le_bytes());
+                }
+                17 => {
+                    // ColumnTime: i32 seconds since midnight.
+                    let n = cell.and_then(time_to_secs).unwrap_or(0);
+                    chunk.extend_from_slice(&n.to_le_bytes());
+                }
+                18 => {
+                    // ColumnDateTime: i32 epoch days + i32 seconds of day.
+                    let (d, t) = cell.and_then(datetime_to_pair).unwrap_or((0, 0));
+                    chunk.extend_from_slice(&d.to_le_bytes());
+                    chunk.extend_from_slice(&t.to_le_bytes());
+                }
+                // strings / JSON are `u32` little-endian length prefixed
                 _ => {
                     let s = cell.unwrap_or("");
                     chunk.extend_from_slice(&(s.len() as u32).to_le_bytes());
@@ -1959,11 +2048,10 @@ pub fn select_response_from_typed(
         .iter()
         .enumerate()
         .map(|(i, name)| {
-            let embedding = types.get(i).and_then(|t| embedding_info(t));
-            let logic_type = if embedding.is_some() {
-                LOGIC_EMBEDDING
-            } else {
-                column_type_to_logic(infer_column_type(rows, i))
+            let declared = types.get(i).map(String::as_str).unwrap_or("");
+            let (logic_type, embedding) = match classify_column(declared, rows, i) {
+                ColKind::Embedding(dim, elem) => (LOGIC_EMBEDDING, Some((dim, elem))),
+                ColKind::Scalar(code) => (column_type_to_logic(code), None),
             };
             ColumnDefWire {
                 id: i as i32,
@@ -2941,5 +3029,58 @@ mod tests {
             let (sid, strs) = read_string_request(ip).unwrap();
             assert_eq!((sid, strs.get(&1).map(String::as_str)), (13, Some("d")));
         });
+    }
+
+    /// Date/Time/Datetime/Json columns are packed the way the SDK's
+    /// `parse_*_bytes` expects, and announced with the matching `LogicType`.
+    #[test]
+    fn non_scalar_column_packing() {
+        let cols: Vec<String> = ["d", "tm", "dt", "j"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let types: Vec<String> = ["Date", "Time", "Datetime", "Json"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let rows = vec![vec![
+            "2024-01-22".to_string(),
+            "00:03:55".to_string(),
+            "2024-01-22 00:03:55".to_string(),
+            "{\"a\":1}".to_string(),
+        ]];
+
+        let fields = rows_to_column_fields_typed(&cols, &types, &rows);
+        // ColumnDate: i32 days since the epoch (2024-01-22 -> 19744).
+        assert_eq!(fields[0].column_type, 16);
+        assert_eq!(
+            i32::from_le_bytes(fields[0].column_vectors[0][..4].try_into().unwrap()),
+            19744
+        );
+        // ColumnTime: i32 seconds of day (00:03:55 -> 235).
+        assert_eq!(fields[1].column_type, 17);
+        assert_eq!(
+            i32::from_le_bytes(fields[1].column_vectors[0][..4].try_into().unwrap()),
+            235
+        );
+        // ColumnDateTime: (epoch days, seconds of day).
+        assert_eq!(fields[2].column_type, 18);
+        let dt = &fields[2].column_vectors[0];
+        assert_eq!(i32::from_le_bytes(dt[..4].try_into().unwrap()), 19744);
+        assert_eq!(i32::from_le_bytes(dt[4..8].try_into().unwrap()), 235);
+        // ColumnJson: same length-prefixed UTF-8 framing as varchar.
+        assert_eq!(fields[3].column_type, 22);
+        let j = &fields[3].column_vectors[0];
+        assert_eq!(
+            u32::from_le_bytes(j[..4].try_into().unwrap()) as usize,
+            "{\"a\":1}".len()
+        );
+        assert_eq!(&j[4..], b"{\"a\":1}");
+
+        // ... and the announced LogicType is the matching one.
+        let resp = select_response_from_typed(&cols, &types, &rows);
+        let logic: Vec<i32> = resp.column_defs.iter().map(|c| c.logic_type).collect();
+        assert_eq!(logic, vec![17, 18, 19, 23]); // Date, Time, DateTime, Json
+        assert!(resp.column_defs.iter().all(|c| c.embedding.is_none()));
     }
 }
