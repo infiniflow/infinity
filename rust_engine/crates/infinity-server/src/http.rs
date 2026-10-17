@@ -583,6 +583,24 @@ fn drop_option_sql(body: &Json) -> std::result::Result<bool, (u16, String)> {
     }
 }
 
+/// Accepts either a bare string (`"c1"`, `"c1,c2"`) or an array of strings.
+fn str_list(v: &Json) -> Vec<String> {
+    match v {
+        Json::Str(s) => s
+            .split(',')
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .map(str::to_string)
+            .collect(),
+        Json::Arr(a) => a
+            .iter()
+            .filter_map(Json::as_str)
+            .map(str::to_string)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Builds `SELECT …` for a `GET …/docs` request (the HTTP query DSL).
 fn docs_sql(body: &Json, db: &str, table: &str) -> String {
     let output: Vec<String> = body
@@ -720,18 +738,20 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
 
     if let Some(f) = body.get("filter").and_then(Json::as_str) {
         if !f.is_empty() {
-            sql.push_str(&format!(" WHERE {f}"));
+            sql.push_str(&format!(" WHERE {}", rewrite_pseudo(f)));
         }
     }
-    if let Some(g) = body.get("group_by").and_then(Json::as_arr) {
-        let cols: Vec<&str> = g.iter().filter_map(Json::as_str).collect();
+    if let Some(g) = body.get("group_by") {
+        let cols = str_list(g);
         if !cols.is_empty() {
+            let cols: Vec<String> = cols.iter().map(|c| rewrite_pseudo(c)).collect();
             sql.push_str(&format!(" GROUP BY {}", cols.join(", ")));
         }
     }
-    if let Some(h) = body.get("having").and_then(Json::as_arr) {
-        let preds: Vec<&str> = h.iter().filter_map(Json::as_str).collect();
+    if let Some(h) = body.get("having") {
+        let preds = str_list(h);
         if !preds.is_empty() {
+            let preds: Vec<String> = preds.iter().map(|p| rewrite_pseudo(p)).collect();
             sql.push_str(&format!(" HAVING {}", preds.join(" AND ")));
         }
     }
@@ -741,7 +761,7 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
             .filter_map(|x| {
                 // `[col, "asc"]` (thrift-like) or `{col: "asc"}` (the REST SDK)
                 if let Some(a) = x.as_arr() {
-                    let col = a.first()?.as_str()?;
+                    let col = rewrite_pseudo(a.first()?.as_str()?);
                     let dir = a.get(1).and_then(Json::as_str).unwrap_or("asc");
                     return Some(format!(
                         "{col} {}",
@@ -754,6 +774,7 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                 }
                 let obj = x.as_obj()?;
                 let (col, dir) = obj.first()?;
+                let col = rewrite_pseudo(col);
                 let dir = dir.as_str().unwrap_or("asc");
                 Some(format!(
                     "{col} {}",
@@ -791,17 +812,44 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
     sql
 }
 
+/// The REST DSL's pseudo-columns and the functions they stand for.
+const PSEUDO_COLUMNS: [(&str, &str); 4] = [
+    ("_row_id", "row_id()"),
+    ("_score", "score()"),
+    ("_distance", "distance()"),
+    ("_similarity", "similarity()"),
+];
+
+/// Replaces `_row_id`/`_score`/… inside a filter/sort/group expression.
+fn rewrite_pseudo(text: &str) -> String {
+    let mut out = text.to_string();
+    for (alias, expr) in PSEUDO_COLUMNS {
+        let mut from = 0usize;
+        while let Some(pos) = out[from..].find(alias) {
+            let start = from + pos;
+            let end = start + alias.len();
+            let before_ok = start == 0
+                || !out.as_bytes()[start - 1].is_ascii_alphanumeric()
+                    && out.as_bytes()[start - 1] != b'_';
+            let after_ok = end >= out.len()
+                || !out.as_bytes()[end].is_ascii_alphanumeric() && out.as_bytes()[end] != b'_';
+            if before_ok && after_ok {
+                out.replace_range(start..end, expr);
+                from = start + expr.len();
+            } else {
+                from = end;
+            }
+        }
+    }
+    out
+}
+
 /// Wraps a bare arithmetic expression so the engine names it `(a + b)`, as
 /// the reference does (`(c1 + c2)`).
 fn named_output(o: &str) -> String {
     let t = o.trim();
     // The REST DSL names the pseudo-columns with a leading underscore.
-    for (alias, expr) in [
-        ("_row_id", "row_id()"),
-        ("_score", "score()"),
-        ("_distance", "distance()"),
-        ("_similarity", "similarity()"),
-    ] {
+    for (alias, expr) in PSEUDO_COLUMNS {
         if t.eq_ignore_ascii_case(alias) {
             return expr.to_string();
         }

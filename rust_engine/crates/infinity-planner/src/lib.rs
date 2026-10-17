@@ -449,7 +449,7 @@ fn key_text(e: &ExprAst) -> String {
         ExprAst::Func { name, args } => format!(
             "{}({})",
             name.to_ascii_lowercase(),
-            args.iter().map(key_text).collect::<Vec<_>>().join(",")
+            args.iter().map(key_text).collect::<Vec<_>>().join(", ")
         ),
         ExprAst::Binary(a, op, b) => {
             let sym = match op {

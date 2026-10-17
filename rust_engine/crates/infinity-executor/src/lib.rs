@@ -1600,7 +1600,9 @@ impl Engine {
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
             if matches!(qualified, Statement::Select { .. }) && self.result_cache_active() {
-                let key = sql.trim().to_string();
+                // Key on the statement, not the whole input: a multi-statement
+                // string must not serve the first SELECT's rows for the second.
+                let key = format!("{qualified:?}");
                 if let Some(hit) = self.result_cache.lock().unwrap().get(&key).cloned() {
                     out.extend(hit);
                     continue;
