@@ -5199,19 +5199,73 @@ fn split_words(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
             .split(|c: char| d.contains(&c))
             .map(str::to_string)
             .collect(),
-        // `standard` divides on `@#$` (already non-alphanumeric here) and
-        // **unites** `/` (`analyzer_pool_impl.cpp:270-277`): `2012/02/14` becomes
-        // `20120214`, so `/` is kept while splitting and then dropped.
-        None => s
-            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '/')
-            .map(|t| t.replace('/', ""))
-            .collect(),
+        None => return standard_tokenize(s),
     };
     parts
         .into_iter()
         .map(|t| t.to_ascii_lowercase())
         .filter(|t| !t.is_empty())
         .collect()
+}
+
+/// The `standard` analyzer's tokenizer, mirroring `tokenizer_impl.cpp` byte for
+/// byte. The C++ table is built per **byte**: ASCII alphanumerics and every byte
+/// above 127 are `ALLOW` (so UTF-8 bytes stay inside a token, and a `—` does not
+/// split one), ASCII whitespace is `SPACE`, and everything else is a one-byte
+/// `DELIMITER` token that the analyzer drops. `/` is configured as `UNITE`
+/// (`AddUnites("/")`), which the scanner *skips* while continuing the token — but
+/// only after the first byte, so a leading `/` is kept. Consequences verified on
+/// the engine: `2012/02/14` -> `20120214`, `x/y` -> `xy`,
+/// `www.example.com/path` -> `www`+`example`+`compath`.
+fn standard_tokenize(s: &str) -> Vec<String> {
+    const ALLOW: u8 = 0;
+    const DELIM: u8 = 1;
+    const SPACE: u8 = 2;
+    const UNITE: u8 = 3;
+    fn kind(b: u8) -> u8 {
+        if b > 127 || b.is_ascii_alphanumeric() {
+            ALLOW
+        } else if b.is_ascii_whitespace() {
+            SPACE
+        } else if b == b'/' {
+            UNITE
+        } else {
+            DELIM
+        }
+    }
+    let bytes = s.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        while i < bytes.len() && kind(bytes[i]) == SPACE {
+            i += 1;
+        }
+        if i == bytes.len() {
+            break;
+        }
+        if kind(bytes[i]) == DELIM {
+            // A lone delimiter is its own token, which `DoNext` then skips.
+            i += 1;
+            continue;
+        }
+        let mut tok = vec![bytes[i]];
+        i += 1;
+        while i < bytes.len() {
+            match kind(bytes[i]) {
+                SPACE | DELIM => break,
+                ALLOW => {
+                    tok.push(bytes[i]);
+                    i += 1;
+                }
+                _ => i += 1, // UNITE: dropped, token continues
+            }
+        }
+        let text = String::from_utf8_lossy(&tok).to_ascii_lowercase();
+        if !text.is_empty() {
+            out.push(text);
+        }
+    }
+    out
 }
 
 /// Query-side tokens: the standard analyzer's stem replaces the word.
