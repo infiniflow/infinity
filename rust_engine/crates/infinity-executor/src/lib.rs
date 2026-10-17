@@ -3137,6 +3137,25 @@ impl Engine {
         Ok(())
     }
 
+    /// The tokeniser delimiters implied by a column's full-text analyzer:
+    /// `keyword`/`whitespace` split on whitespace (`Some([])`), `whitespace-<chars>`
+    /// splits on the listed characters, and any other analyzer uses the standard
+    /// tokeniser (`None`).
+    fn index_delims(&self, table: &str, column: &str) -> Option<Vec<char>> {
+        let a = self
+            .index_analyzers
+            .lock()
+            .unwrap()
+            .get(&index_key(table, column))?
+            .to_ascii_lowercase();
+        if a == "keyword" || a == "whitespace" {
+            Some(Vec::new())
+        } else {
+            a.strip_prefix("whitespace")
+                .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
+        }
+    }
+
     /// Selects rows for `SEARCH MATCH TEXT` by term presence. This reproduces
     /// the *row set* (any query term, `minimum_should_match`, `topn`); the exact
     /// BM25 ordering/threshold needs the iresearch scorer, so a query carrying
@@ -3192,6 +3211,10 @@ impl Engine {
             .filter_map(|c| schema.iter().position(|s| s == c))
             .collect();
         if cols.is_empty() {
+            // A column-less clause may still name fields inside the query.
+            if let Some(groups) = parse_field_query(&query) {
+                return self.search_field_query(table, &groups, pred, &params, hidden);
+            }
             return Ok((Vec::new(), hidden.to_vec()));
         }
         // `whitespace`/`keyword` split only on whitespace (so `2023-01-01` stays
@@ -3199,38 +3222,27 @@ impl Engine {
         // delimiters (the C++ `WhitespaceAnalyzer` does not also split on
         // whitespace — see `whitespace_analyzer_impl.cpp`); anything else uses
         // the standard tokenizer.
-        let delims: Option<Vec<char>> = match_columns(&m.column).iter().find_map(|c| {
-            let a = self
-                .index_analyzers
-                .lock()
-                .unwrap()
-                .get(&index_key(table, c))?
-                .to_ascii_lowercase();
-            if a == "keyword" || a == "whitespace" {
-                Some(Vec::new())
-            } else {
-                a.strip_prefix("whitespace")
-                    .map(|rest| rest.trim_start_matches(['-', '_', ' ']).chars().collect())
-            }
-        });
-        let tokenize = |s: &str| -> Vec<String> {
-            let parts: Vec<String> = match &delims {
-                Some(d) if d.is_empty() => s.split_whitespace().map(str::to_string).collect(),
-                Some(d) => s
-                    .split(|c: char| d.contains(&c))
-                    .map(str::to_string)
-                    .collect(),
-                None => s
-                    .split(|c: char| !c.is_alphanumeric() && c != '_')
-                    .map(str::to_string)
-                    .collect(),
-            };
-            parts
-                .into_iter()
-                .map(|t| t.to_ascii_lowercase())
-                .filter(|t| !t.is_empty())
-                .collect()
-        };
+        let delims: Option<Vec<char>> = match_columns(&m.column)
+            .iter()
+            .find_map(|c| self.index_delims(table, c));
+        let tokenize = |s: &str| -> Vec<String> { tokenize_text(s, &delims) };
+        // One entry per matched column: `(schema index, field boost, delimiters)`.
+        // `similarity=boolean` scores each field on its own, so a `keyword`
+        // column next to a `standard` one must not share the other's analyzer.
+        let field_specs: Vec<(usize, f64, Option<Vec<char>>)> = m
+            .column
+            .split(',')
+            .filter_map(|spec| {
+                let name = spec.split('^').next().unwrap_or(spec).trim();
+                let boost = spec
+                    .split('^')
+                    .nth(1)
+                    .and_then(|v| v.trim().parse::<f64>().ok())
+                    .unwrap_or(1.0);
+                let ci = schema.iter().position(|s| s == name)?;
+                Some((ci, boost, self.index_delims(table, name)))
+            })
+            .collect();
         let terms: Vec<String> = tokenize(&query_clean)
             .into_iter()
             .filter(|t| t != "or" && t != "and")
@@ -3354,6 +3366,41 @@ impl Engine {
                     continue;
                 }
             }
+            // `similarity=boolean` scores each field independently: a
+            // `keyword`/`whitespace` field contributes its boost once when any
+            // query term is present, a standard field contributes one boost per
+            // matching term.
+            if boolean {
+                let mut bscore = 0.0f64;
+                let mut bhits = 0usize;
+                for (ci, boost, d) in &field_specs {
+                    let text = match row.get(*ci) {
+                        Some(Value::Str(s)) => s.clone(),
+                        Some(other) => other.to_slt_string(),
+                        None => String::new(),
+                    };
+                    let ftoks = tokenize_text(&text, d);
+                    let fset: std::collections::HashSet<&str> =
+                        ftoks.iter().map(|x| x.as_str()).collect();
+                    let kw = matches!(d, Some(dd) if dd.is_empty());
+                    let matched = terms.iter().filter(|t| fset.contains(t.as_str())).count();
+                    if matched > 0 {
+                        bhits += matched;
+                        bscore += boost * if kw { 1.0 } else { matched as f64 };
+                    }
+                }
+                for (ci, tags) in &rank_features {
+                    let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                    bscore += rank_features_bonus(&cell, tags);
+                }
+                if bhits >= min_should
+                    && bhits > 0
+                    && threshold.map(|t| bscore >= t).unwrap_or(true)
+                {
+                    scored.push((*seq, bscore));
+                }
+                continue;
+            }
             let mut counts: HashMap<&str, usize> = HashMap::new();
             for t in toks {
                 *counts.entry(t.as_str()).or_insert(0) += 1;
@@ -3387,18 +3434,14 @@ impl Engine {
                 } else {
                     field_boosts.get(ti).copied().unwrap_or(1.0)
                 };
-                if boolean {
-                    score += field;
-                } else {
-                    let df = docs
-                        .iter()
-                        .filter(|(_, _, t, _)| t.iter().any(|x| x == term))
-                        .count()
-                        .max(1) as f64;
-                    let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
-                    let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                    score += idf * norm * field;
-                }
+                let df = docs
+                    .iter()
+                    .filter(|(_, _, t, _)| t.iter().any(|x| x == term))
+                    .count()
+                    .max(1) as f64;
+                let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
+                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                score += idf * norm * field;
             }
             for (ci, tags) in &rank_features {
                 let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
@@ -3406,6 +3449,123 @@ impl Engine {
             }
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
                 scored.push((*seq, score));
+            }
+        }
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        scored.truncate(topn);
+        let mut by_id: HashMap<usize, Vec<Value>> =
+            self.fetch_rows_with_ids(table)?.into_iter().collect();
+        let mut out = Vec::new();
+        for (seq, score) in scored {
+            let mut row = by_id.remove(&seq).unwrap_or_default();
+            row.push(Value::Int(seq as i64));
+            row.push(Value::Float(score));
+            row.push(Value::Float(0.0));
+            row.push(Value::Float(score));
+            out.push(row);
+        }
+        Ok((out, hidden.to_vec()))
+    }
+
+    /// Scores a column-less `MATCH TEXT ('', '(doc:…)^w …')` clause: each group
+    /// multiplies its boost by the sum of its fields' boolean scores (a
+    /// `keyword`/`whitespace` field counts once, a standard field once per
+    /// matching term). A document qualifies when at least `minimum_should_match`
+    /// groups score.
+    #[allow(clippy::type_complexity)]
+    fn search_field_query(
+        &self,
+        table: &str,
+        groups: &[(f64, Vec<(String, String)>)],
+        pred: Option<&Expr>,
+        params: &str,
+        hidden: &[String],
+    ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        let schema = self.table_schema(table)?;
+        let mut fields: Vec<(String, usize, Option<Vec<char>>)> = Vec::new();
+        for (_, terms) in groups {
+            for (f, _) in terms {
+                if f.is_empty() || fields.iter().any(|(n, _, _)| n == f) {
+                    continue;
+                }
+                if let Some(ci) = schema.iter().position(|s| s == f) {
+                    let d = self.index_delims(table, f);
+                    fields.push((f.clone(), ci, d));
+                }
+            }
+        }
+        let min_should = params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
+            .map(|(_, v)| minimum_should_match(v.trim(), groups.len()))
+            .unwrap_or(1);
+        let topn = parse_topn_param(params).unwrap_or(10);
+        let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
+                .split('\t')
+                .map(parse_value)
+                .collect();
+            while row.len() < defaults.len() {
+                let i = row.len();
+                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
+            }
+            if self.store.get(&del_key(table, seq))?.is_some() {
+                continue;
+            }
+            if let Some(p) = pred {
+                if !p.eval_predicate(&row) {
+                    continue;
+                }
+            }
+            let tokens: Vec<std::collections::HashSet<String>> = fields
+                .iter()
+                .map(|(_, ci, d)| {
+                    let text = match row.get(*ci) {
+                        Some(Value::Str(s)) => s.clone(),
+                        Some(o) => o.to_slt_string(),
+                        None => String::new(),
+                    };
+                    tokenize_text(&text, d).into_iter().collect()
+                })
+                .collect();
+            let mut score = 0.0f64;
+            let mut groups_hit = 0usize;
+            for (boost, terms) in groups {
+                let mut gscore = 0.0f64;
+                for (fi, (name, _, d)) in fields.iter().enumerate() {
+                    let kw = matches!(d, Some(dd) if dd.is_empty());
+                    let matched = terms
+                        .iter()
+                        .filter(|(f, t)| {
+                            (f == name || f.is_empty())
+                                && tokens[fi].contains(&t.to_ascii_lowercase())
+                        })
+                        .count();
+                    if matched > 0 {
+                        gscore += if kw { 1.0 } else { matched as f64 };
+                    }
+                }
+                if gscore > 0.0 {
+                    groups_hit += 1;
+                }
+                score += boost * gscore;
+            }
+            if groups_hit >= min_should && groups_hit > 0 {
+                scored.push((seq, score));
             }
         }
         scored.sort_by(|a, b| {
@@ -4833,6 +4993,126 @@ fn tensor_score(q: &[Vec<f64>], doc_text: &str, col: ElemType, qry: ElemType) ->
             .fold(f64::NEG_INFINITY, f64::max)
     } else {
         tensor_maxsim(q, &leaves(doc_text), col, qry)
+    }
+}
+
+/// Splits `s` into lower-cased tokens using the delimiters implied by a
+/// full-text analyzer: `Some([])` splits on whitespace, `Some(chars)` splits on
+/// those characters only, and `None` uses the standard (alphanumeric) tokeniser.
+fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+    let parts: Vec<String> = match delims {
+        Some(d) if d.is_empty() => s.split_whitespace().map(str::to_string).collect(),
+        Some(d) => s
+            .split(|c: char| d.contains(&c))
+            .map(str::to_string)
+            .collect(),
+        None => s
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .map(str::to_string)
+            .collect(),
+    };
+    parts
+        .into_iter()
+        .map(|t| t.to_ascii_lowercase())
+        .filter(|t| !t.is_empty())
+        .collect()
+}
+
+/// Splits a field-query group body into terms, keeping a quoted phrase together
+/// and dropping the quote marks (`doc:"a b" doc2:c` -> `["doc:a b", "doc2:c"]`).
+fn split_query_terms(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quote = false;
+    for c in s.chars() {
+        match c {
+            '"' => in_quote = !in_quote,
+            c if c.is_whitespace() && !in_quote => {
+                if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            }
+            c => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// A `MATCH TEXT ('', '(doc:"a b")^4.5 (doc2:c doc2:d)^3', …)` clause names its
+/// fields inside the query string. Returns one entry per group: its boost and
+/// the `(field, term)` pairs. `None` when no group names a field, so ordinary
+/// queries are unaffected.
+#[allow(clippy::type_complexity)]
+fn parse_field_query(q: &str) -> Option<Vec<(f64, Vec<(String, String)>)>> {
+    let chars: Vec<char> = q.chars().collect();
+    let mut i = 0;
+    let mut groups: Vec<(f64, Vec<(String, String)>)> = Vec::new();
+    let mut any_field = false;
+    while i < chars.len() {
+        while i < chars.len() && chars[i].is_whitespace() {
+            i += 1;
+        }
+        if i >= chars.len() {
+            break;
+        }
+        let body: String = if chars[i] == '(' {
+            let start = i + 1;
+            let mut depth = 1;
+            i += 1;
+            while i < chars.len() {
+                match chars[i] {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            let inner: String = chars[start..i.min(chars.len())].iter().collect();
+            if i < chars.len() {
+                i += 1; // skip ')'
+            }
+            inner
+        } else {
+            let start = i;
+            while i < chars.len() && !chars[i].is_whitespace() {
+                i += 1;
+            }
+            chars[start..i].iter().collect()
+        };
+        // optional `^<boost>`
+        let mut boost = 1.0f64;
+        if i < chars.len() && chars[i] == '^' {
+            i += 1;
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                i += 1;
+            }
+            boost = chars[start..i].iter().collect::<String>().parse().unwrap_or(1.0);
+        }
+        let mut terms: Vec<(String, String)> = Vec::new();
+        for raw in split_query_terms(&body) {
+            match raw.split_once(':') {
+                Some((f, t)) if !f.is_empty() => {
+                    any_field = true;
+                    terms.push((f.to_string(), t.trim().to_string()));
+                }
+                _ => terms.push((String::new(), raw)),
+            }
+        }
+        groups.push((boost, terms));
+    }
+    if any_field {
+        Some(groups)
+    } else {
+        None
     }
 }
 
