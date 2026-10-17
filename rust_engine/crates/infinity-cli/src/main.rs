@@ -79,9 +79,40 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     }
     let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| "0.0.0.0:23817".into());
     let engine = Arc::new(Engine::open(&root)?);
+    // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
+    // is what dumps the memory blocks into the on-disk C++ layout.
+    let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
+    if secs > 0 {
+        let weak = Arc::downgrade(&engine);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(secs));
+            match weak.upgrade() {
+                Some(e) => {
+                    let _ = e.flush();
+                }
+                None => break,
+            }
+        });
+    }
     let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
     server.run();
+}
+
+/// Parses a duration like `1s`, `500ms`, `1.5s` or `0s` into whole seconds.
+fn parse_interval_secs(text: &str) -> u64 {
+    let t = text.trim();
+    let (num, scale) = if let Some(v) = t.strip_suffix("ms") {
+        (v, 0.001)
+    } else if let Some(v) = t.strip_suffix('s') {
+        (v, 1.0)
+    } else if let Some(v) = t.strip_suffix('m') {
+        (v, 60.0)
+    } else {
+        (t, 1.0)
+    };
+    let value: f64 = num.trim().parse().unwrap_or(0.0);
+    (value * scale).round() as u64
 }
 
 fn main() {
