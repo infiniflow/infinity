@@ -1034,12 +1034,35 @@ impl Engine {
             if meta.types.iter().all(|t| column_type_of(t).is_some()) {
                 self.write_cpp_blocks(&meta.name)?;
             }
+            // A dropped index must not leave its `idx_{id}` mirror behind.
+            let db_id = self.database_id_of(&meta.name);
+            let tbl_dir = self
+                .blocks_root()
+                .join(format!("db_{db_id}/tbl_{}", meta.id));
+            let live: Vec<String> = self
+                .catalog
+                .list_indexes()?
+                .iter()
+                .filter(|im| im.table == meta.name)
+                .filter_map(|im| self.cpp_index_position(&meta.name, &im.name).ok())
+                .map(|id| format!("idx_{id}"))
+                .collect();
+            if let Ok(entries) = std::fs::read_dir(&tbl_dir) {
+                for e in entries.flatten() {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    if name.starts_with("idx_") && !live.contains(&name) {
+                        let _ = std::fs::remove_dir_all(e.path());
+                    }
+                }
+            }
         }
         // Vector indexes mirror alongside the rows. This is best-effort: an
         // index whose column is not an embedding column simply has no mirror.
         for im in self.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let _ = self.write_cpp_hnsw_index(&im.table, &im.name);
+            } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
+                let _ = self.write_cpp_fulltext_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let k = im
                     .options
@@ -1212,9 +1235,9 @@ impl Engine {
         Ok((meta.columns.clone(), rows))
     }
 
-    /// The C++ index id of `index_name` within `table`: the position of the
-    /// index among the table's indexes, which is how `write_cpp_layout` numbers
-    /// them (`next_index_id`, `cpp_layout.rs:545-550`).
+    /// The C++ index id of `index_name` within `table`: its 1-based position
+    /// among the table's indexes, which is how `write_cpp_layout` numbers them
+    /// (`next_index_id`, `cpp_layout.rs:545-550`).
     fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
         let ids: Vec<String> = self
@@ -1226,6 +1249,7 @@ impl Engine {
             .collect();
         ids.iter()
             .position(|n| n == index_name)
+            .map(|p| p + 1)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))
     }
 
@@ -1342,6 +1366,102 @@ impl Engine {
             source: e,
         })?;
         Ok(count)
+    }
+
+    /// Writes `table`'s full-text index as the C++ `.dic`/`.pos`/`.len` chunk
+    /// family under `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/`,
+    /// returning the number of documents indexed.
+    pub fn write_cpp_fulltext_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        use infinity_storage::inverted_format as inv;
+
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let im = self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .find(|im| im.name == index_name)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        let col = meta
+            .columns
+            .iter()
+            .position(|c| c == &im.column)
+            .ok_or_else(|| Error::NotFound(format!("column '{}'", im.column)))?;
+        let index_id = self.cpp_index_position(&table, index_name)?;
+        let db_id = self.database_id_of(&table);
+        let delims = self.index_delims(&table, &im.column);
+        let rows = self.fetch_rows_with_ids(&table)?;
+
+        // term -> document ordinals, in term order (the FST requires sorted keys)
+        let mut postings: std::collections::BTreeMap<String, Vec<u32>> =
+            std::collections::BTreeMap::new();
+        let mut lengths: Vec<u32> = Vec::with_capacity(rows.len());
+        for (doc, (_, row)) in rows.iter().enumerate() {
+            let text = row
+                .get(col)
+                .map(|v| v.to_slt_string())
+                .unwrap_or_default();
+            let terms = crate::tokenize_index_text(&text, &delims);
+            lengths.push(terms.len() as u32);
+            for t in terms {
+                postings.entry(t).or_default().push(doc as u32);
+            }
+        }
+
+        let flags = inv::TermMetaFlags {
+            has_term_frequency: false,
+            has_term_payload: false,
+        };
+        let mut pos = Vec::new();
+        let mut metas = Vec::with_capacity(postings.len());
+        let terms: Vec<(String, Vec<u32>)> = postings.into_iter().collect();
+        for (_, docs) in &terms {
+            let start = pos.len() as u64;
+            let tp = inv::TermPostings {
+                doc_skiplist: Vec::new(),
+                doc_list: inv::encode_u32_block(docs),
+                pos_skiplist: Vec::new(),
+                pos_list: Vec::new(),
+            };
+            pos.extend_from_slice(&tp.encode());
+            metas.push(inv::TermMeta {
+                doc_freq: docs.len() as u32,
+                total_tf: docs.len() as u32,
+                payload: 0,
+                doc_start: start,
+                pos_start: start,
+                pos_end: pos.len() as u64,
+            });
+        }
+        let (region, offsets) = inv::encode_term_meta_region_with_offsets(&metas, flags);
+        let mut fst = inv::FstBuilder::new();
+        for (i, (term, _)) in terms.iter().enumerate() {
+            fst.insert(term.as_bytes(), offsets[i]);
+        }
+        let dic = inv::encode_dic(&region, &fst.finish());
+        let len = inv::encode_column_lengths(&lengths);
+
+        let dir = self.blocks_root().join(format!(
+            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0",
+            meta.id
+        ));
+        std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
+            path: dir.clone(),
+            source: e,
+        })?;
+        let base = cpp_format::fulltext_base_name(0, None);
+        for (name, bytes) in [
+            (format!("{base}.dic"), &dic),
+            (format!("{base}.pos"), &pos),
+            (format!("{base}.len"), &len),
+        ] {
+            let path = dir.join(&name);
+            std::fs::write(&path, bytes).map_err(|e| Error::Io { path, source: e })?;
+        }
+        Ok(rows.len())
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning

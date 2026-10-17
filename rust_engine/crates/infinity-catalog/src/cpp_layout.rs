@@ -619,7 +619,8 @@ impl Catalog {
         }
 
         // Index records: `idx|{db}|{tbl}|{name}|{ts}` -> index_id (a per-table
-        // counter starting at 0), plus an `index_base` tag holding the C++
+        // counter starting at 1, as the C++ engine hands out), plus an
+        // `index_base` tag holding the C++
         // `IndexBase::Serialize()` JSON (`table_index_meta_impl.cpp:90-97`).
         for im in indexes {
             let im_table = table_of(&im.table);
@@ -638,7 +639,7 @@ impl Catalog {
                 .iter()
                 .filter(|o| table_of(&o.table) == im_table && db_of(&o.table) == im_db)
                 .position(|o| o.name == im.name)
-                .unwrap_or(0);
+                .map_or(1, |p| p + 1);
             store.put(
                 key::catalog_index_key(db_str, tbl_str, &im.name, *ts).as_bytes(),
                 index_id.to_string().as_bytes(),
@@ -657,6 +658,7 @@ impl Catalog {
                 .filter(|o| table_of(&o.table) == cpp.table_name && db_of(&o.table) == cpp.db_name)
                 .count();
             if count > 0 {
+                // The C++ tag holds the last id handed out, and ids are 1-based.
                 store.put(
                     key::catalog_table_tag_key(db_str, tbl_str, "next_index_id").as_bytes(),
                     count.to_string().as_bytes(),
