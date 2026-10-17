@@ -417,6 +417,9 @@ fn handle_connection(
 ) -> Result<()> {
     let mut reader = stream.try_clone().map_err(io)?;
     let mut writer = stream;
+    // Set when a request could not be fully decoded: the stream is then
+    // desynchronised, so reply and close instead of misreading the next call.
+    let mut close_after_reply = false;
     loop {
         let (name, seq) = {
             let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -814,7 +817,18 @@ fn handle_connection(
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         match read_select_args(&mut ip) {
-                            Ok(r) => r,
+                            Ok((_r, bad)) if !bad.is_empty() => {
+                                let resp = SelectResponseWire {
+                                    error_code: 7012,
+                                    error_msg: bad[0].clone(),
+                                    column_defs: Vec::new(),
+                                    column_fields: Vec::new(),
+                                    extra_result: String::new(),
+                                };
+                                write_select_response(&mut writer, seq, &resp)?;
+                                return Ok(());
+                            }
+                            Ok((r, _)) => r,
                             // A malformed select list is reported through the
                             // SelectResponse (the SDK turns error_code into an
                             // InfinityException), not a thrift exception.
@@ -827,6 +841,7 @@ fn handle_connection(
                                     extra_result: String::new(),
                                 };
                                 write_select_response(&mut writer, seq, &resp)?;
+                                close_after_reply = true;
                                 return Ok(());
                             }
                         }
@@ -1616,6 +1631,12 @@ fn handle_connection(
                 eprintln!("[RPC-ERR] {name}: {e}");
             }
             let _ = write_app_exception(&mut writer, &name, seq, &format!("{e}"));
+            // A decode error leaves unread bytes behind; do not try to parse
+            // whatever follows as a new message.
+            close_after_reply = true;
+        }
+        if close_after_reply {
+            break;
         }
     }
     Ok(())
@@ -4535,6 +4556,7 @@ fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
 #[allow(clippy::type_complexity)] // (sql, display, raw, star)
 fn read_select_item(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
+    bad: &mut Vec<String>,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>, bool)> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
     let (mut names, mut display, mut raw, mut star) = (Vec::new(), Vec::new(), Vec::new(), false);
@@ -4560,14 +4582,13 @@ fn read_select_item(
                 // A projected function: send it to the engine as expression text
                 // (`year(c1)`), which is also the output column name.
                 let (name, args) = read_function_expr(ip)?;
-                // `AND`/`OR` are only defined on booleans; a projection like
-                // `c1 + 0.1 AND c2 - 1.0` is a type error, not a NULL column.
+                // A projection like `c1 + 0.1 AND c2 - 1.0` is a type error.
+                // Record it and keep parsing: bailing out here would leave the
+                // request half-read and desynchronise the connection.
                 if (name.eq_ignore_ascii_case("and") || name.eq_ignore_ascii_case("or"))
                     && !args.iter().all(is_predicate_pexpr)
                 {
-                    return Err(Error::Invalid(
-                        "parser: AND/OR operands must be boolean expressions".into(),
-                    ));
+                    bad.push("parser: AND/OR operands must be boolean expressions".to_string());
                 }
                 let e = PExpr::Call(name, args);
                 names.push(pexpr_sql(&e));
@@ -4659,10 +4680,15 @@ fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<(S
 
 /// Reads the args of a `Select` CALL (after the message head). An empty
 /// `select_list` is treated as `SELECT *`.
-pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<SelectReq> {
+pub fn read_select_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(SelectReq, Vec<String>)> {
     ip.read_struct_begin().map_err(tw)?; // Select_args
     let _ = ip.read_field_begin().map_err(tw)?; // request (Struct)
     ip.read_struct_begin().map_err(tw)?; // SelectRequest
+                                         // Projections that are type errors, collected while the whole request is
+                                         // still read (so the connection stays in sync).
+    let mut bad: Vec<String> = Vec::new();
     let mut r = SelectReq {
         session_id: 0,
         db_name: String::new(),
@@ -4694,7 +4720,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, display, raw, star) = read_select_item(ip)?;
+                    let (names, display, raw, star) = read_select_item(ip, &mut bad)?;
                     r.columns.extend(names);
                     r.names.extend(display);
                     r.raw_names.extend(raw);
@@ -4766,14 +4792,14 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
             r.names[i] = raw;
         }
     }
-    Ok(r)
+    Ok((r, bad))
 }
 
 /// Reads a full `Select` CALL, returning `(seqid, request)`.
 pub fn read_select_call(r: &mut impl Read) -> Result<(i32, SelectReq)> {
     let mut ip = TBinaryInputProtocol::new(r, true);
     let msg = ip.read_message_begin().map_err(tw)?;
-    let req = read_select_args(&mut ip)?;
+    let (req, _) = read_select_args(&mut ip)?;
     Ok((msg.sequence_number, req))
 }
 
@@ -6702,7 +6728,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, _, _, star) = read_select_item(ip)?;
+                    let (names, _, _, star) = read_select_item(ip, &mut Vec::new())?;
                     req.columns.extend(names);
                     req.star |= star;
                 }
