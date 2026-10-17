@@ -4558,49 +4558,6 @@ impl Engine {
             )?),
             None => None,
         };
-        // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
-        // the number of indexed terms, and `similarity=boolean` scores one point
-        // per matching term weighted by the field/term boosts.
-        // Deleted rows still contribute to the index statistics (they are only
-        // filtered from the result), so gather every stored row first.
-        let prefix = row_prefix(table);
-        let defaults = self.table_defaults(table).unwrap_or_default();
-        // (row id, row, per-column tokens with positions, live)
-        #[allow(clippy::type_complexity)]
-        let mut docs: Vec<(usize, Vec<Value>, Vec<Vec<(String, u32)>>, bool)> = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
-            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
-                .split('\t')
-                .map(parse_value)
-                .collect();
-            // Rows loaded before a column was added (or from a narrower COPY)
-            // take the column's default value, not NULL.
-            while row.len() < defaults.len() {
-                let i = row.len();
-                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
-                    Some(d) => Value::from_literal(&default_literal(d)),
-                    None => Value::Null,
-                });
-            }
-            // Tokenise every matched column on its own: BM25 keeps per-field
-            // statistics and a `doctitle,body^5` query sums them.
-            let fields: Vec<Vec<(String, u32)>> = cols
-                .iter()
-                .map(|&i| {
-                    let text = match row.get(i) {
-                        Some(Value::Str(s)) => s.clone(),
-                        Some(other) => other.to_slt_string(),
-                        None => String::new(),
-                    };
-                    tokenize_index_positions(&text, &delims)
-                })
-                .collect();
-            let live = self.store.get(&del_key(table, seq))?.is_none();
-            docs.push((seq, row, fields, live));
-        }
         let boolean = params.split(';').any(|p| {
             p.split_once('=')
                 .map(|(k, v)| {
@@ -4654,69 +4611,60 @@ impl Engine {
             }
             groups
         };
-        let n_docs = docs.len().max(1);
-        // Document frequency per (field, term). Computing it inside `idf_of`
-        // made scoring O(rows^2); one pass here turns it into a lookup.
-        let dfs: Vec<HashMap<String, usize>> = (0..cols.len())
-            .map(|f| {
-                let mut m: HashMap<String, usize> = HashMap::new();
-                for (_, _, fields, _) in &docs {
-                    // A term counts once per document, however often it occurs.
-                    let mut seen: std::collections::HashSet<&str> =
-                        std::collections::HashSet::new();
-                    for (t, _) in &fields[f] {
-                        if seen.insert(t.as_str()) {
-                            *m.entry(t.clone()).or_insert(0) += 1;
-                        }
-                    }
-                }
-                m
-            })
-            .collect();
-        // One BM25 corpus per column (Lucene keeps statistics per field).
-        let avg_lens: Vec<f64> = (0..cols.len())
-            .map(|f| {
-                let sum: f64 = docs.iter().map(|d| d.2[f].len() as f64).sum();
-                let a = sum / docs.len().max(1) as f64;
-                if a <= 0.0 {
-                    1.0
-                } else {
-                    a
-                }
-            })
-            .collect();
-        // A `keyword`/`whitespace` field scores constantly: one field-boost
-        // point per matching document (not per query term).
-        let keyword_field = matches!(&delims, Some(d) if d.is_empty());
-        let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (seq, row, fields, live) in &docs {
-            if !live {
-                continue;
+        // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
+        // the number of indexed terms, and `similarity=boolean` scores one point
+        // per matching term weighted by the field/term boosts.
+        // Deleted rows still contribute to the index statistics (they are only
+        // filtered from the result), so gather every stored row first.
+        let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        // Per document we keep only what scoring needs: the tokenised fields,
+        // whether it is live and passes the filters, and the pre-computed
+        // rank-features / boolean contributions. Keeping the full row here made
+        // a query over 250k wide rows cost gigabytes, and several concurrent
+        // readers exhausted the server's memory.
+        #[allow(clippy::type_complexity)]
+        let mut docs: Vec<(usize, Vec<Vec<(String, u32)>>, bool, bool, f64, usize, f64)> =
+            Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
+                .split('\t')
+                .map(parse_value)
+                .collect();
+            // Rows loaded before a column was added (or from a narrower COPY)
+            // take the column's default value, not NULL.
+            while row.len() < defaults.len() {
+                let i = row.len();
+                row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
             }
-            if let Some(p) = &in_filter {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            if let Some(p) = &opt_filter {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            // The outer WHERE (a fusion child's inherited filter) prunes
-            // candidates before the top-N ranking.
-            if let Some(p) = pred {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            // `similarity=boolean` scores each field independently: a
-            // `keyword`/`whitespace` field contributes its boost once when any
-            // query term is present, a standard field contributes one boost per
-            // matching term.
+            let live = self.store.get(&del_key(table, seq))?.is_none();
+            let filters_hold = in_filter
+                .as_ref()
+                .map(|p| p.eval_predicate(&row))
+                .unwrap_or(true)
+                && opt_filter
+                    .as_ref()
+                    .map(|p| p.eval_predicate(&row))
+                    .unwrap_or(true)
+                && pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
+            // `rank_features=<col>^<tag>^<weight>` adds `value * weight`.
+            let rank_bonus: f64 = rank_features
+                .iter()
+                .map(|(ci, tags)| {
+                    let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                    rank_features_bonus(&cell, tags)
+                })
+                .sum();
+            // `similarity=boolean` scores fields independently; compute it here
+            // while the row is still in hand.
+            let (mut bhits, mut bscore) = (0usize, 0.0f64);
             if boolean {
-                let mut bscore = 0.0f64;
-                let mut bhits = 0usize;
                 for (ci, boost, d) in &field_specs {
                     let text = match row.get(*ci) {
                         Some(Value::Str(s)) => s.clone(),
@@ -4733,12 +4681,71 @@ impl Engine {
                         bscore += boost * if kw { 1.0 } else { matched as f64 };
                     }
                 }
-                for (ci, tags) in &rank_features {
-                    let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
-                    bscore += rank_features_bonus(&cell, tags);
+            }
+            // Tokenise every matched column on its own: BM25 keeps per-field
+            // statistics and a `doctitle,body^5` query sums them.
+            let fields: Vec<Vec<(String, u32)>> = cols
+                .iter()
+                .map(|&i| {
+                    let text = match row.get(i) {
+                        Some(Value::Str(s)) => s.clone(),
+                        Some(other) => other.to_slt_string(),
+                        None => String::new(),
+                    };
+                    tokenize_index_positions(&text, &delims)
+                })
+                .collect();
+            docs.push((seq, fields, live, filters_hold, rank_bonus, bhits, bscore));
+        }
+        let n_docs = docs.len().max(1);
+        // Document frequency per (field, term). Computing it inside `idf_of`
+        // made scoring O(rows^2); one pass here turns it into a lookup.
+        let dfs: Vec<HashMap<String, usize>> = (0..cols.len())
+            .map(|f| {
+                let mut m: HashMap<String, usize> = HashMap::new();
+                for (_, fields, ..) in &docs {
+                    // A term counts once per document, however often it occurs.
+                    let mut seen: std::collections::HashSet<&str> =
+                        std::collections::HashSet::new();
+                    for (t, _) in &fields[f] {
+                        if seen.insert(t.as_str()) {
+                            *m.entry(t.clone()).or_insert(0) += 1;
+                        }
+                    }
                 }
-                if bhits >= min_should
-                    && bhits > 0
+                m
+            })
+            .collect();
+        // One BM25 corpus per column (Lucene keeps statistics per field).
+        let avg_lens: Vec<f64> = (0..cols.len())
+            .map(|f| {
+                let sum: f64 = docs.iter().map(|d| d.1[f].len() as f64).sum();
+                let a = sum / docs.len().max(1) as f64;
+                if a <= 0.0 {
+                    1.0
+                } else {
+                    a
+                }
+            })
+            .collect();
+        // A `keyword`/`whitespace` field scores constantly: one field-boost
+        // point per matching document (not per query term).
+        let keyword_field = matches!(&delims, Some(d) if d.is_empty());
+        let mut scored: Vec<(usize, f64)> = Vec::new();
+        for (seq, fields, live, filters_hold, rank_bonus, bool_hits, bool_score) in &docs {
+            // Filters and the live check were evaluated while the row was in
+            // hand; a row that fails either never reaches the ranking.
+            if !live || !filters_hold {
+                continue;
+            }
+            // `similarity=boolean` scores each field independently: a
+            // `keyword`/`whitespace` field contributes its boost once when any
+            // query term is present, a standard field contributes one boost per
+            // matching term.
+            if boolean {
+                let bscore = bool_score + rank_bonus;
+                if *bool_hits >= min_should
+                    && *bool_hits > 0
                     && threshold.map(|t| bscore >= t).unwrap_or(true)
                 {
                     scored.push((*seq, bscore));
@@ -4819,10 +4826,7 @@ impl Engine {
                     .map(|((_, u, _), _)| u.len())
                     .sum()
             };
-            for (ci, tags) in &rank_features {
-                let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
-                score += rank_features_bonus(&cell, tags);
-            }
+            score += rank_bonus;
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
                 scored.push((*seq, score));
             }
