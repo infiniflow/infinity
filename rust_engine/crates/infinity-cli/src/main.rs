@@ -82,7 +82,6 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
     println!("serving on {}", server.local_addr()?);
     server.run();
-    Ok(())
 }
 
 fn main() {
