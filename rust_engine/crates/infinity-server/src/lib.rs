@@ -2972,6 +2972,8 @@ pub struct SelectReq {
     pub where_sql: Option<String>,
     /// Optional `(column, ascending)` order key.
     pub order_by: Option<(String, bool)>,
+    /// Group keys, already rendered as SQL text.
+    pub group_by: Vec<String>,
     pub limit: Option<i64>,
 }
 
@@ -2983,9 +2985,17 @@ impl SelectReq {
         } else {
             self.columns.join(", ")
         };
-        let mut sql = format!("SELECT {} FROM {}", cols, self.table_name);
+        let table = if self.db_name.is_empty() {
+            self.table_name.clone()
+        } else {
+            format!("{}.{}", self.db_name, self.table_name)
+        };
+        let mut sql = format!("SELECT {} FROM {}", cols, table);
         if let Some(w) = &self.where_sql {
             sql.push_str(&format!(" WHERE {w}"));
+        }
+        if !self.group_by.is_empty() {
+            sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
         }
         if let Some((c, asc)) = &self.order_by {
             sql.push_str(&format!(
@@ -3332,6 +3342,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         star: false,
         where_sql: None,
         order_by: None,
+        group_by: Vec::new(),
         limit: None,
     };
     loop {
@@ -3353,6 +3364,18 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
                 ip.read_list_end().map_err(tw)?;
             }
             Some(7) if f.field_type == TType::Struct => r.where_sql = read_where(ip)?,
+            Some(8) if f.field_type == TType::List => {
+                // group_by_list: one ParsedExpr per group key.
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    let e = read_pexpr(ip)?;
+                    let sql = pexpr_sql(&e);
+                    if !sql.is_empty() {
+                        r.group_by.push(sql);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     r.limit = Some(n);
@@ -4897,6 +4920,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         star: false,
         where_sql: None,
         order_by: None,
+        group_by: Vec::new(),
         limit: None,
     };
     let mut explain_type = 4; // Physical
@@ -4922,6 +4946,16 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
                 ip.read_list_end().map_err(tw)?;
             }
             Some(7) if f.field_type == TType::Struct => req.where_sql = read_where(ip)?,
+            Some(8) if f.field_type == TType::List => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    let sql = pexpr_sql(&read_pexpr(ip)?);
+                    if !sql.is_empty() {
+                        req.group_by.push(sql);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     req.limit = Some(n);
