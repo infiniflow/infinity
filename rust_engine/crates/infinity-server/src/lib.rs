@@ -1458,10 +1458,12 @@ fn handle_connection(
                             sql.push_str(&format!(" USING {}", req.index_type));
                         }
                         if !req.params.is_empty() {
+                            // Option values are quoted so a value with spaces
+                            // (`invalid compress type`) still parses.
                             let opts = req
                                 .params
                                 .iter()
-                                .map(|(k, v)| format!("{k}={v}"))
+                                .map(|(k, v)| format!("{k}='{}'", v.replace('\'', "''")))
                                 .collect::<Vec<_>>()
                                 .join(",");
                             sql.push_str(&format!(" WITH ({opts})"));

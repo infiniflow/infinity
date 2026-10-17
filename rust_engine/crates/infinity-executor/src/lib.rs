@@ -1659,9 +1659,12 @@ impl Engine {
     /// already contains a `.` is taken as fully qualified.
     fn qualify_tables(&self, stmt: &Statement) -> Statement {
         let db = self.db();
+        // Identifiers are case-insensitive: the catalog keeps lower-case names,
+        // so every table reference is normalised before it reaches it.
         let q = |t: &str| -> String {
+            let t = t.to_ascii_lowercase();
             if t.is_empty() || t.contains('.') {
-                t.to_string()
+                t
             } else {
                 format!("{db}.{t}")
             }
@@ -3681,6 +3684,12 @@ impl Engine {
                 }
             }
             "SECONDARY" => {
+                // A secondary index covers scalars (and JSON paths).
+                if is_sparse_type(&ty) || is_embedding_type(&ty) || is_tensor_type(&ty) {
+                    return Err(Error::Invalid(format!(
+                        "SECONDARY index requires a scalar column, got '{ty}'"
+                    )));
+                }
                 // the cardinality hint does not apply to a JSON index
                 if is_json_type(&ty) && opts.iter().any(|(k, _)| k == "CARDINALITY") {
                     return Err(Error::Invalid(

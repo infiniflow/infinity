@@ -1305,7 +1305,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                         .as_str()
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| render_json(v));
-                    opts.push(format!("{k}={value}"));
+                    opts.push(format!("{k}='{}'", value.replace('\'', "''")));
                 }
             }
             if !opts.is_empty() {
