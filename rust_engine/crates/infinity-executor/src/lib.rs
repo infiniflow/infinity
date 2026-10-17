@@ -3672,11 +3672,15 @@ impl Engine {
                 }
             }
         }
+        // `minimum_should_match` counts *matched clauses*, where a quoted phrase
+        // (`doc:"a b"`) is one clause that matches only when all of its tokens
+        // are present.
+        let units_total: usize = groups.iter().map(|(_, terms)| terms.len()).sum();
         let min_should = params
             .split(';')
             .filter_map(|p| p.split_once('='))
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
-            .map(|(_, v)| minimum_should_match(v.trim(), groups.len()))
+            .map(|(_, v)| minimum_should_match(v.trim(), units_total))
             .unwrap_or(1);
         let topn = parse_topn_param(params).unwrap_or(10);
         let prefix = row_prefix(table);
@@ -3717,9 +3721,24 @@ impl Engine {
                 })
                 .collect();
             let mut score = 0.0f64;
-            let mut groups_hit = 0usize;
+            // `units_matched` drives `minimum_should_match`: a phrase clause
+            // counts only when every token it expands to is present.
+            let mut units_matched = 0usize;
             for (boost, terms) in groups {
                 let mut gscore = 0.0f64;
+                for (f, t) in terms {
+                    let Some(fi) = fields
+                        .iter()
+                        .position(|(name, _, _)| f == name || f.is_empty())
+                    else {
+                        continue;
+                    };
+                    let d = &fields[fi].2;
+                    let sub = tokenize_text(t, d);
+                    if !sub.is_empty() && sub.iter().all(|x| tokens[fi].contains(x)) {
+                        units_matched += 1;
+                    }
+                }
                 for (fi, (name, _, d)) in fields.iter().enumerate() {
                     let kw = matches!(d, Some(dd) if dd.is_empty());
                     let mut matched = 0usize;
@@ -3737,12 +3756,9 @@ impl Engine {
                         gscore += if kw { 1.0 } else { matched as f64 };
                     }
                 }
-                if gscore > 0.0 {
-                    groups_hit += 1;
-                }
                 score += boost * gscore;
             }
-            if groups_hit >= min_should && groups_hit > 0 {
+            if units_matched >= min_should && units_matched > 0 {
                 scored.push((seq, score));
             }
         }
