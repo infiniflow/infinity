@@ -1239,7 +1239,8 @@ impl Parser {
             // Zero or more `FUSION(…)` tails; `… , FUSION('rrf'), FUSION('match_tensor', …)`
             // chains them. The last one decides the final score in the executor.
             loop {
-                let fusion_here = matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("FUSION"));
+                let fusion_here =
+                    matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("FUSION"));
                 let comma_fusion = self.peek() == &Token::Comma
                     && matches!(self.toks.get(self.pos + 1), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("FUSION"));
                 if !fusion_here && !comma_fusion {

@@ -725,7 +725,11 @@ fn canonical_fusion_params(params: &str) -> String {
     if params.is_empty() {
         return String::new();
     }
-    let parts: Vec<&str> = params.split(';').map(str::trim).filter(|s| !s.is_empty()).collect();
+    let parts: Vec<&str> = params
+        .split(';')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
     if parts.iter().all(|p| p.contains('=')) {
         let mut pairs: Vec<&str> = parts.clone();
         pairs.sort_by_key(|p| p.split_once('=').map(|(k, _)| k).unwrap_or(*p));
