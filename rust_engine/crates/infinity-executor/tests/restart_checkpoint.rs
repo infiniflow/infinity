@@ -47,6 +47,27 @@ fn state_survives_restart_after_wal_truncation() {
 }
 
 #[test]
+fn compaction_survives_wal_replay() {
+    // Compaction renumbers rows. The renumbering must be WAL-visible: replay
+    // used to re-create the old positions and resurrect rows deleted before
+    // the compact.
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let e = open(dir.path());
+        e.execute("CREATE TABLE t (id INTEGER);").unwrap();
+        e.execute("INSERT INTO t VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);")
+            .unwrap();
+        e.execute("DELETE FROM t WHERE id = 2;").unwrap();
+        e.execute("DELETE FROM t WHERE id = 7;").unwrap();
+        e.execute("COMPACT TABLE t;").unwrap();
+        e.flush().unwrap();
+        assert_eq!(count(&e), 8);
+    }
+    let e = open(dir.path());
+    assert_eq!(count(&e), 8, "replay resurrected rows compacted away");
+}
+
+#[test]
 fn deleting_the_wal_file_after_checkpoint_keeps_state() {
     let dir = tempfile::tempdir().unwrap();
     {

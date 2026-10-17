@@ -3399,6 +3399,11 @@ impl Engine {
         let mut max = 0usize;
         for (k, _v) in self.store.scan_prefix(&prefix)? {
             if let Ok(seq) = String::from_utf8_lossy(&k[prefix.len()..]).parse::<usize>() {
+                // A compacted (renumbered) row is tombstoned at its old id;
+                // it must not push the next id past the live range.
+                if self.store.get(&del_key(table, seq))?.is_some() {
+                    continue;
+                }
                 max = max.max(seq + 1);
             }
         }
@@ -3487,16 +3492,11 @@ impl Engine {
     /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
     pub fn compact_table(&self, table: &str) -> Result<()> {
         let rows = self.fetch_rows_with_ids(table)?;
-        if std::env::var_os("INFINITY_DEBUG_RECOVER").is_some() {
-            eprintln!(
-                "compact: {} rows={} first={:?} last={:?} store_keys={}",
-                table,
-                rows.len(),
-                rows.first().map(|r| r.0),
-                rows.last().map(|r| r.0),
-                self.store.scan_prefix(&row_prefix(table))?.len()
-            );
-        }
+        // Renumber through the transaction so WAL replay reproduces the
+        // compacted state: a row moved from `old` to `i` also leaves a
+        // tombstone for `old`, otherwise replay would resurrect it.
+        let mut t = self.txn.begin();
+        let mut moved = false;
         for (i, (old, _)) in rows.iter().enumerate() {
             if *old == i {
                 continue;
@@ -3505,8 +3505,19 @@ impl Engine {
                 .store
                 .get(&row_key(table, *old))?
                 .ok_or_else(|| Error::Storage("row vanished during compaction".into()))?;
-            self.store.put(&row_key(table, i), &v)?;
-            self.store.delete(&row_key(table, *old))?;
+            t.put(row_key(table, i), v);
+            t.put(del_key(table, *old), b"1".to_vec());
+            moved = true;
+        }
+        if moved {
+            self.txn.commit(t)?;
+            // Drop the old positions once the tombstones are durable; recovery
+            // re-creates both, and the tombstone keeps the old row hidden.
+            for (i, (old, _)) in rows.iter().enumerate() {
+                if *old != i {
+                    self.store.delete(&row_key(table, *old))?;
+                }
+            }
         }
         for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
             self.store.delete(&k)?;
