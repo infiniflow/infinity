@@ -3506,6 +3506,7 @@ impl Engine {
             .map(|s| s.to_string())
             .collect();
         // name FLD column [FLD type [FLD options]]
+        #[allow(clippy::type_complexity)]
         let indexes: Vec<(String, String, String, Vec<(String, String)>)> = recs
             .next()
             .unwrap_or_default()

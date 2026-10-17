@@ -644,13 +644,14 @@ fn handle_connection(
                         .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
                     // A database name must start with a letter and contain only
                     // word characters (the reference rejects the rest with 3003).
-                    let bad_db = !db.is_empty()
-                        && !(db
-                            .chars()
-                            .next()
-                            .map(|c| c.is_ascii_alphabetic())
-                            .unwrap_or(false)
-                            && db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
+                    let mut chars = db.chars();
+                    let first_ok = chars
+                        .next()
+                        .map(|c| c.is_ascii_alphabetic())
+                        .unwrap_or(false);
+                    let body_ok = db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+                    let good_db = first_ok && body_ok;
+                    let bad_db = !db.is_empty() && !good_db;
                     let resp = match name.as_str() {
                         "CreateDatabase" | "DropDatabase" if bad_db || db.is_empty() => {
                             CommonResponse {
