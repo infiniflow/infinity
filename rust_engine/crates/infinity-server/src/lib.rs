@@ -1001,6 +1001,39 @@ fn handle_connection(
                     let value = engine.as_ref().and_then(|e| e.config_get(&name));
                     write_show_config_response(&mut writer, seq, sid, &name, value.as_deref())?;
                 }
+                "ShowSegments" => {
+                    let (sid, db, table) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_table_args(&mut ip)?
+                    };
+                    let _ = (sid, &db);
+                    let n = engine
+                        .as_ref()
+                        .map(|e| e.segment_count(&table))
+                        .unwrap_or(0);
+                    let rows: Vec<Vec<String>> = (0..n).map(|i| vec![i.to_string()]).collect();
+                    let resp = select_response_from_typed(&["segment_id".to_string()], &[], &rows);
+                    write_select_response(&mut writer, seq, &resp)?;
+                }
+                "ShowBlocks" => {
+                    let (sid, db, table, segment) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_block_args(&mut ip)?
+                    };
+                    let _ = (sid, &db);
+                    // 8192 rows per block: the reference reports one block per
+                    // 8192-row chunk of the segment.
+                    let blocks = engine
+                        .as_ref()
+                        .map(|e| {
+                            e.segment_rows(&table, segment.max(0) as usize)
+                                .div_ceil(8192)
+                        })
+                        .unwrap_or(0);
+                    let rows: Vec<Vec<String>> = (0..blocks).map(|i| vec![i.to_string()]).collect();
+                    let resp = select_response_from_typed(&["block_id".to_string()], &[], &rows);
+                    write_select_response(&mut writer, seq, &resp)?;
+                }
                 "Import" => {
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -4636,6 +4669,57 @@ pub fn write_show_table_response(
     o.write_struct_end().map_err(tw)?; // ShowTable_result
     o.flush().map_err(tw)?;
     Ok(())
+}
+
+/// `ShowSegmentsRequest { 1: session_id, 2: db_name, 3: table_name }`.
+fn read_table_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(i64, String, String)> {
+    let (mut sid, mut db, mut table) = (0i64, String::new(), String::new());
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => sid = ip.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => db = ip.read_string().map_err(tw)?,
+            (Some(3), TType::String) => table = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((sid, db, table))
+}
+
+/// `ShowBlocksRequest { 1: session_id, 2: db_name, 3: table_name, 4: segment_id }`.
+fn read_block_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(i64, String, String, i64)> {
+    let (mut sid, mut db, mut table, mut segment) = (0i64, String::new(), String::new(), 0i64);
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => sid = ip.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => db = ip.read_string().map_err(tw)?,
+            (Some(3), TType::String) => table = ip.read_string().map_err(tw)?,
+            (Some(4), TType::I64) => segment = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((sid, db, table, segment))
 }
 
 /// `ExportRequest { 1: db, 2: table, 3: columns, 4: file, 5: ExportOption, 6: session_id }`.

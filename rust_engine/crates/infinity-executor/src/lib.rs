@@ -3314,6 +3314,37 @@ impl Engine {
     }
 
     /// True unless `result_cache` is explicitly `off`.
+    /// Rows a single imported segment can hold (`1024 * 8192`).
+    pub const SEGMENT_ROW_CAPACITY: usize = 1024 * 8192;
+
+    /// Number of segments `table` has: at least one per write batch, and more
+    /// when a single import exceeds the segment capacity.
+    pub fn segment_count(&self, table: &str) -> usize {
+        let key = table.split('.').next_back().unwrap_or(table);
+        let batches = self
+            .write_batches
+            .lock()
+            .unwrap()
+            .get(key)
+            .copied()
+            .unwrap_or(1)
+            .max(1);
+        let rows = self.row_count(table).unwrap_or(0);
+        batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
+    }
+
+    /// Rows held by `segment` of `table` (used by `ShowBlocks`).
+    pub fn segment_rows(&self, table: &str, segment: usize) -> usize {
+        let rows = self.row_count(table).unwrap_or(0);
+        let by_size = rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1);
+        if by_size == self.segment_count(table) {
+            rows.saturating_sub(segment * Self::SEGMENT_ROW_CAPACITY)
+                .min(Self::SEGMENT_ROW_CAPACITY)
+        } else {
+            rows / self.segment_count(table).max(1)
+        }
+    }
+
     /// The current value of a configuration knob (the `config` map filled by
     /// `SET CONFIG`), for the `ShowConfig` RPC. Known knobs fall back to the
     /// engine defaults the reference reports before any `SET CONFIG`.
