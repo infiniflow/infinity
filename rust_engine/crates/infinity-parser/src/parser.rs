@@ -1635,6 +1635,16 @@ impl Parser {
                                 other => SelectItem::Expr(other),
                             }
                         }
+                    } else if matches!(
+                        self.toks.get(self.pos + 1),
+                        Some(Token::Op(o)) if matches!(o.as_str(), "=" | "==" | "!=" | "<>" | "<" | ">" | "<=" | ">=")
+                    ) {
+                        // `c1 > 0.1 and c2 < 3.0` — a projected predicate.
+                        let p = self.predicate()?;
+                        match predicate_to_expr(&p) {
+                            Some(e) => SelectItem::Expr(e),
+                            None => return self.err("unsupported expression in select list"),
+                        }
                     } else if matches!(self.toks.get(self.pos + 1), Some(Token::Op(_))) {
                         // `c1 + 1` / `c2 * 2.0` — a projected expression, not a
                         // bare column.

@@ -1196,6 +1196,79 @@ fn uses_row_id(items: &[SelectItem]) -> bool {
     })
 }
 
+thread_local! {
+    /// Set while a table is created from the SDK's physical type, where a
+    /// sparse dimension of 0 is legal.
+    static ALLOW_ZERO_SPARSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` allowing a zero-dimension sparse column.
+pub fn with_zero_dimension_sparse<T>(f: impl FnOnce() -> T) -> T {
+    ALLOW_ZERO_SPARSE.with(|c| c.set(true));
+    let out = f();
+    ALLOW_ZERO_SPARSE.with(|c| c.set(false));
+    out
+}
+
+fn is_boolean_expr(e: &ExprAst) -> bool {
+    match e {
+        ExprAst::Cmp(..) | ExprAst::And(..) | ExprAst::Or(..) | ExprAst::Not(..) => true,
+        // NULL is "unknown" and is valid wherever a boolean is expected; a
+        // column may hold a boolean (its type is not visible here).
+        ExprAst::Literal(crate::Literal::Null) | ExprAst::Column(_) => true,
+        // `TRUE`/`FALSE` parse to lower-case string literals.
+        ExprAst::Literal(crate::Literal::Str(v)) => {
+            v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("false")
+        }
+        ExprAst::Func { name, .. } => [
+            "IS_NULL",
+            "IS_NOT_NULL",
+            "LIKE",
+            "CONTAINS",
+            "REGEX",
+            "FILTER_TEXT",
+            "FILTER_FULLTEXT",
+        ]
+        .iter()
+        .any(|n| name.eq_ignore_ascii_case(n)),
+        _ => false,
+    }
+}
+
+/// Rejects `AND`/`OR`/`NOT` with non-boolean operands (e.g. `c1 + 0.1 AND …`).
+fn validate_boolean_expr(e: &ExprAst) -> Result<()> {
+    match e {
+        ExprAst::And(a, b) | ExprAst::Or(a, b) => {
+            for x in [a.as_ref(), b.as_ref()] {
+                if !is_boolean_expr(x) {
+                    return Err(Error::Invalid(
+                        "boolean operator requires boolean operands".into(),
+                    ));
+                }
+                validate_boolean_expr(x)?;
+            }
+            Ok(())
+        }
+        ExprAst::Not(a) => {
+            if !is_boolean_expr(a) {
+                return Err(Error::Invalid("NOT requires a boolean operand".into()));
+            }
+            validate_boolean_expr(a)
+        }
+        ExprAst::Binary(a, _, b) | ExprAst::Cmp(a, _, b) => {
+            validate_boolean_expr(a)?;
+            validate_boolean_expr(b)
+        }
+        ExprAst::Func { args, .. } => {
+            for a in args {
+                validate_boolean_expr(a)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
 /// `DISTANCE()` requires a distance metric and `SIMILARITY()` a similarity
 /// metric; reject the mismatch.
 fn validate_search_pseudo_columns(s: &SearchClause, items: &[SelectItem]) -> Result<()> {
@@ -1958,7 +2031,11 @@ impl Engine {
                         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
                         if parts.len() == 2 {
                             let dim: i64 = parts[1].parse().unwrap_or(0);
-                            if dim < 0 {
+                            // The reference rejects a zero bound at DDL time, but
+                            // the SDK's `sparse,0,…` column type (physical type
+                            // dimension 0) is accepted.
+                            let allow_zero = ALLOW_ZERO_SPARSE.with(|c| c.get());
+                            if dim < 0 || (dim == 0 && !allow_zero) {
                                 return Err(Error::Invalid(format!(
                                     "invalid sparse dimension {dim} for column '{}'",
                                     c.name
@@ -2962,6 +3039,20 @@ impl Engine {
                 // SUM/AVG require a numeric argument.
                 if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
                     self.validate_aggregate_args(t, items)?;
+                }
+                // `AND`/`OR`/`NOT` take boolean operands: a projected
+                // arithmetic expression such as `c1 + 0.1 and c2 - 1.0` is
+                // invalid (the reference rejects it).
+                for it in items {
+                    match it {
+                        SelectItem::Expr(e) => validate_boolean_expr(e)?,
+                        SelectItem::Func { args, .. } => {
+                            for a in args {
+                                validate_boolean_expr(a)?;
+                            }
+                        }
+                        _ => {}
+                    }
                 }
                 if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
                     validate_search_pseudo_columns(s, items)?;
@@ -3997,6 +4088,9 @@ impl Engine {
             }
         }
         let params = arg_str(m.args.get(1)).unwrap_or_default();
+        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+            eprintln!("[TEXT] params={params:?}");
+        }
         // `threshold=<f>` keeps only documents scoring at least `f`
         let threshold: Option<f64> = params
             .split(';')
@@ -4030,6 +4124,22 @@ impl Engine {
                 .unwrap_or(false)
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
+        // A query using the boolean keywords needs an explicit `operator=`.
+        let has_bool_kw = query.split_whitespace().any(|w| {
+            w.eq_ignore_ascii_case("or")
+                || w.eq_ignore_ascii_case("and")
+                || w.eq_ignore_ascii_case("not")
+        });
+        let has_operator_opt = params.split(';').any(|p| {
+            p.split_once('=')
+                .map(|(k, _)| k.trim().eq_ignore_ascii_case("operator"))
+                .unwrap_or(false)
+        });
+        if has_bool_kw && !has_operator_opt {
+            return Err(Error::Invalid(
+                "parser: the full-text query needs operator=and|or".into(),
+            ));
+        }
         // field boosts from `col^w` / `col@index^w`
         let field_boosts: Vec<f64> = m
             .column
@@ -4105,7 +4215,9 @@ impl Engine {
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
             .map(|(_, v)| minimum_should_match(v.trim(), terms.len()))
             .unwrap_or(1);
-        let min_should = if require_all { terms.len() } else { min_should };
+        // With `operator=and`, each OR-separated group is a clause: a run of
+        // several words must appear as a phrase (iresearch's `AndQuery`).
+        let min_should = if require_all { units.len() } else { min_should };
         let topn = parse_topn_param(&params).unwrap_or(10);
         let in_filter = match m.filter.as_ref() {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
@@ -4299,7 +4411,7 @@ impl Engine {
                 }
                 for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
                     let uboost = *uboost;
-                    if *phrase && unit.len() > 1 {
+                    if (*phrase || require_all) && unit.len() > 1 {
                         // A phrase scores like one term whose `tf` is the phrase
                         // frequency and whose `idf` is the sum over its terms
                         // (Lucene `PhraseWeight`).
@@ -4326,18 +4438,28 @@ impl Engine {
                     }
                 }
             }
-            let hits: usize = units
-                .iter()
-                .zip(unit_hits.iter())
-                .filter(|(_, m)| **m)
-                .map(|((_, u, _), _)| u.len())
-                .sum();
+            let hits: usize = if require_all {
+                // one count per required clause
+                unit_hits.iter().filter(|m| **m).count()
+            } else {
+                units
+                    .iter()
+                    .zip(unit_hits.iter())
+                    .filter(|(_, m)| **m)
+                    .map(|((_, u, _), _)| u.len())
+                    .sum()
+            };
             for (ci, tags) in &rank_features {
                 let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
                 score += rank_features_bonus(&cell, tags);
             }
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
+                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                    eprintln!("[TSCORE] seq={seq} score={score} threshold={threshold:?}");
+                }
                 scored.push((*seq, score));
+            } else if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                eprintln!("[TSKIP] seq={seq} score={score} hits={hits} threshold={threshold:?}");
             }
         }
         scored.sort_by(|a, b| {
@@ -4345,6 +4467,13 @@ impl Engine {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
         });
+        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+            eprintln!(
+                "[TRES] params={params:?} n={} top={:?}",
+                scored.len(),
+                &scored[..scored.len().min(5)]
+            );
+        }
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
             self.fetch_rows_with_ids(table)?.into_iter().collect();
@@ -4482,6 +4611,13 @@ impl Engine {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
         });
+        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+            eprintln!(
+                "[TRES] params={params:?} n={} top={:?}",
+                scored.len(),
+                &scored[..scored.len().min(5)]
+            );
+        }
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
             self.fetch_rows_with_ids(table)?.into_iter().collect();
@@ -5840,12 +5976,16 @@ fn normalize_cell(s: &str) -> String {
 }
 
 /// Decodes a COPY `DELIMITER` option (`\t`, `\n`, … or a literal char).
+///
+/// Mirrors zsv's `zsv_scanner_init`: a NUL delimiter (what an unset SDK
+/// option turns into) and the illegal `\n`/`\r`/`"` all fall back to `,`.
 fn decode_delimiter(v: &str) -> char {
     match v {
         "\\t" => '\t',
-        "\\n" => '\n',
-        "\\r" => '\r',
-        _ => v.chars().next().unwrap_or(','),
+        _ => match v.chars().next() {
+            Some(c) if c != '\0' && c != '\n' && c != '\r' && c != '"' => c,
+            _ => ',',
+        },
     }
 }
 
