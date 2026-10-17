@@ -365,11 +365,7 @@ impl Catalog {
         // Table ids start at 0, as the C++ engine's do; the counter holds the
         // next id to hand out.
         let mut next = self.read_counter()?;
-        while self
-            .store
-            .get(&table_key(next))?
-            .is_some()
-        {
+        while self.store.get(&table_key(next))?.is_some() {
             next += 1;
         }
         self.store.put(COUNTER_KEY, &(next + 1).to_le_bytes())?;

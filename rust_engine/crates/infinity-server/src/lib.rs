@@ -555,11 +555,28 @@ fn handle_connection(
                             .flatten()
                             .map(|m| (m, eng.row_count(&full).unwrap_or(0) as i64))
                     });
-                    let (code, msg, col_count, row_count) = match found {
-                        Some((meta, rows)) => {
-                            (0i64, "OK".to_string(), meta.columns.len() as i64, rows)
-                        }
-                        None => (3022i64, format!("Table: {table} doesn't exist."), 0, 0),
+                    let (code, msg, col_count, row_count, segments) = match found {
+                        Some((meta, rows)) => (
+                            0i64,
+                            "OK".to_string(),
+                            meta.columns.len() as i64,
+                            rows,
+                            if rows == 0 {
+                                0
+                            } else {
+                                engine
+                                    .as_ref()
+                                    .map(|e| e.segment_count(&full) as i64)
+                                    .unwrap_or(1)
+                            },
+                        ),
+                        None => (
+                            3022i64,
+                            format!("Table: {table} doesn't exist."),
+                            0,
+                            0,
+                            0,
+                        ),
                     };
                     write_show_table_response(
                         &mut writer,
@@ -569,6 +586,7 @@ fn handle_connection(
                         code,
                         &msg,
                         col_count,
+                        segments,
                         row_count,
                     )?;
                 }
@@ -2534,7 +2552,7 @@ pub fn rows_to_column_fields_typed(
                 let cell = r
                     .get(ci)
                     .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                    .filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -2562,7 +2580,7 @@ pub fn rows_to_column_fields_typed(
                 let cell = r
                     .get(ci)
                     .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                    .filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -2608,7 +2626,7 @@ pub fn rows_to_column_fields_typed(
                 let cell = r
                     .get(ci)
                     .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                    .filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -2644,7 +2662,7 @@ pub fn rows_to_column_fields_typed(
                 let cell = r
                     .get(ci)
                     .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                    .filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -2677,7 +2695,7 @@ pub fn rows_to_column_fields_typed(
             let cell = r
                 .get(ci)
                 .map(String::as_str)
-                .filter(|v| !v.eq_ignore_ascii_case("null"));
+                .filter(|v| *v != "null");
             let valid = cell.is_some();
             match code {
                 1 => {
@@ -6343,6 +6361,7 @@ pub fn write_show_table_response(
     code: i64,
     msg: &str,
     column_count: i64,
+    segment_count: i64,
     row_count: i64,
 ) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
@@ -6362,7 +6381,7 @@ pub fn write_show_table_response(
         ("error_code", 1i16, code),
         ("row_count", 8i16, row_count),
         ("column_count", 6i16, column_count),
-        ("segment_count", 7i16, 1i64),
+        ("segment_count", 7i16, segment_count),
     ] {
         o.write_field_begin(&TFieldIdentifier::new(name, TType::I64, id))
             .map_err(tw)?;

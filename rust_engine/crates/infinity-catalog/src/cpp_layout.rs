@@ -930,7 +930,11 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
                 .map(|c| type_text_of(&c.column_type).unwrap_or_default())
                 .collect(),
             comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
-            ids: t.columns.iter().map(|c| c.column_id.max(0) as u64).collect(),
+            ids: t
+                .columns
+                .iter()
+                .map(|c| c.column_id.max(0) as u64)
+                .collect(),
         });
     }
     Ok(out)

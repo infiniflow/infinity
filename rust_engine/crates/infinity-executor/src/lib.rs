@@ -3402,10 +3402,6 @@ impl Engine {
             .unwrap_or(1)
             .max(1);
         let rows = self.row_count(table).unwrap_or(0);
-        if rows == 0 {
-            // An empty table has no segment yet.
-            return 0;
-        }
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
     }
 
