@@ -26,7 +26,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result};
-use infinity_executor::{Engine, QueryResult};
+use infinity_executor::{with_zero_dimension_sparse, Engine, QueryResult};
 
 use thrift::protocol::{
     TBinaryInputProtocol, TBinaryOutputProtocol, TFieldIdentifier, TInputProtocol, TListIdentifier,
@@ -431,6 +431,9 @@ fn handle_connection(
         // Handle the request, but never let a decode/execute error kill the
         // connection: reply with a Thrift exception instead of dropping the
         // socket (the SDK reports `connection reset` otherwise).
+        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+            eprintln!("[RPC] {name}");
+        }
         let handled: Result<()> = (|| {
             match name.as_str() {
                 "Connect" => {
@@ -827,6 +830,9 @@ fn handle_connection(
                                 batch.join(",")
                             )
                         };
+                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                            eprintln!("[INSERT] {sql}");
+                        }
                         resp = run_common(engine.as_ref(), &sql, sid);
                         if resp.error_code != OK {
                             break;
@@ -908,6 +914,16 @@ fn handle_connection(
                                 // text the client sent (`(c1 + c2)`).
                                 if !req.star && req.names.len() == columns.len() {
                                     columns = req.names.clone();
+                                } else if req.star
+                                    && !req.names.is_empty()
+                                    && columns.len() >= req.names.len()
+                                {
+                                    // `SELECT *, distance()`: only the trailing
+                                    // expression columns are renamed.
+                                    let start = columns.len() - req.names.len();
+                                    for (i, n) in req.names.iter().enumerate() {
+                                        columns[start + i] = n.clone();
+                                    }
                                 }
                                 let mut resp = select_response_from_typed(
                                     &columns,
@@ -1202,6 +1218,9 @@ fn handle_connection(
                     };
                     for name in names {
                         let sql = format!("ALTER TABLE {full} DROP COLUMN {name}");
+                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                            eprintln!("[INSERT] {sql}");
+                        }
                         resp = run_common(engine.as_ref(), &sql, sid);
                         if resp.error_code != OK {
                             break;
@@ -1400,13 +1419,22 @@ fn handle_connection(
                         3 => "FVECS",
                         _ => "CSV",
                     };
+                    // C++ takes `delimiter[0]` and zsv treats NUL as `,`; an
+                    // unset SDK option serialises as a single NUL byte.
+                    let delimiter = match req.delimiter.chars().next() {
+                        Some(c) if c != '\0' => c.to_string(),
+                        _ => ",".to_string(),
+                    };
                     let mut sql = format!(
                         "COPY {table} FROM '{}' WITH ( DELIMITER '{}', FORMAT {format} )",
                         req.file.replace('\'', "''"),
-                        req.delimiter.replace('\'', "''")
+                        delimiter.replace('\'', "''")
                     );
                     if req.has_header {
                         sql.push_str(" ;");
+                    }
+                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                        eprintln!("[IMPORT] {sql}");
                     }
                     let resp = match engine.as_ref() {
                         Some(eng) => match eng.execute(&sql) {
@@ -1854,7 +1882,8 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
         format!("{}.{}", req.db_name, req.table_name)
     };
     let sql = format!("CREATE TABLE {table} ({});", cols.join(", "));
-    match engine.execute(&sql) {
+    // The SDK's `sparse,0,…` type carries dimension 0, which SQL DDL rejects.
+    match with_zero_dimension_sparse(|| engine.execute(&sql)) {
         Ok(_) => CommonResponse {
             error_code: OK,
             error_msg: "OK".into(),
@@ -2682,6 +2711,28 @@ pub fn rows_to_column_fields_typed(
             for r in rows {
                 let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
                 masks.push(cell.is_some());
+                // A bit vector is packed `dim` bits into `ceil(dim/8)` bytes
+                // (LSB first), which is what the SDK unpacks.
+                if elem == 0 {
+                    let bits: Vec<u8> = cell
+                        .unwrap_or("")
+                        .chars()
+                        .filter(|c| *c == '0' || *c == '1')
+                        .map(|c| u8::from(c == '1'))
+                        .collect();
+                    let nbytes = (dim as usize).div_ceil(8);
+                    for b in 0..nbytes {
+                        let mut byte = 0u8;
+                        for k in 0..8 {
+                            let i = b * 8 + k;
+                            if i < bits.len() && bits[i] == 1 {
+                                byte |= 1 << k;
+                            }
+                        }
+                        chunk.push(byte);
+                    }
+                    continue;
+                }
                 let vals: Vec<f64> = cell
                     .map(|v| {
                         v.trim()
@@ -3534,7 +3585,14 @@ pub struct SelectReq {
 impl SelectReq {
     /// Builds the SQL for this request.
     pub fn to_sql(&self) -> String {
-        let cols = if self.star || self.columns.is_empty() {
+        let cols = if self.star {
+            // `SELECT *, distance()` keeps the trailing projection.
+            if self.columns.is_empty() {
+                "*".to_string()
+            } else {
+                format!("*, {}", self.columns.join(", "))
+            }
+        } else if self.columns.is_empty() {
             "*".to_string()
         } else {
             self.columns.join(", ")
@@ -4087,6 +4145,7 @@ fn read_generic_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<O
 fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut fields, mut text, mut opts) = (String::new(), String::new(), String::new());
+    let mut text_filter: Option<String> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4096,6 +4155,7 @@ fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<
             Some(1) => fields = ip.read_string().map_err(tw)?,
             Some(2) => text = ip.read_string().map_err(tw)?,
             Some(3) => opts = ip.read_string().map_err(tw)?,
+            Some(4) if f.field_type == TType::Struct => text_filter = read_where(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -4106,8 +4166,11 @@ fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
+    let filt = text_filter
+        .map(|p| format!(", WHERE {p}"))
+        .unwrap_or_default();
     Ok(format!(
-        "MATCH TEXT ('{}', '{}'{tail})",
+        "MATCH TEXT ('{}', '{}'{tail}{filt})",
         fields.replace('\'', "''"),
         text.replace('\'', "''")
     ))
@@ -4290,6 +4353,7 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     let mut metric = 0i32;
     let mut topn = 10i64;
     let mut params: Vec<(String, String)> = Vec::new();
+    let mut knn_filter: Option<String> = None;
     let mut query_expr: Option<String> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -4306,6 +4370,7 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
             Some(4) => metric = ip.read_i32().map_err(tw)?,
             Some(5) => topn = ip.read_i64().map_err(tw)?,
             Some(6) if f.field_type == TType::List => params = read_init_params(ip)?,
+            Some(7) if f.field_type == TType::Struct => knn_filter = read_where(ip)?,
             Some(8) if f.field_type == TType::Struct => {
                 let (name, args) = read_function_expr(ip)?;
                 query_expr = Some(pexpr_sql(&PExpr::Call(name, args)));
@@ -4337,8 +4402,11 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
+    let filt = knn_filter
+        .map(|p| format!(", WHERE {p}"))
+        .unwrap_or_default();
     Ok(Some(format!(
-        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail}){hints}",
+        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail}{filt}){hints}",
         knn_element(elem),
         knn_metric(metric)
     )))
@@ -4352,6 +4420,7 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     let mut metric = String::new();
     let mut topn = 10i64;
     let mut params: Vec<(String, String)> = Vec::new();
+    let mut sparse_filter: Option<String> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4368,6 +4437,7 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
             Some(3) => metric = ip.read_string().map_err(tw)?,
             Some(4) => topn = ip.read_i64().map_err(tw)?,
             Some(5) if f.field_type == TType::List => params = read_init_params(ip)?,
+            Some(6) if f.field_type == TType::Struct => sparse_filter = read_where(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -4382,8 +4452,11 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
+    let filt = sparse_filter
+        .map(|p| format!(", WHERE {p}"))
+        .unwrap_or_default();
     Ok(Some(format!(
-        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail}){hints}"
+        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail}{filt}){hints}"
     )))
 }
 

@@ -530,6 +530,18 @@ fn rest_type_name(decl: &str) -> String {
 }
 
 /// `[[{"col": v, "col_bitmap": true}, …], …]`
+/// The result type of a projected expression the engine names after itself
+/// (`trunc(c1, 14)` yields text). Unknown expressions stay untyped.
+fn expr_result_type(name: &str) -> String {
+    let n = name.trim().to_ascii_lowercase();
+    let f = n.split('(').next().unwrap_or("");
+    match f {
+        "trunc" | "truncate" | "upper" | "lower" | "substr" | "substring" | "trim" | "ltrim"
+        | "rtrim" | "reverse" | "md5" | "concat" => "Varchar".to_string(),
+        _ => String::new(),
+    }
+}
+
 fn output_json(columns: &[String], types: &[String], rows: &[Vec<String>]) -> String {
     let rows_json = rows
         .iter()
@@ -814,8 +826,9 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
 }
 
 /// The REST DSL's pseudo-columns and the functions they stand for.
-const PSEUDO_COLUMNS: [(&str, &str); 4] = [
-    ("_row_id", "row_id()"),
+const PSEUDO_COLUMNS: [(&str, &str); 3] = [
+    // `_row_id` is a real (hidden) column the planner resolves; only the
+    // search pseudo-columns need a function spelling.
     ("_score", "score()"),
     ("_distance", "distance()"),
     ("_similarity", "similarity()"),
@@ -1681,7 +1694,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                                 .iter()
                                 .find(|(n, _)| n.eq_ignore_ascii_case(c))
                                 .map(|(_, t)| t.clone())
-                                .unwrap_or_default()
+                                .unwrap_or_else(|| expr_result_type(c))
                         })
                         .collect();
                     let mut extra = String::new();

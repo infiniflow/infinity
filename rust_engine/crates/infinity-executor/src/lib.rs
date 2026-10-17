@@ -2754,7 +2754,30 @@ impl Engine {
                         }
                     }
                 }
-                let rows = align_insert_rows(&schema, &meta.defaults, columns.as_deref(), rows);
+                let mut rows = align_insert_rows(&schema, &meta.defaults, columns.as_deref(), rows);
+                // An integer column truncates a fractional value, as the
+                // reference's implicit cast does (`-6.3` -> `-6`).
+                for row in rows.iter_mut() {
+                    for (i, cell) in row.iter_mut().enumerate() {
+                        let int_col = meta
+                            .types
+                            .get(i)
+                            .map(|t| {
+                                let t = t.trim().to_ascii_uppercase();
+                                t.starts_with("INT")
+                                    || t.starts_with("TINYINT")
+                                    || t.starts_with("SMALLINT")
+                                    || t.starts_with("BIGINT")
+                            })
+                            .unwrap_or(false);
+                        if !int_col {
+                            continue;
+                        }
+                        if let Literal::Float(f) = cell {
+                            *cell = Literal::Int(*f as i64);
+                        }
+                    }
+                }
                 // enforce NOT NULL
                 for row in &rows {
                     for (i, nn) in meta.not_nulls.iter().enumerate() {
@@ -3036,6 +3059,13 @@ impl Engine {
                     from.clone()
                 };
                 let from = &from_derived;
+                // A WHERE clause must be a predicate: `WHERE c1` on a
+                // non-boolean column is rejected by the reference.
+                if let (Some(t), Some(p), None) =
+                    (from.as_ref(), where_pred.as_ref(), derived.as_ref())
+                {
+                    self.validate_where_predicate(t, p)?;
+                }
                 // SUM/AVG require a numeric argument.
                 if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
                     self.validate_aggregate_args(t, items)?;
@@ -4124,20 +4154,25 @@ impl Engine {
                 .unwrap_or(false)
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
-        // A query using the boolean keywords needs an explicit `operator=`.
-        let has_bool_kw = query.split_whitespace().any(|w| {
-            w.eq_ignore_ascii_case("or")
-                || w.eq_ignore_ascii_case("and")
-                || w.eq_ignore_ascii_case("not")
-        });
+        // A query ending in a boolean keyword (`... OR NOT`) is incomplete.
+        let ends_with_op = query
+            .split_whitespace()
+            .last()
+            .map(|w| {
+                w.eq_ignore_ascii_case("or")
+                    || w.eq_ignore_ascii_case("and")
+                    || w.eq_ignore_ascii_case("not")
+            })
+            .unwrap_or(false);
+        // ... unless an explicit `operator=` supplies the default.
         let has_operator_opt = params.split(';').any(|p| {
             p.split_once('=')
                 .map(|(k, _)| k.trim().eq_ignore_ascii_case("operator"))
                 .unwrap_or(false)
         });
-        if has_bool_kw && !has_operator_opt {
+        if ends_with_op && !has_operator_opt {
             return Err(Error::Invalid(
-                "parser: the full-text query needs operator=and|or".into(),
+                "parser: incomplete boolean expression in the full-text query".into(),
             ));
         }
         // field boosts from `col^w` / `col@index^w`
@@ -4634,6 +4669,51 @@ impl Engine {
     }
 
     /// Rejects `SUM`/`AVG` over a non-numeric column.
+    /// A WHERE term used on its own (`WHERE c1`) must itself be boolean; the
+    /// reference rejects a numeric column or an arithmetic expression there.
+    fn validate_where_predicate(&self, table: &str, p: &infinity_parser::Predicate) -> Result<()> {
+        use infinity_parser::Predicate;
+        let schema = self.table_schema(table)?;
+        let types = self.column_types(table)?;
+        fn bool_column(schema: &[String], types: &[String], name: &str) -> bool {
+            schema
+                .iter()
+                .position(|c| c == name)
+                .and_then(|i| types.get(i))
+                .map(|t| t.trim().to_ascii_uppercase().starts_with("BOOL"))
+                .unwrap_or(false)
+        }
+        match p {
+            Predicate::Bool(a, _, b) => {
+                self.validate_where_predicate(table, a)?;
+                self.validate_where_predicate(table, b)
+            }
+            Predicate::Not(a) => self.validate_where_predicate(table, a),
+            Predicate::IsTrue(e) => match e {
+                ExprAst::Column(c) if bool_column(&schema, &types, c) => Ok(()),
+                ExprAst::Column(_) => Err(Error::Invalid(
+                    "filter requires a boolean expression".into(),
+                )),
+                // A function call may yield a boolean (CONTAINS, FILTER_TEXT…);
+                // its own validation applies. The numeric pseudo-columns do not.
+                ExprAst::Func { name, .. }
+                    if ["ROW_ID", "SCORE", "DISTANCE", "SIMILARITY"]
+                        .iter()
+                        .any(|n| name.eq_ignore_ascii_case(n)) =>
+                {
+                    Err(Error::Invalid(
+                        "filter requires a boolean expression".into(),
+                    ))
+                }
+                ExprAst::Func { .. } => Ok(()),
+                _ => Err(Error::Invalid(
+                    "filter requires a boolean expression".into(),
+                )),
+            },
+            _ => Ok(()),
+        }
+    }
+
     fn validate_aggregate_args(&self, table: &str, items: &[SelectItem]) -> Result<()> {
         let schema = self.table_schema(table)?;
         let types = self.column_types(table)?;
@@ -5691,7 +5771,7 @@ impl Engine {
                     // A `bit` embedding column stores a bit string, so both the
                     // query and the stored value are read as 0/1 positions.
                     let bit_col = types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
-                    let qv: Vec<f64> = query_items
+                    let mut qv: Vec<f64> = query_items
                         .iter()
                         .filter_map(|x| x.parse::<f64>().ok())
                         .map(|x| {
@@ -5706,6 +5786,27 @@ impl Engine {
                             }
                         })
                         .collect();
+                    // The SDK packs a bit query into bytes (LSB first); expand
+                    // it to one bit per position unless it is already un-packed.
+                    if bit_col {
+                        let decl = types.get(col_idx).map(String::as_str).unwrap_or("");
+                        let dim = type_dim(decl).unwrap_or(0);
+                        let multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
+                        if dim > 0 && qv.len() != dim && qv.len() * 8 >= dim {
+                            let mut bits = Vec::with_capacity(qv.len() * 8);
+                            for b in &qv {
+                                let byte = *b as u8;
+                                for k in 0..8 {
+                                    bits.push(((byte >> k) & 1) as f64);
+                                }
+                            }
+                            // A multivector query packs several `dim`-sized rows.
+                            if !multi {
+                                bits.truncate(dim);
+                            }
+                            qv = bits;
+                        }
+                    }
                     if qv.is_empty() {
                         continue;
                     }
@@ -5726,6 +5827,14 @@ impl Engine {
                             continue;
                         }
                         let qrows: Vec<&[f64]> = qv.chunks(dim).collect();
+                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                            eprintln!(
+                                "[MV] dim={dim} qv={} qrows={} drows={}",
+                                qv.len(),
+                                qrows.len(),
+                                doc_rows.len()
+                            );
+                        }
                         let mut total = 0.0f64;
                         for qr in qrows {
                             let mut best: Option<f64> = None;
