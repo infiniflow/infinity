@@ -46,7 +46,12 @@ impl TableMeta {
             .iter()
             .enumerate()
             .map(|(i, c)| {
-                let d = self.defaults.get(i).cloned().flatten().unwrap_or_default();
+                // `\u{1}` marks "a default is present" so that `DEFAULT ''`
+                // survives the round trip (an empty field means "no default").
+                let d = match self.defaults.get(i).cloned().flatten() {
+                    Some(v) => format!("\u{1}{v}"),
+                    None => String::new(),
+                };
                 let n = if self.not_nulls.get(i).copied().unwrap_or(false) {
                     "1"
                 } else {
@@ -78,10 +83,10 @@ impl TableMeta {
             let ty = f.next().unwrap_or("");
             let cm = f.next().unwrap_or("");
             columns.push(n.to_string());
-            defaults.push(if d.is_empty() {
-                None
-            } else {
-                Some(d.to_string())
+            defaults.push(match d.strip_prefix('\u{1}') {
+                Some(rest) => Some(rest.to_string()),
+                None if d.is_empty() => None,
+                None => Some(d.to_string()),
             });
             not_nulls.push(nn == "1");
             types.push(ty.to_string());

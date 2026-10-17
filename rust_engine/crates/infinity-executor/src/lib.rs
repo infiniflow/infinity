@@ -6877,4 +6877,16 @@ mod tests {
             "<em>Anarchism</em> is a philosophy.  ... <em>Anarchism</em> spread."
         );
     }
+
+    /// A column declared `DEFAULT ''` keeps the empty string, not NULL.
+    #[test]
+    fn empty_string_default_survives_a_catalog_round_trip() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (num INTEGER, c VARCHAR DEFAULT '')")
+            .unwrap();
+        e.execute("INSERT INTO t (num) VALUES (1)").unwrap();
+        let rows = rows(&e, "SELECT * FROM t");
+        assert_eq!(rows, vec![vec!["1".to_string(), String::new()]]);
+    }
 }

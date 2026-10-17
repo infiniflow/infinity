@@ -1243,3 +1243,27 @@ mod tests {
         assert_eq!(ft.base.column_names, vec!["body".to_string()]);
     }
 }
+
+#[cfg(test)]
+mod empty_default_probe {
+    #[test]
+    fn empty_string_default_is_a_constant() {
+        let j = super::default_constant_expr("");
+        assert!(j.is_some(), "empty default must not be dropped");
+        let text = super::default_text_of(j.as_ref().unwrap());
+        assert_eq!(text.as_deref(), Some(""));
+        // through the stored bytes
+        let mut v =
+            super::ColumnDefValue::new(super::data_type_of_text("VARCHAR").unwrap(), 0, "c");
+        v.default = j.clone();
+        let bytes = super::value_format::column_def_bytes(&v);
+        let back = super::value_format::column_def_from_bytes(&bytes).unwrap();
+        assert_eq!(
+            back.default
+                .as_ref()
+                .and_then(super::default_text_of)
+                .as_deref(),
+            Some("")
+        );
+    }
+}
