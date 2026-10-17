@@ -25,7 +25,7 @@ fn main() {
     let row_count = engine.row_count(&table).unwrap_or(0) as i64;
 
     let mut out = std::io::stdout().lock();
-    write_show_table_response(&mut out, seq, &db, &table, col_count, row_count)
+    write_show_table_response(&mut out, seq, &db, &table, 0, "OK", col_count, row_count)
         .expect("write reply");
     out.flush().expect("flush");
 }

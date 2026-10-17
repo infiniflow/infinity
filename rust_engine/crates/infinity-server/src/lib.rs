@@ -529,17 +529,34 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_show_table_args(&mut ip)?
                     };
-                    let (col_count, row_count) = match &engine {
-                        Some(eng) => match eng.catalog().get_table_by_name(&table) {
-                            Ok(Some(meta)) => (
-                                meta.columns.len() as i64,
-                                eng.row_count(&table).unwrap_or(0) as i64,
-                            ),
-                            _ => (0, 0),
-                        },
-                        None => (0, 0),
+                    let full = if db.is_empty() || table.contains('.') {
+                        table.clone()
+                    } else {
+                        format!("{db}.{table}")
                     };
-                    write_show_table_response(&mut writer, seq, &db, &table, col_count, row_count)?;
+                    let found = engine.as_ref().and_then(|eng| {
+                        eng.catalog()
+                            .get_table_by_name(&full)
+                            .ok()
+                            .flatten()
+                            .map(|m| (m, eng.row_count(&full).unwrap_or(0) as i64))
+                    });
+                    let (code, msg, col_count, row_count) = match found {
+                        Some((meta, rows)) => {
+                            (0i64, "OK".to_string(), meta.columns.len() as i64, rows)
+                        }
+                        None => (3022i64, format!("Table: {table} doesn't exist."), 0, 0),
+                    };
+                    write_show_table_response(
+                        &mut writer,
+                        seq,
+                        &db,
+                        &table,
+                        code,
+                        &msg,
+                        col_count,
+                        row_count,
+                    )?;
                 }
                 "ShowIndex" => {
                     let (db, table, index_name, _sid) = {
@@ -1587,7 +1604,7 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
                     "''".to_string()
                 } else if t.starts_with('\'')
                     || t.parse::<f64>().is_ok()
-                    || t.eq_ignore_ascii_case("null")
+                    || t == "null"
                     || t.eq_ignore_ascii_case("true")
                     || t.eq_ignore_ascii_case("false")
                     || t.starts_with('[')
@@ -2275,7 +2292,7 @@ fn infer_column_type(rows: &[Vec<String>], ci: usize) -> i32 {
     for r in rows {
         let Some(v) = r.get(ci) else { continue };
         let t = v.trim();
-        if t.is_empty() || t.eq_ignore_ascii_case("null") {
+        if t.is_empty() || t == "null" {
             continue;
         }
         any = true;
@@ -2324,10 +2341,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -2352,10 +2366,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -2398,10 +2409,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -2434,10 +2442,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| !v.eq_ignore_ascii_case("null"));
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -2467,10 +2472,7 @@ pub fn rows_to_column_fields_typed(
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r
-                .get(ci)
-                .map(String::as_str)
-                .filter(|v| !v.eq_ignore_ascii_case("null"));
+            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
             let valid = cell.is_some();
             match code {
                 1 => {
@@ -6032,11 +6034,14 @@ pub fn read_show_table_call(r: &mut impl Read) -> Result<(i32, String, String, i
 
 /// Writes a `ShowTable` REPLY.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn write_show_table_response(
     w: &mut impl Write,
     seq: i32,
     db: &str,
     table: &str,
+    code: i64,
+    msg: &str,
     column_count: i64,
     row_count: i64,
 ) -> Result<()> {
@@ -6054,7 +6059,7 @@ pub fn write_show_table_response(
     o.write_struct_begin(&TStructIdentifier::new("ShowTableResponse"))
         .map_err(tw)?;
     for (name, id, val) in [
-        ("error_code", 1i16, 0i64),
+        ("error_code", 1i16, code),
         ("row_count", 8i16, row_count),
         ("column_count", 6i16, column_count),
         ("segment_count", 7i16, 1i64),
@@ -6065,7 +6070,7 @@ pub fn write_show_table_response(
         o.write_field_end().map_err(tw)?;
     }
     for (name, id, val) in [
-        ("error_msg", 2i16, "OK"),
+        ("error_msg", 2i16, msg),
         ("database_name", 3i16, db),
         ("table_name", 4i16, table),
         ("store_dir", 5i16, ""),
