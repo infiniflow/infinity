@@ -5345,17 +5345,16 @@ impl Engine {
             let is_multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
             if !is_multi {
                 if let Some(d) = type_dim(decl) {
-                    // A bit vector packs eight elements per query item.
+                    // A bit vector accepts either one bit per item or a packed
+                    // form with eight bits per item.
                     let bit_col = tensor_elem_type(decl) == ElemType::Bit;
-                    let actual = if bit_col {
-                        query_items.len() * 8
-                    } else {
-                        query_items.len()
-                    };
-                    if !query_items.is_empty() && actual != d {
+                    let n = query_items.len();
+                    let ok = !query_items.is_empty()
+                        && (n == d || (bit_col && n * 8 == d));
+                    if !ok {
                         return Err(Error::Invalid(format!(
                             "query embedding has {} dimensions, but column '{}' expects {}",
-                            actual, m.column, d
+                            n, m.column, d
                         )));
                     }
                 }
