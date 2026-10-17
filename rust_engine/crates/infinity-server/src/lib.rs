@@ -7483,7 +7483,8 @@ mod tests {
                 element_logic_type: 22, // Array
                 element: Box::new(PhysicalWire::Array {
                     element_logic_type: 3, // Integer
-                    element: Box::new(PhysicalWire::None),
+                    // SDKs need a physical descriptor even for scalar elements.
+                    element: Box::new(PhysicalWire::Scalar(3)),
                 }),
             }
         );
