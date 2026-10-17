@@ -3105,6 +3105,19 @@ pub fn pexpr_sql(e: &PExpr) -> String {
     match e {
         PExpr::Column(c) => c.clone(),
         PExpr::Value(v) => v.to_sql(),
+        // `in(a, 1, 2, 3)` / `not_in(...)` render as SQL `IN` lists.
+        PExpr::Call(n, a)
+            if (n.eq_ignore_ascii_case("in") || n.eq_ignore_ascii_case("not_in"))
+                && a.len() >= 2 =>
+        {
+            let op = if n.eq_ignore_ascii_case("not_in") {
+                "NOT IN"
+            } else {
+                "IN"
+            };
+            let list = a[1..].iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
+            format!("({} {op} ({list}))", pexpr_sql(&a[0]))
+        }
         // The SDK sends a projected binary expression as `FunctionExpr("+", [a, b])`.
         PExpr::Call(n, a) if a.len() == 2 && is_binary_op(n) => {
             format!("({} {n} {})", pexpr_sql(&a[0]), pexpr_sql(&a[1]))
@@ -3196,6 +3209,36 @@ pub fn read_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr
                     let (name, args) = read_function_expr(ip)?;
                     out = PExpr::Call(name, args);
                 }
+                // `InExpr` nested inside another expression: `c1 IN (1, 2)`.
+                Some(11) if uf.field_type == TType::Struct => {
+                    ip.read_struct_begin().map_err(tw)?;
+                    let mut left = PExpr::Other;
+                    let mut vals: Vec<PExpr> = Vec::new();
+                    let mut in_type = true;
+                    loop {
+                        let g = ip.read_field_begin().map_err(tw)?;
+                        if g.field_type == TType::Stop {
+                            break;
+                        }
+                        match (g.id, g.field_type) {
+                            (Some(1), TType::Struct) => left = read_pexpr(ip)?,
+                            (Some(2), TType::List) => {
+                                let l = ip.read_list_begin().map_err(tw)?;
+                                for _ in 0..l.size {
+                                    vals.push(read_pexpr(ip)?);
+                                }
+                                ip.read_list_end().map_err(tw)?;
+                            }
+                            (Some(3), TType::Bool) => in_type = ip.read_bool().map_err(tw)?,
+                            _ => ip.skip(g.field_type).map_err(tw)?,
+                        }
+                        ip.read_field_end().map_err(tw)?;
+                    }
+                    ip.read_struct_end().map_err(tw)?;
+                    let mut args = vec![left];
+                    args.extend(vals);
+                    out = PExpr::Call(if in_type { "in" } else { "not_in" }.to_string(), args);
+                }
                 _ => ip.skip(uf.field_type).map_err(tw)?,
             }
             let _ = ip.read_field_end();
@@ -3269,7 +3312,12 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                         if name.eq_ignore_ascii_case("in") && !rest.is_empty() =>
                     {
                         let list = rest.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
-                        pred = Some(format!("({} IN ({list}))", pexpr_sql(head)));
+                        let op = if name.eq_ignore_ascii_case("not_in") {
+                            "NOT IN"
+                        } else {
+                            "IN"
+                        };
+                        pred = Some(format!("({} {op} ({list}))", pexpr_sql(head)));
                     }
                     (None, [only]) if name.eq_ignore_ascii_case("not") => {
                         pred = Some(format!("(NOT {})", pexpr_sql(only)));
@@ -3282,6 +3330,36 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                     }
                     _ => {}
                 }
+            } else if uf.id == Some(11) && uf.field_type == TType::Struct {
+                // `InExpr { 1: left_operand, 2: arguments, 3: in_type }` —
+                // `c1 IN (1, 2, 3)` / `NOT IN`.
+                ip.read_struct_begin().map_err(tw)?;
+                let mut left = PExpr::Other;
+                let mut vals: Vec<PExpr> = Vec::new();
+                let mut in_type = true;
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    match (g.id, g.field_type) {
+                        (Some(1), TType::Struct) => left = read_pexpr(ip)?,
+                        (Some(2), TType::List) => {
+                            let l = ip.read_list_begin().map_err(tw)?;
+                            for _ in 0..l.size {
+                                vals.push(read_pexpr(ip)?);
+                            }
+                            ip.read_list_end().map_err(tw)?;
+                        }
+                        (Some(3), TType::Bool) => in_type = ip.read_bool().map_err(tw)?,
+                        _ => ip.skip(g.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+                let list = vals.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
+                let op = if in_type { "IN" } else { "NOT IN" };
+                pred = Some(format!("({} {op} ({list}))", pexpr_sql(&left)));
             } else {
                 ip.skip(uf.field_type).map_err(tw)?;
             }
