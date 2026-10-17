@@ -2643,7 +2643,16 @@ impl Engine {
                     .store
                     .get(&snap_key(name))?
                     .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
-                self.restore_table_blob(&String::from_utf8_lossy(&data))?;
+                let blob = String::from_utf8_lossy(&data).into_owned();
+                // Restoring into an existing table is refused, as in the
+                // reference (`DROP TABLE` first).
+                let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
+                if !table.is_empty() && self.catalog.get_table_by_name(&table)?.is_some() {
+                    return Err(Error::Invalid(format!(
+                        "table '{table}' already exists"
+                    )));
+                }
+                self.restore_table_blob(&blob)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],

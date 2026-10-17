@@ -1456,6 +1456,15 @@ fn handle_connection(
                                         rows = rw;
                                     }
                                 }
+                                // The SQL renderer marks an absent comment
+                                // `(empty)`; the SDK sees an empty string.
+                                for row in rows.iter_mut() {
+                                    if let Some(c) = row.get_mut(3) {
+                                        if c == "(empty)" {
+                                            c.clear();
+                                        }
+                                    }
+                                }
                                 select_response_from(
                                     &[
                                         "name".to_string(),
