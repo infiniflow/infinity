@@ -426,6 +426,30 @@ fn compile_agg_expr(
 
 /// A canonical text for an expression, used to match select items against
 /// GROUP BY keys (both are parsed from the same query text).
+/// The C++ spelling of a cast target (`varchar` -> `Varchar`).
+fn cpp_type_name(t: &str) -> String {
+    match t.to_ascii_lowercase().as_str() {
+        "varchar" => "Varchar".into(),
+        "integer" | "int" | "int32" => "Integer".into(),
+        "bigint" | "int64" => "BigInt".into(),
+        "tinyint" | "int8" => "TinyInt".into(),
+        "smallint" | "int16" => "SmallInt".into(),
+        "float" | "float32" => "Float".into(),
+        "double" | "float64" => "Double".into(),
+        "boolean" | "bool" => "Boolean".into(),
+        "date" => "Date".into(),
+        "datetime" => "DateTime".into(),
+        "time" => "Time".into(),
+        other => {
+            let mut c = other.chars();
+            match c.next() {
+                Some(f) => f.to_ascii_uppercase().to_string() + c.as_str(),
+                None => String::new(),
+            }
+        }
+    }
+}
+
 /// A literal as the reference prints it in an expression name (`0.1`, not
 /// `0.100000`).
 fn name_literal(l: &infinity_parser::Literal) -> String {
@@ -446,6 +470,18 @@ fn key_text(e: &ExprAst) -> String {
     match e {
         ExprAst::Column(c) => c.clone(),
         ExprAst::Literal(l) => name_literal(l),
+        // `CAST(x AS type)` prints as the reference's `Cast(x AS Type)`.
+        ExprAst::Func { name, args }
+            if name.eq_ignore_ascii_case("cast")
+                && args.len() == 2
+                && matches!(args[1], ExprAst::Literal(infinity_parser::Literal::Str(_))) =>
+        {
+            let ty = match &args[1] {
+                ExprAst::Literal(infinity_parser::Literal::Str(s)) => cpp_type_name(s),
+                _ => String::new(),
+            };
+            format!("Cast({} AS {ty})", key_text(&args[0]))
+        }
         ExprAst::Func { name, args } => format!(
             "{}({})",
             name.to_ascii_lowercase(),
