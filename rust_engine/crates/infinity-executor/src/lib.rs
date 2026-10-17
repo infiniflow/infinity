@@ -2134,8 +2134,8 @@ impl Engine {
                         if let Some(idx_ty) = idx_ty {
                             let t = idx_ty.to_ascii_lowercase();
                             let int_like = [
-                                "int8", "int16", "int32", "int64", "uint8", "uint16",
-                                "uint32", "uint64", "tinyint", "smallint", "int", "bigint",
+                                "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32",
+                                "uint64", "tinyint", "smallint", "int", "bigint",
                             ]
                             .contains(&t.as_str());
                             if !int_like {

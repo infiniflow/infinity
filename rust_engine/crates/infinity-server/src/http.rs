@@ -1369,8 +1369,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         // `ALTER INDEX … SET (topk=…)` only tunes a runtime hint; accept it
         // (after checking the index exists) without changing the mirror.
         ("PUT", ["databases", db, "tables", table, "indexes", index]) => {
-            let (Some(_db), Some(table), Some(index)) =
-                (ident(db), ident(table), ident(index))
+            let (Some(_db), Some(table), Some(index)) = (ident(db), ident(table), ident(index))
             else {
                 return (404, String::new());
             };
