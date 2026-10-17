@@ -3309,12 +3309,7 @@ impl SelectReq {
             sql.push_str(&format!(" WHERE {}", substitute_aliases(w, &self.aliases)));
         }
         if !self.group_by.is_empty() {
-            let keys: Vec<String> = self
-                .group_by
-                .iter()
-                .map(|g| substitute_aliases(g, &self.aliases))
-                .collect();
-            sql.push_str(&format!(" GROUP BY {}", keys.join(", ")));
+            sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
         }
         if let Some(h) = &self.having_sql {
             sql.push_str(&format!(" HAVING {}", substitute_aliases(h, &self.aliases)));
@@ -3323,13 +3318,7 @@ impl SelectReq {
             let keys: Vec<String> = self
                 .order_by
                 .iter()
-                .map(|(c, asc)| {
-                    format!(
-                        "{} {}",
-                        substitute_aliases(c, &self.aliases),
-                        if *asc { "ASC" } else { "DESC" }
-                    )
-                })
+                .map(|(c, asc)| format!("{c} {}", if *asc { "ASC" } else { "DESC" }))
                 .collect();
             sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
         }
