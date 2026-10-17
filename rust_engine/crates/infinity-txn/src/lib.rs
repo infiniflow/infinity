@@ -76,6 +76,10 @@ pub struct TxnManager {
     wal_path: PathBuf,
     next_txn_id: AtomicU64,
     next_ts: AtomicU64,
+    /// Monotonic high-water mark of commit timestamps applied to the KV. The
+    /// marker written into each batch must never regress, or a concurrent
+    /// checkpoint would keep a much longer WAL than necessary.
+    max_applied: AtomicU64,
 }
 
 impl TxnManager {
@@ -101,6 +105,7 @@ impl TxnManager {
             // A checkpoint may have truncated the WAL, so the applied marker in
             // the KV store is the other source of the timestamp high-water mark.
             next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
+            max_applied: AtomicU64::new(applied_ts),
         })
     }
 
@@ -129,7 +134,9 @@ impl TxnManager {
         // The applied-timestamp marker rides along with the batch, so a replay
         // after a reopen never re-applies records that are already in the KV.
         let mut writes = txn.writes.clone();
-        writes.push((APPLIED_TS_KEY.to_vec(), commit_ts.to_le_bytes().to_vec()));
+        let applied = self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
+        let applied = applied.max(commit_ts);
+        writes.push((APPLIED_TS_KEY.to_vec(), applied.to_le_bytes().to_vec()));
         self.store.atomic_write(&writes)?;
         Ok(commit_ts)
     }
