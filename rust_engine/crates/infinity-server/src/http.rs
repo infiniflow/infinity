@@ -1366,6 +1366,25 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 Err(e) => e,
             }
         }
+        // `ALTER INDEX … SET (topk=…)` only tunes a runtime hint; accept it
+        // (after checking the index exists) without changing the mirror.
+        ("PUT", ["databases", db, "tables", table, "indexes", index]) => {
+            let (Some(_db), Some(table), Some(index)) =
+                (ident(db), ident(table), ident(index))
+            else {
+                return (404, String::new());
+            };
+            let _ = table;
+            let exists = engine
+                .catalog()
+                .list_indexes()
+                .map(|is| is.iter().any(|i| i.name == index))
+                .unwrap_or(false);
+            if !exists {
+                return err_response(3023, &format!("index '{index}' does not exist"));
+            }
+            (200, ok_json())
+        }
         ("DELETE", ["databases", db, "tables", table, "indexes", index]) => {
             let (Some(table), Some(index)) = (ident(table), ident(index)) else {
                 return (404, String::new());

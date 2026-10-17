@@ -5870,6 +5870,8 @@ impl Engine {
                     | "index_name"
                     | "ignore_index"
                     | "index_type"
+                    // `MATCH TEXT`/`MATCH SPARSE` carry a per-search filter.
+                    | "filter"
             );
             if !known {
                 return Err(Error::Invalid(format!(
