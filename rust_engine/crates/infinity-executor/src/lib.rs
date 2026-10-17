@@ -2007,8 +2007,7 @@ impl Engine {
     /// counter (no scan). Used to decide whether the C++ block mirror is worth
     /// its duplicate copy of a large table.
     fn approx_row_count(&self, table: &str) -> usize {
-        let key = table
-            .split('.').next_back().unwrap_or(table).to_string();
+        let key = table.split('.').next_back().unwrap_or(table).to_string();
         match self.row_counters.lock().unwrap().get(&key) {
             Some((seg, off, _)) => ((*seg as u64) << 32 | *off as u64) as usize,
             None => 0,
@@ -3128,8 +3127,7 @@ impl Engine {
                     self.txn.commit(t)?;
                     // The secondary indexes must see the rewritten rows.
                     for (k, nr) in new_rows.iter().enumerate() {
-                        let texts: Vec<String> =
-                            nr.iter().map(|v| v.to_slt_string()).collect();
+                        let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
                         self.update_indexes_on_insert_text(table, first_seq + k, &texts)?;
                     }
                 }
@@ -6392,12 +6390,12 @@ impl Engine {
     }
 
     pub fn flush(&self) -> Result<()> {
+        // Snapshot the applied timestamp *before* the fsync: everything up to
+        // it is then durable, so the log prefix can be dropped afterwards.
+        let applied = self.txn.applied_ts()?;
         self.catalog.flush()?;
         self.txn.flush()?;
-        // The KV store is now durable: everything the WAL holds is already in
-        // it, so the log can be emptied (the reference truncates at a
-        // checkpoint too). `meta:applied_ts` keeps recovery correct.
-        let _ = self.txn.truncate_wal_if_applied();
+        let _ = self.txn.truncate_wal_up_to(applied);
         self.flush_cpp_blocks()?;
         // Mirror the catalog into the C++ key space / value encoding, in the
         // catalog store at `<dir>/catalog` (the path the C++ engine uses), so a

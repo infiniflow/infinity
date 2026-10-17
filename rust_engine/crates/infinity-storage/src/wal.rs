@@ -128,14 +128,12 @@ impl WalManager {
     /// the KV store). The append handle stays usable: with `O_APPEND` the next
     /// write lands at the new end of file.
     pub fn truncate_all(&mut self) -> Result<()> {
-        self.file
-            .set_len(0)
-            .map_err(|e| Error::io(&self.path, e))?;
+        self.file.set_len(0).map_err(|e| Error::io(&self.path, e))?;
         self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
 
     /// Current size of the WAL in bytes.
-    pub fn len(&self) -> Result<u64> {
+    pub fn file_size(&self) -> Result<u64> {
         Ok(self
             .file
             .metadata()
@@ -175,8 +173,7 @@ impl WalManager {
                 if content.len() < 16 {
                     break;
                 }
-                let commit_ts =
-                    u64::from_le_bytes(content[8..16].try_into().unwrap());
+                let commit_ts = u64::from_le_bytes(content[8..16].try_into().unwrap());
                 if commit_ts > ts {
                     wr.write_all(&header)
                         .and_then(|_| wr.write_all(&content))
@@ -185,9 +182,7 @@ impl WalManager {
                 }
             }
             wr.flush().map_err(|e| Error::io(&tmp, e))?;
-            wr.get_ref()
-                .sync_all()
-                .map_err(|e| Error::io(&tmp, e))?;
+            wr.get_ref().sync_all().map_err(|e| Error::io(&tmp, e))?;
         }
         std::fs::rename(&tmp, &self.path).map_err(|e| Error::io(&self.path, e))?;
         *self = WalManager::open(&self.path)?;

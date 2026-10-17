@@ -7,7 +7,7 @@
 #![forbid(unsafe_code)]
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result, TxnTimeStamp};
@@ -76,11 +76,6 @@ pub struct TxnManager {
     wal_path: PathBuf,
     next_txn_id: AtomicU64,
     next_ts: AtomicU64,
-    /// Highest commit timestamp already written to the KV store.
-    last_commit: AtomicU64,
-    /// Commits that appended to the WAL but have not finished applying to the
-    /// KV yet; a checkpoint must not truncate the WAL while one is in flight.
-    inflight: AtomicUsize,
 }
 
 impl TxnManager {
@@ -106,8 +101,6 @@ impl TxnManager {
             // A checkpoint may have truncated the WAL, so the applied marker in
             // the KV store is the other source of the timestamp high-water mark.
             next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
-            last_commit: AtomicU64::new(applied_ts),
-            inflight: AtomicUsize::new(0),
         })
     }
 
@@ -128,7 +121,6 @@ impl TxnManager {
             return Err(Error::Txn("empty transaction".into()));
         }
         let commit_ts = self.next_ts.fetch_add(1, Ordering::SeqCst);
-        self.inflight.fetch_add(1, Ordering::SeqCst);
         let payload = encode_writes(&txn.writes);
         {
             let mut wal = self.wal.lock().unwrap();
@@ -138,10 +130,7 @@ impl TxnManager {
         // after a reopen never re-applies records that are already in the KV.
         let mut writes = txn.writes.clone();
         writes.push((APPLIED_TS_KEY.to_vec(), commit_ts.to_le_bytes().to_vec()));
-        let written = self.store.atomic_write(&writes);
-        self.last_commit.store(commit_ts, Ordering::SeqCst);
-        self.inflight.fetch_sub(1, Ordering::SeqCst);
-        written?;
+        self.store.atomic_write(&writes)?;
         Ok(commit_ts)
     }
 
@@ -173,30 +162,21 @@ impl TxnManager {
             .unwrap_or(0))
     }
 
-    /// Drops the WAL prefix that the KV store already holds (the store must be
-    /// fsynced first). `meta:applied_ts` keeps recovery correct; this only
-    /// bounds the WAL's size, as the reference does at a checkpoint.
-    ///
-    /// Small logs are left alone, and no truncation happens while a commit has
-    /// appended but not yet reached the KV store.
-    pub fn truncate_wal_if_applied(&self) -> Result<bool> {
-        let applied = self.applied_ts()?;
+    /// Drops the WAL prefix that the KV store already holds. The caller must
+    /// pass a timestamp whose records have been fsynced (`flush()` first), so a
+    /// crash can never lose a record that this call discards. `meta:applied_ts`
+    /// keeps recovery correct; this only bounds the log's size, as the
+    /// reference does at a checkpoint.
+    pub fn truncate_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
         if applied == 0 {
             return Ok(false);
         }
         let mut wal = self.wal.lock().unwrap();
-        if self.inflight.load(Ordering::SeqCst) != 0 {
-            return Ok(false);
-        }
         const MIN_TRUNCATE_BYTES: u64 = 16 * 1024 * 1024;
-        if wal.len()? < MIN_TRUNCATE_BYTES {
+        if wal.file_size()? < MIN_TRUNCATE_BYTES {
             return Ok(false);
         }
-        if applied == self.last_commit.load(Ordering::SeqCst) {
-            wal.truncate_all()?;
-        } else {
-            wal.truncate_up_to_streaming(applied)?;
-        }
+        wal.truncate_up_to_streaming(applied)?;
         Ok(true)
     }
 
