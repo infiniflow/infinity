@@ -16,9 +16,27 @@ cd "$here/.." && cargo test --workspace -q || status=1
 cargo run -q --release -p infinity-cli -- conformance "$root/test/sql/snapshot" \
   || { echo "snapshot .slt baseline not at 100%"; status=1; }
 
-# 2. python restart_test (needs a running server + the python SDK)
+# 2. python restart_test (needs a running server + the python SDK).
+#    The harness starts the engine as `<binary> --config=<toml>`; the shim maps
+#    that onto the Rust `infinity-server`. Unprivileged users get a writable
+#    `/var/infinity` (plus the CSV fixtures) via `bwrap` when it is available.
 if [[ -d "$root/python/restart_test" ]]; then
-  ( cd "$root/python" && python3 -m pytest -q restart_test ) || status=1
+  py="${PYTHON:-}"
+  if [[ -z "$py" ]]; then
+    if [[ -x "$root/.venv/bin/python" ]]; then py="$root/.venv/bin/python"; else py="python3"; fi
+  fi
+  shim="$here/infinity_rust_shim.sh"
+  run=( "$py" -m pytest -q restart_test --infinity_path="$shim" )
+  if command -v bwrap >/dev/null 2>&1; then
+    data="${INFINITY_GATE_C_DATA:-$(mktemp -d)}"
+    mkdir -p "$data/tmp"
+    cp "$root"/test/data/csv/* "$data/" 2>/dev/null || true
+    echo "restart_test: bwrap sandbox, fixtures at $data"
+    run=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
+          --bind "$data" /var/infinity/test_data --dir /var/infinity/log \
+          -- "${run[@]}" )
+  fi
+  ( cd "$root/python" && "${run[@]}" ) || status=1
 else
   echo "SKIP: python/restart_test not present"
 fi
