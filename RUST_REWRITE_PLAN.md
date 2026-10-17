@@ -522,6 +522,11 @@ QueryContext::query(sql)
 - 已实现路由：databases/tables/columns/indexes/docs、import（PUT table→COPY FROM）/export（GET table/{t}→COPY TO）/rename/compact/optimize/segments/blocks/add-drop columns/EXPLAIN meta；标识符统一小写（3003/3004）、create/drop 选项 3074/3075、`replace_if_exists`→3032、空列清单 3048、重复表 3017、缺表 3022。
 - 已知缺口：HTTP 下 JSON 函数/日期函数的列名与类型推断（`json_extract_*` 值仍按字符串）、`test_select_truncate`/`test_select_aggregate` 的数值渲染、快照路由、`after_disconnect` 用例（新连接走 Thrift 的混用场景）。
 
+### Gate B — 性能根因（2026-10-17，关键发现）
+- 现象：Go SDK 全量跑到 8192 次单行 INSERT 时"卡死"（120s/600s 超时），`test_show`/`test_table`/`test_update`/`test_knn` 在 420s 上限内跑不完，单行 INSERT 实测 **43 ms/次**。
+- 根因：**服务端未设置 TCP_NODELAY**，小请求/小回复触发 Nagle + delayed ACK（Linux 40 ms 定时器）。
+- 修复：`infinity-server`/HTTP/PG 三个监听在 accept 后 `set_nodelay(true)`；同一条单行 INSERT 从 **43 ms → 0.072 ms**（~600×）。原先"慢/超时"的失败项（Go 全量、多文件 420s 上限）需要用新二进制重新测量，不能再引用旧结论。
+
 ### Gate C — 持久化与恢复
 - `python/restart_test` 通过；`test/sql/snapshot` 通过；**WAL 崩溃恢复**用例通过。
 - **对象存储 / MinIO** 用例通过（对应 CI 的 minio job）。
