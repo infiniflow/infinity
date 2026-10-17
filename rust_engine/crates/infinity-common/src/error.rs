@@ -50,6 +50,8 @@ impl Error {
         match self {
             // 7012 PARSER_ERROR: data that does not parse for the column type.
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
+            // 3032 NOT_SUPPORTED (e.g. dropping a column an index still uses).
+            Error::Invalid(m) if m.contains("used by an index") => 3032,
             // 3068 DUPLICATE_COLUMN_NAME / 3024 COLUMN_NOT_EXIST.
             Error::Invalid(m) if m.starts_with("duplicate column") => 3068,
             // 3013 SYNTAX_ERROR vs 3014 INVALID_PARAMETER_VALUE.
