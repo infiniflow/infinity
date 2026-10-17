@@ -2122,12 +2122,38 @@ impl Engine {
                         let inner =
                             c.type_text[c.type_text.find('(').unwrap() + 1..].trim_end_matches(')');
                         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-                        if parts.len() == 2 {
-                            let dim: i64 = parts[1].parse().unwrap_or(0);
+                        // Two spellings reach us: `SPARSE(elem, dim)` (the
+                        // reference DDL) and `Sparse(elem, index_type, dim)` (the
+                        // REST physical type). The three-part form's index type
+                        // must be an integer width.
+                        let (idx_ty, dim_part) = if parts.len() >= 3 {
+                            (Some(parts[1]), parts[2])
+                        } else {
+                            (None, parts[1])
+                        };
+                        if let Some(idx_ty) = idx_ty {
+                            let t = idx_ty.to_ascii_lowercase();
+                            let int_like = [
+                                "int8", "int16", "int32", "int64", "uint8", "uint16",
+                                "uint32", "uint64", "tinyint", "smallint", "int", "bigint",
+                            ]
+                            .contains(&t.as_str());
+                            if !int_like {
+                                return Err(Error::Invalid(format!(
+                                    "invalid sparse index type '{idx_ty}' for column '{}'",
+                                    c.name
+                                )));
+                            }
+                        }
+                        if parts.len() >= 2 {
+                            let dim: i64 = dim_part.parse().unwrap_or(0);
                             // The reference rejects a zero bound at DDL time, but
                             // the SDK's `sparse,0,…` column type (physical type
                             // dimension 0) is accepted.
-                            let allow_zero = ALLOW_ZERO_SPARSE.with(|c| c.get());
+                            let allow_zero = ALLOW_ZERO_SPARSE.with(|c| c.get())
+                                // the REST physical-type spelling declares an
+                                // unknown bound as 0
+                                || parts.len() >= 3;
                             if dim < 0 || (dim == 0 && !allow_zero) {
                                 return Err(Error::Invalid(format!(
                                     "invalid sparse dimension {dim} for column '{}'",

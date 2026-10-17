@@ -90,6 +90,9 @@ impl Error {
             Error::Invalid(m) if m.starts_with("table '") && m.ends_with("already exists") => 3017,
             // 3022 TABLE_NOT_EXIST.
             Error::Invalid(m) if m.starts_with("table '") && m.ends_with("does not exist") => 3022,
+            // 3057 INVALID_EMBEDDING_DATA_TYPE (sparse index type / element type).
+            Error::Invalid(m) if m.starts_with("invalid sparse index type") => 3057,
+            Error::Invalid(m) if m.starts_with("invalid embedding data type") => 3057,
             // 3018 DUPLICATE_INDEX_NAME.
             Error::Invalid(m) if m.starts_with("index '") && m.ends_with("already exists") => 3018,
             // 3033 DROPPING_USING_DB: `DROP DATABASE default_db`.
