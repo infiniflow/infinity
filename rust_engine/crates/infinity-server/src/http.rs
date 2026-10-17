@@ -903,6 +903,9 @@ fn sql_value_arr(v: &Json) -> String {
                 .map(|x| match x {
                     Json::Num(n) => format!("{n}"),
                     Json::Str(s) => format!("'{}'", s.replace('\'', "''")),
+                    // A tensor query is a list of sub-vectors; recurse so the
+                    // nesting survives (a flat `[0,0]` scores every row 0).
+                    Json::Arr(_) => sql_value_arr(x),
                     _ => "0".to_string(),
                 })
                 .collect::<Vec<_>>()

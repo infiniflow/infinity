@@ -5390,7 +5390,16 @@ impl Engine {
                 .unwrap_or(ElemType::Float32);
             for doc in &mut docs {
                 let score = match col_idx.and_then(|i| doc.row.get(i)) {
-                    Some(Value::Str(v)) => tensor_score(&q, v, col_elem, qry_elem),
+                    Some(Value::Str(v)) => tensor_score(
+                        &q,
+                        v,
+                        col_elem,
+                        qry_elem,
+                        col_idx
+                            .and_then(|i| types.get(i))
+                            .map(|t| t.to_ascii_uppercase().starts_with("TENSORARRAY"))
+                            .unwrap_or(false),
+                    ),
                     _ => 0.0,
                 };
                 set_score(&mut doc.row, score);
@@ -5559,7 +5568,16 @@ impl Engine {
                 Some(v) => v.to_slt_string(),
                 None => continue,
             };
-            let score = tensor_score(&q, &cell, col_elem, qry_elem);
+            let score = tensor_score(
+                &q,
+                &cell,
+                col_elem,
+                qry_elem,
+                types
+                    .get(col_idx)
+                    .map(|t| t.to_ascii_uppercase().starts_with("TENSORARRAY"))
+                    .unwrap_or(false),
+            );
             scored.push((id, score, row));
         }
         scored.sort_by(|a, b| {
@@ -5881,7 +5899,16 @@ impl Engine {
                     let qry_elem = arg_str(m.args.get(1))
                         .map(|s| elem_type_of(&s))
                         .unwrap_or(ElemType::Float32);
-                    let score = tensor_score(&q, v, col_elem, qry_elem);
+                    let score = tensor_score(
+                        &q,
+                        v,
+                        col_elem,
+                        qry_elem,
+                        types
+                            .get(col_idx)
+                            .map(|t| t.to_ascii_uppercase().starts_with("TENSORARRAY"))
+                            .unwrap_or(false),
+                    );
                     scored.push((*seq, score, -score));
                 } else if is_sparse {
                     // A `bit` sparse vector holds bare indices; its inner product
@@ -6521,7 +6548,13 @@ fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: ElemType) -
 /// Scores one stored tensor value against the query. A column holding a
 /// `TensorArray` (top-level groups are themselves bracketed) scores by the max
 /// over its component tensors; a plain tensor uses MaxSim directly.
-fn tensor_score(q: &[Vec<f64>], doc_text: &str, col: ElemType, qry: ElemType) -> f64 {
+fn tensor_score(
+    q: &[Vec<f64>],
+    doc_text: &str,
+    col: ElemType,
+    qry: ElemType,
+    tensor_array: bool,
+) -> f64 {
     let leaves = |g: &str| {
         if col == ElemType::Bit {
             parse_bit_leaves(g)
@@ -6539,13 +6572,10 @@ fn tensor_score(q: &[Vec<f64>], doc_text: &str, col: ElemType, qry: ElemType) ->
         return 0.0;
     }
     let groups = split_top_level(inner);
-    // A `TensorArray` has a third nesting level: each top-level group is itself
-    // a bracketed tensor. A plain tensor's groups are plain number lists.
-    let is_array = groups.iter().any(|g| {
-        let gi = g.trim().strip_prefix('[').unwrap_or(g);
-        gi.trim_start().starts_with('[')
-    });
-    if is_array {
+    // A `TENSORARRAY` row holds several tensors, each scored independently; a
+    // plain `TENSOR` row is one tensor whose stored form may already be split
+    // into `dim`-sized groups.
+    if tensor_array {
         groups
             .iter()
             .map(|g| tensor_maxsim(q, &leaves(g), col, qry))
