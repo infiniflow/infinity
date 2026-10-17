@@ -911,6 +911,9 @@ fn handle_connection(
                         if take > 0 {
                             sql.push_str(&format!(", LIMIT {take}"));
                         }
+                        if !req.columns.is_empty() {
+                            sql.push_str(&format!(", COLUMNS '{}'", req.columns.join(",")));
+                        }
                         sql.push_str(" )");
                         let Some(eng) = engine.as_ref() else {
                             resp = CommonResponse {
@@ -4525,6 +4528,7 @@ struct ExportArgs {
     file: String,
     delimiter: String,
     file_type: i32,
+    columns: Vec<String>,
     offset: i64,
     limit: i64,
     row_limit: i64,
@@ -4538,6 +4542,7 @@ fn read_export_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Exp
         file: String::new(),
         delimiter: ",".into(),
         file_type: 0,
+        columns: Vec::new(),
         offset: 0,
         limit: 0,
         row_limit: 0,
@@ -4554,6 +4559,13 @@ fn read_export_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Exp
         match (f.id, f.field_type) {
             (Some(1), TType::String) => a.db = ip.read_string().map_err(tw)?,
             (Some(2), TType::String) => a.table = ip.read_string().map_err(tw)?,
+            (Some(3), TType::List) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    a.columns.push(ip.read_string().map_err(tw)?);
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
             (Some(4), TType::String) => a.file = ip.read_string().map_err(tw)?,
             (Some(5), TType::Struct) => {
                 ip.read_struct_begin().map_err(tw)?;

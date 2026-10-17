@@ -4243,59 +4243,80 @@ impl Engine {
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
-    /// Writes `table` to a CSV file (`COPY t TO …`).
+    /// Writes `table` to a file (`COPY t TO …`): CSV, JSONL, or the binary
+    /// `fvecs` (per row: `i32 dim` followed by `dim` little-endian `f32`).
     fn copy_to(&self, table: &str, path: &str, opts: &[(String, String)]) -> Result<QueryResult> {
         let rows = self.fetch_rows(table)?;
         let schema = self.table_schema(table)?;
         let column_types = self.column_types(table)?;
-        let jsonl = opts
-            .iter()
-            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSONL"));
+        let opt = |name: &str| -> Option<&str> {
+            opts.iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.as_str())
+        };
+        let format = opt("FORMAT").unwrap_or("CSV").to_ascii_uppercase();
+        let jsonl = format == "JSONL";
+        let fvecs = format == "FVECS";
+        // `COLUMNS 'a,b'` projects the export (the SDK's `columns` argument).
+        let projected: Option<Vec<usize>> = opt("COLUMNS").map(|list| {
+            list.split(',')
+                .map(str::trim)
+                .filter(|c| !c.is_empty())
+                .filter_map(|c| schema.iter().position(|x| x == c))
+                .collect()
+        });
+        let indices: Vec<usize> = projected.unwrap_or_else(|| (0..schema.len()).collect());
         // `OFFSET n` skips rows; `LIMIT n` caps the exported count.
-        let offset: usize = opts
-            .iter()
-            .find(|(k, _)| k == "OFFSET")
-            .and_then(|(_, v)| v.parse().ok())
-            .unwrap_or(0);
-        let limit: Option<usize> = opts
-            .iter()
-            .find(|(k, _)| k == "LIMIT")
-            .and_then(|(_, v)| v.parse().ok());
+        let offset: usize = opt("OFFSET").and_then(|v| v.parse().ok()).unwrap_or(0);
+        let limit: Option<usize> = opt("LIMIT").and_then(|v| v.parse().ok());
         let selected: Vec<&Vec<Value>> = rows
             .iter()
             .skip(offset)
             .take(limit.unwrap_or(usize::MAX))
             .collect();
-        let mut out = String::new();
-        if jsonl {
+        let mut out: Vec<u8> = Vec::new();
+        if fvecs {
             for row in &selected {
-                let fields: Vec<String> = schema
+                let Some(&ci) = indices.first() else { continue };
+                let text = row.get(ci).map(|v| v.to_slt_string()).unwrap_or_default();
+                let inner = text.trim().trim_start_matches('[').trim_end_matches(']');
+                let vals: Vec<f32> = inner
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                    .filter_map(|v| v.parse::<f32>().ok())
+                    .collect();
+                out.extend_from_slice(&(vals.len() as i32).to_le_bytes());
+                for v in vals {
+                    out.extend_from_slice(&v.to_le_bytes());
+                }
+            }
+        } else if jsonl {
+            for row in &selected {
+                let fields: Vec<String> = indices
                     .iter()
-                    .zip(row.iter())
-                    .map(|(name, v)| {
-                        let ty = column_types
-                            .get(schema.iter().position(|c| c == name).unwrap_or(usize::MAX))
-                            .map(String::as_str)
-                            .unwrap_or("");
-                        format!("\"{name}\":{}", json_value_typed(v, ty))
+                    .map(|&i| {
+                        let name = &schema[i];
+                        let ty = column_types.get(i).map(String::as_str).unwrap_or("");
+                        let v = row.get(i).cloned().unwrap_or(Value::Null);
+                        format!("\"{name}\":{}", json_value_typed(&v, ty))
                     })
                     .collect();
-                out.push('{');
-                out.push_str(&fields.join(","));
-                out.push_str("}\n");
+                out.extend_from_slice(format!("{{{}}}\n", fields.join(",")).as_bytes());
             }
         } else {
             for row in &selected {
-                let line = row
+                let line = indices
                     .iter()
-                    .map(|v| match v {
-                        Value::Str(s) if s.contains(',') => format!("\"{s}\""),
-                        other => other.to_slt_string(),
+                    .map(|&i| match row.get(i) {
+                        Some(Value::Str(s)) if s.contains(',') => format!("\"{s}\""),
+                        Some(other) => other.to_slt_string(),
+                        None => String::new(),
                     })
                     .collect::<Vec<_>>()
                     .join(",");
-                out.push_str(&line);
-                out.push('\n');
+                out.extend_from_slice(line.as_bytes());
+                out.push(b'\n');
             }
         }
         // Tolerate unwritable export paths (statement-level success).
