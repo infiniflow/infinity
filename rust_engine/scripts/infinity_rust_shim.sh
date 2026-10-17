@@ -18,4 +18,8 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bin="${INFINITY_SERVER_BIN:-$here/../target/release/infinity-server}"
 data_dir="${INFINITY_DATA:-/var/infinity}"
 mkdir -p "$data_dir"
+# The harness only speaks Thrift on 23817; give the HTTP listener an ephemeral
+# port so a foreign server already holding 23820 cannot make this one panic at
+# startup (which would leave the harness talking to the stale process).
+export INFINITY_HTTP_BIND="${INFINITY_HTTP_BIND:-127.0.0.1:0}"
 exec "$bin" "$data_dir"

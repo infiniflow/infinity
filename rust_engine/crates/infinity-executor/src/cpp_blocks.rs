@@ -893,7 +893,7 @@ fn decode_value(
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
     /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
-    fn blocks_root(&self) -> PathBuf {
+    pub(crate) fn blocks_root(&self) -> PathBuf {
         self.dir.join("data")
     }
 

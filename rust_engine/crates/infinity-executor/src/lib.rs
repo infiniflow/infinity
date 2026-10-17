@@ -1693,11 +1693,25 @@ impl Engine {
     /// entries and index declarations, so a later CREATE TABLE with the same
     /// name starts empty.
     fn drop_table_all(&self, name: &str) -> Result<bool> {
+        let table_id = self.catalog.get_table_by_name(name)?.map(|m| m.id);
         self.row_counters
             .lock()
             .unwrap()
             .remove(name.split('.').next_back().unwrap_or(name));
         let existed = self.catalog.drop_table(name)?;
+        // The C++ block mirror of a dropped table is removed with it, so a
+        // later restart cannot resurrect the data.
+        if let Some(id) = table_id {
+            let root = self.blocks_root();
+            if let Ok(dbs) = std::fs::read_dir(&root) {
+                for db in dbs.flatten() {
+                    let dir = db.path().join(format!("tbl_{id}"));
+                    if dir.is_dir() {
+                        let _ = std::fs::remove_dir_all(dir);
+                    }
+                }
+            }
+        }
         for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
             self.store.delete(&k)?;
         }
@@ -1908,12 +1922,17 @@ impl Engine {
                             .first()
                             .map(|s| s.to_ascii_lowercase())
                             .unwrap_or_default();
-                        if !matches!(elem.as_str(), "float" | "float32" | "double") {
+                        if !matches!(elem.as_str(), "float" | "float32" | "double" | "bit") {
                             return Err(Error::Invalid(format!(
                                 "invalid element type '{elem}' for a sparse column"
                             )));
                         }
-                        let dim: i64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                        // `SPARSE(elem, dim)` or `SPARSE(elem, index_type, dim)`
+                        let dim: i64 = parts
+                            .iter()
+                            .rev()
+                            .find_map(|s| s.parse::<i64>().ok())
+                            .unwrap_or(0);
                         if dim <= 0 {
                             return Err(Error::Invalid(format!(
                                 "invalid sparse dimension {dim} for column '{}'",

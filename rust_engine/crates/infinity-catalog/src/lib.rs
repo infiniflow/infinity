@@ -338,11 +338,25 @@ impl Catalog {
         if self.cpp_only {
             // No native counter: the id is one past the highest table id, which
             // is exactly what `write_cpp_layout_from` derives from the tables.
-            return Ok(self.cpp_tables()?.iter().map(|t| t.id).max().unwrap_or(0) + 1);
+            return Ok(self
+                .cpp_tables()?
+                .iter()
+                .map(|t| t.id)
+                .max()
+                .map_or(0, |v| v + 1));
         }
         let _g = self.counter_lock.lock().unwrap();
-        let next = self.read_counter()? + 1;
-        self.store.put(COUNTER_KEY, &next.to_le_bytes())?;
+        // Table ids start at 0, as the C++ engine's do; the counter holds the
+        // next id to hand out.
+        let mut next = self.read_counter()?;
+        while self
+            .store
+            .get(&table_key(next))?
+            .is_some()
+        {
+            next += 1;
+        }
+        self.store.put(COUNTER_KEY, &(next + 1).to_le_bytes())?;
         Ok(next)
     }
 
@@ -412,7 +426,7 @@ impl Catalog {
         self.store.atomic_write(&[
             (table_key(id), meta.encode()),
             (name_key(name), id.to_le_bytes().to_vec()),
-            (COUNTER_KEY.to_vec(), id.to_le_bytes().to_vec()),
+            (COUNTER_KEY.to_vec(), (id + 1).to_le_bytes().to_vec()),
         ])?;
         Ok(meta)
     }
@@ -817,9 +831,9 @@ mod tests {
         let c = Catalog::open(dir.path()).unwrap();
         let t1 = c.create_table("t1", &cols(&["a", "b", "c"])).unwrap();
         let t2 = c.create_table("t2", &cols(&["x"])).unwrap();
-        assert_eq!(t1.id, 1);
-        assert_eq!(t2.id, 2);
-        assert_eq!(c.get_table(1).unwrap(), Some(t1.clone()));
+        assert_eq!(t1.id, 0);
+        assert_eq!(t2.id, 1);
+        assert_eq!(c.get_table(0).unwrap(), Some(t1.clone()));
         assert_eq!(c.get_table_by_name("t2").unwrap(), Some(t2.clone()));
         assert_eq!(c.list_tables().unwrap().len(), 2);
     }
@@ -844,7 +858,7 @@ mod tests {
         let t = c.get_table_by_name("persisted").unwrap().unwrap();
         assert_eq!(t.columns, cols(&["id", "name"]));
         let t2 = c.create_table("another", &cols(&["z"])).unwrap();
-        assert_eq!(t2.id, 2);
+        assert_eq!(t2.id, 1);
     }
 
     #[test]
