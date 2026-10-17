@@ -552,27 +552,32 @@ fn handle_connection(
                         format!("{db}.{table}")
                     };
                     let found = engine.as_ref().and_then(|eng| {
-                        eng.catalog()
-                            .list_indexes()
-                            .ok()?
-                            .into_iter()
-                            .find(|im| im.table == full && im.name == index_name)
+                        eng.catalog().list_indexes().ok()?.into_iter().find(|im| {
+                            im.table == full && im.name.eq_ignore_ascii_case(&index_name)
+                        })
                     });
-                    let (code, msg, kind, cols) = match found {
-                        Some(im) => (0i64, "OK".to_string(), im.index_type, im.column),
+                    let (code, msg, name, kind, cols) = match found {
+                        Some(im) => (0i64, "OK".to_string(), im.name, im.index_type, im.column),
                         None => (
                             3023i64,
                             format!("index '{index_name}' does not exist"),
+                            index_name.clone(),
                             String::new(),
                             String::new(),
                         ),
                     };
+                    let comment = engine
+                        .as_ref()
+                        .and_then(|eng| eng.index_comment(&full, &name))
+                        .unwrap_or_default();
+                    let comment = comment.as_str();
                     write_show_index_response(
                         &mut writer,
                         seq,
                         &db,
                         &table,
-                        &index_name,
+                        &name,
+                        comment,
                         code,
                         &msg,
                         &kind,
@@ -650,12 +655,14 @@ fn handle_connection(
                         }
                         "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
                             engine.as_ref(),
-                            &format!("DROP INDEX IF EXISTS {name3}"),
+                            &format!("DROP INDEX IF EXISTS {}", name3.to_ascii_lowercase()),
                             sid,
                         ),
-                        "DropIndex" if !name3.is_empty() => {
-                            run_common(engine.as_ref(), &format!("DROP INDEX {name3}"), sid)
-                        }
+                        "DropIndex" if !name3.is_empty() => run_common(
+                            engine.as_ref(),
+                            &format!("DROP INDEX {}", name3.to_ascii_lowercase()),
+                            sid,
+                        ),
                         // `GetDatabase`, `GetTable`, `CreateIndex` have no engine
                         // side effect for the operations the SDK performs on the
                         // default database.
@@ -1376,28 +1383,56 @@ fn handle_connection(
                 "CreateIndex" => {
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_create_index_args(&mut ip)?
+                        let r = read_create_index_args(&mut ip)?;
+                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                            eprintln!("[CREATEINDEX] {r:?}");
+                        }
+                        r
                     };
                     let full = if req.db_name.is_empty() {
                         req.table_name.clone()
                     } else {
                         format!("{}.{}", req.db_name, req.table_name)
                     };
-                    let resp = if req.column.is_empty() {
+                    let target = req.function.clone().unwrap_or_else(|| req.column.clone());
+                    let resp = if target.is_empty() {
                         CommonResponse {
                             error_code: OK,
                             error_msg: "OK".into(),
                             session_id: req.session_id,
                         }
                     } else {
-                        run_common(
-                            engine.as_ref(),
-                            &format!(
-                                "CREATE INDEX {} ON {} ({});",
-                                req.index_name, full, req.column
-                            ),
-                            req.session_id,
-                        )
+                        // Identifiers are case-insensitive; the catalog keeps the
+                        // canonical lower-case spelling.
+                        let name = req.index_name.to_ascii_lowercase();
+                        let mut sql = format!(
+                            "CREATE INDEX {}{name} ON {full} ({target})",
+                            if req.conflict == 0 {
+                                "IF NOT EXISTS "
+                            } else {
+                                ""
+                            }
+                        );
+                        if !req.index_type.is_empty() {
+                            sql.push_str(&format!(" USING {}", req.index_type));
+                        }
+                        if !req.params.is_empty() {
+                            let opts = req
+                                .params
+                                .iter()
+                                .map(|(k, v)| format!("{k}={v}"))
+                                .collect::<Vec<_>>()
+                                .join(",");
+                            sql.push_str(&format!(" WITH ({opts})"));
+                        }
+                        sql.push(';');
+                        let resp = run_common(engine.as_ref(), &sql, req.session_id);
+                        if resp.error_code == OK {
+                            if let Some(eng) = engine.as_ref() {
+                                eng.set_index_comment(&full, &name, &req.index_comment);
+                            }
+                        }
+                        resp
                     };
                     write_reply_common(&mut writer, "CreateIndex", seq, &resp)?;
                 }
@@ -1431,6 +1466,9 @@ fn handle_connection(
             Ok(())
         })();
         if let Err(e) = handled {
+            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                eprintln!("[RPC-ERR] {name}: {e}");
+            }
             let _ = write_app_exception(&mut writer, &name, seq, &format!("{e}"));
         }
     }
@@ -1534,7 +1572,23 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
                 col.push_str(" NOT NULL");
             }
             if let Some(d) = &c.default {
-                col.push_str(&format!(" DEFAULT {d}"));
+                // The wire carries the raw value: quote a bare string (an empty
+                // one would otherwise leave `DEFAULT` without a value).
+                let t = d.trim();
+                let rendered = if t.is_empty() {
+                    "''".to_string()
+                } else if t.starts_with('\'')
+                    || t.parse::<f64>().is_ok()
+                    || t.eq_ignore_ascii_case("null")
+                    || t.eq_ignore_ascii_case("true")
+                    || t.eq_ignore_ascii_case("false")
+                    || t.starts_with('[')
+                {
+                    t.to_string()
+                } else {
+                    format!("'{}'", t.replace('\'', "''"))
+                };
+                col.push_str(&format!(" DEFAULT {rendered}"));
             }
             col
         })
@@ -3214,6 +3268,8 @@ pub struct SelectReq {
     pub offset: Option<i64>,
     /// `total_hits_count` option: report how many rows matched before LIMIT.
     pub total_hits: bool,
+    /// `(alias, expression SQL)` pairs, so WHERE/ORDER BY can name a projection.
+    pub aliases: Vec<(String, String)>,
 }
 
 impl SelectReq {
@@ -3231,19 +3287,30 @@ impl SelectReq {
         };
         let mut sql = format!("SELECT {} FROM {}", cols, table);
         if let Some(w) = &self.where_sql {
-            sql.push_str(&format!(" WHERE {w}"));
+            sql.push_str(&format!(" WHERE {}", substitute_aliases(w, &self.aliases)));
         }
         if !self.group_by.is_empty() {
-            sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
+            let keys: Vec<String> = self
+                .group_by
+                .iter()
+                .map(|g| substitute_aliases(g, &self.aliases))
+                .collect();
+            sql.push_str(&format!(" GROUP BY {}", keys.join(", ")));
         }
         if let Some(h) = &self.having_sql {
-            sql.push_str(&format!(" HAVING {h}"));
+            sql.push_str(&format!(" HAVING {}", substitute_aliases(h, &self.aliases)));
         }
         if !self.order_by.is_empty() {
             let keys: Vec<String> = self
                 .order_by
                 .iter()
-                .map(|(c, asc)| format!("{c} {}", if *asc { "ASC" } else { "DESC" }))
+                .map(|(c, asc)| {
+                    format!(
+                        "{} {}",
+                        substitute_aliases(c, &self.aliases),
+                        if *asc { "ASC" } else { "DESC" }
+                    )
+                })
                 .collect();
             sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
         }
@@ -3636,6 +3703,54 @@ fn logic_type_name(logic: i32) -> String {
     .to_string()
 }
 
+/// Replaces bare identifiers that name a projection alias with the aliased
+/// expression text, leaving string literals untouched.
+fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
+    if aliases.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let bytes: Vec<char> = text.chars().collect();
+    let mut i = 0usize;
+    let is_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    while i < bytes.len() {
+        let c = bytes[i];
+        if c == '\'' || c == '"' {
+            // copy the quoted run verbatim
+            let quote = c;
+            out.push(c);
+            i += 1;
+            while i < bytes.len() {
+                out.push(bytes[i]);
+                if bytes[i] == quote {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        if c.is_ascii_alphabetic() || c == '_' {
+            let start = i;
+            while i < bytes.len() && is_ident(bytes[i]) {
+                out.push(bytes[i]);
+                i += 1;
+            }
+            let word: String = bytes[start..i].iter().collect();
+            if let Some((_, expr)) = aliases.iter().find(|(a, _)| a.eq_ignore_ascii_case(&word)) {
+                out.truncate(out.len() - word.len());
+                out.push('(');
+                out.push_str(expr);
+                out.push(')');
+            }
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
 fn sql_op(name: &str) -> Option<&'static str> {
     Some(match name {
         "=" | "==" => "=",
@@ -3951,6 +4066,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         limit: None,
         offset: None,
         total_hits: false,
+        aliases: Vec::new(),
     };
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -4009,6 +4125,13 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     if !r.star && r.columns.is_empty() {
         // 3050 EMPTY_SELECT_FIELDS: `output([])` must not degrade into `*`.
         return Err(Error::Invalid("empty select fields".into()));
+    }
+    // `SELECT expr AS alias` lets WHERE/ORDER BY/HVING say `alias`.
+    for c in &r.columns {
+        if let Some((expr, alias)) = c.rsplit_once(" AS ") {
+            r.aliases
+                .push((alias.trim().to_string(), expr.trim().to_string()));
+        }
     }
     // A projection that is also a group key keeps the client's spelling.
     for (i, sql) in r.columns.iter().enumerate() {
@@ -4745,31 +4868,91 @@ pub fn read_string_request(
 /// Executes `sql` against the bound engine, mapping the outcome to a
 /// `CommonResponse` (`error_code` 0 on success).
 /// A `CreateIndex` request reduced to what the engine needs.
+#[derive(Debug)]
 pub struct CreateIndexReq {
     pub db_name: String,
     pub table_name: String,
     pub index_name: String,
+    pub index_comment: String,
     pub column: String,
+    pub index_type: String,
+    pub params: Vec<(String, String)>,
+    /// `IndexInfo.function_expr`: a functional index's expression text.
+    pub function: Option<String>,
+    pub conflict: i64,
     pub session_id: i64,
 }
 
-/// Reads the column name out of a nested `IndexInfo` struct.
-fn read_index_info_column(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// The engine's index-kind name for the thrift `IndexType` ordinal.
+fn index_type_sql(code: i32) -> &'static str {
+    match code {
+        0 => "IVF",
+        1 => "HNSW",
+        2 => "FULLTEXT",
+        3 => "BMP",
+        // functional secondary indexes share the SECONDARY kind
+        4 | 5 => "SECONDARY",
+        6 => "EMVB",
+        7 => "DISKANN",
+        8 => "PLAID",
+        9 => "SMVE",
+        _ => "",
+    }
+}
+
+/// Reads an `IndexInfo` struct: column, index type, parameters, expression.
+fn read_index_info(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+    out: &mut CreateIndexReq,
+) -> Result<()> {
     ip.read_struct_begin().map_err(tw)?;
-    let mut col = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
             break;
         }
         match f.id {
-            Some(1) if f.field_type == TType::String => col = Some(ip.read_string().map_err(tw)?),
+            Some(1) if f.field_type == TType::String => {
+                out.column = ip.read_string().map_err(tw)?;
+            }
+            Some(2) if f.field_type == TType::I32 => {
+                // `IndexType` is an enum on the wire.
+                out.index_type = index_type_sql(ip.read_i32().map_err(tw)?).to_string();
+            }
+            Some(3) if f.field_type == TType::List => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    let mut k = String::new();
+                    let mut v = String::new();
+                    ip.read_struct_begin().map_err(tw)?;
+                    loop {
+                        let g = ip.read_field_begin().map_err(tw)?;
+                        if g.field_type == TType::Stop {
+                            break;
+                        }
+                        match g.id {
+                            Some(1) => k = ip.read_string().map_err(tw)?,
+                            Some(2) => v = ip.read_string().map_err(tw)?,
+                            _ => ip.skip(g.field_type).map_err(tw)?,
+                        }
+                        ip.read_field_end().map_err(tw)?;
+                    }
+                    ip.read_struct_end().map_err(tw)?;
+                    out.params.push((k, v));
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(4) if f.field_type == TType::Struct => {
+                // A functional index carries a bare `FunctionExpr`.
+                let (name, args) = read_function_expr(ip)?;
+                out.function = Some(pexpr_sql(&PExpr::Call(name, args)));
+            }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    Ok(col)
+    Ok(())
 }
 
 /// Reads a `CreateIndex` CALL, extracting `db.table(index_name, column)`.
@@ -4783,7 +4966,12 @@ pub fn read_create_index_args(
         db_name: String::new(),
         table_name: String::new(),
         index_name: String::new(),
+        index_comment: String::new(),
         column: String::new(),
+        index_type: String::new(),
+        params: Vec::new(),
+        function: None,
+        conflict: 1,
         session_id: 0,
     };
     loop {
@@ -4799,12 +4987,28 @@ pub fn read_create_index_args(
             Some(3) if f.field_type == TType::String => {
                 r.index_name = ip.read_string().map_err(tw)?;
             }
-            Some(5) if f.field_type == TType::Struct => {
-                if let Some(c) = read_index_info_column(ip)? {
-                    r.column = c;
-                }
+            Some(4) if f.field_type == TType::String => {
+                r.index_comment = ip.read_string().map_err(tw)?;
             }
+            Some(5) if f.field_type == TType::Struct => read_index_info(ip, &mut r)?,
             Some(6) => r.session_id = ip.read_i64().map_err(tw)?,
+            Some(7) if f.field_type == TType::Struct => {
+                // `CreateOption { 1: conflict_type, 2: properties }`
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let g = ip.read_field_begin().map_err(tw)?;
+                    if g.field_type == TType::Stop {
+                        break;
+                    }
+                    if g.id == Some(1) {
+                        r.conflict = ip.read_i32().map_err(tw)? as i64;
+                    } else {
+                        ip.skip(g.field_type).map_err(tw)?;
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -4822,11 +5026,16 @@ fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> Commo
                 error_msg: "OK".into(),
                 session_id,
             },
-            Err(e) => CommonResponse {
-                error_code: e.status_code(),
-                error_msg: e.to_string(),
-                session_id,
-            },
+            Err(e) => {
+                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                    eprintln!("[SQL-ERR] {sql} -> {e}");
+                }
+                CommonResponse {
+                    error_code: e.status_code(),
+                    error_msg: e.to_string(),
+                    session_id,
+                }
+            }
         },
         None => CommonResponse {
             error_code: 1,
@@ -5298,6 +5507,7 @@ pub fn write_show_index_response(
     db: &str,
     table: &str,
     index: &str,
+    comment: &str,
     code: i64,
     msg: &str,
     kind: &str,
@@ -5325,7 +5535,7 @@ pub fn write_show_index_response(
         ("db_name", 3i16, db),
         ("table_name", 4i16, table),
         ("index_name", 5i16, index),
-        ("index_comment", 6i16, ""),
+        ("index_comment", 6i16, comment),
         ("index_type", 7i16, kind),
         ("index_column_names", 8i16, columns),
         ("index_column_ids", 9i16, ""),
@@ -5797,6 +6007,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         limit: None,
         offset: None,
         total_hits: false,
+        aliases: Vec::new(),
     };
     let mut explain_type = 4; // Physical
     ip.read_struct_begin().map_err(tw)?; // Explain_args
