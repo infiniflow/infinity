@@ -4118,9 +4118,6 @@ impl Engine {
             }
         }
         let params = arg_str(m.args.get(1)).unwrap_or_default();
-        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-            eprintln!("[TEXT] params={params:?}");
-        }
         // `threshold=<f>` keeps only documents scoring at least `f`
         let threshold: Option<f64> = params
             .split(';')
@@ -4489,12 +4486,7 @@ impl Engine {
                 score += rank_features_bonus(&cell, tags);
             }
             if hits >= min_should && hits > 0 && threshold.map(|t| score >= t).unwrap_or(true) {
-                if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                    eprintln!("[TSCORE] seq={seq} score={score} threshold={threshold:?}");
-                }
                 scored.push((*seq, score));
-            } else if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                eprintln!("[TSKIP] seq={seq} score={score} hits={hits} threshold={threshold:?}");
             }
         }
         scored.sort_by(|a, b| {
@@ -4502,13 +4494,6 @@ impl Engine {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
         });
-        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-            eprintln!(
-                "[TRES] params={params:?} n={} top={:?}",
-                scored.len(),
-                &scored[..scored.len().min(5)]
-            );
-        }
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
             self.fetch_rows_with_ids(table)?.into_iter().collect();
@@ -4646,13 +4631,6 @@ impl Engine {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
         });
-        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-            eprintln!(
-                "[TRES] params={params:?} n={} top={:?}",
-                scored.len(),
-                &scored[..scored.len().min(5)]
-            );
-        }
         scored.truncate(topn);
         let mut by_id: HashMap<usize, Vec<Value>> =
             self.fetch_rows_with_ids(table)?.into_iter().collect();
@@ -5822,36 +5800,39 @@ impl Engine {
                         let dim = type_dim(types.get(col_idx).map(String::as_str).unwrap_or(""))
                             .unwrap_or(qv.len())
                             .max(1);
-                        let doc_rows = parse_tensor_leaves(v);
+                        // A bit multivector stores one bit string per row.
+                        let doc_rows = if tensor_elem_type(
+                            types.get(col_idx).map(String::as_str).unwrap_or(""),
+                        ) == ElemType::Bit
+                        {
+                            parse_bit_leaves(v)
+                        } else {
+                            parse_tensor_leaves(v)
+                        };
                         if doc_rows.is_empty() || doc_rows.iter().all(|r| r.is_empty()) {
                             continue;
                         }
                         let qrows: Vec<&[f64]> = qv.chunks(dim).collect();
-                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                            eprintln!(
-                                "[MV] dim={dim} qv={} qrows={} drows={}",
-                                qv.len(),
-                                qrows.len(),
-                                doc_rows.len()
-                            );
-                        }
-                        let mut total = 0.0f64;
+                        let (mut total, mut total_dist) = (0.0f64, 0.0f64);
                         for qr in qrows {
-                            let mut best: Option<f64> = None;
+                            let mut best: Option<(f64, f64)> = None;
                             for dr in &doc_rows {
                                 if dr.len() != qr.len() {
                                     continue;
                                 }
-                                let (sim, _) = vector_score(qr, dr, &metric);
-                                if best.map(|b| sim > b).unwrap_or(true) {
-                                    best = Some(sim);
+                                let (sim, dist) = vector_score(qr, dr, &metric);
+                                if best.map(|(b, _)| sim > b).unwrap_or(true) {
+                                    best = Some((sim, dist));
                                 }
                             }
-                            if let Some(b) = best {
-                                total += b;
+                            if let Some((sim, dist)) = best {
+                                total += sim;
+                                total_dist += dist;
                             }
                         }
-                        scored.push((*seq, total, -total));
+                        // MAXSIM distance is the sum of the best per-row
+                        // distances; the similarity is its `1/(1+d)` form.
+                        scored.push((*seq, total, total_dist));
                         continue;
                     }
                     let rv: Vec<f64> = if bit_col {
