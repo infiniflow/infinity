@@ -49,8 +49,51 @@ fn usage() -> ! {
     std::process::exit(2);
 }
 
+/// Reads `key = "value"` out of a TOML text without pulling in a parser.
+fn toml_value(text: &str, key: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .find(|l| l.starts_with(key) && l[key.len()..].trim_start().starts_with('='))
+        .and_then(|l| l.split_once('='))
+        .map(|(_, v)| v.trim().trim_matches('"').to_string())
+}
+
+/// `infinity --config=<file>` — the C++ server's invocation, used by
+/// `python/restart_test`. The data root is the parent of `persistence_dir`.
+fn serve_from_config(path: &str) -> infinity_common::Result<()> {
+    let text = std::fs::read_to_string(path).map_err(|e| infinity_common::Error::Io {
+        path: PathBuf::from(path),
+        source: e,
+    })?;
+    let persistence =
+        toml_value(&text, "persistence_dir").unwrap_or_else(|| "/var/infinity/persistence".into());
+    let root = Path::new(&persistence)
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("/var/infinity"));
+    for sub in ["catalog", "persistence", "wal", "log", "tmp"] {
+        std::fs::create_dir_all(root.join(sub)).map_err(|e| infinity_common::Error::Io {
+            path: root.join(sub),
+            source: e,
+        })?;
+    }
+    let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| "0.0.0.0:23817".into());
+    let engine = Arc::new(Engine::open(&root)?);
+    let server = infinity_server::Server::bind_with_engine(&addr, engine)?;
+    println!("serving on {}", server.local_addr()?);
+    server.run();
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(cfg) = args.iter().find_map(|a| a.strip_prefix("--config=")) {
+        if let Err(e) = serve_from_config(cfg) {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.len() < 2 {
         usage();
     }
