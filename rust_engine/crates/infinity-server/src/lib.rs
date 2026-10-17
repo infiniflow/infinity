@@ -878,7 +878,11 @@ fn handle_connection(
                 // `Flush` persists table data into the C++ block layout and the
                 // indexes into their chunk files, which is what the restart
                 // harness inspects on disk.
-                "Flush" => {
+                // `Flush` persists table data into the C++ block layout and the
+                // indexes into their chunk files, which is what the restart
+                // harness inspects on disk. `Cleanup` removes the mirrors of
+                // dropped tables/indexes, so it flushes too.
+                "Flush" | "Cleanup" => {
                     let (sid, _) = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_string_request(&mut ip)?
@@ -902,7 +906,7 @@ fn handle_connection(
                             session_id: sid,
                         },
                     };
-                    write_reply_common(&mut writer, "Flush", seq, &resp)?;
+                    write_reply_common(&mut writer, &name, seq, &resp)?;
                 }
                 // `Compact` merges the table's segments into one.
                 "Compact" => {
@@ -944,7 +948,6 @@ fn handle_connection(
                 // maintenance that the in-memory engine has nothing to do for, so
                 // they report success rather than `unknown method`.
                 "Optimize"
-                | "Cleanup"
                 | "Command"
                 | "AlterIndex"
                 | "DumpIndex"

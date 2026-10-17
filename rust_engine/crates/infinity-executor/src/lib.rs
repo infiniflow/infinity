@@ -1279,6 +1279,15 @@ fn validate_sparse_literal(type_text: &str, lit: &str) -> Result<()> {
         return Ok(());
     }
     let bound = type_dim(type_text).unwrap_or(0);
+    // An integer-element sparse column rejects fractional values.
+    let up = type_text.to_ascii_uppercase();
+    let int_elem = up
+        .split('(')
+        .nth(1)
+        .map(|inner| {
+            inner.trim_start().starts_with("INT") || inner.trim_start().starts_with("UINT")
+        })
+        .unwrap_or(false);
     let inner = t.trim_start_matches('[').trim_end_matches(']');
     let mut seen: Vec<i64> = Vec::new();
     for item in inner.split(',') {
@@ -1297,6 +1306,15 @@ fn validate_sparse_literal(type_text: &str, lit: &str) -> Result<()> {
             return Err(Error::Invalid(format!(
                 "sparse index {i} is out of range (bound {bound})"
             )));
+        }
+        if int_elem {
+            if let Some((_, val)) = item.split_once(':') {
+                if val.trim().parse::<i64>().is_err() {
+                    return Err(Error::Invalid(
+                        "parser: sparse value must be an integer".into(),
+                    ));
+                }
+            }
         }
         if seen.contains(&i) {
             return Err(Error::Invalid(format!("duplicate sparse index {i}")));
@@ -1917,6 +1935,11 @@ impl Engine {
                     }
                     if let Some(d) = type_dim_deep(&c.type_text) {
                         let up = c.type_text.to_ascii_uppercase();
+                        // A sparse column may declare a zero bound and fail at
+                        // search time instead.
+                        if up.starts_with("SPARSE(") {
+                            continue;
+                        }
                         let embedding = up.contains("EMBEDDING") || up.contains("VECTOR");
                         if d == 0 || (embedding && d > 16384) {
                             return Err(Error::Invalid(format!(

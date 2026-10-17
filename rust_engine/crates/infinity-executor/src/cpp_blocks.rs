@@ -1118,7 +1118,15 @@ impl Engine {
     /// mirror; that (and only that) is skipped silently.
     pub fn recover_cpp_blocks(&self) -> Result<()> {
         for meta in self.catalog.list_tables()? {
-            if !self.fetch_rows_with_ids(&meta.name)?.is_empty() {
+            let native = self.fetch_rows_with_ids(&meta.name)?.len();
+            if std::env::var_os("INFINITY_DEBUG_RECOVER").is_some() {
+                eprintln!(
+                    "recover: {} native={native} mirror={:?}",
+                    meta.name,
+                    self.read_cpp_blocks(&meta.name).map(|(_, r)| r.len())
+                );
+            }
+            if native > 0 {
                 continue;
             }
             if self.read_cpp_blocks(&meta.name).is_ok() {

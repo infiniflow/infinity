@@ -61,8 +61,13 @@ impl Error {
             Error::Invalid(m) if m.starts_with("fulltext index does not exist") => 3053,
             // 3049 NOT_SUPPORTED_TYPE_CONVERSION.
             Error::Invalid(m) if m.starts_with("not supported type conversion") => 3049,
-            // 3010 INVALID_KNN_DISTANCE_TYPE (sparse only supports `ip`).
-            Error::Invalid(m) if m.starts_with("invalid distance type") => 3010,
+            // 3010 DATA_TYPE_MISMATCH / INVALID_KNN_DISTANCE_TYPE.
+            Error::Invalid(m)
+                if m.starts_with("invalid distance type")
+                    || m.starts_with("invalid sparse dimension") =>
+            {
+                3010
+            }
             // 3009 INVALID_INDEX_DEFINITION (index kind vs column type).
             Error::Invalid(m) if m.contains("index requires a") => 3009,
             // 3077 ANALYZER_NOT_FOUND.
@@ -72,8 +77,7 @@ impl Error {
                 if m.starts_with("block_size ")
                     || m.starts_with("unsupported compress_type")
                     || m.starts_with("nbits ")
-                    || m.starts_with("invalid element type")
-                    || m.starts_with("invalid sparse dimension") =>
+                    || m.starts_with("invalid element type") =>
             {
                 3061
             }
