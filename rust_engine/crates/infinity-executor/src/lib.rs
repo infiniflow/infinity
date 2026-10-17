@@ -3183,7 +3183,7 @@ impl Engine {
                     *offset,
                 )?;
                 // `SELECT sum(c1) AS s` names the output column `s`.
-                apply_select_aliases(&mut plan, &aliases);
+                apply_select_aliases(&mut plan, aliases);
                 // A full-text `threshold=` filter is answered by the index: the
                 // score needs corpus statistics a row-local predicate cannot see,
                 // so resolve the qualifying rows once and feed them down.
@@ -5618,9 +5618,31 @@ impl Engine {
         }
         let topn = if is_tensor {
             // topn lives in the trailing parameter string; the default is 10.
-            match arg_str(m.args.get(3)) {
-                Some(p) => parse_topn_param(&p).unwrap_or(10),
+            // The reference multiplies it by 100 into a u32, so anything
+            // above `u32::MAX / 100` would wrap; it is rejected.
+            let raw = arg_str(m.args.get(3)).unwrap_or_default();
+            let value = raw
+                .split(';')
+                .filter_map(|part| {
+                    let (k, v) = part.split_once('=')?;
+                    k.trim().eq_ignore_ascii_case("topn").then_some(v.trim())
+                })
+                .next_back();
+            match value {
                 None => 10,
+                Some(v) => match v.parse::<i64>() {
+                    Ok(n) if n > 0 && n <= i64::from(u32::MAX / 100) => n as usize,
+                    Ok(_) => {
+                        return Err(Error::Invalid(
+                            "invalid parameter: topn must be a positive integer".into(),
+                        ))
+                    }
+                    Err(_) => {
+                        return Err(Error::Invalid(
+                            "invalid parameter: topn must be a positive integer".into(),
+                        ))
+                    }
+                },
             }
         } else {
             let n = m.args.iter().rev().find_map(arg_int).unwrap_or(10);
@@ -7310,10 +7332,16 @@ mod tests {
             QueryResult::Rows { columns, rows } => {
                 assert_eq!(
                     columns,
-                    &["count(*)", "sum(id)", "avg(id)", "min(id)", "max(id)"]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>()
+                    &[
+                        "count(star)",
+                        "sum(id)",
+                        "(sum(id) / count(id))",
+                        "min(id)",
+                        "max(id)"
+                    ]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
                 );
                 assert_eq!(
                     rows,
@@ -7337,7 +7365,10 @@ mod tests {
             .unwrap()[0]
         {
             QueryResult::Rows { columns, rows } => {
-                assert_eq!(columns, &vec!["name".to_string(), "count(*)".to_string()]);
+                assert_eq!(
+                    columns,
+                    &vec!["name".to_string(), "count(star)".to_string()]
+                );
                 assert_eq!(
                     rows,
                     &vec![

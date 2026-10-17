@@ -245,11 +245,15 @@ pub fn predicate_expr(pred: &Predicate, schema: &[String]) -> Result<Expr> {
 }
 
 fn agg_label(func: AggFunc, args: &[String]) -> String {
-    if args.is_empty() {
-        format!("{}(*)", func.as_str())
-    } else {
-        format!("{}({})", func.as_str(), args.join(","))
+    // The SDK reads `count(*)` by the reference's `count(star)` key, and AVG is
+    // reported as the `(sum(x) / count(x))` expression the reference plans.
+    if args.is_empty() || args.iter().all(|a| a == "*") {
+        return format!("{}(star)", func.as_str());
     }
+    if func == AggFunc::Avg && args.len() == 1 {
+        return format!("(sum({0}) / count({0}))", args[0]);
+    }
+    format!("{}({})", func.as_str(), args.join(","))
 }
 
 /// True if `e` contains an aggregate call.
