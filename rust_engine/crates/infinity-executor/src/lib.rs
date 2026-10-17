@@ -4925,6 +4925,24 @@ impl Engine {
             Some(ExprAst::Literal(Literal::Array(items))) => items.clone(),
             _ => Vec::new(),
         };
+        // A plain (multi-)vector column only accepts a query vector of its own
+        // dimension; a `MULTIVECTOR` compares against each sub-vector.
+        if !is_sparse && !is_tensor {
+            let decl = types.get(col_idx).map(String::as_str).unwrap_or("");
+            let is_multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
+            if !is_multi {
+                if let Some(d) = type_dim(decl) {
+                    if !query_items.is_empty() && query_items.len() != d {
+                        return Err(Error::Invalid(format!(
+                            "query embedding has {} dimensions, but column '{}' expects {}",
+                            query_items.len(),
+                            m.column,
+                            d
+                        )));
+                    }
+                }
+            }
+        }
         // An integer-element column only accepts a matching query element type.
         // (For VECTOR/TENSOR the query element type is the argument after the
         // query array.)
