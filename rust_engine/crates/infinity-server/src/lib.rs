@@ -279,6 +279,9 @@ impl Server {
         for stream in self.listener.incoming() {
             match stream {
                 Ok(s) => {
+                    // Small request/reply pairs must not wait on Nagle +
+                    // delayed ACK: that adds ~40 ms per RPC round trip.
+                    let _ = s.set_nodelay(true);
                     let sessions = self.sessions.clone();
                     let next = self.next_session.clone();
                     let engine = self.engine.clone();

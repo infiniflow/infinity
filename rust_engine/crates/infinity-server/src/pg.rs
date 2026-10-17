@@ -59,6 +59,7 @@ impl PgServer {
         for stream in self.listener.incoming() {
             match stream {
                 Ok(s) => {
+                    let _ = s.set_nodelay(true);
                     let engine = self.engine.clone();
                     std::thread::spawn(move || {
                         let _ = handle(s, &engine);
