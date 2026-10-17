@@ -666,6 +666,9 @@ fn handle_connection(
                         column_fields: Vec::new(),
                         extra_result: String::new(),
                     };
+                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                        eprintln!("[SELECT] {}", req.to_sql());
+                    }
                     let resp = match &engine {
                         Some(eng) => match eng.execute(&req.to_sql()) {
                             Ok(rs) => {
@@ -694,16 +697,42 @@ fn handle_connection(
                     write_select_response(&mut writer, seq, &resp)?;
                 }
                 // Lifecycle / maintenance RPCs returning a plain `CommonResponse`.
+                // `Flush` persists table data into the C++ block layout and the
+                // indexes into their chunk files, which is what the restart
+                // harness inspects on disk.
+                "Flush" => {
+                    let (sid, _) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let resp = match engine.as_ref() {
+                        Some(eng) => match eng.flush() {
+                            Ok(()) => CommonResponse {
+                                error_code: OK,
+                                error_msg: "OK".into(),
+                                session_id: sid,
+                            },
+                            Err(e) => CommonResponse {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                session_id: sid,
+                            },
+                        },
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: sid,
+                        },
+                    };
+                    write_reply_common(&mut writer, "Flush", seq, &resp)?;
+                }
                 // `RenameTable` is executed for real; the rest are engine-level
                 // maintenance that the in-memory engine has nothing to do for, so
                 // they report success rather than `unknown method`.
                 "Optimize"
                 | "Compact"
                 | "Cleanup"
-                | "Flush"
                 | "Command"
-                | "SetConfig"
-                | "Export"
                 | "AlterIndex"
                 | "DumpIndex"
                 | "CreateTableSnapshot"
@@ -828,6 +857,65 @@ fn handle_connection(
                         }
                     }
                     write_reply_common(&mut writer, "DropColumns", seq, &resp)?;
+                }
+                "Export" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_export_args(&mut ip)?
+                    };
+                    let full = if req.db.is_empty() {
+                        req.table.clone()
+                    } else {
+                        format!("{}.{}", req.db, req.table)
+                    };
+                    let format = match req.file_type {
+                        1 => "JSON",
+                        2 => "JSONL",
+                        3 => "FVECS",
+                        _ => "CSV",
+                    };
+                    let mut sql = format!(
+                        "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}",
+                        req.file.replace('\'', "''"),
+                        req.delimiter.replace('\'', "''")
+                    );
+                    if req.offset > 0 {
+                        sql.push_str(&format!(", OFFSET {}", req.offset));
+                    }
+                    // `row_limit` caps `limit` (the reference exports the
+                    // smaller of the two).
+                    let limit = match (req.limit > 0, req.row_limit > 0) {
+                        (true, true) => Some(req.limit.min(req.row_limit)),
+                        (true, false) => Some(req.limit),
+                        (false, true) => Some(req.row_limit),
+                        (false, false) => None,
+                    };
+                    if let Some(n) = limit {
+                        sql.push_str(&format!(", LIMIT {n}"));
+                    }
+                    sql.push_str(" )");
+                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                        eprintln!("[EXPORT] {sql}");
+                    }
+                    let resp = run_common(engine.as_ref(), &sql, req.session_id);
+                    write_reply_common(&mut writer, "Export", seq, &resp)?;
+                }
+                "SetConfig" => {
+                    let (sid, name, value) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_set_config_args(&mut ip)?
+                    };
+                    let sql = format!("SET CONFIG {name} {value}");
+                    let resp = run_common(engine.as_ref(), &sql, sid);
+                    write_reply_common(&mut writer, "SetConfig", seq, &resp)?;
+                }
+                "ShowConfig" => {
+                    let (sid, name) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_show_config_args(&mut ip)?
+                    };
+                    let value = engine.as_ref().and_then(|e| e.config_get(&name));
+                    write_show_config_response(&mut writer, seq, sid, &name, value.as_deref())?;
                 }
                 "Import" => {
                     let req = {
@@ -2888,8 +2976,13 @@ pub fn read_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr
                     out = PExpr::Value(read_constant_expr(ip)?)
                 }
                 Some(2) if uf.field_type == TType::Struct => {
-                    let (names, _) = read_column_expr(ip)?;
-                    out = PExpr::Column(names.into_iter().next().unwrap_or_default());
+                    let (names, star) = read_column_expr(ip)?;
+                    // `count(*)` carries a star column with no name.
+                    out = if star && names.is_empty() {
+                        PExpr::Column("*".into())
+                    } else {
+                        PExpr::Column(names.into_iter().next().unwrap_or_default())
+                    };
                 }
                 Some(3) if uf.field_type == TType::Struct => {
                     let (name, args) = read_function_expr(ip)?;
@@ -4352,6 +4445,210 @@ pub fn write_show_table_response(
     o.write_field_stop().map_err(tw)?;
     o.write_struct_end().map_err(tw)?; // ShowTable_result
     o.flush().map_err(tw)?;
+    Ok(())
+}
+
+/// `ExportRequest { 1: db, 2: table, 3: columns, 4: file, 5: ExportOption, 6: session_id }`.
+struct ExportArgs {
+    db: String,
+    table: String,
+    file: String,
+    delimiter: String,
+    file_type: i32,
+    offset: i64,
+    limit: i64,
+    row_limit: i64,
+    session_id: i64,
+}
+
+fn read_export_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ExportArgs> {
+    let mut a = ExportArgs {
+        db: String::new(),
+        table: String::new(),
+        file: String::new(),
+        delimiter: ",".into(),
+        file_type: 0,
+        offset: 0,
+        limit: 0,
+        row_limit: 0,
+        session_id: 0,
+    };
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::String) => a.db = ip.read_string().map_err(tw)?,
+            (Some(2), TType::String) => a.table = ip.read_string().map_err(tw)?,
+            (Some(4), TType::String) => a.file = ip.read_string().map_err(tw)?,
+            (Some(5), TType::Struct) => {
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let of = ip.read_field_begin().map_err(tw)?;
+                    if of.field_type == TType::Stop {
+                        break;
+                    }
+                    match (of.id, of.field_type) {
+                        (Some(1), TType::String) => a.delimiter = ip.read_string().map_err(tw)?,
+                        (Some(3), TType::I32) => a.file_type = ip.read_i32().map_err(tw)?,
+                        (Some(4), TType::I64) => a.offset = ip.read_i64().map_err(tw)?,
+                        (Some(5), TType::I64) => a.limit = ip.read_i64().map_err(tw)?,
+                        (Some(6), TType::I64) => a.row_limit = ip.read_i64().map_err(tw)?,
+                        _ => ip.skip(of.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
+            (Some(6), TType::I64) => a.session_id = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok(a)
+}
+
+/// `SetConfigRequest { 1: session_id, 2: config_name, 3: ConfigValue }`.
+fn read_set_config_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(i64, String, String)> {
+    let (mut sid, mut name, mut value) = (0i64, String::new(), String::new());
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => sid = ip.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => name = ip.read_string().map_err(tw)?,
+            (Some(3), TType::Struct) => {
+                // `union ConfigValue { 1: string, 2: i64, 3: bool, 4: double }`
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let vf = ip.read_field_begin().map_err(tw)?;
+                    if vf.field_type == TType::Stop {
+                        break;
+                    }
+                    value = match (vf.id, vf.field_type) {
+                        (Some(1), TType::String) => ip.read_string().map_err(tw)?,
+                        (Some(2), TType::I64) => ip.read_i64().map_err(tw)?.to_string(),
+                        (Some(3), TType::Bool) => {
+                            if ip.read_bool().map_err(tw)? {
+                                "true".into()
+                            } else {
+                                "false".into()
+                            }
+                        }
+                        (Some(4), TType::Double) => format!("{}", ip.read_double().map_err(tw)?),
+                        _ => {
+                            ip.skip(vf.field_type).map_err(tw)?;
+                            value
+                        }
+                    };
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    // A value with spaces must be quoted for the SQL parser.
+    if value.is_empty() || value.contains(' ') {
+        value = format!("'{}'", value.replace('\'', "''"));
+    }
+    Ok((sid, name, value))
+}
+
+/// `ShowConfigRequest { 1: session_id, 2: config_name }`.
+fn read_show_config_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(i64, String)> {
+    let (mut sid, mut name) = (0i64, String::new());
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => sid = ip.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => name = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((sid, name))
+}
+
+/// `ShowConfigResponse { 1: error_code, 2: error_msg, 3: config_name, 4: ConfigValue }`.
+fn write_show_config_response(
+    w: &mut impl Write,
+    seq: i32,
+    sid: i64,
+    name: &str,
+    value: Option<&str>,
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ShowConfig",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowConfig_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowConfigResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(if value.is_some() { OK } else { 3014 })
+        .map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string(value.map(|_| "OK").unwrap_or("unknown config"))
+        .map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("config_name", TType::String, 3i16))
+        .map_err(tw)?;
+    o.write_string(name).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    if let Some(v) = value {
+        o.write_field_begin(&TFieldIdentifier::new("config_value", TType::Struct, 4i16))
+            .map_err(tw)?;
+        o.write_struct_begin(&TStructIdentifier::new("ConfigValue"))
+            .map_err(tw)?;
+        o.write_field_begin(&TFieldIdentifier::new("string_value", TType::String, 1i16))
+            .map_err(tw)?;
+        o.write_string(v).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+        o.write_field_stop().map_err(tw)?;
+        o.write_struct_end().map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+    }
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.flush().map_err(tw)?;
+    let _ = sid;
     Ok(())
 }
 
