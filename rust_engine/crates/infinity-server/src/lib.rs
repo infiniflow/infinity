@@ -1646,6 +1646,19 @@ fn handle_connection(
                     }
                     write_show_current_node_response(&mut writer, seq, "leader", "alive")?;
                 }
+                "ShowSnapshot" => {
+                    let (sid, name) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_snapshot_args(&mut ip)?
+                    };
+                    let _ = sid;
+                    let known = engine
+                        .as_ref()
+                        .and_then(|e| e.snapshot_names().ok())
+                        .map(|n| n.iter().any(|x| x == &name))
+                        .unwrap_or(false);
+                    write_show_snapshot_response(&mut writer, seq, &name, known)?;
+                }
                 "ListSnapshots" => {
                     {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -5998,6 +6011,104 @@ pub fn write_show_current_node_response(
 
 /// Writes a `ListSnapshots` REPLY with the given snapshot names
 /// (`ListSnapshotsResponse.snapshots` is a list of `Snapshot` structs).
+/// `ShowSnapshotRequest { 1: session_id, 2: snapshot_name }`.
+fn read_snapshot_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(i64, String)> {
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    let (mut sid, mut name) = (0i64, String::new());
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::I64) => sid = ip.read_i64().map_err(tw)?,
+            (Some(2), TType::String) => name = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((sid, name))
+}
+
+/// `ShowSnapshotResponse { 1: error_code, 2: error_msg, 3: SnapshotInfo }`.
+fn write_show_snapshot_response(
+    w: &mut impl Write,
+    seq: i32,
+    name: &str,
+    found: bool,
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ShowSnapshot",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowSnapshot_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowSnapshotResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(if found { OK } else { 3022 }).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    for (field, id, value) in [
+        (
+            "error_msg",
+            2i16,
+            if found {
+                "OK".to_string()
+            } else {
+                format!("snapshot '{name}' does not exist")
+            },
+        ),
+    ] {
+        o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
+            .map_err(tw)?;
+        o.write_string(&value).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+    }
+    if found {
+        o.write_field_begin(&TFieldIdentifier::new("snapshot", TType::Struct, 3i16))
+            .map_err(tw)?;
+        o.write_struct_begin(&TStructIdentifier::new("SnapshotInfo"))
+            .map_err(tw)?;
+        for (field, id, value) in [
+            ("name", 1i16, name.to_string()),
+            ("scope", 2i16, "table".to_string()),
+            ("time", 3i16, String::new()),
+            ("size", 5i16, String::new()),
+        ] {
+            o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
+                .map_err(tw)?;
+            o.write_string(&value).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
+        o.write_field_begin(&TFieldIdentifier::new("commit", TType::I64, 4i16))
+            .map_err(tw)?;
+        o.write_i64(0).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+        o.write_field_stop().map_err(tw)?;
+        o.write_struct_end().map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+    }
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?;
+    o.flush().map_err(tw)?;
+    Ok(())
+}
+
 pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32, names: &[String]) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
     o.write_message_begin(&TMessageIdentifier::new(
