@@ -550,7 +550,11 @@ impl Catalog {
                 tbl_str.as_bytes(),
             )?;
             for (tag, value) in [
-                ("next_column_id", t.columns.len() as u64),
+                // The next id to hand out; dropping a column leaves a hole.
+                (
+                    "next_column_id",
+                    t.ids.iter().copied().max().map_or(0, |v| v + 1),
+                ),
                 ("next_segment_id", 0),
                 ("unsealed_segment_id", 0),
                 ("comment", 0),
@@ -576,7 +580,8 @@ impl Catalog {
                         t.name
                     )));
                 };
-                let mut value = ColumnDefValue::new(data_type, i as i64, col.clone());
+                let column_id = t.ids.get(i).copied().unwrap_or(i as u64) as i64;
+                let mut value = ColumnDefValue::new(data_type, column_id, col.clone());
                 value.column_comment = t.comments.get(i).cloned().flatten();
                 // The C++ records NOT NULL as the `kNotNull` constraint and a
                 // default as a `ConstantExpr::Serialize()` object, so carry
@@ -608,7 +613,7 @@ impl Catalog {
                     table_name: name.to_string(),
                     table_id: t.id,
                     columns,
-                    next_column_id: t.columns.len() as u64,
+                    next_column_id: t.ids.iter().copied().max().map_or(0, |v| v + 1),
                 },
             ));
         }
@@ -916,6 +921,7 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
                 .map(|c| type_text_of(&c.column_type).unwrap_or_default())
                 .collect(),
             comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
+            ids: t.columns.iter().map(|c| c.column_id.max(0) as u64).collect(),
         });
     }
     Ok(out)

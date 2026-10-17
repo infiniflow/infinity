@@ -997,7 +997,7 @@ impl Engine {
                     self_outline
                 };
                 block_columns.push(BlockColumn {
-                    column_id: col as u64,
+                    column_id: meta.ids.get(col).copied().unwrap_or(col as u64),
                     body,
                     outline,
                 });
@@ -1152,7 +1152,8 @@ impl Engine {
             for row in 0..row_count {
                 let mut out = Vec::with_capacity(types.len());
                 for (col, column_type) in types.iter().enumerate() {
-                    let Some(raw) = columns.iter().find(|c| c.column_id == col as u64) else {
+                    let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
+                    let Some(raw) = columns.iter().find(|c| c.column_id == column_id) else {
                         return Err(Error::Invalid(format!("block is missing column {col}")));
                     };
                     let layout = layout_of(&meta.types[col], *column_type)

@@ -29,6 +29,10 @@ pub struct TableMeta {
     pub types: Vec<String>,
     /// Per-column `COMMENT '…'`.
     pub comments: Vec<Option<String>>,
+    /// Per-column ids. C++ assigns a stable id when a column is created and
+    /// never reuses it, so `DROP COLUMN` leaves a hole (the block files are
+    /// named `<id>.col`).
+    pub ids: Vec<u64>,
 }
 
 /// Field/record separators for the encoded table metadata.
@@ -59,7 +63,8 @@ impl TableMeta {
                 };
                 let ty = self.types.get(i).cloned().unwrap_or_default();
                 let cm = self.comments.get(i).cloned().flatten().unwrap_or_default();
-                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}{FSEP}{cm}")
+                let cid = self.ids.get(i).copied().unwrap_or(i as u64);
+                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}{FSEP}{cm}{FSEP}{cid}")
             })
             .collect();
         format!("{}{RSEP}{}", self.name, cols.join(&RSEP.to_string())).into_bytes()
@@ -75,6 +80,7 @@ impl TableMeta {
         let mut not_nulls = Vec::new();
         let mut types = Vec::new();
         let mut comments = Vec::new();
+        let mut ids = Vec::new();
         for part in cols.split(RSEP).filter(|c| !c.is_empty()) {
             let mut f = part.split(FSEP);
             let n = f.next().unwrap_or(part);
@@ -82,6 +88,7 @@ impl TableMeta {
             let nn = f.next().unwrap_or("0");
             let ty = f.next().unwrap_or("");
             let cm = f.next().unwrap_or("");
+            let cid = f.next().and_then(|v| v.parse::<u64>().ok());
             columns.push(n.to_string());
             defaults.push(match d.strip_prefix('\u{1}') {
                 Some(rest) => Some(rest.to_string()),
@@ -95,6 +102,7 @@ impl TableMeta {
             } else {
                 Some(cm.to_string())
             });
+            ids.push(cid.unwrap_or(ids.len() as u64));
         }
         Ok(Self {
             id,
@@ -104,6 +112,7 @@ impl TableMeta {
             not_nulls,
             types,
             comments,
+            ids,
         })
     }
 }
@@ -392,6 +401,7 @@ impl Catalog {
             not_nulls: not_nulls.to_vec(),
             types: types.to_vec(),
             comments: comments.to_vec(),
+            ids: (0..columns.len() as u64).collect(),
         };
         if self.cpp_only {
             let mut tables = self.cpp_tables()?;
@@ -448,6 +458,8 @@ impl Catalog {
                 .push(not_nulls.get(i).copied().unwrap_or(false));
             meta.types.push(types.get(i).cloned().unwrap_or_default());
             meta.comments.push(comments.get(i).cloned().flatten());
+            let next_id = meta.ids.iter().copied().max().map_or(0, |v| v + 1);
+            meta.ids.push(next_id);
         }
         if self.cpp_only {
             let mut tables = self.cpp_tables()?;
@@ -483,6 +495,10 @@ impl Catalog {
         }
         if idx < meta.comments.len() {
             meta.comments.remove(idx);
+        }
+        // The id is retired with the column; later columns keep theirs.
+        if idx < meta.ids.len() {
+            meta.ids.remove(idx);
         }
         if self.cpp_only {
             let mut tables = self.cpp_tables()?;
