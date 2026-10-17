@@ -3548,13 +3548,17 @@ impl Engine {
                 let mut gscore = 0.0f64;
                 for (fi, (name, _, d)) in fields.iter().enumerate() {
                     let kw = matches!(d, Some(dd) if dd.is_empty());
-                    let matched = terms
-                        .iter()
-                        .filter(|(f, t)| {
-                            (f == name || f.is_empty())
-                                && tokens[fi].contains(&t.to_ascii_lowercase())
-                        })
-                        .count();
+                    let mut matched = 0usize;
+                    for (f, t) in terms {
+                        if f == name || f.is_empty() {
+                            // A quoted phrase is split by the field's own
+                            // analyzer (one token for `keyword`).
+                            matched += tokenize_text(t, d)
+                                .iter()
+                                .filter(|x| tokens[fi].contains(*x))
+                                .count();
+                        }
+                    }
                     if matched > 0 {
                         gscore += if kw { 1.0 } else { matched as f64 };
                     }
@@ -5095,7 +5099,11 @@ fn parse_field_query(q: &str) -> Option<Vec<(f64, Vec<(String, String)>)>> {
             while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
                 i += 1;
             }
-            boost = chars[start..i].iter().collect::<String>().parse().unwrap_or(1.0);
+            boost = chars[start..i]
+                .iter()
+                .collect::<String>()
+                .parse()
+                .unwrap_or(1.0);
         }
         let mut terms: Vec<(String, String)> = Vec::new();
         for raw in split_query_terms(&body) {
