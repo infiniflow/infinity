@@ -78,7 +78,47 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         })?;
     }
     let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| "0.0.0.0:23817".into());
+    // `storage_type = "minio"`: the C++-format data files live in the bucket and
+    // are downloaded before recovery, then kept in sync at every checkpoint.
+    let storage_type = toml_value(&text, "storage_type").unwrap_or_default();
+    let object_store = if storage_type.eq_ignore_ascii_case("minio") {
+        let endpoint = toml_value(&text, "url").unwrap_or_default();
+        let bucket = toml_value(&text, "bucket_name").unwrap_or_default();
+        let https = toml_value(&text, "enable_https").unwrap_or_default();
+        if https.eq_ignore_ascii_case("true") {
+            eprintln!("object store: enable_https is not supported; keeping data local");
+            None
+        } else if endpoint.is_empty() || bucket.is_empty() {
+            eprintln!("object store: url/bucket_name missing; keeping data local");
+            None
+        } else {
+            let client = infinity_storage::s3::S3Client::new(infinity_storage::s3::S3Config {
+                endpoint,
+                bucket,
+                access_key: toml_value(&text, "access_key").unwrap_or_default(),
+                secret_key: toml_value(&text, "secret_key").unwrap_or_default(),
+            });
+            match client.ensure_bucket() {
+                Ok(()) => Some(Arc::new(client)),
+                Err(e) => {
+                    eprintln!("object store: {e}; keeping data local");
+                    None
+                }
+            }
+        }
+    } else {
+        None
+    };
+    if let Some(client) = &object_store {
+        match infinity_storage::s3::restore_tree(client, &root.join("data"), "data") {
+            Ok(n) => println!("object store: restored {n} file(s) from s3"),
+            Err(e) => eprintln!("object store: restore failed: {e}"),
+        }
+    }
     let engine = Arc::new(Engine::open(&root)?);
+    if let Some(client) = object_store {
+        engine.set_object_store(client);
+    }
     // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
     // chunk once it reaches this size.
     engine.set_memindex_quota(parse_size_bytes(

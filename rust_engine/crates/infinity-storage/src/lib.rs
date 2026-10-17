@@ -21,6 +21,7 @@ pub mod metastore;
 #[cfg(feature = "rocksdb-store")]
 pub mod metastore_rocks;
 pub mod mvcc;
+pub mod s3;
 pub mod wal;
 
 pub use cpp_format::{

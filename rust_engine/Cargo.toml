@@ -34,6 +34,8 @@ infinity-executor = { path = "crates/infinity-executor" }
 infinity-server = { path = "crates/infinity-server" }
 fjall = "3"
 lz4_flex = "0.13"
+hmac = "0.12"
+sha2 = "0.10"
 crc32fast = "1"
 thiserror = "1"
 tempfile = "3"

@@ -1606,6 +1606,9 @@ pub struct Engine {
     /// Estimated bytes buffered in each HNSW memory index since its last dump,
     /// keyed by `"<table>.<column>"`.
     index_pending_bytes: Mutex<HashMap<String, usize>>,
+    /// Object store backing the C++-format data files (`storage_type =
+    /// "minio"`). `None` keeps everything on the local disk.
+    object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1684,6 +1687,7 @@ impl Engine {
             row_counters: Mutex::new(HashMap::new()),
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
+            object_store: Mutex::new(None),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -6397,6 +6401,12 @@ impl Engine {
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
         self.flush_cpp_blocks()?;
+        // With `storage_type = "minio"` the C++-format data files are mirrored
+        // into the bucket; the row/meta KV stays local.
+        if let Some(client) = self.object_store.lock().unwrap().clone() {
+            let root = self.dir.join("data");
+            let _ = infinity_storage::s3::sync_tree(&client, &root, "data");
+        }
         // Mirror the catalog into the C++ key space / value encoding, in the
         // catalog store at `<dir>/catalog` (the path the C++ engine uses), so a
         // C++ engine can read this directory. Best effort: a column type the
@@ -6404,6 +6414,11 @@ impl Engine {
         // rather than failing the flush.
         let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
         Ok(())
+    }
+
+    /// Binds an object store for the C++-format data files.
+    pub fn set_object_store(&self, client: Arc<infinity_storage::s3::S3Client>) {
+        *self.object_store.lock().unwrap() = Some(client);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
