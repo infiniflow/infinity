@@ -1240,16 +1240,19 @@ impl Engine {
     /// (`next_index_id`, `cpp_layout.rs:545-550`).
     fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
-        let ids: Vec<String> = self
+        let ids: Vec<(String, u64)> = self
             .catalog
             .list_indexes()?
             .into_iter()
             .filter(|im| im.table == short || im.table == table)
-            .map(|im| im.name)
+            .map(|im| (im.name, im.id))
             .collect();
         ids.iter()
-            .position(|n| n == index_name)
-            .map(|p| p + 1)
+            .position(|(n, _)| n == index_name)
+            .map(|p| match ids[p].1 {
+                0 => p + 1,
+                id => id as usize,
+            })
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}' on '{table}'")))
     }
 

@@ -140,6 +140,9 @@ pub struct IndexMeta {
     pub index_type: String,
     /// `WITH (…)` options, keys upper-cased as the parser yields them.
     pub options: Vec<(String, String)>,
+    /// The C++ index id: a per-table counter starting at 1, never reused, so
+    /// `DROP INDEX` leaves a hole (`idx_{id}` directories).
+    pub id: u64,
 }
 
 /// Separates the stored option pairs; `\x1f` (unit separator) cannot occur in
@@ -155,8 +158,8 @@ impl IndexMeta {
             .collect::<Vec<_>>()
             .join(&OPT_SEP.to_string());
         format!(
-            "{}\t{}\t{}\t{}",
-            self.table, self.column, self.index_type, opts
+            "{}\t{}\t{}\t{}\t{}",
+            self.table, self.column, self.index_type, opts, self.id
         )
         .into_bytes()
     }
@@ -165,7 +168,7 @@ impl IndexMeta {
         let s = String::from_utf8_lossy(bytes);
         // Older records carried just `table\tcolumn`; newer ones append the
         // index type and the `WITH` options.
-        let mut it = s.splitn(4, '\t');
+        let mut it = s.splitn(5, '\t');
         let table = it
             .next()
             .ok_or_else(|| Error::Catalog(format!("bad index meta for '{name}'")))?;
@@ -173,7 +176,7 @@ impl IndexMeta {
             .next()
             .ok_or_else(|| Error::Catalog(format!("bad index meta for '{name}'")))?;
         let index_type = it.next().unwrap_or_default().to_string();
-        let options = it
+        let options: Vec<(String, String)> = it
             .next()
             .unwrap_or_default()
             .split(OPT_SEP)
@@ -181,12 +184,14 @@ impl IndexMeta {
             .filter_map(|p| p.split_once('='))
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
+        let id = it.next().and_then(|v| v.parse().ok()).unwrap_or(0);
         Ok(Self {
             name,
             table: table.to_string(),
             column: column.to_string(),
             index_type,
             options,
+            id,
         })
     }
 }
@@ -277,6 +282,16 @@ impl Catalog {
                 out.push(meta);
             }
         }
+        // Records read back from the C++ key space do not carry the id; number
+        // them per table (1-based, as `CREATE INDEX` would).
+        let mut next: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+        for im in out.iter_mut() {
+            if im.id == 0 {
+                let n = next.entry(im.table.clone()).or_insert(0);
+                *n += 1;
+                im.id = *n;
+            }
+        }
         // Name-only indexes — the engine does not materialise an expression
         // target such as `c1 + 5`, so it has no C++ `IndexBase`; its name lives
         // under a supplementary table tag (`write_cpp_layout_from`).
@@ -298,6 +313,7 @@ impl Catalog {
                         column: String::new(),
                         index_type: String::new(),
                         options: Vec::new(),
+                        id: 0,
                     });
                 }
             }
@@ -707,12 +723,22 @@ impl Catalog {
         index_type: &str,
         options: &[(String, String)],
     ) -> Result<IndexMeta> {
+        // Per-table index ids start at 1 and are never reused.
+        let short = table.split('.').next_back().unwrap_or(table);
+        let id = self
+            .list_indexes()?
+            .iter()
+            .filter(|i| i.table == table || i.table == short)
+            .map(|i| i.id)
+            .max()
+            .map_or(1, |v| v + 1);
         let meta = IndexMeta {
             name: name.to_string(),
             table: table.to_string(),
             column: column.to_string(),
             index_type: index_type.to_ascii_uppercase(),
             options: options.to_vec(),
+            id,
         };
         if self.cpp_only {
             let mut indexes = self.cpp_indexes()?;

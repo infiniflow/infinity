@@ -634,12 +634,17 @@ impl Catalog {
             let Some(def) = index_def_for(im, cpp) else {
                 continue;
             };
-            // `list_indexes` is ordered, so ids are stable across runs.
-            let index_id = indexes
-                .iter()
-                .filter(|o| table_of(&o.table) == im_table && db_of(&o.table) == im_db)
-                .position(|o| o.name == im.name)
-                .map_or(1, |p| p + 1);
+            // Ids are assigned at CREATE INDEX and never reused; a record read
+            // back without an id falls back to its 1-based position.
+            let index_id = if im.id > 0 {
+                im.id
+            } else {
+                indexes
+                    .iter()
+                    .filter(|o| table_of(&o.table) == im_table && db_of(&o.table) == im_db)
+                    .position(|o| o.name == im.name)
+                    .map_or(1, |p| p + 1) as u64
+            };
             store.put(
                 key::catalog_index_key(db_str, tbl_str, &im.name, *ts).as_bytes(),
                 index_id.to_string().as_bytes(),
@@ -897,6 +902,8 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
             def.base.index_type.clone()
         },
         options,
+        // Filled in by `Catalog::cpp_indexes` (the record does not carry it).
+        id: 0,
     })
 }
 
