@@ -1459,13 +1459,14 @@ fn handle_connection(
                                         }
                                     }
                                 }
-                                select_response_from(
+                                select_response_from_typed(
                                     &[
                                         "name".to_string(),
                                         "type".to_string(),
                                         "default".to_string(),
                                         "comment".to_string(),
                                     ],
+                                    &vec!["VARCHAR".to_string(); 4],
                                     &rows,
                                 )
                             }
@@ -2563,12 +2564,22 @@ pub fn rows_to_column_fields_typed(
     let mut out = Vec::new();
     for (ci, name) in columns.iter().enumerate() {
         let declared = types.get(ci).map(String::as_str).unwrap_or("");
+        // Text cells keep any spelling (`Null` is data); other columns treat
+        // `null`/`NULL` as the SQL NULL marker.
+        let text_col = declared.trim().to_ascii_uppercase().starts_with("VARCHAR");
+        let is_null = |v: &str| {
+            if text_col {
+                v == "null"
+            } else {
+                v.eq_ignore_ascii_case("null")
+            }
+        };
         let kind = classify_column(declared, rows, ci);
         if let ColKind::Array { .. } = kind {
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -2593,7 +2604,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -2636,7 +2647,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -2669,7 +2680,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -2699,7 +2710,7 @@ pub fn rows_to_column_fields_typed(
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+            let cell = r.get(ci).map(String::as_str).filter(|v| !is_null(v));
             let valid = cell.is_some();
             match code {
                 1 => {
@@ -6037,20 +6048,15 @@ fn write_show_snapshot_response(
         .map_err(tw)?;
     o.write_i64(if found { OK } else { 3022 }).map_err(tw)?;
     o.write_field_end().map_err(tw)?;
-    for (field, id, value) in [(
-        "error_msg",
-        2i16,
-        if found {
-            "OK".to_string()
-        } else {
-            format!("snapshot '{name}' does not exist")
-        },
-    )] {
-        o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
-            .map_err(tw)?;
-        o.write_string(&value).map_err(tw)?;
-        o.write_field_end().map_err(tw)?;
-    }
+    let msg = if found {
+        "OK".to_string()
+    } else {
+        format!("snapshot '{name}' does not exist")
+    };
+    o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
+        .map_err(tw)?;
+    o.write_string(&msg).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
     if found {
         o.write_field_begin(&TFieldIdentifier::new("snapshot", TType::Struct, 3i16))
             .map_err(tw)?;
@@ -7076,6 +7082,7 @@ mod tests {
                 not_null: false,
                 logic_type: 5,
                 physical: PhysicalWire::None,
+                comment: String::new(),
             }],
             session_id: 1,
         };
