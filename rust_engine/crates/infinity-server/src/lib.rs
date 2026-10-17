@@ -570,13 +570,7 @@ fn handle_connection(
                                     .unwrap_or(1)
                             },
                         ),
-                        None => (
-                            3022i64,
-                            format!("Table: {table} doesn't exist."),
-                            0,
-                            0,
-                            0,
-                        ),
+                        None => (3022i64, format!("Table: {table} doesn't exist."), 0, 0, 0),
                     };
                     write_show_table_response(
                         &mut writer,
@@ -2574,10 +2568,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -2602,10 +2593,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -2648,10 +2636,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -2684,10 +2669,7 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r
-                    .get(ci)
-                    .map(String::as_str)
-                    .filter(|v| *v != "null");
+                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -2717,10 +2699,7 @@ pub fn rows_to_column_fields_typed(
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r
-                .get(ci)
-                .map(String::as_str)
-                .filter(|v| *v != "null");
+            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
             let valid = cell.is_some();
             match code {
                 1 => {
@@ -6012,9 +5991,7 @@ pub fn write_show_current_node_response(
 /// Writes a `ListSnapshots` REPLY with the given snapshot names
 /// (`ListSnapshotsResponse.snapshots` is a list of `Snapshot` structs).
 /// `ShowSnapshotRequest { 1: session_id, 2: snapshot_name }`.
-fn read_snapshot_args(
-    ip: &mut TBinaryInputProtocol<&mut impl Read>,
-) -> Result<(i64, String)> {
+fn read_snapshot_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(i64, String)> {
     ip.read_struct_begin().map_err(tw)?;
     let _ = ip.read_field_begin().map_err(tw)?;
     ip.read_struct_begin().map_err(tw)?;
@@ -6060,17 +6037,15 @@ fn write_show_snapshot_response(
         .map_err(tw)?;
     o.write_i64(if found { OK } else { 3022 }).map_err(tw)?;
     o.write_field_end().map_err(tw)?;
-    for (field, id, value) in [
-        (
-            "error_msg",
-            2i16,
-            if found {
-                "OK".to_string()
-            } else {
-                format!("snapshot '{name}' does not exist")
-            },
-        ),
-    ] {
+    for (field, id, value) in [(
+        "error_msg",
+        2i16,
+        if found {
+            "OK".to_string()
+        } else {
+            format!("snapshot '{name}' does not exist")
+        },
+    )] {
         o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
             .map_err(tw)?;
         o.write_string(&value).map_err(tw)?;

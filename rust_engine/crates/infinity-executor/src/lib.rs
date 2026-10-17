@@ -2648,9 +2648,7 @@ impl Engine {
                 // reference (`DROP TABLE` first).
                 let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
                 if !table.is_empty() && self.catalog.get_table_by_name(&table)?.is_some() {
-                    return Err(Error::Invalid(format!(
-                        "table '{table}' already exists"
-                    )));
+                    return Err(Error::Invalid(format!("table '{table}' already exists")));
                 }
                 self.restore_table_blob(&blob)?;
                 Ok(QueryResult::Rows {
