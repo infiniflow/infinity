@@ -5004,7 +5004,11 @@ impl Engine {
                 m.args.get(4)
             {
                 let name = name.trim();
+                // A bare identifier is an index hint; anything with `=` is a
+                // search option (`threshold=200`).
                 if !name.is_empty()
+                    && !name.contains('=')
+                    && !name.contains(';')
                     && !self
                         .catalog
                         .list_indexes()?
@@ -5067,12 +5071,17 @@ impl Engine {
             let is_multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
             if !is_multi {
                 if let Some(d) = type_dim(decl) {
-                    if !query_items.is_empty() && query_items.len() != d {
+                    // A bit vector packs eight elements per query item.
+                    let bit_col = tensor_elem_type(decl) == ElemType::Bit;
+                    let actual = if bit_col {
+                        query_items.len() * 8
+                    } else {
+                        query_items.len()
+                    };
+                    if !query_items.is_empty() && actual != d {
                         return Err(Error::Invalid(format!(
                             "query embedding has {} dimensions, but column '{}' expects {}",
-                            query_items.len(),
-                            m.column,
-                            d
+                            actual, m.column, d
                         )));
                     }
                 }
