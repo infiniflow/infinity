@@ -877,8 +877,10 @@ fn encode_row(row: &[Literal], types: &[String]) -> String {
         .map(|(i, v)| {
             let s = v.to_slt_string();
             match types.get(i) {
-                // float columns render with six decimals in `.slt` output
-                Some(t) if is_float_type(t) => match s.parse::<f64>() {
+                // float columns render with six decimals in `.slt` output.
+                // The C++ numeric cast tolerates surrounding whitespace, so
+                // `" 2.1"` is a valid double literal.
+                Some(t) if is_float_type(t) => match s.trim().parse::<f64>() {
                     Ok(f) => format!("{f:.6}"),
                     Err(_) => s,
                 },
@@ -3503,6 +3505,12 @@ impl Engine {
                 }
             }
             "FULLTEXT" => {
+                // A full-text index can only invert a text column.
+                if !ty.starts_with("VARCHAR") {
+                    return Err(Error::Invalid(format!(
+                        "FULLTEXT index requires a varchar column, got '{ty}'"
+                    )));
+                }
                 for (k, v) in opts {
                     if k == "ANALYZER" {
                         let v = v.to_ascii_uppercase();

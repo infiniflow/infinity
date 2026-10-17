@@ -142,15 +142,26 @@ pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
                 if let (Some(ExprAst::Literal(Literal::Str(col))), Some(q)) =
                     (args.first(), args.get(1))
                 {
+                    let opts = match args.get(2) {
+                        Some(ExprAst::Literal(Literal::Str(o))) => o.clone(),
+                        _ => String::new(),
+                    };
                     // `col@index` names the column plus an optional index hint.
-                    let col_name = col.split('@').next().unwrap_or(col);
+                    let mut col_name = col.split('@').next().unwrap_or(col).to_string();
+                    // An empty field falls back to `default_field=<col>`.
+                    if col_name.is_empty() {
+                        if let Some(f) = opts.split(';').find_map(|p| {
+                            let (k, v) = p.split_once('=')?;
+                            k.trim()
+                                .eq_ignore_ascii_case("default_field")
+                                .then(|| v.trim().to_string())
+                        }) {
+                            col_name = f;
+                        }
+                    }
                     if let (Some(i), ExprAst::Literal(Literal::Str(query))) =
-                        (schema.iter().position(|c| c == col_name), q)
+                        (schema.iter().position(|c| c == &col_name), q)
                     {
-                        let opts = match args.get(2) {
-                            Some(ExprAst::Literal(Literal::Str(o))) => o.clone(),
-                            _ => String::new(),
-                        };
                         return Ok(Expr::FullText(i, query.clone(), opts));
                     }
                 }

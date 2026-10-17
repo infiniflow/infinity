@@ -53,6 +53,8 @@ impl Error {
             // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the
             // target column.
             Error::Invalid(m) if m.starts_with("import:") => 3037,
+            // 3018 DUPLICATE_INDEX_NAME.
+            Error::Invalid(m) if m.starts_with("index '") && m.ends_with("already exists") => 3018,
             // 3032 NOT_SUPPORTED (e.g. dropping a column an index still uses,
             // or a value whose shape the column type cannot hold).
             Error::Invalid(m)

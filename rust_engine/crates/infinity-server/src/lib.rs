@@ -736,8 +736,8 @@ fn handle_connection(
                                 }
                                 // A projected expression is named by the SQL
                                 // text the client sent (`(c1 + c2)`).
-                                if !req.star && req.columns.len() == columns.len() {
-                                    columns = req.columns.clone();
+                                if !req.star && req.names.len() == columns.len() {
+                                    columns = req.names.clone();
                                 }
                                 select_response_from_typed(
                                     &columns,
@@ -3045,6 +3045,9 @@ pub struct SelectReq {
     pub table_name: String,
     /// Projected columns (empty + `star=false` means `*`).
     pub columns: Vec<String>,
+    /// The client-facing names, which follow the C++ `Name()` printer (a cast
+    /// prints as `Cast(c3 AS Varchar)`, string arguments lose their quotes).
+    pub names: Vec<String>,
     pub star: bool,
     /// Optional `WHERE` clause already rendered as SQL.
     pub where_sql: Option<String>,
@@ -3098,6 +3101,9 @@ pub enum PExpr {
     Column(String),
     Value(ValueLit),
     Call(String, Vec<PExpr>),
+    /// `CAST(expr AS type)`: the carried text is the C++ `DataType::ToString()`
+    /// spelling (`Varchar`, `Integer`, `Double`, ...).
+    Cast(Box<PExpr>, String),
     Other,
 }
 
@@ -3126,10 +3132,82 @@ pub fn pexpr_sql(e: &PExpr) -> String {
         }
         PExpr::Call(n, a) => format!(
             "{}({})",
-            n,
+            canonical_fn_name(n),
             a.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ")
         ),
+        PExpr::Cast(inner, ty) => format!("CAST({} AS {})", pexpr_sql(inner), ty),
         PExpr::Other => String::new(),
+    }
+}
+
+/// The C++ `BaseExpression::Name()` spelling of a projected expression.
+///
+/// Unlike [`pexpr_sql`] this is *display* text: string constants lose their
+/// SQL quotes, a cast prints as `Cast(<arg> AS <type>)`, and the registered
+/// function name is used (the catalog knows `ABS`, not `abs`).
+pub fn pexpr_name(e: &PExpr) -> String {
+    match e {
+        PExpr::Column(c) => c.clone(),
+        PExpr::Value(v) => v.to_display(),
+        // `filter_text` and `filter_fulltext` both analyse to the special
+        // `FilterFulltextExpression`, whose `ToString()` is fixed.
+        PExpr::Call(n, a) if is_filter_fn(n) => {
+            let text = |i: usize| match a.get(i) {
+                Some(PExpr::Value(ValueLit::Str(s))) => s.clone(),
+                Some(other) => pexpr_name(other),
+                None => String::new(),
+            };
+            let options = if a.len() > 2 {
+                format!(", '{}'", text(2))
+            } else {
+                String::new()
+            };
+            format!("FILTER_FULLTEXT('{}', '{}'{options})", text(0), text(1))
+        }
+        PExpr::Call(n, a) if a.len() == 2 && is_binary_op(n) => {
+            format!(
+                "({} {} {})",
+                pexpr_name(&a[0]),
+                canonical_op_name(n),
+                pexpr_name(&a[1])
+            )
+        }
+        PExpr::Call(n, a) => {
+            let args = a.iter().map(pexpr_name).collect::<Vec<_>>().join(", ");
+            format!("{}({args})", canonical_fn_name(n))
+        }
+        PExpr::Cast(inner, ty) => format!("Cast({} AS {})", pexpr_name(inner), ty),
+        PExpr::Other => String::new(),
+    }
+}
+
+/// True for the two spellings of the full-text filter function.
+fn is_filter_fn(name: &str) -> bool {
+    name.eq_ignore_ascii_case("filter_text") || name.eq_ignore_ascii_case("filter_fulltext")
+}
+
+/// Connectives are registered in upper case, so the printer spells them so.
+fn canonical_op_name(name: &str) -> &str {
+    if name.eq_ignore_ascii_case("and") {
+        "AND"
+    } else if name.eq_ignore_ascii_case("or") {
+        "OR"
+    } else if name.eq_ignore_ascii_case("not") {
+        "NOT"
+    } else {
+        name
+    }
+}
+
+/// The C++ catalog registers most scalars in lower case but a few in upper
+/// case, and the projection name comes from those registered names.
+fn canonical_fn_name(name: &str) -> &str {
+    if name.eq_ignore_ascii_case("abs") {
+        "ABS"
+    } else if name.eq_ignore_ascii_case("pow") {
+        "POW"
+    } else {
+        name
     }
 }
 
@@ -3153,22 +3231,25 @@ fn is_predicate_pexpr(e: &PExpr) -> bool {
     match e {
         PExpr::Call(n, args) => {
             let n = n.to_ascii_lowercase();
-            matches!(
-                n.as_str(),
-                "=" | "=="
-                    | "!="
-                    | "<>"
-                    | "<"
-                    | "<="
-                    | ">"
-                    | ">="
-                    | "and"
-                    | "or"
-                    | "not"
-                    | "in"
-                    | "not_in"
-                    | "between"
-            ) && !args.is_empty()
+            is_boolean_fn(&n)
+                || matches!(
+                    n.as_str(),
+                    "=" | "=="
+                        | "!="
+                        | "<>"
+                        | "<"
+                        | "<="
+                        | ">"
+                        | ">="
+                        | "and"
+                        | "or"
+                        | "not"
+                        | "in"
+                        | "not_in"
+                        | "between"
+                        | "is_null"
+                        | "is_not_null"
+                ) && !args.is_empty()
         }
         _ => false,
     }
@@ -3282,6 +3363,8 @@ pub fn read_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr
                     args.extend(vals);
                     out = PExpr::Call(if in_type { "in" } else { "not_in" }.to_string(), args);
                 }
+                // `CastExpr`: `{1: expr, 2: data_type}`.
+                Some(12) if uf.field_type == TType::Struct => out = read_cast_pexpr(ip)?,
                 _ => ip.skip(uf.field_type).map_err(tw)?,
             }
             let _ = ip.read_field_end();
@@ -3294,6 +3377,63 @@ pub fn read_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr
     }
     ip.read_struct_end().map_err(tw)?;
     Ok(out)
+}
+
+/// Reads a `CastExpr` (`{1: expr, 2: data_type}`) into a [`PExpr::Cast`].
+fn read_cast_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut inner = PExpr::Other;
+    let mut ty = String::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) if f.field_type == TType::Struct => inner = read_pexpr(ip)?,
+            Some(2) if f.field_type == TType::Struct => {
+                let (logic, _) = read_data_type(ip)?;
+                ty = logic_type_name(logic);
+            }
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(PExpr::Cast(Box::new(inner), ty))
+}
+
+/// The thrift `LogicType` name for a wire ordinal, i.e. the spelling C++'s
+/// `DataType::ToString()` uses for a cast target (`Varchar`, `Integer`, ...).
+fn logic_type_name(logic: i32) -> String {
+    match logic {
+        0 => "Boolean",
+        1 => "TinyInt",
+        2 => "SmallInt",
+        3 => "Integer",
+        4 => "BigInt",
+        5 => "HugeInt",
+        6 => "Decimal",
+        7 => "Float",
+        8 => "Double",
+        9 => "Float16",
+        10 => "BFloat16",
+        11 => "Varchar",
+        12 => "Embedding",
+        13 => "Tensor",
+        14 => "TensorArray",
+        15 => "Sparse",
+        16 => "MultiVector",
+        17 => "Date",
+        18 => "Time",
+        19 => "DateTime",
+        20 => "Timestamp",
+        21 => "Interval",
+        22 => "Array",
+        23 => "Json",
+        _ => "Varchar",
+    }
+    .to_string()
 }
 
 fn sql_op(name: &str) -> Option<&'static str> {
@@ -3460,9 +3600,11 @@ fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
 }
 
 /// Reads a `ParsedExpr` in its `ColumnExpr` form (`ParsedExprType` union field 2).
-fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Vec<String>, bool)> {
+fn read_select_item(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(Vec<String>, Vec<String>, bool)> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
-    let (mut names, mut star) = (Vec::new(), false);
+    let (mut names, mut display, mut star) = (Vec::new(), Vec::new(), false);
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
         if fd.field_type == TType::Stop {
@@ -3473,13 +3615,22 @@ fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
             let uf = ip.read_field_begin().map_err(tw)?;
             if uf.id == Some(2) && uf.field_type == TType::Struct {
                 let (n, s) = read_column_expr(ip)?;
+                display.extend(n.iter().cloned());
                 names = n;
                 star = s;
             } else if uf.id == Some(3) && uf.field_type == TType::Struct {
                 // A projected function: send it to the engine as expression text
                 // (`year(c1)`), which is also the output column name.
                 let (name, args) = read_function_expr(ip)?;
-                names.push(pexpr_sql(&PExpr::Call(name, args)));
+                let e = PExpr::Call(name, args);
+                names.push(pexpr_sql(&e));
+                display.push(pexpr_name(&e));
+            } else if uf.id == Some(12) && uf.field_type == TType::Struct {
+                // A cast: the engine gets SQL, the client the C++ `Name()`
+                // spelling (`Cast(c3 AS Varchar)`).
+                let e = read_cast_pexpr(ip)?;
+                names.push(pexpr_sql(&e));
+                display.push(pexpr_name(&e));
             } else if uf.field_type == TType::Struct {
                 // consume the nested expression struct explicitly (a `skip` on
                 // a struct holding lists can under-consume)
@@ -3505,7 +3656,7 @@ fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    Ok((names, star))
+    Ok((names, display, star))
 }
 
 /// Reads an `order_by_list` (`list<OrderByExpr{1: ParsedExpr, 2: bool asc}>`),
@@ -3553,6 +3704,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         db_name: String::new(),
         table_name: String::new(),
         columns: Vec::new(),
+        names: Vec::new(),
         star: false,
         where_sql: None,
         order_by: Vec::new(),
@@ -3571,8 +3723,9 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, star) = read_select_item(ip)?;
+                    let (names, display, star) = read_select_item(ip)?;
                     r.columns.extend(names);
+                    r.names.extend(display);
                     r.star |= star;
                 }
                 ip.read_list_end().map_err(tw)?;
@@ -3648,6 +3801,15 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
             if let Some(t) = map.get(&key) {
                 return t.clone();
             }
+            // `Cast(x AS T)` is announced as `T`.
+            if let Some(rest) = key
+                .strip_prefix("cast(")
+                .or_else(|| key.strip_prefix("try_cast("))
+            {
+                if let Some((_, ty)) = rest.rsplit_once(" as ") {
+                    return ty.trim_end_matches(')').trim().to_ascii_uppercase();
+                }
+            }
             // An aggregate result takes its argument's type, widening the sum
             // (and count/avg) to 64 bits, exactly as the C++ engine does.
             if let Some((func, arg)) = key.strip_suffix(')').and_then(|s| s.split_once('(')) {
@@ -3667,10 +3829,34 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
                     | "century" | "decade" | "epoch" | "era" | "length" | "char_length"
                     | "character_length" | "position" | "strpos" => "BIGINT".to_string(),
                     // Text functions return text.
-                    "substring" | "substr" | "trim" | "ltrim" | "rtrim" | "upper" | "lower"
-                    | "concat" | "replace" | "lpad" | "rpad" => "VARCHAR".to_string(),
+                    "substring"
+                    | "substr"
+                    | "trim"
+                    | "ltrim"
+                    | "rtrim"
+                    | "upper"
+                    | "lower"
+                    | "concat"
+                    | "replace"
+                    | "lpad"
+                    | "rpad"
+                    | "reverse"
+                    | "md5"
+                    | "json_extract"
+                    | "json_extract_string" => "VARCHAR".to_string(),
+                    // JSON extractors return their declared target type.
+                    "json_extract_int" => "BIGINT".to_string(),
+                    "json_extract_double" | "json_extract_float" => "DOUBLE".to_string(),
+                    "json_extract_bool"
+                    | "json_extract_isnull"
+                    | "json_exists_path"
+                    | "json_contains" => "BOOLEAN".to_string(),
+                    // `trunc` formats the value as text at a fixed precision,
+                    // so it is the one numeric-looking function returning
+                    // VARCHAR (`TruncFunction ... -> DataType(kVarchar)`).
+                    "trunc" | "truncate" => "VARCHAR".to_string(),
                     // Scalar numeric functions.
-                    // `trunc`/`round`/`abs` keep the argument's type; the
+                    // `round`/`abs` keep the argument's type; the
                     // transcendental functions widen to DOUBLE.
                     "sqrt" | "pow" | "power" | "exp" | "ln" | "log" | "log2" | "log10" | "sin"
                     | "cos" | "tan" => "DOUBLE".to_string(),
@@ -3798,6 +3984,18 @@ pub enum ValueLit {
 }
 
 impl ValueLit {
+    /// The C++ `ConstantExpr::ToString()` spelling: strings are unquoted.
+    pub fn to_display(&self) -> String {
+        match self {
+            ValueLit::Int(i) => i.to_string(),
+            ValueLit::Float(f) => f.to_string(),
+            ValueLit::Str(s) => s.clone(),
+            ValueLit::Bool(b) => b.to_string(),
+            ValueLit::Null => "Null".to_string(),
+            other => other.to_sql(),
+        }
+    }
+
     pub fn to_sql(&self) -> String {
         match self {
             ValueLit::Int(i) => i.to_string(),
@@ -5315,6 +5513,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         db_name: String::new(),
         table_name: String::new(),
         columns: Vec::new(),
+        names: Vec::new(),
         star: false,
         where_sql: None,
         order_by: Vec::new(),
@@ -5337,7 +5536,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, star) = read_select_item(ip)?;
+                    let (names, _, star) = read_select_item(ip)?;
                     req.columns.extend(names);
                     req.star |= star;
                 }

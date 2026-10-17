@@ -494,6 +494,14 @@ fn cast_value(v: &Value, ty: &str) -> Value {
             Value::Null => None,
         }
     };
+    // C++ casts a floating value to a 32/64-bit integer with `std::nearbyint`
+    // (round half to even); only the narrow integer casts truncate.
+    let as_int_round = |v: &Value| -> Option<i64> {
+        match v {
+            Value::Float(f) => Some(f.round_ties_even() as i64),
+            other => as_int(other),
+        }
+    };
     let as_float = |v: &Value| -> Option<f64> {
         match v {
             Value::Int(i) => Some(*i as f64),
@@ -516,11 +524,11 @@ fn cast_value(v: &Value, ty: &str) -> Value {
             .and_then(|i| i16::try_from(i).ok())
             .map(|i| Value::Int(i as i64))
             .unwrap_or(Value::Null),
-        "INT" | "INTEGER" => as_int(v)
+        "INT" | "INTEGER" => as_int_round(v)
             .and_then(|i| i32::try_from(i).ok())
             .map(|i| Value::Int(i as i64))
             .unwrap_or(Value::Null),
-        "BIGINT" => as_int(v).map(Value::Int).unwrap_or(Value::Null),
+        "BIGINT" => as_int_round(v).map(Value::Int).unwrap_or(Value::Null),
         "FLOAT" | "REAL" => match as_float(v) {
             Some(f) => Value::Float((f as f32) as f64),
             None => Value::Null,
