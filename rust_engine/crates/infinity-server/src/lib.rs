@@ -1025,7 +1025,7 @@ fn handle_connection(
                                 def.push_str(" NOT NULL");
                             }
                             if let Some(d) = &c.default {
-                                def.push_str(&format!(" DEFAULT {d}"));
+                                def.push_str(&format!(" DEFAULT {}", render_default(d)));
                             }
                             def
                         })
@@ -1580,6 +1580,25 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
 }
 
 /// Applies a `CreateTable` request to the engine (or errors if no engine bound).
+/// Renders a wire `DEFAULT` value as SQL, quoting a bare string so that an empty
+/// or identifier-like value does not leave `DEFAULT` without a value.
+fn render_default(d: &str) -> String {
+    let t = d.trim();
+    if t.is_empty() {
+        "''".to_string()
+    } else if t.starts_with('\'')
+        || t.parse::<f64>().is_ok()
+        || t == "null"
+        || t.eq_ignore_ascii_case("true")
+        || t.eq_ignore_ascii_case("false")
+        || t.starts_with('[')
+    {
+        t.to_string()
+    } else {
+        format!("'{}'", t.replace('\'', "''"))
+    }
+}
+
 fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResponse {
     let Some(engine) = engine else {
         return CommonResponse {
@@ -1597,23 +1616,7 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
                 col.push_str(" NOT NULL");
             }
             if let Some(d) = &c.default {
-                // The wire carries the raw value: quote a bare string (an empty
-                // one would otherwise leave `DEFAULT` without a value).
-                let t = d.trim();
-                let rendered = if t.is_empty() {
-                    "''".to_string()
-                } else if t.starts_with('\'')
-                    || t.parse::<f64>().is_ok()
-                    || t == "null"
-                    || t.eq_ignore_ascii_case("true")
-                    || t.eq_ignore_ascii_case("false")
-                    || t.starts_with('[')
-                {
-                    t.to_string()
-                } else {
-                    format!("'{}'", t.replace('\'', "''"))
-                };
-                col.push_str(&format!(" DEFAULT {rendered}"));
+                col.push_str(&format!(" DEFAULT {}", render_default(d)));
             }
             col
         })
