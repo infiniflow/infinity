@@ -498,6 +498,7 @@ fn cell_json(value: &str, ty: &str) -> String {
 }
 
 /// The REST spelling of a declared type (`Integer` -> `integer`).
+#[allow(dead_code)]
 fn rest_type_name(decl: &str) -> String {
     let up = decl.to_ascii_uppercase();
     for (prefix, name) in [
@@ -977,14 +978,20 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 Ok(v) => v,
                 Err(e) => return e,
             };
+            let full = format!("{db}.{table}");
             if replace {
-                let _ = engine.execute(&format!("DROP TABLE IF EXISTS {db}.{table};"));
+                let _ = engine.execute(&format!("DROP TABLE IF EXISTS {full};"));
+            } else if ignore
+                && engine
+                    .catalog()
+                    .get_table_by_name(&full)
+                    .ok()
+                    .flatten()
+                    .is_some()
+            {
+                return (200, ok_json());
             }
-            let sql = format!(
-                "CREATE TABLE {}{db}.{table} ({});",
-                if ignore { "IF NOT EXISTS " } else { "" },
-                cols.join(", ")
-            );
+            let sql = format!("CREATE TABLE {full} ({});", cols.join(", "));
             match run(&sql) {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
@@ -1079,7 +1086,12 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 if safe_ident(name).is_none() {
                     return err_response(3013, "syntax: invalid column name");
                 }
-                cols.push(format!("{name} {}", type_to_sql(ty)));
+                let mut def = format!("{name} {}", type_to_sql(ty));
+                // A declared default must be applied to the rows already stored.
+                if let Some(d) = f.get("default").map(|v| v.as_str().unwrap_or("")) {
+                    def.push_str(&format!(" DEFAULT {}", crate::render_default(d)));
+                }
+                cols.push(def);
             }
             match run(&format!(
                 "ALTER TABLE {db}.{table} ADD COLUMN ({});",
@@ -1125,7 +1137,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                             format!(
                                 "{{\"name\":\"{}\",\"type\":\"{}\",\"column_name\":\"{}\",\"column_type\":\"{}\",\"default\":{},\"comment\":{},\"constraints\":[]}}",
                                 json_escape(r.first().map(String::as_str).unwrap_or("")),
-                                json_escape(&rest_type_name(r.get(1).map(String::as_str).unwrap_or(""))),
+                                json_escape(r.get(1).map(String::as_str).unwrap_or("")),
                                 json_escape(r.first().map(String::as_str).unwrap_or("")),
                                 json_escape(r.get(1).map(String::as_str).unwrap_or("")),
                                 match r.get(2).map(String::as_str).unwrap_or("") {

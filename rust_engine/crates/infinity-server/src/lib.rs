@@ -1582,7 +1582,7 @@ fn column_sql_type(c: &ColumnDefWire) -> String {
 /// Applies a `CreateTable` request to the engine (or errors if no engine bound).
 /// Renders a wire `DEFAULT` value as SQL, quoting a bare string so that an empty
 /// or identifier-like value does not leave `DEFAULT` without a value.
-fn render_default(d: &str) -> String {
+pub(crate) fn render_default(d: &str) -> String {
     let t = d.trim();
     if t.is_empty() {
         "''".to_string()
