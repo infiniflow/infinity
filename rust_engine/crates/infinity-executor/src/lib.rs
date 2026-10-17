@@ -1221,11 +1221,14 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
         || type_text.trim().eq_ignore_ascii_case("BOOL")
     {
         let v = lit.trim();
-        // `NULL` arrives as literal text from the `INSERT` path.
+        // `NULL` arrives as literal text from the `INSERT` path, and the Thrift
+        // wire encodes booleans as 1/0.
         if !v.is_empty()
             && !v.eq_ignore_ascii_case("true")
             && !v.eq_ignore_ascii_case("false")
             && !v.eq_ignore_ascii_case("null")
+            && v != "1"
+            && v != "0"
         {
             return Err(Error::Invalid(
                 "parser: Boolean type should be true or false".into(),
@@ -2660,6 +2663,17 @@ impl Engine {
                     .get_table_by_name(table)?
                     .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
                 let schema = meta.columns.clone();
+                // An explicit column list must name existing columns; the C++
+                // engine reports this as a syntax error.
+                if let Some(cols) = columns.as_deref() {
+                    for c in cols {
+                        if !schema.iter().any(|s| s == c) {
+                            return Err(Error::Invalid(format!(
+                                "syntax: column '{c}' does not exist in table '{table}'"
+                            )));
+                        }
+                    }
+                }
                 let rows = align_insert_rows(&schema, &meta.defaults, columns.as_deref(), rows);
                 // enforce NOT NULL
                 for row in &rows {
