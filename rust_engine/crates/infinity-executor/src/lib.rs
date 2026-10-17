@@ -1618,7 +1618,10 @@ impl Engine {
             source: e,
         })?;
         let txn = TxnManager::open(wal_dir.join("wal.log"), store.clone())?;
-        txn.recover(0)?;
+        // Only replay what the KV store has not applied yet: a clean restart
+        // must not resurrect rows that were deleted after they were logged.
+        let applied = txn.applied_ts()?;
+        txn.recover(applied)?;
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()

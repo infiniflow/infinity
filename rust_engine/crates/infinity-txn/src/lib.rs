@@ -117,7 +117,11 @@ impl TxnManager {
             let mut wal = self.wal.lock().unwrap();
             wal.append(&WalRecord::new(txn.id, commit_ts, payload))?;
         }
-        self.store.atomic_write(&txn.writes)?;
+        // The applied-timestamp marker rides along with the batch, so a replay
+        // after a reopen never re-applies records that are already in the KV.
+        let mut writes = txn.writes.clone();
+        writes.push((APPLIED_TS_KEY.to_vec(), commit_ts.to_le_bytes().to_vec()));
+        self.store.atomic_write(&writes)?;
         Ok(commit_ts)
     }
 
@@ -137,6 +141,18 @@ impl TxnManager {
         Ok(applied)
     }
 
+    /// The highest commit timestamp already applied to the KV store.
+    pub fn applied_ts(&self) -> Result<TxnTimeStamp> {
+        Ok(self
+            .store
+            .get(APPLIED_TS_KEY)?
+            .and_then(|v| {
+                v.get(..8)
+                    .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
+            })
+            .unwrap_or(0))
+    }
+
     pub fn flush(&self) -> Result<()> {
         self.wal.lock().unwrap().flush()?;
         self.store.flush()
@@ -146,6 +162,9 @@ impl TxnManager {
         &self.wal_path
     }
 }
+
+/// Key of the applied-commit-timestamp marker in the row/meta store.
+const APPLIED_TS_KEY: &[u8] = b"meta:applied_ts";
 
 #[cfg(test)]
 mod tests {
