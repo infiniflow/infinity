@@ -4815,6 +4815,24 @@ impl Engine {
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
         }
+        // A trailing index name in `MATCH VECTOR (col, vec, 'float', 'l2', k,
+        // 'idx')` must reference an existing index.
+        if !is_tensor && !is_sparse {
+            if let Some(infinity_parser::ExprAst::Literal(infinity_parser::Literal::Str(name))) =
+                m.args.get(4)
+            {
+                let name = name.trim();
+                if !name.is_empty()
+                    && !self
+                        .catalog
+                        .list_indexes()?
+                        .iter()
+                        .any(|im| im.name == name)
+                {
+                    return Err(Error::NotFound(format!("index '{name}'")));
+                }
+            }
+        }
         // `USING INDEX (name)` must reference an existing index
         if let Some(list) = using_index {
             for name in list
