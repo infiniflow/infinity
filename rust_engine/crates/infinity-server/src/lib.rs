@@ -507,7 +507,7 @@ fn handle_connection(
                                 session_id: req.session_id,
                             },
                             Err(e) => CommonResponse {
-                                error_code: 1,
+                                error_code: e.status_code(),
                                 error_msg: e.to_string(),
                                 session_id: req.session_id,
                             },
@@ -706,7 +706,6 @@ fn handle_connection(
                 | "Command"
                 | "SetConfig"
                 | "Export"
-                | "Import"
                 | "AlterIndex"
                 | "DumpIndex"
                 | "CreateTableSnapshot"
@@ -741,6 +740,50 @@ fn handle_connection(
                     };
                     write_reply_common(&mut writer, &name, seq, &resp)?;
                 }
+                "Import" => {
+                    let req = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_import_args(&mut ip)?
+                    };
+                    let table = if req.db.is_empty() {
+                        req.table.clone()
+                    } else {
+                        format!("{}.{}", req.db, req.table)
+                    };
+                    let format = match req.file_type {
+                        1 => "JSON",
+                        2 => "JSONL",
+                        _ => "CSV",
+                    };
+                    let mut sql = format!(
+                        "COPY {table} FROM '{}' WITH ( DELIMITER '{}', FORMAT {format} )",
+                        req.file.replace('\'', "''"),
+                        req.delimiter.replace('\'', "''")
+                    );
+                    if req.has_header {
+                        sql.push_str(" ;");
+                    }
+                    let resp = match engine.as_ref() {
+                        Some(eng) => match eng.execute(&sql) {
+                            Ok(_) => CommonResponse {
+                                error_code: OK,
+                                error_msg: "OK".into(),
+                                session_id: req.session_id,
+                            },
+                            Err(e) => CommonResponse {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                session_id: req.session_id,
+                            },
+                        },
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: req.session_id,
+                        },
+                    };
+                    write_reply_common(&mut writer, "Import", seq, &resp)?;
+                }
                 "ShowColumns" => {
                     let (_sid, fields) = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -773,7 +816,7 @@ fn handle_connection(
                                 )
                             }
                             Err(e) => SelectResponseWire {
-                                error_code: 1,
+                                error_code: e.status_code(),
                                 error_msg: e.to_string(),
                                 column_defs: Vec::new(),
                                 column_fields: Vec::new(),
@@ -1035,7 +1078,7 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
             session_id: req.session_id,
         },
         Err(e) => CommonResponse {
-            error_code: 1,
+            error_code: e.status_code(),
             error_msg: e.to_string(),
             session_id: req.session_id,
         },
@@ -3661,7 +3704,7 @@ fn run_common(engine: Option<&Arc<Engine>>, sql: &str, session_id: i64) -> Commo
                 session_id,
             },
             Err(e) => CommonResponse {
-                error_code: 1,
+                error_code: e.status_code(),
                 error_msg: e.to_string(),
                 session_id,
             },
@@ -4564,4 +4607,66 @@ mod tests {
             }
         );
     }
+}
+
+/// `ImportRequest { 1: db_name, 2: table_name, 3: file_name, 4: ImportOption, 5: session_id }`
+/// where `ImportOption { 1: delimiter, 2: has_header, 3: copy_file_type }`.
+struct ImportArgs {
+    db: String,
+    table: String,
+    file: String,
+    delimiter: String,
+    has_header: bool,
+    file_type: i32,
+    session_id: i64,
+}
+
+fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ImportArgs> {
+    let mut args = ImportArgs {
+        db: String::new(),
+        table: String::new(),
+        file: String::new(),
+        delimiter: ",".into(),
+        has_header: false,
+        file_type: 0,
+        session_id: 0,
+    };
+    ip.read_struct_begin().map_err(tw)?; // Import_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request
+    ip.read_struct_begin().map_err(tw)?; // ImportRequest
+    loop {
+        let fd = ip.read_field_begin().map_err(tw)?;
+        if fd.field_type == TType::Stop {
+            break;
+        }
+        match (fd.id, fd.field_type) {
+            (Some(1), TType::String) => args.db = ip.read_string().map_err(tw)?,
+            (Some(2), TType::String) => args.table = ip.read_string().map_err(tw)?,
+            (Some(3), TType::String) => args.file = ip.read_string().map_err(tw)?,
+            (Some(4), TType::Struct) => {
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let of = ip.read_field_begin().map_err(tw)?;
+                    if of.field_type == TType::Stop {
+                        break;
+                    }
+                    match (of.id, of.field_type) {
+                        (Some(1), TType::String) => {
+                            args.delimiter = ip.read_string().map_err(tw)?
+                        }
+                        (Some(2), TType::Bool) => args.has_header = ip.read_bool().map_err(tw)?,
+                        (Some(3), TType::I32) => args.file_type = ip.read_i32().map_err(tw)?,
+                        _ => ip.skip(of.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
+            (Some(5), TType::I64) => args.session_id = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(fd.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(args)
 }

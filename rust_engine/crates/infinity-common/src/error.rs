@@ -42,4 +42,40 @@ impl Error {
             source,
         }
     }
+
+    /// The C++ `ErrorCode` this maps to (see `python/infinity_sdk/infinity/errors.py`).
+    /// The wire protocol sends this number, and the SDK turns it into
+    /// `InfinityException(code, msg)`, so the numbers must match the reference.
+    pub fn status_code(&self) -> i64 {
+        match self {
+            // 7012 PARSER_ERROR: data that does not parse for the column type.
+            Error::Invalid(m) if m.starts_with("parser:") => 7012,
+            // 3013 SYNTAX_ERROR vs 3014 INVALID_PARAMETER_VALUE.
+            Error::Invalid(m)
+                if m.starts_with("parse")
+                    || m.starts_with("syntax")
+                    || m.starts_with("unexpected") =>
+            {
+                3013
+            }
+            Error::Invalid(_) => 3014,
+            Error::NotFound(m) => {
+                let m = m.to_ascii_lowercase();
+                if m.starts_with("database") || m.starts_with("db ") {
+                    3021
+                } else if m.starts_with("index") {
+                    3023
+                } else if m.starts_with("column") {
+                    3024
+                } else if m.starts_with("table") {
+                    3022
+                } else {
+                    3022
+                }
+            }
+            // Everything else keeps the generic code the reference uses for
+            // internal failures.
+            _ => 1,
+        }
+    }
 }

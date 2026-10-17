@@ -1215,6 +1215,18 @@ fn validate_search_pseudo_columns(s: &SearchClause, items: &[SelectItem]) -> Res
 /// Validates an INSERT value against its declared column type (dimension or
 /// sparse index range).
 fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
+    // A BOOLEAN cell must be `true`/`false`; the C++ CSV reader rejects anything
+    // else with a parser error (`Boolean type should be true or false`).
+    if type_text.trim().eq_ignore_ascii_case("BOOLEAN")
+        || type_text.trim().eq_ignore_ascii_case("BOOL")
+    {
+        let v = lit.trim();
+        if !v.is_empty() && !v.eq_ignore_ascii_case("true") && !v.eq_ignore_ascii_case("false") {
+            return Err(Error::Invalid(
+                "parser: Boolean type should be true or false".into(),
+            ));
+        }
+    }
     if is_sparse_type(type_text) {
         return validate_sparse_literal(type_text, lit);
     }
