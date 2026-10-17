@@ -692,7 +692,10 @@ pub fn plan_select(
                         name: name.clone(),
                         args: args.clone(),
                     };
-                    names.push(name.to_ascii_lowercase());
+                    // Name the column after the expression, as the C++ engine
+                    // does (`year(c1)`, `datepart(c4, c1)`) — the SDK reads
+                    // results by that name.
+                    names.push(item_label(it));
                     exprs.push(compile_expr(&e, &schema)?);
                 }
                 SelectItem::Literal(l) => {
@@ -700,7 +703,7 @@ pub fn plan_select(
                     exprs.push(Expr::Literal(Value::from_literal(l)));
                 }
                 SelectItem::Expr(e) => {
-                    names.push("expr".to_string());
+                    names.push(key_text(e));
                     exprs.push(compile_expr(e, &schema)?);
                 }
                 SelectItem::Star => {
