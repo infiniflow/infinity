@@ -668,6 +668,26 @@ fn handle_connection(
                             };
                             run_common(engine.as_ref(), &sql, sid)
                         }
+                        "GetTable" if !name2.is_empty() => {
+                            let full = qualify(&name2);
+                            let exists = engine
+                                .as_ref()
+                                .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
+                                .is_some();
+                            if exists {
+                                CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: sid,
+                                }
+                            } else {
+                                CommonResponse {
+                                    error_code: 3022, // TABLE_NOT_EXIST
+                                    error_msg: format!("Table: {name2} doesn't exist."),
+                                    session_id: sid,
+                                }
+                            }
+                        }
                         "DropTable" if !name2.is_empty() => {
                             let full = qualify(&name2);
                             let exists = engine
@@ -1671,6 +1691,32 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
             session_id: req.session_id,
         };
     };
+    // A column name must start with a letter and contain only word characters.
+    for c in &req.columns {
+        if c.name.is_empty() {
+            return CommonResponse {
+                error_code: 3042, // EMPTY_COLUMN_NAME
+                error_msg: "empty column name".into(),
+                session_id: req.session_id,
+            };
+        }
+        let valid = c
+            .name
+            .chars()
+            .next()
+            .map(|ch| ch.is_ascii_alphabetic())
+            .unwrap_or(false)
+            && c.name
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '_');
+        if !valid {
+            return CommonResponse {
+                error_code: 3005, // INVALID_COLUMN_NAME
+                error_msg: format!("invalid column name '{}'", c.name),
+                session_id: req.session_id,
+            };
+        }
+    }
     let cols: Vec<String> = req
         .columns
         .iter()
@@ -4726,6 +4772,21 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
         .iter()
         .map(|c| {
             let key = c.rsplit('.').next().unwrap_or(c).to_ascii_lowercase();
+            // `unnest(col)` yields the array's element type, not the array.
+            let inner = c
+                .trim()
+                .strip_prefix("unnest(")
+                .and_then(|r| r.strip_suffix(')'))
+                .map(|r| r.trim())
+                .unwrap_or("");
+            if !inner.is_empty() {
+                if let Some(t) = map.get(&inner.to_ascii_lowercase()) {
+                    let up = t.to_ascii_uppercase();
+                    if let Some(rest) = up.strip_prefix("ARRAY(") {
+                        return rest.trim_end_matches(')').to_string();
+                    }
+                }
+            }
             if let Some(t) = map.get(&key) {
                 return t.clone();
             }
