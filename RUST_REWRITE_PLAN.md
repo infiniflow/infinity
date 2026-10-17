@@ -543,8 +543,8 @@ QueryContext::query(sql)
 - **Gate B — Python `test_knn` 已全绿（2026-10-17 夜）**：`pytest test_knn.py -q` **373 passed / 6 skipped / 0 failed，709 秒**（此前 16 failed）。`test_show` **24 passed / 1 skipped**、`test_update` **48 passed**、`test_table` **27 passed**（修：`CreateOption.conflict_type` 的 Ignore 为幂等成功、Replace 返回 3032、空列 3048、列名小写化）。
 
 ### Gate B — Go SDK 复测（2026-10-17 深夜，Rust 服务 + 私有 netns）
-- `go test -c ./tests` 后在同一 `bwrap --unshare-net` 沙箱内启动 Rust 服务（23817）并运行：整包只有 **`TestKNNWithGivenIndexNameAndIgnoreIndex`（l2/ip 两个子用例）失败**，其余全部通过（Go 未加 `-test.v` 时只打印失败项）。
-- 失败签名：`index_name` + `ignore_index=true` 的 SELECT 先正确返回 3013，随后服务端关闭连接（`Connection is closed` / `SelectResponse ... connection reset by peer`）。怀疑该请求的 Thrift 结构未被 `read_select_args`/`read_search_expr` 完整消费，回包后残留字节让下一帧解析失败而断开；需按字段逐字节核对（与 Python 侧 HTTP 无关）。
+- `go test -c ./tests` 后在同一 `bwrap --unshare-net` 沙箱内启动 Rust 服务（23817）并运行：**`-test.v` 全量 373 PASS / 0 FAIL，整包 PASS**。
+- 关键修复：`index_name` + `ignore_index=true` 此前在 **解码阶段**直接返回错误，导致 `SelectRequest` 剩余字段未消费、回包后下一帧解析失败而断开（Go 报 `Connection is closed`）。改为解码阶段不报错、把两个提示一并写进 `MATCH VECTOR` 的选项尾，由执行器在**请求已完整消费后**返回 3013。
 - 跑法：`go test -c -o /tmp/go_tests.test ./tests`；沙箱内 `INFINITY_BIND=127.0.0.1:23817`，并把 `test/data/**` 扁平复制到 `/var/infinity/test_data/`（Go 用例按该路径取夹具）。
 
 ### Gate C — 持久化与恢复
