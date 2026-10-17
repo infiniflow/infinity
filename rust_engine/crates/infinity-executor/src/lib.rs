@@ -1221,7 +1221,12 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
         || type_text.trim().eq_ignore_ascii_case("BOOL")
     {
         let v = lit.trim();
-        if !v.is_empty() && !v.eq_ignore_ascii_case("true") && !v.eq_ignore_ascii_case("false") {
+        // `NULL` arrives as literal text from the `INSERT` path.
+        if !v.is_empty()
+            && !v.eq_ignore_ascii_case("true")
+            && !v.eq_ignore_ascii_case("false")
+            && !v.eq_ignore_ascii_case("null")
+        {
             return Err(Error::Invalid(
                 "parser: Boolean type should be true or false".into(),
             ));
