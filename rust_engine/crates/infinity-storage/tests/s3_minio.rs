@@ -14,6 +14,7 @@ fn client(bucket: &str) -> Option<S3Client> {
         bucket: bucket.to_string(),
         access_key: "minioadmin".into(),
         secret_key: "minioadmin".into(),
+        https: std::env::var("INFINITY_MINIO_HTTPS").ok().as_deref() == Some("1"),
     }))
 }
 

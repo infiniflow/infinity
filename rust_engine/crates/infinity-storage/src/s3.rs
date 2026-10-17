@@ -12,6 +12,7 @@
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
+use std::sync::Arc;
 
 use hmac::{Hmac, Mac};
 use infinity_common::{Error, Result};
@@ -27,6 +28,38 @@ pub struct S3Config {
     pub bucket: String,
     pub access_key: String,
     pub secret_key: String,
+    /// Speak TLS to the endpoint (`enable_https = true`).
+    pub https: bool,
+}
+
+/// A plain or TLS byte stream to the object store.
+enum Transport {
+    Plain(TcpStream),
+    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
+}
+
+impl Read for Transport {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Transport::Plain(s) => s.read(buf),
+            Transport::Tls(s) => s.read(buf),
+        }
+    }
+}
+
+impl Write for Transport {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Transport::Plain(s) => s.write(buf),
+            Transport::Tls(s) => s.write(buf),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Transport::Plain(s) => s.flush(),
+            Transport::Tls(s) => s.flush(),
+        }
+    }
 }
 
 /// A signed S3 request, separated from the IO so signing can be unit-tested.
@@ -188,12 +221,8 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
-fn read_http_response(stream: &mut TcpStream) -> Result<HttpResponse> {
-    let mut reader = BufReader::new(
-        stream
-            .try_clone()
-            .map_err(|e| Error::Storage(e.to_string()))?,
-    );
+fn read_http_response(stream: &mut impl Read) -> Result<HttpResponse> {
+    let mut reader = BufReader::new(stream);
     let mut status_line = String::new();
     reader
         .read_line(&mut status_line)
@@ -287,8 +316,7 @@ impl S3Client {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let req = sign_request(&self.cfg, method, key, params, body, now);
-        let mut stream = TcpStream::connect(&self.cfg.endpoint)
-            .map_err(|e| Error::Storage(format!("S3 connect {}: {e}", self.cfg.endpoint)))?;
+        let mut stream = self.connect()?;
         let mut head = format!("{} {} HTTP/1.1\r\n", req.method, req.target);
         for (k, v) in &req.headers {
             head.push_str(&format!("{k}: {v}\r\n"));
@@ -300,6 +328,35 @@ impl S3Client {
             .map_err(|e| Error::Storage(format!("S3 write: {e}")))?;
         stream.flush().map_err(|e| Error::Storage(e.to_string()))?;
         read_http_response(&mut stream)
+    }
+
+    fn connect(&self) -> Result<Transport> {
+        let tcp = TcpStream::connect(&self.cfg.endpoint)
+            .map_err(|e| Error::Storage(format!("S3 connect {}: {e}", self.cfg.endpoint)))?;
+        if !self.cfg.https {
+            return Ok(Transport::Plain(tcp));
+        }
+        let mut roots = rustls::RootCertStore::empty();
+        let native = rustls_native_certs::load_native_certs();
+        for cert in native.certs {
+            let _ = roots.add(cert);
+        }
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        let host = self
+            .cfg
+            .endpoint
+            .rsplit_once(':')
+            .map(|(h, _)| h)
+            .unwrap_or(&self.cfg.endpoint);
+        let server = rustls::pki_types::ServerName::try_from(host.to_string())
+            .map_err(|e| Error::Storage(format!("bad TLS host '{host}': {e}")))?;
+        let conn = rustls::ClientConnection::new(Arc::new(config), server)
+            .map_err(|e| Error::Storage(format!("TLS handshake: {e}")))?;
+        Ok(Transport::Tls(Box::new(rustls::StreamOwned::new(
+            conn, tcp,
+        ))))
     }
 
     fn check(resp: HttpResponse, what: &str) -> Result<Vec<u8>> {
@@ -485,6 +542,7 @@ mod tests {
             bucket: "infinity".into(),
             access_key: "minioadmin".into(),
             secret_key: "minioadmin".into(),
+            https: false,
         }
     }
 

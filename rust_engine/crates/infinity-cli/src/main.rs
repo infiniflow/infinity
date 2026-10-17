@@ -85,10 +85,7 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         let endpoint = toml_value(&text, "url").unwrap_or_default();
         let bucket = toml_value(&text, "bucket_name").unwrap_or_default();
         let https = toml_value(&text, "enable_https").unwrap_or_default();
-        if https.eq_ignore_ascii_case("true") {
-            eprintln!("object store: enable_https is not supported; keeping data local");
-            None
-        } else if endpoint.is_empty() || bucket.is_empty() {
+        if endpoint.is_empty() || bucket.is_empty() {
             eprintln!("object store: url/bucket_name missing; keeping data local");
             None
         } else {
@@ -97,6 +94,7 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
                 bucket,
                 access_key: toml_value(&text, "access_key").unwrap_or_default(),
                 secret_key: toml_value(&text, "secret_key").unwrap_or_default(),
+                https: https.eq_ignore_ascii_case("true"),
             });
             match client.ensure_bucket() {
                 Ok(()) => Some(Arc::new(client)),
