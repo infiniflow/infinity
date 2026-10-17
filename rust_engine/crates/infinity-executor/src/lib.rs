@@ -1570,6 +1570,44 @@ fn parse_value(cell: &str) -> Value {
     }
 }
 
+/// Bounds how many full-table scans (full-text or vector) run at once. Each
+/// such scan materialises a large share of the table, so several concurrent
+/// readers can exhaust the process's memory even when a single query fits.
+struct ScanGate {
+    active: Mutex<usize>,
+    cv: std::sync::Condvar,
+    limit: usize,
+}
+
+impl ScanGate {
+    fn new(limit: usize) -> Self {
+        Self {
+            active: Mutex::new(0),
+            cv: std::sync::Condvar::new(),
+            limit: limit.max(1),
+        }
+    }
+
+    fn enter(&self) -> ScanSlot<'_> {
+        let mut active = self.active.lock().unwrap();
+        while *active >= self.limit {
+            active = self.cv.wait(active).unwrap();
+        }
+        *active += 1;
+        ScanSlot(self)
+    }
+}
+
+struct ScanSlot<'a>(&'a ScanGate);
+
+impl Drop for ScanSlot<'_> {
+    fn drop(&mut self) {
+        let mut active = self.0.active.lock().unwrap();
+        *active = active.saturating_sub(1);
+        self.0.cv.notify_one();
+    }
+}
+
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
 pub struct Engine {
     catalog: Catalog,
@@ -1609,6 +1647,8 @@ pub struct Engine {
     /// Object store backing the C++-format data files (`storage_type =
     /// "minio"`). `None` keeps everything on the local disk.
     object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
+    /// Concurrency limit for full-table text/vector scans.
+    scan_gate: ScanGate,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1688,6 +1728,12 @@ impl Engine {
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
             object_store: Mutex::new(None),
+            scan_gate: ScanGate::new(
+                std::env::var("INFINITY_SCAN_CONCURRENCY")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(2),
+            ),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -4425,6 +4471,9 @@ impl Engine {
         pred: Option<&Expr>,
         hidden: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
+        // A full-text scan holds the whole table's token data; bound how many
+        // run at once so a handful of concurrent readers cannot exhaust memory.
+        let _scan = self.scan_gate.enter();
         let schema = self.table_schema(table)?;
         // A full-text search runs through an index; without one the C++ engine
         // refuses the statement.
@@ -5874,6 +5923,10 @@ impl Engine {
         if !m.kind.eq_ignore_ascii_case("VECTOR") && !is_sparse && !is_tensor {
             return Ok((Vec::new(), hidden));
         }
+        // A vector/sparse/tensor scan also reads most of the table; share the
+        // same bound as full-text scans (acquired after the TEXT early return,
+        // which takes the slot itself).
+        let _scan = self.scan_gate.enter();
         // A trailing index name in `MATCH VECTOR (col, vec, 'float', 'l2', k,
         // 'idx')` must reference an existing index.
         if !is_tensor && !is_sparse {
