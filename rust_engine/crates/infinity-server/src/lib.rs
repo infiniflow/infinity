@@ -740,6 +740,46 @@ fn handle_connection(
                     };
                     write_reply_common(&mut writer, &name, seq, &resp)?;
                 }
+                "Explain" => {
+                    let (req, etype) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_explain_args(&mut ip)?
+                    };
+                    let kind = match etype {
+                        4 => "PHYSICAL",
+                        6 => "FRAGMENT",
+                        _ => "PHYSICAL",
+                    };
+                    let sql = format!("EXPLAIN {kind} {}", req.to_sql());
+                    let resp = match engine.as_ref() {
+                        Some(eng) => match eng.execute(&sql) {
+                            Ok(rs) => {
+                                let mut rows: Vec<Vec<String>> = Vec::new();
+                                for r in rs {
+                                    if let QueryResult::Rows { rows: rw, .. } = r {
+                                        rows = rw;
+                                    }
+                                }
+                                select_response_from_typed(&["explain".to_string()], &[], &rows)
+                            }
+                            Err(e) => SelectResponseWire {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                column_defs: Vec::new(),
+                                column_fields: Vec::new(),
+                                extra_result: String::new(),
+                            },
+                        },
+                        None => SelectResponseWire {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            column_defs: Vec::new(),
+                            column_fields: Vec::new(),
+                            extra_result: String::new(),
+                        },
+                    };
+                    write_result_response(&mut writer, seq, "Explain", &resp)?;
+                }
                 "Import" => {
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -2129,10 +2169,21 @@ pub fn write_select_response(
     seq: i32,
     resp: &SelectResponseWire,
 ) -> Result<()> {
+    write_result_response(w, seq, "Select", resp)
+}
+
+/// The same shape as `SelectResponse` (error_code, error_msg, column_defs,
+/// column_fields) under any method name — `Explain` returns the same structure.
+pub fn write_result_response(
+    w: &mut impl Write,
+    seq: i32,
+    method: &str,
+    resp: &SelectResponseWire,
+) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
-    o.write_message_begin(&TMessageIdentifier::new("Select", TMessageType::Reply, seq))
+    o.write_message_begin(&TMessageIdentifier::new(method, TMessageType::Reply, seq))
         .map_err(tw)?;
-    o.write_struct_begin(&TStructIdentifier::new("Select_result"))
+    o.write_struct_begin(&TStructIdentifier::new(format!("{method}_result")))
         .map_err(tw)?;
     o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
         .map_err(tw)?;
@@ -4223,6 +4274,57 @@ pub fn write_show_table_response(
     o.write_struct_end().map_err(tw)?; // ShowTable_result
     o.flush().map_err(tw)?;
     Ok(())
+}
+
+/// `ExplainRequest`: the `SelectRequest` prefix plus `13: ExplainType`.
+fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(SelectReq, i32)> {
+    let mut req = SelectReq {
+        session_id: 0,
+        db_name: String::new(),
+        table_name: String::new(),
+        columns: Vec::new(),
+        star: false,
+        where_sql: None,
+        order_by: None,
+        limit: None,
+    };
+    let mut explain_type = 4; // Physical
+    ip.read_struct_begin().map_err(tw)?; // Explain_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request
+    ip.read_struct_begin().map_err(tw)?; // ExplainRequest
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => req.session_id = ip.read_i64().map_err(tw)?,
+            Some(2) => req.db_name = ip.read_string().map_err(tw)?,
+            Some(3) => req.table_name = ip.read_string().map_err(tw)?,
+            Some(4) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    let (names, star) = read_select_item(ip)?;
+                    req.columns.extend(names);
+                    req.star |= star;
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(7) if f.field_type == TType::Struct => req.where_sql = read_where(ip)?,
+            Some(10) if f.field_type == TType::Struct => {
+                if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
+                    req.limit = Some(n);
+                }
+            }
+            Some(12) => req.order_by = read_order_by(ip)?,
+            Some(13) => explain_type = ip.read_i32().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?; // ExplainRequest
+    end_args(ip)?; // Explain_args
+    Ok((req, explain_type))
 }
 
 /// `ImportRequest { 1: db_name, 2: table_name, 3: file_name, 4: ImportOption, 5: session_id }`

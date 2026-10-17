@@ -2,7 +2,7 @@
 //! §2.6.1, task #68).
 //!
 //! `write_cpp_blocks` mirrors every row of a table into
-//! `{data_dir}/blocks/db_{db}/tbl_{table}/seg_{seg}/blk_{blk}/` using the byte
+//! `{data_dir}/data/db_{db}/tbl_{table}/seg_{seg}/blk_{blk}/` using the byte
 //! layouts frozen in `rust_engine/docs/CPP_FORMAT_SPEC.md` §1/§8 — the same
 //! files the C++ engine opens. `read_cpp_blocks` reads them back **without**
 //! touching the KV store, which is how the round-trip tests prove the mirror is
@@ -891,9 +891,10 @@ fn decode_value(
 }
 
 impl Engine {
-    /// Root of the C++-format block mirror.
+    /// Root of the C++-format block mirror. The C++ engine keeps the table
+    /// data under `<data_dir>/data/db_{db}/…`, next to `<data_dir>/catalog`.
     fn blocks_root(&self) -> PathBuf {
-        self.dir.join("blocks")
+        self.dir.join("data")
     }
 
     /// Qualifies an unqualified table name with the session database, which is
@@ -906,7 +907,7 @@ impl Engine {
         }
     }
 
-    /// Writes `table`'s rows into `{data_dir}/blocks/db_{db}/tbl_{id}/seg_0/…`
+    /// Writes `table`'s rows into `{data_dir}/data/db_{db}/tbl_{id}/seg_0/…`
     /// in the C++ block layout, returning the number of rows written.
     ///
     /// Rows are chunked `DEFAULT_BLOCK_CAPACITY` (8192) per block, as C++ does.
@@ -1310,7 +1311,7 @@ impl Engine {
     }
 
     /// Writes `table`'s index as a C++ HNSW chunk file under
-    /// `{data_dir}/blocks/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_0.idx`,
+    /// `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_0.idx`,
     /// returning how many vectors were written (task #70).
     pub fn write_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
         let table = self.qualified_table(table);
@@ -1691,7 +1692,7 @@ mod tests {
         assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
         // The C++ file names exist under the mirror root (`tbl_{id}` uses the
         // catalog's table id, so discover it rather than hardcoding).
-        let db_dir = dir.path().join("blocks").join("db_0");
+        let db_dir = dir.path().join("data").join("db_0");
         let tbl_dir = std::fs::read_dir(&db_dir)
             .unwrap()
             .filter_map(|e| e.ok())
@@ -1907,7 +1908,7 @@ mod tests {
 
         assert_eq!(engine.write_cpp_blocks("ts").unwrap(), 2);
         // The outline holds the raw element bytes: 3 vectors * dim 3 * 4 bytes.
-        let db_dir = dir.path().join("blocks").join("db_0");
+        let db_dir = dir.path().join("data").join("db_0");
         let tbl_dir = std::fs::read_dir(&db_dir)
             .unwrap()
             .filter_map(|e| e.ok())
