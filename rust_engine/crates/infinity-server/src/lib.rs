@@ -2647,12 +2647,55 @@ impl SelectReq {
     }
 }
 
-/// A decoded `ParsedExpr` (subset): a column reference, a constant, or unknown.
+/// A decoded `ParsedExpr` (subset): a column reference, a constant, a function
+/// call (rendered back to SQL text), or unknown.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PExpr {
     Column(String),
     Value(ValueLit),
+    Call(String, Vec<PExpr>),
     Other,
+}
+
+/// Renders a decoded `ParsedExpr` back to SQL text, so a projected function
+/// (`year(c1)`, `datepart(c4, c1)`) can be sent to the engine as-is.
+pub fn pexpr_sql(e: &PExpr) -> String {
+    match e {
+        PExpr::Column(c) => c.clone(),
+        PExpr::Value(v) => v.to_sql(),
+        PExpr::Call(n, a) => format!(
+            "{}({})",
+            n,
+            a.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ")
+        ),
+        PExpr::Other => String::new(),
+    }
+}
+
+/// Reads a `FunctionExpr`: `{1: string function_name, 2: list<ParsedExpr> arguments}`.
+fn read_function_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(String, Vec<PExpr>)> {
+    ip.read_struct_begin().map_err(tw)?;
+    let (mut name, mut args) = (String::new(), Vec::new());
+    loop {
+        let g = ip.read_field_begin().map_err(tw)?;
+        if g.field_type == TType::Stop {
+            break;
+        }
+        match g.id {
+            Some(1) => name = ip.read_string().map_err(tw)?,
+            Some(2) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    args.push(read_pexpr(ip)?);
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            _ => ip.skip(g.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok((name, args))
 }
 
 /// Reads any `ParsedExpr`, extracting the `ConstantExpr`/`ColumnExpr` form.
@@ -2674,6 +2717,10 @@ pub fn read_pexpr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<PExpr
                 Some(2) if uf.field_type == TType::Struct => {
                     let (names, _) = read_column_expr(ip)?;
                     out = PExpr::Column(names.into_iter().next().unwrap_or_default());
+                }
+                Some(3) if uf.field_type == TType::Struct => {
+                    let (name, args) = read_function_expr(ip)?;
+                    out = PExpr::Call(name, args);
                 }
                 _ => ip.skip(uf.field_type).map_err(tw)?,
             }
@@ -2798,6 +2845,11 @@ fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
                 let (n, s) = read_column_expr(ip)?;
                 names = n;
                 star = s;
+            } else if uf.id == Some(3) && uf.field_type == TType::Struct {
+                // A projected function: send it to the engine as expression text
+                // (`year(c1)`), which is also the output column name.
+                let (name, args) = read_function_expr(ip)?;
+                names.push(pexpr_sql(&PExpr::Call(name, args)));
             } else if uf.field_type == TType::Struct {
                 // consume the nested expression struct explicitly (a `skip` on
                 // a struct holding lists can under-consume)
