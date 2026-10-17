@@ -1041,7 +1041,7 @@ fn handle_connection(
                 // Database snapshots are stored as one blob per database; a
                 // `RestoreSnapshot` with `scope="database"` restores it (the
                 // table scope falls through to the SQL statement).
-                "CreateDatabaseSnapshot" | "RestoreSnapshot" => {
+                "CreateDatabaseSnapshot" | "CreateSystemSnapshot" | "RestoreSnapshot" => {
                     let (sid, fields) = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_string_request(&mut ip)?
@@ -1052,7 +1052,12 @@ fn handle_connection(
                             let res = if name == "CreateDatabaseSnapshot" {
                                 // `{2: db_name, 3: snapshot_name}`
                                 eng.create_database_snapshot(&get(3), &get(2))
-                            } else if get(3).eq_ignore_ascii_case("database") {
+                            } else if name == "CreateSystemSnapshot" {
+                                // `{2: snapshot_name}`
+                                eng.create_system_snapshot(&get(2))
+                            } else if get(3).eq_ignore_ascii_case("database")
+                                || get(3).eq_ignore_ascii_case("system")
+                            {
                                 // `{2: snapshot_name, 3: scope}`
                                 eng.restore_database_snapshot(&get(2))
                             } else {
@@ -1088,7 +1093,6 @@ fn handle_connection(
                 | "AlterIndex"
                 | "DumpIndex"
                 | "CreateTableSnapshot"
-                | "CreateSystemSnapshot"
                 | "DropSnapshot"
                 | "RenameTable" => {
                     let (sid, fields) = {

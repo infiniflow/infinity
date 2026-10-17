@@ -2366,6 +2366,10 @@ impl Engine {
                 // The default database backs every session, so the C++ engine
                 // refuses to drop it (3033 DROPPING_USING_DB).
                 if name.eq_ignore_ascii_case("default_db") {
+                    // `IF EXISTS` tolerates it (a no-op); a plain drop is 3033.
+                    if *if_exists {
+                        return Ok(QueryResult::DroppedDatabase { name: name.clone() });
+                    }
                     return Err(Error::Invalid(
                         "dropping the current database is not allowed".into(),
                     ));
@@ -3678,7 +3682,10 @@ impl Engine {
                 )
             })
             .collect();
-        out.push_str(&idxs.join(&SNAP_REC.to_string()));
+        // Indexes use their own separator: SNAP_REC also terminates the block,
+        // so encoding them with SNAP_REC would make the decoder treat the 2nd..
+        // index as a data row.
+        out.push_str(&idxs.join("\n"));
         out.push(SNAP_REC);
         for (_, row) in &rows {
             out.push_str(
@@ -3727,7 +3734,7 @@ impl Engine {
         let indexes: Vec<(String, String, String, Vec<(String, String)>)> = recs
             .next()
             .unwrap_or_default()
-            .split(SNAP_REC)
+            .split('\n')
             .filter(|s| !s.is_empty())
             .map(|s| {
                 let mut f = s.split(SNAP_FLD);
@@ -3794,6 +3801,19 @@ impl Engine {
             .into_iter()
             .filter(|m| m.name.starts_with(&prefix))
         {
+            if !out.is_empty() {
+                out.push(DB_SNAP_SEP);
+            }
+            out.push_str(&self.snapshot_table_blob(&meta.name)?);
+        }
+        self.store.put(&snap_key(name), out.as_bytes())?;
+        Ok(())
+    }
+
+    /// `CREATE SYSTEM SNAPSHOT <name>`: every table of every database.
+    pub fn create_system_snapshot(&self, name: &str) -> Result<()> {
+        let mut out = String::new();
+        for meta in self.catalog.list_tables()? {
             if !out.is_empty() {
                 out.push(DB_SNAP_SEP);
             }
