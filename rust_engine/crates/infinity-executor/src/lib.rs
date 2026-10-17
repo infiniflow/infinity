@@ -1896,6 +1896,32 @@ impl Engine {
     fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
+                // A sparse column's element type must be a float and its
+                // dimension positive.
+                for c in columns {
+                    let up = c.type_text.to_ascii_uppercase();
+                    if up.starts_with("SPARSE(") {
+                        let inner =
+                            c.type_text[c.type_text.find('(').unwrap() + 1..].trim_end_matches(')');
+                        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                        let elem = parts
+                            .first()
+                            .map(|s| s.to_ascii_lowercase())
+                            .unwrap_or_default();
+                        if !matches!(elem.as_str(), "float" | "float32" | "double") {
+                            return Err(Error::Invalid(format!(
+                                "invalid element type '{elem}' for a sparse column"
+                            )));
+                        }
+                        let dim: i64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                        if dim <= 0 {
+                            return Err(Error::Invalid(format!(
+                                "invalid sparse dimension {dim} for column '{}'",
+                                c.name
+                            )));
+                        }
+                    }
+                }
                 // A vector-like column's declared dimension must be positive.
                 for c in columns {
                     if !declares_dimension(&c.type_text) {

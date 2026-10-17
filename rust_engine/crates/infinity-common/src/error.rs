@@ -67,6 +67,16 @@ impl Error {
             Error::Invalid(m) if m.contains("index requires a") => 3009,
             // 3077 ANALYZER_NOT_FOUND.
             Error::Invalid(m) if m.starts_with("analyzer '") && m.ends_with("not found") => 3077,
+            // 3061 INVALID_INDEX_PARAM (BMP/PLAID option validation).
+            Error::Invalid(m)
+                if m.starts_with("block_size ")
+                    || m.starts_with("unsupported compress_type")
+                    || m.starts_with("nbits ")
+                    || m.starts_with("invalid element type")
+                    || m.starts_with("invalid sparse dimension") =>
+            {
+                3061
+            }
             // 3061 INVALID_INDEX_PARAM.
             Error::Invalid(m) if m.starts_with("invalid index parameter") => 3061,
             // 3017 DUPLICATE_TABLE_NAME (catalog wording).
