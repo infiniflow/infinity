@@ -3006,6 +3006,10 @@ pub fn pexpr_sql(e: &PExpr) -> String {
     match e {
         PExpr::Column(c) => c.clone(),
         PExpr::Value(v) => v.to_sql(),
+        // The SDK sends a projected binary expression as `FunctionExpr("+", [a, b])`.
+        PExpr::Call(n, a) if a.len() == 2 && is_binary_op(n) => {
+            format!("({} {n} {})", pexpr_sql(&a[0]), pexpr_sql(&a[1]))
+        }
         PExpr::Call(n, a) => format!(
             "{}({})",
             n,
@@ -3013,6 +3017,27 @@ pub fn pexpr_sql(e: &PExpr) -> String {
         ),
         PExpr::Other => String::new(),
     }
+}
+
+/// Arithmetic/comparison operators the SDK encodes as two-argument functions.
+fn is_binary_op(name: &str) -> bool {
+    matches!(
+        name,
+        "+" | "-"
+            | "*"
+            | "/"
+            | "%"
+            | "="
+            | "=="
+            | "!="
+            | "<>"
+            | "<"
+            | "<="
+            | ">"
+            | ">="
+            | "and"
+            | "or"
+    )
 }
 
 /// Reads a `FunctionExpr`: `{1: string function_name, 2: list<ParsedExpr> arguments}`.
