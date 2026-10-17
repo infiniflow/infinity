@@ -415,10 +415,26 @@ fn compile_agg_expr(
 
 /// A canonical text for an expression, used to match select items against
 /// GROUP BY keys (both are parsed from the same query text).
+/// A literal as the reference prints it in an expression name (`0.1`, not
+/// `0.100000`).
+fn name_literal(l: &infinity_parser::Literal) -> String {
+    match l {
+        infinity_parser::Literal::Float(f) => {
+            let s = format!("{f}");
+            if s.contains('.') || s.contains('e') {
+                s
+            } else {
+                format!("{s}.0")
+            }
+        }
+        other => other.to_slt_string(),
+    }
+}
+
 fn key_text(e: &ExprAst) -> String {
     match e {
         ExprAst::Column(c) => c.clone(),
-        ExprAst::Literal(l) => l.to_slt_string(),
+        ExprAst::Literal(l) => name_literal(l),
         ExprAst::Func { name, args } => format!(
             "{}({})",
             name.to_ascii_lowercase(),
@@ -432,7 +448,7 @@ fn key_text(e: &ExprAst) -> String {
                 infinity_parser::BinOp::Div => "/",
                 infinity_parser::BinOp::Mod => "%",
             };
-            format!("{} {} {}", key_text(a), sym, key_text(b))
+            format!("({} {} {})", key_text(a), sym, key_text(b))
         }
         ExprAst::Cmp(a, op, b) => {
             format!("{} {} {}", key_text(a), op.as_str(), key_text(b))
