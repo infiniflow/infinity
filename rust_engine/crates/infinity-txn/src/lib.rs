@@ -7,7 +7,7 @@
 #![forbid(unsafe_code)]
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use infinity_common::{Error, Result, TxnTimeStamp};
@@ -76,6 +76,11 @@ pub struct TxnManager {
     wal_path: PathBuf,
     next_txn_id: AtomicU64,
     next_ts: AtomicU64,
+    /// Highest commit timestamp already written to the KV store.
+    last_commit: AtomicU64,
+    /// Commits that appended to the WAL but have not finished applying to the
+    /// KV yet; a checkpoint must not truncate the WAL while one is in flight.
+    inflight: AtomicUsize,
 }
 
 impl TxnManager {
@@ -83,6 +88,13 @@ impl TxnManager {
     pub fn open(wal_path: impl Into<PathBuf>, store: Arc<dyn MetaStore>) -> Result<Self> {
         let wal_path = wal_path.into();
         let recs = WalManager::read_all(&wal_path)?;
+        let applied_ts = store
+            .get(APPLIED_TS_KEY)?
+            .and_then(|v| {
+                v.get(..8)
+                    .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
+            })
+            .unwrap_or(0);
         let max_ts = recs.iter().map(|r| r.commit_ts).max().unwrap_or(0);
         let max_id = recs.iter().map(|r| r.txn_id).max().unwrap_or(0);
         let wal = WalManager::open(&wal_path)?;
@@ -91,7 +103,11 @@ impl TxnManager {
             wal: Mutex::new(wal),
             wal_path,
             next_txn_id: AtomicU64::new(max_id + 1),
-            next_ts: AtomicU64::new(max_ts + 1),
+            // A checkpoint may have truncated the WAL, so the applied marker in
+            // the KV store is the other source of the timestamp high-water mark.
+            next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
+            last_commit: AtomicU64::new(applied_ts),
+            inflight: AtomicUsize::new(0),
         })
     }
 
@@ -112,6 +128,7 @@ impl TxnManager {
             return Err(Error::Txn("empty transaction".into()));
         }
         let commit_ts = self.next_ts.fetch_add(1, Ordering::SeqCst);
+        self.inflight.fetch_add(1, Ordering::SeqCst);
         let payload = encode_writes(&txn.writes);
         {
             let mut wal = self.wal.lock().unwrap();
@@ -121,7 +138,10 @@ impl TxnManager {
         // after a reopen never re-applies records that are already in the KV.
         let mut writes = txn.writes.clone();
         writes.push((APPLIED_TS_KEY.to_vec(), commit_ts.to_le_bytes().to_vec()));
-        self.store.atomic_write(&writes)?;
+        let written = self.store.atomic_write(&writes);
+        self.last_commit.store(commit_ts, Ordering::SeqCst);
+        self.inflight.fetch_sub(1, Ordering::SeqCst);
+        written?;
         Ok(commit_ts)
     }
 
@@ -151,6 +171,23 @@ impl TxnManager {
                     .map(|b| TxnTimeStamp::from_le_bytes(b.try_into().unwrap()))
             })
             .unwrap_or(0))
+    }
+
+    /// Empties the WAL when every record in it has already been applied to the
+    /// KV store (and the store has been fsynced). The `meta:applied_ts` marker
+    /// keeps recovery correct; this only bounds the WAL's size, as the
+    /// reference does at a checkpoint.
+    pub fn truncate_wal_if_applied(&self) -> Result<bool> {
+        let applied = self.applied_ts()?;
+        if applied == 0 || applied != self.last_commit.load(Ordering::SeqCst) {
+            return Ok(false);
+        }
+        let mut wal = self.wal.lock().unwrap();
+        if self.inflight.load(Ordering::SeqCst) != 0 {
+            return Ok(false);
+        }
+        wal.truncate_all()?;
+        Ok(true)
     }
 
     pub fn flush(&self) -> Result<()> {

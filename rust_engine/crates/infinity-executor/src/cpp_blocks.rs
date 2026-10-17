@@ -35,6 +35,36 @@ pub struct LoadedVectorIndex {
     pub labels: Vec<u32>,
 }
 
+/// A table whose estimated encoded size exceeds this keeps only the engine's
+/// own row store. The C++ block mirror duplicates every row, so mirroring a
+/// multi-gigabyte table would double its disk footprint; the mirror is a
+/// best-effort interop artifact, not the system of record.
+const MIRROR_BUDGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+
+/// Rough encoded bytes per row, from the declared column types.
+fn estimated_row_bytes(types: &[String]) -> usize {
+    types
+        .iter()
+        .map(|t| {
+            let up = t.trim().to_ascii_uppercase();
+            let dim = crate::type_dim(t).unwrap_or(0);
+            if dim > 0
+                && (up.starts_with("VECTOR")
+                    || up.starts_with("EMBEDDING")
+                    || up.starts_with("MULTIVECTOR")
+                    || up.starts_with("TENSOR"))
+            {
+                return dim * 4;
+            }
+            if up.starts_with("SPARSE") {
+                return dim * 8;
+            }
+            64
+        })
+        .sum::<usize>()
+        .max(1)
+}
+
 /// `chunk_{id}.idx` files under `dir`, ordered by chunk id. The reference
 /// appends one chunk per memory-index dump and merges them on optimize.
 fn hnsw_chunks(dir: &std::path::Path) -> Vec<(u64, PathBuf)> {
@@ -1054,7 +1084,11 @@ impl Engine {
     /// mis-encoded.
     pub fn flush_cpp_blocks(&self) -> Result<()> {
         for meta in self.catalog.list_tables()? {
-            if meta.types.iter().all(|t| column_type_of(t).is_some()) {
+            let rows = self.approx_row_count(&meta.name);
+            let per_row = estimated_row_bytes(&meta.types);
+            if meta.types.iter().all(|t| column_type_of(t).is_some())
+                && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
+            {
                 self.write_cpp_blocks(&meta.name)?;
             }
             // A dropped index must not leave its `idx_{id}` mirror behind.

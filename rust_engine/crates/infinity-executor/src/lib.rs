@@ -2003,6 +2003,18 @@ impl Engine {
             .remove(table.split('.').next_back().unwrap_or(table));
     }
 
+    /// Upper bound on the rows ever reserved for `table`, from the in-memory
+    /// counter (no scan). Used to decide whether the C++ block mirror is worth
+    /// its duplicate copy of a large table.
+    fn approx_row_count(&self, table: &str) -> usize {
+        let key = table
+            .split('.').next_back().unwrap_or(table).to_string();
+        match self.row_counters.lock().unwrap().get(&key) {
+            Some((seg, off, _)) => ((*seg as u64) << 32 | *off as u64) as usize,
+            None => 0,
+        }
+    }
+
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     fn bump_writes(&self, table: &str) {
         let key = table
@@ -6382,6 +6394,10 @@ impl Engine {
     pub fn flush(&self) -> Result<()> {
         self.catalog.flush()?;
         self.txn.flush()?;
+        // The KV store is now durable: everything the WAL holds is already in
+        // it, so the log can be emptied (the reference truncates at a
+        // checkpoint too). `meta:applied_ts` keeps recovery correct.
+        let _ = self.txn.truncate_wal_if_applied();
         self.flush_cpp_blocks()?;
         // Mirror the catalog into the C++ key space / value encoding, in the
         // catalog store at `<dir>/catalog` (the path the C++ engine uses), so a

@@ -124,6 +124,16 @@ impl WalManager {
         self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
 
+    /// Empties the file (used at a checkpoint once every record is applied to
+    /// the KV store). The append handle stays usable: with `O_APPEND` the next
+    /// write lands at the new end of file.
+    pub fn truncate_all(&mut self) -> Result<()> {
+        self.file
+            .set_len(0)
+            .map_err(|e| Error::io(&self.path, e))?;
+        self.file.sync_all().map_err(|e| Error::io(&self.path, e))
+    }
+
     /// Reads all valid records from a WAL file path.
     pub fn read_all(path: impl AsRef<Path>) -> Result<Vec<WalRecord>> {
         let path = path.as_ref();
