@@ -313,6 +313,7 @@ pub enum Statement {
     },
     DropTable {
         name: String,
+        if_exists: bool,
     },
     DropIndex {
         name: String,

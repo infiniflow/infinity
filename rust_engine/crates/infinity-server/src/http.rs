@@ -325,6 +325,12 @@ fn safe_ident(name: &str) -> Option<&str> {
     }
 }
 
+/// Validates an identifier and normalises it to lower case (the catalog keeps
+/// canonical lower-case names).
+fn ident(name: &str) -> Option<String> {
+    safe_ident(name).map(|n| n.to_ascii_lowercase())
+}
+
 /// `vector,4,float` (the REST spelling) -> `Embedding(float,4)`.
 fn type_to_sql(ty: &str) -> String {
     let parts: Vec<&str> = ty.split(',').map(|s| s.trim()).collect();
@@ -555,7 +561,8 @@ fn create_option_sql(body: &Json) -> std::result::Result<(bool, bool), (u16, Str
         Some(v) => match v.as_str().unwrap_or("") {
             "error" => Ok((false, false)),
             "ignore_if_exists" => Ok((true, false)),
-            "replace_if_exists" => Ok((false, true)),
+            // The reference does not implement replace yet.
+            "replace_if_exists" => Err(err_response(3032, "not supported: replace_if_exists")),
             other => Err(err_response(
                 3074,
                 &format!("invalid create option: {other}"),
@@ -570,7 +577,7 @@ fn drop_option_sql(body: &Json) -> std::result::Result<bool, (u16, String)> {
         Some(v) => match v.as_str().unwrap_or("") {
             "error" => Ok(false),
             "ignore_if_not_exists" => Ok(true),
-            other => Err(err_response(3074, &format!("invalid drop option: {other}"))),
+            other => Err(err_response(3075, &format!("invalid drop option: {other}"))),
         },
     }
 }
@@ -878,7 +885,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             )
         }
         ("POST", ["databases", db]) => {
-            let Some(db) = safe_ident(db) else {
+            let Some(db) = ident(db) else {
                 return (404, String::new());
             };
             let (ignore, replace) = match create_option_sql(&doc) {
@@ -899,7 +906,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("DELETE", ["databases", db]) => {
-            let Some(db) = safe_ident(db) else {
+            let Some(db) = ident(db) else {
                 return (404, String::new());
             };
             let drop_ignore = match drop_option_sql(&doc) {
@@ -917,7 +924,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db]) => {
-            let Some(db) = safe_ident(db) else {
+            let Some(db) = ident(db) else {
                 return (404, String::new());
             };
             let exists = engine
@@ -925,7 +932,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 .list_databases()
                 .unwrap_or_default()
                 .iter()
-                .any(|d| d.eq_ignore_ascii_case(db));
+                .any(|d| d.eq_ignore_ascii_case(&db));
             if !exists {
                 return err_response(3021, &format!("database '{db}' does not exist"));
             }
@@ -933,13 +940,13 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 200,
                 format!(
                     "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\"}}",
-                    json_escape(db)
+                    json_escape(&db)
                 ),
             )
         }
         // ---- tables ----
         ("POST", ["databases", db, "tables", table]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let fields = doc.get("fields").and_then(Json::as_arr).unwrap_or(&[]);
@@ -950,9 +957,13 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             for f in fields {
                 let name = f.get("name").and_then(Json::as_str).unwrap_or("");
                 let ty = f.get("type").and_then(Json::as_str).unwrap_or("varchar");
-                if safe_ident(name).is_none() {
-                    return err_response(3013, "syntax: invalid column name");
+                if name.is_empty() {
+                    return err_response(3042, "empty column name");
                 }
+                if safe_ident(name).is_none() {
+                    return err_response(3005, &format!("invalid column name '{name}'"));
+                }
+                let name = name.to_ascii_lowercase();
                 let mut col = format!("{name} {}", type_to_sql(ty));
                 if let Some(default) = f.get("default") {
                     let d = match default {
@@ -998,7 +1009,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("DELETE", ["databases", db, "tables", table]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let drop_ignore = match drop_option_sql(&doc) {
@@ -1015,7 +1026,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "tables"]) => {
-            let Some(db) = safe_ident(db) else {
+            let Some(db) = ident(db) else {
                 return (404, String::new());
             };
             let prefix = format!("{db}.");
@@ -1051,7 +1062,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             )
         }
         ("GET", ["databases", db, "tables", table]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
@@ -1062,8 +1073,8 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                         200,
                         format!(
                             "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"storage_directory\":\"\",\"column_count\":{},\"segment_count\":1,\"row_count\":{rows}}}",
-                            json_escape(db),
-                            json_escape(table),
+                            json_escape(&db),
+                            json_escape(&table),
                             meta.columns.len()
                         ),
                     )
@@ -1072,7 +1083,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("POST", ["databases", db, "tables", table, "columns"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let fields = match doc.get("fields").and_then(Json::as_arr) {
@@ -1117,7 +1128,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("DELETE", ["databases", db, "tables", table, "columns"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let names: Vec<&str> = doc
@@ -1139,7 +1150,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             (200, resp)
         }
         ("GET", ["databases", db, "tables", table, "columns"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let sql = format!("SHOW TABLE {db}.{table} COLUMNS;");
@@ -1177,7 +1188,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         }
         // ---- index ----
         ("POST", ["databases", db, "tables", table, "indexes", index]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             // The REST body is `{fields: [target], index: {type, …params}}`.
@@ -1224,7 +1235,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("DELETE", ["databases", db, "tables", table, "indexes", index]) => {
-            let (Some(table), Some(index)) = (safe_ident(table), safe_ident(index)) else {
+            let (Some(table), Some(index)) = (ident(table), ident(index)) else {
                 return (404, String::new());
             };
             let _ = (db, table);
@@ -1239,7 +1250,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "tables", table, "indexes"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
@@ -1262,7 +1273,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             )
         }
         ("GET", ["databases", db, "tables", table, "indexes", index]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
@@ -1277,8 +1288,8 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                     200,
                     format!(
                         "{{\"error_code\":0,\"error_msg\":\"OK\",\"database_name\":\"{}\",\"table_name\":\"{}\",\"index_name\":\"{}\",\"index_comment\":\"\",\"index_type\":\"{}\",\"index_column_names\":\"{}\",\"index_column_ids\":\"\",\"index_function_info\":\"\",\"other_parameters\":\"\",\"store_dir\":\"\",\"segment_index_count\":\"\"}}",
-                        json_escape(db),
-                        json_escape(table),
+                        json_escape(&db),
+                        json_escape(&table),
                         json_escape(&i.name),
                         json_escape(&i.index_type),
                         json_escape(&i.column)
@@ -1288,7 +1299,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "tables", table, "meta"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let explain = match doc.get("explain_type").and_then(Json::as_str) {
@@ -1345,7 +1356,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         }
         // ---- import / export / rename / compact / optimize ----
         ("PUT", ["databases", db, "tables", table]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
@@ -1372,7 +1383,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "table", table]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
@@ -1399,7 +1410,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("POST", ["databases", db, "tables", table, "rename"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let new_name = doc
@@ -1415,7 +1426,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("PUT", ["databases", db, "tables", table, "compact"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             match run(&format!("COMPACT TABLE {db}.{table};")) {
@@ -1424,7 +1435,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("PUT", ["databases", db, "tables", table, "optimize"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             match run(&format!("COMPACT TABLE {db}.{table};")) {
@@ -1433,7 +1444,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "tables", table, "segments"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             // one segment per table in this engine; report its blocks
@@ -1446,7 +1457,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             )
         }
         ("GET", ["databases", db, "tables", table, "segments", _seg, "blocks"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let rows = engine.row_count(&format!("{db}.{table}")).unwrap_or(0);
@@ -1459,7 +1470,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         }
         // ---- docs: insert / delete / update / search ----
         ("POST", ["databases", db, "tables", table, "docs"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
@@ -1508,7 +1519,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             )
         }
         ("DELETE", ["databases", db, "tables", table, "docs"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
@@ -1532,7 +1543,7 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("PUT", ["databases", db, "tables", table, "docs"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
@@ -1567,12 +1578,12 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             }
         }
         ("GET", ["databases", db, "tables", table, "docs"]) => {
-            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
                 return (404, String::new());
             };
             let full = format!("{db}.{table}");
             let types = column_types(engine, &full);
-            let sql = docs_sql(&doc, db, table);
+            let sql = docs_sql(&doc, &db, &table);
             match run(&sql) {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);

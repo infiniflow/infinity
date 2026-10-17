@@ -1646,7 +1646,9 @@ impl Engine {
         };
         let mut s = stmt.clone();
         match &mut s {
-            Statement::CreateTable { name, .. } | Statement::DropTable { name } => *name = q(name),
+            Statement::CreateTable { name, .. } | Statement::DropTable { name, .. } => {
+                *name = q(name)
+            }
             Statement::Insert { table, .. }
             | Statement::Delete { table, .. }
             | Statement::Update { table, .. }
@@ -2437,8 +2439,11 @@ impl Engine {
                     column: column.clone(),
                 })
             }
-            Statement::DropTable { name } => {
+            Statement::DropTable { name, if_exists } => {
                 let existed = self.drop_table_all(name)?;
+                if !existed && !*if_exists {
+                    return Err(Error::Invalid(format!("table '{name}' does not exist")));
+                }
                 Ok(QueryResult::DroppedTable {
                     name: name.clone(),
                     existed,
