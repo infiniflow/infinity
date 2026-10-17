@@ -1355,6 +1355,20 @@ impl Engine {
             .find(|im| im.name == index_name)
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        // A MULTIVECTOR holds several sub-vectors per row; the C++ mirror is a
+        // single-vector graph, so there is nothing to write for it.
+        if let Some(i) = meta.columns.iter().position(|c| c == &column) {
+            if meta
+                .types
+                .get(i)
+                .map(|t| t.trim().to_ascii_uppercase().starts_with("MULTIVECTOR"))
+                .unwrap_or(false)
+            {
+                return Err(Error::Invalid(format!(
+                    "no single-vector HNSW mirror for multivector column '{column}'"
+                )));
+            }
+        }
         let (count, chunk) = self.cpp_hnsw_chunk(&table, &column)?;
         let db_id = self.database_id_of(&table);
         let dir = self

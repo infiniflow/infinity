@@ -7448,7 +7448,7 @@ mod tests {
         assert_eq!(
             rresp.column_defs[0].physical,
             PhysicalWire::Array {
-                element_logic_type: 3, // Integer
+                element_logic_type: 3,                      // Integer
                 element: Box::new(PhysicalWire::Scalar(3)), // ColumnInt32
             }
         );

@@ -486,6 +486,15 @@ fn key_text(e: &ExprAst) -> String {
             format!("Cast({} AS {ty})", key_text(&args[0]))
         }
         ExprAst::Func { name, args } => {
+            // The search pseudo-columns are named by their bare upper-case name
+            // (`SIMILARITY`, `DISTANCE`, `SCORE`, `ROW_ID`), as the SDK reads them.
+            let pseudo = name.to_ascii_uppercase();
+            if matches!(
+                pseudo.as_str(),
+                "SIMILARITY" | "DISTANCE" | "SCORE" | "ROW_ID"
+            ) {
+                return pseudo;
+            }
             // The full-text filter functions print as `FILTER_FULLTEXT('col', 'q')`
             // in the reference; other scalar functions keep the lower-case name.
             let up = name.to_ascii_uppercase();

@@ -1202,6 +1202,80 @@ thread_local! {
     static ALLOW_ZERO_SPARSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
+/// Rewrites `UNNEST(col)` to the name of the column the expansion appends.
+///
+/// The SDKs turn `filter("uc2 > 1")` into `WHERE unnest(c2) > 1` (the alias is
+/// replaced by the output expression), but the filter runs *after* the
+/// expansion, where the values live in a synthetic column.
+fn rewrite_unnest_expr(e: &ExprAst, col: &str, alias: &str) -> ExprAst {
+    match e {
+        ExprAst::Func { name, args }
+            if name.eq_ignore_ascii_case("UNNEST")
+                && args.len() == 1
+                && matches!(&args[0], ExprAst::Column(c) if c.eq_ignore_ascii_case(col)) =>
+        {
+            ExprAst::Column(alias.to_string())
+        }
+        ExprAst::Func { name, args } => ExprAst::Func {
+            name: name.clone(),
+            args: args
+                .iter()
+                .map(|a| rewrite_unnest_expr(a, col, alias))
+                .collect(),
+        },
+        ExprAst::Binary(a, op, b) => ExprAst::Binary(
+            Box::new(rewrite_unnest_expr(a, col, alias)),
+            *op,
+            Box::new(rewrite_unnest_expr(b, col, alias)),
+        ),
+        ExprAst::Cmp(a, op, b) => ExprAst::Cmp(
+            Box::new(rewrite_unnest_expr(a, col, alias)),
+            *op,
+            Box::new(rewrite_unnest_expr(b, col, alias)),
+        ),
+        ExprAst::Not(a) => ExprAst::Not(Box::new(rewrite_unnest_expr(a, col, alias))),
+        ExprAst::And(a, b) => ExprAst::And(
+            Box::new(rewrite_unnest_expr(a, col, alias)),
+            Box::new(rewrite_unnest_expr(b, col, alias)),
+        ),
+        ExprAst::Or(a, b) => ExprAst::Or(
+            Box::new(rewrite_unnest_expr(a, col, alias)),
+            Box::new(rewrite_unnest_expr(b, col, alias)),
+        ),
+        other => other.clone(),
+    }
+}
+
+fn rewrite_unnest_pred(p: &Predicate, col: &str, alias: &str) -> Predicate {
+    match p {
+        Predicate::Cmp(a, op, b) => Predicate::Cmp(
+            rewrite_unnest_expr(a, col, alias),
+            *op,
+            rewrite_unnest_expr(b, col, alias),
+        ),
+        Predicate::IsTrue(e) => Predicate::IsTrue(rewrite_unnest_expr(e, col, alias)),
+        Predicate::IsNull(e, not) => Predicate::IsNull(rewrite_unnest_expr(e, col, alias), *not),
+        Predicate::Like(a, b, esc, not) => Predicate::Like(
+            rewrite_unnest_expr(a, col, alias),
+            rewrite_unnest_expr(b, col, alias),
+            *esc,
+            *not,
+        ),
+        Predicate::In(e, list, not) => Predicate::In(
+            rewrite_unnest_expr(e, col, alias),
+            list.iter()
+                .map(|x| rewrite_unnest_expr(x, col, alias))
+                .collect(),
+            *not,
+        ),
+        Predicate::Bool(a, op, b) => Predicate::Bool(
+            Box::new(rewrite_unnest_pred(a, col, alias)),
+            *op,
+            Box::new(rewrite_unnest_pred(b, col, alias)),
+        ),
+        Predicate::Not(a) => Predicate::Not(Box::new(rewrite_unnest_pred(a, col, alias))),
+    }
+}
 /// Runs `f` allowing a zero-dimension sparse column.
 pub fn with_zero_dimension_sparse<T>(f: impl FnOnce() -> T) -> T {
     ALLOW_ZERO_SPARSE.with(|c| c.set(true));
@@ -2975,6 +3049,9 @@ impl Engine {
                 // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
                 // row per element, then let the normal planner handle WHERE,
                 // GROUP BY and aggregates over the expanded relation.
+                let mut where_pred = where_pred.clone();
+                let mut group_by = group_by.to_vec();
+                let mut having = having.clone();
                 let mut items_owned: Vec<SelectItem> = items.to_vec();
                 let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
                 let unnest_idx = items_owned.iter().position(|it| {
@@ -3039,6 +3116,19 @@ impl Engine {
                                     out.push(r);
                                 }
                             }
+                            // Filters written against the output expression
+                            // (`uc2 > 1` is sent as `unnest(c2) > 1`) must see
+                            // the expanded column.
+                            if let Some(p) = where_pred.as_ref() {
+                                where_pred = Some(rewrite_unnest_pred(p, &col, &new_name));
+                            }
+                            if let Some(p) = having.as_ref() {
+                                having = Some(Box::new(rewrite_unnest_pred(p, &col, &new_name)));
+                            }
+                            group_by = group_by
+                                .iter()
+                                .map(|g| rewrite_unnest_expr(g, &col, &new_name))
+                                .collect();
                             items_owned[ui] = SelectItem::Column(new_name.clone());
                             unnest_expansion = Some((new_name, out));
                         }
@@ -3176,7 +3266,7 @@ impl Engine {
                     &tables,
                     join.as_ref(),
                     where_pred.as_ref(),
-                    group_by,
+                    &group_by,
                     having.as_deref(),
                     &order_keys,
                     *limit,
@@ -4334,6 +4424,9 @@ impl Engine {
                         .cloned()
                         .unwrap_or_default();
                     if !analyzer.eq_ignore_ascii_case("rankfeatures") {
+                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                            eprintln!("[RANKF] table={table} col={col} analyzer={analyzer:?}");
+                        }
                         return Err(Error::Invalid(format!(
                             "rank_features requires a rankfeatures index on '{col}'"
                         )));
