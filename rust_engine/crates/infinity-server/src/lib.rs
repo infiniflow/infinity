@@ -684,6 +684,17 @@ fn handle_connection(
                                         rows = rw;
                                     }
                                 }
+                                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                                    eprintln!(
+                                        "[COLS] star={} req={:?} got={:?}",
+                                        req.star, req.columns, columns
+                                    );
+                                }
+                                // A projected expression is named by the SQL
+                                // text the client sent (`(c1 + c2)`).
+                                if !req.star && req.columns.len() == columns.len() {
+                                    columns = req.columns.clone();
+                                }
                                 select_response_from_typed(
                                     &columns,
                                     &declared_types(eng, &req.table_name, &columns),
@@ -3159,9 +3170,29 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                     ip.read_field_end().map_err(tw)?;
                 }
                 ip.read_struct_end().map_err(tw)?;
-                // Either side may be an expression (`sqrt(c1) = 2`).
-                if let (Some(op), [l, r]) = (sql_op(&name), &args[..]) {
-                    pred = Some(format!("{} {op} {}", pexpr_sql(l), pexpr_sql(r)));
+                // Either side may be an expression (`sqrt(c1) = 2`), and the
+                // connectives arrive as functions too.
+                match (sql_op(&name), &args[..]) {
+                    (Some(op), [l, r]) => {
+                        pred = Some(format!("{} {op} {}", pexpr_sql(l), pexpr_sql(r)))
+                    }
+                    // `c1 IN (1, 2, 3)` arrives as `in(c1, 1, 2, 3)`.
+                    (None, [head, rest @ ..])
+                        if name.eq_ignore_ascii_case("in") && !rest.is_empty() =>
+                    {
+                        let list = rest.iter().map(pexpr_sql).collect::<Vec<_>>().join(", ");
+                        pred = Some(format!("({} IN ({list}))", pexpr_sql(head)));
+                    }
+                    (None, [only]) if name.eq_ignore_ascii_case("not") => {
+                        pred = Some(format!("(NOT {})", pexpr_sql(only)));
+                    }
+                    (None, [l, r])
+                        if name.eq_ignore_ascii_case("and") || name.eq_ignore_ascii_case("or") =>
+                    {
+                        let joiner = name.to_ascii_lowercase();
+                        pred = Some(format!("({} {joiner} {})", pexpr_sql(l), pexpr_sql(r)));
+                    }
+                    _ => {}
                 }
             } else {
                 ip.skip(uf.field_type).map_err(tw)?;
