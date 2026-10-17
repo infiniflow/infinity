@@ -4412,6 +4412,20 @@ impl Engine {
             Some(p) => Some(infinity_planner::predicate_expr(p, &schema)?),
             None => None,
         };
+        // `filter=…` in the MATCH TEXT options narrows the candidates.
+        let opt_filter = match params
+            .split(';')
+            .filter_map(|p| p.split_once('='))
+            .find(|(k, _)| k.trim().eq_ignore_ascii_case("filter"))
+            .map(|(_, v)| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+        {
+            Some(f) => Some(infinity_planner::predicate_expr(
+                &parse_filter_predicate(&f)?,
+                &schema,
+            )?),
+            None => None,
+        };
         // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
         // the number of indexed terms, and `similarity=boolean` scores one point
         // per matching term weighted by the field/term boosts.
@@ -4530,6 +4544,11 @@ impl Engine {
                 continue;
             }
             if let Some(p) = &in_filter {
+                if !p.eval_predicate(row) {
+                    continue;
+                }
+            }
+            if let Some(p) = &opt_filter {
                 if !p.eval_predicate(row) {
                     continue;
                 }
@@ -5860,6 +5879,8 @@ impl Engine {
                 "topn"
                     | "threshold"
                     | "ef"
+                    | "ef_search"
+                    | "nprobe"
                     | "io_limit"
                     | "distance"
                     | "similarity"
@@ -5913,6 +5934,25 @@ impl Engine {
         let threshold = with_opts
             .and_then(parse_threshold)
             .or_else(|| parse_threshold(&params));
+        // `filter=…` narrows the candidates of this search (the SDK passes the
+        // same expression it would put in WHERE).
+        let search_filter = match option_value("filter") {
+            Some(f) if !f.is_empty() => {
+                let p = parse_filter_predicate(&f)?;
+                Some(infinity_planner::predicate_expr(
+                    &p,
+                    &self.table_schema(table)?,
+                )?)
+            }
+            _ => None,
+        };
+        // A per-search `filter=` and an outer WHERE are mutually exclusive (the
+        // reference rejects the combination).
+        if search_filter.is_some() && pred.is_some() {
+            return Err(Error::Invalid(
+                "cannot have both a filter option and a where clause".into(),
+            ));
+        }
 
         let rows = self.fetch_rows_with_ids(table)?;
         // A `bit` sparse column scores and renders as an integer.
@@ -5964,6 +6004,11 @@ impl Engine {
                 }
             }
             if let Some(p) = &in_filter {
+                if !p.eval_predicate(row) {
+                    continue;
+                }
+            }
+            if let Some(p) = &search_filter {
                 if !p.eval_predicate(row) {
                     continue;
                 }
@@ -6225,6 +6270,19 @@ fn apply_select_aliases(plan: &mut LogicalPlan, aliases: &[Option<String>]) {
         | LogicalPlan::Offset { input, .. }
         | LogicalPlan::Filter { input, .. } => apply_select_aliases(input, aliases),
         _ => {}
+    }
+}
+
+/// Parses a bare predicate string (`num != 98 AND num != 12`) by wrapping it
+/// in a statement; used by the per-search `filter=` option.
+fn parse_filter_predicate(text: &str) -> Result<infinity_parser::Predicate> {
+    let sql = format!("SELECT 1 FROM t WHERE {text};");
+    match infinity_parser::parse(&sql)?.as_slice() {
+        [infinity_parser::Statement::Select {
+            where_pred: Some(p),
+            ..
+        }] => Ok(p.clone()),
+        _ => Err(Error::Invalid(format!("invalid filter '{text}'"))),
     }
 }
 
