@@ -20,8 +20,8 @@ use infinity_common::{Error, Result};
 use infinity_expression::{aggregate, Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::{
-    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, MatchClause, SearchClause, SelectItem,
-    Statement,
+    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, MatchClause, Predicate, SearchClause,
+    SelectItem, Statement,
 };
 use infinity_planner::{plan_select, LogicalPlan};
 #[cfg(not(feature = "rocksdb-store"))]
@@ -823,6 +823,38 @@ fn reshape_tensor(s: &str, dim: usize) -> String {
         })
         .collect();
     format!("[{}]", groups.join(","))
+}
+
+/// Recognises a bare `filter_text(…)`/`filter_fulltext(…)` predicate carrying a
+/// `threshold=`, returning `(column, query, options)`. Such a filter is
+/// answered by the full-text index (its BM25 needs corpus statistics), so the
+/// executor resolves it in one pass rather than testing row by row.
+fn fulltext_threshold_call(p: &Predicate) -> Option<(String, String, String)> {
+    let Predicate::IsTrue(ExprAst::Func { name, args }) = p else {
+        return None;
+    };
+    let up = name.to_ascii_uppercase();
+    if up != "FILTER_TEXT" && up != "FILTER_FULLTEXT" {
+        return None;
+    }
+    let s = |i: usize| match args.get(i) {
+        Some(ExprAst::Literal(Literal::Str(v))) => Some(v.clone()),
+        _ => None,
+    };
+    let opts = s(2)?;
+    if !opts
+        .split(';')
+        .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="))
+    {
+        return None;
+    }
+    // `col@index` names the column plus an index hint.
+    let column = s(0)?;
+    Some((
+        column.split('@').next().unwrap_or(&column).to_string(),
+        s(1)?,
+        opts,
+    ))
 }
 
 /// Normalises a column default to its stored form: an integer-element
@@ -2778,6 +2810,41 @@ impl Engine {
                     *limit,
                     *offset,
                 )?;
+                // A full-text `threshold=` filter is answered by the index: the
+                // score needs corpus statistics a row-local predicate cannot see,
+                // so resolve the qualifying rows once and feed them down.
+                if override_rows.is_none() && join.is_none() {
+                    if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
+                        if let Some((col, query, opts)) = fulltext_threshold_call(p) {
+                            let m = MatchClause {
+                                kind: "TEXT".into(),
+                                column: col,
+                                args: vec![
+                                    ExprAst::Literal(Literal::Str(query)),
+                                    ExprAst::Literal(Literal::Str(opts)),
+                                ],
+                                filter: None,
+                            };
+                            let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
+                            let mut ids: Vec<u64> = rows
+                                .iter()
+                                .filter_map(|r| match r.iter().rev().nth(3) {
+                                    Some(Value::Int(i)) => Some(*i as u64),
+                                    _ => None,
+                                })
+                                .collect();
+                            // Table order, not score order: this is a WHERE filter.
+                            ids.sort_unstable();
+                            let mut out = self.fetch_rows_by_ids(t, &ids)?;
+                            if rowid_col {
+                                for (r, id) in out.iter_mut().zip(ids.iter()) {
+                                    r.push(Value::Int(*id as i64));
+                                }
+                            }
+                            override_rows = Some(out);
+                        }
+                    }
+                }
                 // index scan: an equality predicate on an indexed single-table
                 // column fetches only the matching rows.
                 if override_rows.is_none() && join.is_none() {
