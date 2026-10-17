@@ -3112,27 +3112,24 @@ impl Engine {
                     }
                 }
                 if !to_del.is_empty() {
-                    // update = delete + append within a single transaction. The
-                    // appended rows take ids from the same reservation counter
-                    // as INSERT (a fresh scan would materialise the whole table).
-                    let first_seq = self.reserve_rows(table, new_rows.len(), false)?;
+                    // Rewrite the rows in place. Delete+append would double the
+                    // store's footprint for every update (each row carries its
+                    // vectors); keeping the sequence id also leaves secondary
+                    // indexes valid.
                     let mut t = self.txn.begin();
-                    for seq in &to_del {
-                        t.put(del_key(table, *seq), b"1".to_vec());
-                    }
-                    for (k, nr) in new_rows.iter().enumerate() {
+                    for (seq, nr) in to_del.iter().zip(new_rows.iter()) {
                         let encoded = nr
                             .iter()
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(table, first_seq + k), encoded.into_bytes());
+                        t.put(row_key(table, *seq), encoded.into_bytes());
                     }
                     self.txn.commit(t)?;
-                    // The secondary indexes must see the rewritten rows.
-                    for (k, nr) in new_rows.iter().enumerate() {
+                    // The secondary indexes must see the rewritten values.
+                    for (seq, nr) in to_del.iter().zip(new_rows.iter()) {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
-                        self.update_indexes_on_insert_text(table, first_seq + k, &texts)?;
+                        self.update_indexes_on_insert_text(table, *seq, &texts)?;
                     }
                 }
                 Ok(QueryResult::Updated {
