@@ -6542,6 +6542,8 @@ mod tests {
         let e = Engine::open(dir.path()).unwrap();
         e.execute("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
             .unwrap();
+        e.execute("CREATE INDEX tf_ft ON tf (body) USING FULLTEXT;")
+            .unwrap();
         e.execute("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
             .unwrap();
         // The rerank ignores the children's BM25: only the tensor similarity counts.

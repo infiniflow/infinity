@@ -40,6 +40,9 @@ fn higher_term_frequency_scores_no_lower() {
     let e = Engine::open(dir.path()).unwrap();
     e.execute("CREATE TABLE t (id INTEGER, doc VARCHAR);")
         .unwrap();
+    // MATCH TEXT needs a full-text index on the searched column.
+    e.execute("CREATE INDEX t_ft ON t (doc) USING FULLTEXT;")
+        .unwrap();
     e.execute("INSERT INTO t VALUES (1, 'apple apple'), (3, 'apple banana cherry date');")
         .unwrap();
     let s = scores(&e, "apple");
@@ -55,6 +58,9 @@ fn shorter_document_scores_no_lower_at_equal_tf() {
     let dir = tempfile::tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     e.execute("CREATE TABLE t (id INTEGER, doc VARCHAR);")
+        .unwrap();
+    // MATCH TEXT needs a full-text index on the searched column.
+    e.execute("CREATE INDEX t_ft ON t (doc) USING FULLTEXT;")
         .unwrap();
     // same tf (1) for the query term, different document lengths
     e.execute(
@@ -73,6 +79,9 @@ fn non_matching_document_is_absent() {
     let dir = tempfile::tempdir().unwrap();
     let e = Engine::open(dir.path()).unwrap();
     e.execute("CREATE TABLE t (id INTEGER, doc VARCHAR);")
+        .unwrap();
+    // MATCH TEXT needs a full-text index on the searched column.
+    e.execute("CREATE INDEX t_ft ON t (doc) USING FULLTEXT;")
         .unwrap();
     e.execute("INSERT INTO t VALUES (1, 'apple'), (2, 'pear');")
         .unwrap();
