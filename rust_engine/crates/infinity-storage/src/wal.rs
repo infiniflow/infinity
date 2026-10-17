@@ -10,7 +10,7 @@
 //! (single writer), matching the engine's serial `WriteWAL` stage.
 
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 use infinity_common::{Error, Result, TxnTimeStamp};
@@ -134,6 +134,66 @@ impl WalManager {
         self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
 
+    /// Current size of the WAL in bytes.
+    pub fn len(&self) -> Result<u64> {
+        Ok(self
+            .file
+            .metadata()
+            .map_err(|e| Error::io(&self.path, e))?
+            .len())
+    }
+
+    /// Rewrites the WAL keeping only frames with `commit_ts > ts`, streaming
+    /// frame by frame so a multi-gigabyte log never has to fit in memory.
+    /// Returns the number of records retained. The append handle is reopened on
+    /// the new inode.
+    pub fn truncate_up_to_streaming(&mut self, ts: TxnTimeStamp) -> Result<usize> {
+        let tmp = self.path.with_extension("log.compact");
+        let mut kept = 0usize;
+        {
+            let src = File::open(&self.path).map_err(|e| Error::io(&self.path, e))?;
+            let mut rd = BufReader::new(src);
+            let out = File::create(&tmp).map_err(|e| Error::io(&tmp, e))?;
+            let mut wr = BufWriter::new(out);
+            loop {
+                let mut header = [0u8; HEADER_LEN];
+                match rd.read_exact(&mut header) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                    Err(e) => return Err(Error::io(&self.path, e)),
+                }
+                let magic = u32::from_le_bytes(header[0..4].try_into().unwrap());
+                let size = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+                let checksum = u32::from_le_bytes(header[8..12].try_into().unwrap());
+                if magic != WAL_MAGIC {
+                    break;
+                }
+                let mut content = vec![0u8; size];
+                if rd.read_exact(&mut content).is_err() || crc32_ieee(&content) != checksum {
+                    break; // torn frame at the tail
+                }
+                if content.len() < 16 {
+                    break;
+                }
+                let commit_ts =
+                    u64::from_le_bytes(content[8..16].try_into().unwrap());
+                if commit_ts > ts {
+                    wr.write_all(&header)
+                        .and_then(|_| wr.write_all(&content))
+                        .map_err(|e| Error::io(&tmp, e))?;
+                    kept += 1;
+                }
+            }
+            wr.flush().map_err(|e| Error::io(&tmp, e))?;
+            wr.get_ref()
+                .sync_all()
+                .map_err(|e| Error::io(&tmp, e))?;
+        }
+        std::fs::rename(&tmp, &self.path).map_err(|e| Error::io(&self.path, e))?;
+        *self = WalManager::open(&self.path)?;
+        Ok(kept)
+    }
+
     /// Reads all valid records from a WAL file path.
     pub fn read_all(path: impl AsRef<Path>) -> Result<Vec<WalRecord>> {
         let path = path.as_ref();
@@ -186,6 +246,25 @@ impl WalManager {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn streaming_truncate_keeps_only_newer_records() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("wal.log");
+        let mut w = WalManager::open(&path).unwrap();
+        for ts in 1..=10u64 {
+            w.append(&WalRecord::new(ts, ts, vec![ts as u8])).unwrap();
+        }
+        assert_eq!(w.truncate_up_to_streaming(6).unwrap(), 4);
+        let recs = WalManager::read_all(&path).unwrap();
+        assert_eq!(
+            recs.iter().map(|r| r.commit_ts).collect::<Vec<_>>(),
+            vec![7, 8, 9, 10]
+        );
+        // the append handle points at the rewritten file
+        w.append(&WalRecord::new(11, 11, vec![11])).unwrap();
+        assert_eq!(WalManager::read_all(&path).unwrap().len(), 5);
+    }
 
     #[test]
     fn append_and_read_roundtrip() {

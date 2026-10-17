@@ -173,20 +173,30 @@ impl TxnManager {
             .unwrap_or(0))
     }
 
-    /// Empties the WAL when every record in it has already been applied to the
-    /// KV store (and the store has been fsynced). The `meta:applied_ts` marker
-    /// keeps recovery correct; this only bounds the WAL's size, as the
-    /// reference does at a checkpoint.
+    /// Drops the WAL prefix that the KV store already holds (the store must be
+    /// fsynced first). `meta:applied_ts` keeps recovery correct; this only
+    /// bounds the WAL's size, as the reference does at a checkpoint.
+    ///
+    /// Small logs are left alone, and no truncation happens while a commit has
+    /// appended but not yet reached the KV store.
     pub fn truncate_wal_if_applied(&self) -> Result<bool> {
         let applied = self.applied_ts()?;
-        if applied == 0 || applied != self.last_commit.load(Ordering::SeqCst) {
+        if applied == 0 {
             return Ok(false);
         }
         let mut wal = self.wal.lock().unwrap();
         if self.inflight.load(Ordering::SeqCst) != 0 {
             return Ok(false);
         }
-        wal.truncate_all()?;
+        const MIN_TRUNCATE_BYTES: u64 = 16 * 1024 * 1024;
+        if wal.len()? < MIN_TRUNCATE_BYTES {
+            return Ok(false);
+        }
+        if applied == self.last_commit.load(Ordering::SeqCst) {
+            wal.truncate_all()?;
+        } else {
+            wal.truncate_up_to_streaming(applied)?;
+        }
         Ok(true)
     }
 
