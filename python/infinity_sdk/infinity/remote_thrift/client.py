@@ -86,7 +86,11 @@ TRY_TIMES = 10
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI, *, try_times: int = TRY_TIMES, logger: logging.Logger = None):
-        self.lock = rwlock.RWLockRead()
+        # Every call shares one transport/protocol pair, so calls must be
+        # exclusive: with a reader lock two threads interleave
+        # `readMessageBegin` and split each other's replies (seen as
+        # "unknown result" or a client that waits forever).
+        self.lock = rwlock.RWLockWrite()
 
         self.session_id = -1
         self.uri = uri
@@ -176,7 +180,7 @@ class ThriftInfinityClient:
         def wrapper(self, *args, **kwargs):
             for i in range(self.try_times):
                 try:
-                    with self.lock.gen_rlock():
+                    with self.lock.gen_wlock():
                         old_session_i = self.session_i
                         ret = func(self, *args, **kwargs)
                         break

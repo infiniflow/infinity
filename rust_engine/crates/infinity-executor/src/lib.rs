@@ -1106,6 +1106,12 @@ fn invalid_config_value(key: &str, value: &str) -> Option<String> {
     }
 }
 
+/// True when a result is small enough to keep in the result cache. Caching a
+/// whole-table `SELECT *` retains (and clones on each hit) hundreds of MB.
+fn cacheable_result(res: &QueryResult) -> bool {
+    matches!(res, QueryResult::Rows { rows, .. } if rows.len() <= 4096)
+}
+
 /// True when a statement can change data or metadata and therefore invalidates
 /// cached `SELECT` results.
 fn invalidates_result_cache(stmt: &Statement) -> bool {
@@ -1811,7 +1817,12 @@ impl Engine {
                     continue;
                 }
                 let res = self.execute_stmt(&qualified)?;
-                if self.result_cache.lock().unwrap().len() < self.result_cache_capacity() {
+                // Only small results are worth caching: retaining (and later
+                // cloning on a hit) a whole-table `SELECT *` keeps hundreds of
+                // megabytes to gigabytes alive.
+                if cacheable_result(&res)
+                    && self.result_cache.lock().unwrap().len() < self.result_cache_capacity()
+                {
                     self.result_cache
                         .lock()
                         .unwrap()
