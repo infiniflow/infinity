@@ -5316,19 +5316,33 @@ impl Engine {
                         .map(|t| t.to_ascii_uppercase().starts_with("MULTIVECTOR"))
                         .unwrap_or(false);
                     if multivector {
-                        let mut best: Option<(f64, f64)> = None;
-                        for sv in parse_tensor_leaves(v) {
-                            if sv.len() != qv.len() {
-                                continue;
+                        // MAXSIM: split both sides into `dim`-sized rows and sum,
+                        // over the query rows, the best similarity to a stored row.
+                        let dim = type_dim(types.get(col_idx).map(String::as_str).unwrap_or(""))
+                            .unwrap_or(qv.len())
+                            .max(1);
+                        let doc_rows = parse_tensor_leaves(v);
+                        if doc_rows.is_empty() || doc_rows.iter().all(|r| r.is_empty()) {
+                            continue;
+                        }
+                        let qrows: Vec<&[f64]> = qv.chunks(dim).collect();
+                        let mut total = 0.0f64;
+                        for qr in qrows {
+                            let mut best: Option<f64> = None;
+                            for dr in &doc_rows {
+                                if dr.len() != qr.len() {
+                                    continue;
+                                }
+                                let (sim, _) = vector_score(qr, dr, &metric);
+                                if best.map(|b| sim > b).unwrap_or(true) {
+                                    best = Some(sim);
+                                }
                             }
-                            let (sim, dist) = vector_score(&qv, &sv, &metric);
-                            if best.map(|(s, _)| sim > s).unwrap_or(true) {
-                                best = Some((sim, dist));
+                            if let Some(b) = best {
+                                total += b;
                             }
                         }
-                        if let Some((sim, dist)) = best {
-                            scored.push((*seq, sim, dist));
-                        }
+                        scored.push((*seq, total, -total));
                         continue;
                     }
                     let rv: Vec<f64> = if bit_col {
