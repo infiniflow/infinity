@@ -537,7 +537,8 @@ fn expr_result_type(name: &str) -> String {
     let f = n.split('(').next().unwrap_or("");
     match f {
         "trunc" | "truncate" | "upper" | "lower" | "substr" | "substring" | "trim" | "ltrim"
-        | "rtrim" | "reverse" | "md5" | "concat" => "Varchar".to_string(),
+        | "rtrim" | "reverse" | "md5" | "concat" | "json_extract" | "json_extract_string"
+        | "json_keys" => "Varchar".to_string(),
         _ => String::new(),
     }
 }

@@ -471,22 +471,52 @@ fn key_text(e: &ExprAst) -> String {
         ExprAst::Column(c) => c.clone(),
         ExprAst::Literal(l) => name_literal(l),
         // `CAST(x AS type)` prints as the reference's `Cast(x AS Type)`.
-        ExprAst::Func { name, args }
-            if name.eq_ignore_ascii_case("cast")
-                && args.len() == 2
-                && matches!(args[1], ExprAst::Literal(infinity_parser::Literal::Str(_))) =>
-        {
+        ExprAst::Func { name, args } if name.eq_ignore_ascii_case("cast") && args.len() == 2 => {
+            // `CAST(x AS T)` and the REST spelling `cast(x, T)` both print as
+            // the reference's `Cast(x AS T)`.
             let ty = match &args[1] {
                 ExprAst::Literal(infinity_parser::Literal::Str(s)) => cpp_type_name(s),
+                ExprAst::Column(c) => cpp_type_name(c),
                 _ => String::new(),
             };
             format!("Cast({} AS {ty})", key_text(&args[0]))
         }
-        ExprAst::Func { name, args } => format!(
-            "{}({})",
-            name.to_ascii_lowercase(),
-            args.iter().map(key_text).collect::<Vec<_>>().join(", ")
-        ),
+        ExprAst::Func { name, args } => {
+            // The full-text filter functions print as `FILTER_FULLTEXT('col', 'q')`
+            // in the reference; other scalar functions keep the lower-case name.
+            let up = name.to_ascii_uppercase();
+            if up == "FILTER_TEXT" || up == "FILTER_FULLTEXT" {
+                let rendered = args
+                    .iter()
+                    .map(|a| match a {
+                        ExprAst::Literal(infinity_parser::Literal::Str(s)) => format!("'{s}'"),
+                        _ => key_text(a),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return format!("FILTER_FULLTEXT({rendered})");
+            }
+            format!(
+                "{}({})",
+                name.to_ascii_lowercase(),
+                args.iter().map(key_text).collect::<Vec<_>>().join(", ")
+            )
+        }
+        // Unary minus is parsed as `0 - x`; print it as `-x` (a function
+        // operand keeps its parentheses and upper-case name, as the reference
+        // prints `-(ABS(num))`).
+        ExprAst::Binary(a, infinity_parser::BinOp::Sub, b)
+            if matches!(**a, ExprAst::Literal(infinity_parser::Literal::Int(0))) =>
+        {
+            match b.as_ref() {
+                ExprAst::Func { name, args } => format!(
+                    "-({}({}))",
+                    name.to_ascii_uppercase(),
+                    args.iter().map(key_text).collect::<Vec<_>>().join(", ")
+                ),
+                other => format!("-{}", key_text(other)),
+            }
+        }
         ExprAst::Binary(a, op, b) => {
             let sym = match op {
                 infinity_parser::BinOp::Add => "+",
@@ -500,9 +530,17 @@ fn key_text(e: &ExprAst) -> String {
         ExprAst::Cmp(a, op, b) => {
             format!("{} {} {}", key_text(a), op.as_str(), key_text(b))
         }
-        ExprAst::Not(a) => format!("not({})", key_text(a)),
-        ExprAst::And(a, b) => format!("({} and {})", key_text(a), key_text(b)),
-        ExprAst::Or(a, b) => format!("({} or {})", key_text(a), key_text(b)),
+        ExprAst::Not(a) => format!("NOT ({})", key_text(a)),
+        ExprAst::And(a, b) => format!("({} AND {})", key_operand(a), key_operand(b)),
+        ExprAst::Or(a, b) => format!("({} OR {})", key_operand(a), key_operand(b)),
+    }
+}
+
+/// A logical operator's operands are parenthesised when they are comparisons.
+fn key_operand(e: &ExprAst) -> String {
+    match e {
+        ExprAst::Cmp(..) | ExprAst::And(..) | ExprAst::Or(..) => format!("({})", key_text(e)),
+        _ => key_text(e),
     }
 }
 
@@ -546,12 +584,11 @@ pub fn item_label(it: &SelectItem) -> String {
         SelectItem::Aggregate(a) => agg_label(a.func, &a.args),
         SelectItem::Column(c) => c.clone(),
         // The C++ engine names an un-aliased function column after the
-        // expression text (`year(c1)`, `datepart(c4, c1)`), not the bare name.
-        SelectItem::Func { name, args } => format!(
-            "{}({})",
-            name.to_ascii_lowercase(),
-            args.iter().map(key_text).collect::<Vec<_>>().join(", ")
-        ),
+        // expression text (`year(c1)`, `Cast(c3 AS Varchar)`), not the bare name.
+        SelectItem::Func { name, args } => key_text(&ExprAst::Func {
+            name: name.clone(),
+            args: args.clone(),
+        }),
         SelectItem::Literal(_) => "c0".to_string(),
         SelectItem::Expr(e) => key_text(e),
         SelectItem::Star => "*".to_string(),
