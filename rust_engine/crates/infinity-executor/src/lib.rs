@@ -3275,6 +3275,35 @@ impl Engine {
     }
 
     /// True unless `result_cache` is explicitly `off`.
+    /// The current value of a configuration knob (the `config` map filled by
+    /// `SET CONFIG`), for the `ShowConfig` RPC. Known knobs fall back to the
+    /// engine defaults the reference reports before any `SET CONFIG`.
+    pub fn config_get(&self, key: &str) -> Option<String> {
+        let key = key.to_ascii_lowercase();
+        if let Some(v) = self.config.lock().unwrap().get(&key) {
+            return Some(v.clone());
+        }
+        let default = match key.as_str() {
+            "log_level" => "info",
+            "result_cache" => "on",
+            "cache_result_capacity" => "1024",
+            "checkpoint_interval" => "0",
+            "cleanup_interval" => "1000",
+            _ => return None,
+        };
+        Some(default.to_string())
+    }
+
+    /// Every configuration knob's current value.
+    pub fn config_all(&self) -> Vec<(String, String)> {
+        self.config
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     fn result_cache_enabled(&self) -> bool {
         match self.config.lock().unwrap().get("result_cache") {
             Some(v) => !v.eq_ignore_ascii_case("off"),

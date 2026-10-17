@@ -874,39 +874,109 @@ fn handle_connection(
                         3 => "FVECS",
                         _ => "CSV",
                     };
-                    let mut sql = format!(
-                        "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}",
-                        req.file.replace('\'', "''"),
-                        req.delimiter.replace('\'', "''")
-                    );
-                    if req.offset > 0 {
-                        sql.push_str(&format!(", OFFSET {}", req.offset));
-                    }
-                    // `row_limit` caps `limit` (the reference exports the
-                    // smaller of the two).
-                    let limit = match (req.limit > 0, req.row_limit > 0) {
-                        (true, true) => Some(req.limit.min(req.row_limit)),
-                        (true, false) => Some(req.limit),
-                        (false, true) => Some(req.row_limit),
-                        (false, false) => None,
+                    // `limit` is the total number of rows, `row_limit` the size
+                    // of each part: the reference writes the first `row_limit`
+                    // rows to `<file>` and the rest to `<file>.part1`, `.part2`…
+                    let total = (req.limit > 0).then_some(req.limit);
+                    let part = (req.row_limit > 0).then_some(req.row_limit);
+                    let mut written = 0i64;
+                    let mut index = 0i64;
+                    let mut resp = CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: req.session_id,
                     };
-                    if let Some(n) = limit {
-                        sql.push_str(&format!(", LIMIT {n}"));
+                    loop {
+                        let remaining = total.map(|t| t - written);
+                        if remaining.is_some_and(|r| r <= 0) {
+                            break;
+                        }
+                        let take = match (part, remaining) {
+                            (Some(p), Some(r)) => p.min(r),
+                            (Some(p), None) => p,
+                            (None, Some(r)) => r,
+                            (None, None) => 0,
+                        };
+                        let path = if index == 0 {
+                            req.file.clone()
+                        } else {
+                            format!("{}.part{index}", req.file)
+                        };
+                        let mut sql = format!(
+                            "COPY {full} TO '{}' WITH ( DELIMITER '{}', FORMAT {format}, OFFSET {}",
+                            path.replace('\'', "''"),
+                            req.delimiter.replace('\'', "''"),
+                            req.offset + written
+                        );
+                        if take > 0 {
+                            sql.push_str(&format!(", LIMIT {take}"));
+                        }
+                        sql.push_str(" )");
+                        let Some(eng) = engine.as_ref() else {
+                            resp = CommonResponse {
+                                error_code: 1,
+                                error_msg: "no engine bound".into(),
+                                session_id: req.session_id,
+                            };
+                            break;
+                        };
+                        match eng.execute(&sql) {
+                            Ok(rs) => {
+                                let n = rs
+                                    .into_iter()
+                                    .map(|r| match r {
+                                        QueryResult::Inserted { count } => count as i64,
+                                        _ => 0,
+                                    })
+                                    .max()
+                                    .unwrap_or(0);
+                                resp = CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: req.session_id,
+                                };
+                                written += n;
+                                if n == 0 || part.is_none() {
+                                    break;
+                                }
+                                index += 1;
+                            }
+                            Err(e) => {
+                                resp = CommonResponse {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    session_id: req.session_id,
+                                };
+                                break;
+                            }
+                        }
                     }
-                    sql.push_str(" )");
-                    if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                        eprintln!("[EXPORT] {sql}");
-                    }
-                    let resp = run_common(engine.as_ref(), &sql, req.session_id);
                     write_reply_common(&mut writer, "Export", seq, &resp)?;
                 }
                 "SetConfig" => {
-                    let (sid, name, value) = {
+                    let (sid, name, value, kind) = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_set_config_args(&mut ip)?
                     };
-                    let sql = format!("SET CONFIG {name} {value}");
-                    let resp = run_common(engine.as_ref(), &sql, sid);
+                    let resp = match name.to_ascii_lowercase().as_str() {
+                        // read-only knobs reject any assignment
+                        "mem_index_capacity" => CommonResponse {
+                            error_code: 3076,
+                            error_msg: "Invalid command: Config mem_index_capacity is read-only"
+                                .into(),
+                            session_id: sid,
+                        },
+                        // `log_level` is a string knob; a number is a type mismatch
+                        "log_level" if kind != 1 => CommonResponse {
+                            error_code: 3010,
+                            error_msg: "data type mismatch for config 'log_level'".into(),
+                            session_id: sid,
+                        },
+                        _ => {
+                            let sql = format!("SET CONFIG {name} {value}");
+                            run_common(engine.as_ref(), &sql, sid)
+                        }
+                    };
                     write_reply_common(&mut writer, "SetConfig", seq, &resp)?;
                 }
                 "ShowConfig" => {
@@ -4517,8 +4587,9 @@ fn read_export_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Exp
 /// `SetConfigRequest { 1: session_id, 2: config_name, 3: ConfigValue }`.
 fn read_set_config_args(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
-) -> Result<(i64, String, String)> {
+) -> Result<(i64, String, String, i32)> {
     let (mut sid, mut name, mut value) = (0i64, String::new(), String::new());
+    let mut kind = 1i32; // ConfigValue arm: 1 string, 2 int, 3 bool, 4 double
     ip.read_struct_begin().map_err(tw)?;
     let _ = ip.read_field_begin().map_err(tw)?;
     ip.read_struct_begin().map_err(tw)?;
@@ -4538,6 +4609,7 @@ fn read_set_config_args(
                     if vf.field_type == TType::Stop {
                         break;
                     }
+                    kind = vf.id.map(i32::from).unwrap_or(kind);
                     value = match (vf.id, vf.field_type) {
                         (Some(1), TType::String) => ip.read_string().map_err(tw)?,
                         (Some(2), TType::I64) => ip.read_i64().map_err(tw)?.to_string(),
@@ -4568,7 +4640,7 @@ fn read_set_config_args(
     if value.is_empty() || value.contains(' ') {
         value = format!("'{}'", value.replace('\'', "''"));
     }
-    Ok((sid, name, value))
+    Ok((sid, name, value, kind))
 }
 
 /// `ShowConfigRequest { 1: session_id, 2: config_name }`.
@@ -4630,13 +4702,24 @@ fn write_show_config_response(
     o.write_string(name).map_err(tw)?;
     o.write_field_end().map_err(tw)?;
     if let Some(v) = value {
+        // Numeric knobs answer with the `int_value` arm, the rest with a string.
+        let numeric = matches!(
+            name.to_ascii_lowercase().as_str(),
+            "cleanup_interval" | "checkpoint_interval" | "cache_result_capacity"
+        );
         o.write_field_begin(&TFieldIdentifier::new("config_value", TType::Struct, 4i16))
             .map_err(tw)?;
         o.write_struct_begin(&TStructIdentifier::new("ConfigValue"))
             .map_err(tw)?;
-        o.write_field_begin(&TFieldIdentifier::new("string_value", TType::String, 1i16))
-            .map_err(tw)?;
-        o.write_string(v).map_err(tw)?;
+        if numeric {
+            o.write_field_begin(&TFieldIdentifier::new("int_value", TType::I64, 2i16))
+                .map_err(tw)?;
+            o.write_i64(v.parse().unwrap_or(0)).map_err(tw)?;
+        } else {
+            o.write_field_begin(&TFieldIdentifier::new("string_value", TType::String, 1i16))
+                .map_err(tw)?;
+            o.write_string(v).map_err(tw)?;
+        }
         o.write_field_end().map_err(tw)?;
         o.write_field_stop().map_err(tw)?;
         o.write_struct_end().map_err(tw)?;
