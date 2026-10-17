@@ -3365,6 +3365,9 @@ impl Engine {
     /// Rows a single imported segment can hold (`1024 * 8192`).
     pub const SEGMENT_ROW_CAPACITY: usize = 1024 * 8192;
 
+    /// Rows committed per block while streaming a `COPY … FROM`.
+    const COPY_BATCH_ROWS: usize = 8192;
+
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
     pub fn segment_count(&self, table: &str) -> usize {
@@ -4592,7 +4595,6 @@ impl Engine {
             self.txn.commit(t)?;
             return Ok(QueryResult::Inserted { count: rows.len() });
         }
-        let text = String::from_utf8_lossy(&bytes_in).into_owned();
         let delim = opts
             .iter()
             .find(|(k, _)| k == "DELIMITER")
@@ -4600,74 +4602,91 @@ impl Engine {
             .unwrap_or(',');
         let types_for_scan = self.column_types(table)?;
         let defaults = self.table_defaults(table)?;
-        // A `FORMAT JSONL` copy reads one JSON object per line.
-        let is_jsonl = opts
-            .iter()
-            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSONL"));
-        if is_jsonl {
-            return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
-        }
-        // A `FORMAT JSON` copy is a single JSON array of objects.
-        let is_json = opts
-            .iter()
-            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("JSON"));
-        if is_json {
+        let format_of = |name: &str| {
+            opts.iter()
+                .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case(name))
+        };
+        // `FORMAT JSONL` (one object per line) and `FORMAT JSON` (one array)
+        // are small in practice; the CSV path streams.
+        if format_of("JSONL") || format_of("JSON") {
+            let text = String::from_utf8_lossy(&bytes_in).into_owned();
+            if format_of("JSONL") {
+                return self.copy_from_jsonl(table, &text, &types_for_scan, &defaults);
+            }
             return self.copy_from_json(table, &text, &types_for_scan, &defaults);
         }
-        let mut rows: Vec<Vec<Literal>> = Vec::new();
-        for line in text.lines() {
-            let line = line.trim_end_matches('\r');
-            if line.is_empty() {
-                continue;
-            }
-            let fields: Vec<String> = csv_fields(line, delim);
-            let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
-            // Extra CSV columns cannot be dropped silently. Missing ones are
-            // padded with the column default / NULL.
-            if cells.len() > types_for_scan.len() {
-                return Err(Error::Invalid(format!(
-                    "import: the file has {} columns but the table has {}",
-                    cells.len(),
-                    types_for_scan.len()
-                )));
-            }
-            // an empty CSV cell takes the column default when one is declared
-            for (i, c) in cells.iter_mut().enumerate() {
-                if c.is_empty() {
-                    if let Some(Some(d)) = defaults.get(i) {
-                        *c = d.clone();
+        // CSV: read line by line and commit in blocks, so an 8-million-row
+        // import does not hold the file and its parsed rows in memory.
+        let file = match std::fs::File::open(&resolved) {
+            Ok(f) => f,
+            Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
+        };
+        let mut reader = std::io::BufReader::new(file);
+        let mut total = 0usize;
+        let mut first_batch = true;
+        loop {
+            let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
+            let mut eof = false;
+            while batch.len() < Self::COPY_BATCH_ROWS {
+                let mut line = String::new();
+                use std::io::BufRead;
+                match reader.read_line(&mut line) {
+                    Ok(0) => {
+                        eof = true;
+                        break;
+                    }
+                    Ok(_) => {}
+                    Err(e) => return Err(Error::io(&resolved, e)),
+                }
+                let line = line.trim_end_matches(['\n', '\r']);
+                if line.is_empty() {
+                    continue;
+                }
+                let fields: Vec<String> = csv_fields(line, delim);
+                let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+                if cells.len() > types_for_scan.len() {
+                    return Err(Error::Invalid(format!(
+                        "import: the file has {} columns but the table has {}",
+                        cells.len(),
+                        types_for_scan.len()
+                    )));
+                }
+                for (i, c) in cells.iter_mut().enumerate() {
+                    if c.is_empty() {
+                        if let Some(Some(d)) = defaults.get(i) {
+                            *c = d.clone();
+                        }
                     }
                 }
-            }
-            // skip rows whose typed (sparse) cells are malformed
-            for (i, c) in cells.iter().enumerate() {
-                if let Some(t) = types_for_scan.get(i) {
-                    // A cell that does not fit the column is a file-format error
-                    // (`IMPORT_FILE_FORMAT_ERROR`).
-                    validate_insert_value(t, c.trim()).map_err(|e| match e {
-                        // An already-classified parse error keeps its code.
-                        Error::Invalid(m) if m.starts_with("parser:") => Error::Invalid(m),
-                        other => Error::Invalid(format!("import: {other}")),
-                    })?;
+                for (i, c) in cells.iter().enumerate() {
+                    if let Some(t) = types_for_scan.get(i) {
+                        validate_insert_value(t, c.trim()).map_err(|e| match e {
+                            Error::Invalid(m) if m.starts_with("parser:") => Error::Invalid(m),
+                            other => Error::Invalid(format!("import: {other}")),
+                        })?;
+                    }
                 }
+                batch.push(cells.into_iter().map(Literal::Str).collect());
             }
-            rows.push(cells.into_iter().map(Literal::Str).collect());
+            if !batch.is_empty() {
+                let base = self.reserve_rows(table, batch.len(), first_batch)?;
+                first_batch = false;
+                let mut t = self.txn.begin();
+                for (k, row) in batch.iter().enumerate() {
+                    let encoded = encode_row(row, &types_for_scan);
+                    t.put(row_key(table, base + k), encoded.into_bytes());
+                }
+                self.txn.commit(t)?;
+                for (k, row) in batch.iter().enumerate() {
+                    self.update_indexes_on_insert(table, base + k, row)?;
+                }
+                total += batch.len();
+            }
+            if eof {
+                break;
+            }
         }
-        if rows.is_empty() {
-            return Ok(QueryResult::Inserted { count: 0 });
-        }
-        let base = self.reserve_rows(table, rows.len(), true)?;
-        let types = self.column_types(table)?;
-        let mut t = self.txn.begin();
-        for (k, row) in rows.iter().enumerate() {
-            let encoded = encode_row(row, &types);
-            t.put(row_key(table, base + k), encoded.into_bytes());
-        }
-        self.txn.commit(t)?;
-        for (k, row) in rows.iter().enumerate() {
-            self.update_indexes_on_insert(table, base + k, row)?;
-        }
-        Ok(QueryResult::Inserted { count: rows.len() })
+        Ok(QueryResult::Inserted { count: total })
     }
 
     /// Loads a `FORMAT JSONL` copy: one JSON object per line, keyed by column
