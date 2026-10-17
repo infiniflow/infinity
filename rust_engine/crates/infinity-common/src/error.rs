@@ -67,9 +67,8 @@ impl Error {
                     3023
                 } else if m.starts_with("column") {
                     3024
-                } else if m.starts_with("table") {
-                    3022
                 } else {
+                    // Tables are the common case for a not-found error.
                     3022
                 }
             }

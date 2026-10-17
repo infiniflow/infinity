@@ -4225,6 +4225,68 @@ pub fn write_show_table_response(
     Ok(())
 }
 
+/// `ImportRequest { 1: db_name, 2: table_name, 3: file_name, 4: ImportOption, 5: session_id }`
+/// where `ImportOption { 1: delimiter, 2: has_header, 3: copy_file_type }`.
+struct ImportArgs {
+    db: String,
+    table: String,
+    file: String,
+    delimiter: String,
+    has_header: bool,
+    file_type: i32,
+    session_id: i64,
+}
+
+fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ImportArgs> {
+    let mut args = ImportArgs {
+        db: String::new(),
+        table: String::new(),
+        file: String::new(),
+        delimiter: ",".into(),
+        has_header: false,
+        file_type: 0,
+        session_id: 0,
+    };
+    ip.read_struct_begin().map_err(tw)?; // Import_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request
+    ip.read_struct_begin().map_err(tw)?; // ImportRequest
+    loop {
+        let fd = ip.read_field_begin().map_err(tw)?;
+        if fd.field_type == TType::Stop {
+            break;
+        }
+        match (fd.id, fd.field_type) {
+            (Some(1), TType::String) => args.db = ip.read_string().map_err(tw)?,
+            (Some(2), TType::String) => args.table = ip.read_string().map_err(tw)?,
+            (Some(3), TType::String) => args.file = ip.read_string().map_err(tw)?,
+            (Some(4), TType::Struct) => {
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let of = ip.read_field_begin().map_err(tw)?;
+                    if of.field_type == TType::Stop {
+                        break;
+                    }
+                    match (of.id, of.field_type) {
+                        (Some(1), TType::String) => {
+                            args.delimiter = ip.read_string().map_err(tw)?
+                        }
+                        (Some(2), TType::Bool) => args.has_header = ip.read_bool().map_err(tw)?,
+                        (Some(3), TType::I32) => args.file_type = ip.read_i32().map_err(tw)?,
+                        _ => ip.skip(of.field_type).map_err(tw)?,
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
+            (Some(5), TType::I64) => args.session_id = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(fd.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(args)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4607,66 +4669,4 @@ mod tests {
             }
         );
     }
-}
-
-/// `ImportRequest { 1: db_name, 2: table_name, 3: file_name, 4: ImportOption, 5: session_id }`
-/// where `ImportOption { 1: delimiter, 2: has_header, 3: copy_file_type }`.
-struct ImportArgs {
-    db: String,
-    table: String,
-    file: String,
-    delimiter: String,
-    has_header: bool,
-    file_type: i32,
-    session_id: i64,
-}
-
-fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ImportArgs> {
-    let mut args = ImportArgs {
-        db: String::new(),
-        table: String::new(),
-        file: String::new(),
-        delimiter: ",".into(),
-        has_header: false,
-        file_type: 0,
-        session_id: 0,
-    };
-    ip.read_struct_begin().map_err(tw)?; // Import_args
-    let _ = ip.read_field_begin().map_err(tw)?; // request
-    ip.read_struct_begin().map_err(tw)?; // ImportRequest
-    loop {
-        let fd = ip.read_field_begin().map_err(tw)?;
-        if fd.field_type == TType::Stop {
-            break;
-        }
-        match (fd.id, fd.field_type) {
-            (Some(1), TType::String) => args.db = ip.read_string().map_err(tw)?,
-            (Some(2), TType::String) => args.table = ip.read_string().map_err(tw)?,
-            (Some(3), TType::String) => args.file = ip.read_string().map_err(tw)?,
-            (Some(4), TType::Struct) => {
-                ip.read_struct_begin().map_err(tw)?;
-                loop {
-                    let of = ip.read_field_begin().map_err(tw)?;
-                    if of.field_type == TType::Stop {
-                        break;
-                    }
-                    match (of.id, of.field_type) {
-                        (Some(1), TType::String) => {
-                            args.delimiter = ip.read_string().map_err(tw)?
-                        }
-                        (Some(2), TType::Bool) => args.has_header = ip.read_bool().map_err(tw)?,
-                        (Some(3), TType::I32) => args.file_type = ip.read_i32().map_err(tw)?,
-                        _ => ip.skip(of.field_type).map_err(tw)?,
-                    }
-                    ip.read_field_end().map_err(tw)?;
-                }
-                ip.read_struct_end().map_err(tw)?;
-            }
-            (Some(5), TType::I64) => args.session_id = ip.read_i64().map_err(tw)?,
-            _ => ip.skip(fd.field_type).map_err(tw)?,
-        }
-        ip.read_field_end().map_err(tw)?;
-    }
-    ip.read_struct_end().map_err(tw)?;
-    Ok(args)
 }
