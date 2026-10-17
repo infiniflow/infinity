@@ -6082,7 +6082,9 @@ impl Engine {
                         let decl = types.get(col_idx).map(String::as_str).unwrap_or("");
                         let dim = type_dim(decl).unwrap_or(0);
                         let multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
-                        if dim > 0 && qv.len() != dim && qv.len() * 8 >= dim {
+                        // Un-packed bits already line up on `dim` boundaries;
+                        // only a byte-packed query needs expanding.
+                        if dim > 0 && qv.len() % dim != 0 && (qv.len() * 8) % dim == 0 {
                             let mut bits = Vec::with_capacity(qv.len() * 8);
                             for b in &qv {
                                 let byte = *b as u8;
