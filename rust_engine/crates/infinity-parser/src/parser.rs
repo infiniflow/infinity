@@ -307,9 +307,9 @@ impl Parser {
                     Ok(Statement::DropIndex { name, if_exists })
                 } else {
                     self.expect_kw("TABLE")?;
-                    self.eat_if_exists();
+                    let if_exists = self.eat_if_exists();
                     let name = self.expect_table_name()?;
-                    Ok(Statement::DropTable { name })
+                    Ok(Statement::DropTable { name, if_exists })
                 }
             }
             "SET" if matches!(self.toks.get(self.pos + 1), Some(Token::Ident(k)) if k.eq_ignore_ascii_case("CONFIG")) =>
@@ -2196,7 +2196,10 @@ mod tests {
     fn drop_table() {
         assert_eq!(
             one("DROP TABLE t"),
-            Statement::DropTable { name: "t".into() }
+            Statement::DropTable {
+                name: "t".into(),
+                if_exists: false
+            }
         );
     }
 
@@ -2545,7 +2548,10 @@ mod tests {
     fn drop_if_exists_and_copy_and_utility() {
         assert_eq!(
             one("DROP TABLE IF EXISTS t"),
-            Statement::DropTable { name: "t".into() }
+            Statement::DropTable {
+                name: "t".into(),
+                if_exists: true
+            }
         );
         assert_eq!(
             one("DROP INDEX idx1 ON t"),
