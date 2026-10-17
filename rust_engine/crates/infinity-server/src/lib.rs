@@ -1320,7 +1320,14 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
         .iter()
         .map(|c| format!("{} {}", c.name, column_sql_type(c)))
         .collect();
-    let sql = format!("CREATE TABLE {} ({});", req.table_name, cols.join(", "));
+    // `db_name` names the target database; an unqualified table would otherwise
+    // land in `default_db`.
+    let table = if req.db_name.is_empty() {
+        req.table_name.clone()
+    } else {
+        format!("{}.{}", req.db_name, req.table_name)
+    };
+    let sql = format!("CREATE TABLE {table} ({});", cols.join(", "));
     match engine.execute(&sql) {
         Ok(_) => CommonResponse {
             error_code: OK,

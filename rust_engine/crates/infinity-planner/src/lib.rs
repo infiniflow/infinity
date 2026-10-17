@@ -413,8 +413,19 @@ fn key_text(e: &ExprAst) -> String {
             name.to_ascii_lowercase(),
             args.iter().map(key_text).collect::<Vec<_>>().join(",")
         ),
-        ExprAst::Binary(a, op, b) => format!("({}{:?}{})", key_text(a), op, key_text(b)),
-        ExprAst::Cmp(a, op, b) => format!("({}{:?}{})", key_text(a), op, key_text(b)),
+        ExprAst::Binary(a, op, b) => {
+            let sym = match op {
+                infinity_parser::BinOp::Add => "+",
+                infinity_parser::BinOp::Sub => "-",
+                infinity_parser::BinOp::Mul => "*",
+                infinity_parser::BinOp::Div => "/",
+                infinity_parser::BinOp::Mod => "%",
+            };
+            format!("{} {} {}", key_text(a), sym, key_text(b))
+        }
+        ExprAst::Cmp(a, op, b) => {
+            format!("{} {} {}", key_text(a), op.as_str(), key_text(b))
+        }
         ExprAst::Not(a) => format!("not({})", key_text(a)),
         ExprAst::And(a, b) => format!("({} and {})", key_text(a), key_text(b)),
         ExprAst::Or(a, b) => format!("({} or {})", key_text(a), key_text(b)),

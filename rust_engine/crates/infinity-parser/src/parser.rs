@@ -1598,6 +1598,13 @@ impl Parser {
                                 other => SelectItem::Expr(other),
                             }
                         }
+                    } else if matches!(self.toks.get(self.pos + 1), Some(Token::Op(_))) {
+                        // `c1 + 1` / `c2 * 2.0` — a projected expression, not a
+                        // bare column.
+                        match self.expr()? {
+                            ExprAst::Column(c) => SelectItem::Column(c),
+                            other => SelectItem::Expr(other),
+                        }
                     } else {
                         SelectItem::Column(self.expect_ident()?)
                     }
