@@ -3422,10 +3422,10 @@ impl Engine {
             .find_map(|c| self.index_delims(table, c));
         // One unit per quoted phrase / bare word. The analyzer decides what a
         // `"a b"` group tokenises to, so quotes are stripped first.
-        let units: Vec<(bool, Vec<String>)> = query_units(&query)
+        let units: Vec<(bool, Vec<String>, f64)> = query_units(&query)
             .into_iter()
-            .map(|(phrase, text)| (phrase, tokenize_text(&text, &delims)))
-            .filter(|(_, toks)| !toks.is_empty())
+            .map(|(phrase, text, boost)| (phrase, tokenize_text(&text, &delims), boost))
+            .filter(|(_, toks, _)| !toks.is_empty())
             .collect();
         // One entry per matched column: `(schema index, field boost, delimiters)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
@@ -3453,7 +3453,7 @@ impl Engine {
             .collect();
         let terms: Vec<String> = units
             .iter()
-            .flat_map(|(_, u)| u.iter().cloned())
+            .flat_map(|(_, u, _)| u.iter().cloned())
             .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
@@ -3644,7 +3644,7 @@ impl Engine {
                 };
                 if keyword_field {
                     let mut any = false;
-                    for (ui, (_, unit)) in units.iter().enumerate() {
+                    for (ui, (_, unit, _)) in units.iter().enumerate() {
                         if unit.iter().any(|t| counts.contains_key(t.as_str())) {
                             unit_hits[ui] = true;
                             any = true;
@@ -3655,7 +3655,8 @@ impl Engine {
                     }
                     continue;
                 }
-                for (ui, (phrase, unit)) in units.iter().enumerate() {
+                for (ui, (phrase, unit, uboost)) in units.iter().enumerate() {
+                    let uboost = *uboost;
                     if *phrase && unit.len() > 1 {
                         // A phrase scores like one term whose `tf` is the phrase
                         // frequency and whose `idf` is the sum over its terms
@@ -3668,7 +3669,7 @@ impl Engine {
                         let idf_sum: f64 = unit.iter().map(|t| idf_of(t)).sum();
                         let tf = freq as f64;
                         let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                        score += idf_sum * (norm + delta_phrase) * boost;
+                        score += idf_sum * (norm + delta_phrase) * boost * uboost;
                         continue;
                     }
                     for term in unit {
@@ -3679,7 +3680,7 @@ impl Engine {
                         unit_hits[ui] = true;
                         let idf = idf_of(term);
                         let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                        score += idf * (norm + delta_term) * boost;
+                        score += idf * (norm + delta_term) * boost * uboost;
                     }
                 }
             }
@@ -3687,7 +3688,7 @@ impl Engine {
                 .iter()
                 .zip(unit_hits.iter())
                 .filter(|(_, m)| **m)
-                .map(|((_, u), _)| u.len())
+                .map(|((_, u, _), _)| u.len())
                 .sum();
             for (ci, tags) in &rank_features {
                 let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
@@ -5474,7 +5475,7 @@ fn phrase_freq(at: &HashMap<u32, Vec<&str>>, unit: &[String]) -> usize {
 /// together: `"second default text"` is one phrase unit that only matches where
 /// its tokens sit at consecutive positions, while bare words are single-term
 /// units. `term^2.0` boosts are stripped here — boosts are applied per field.
-fn query_units(query: &str) -> Vec<(bool, String)> {
+fn query_units(query: &str) -> Vec<(bool, String, f64)> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_quote = false;
@@ -5503,8 +5504,12 @@ fn query_units(query: &str) -> Vec<(bool, String)> {
     flush(&mut cur, &mut was_quoted, &mut out);
     out.into_iter()
         .map(|(q, t)| {
-            let t = t.split('^').next().unwrap_or(&t).to_string();
-            (q, t)
+            // `term^2.0` boosts that one unit.
+            let (t, boost) = match t.split_once('^') {
+                Some((t, b)) => (t.to_string(), b.parse::<f64>().unwrap_or(1.0)),
+                None => (t, 1.0),
+            };
+            (q, t, boost)
         })
         .collect()
 }
