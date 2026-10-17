@@ -537,6 +537,44 @@ fn handle_connection(
                     };
                     write_show_table_response(&mut writer, seq, &db, &table, col_count, row_count)?;
                 }
+                "ShowIndex" => {
+                    let (db, table, index_name, _sid) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_show_index_args(&mut ip)?
+                    };
+                    let full = if db.is_empty() || table.contains('.') {
+                        table.clone()
+                    } else {
+                        format!("{db}.{table}")
+                    };
+                    let found = engine.as_ref().and_then(|eng| {
+                        eng.catalog()
+                            .list_indexes()
+                            .ok()?
+                            .into_iter()
+                            .find(|im| im.table == full && im.name == index_name)
+                    });
+                    let (code, msg, kind, cols) = match found {
+                        Some(im) => (0i64, "OK".to_string(), im.index_type, im.column),
+                        None => (
+                            3023i64,
+                            format!("index '{index_name}' does not exist"),
+                            String::new(),
+                            String::new(),
+                        ),
+                    };
+                    write_show_index_response(
+                        &mut writer,
+                        seq,
+                        &db,
+                        &table,
+                        &index_name,
+                        code,
+                        &msg,
+                        &kind,
+                        &cols,
+                    )?;
+                }
                 // Database / table / index lifecycle RPCs that return a plain
                 // `CommonResponse`.
                 "GetDatabase" | "CreateDatabase" | "DropDatabase" | "GetTable" | "DropTable"
@@ -1047,6 +1085,7 @@ fn handle_connection(
                     let format = match req.file_type {
                         1 => "JSON",
                         2 => "JSONL",
+                        3 => "FVECS",
                         _ => "CSV",
                     };
                     let mut sql = format!(
@@ -4579,6 +4618,93 @@ pub fn read_update_call(r: &mut impl Read) -> Result<(i32, UpdateReq)> {
     let msg = ip.read_message_begin().map_err(tw)?;
     let req = read_update_args(&mut ip)?;
     Ok((msg.sequence_number, req))
+}
+
+// -------- ShowIndex --------
+
+/// Reads the args of a `ShowIndex` CALL.
+pub fn read_show_index_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(String, String, String, i64)> {
+    ip.read_struct_begin().map_err(tw)?; // ShowIndex_args
+    let _ = ip.read_field_begin().map_err(tw)?; // request (Struct)
+    ip.read_struct_begin().map_err(tw)?; // ShowIndexRequest
+    let (mut db, mut table, mut index, mut sid) =
+        (String::new(), String::new(), String::new(), 0i64);
+    loop {
+        let fd = ip.read_field_begin().map_err(tw)?;
+        if fd.field_type == TType::Stop {
+            break;
+        }
+        match fd.id {
+            Some(1) => db = ip.read_string().map_err(tw)?,
+            Some(2) => table = ip.read_string().map_err(tw)?,
+            Some(3) => index = ip.read_string().map_err(tw)?,
+            Some(4) => sid = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(fd.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?; // ShowIndexRequest
+    end_args(ip)?; // ShowIndex_args
+    Ok((db, table, index, sid))
+}
+
+/// Writes a `ShowIndex` REPLY.
+#[allow(clippy::too_many_arguments)]
+pub fn write_show_index_response(
+    w: &mut impl Write,
+    seq: i32,
+    db: &str,
+    table: &str,
+    index: &str,
+    code: i64,
+    msg: &str,
+    kind: &str,
+    columns: &str,
+) -> Result<()> {
+    let mut o = TBinaryOutputProtocol::new(w, true);
+    o.write_message_begin(&TMessageIdentifier::new(
+        "ShowIndex",
+        TMessageType::Reply,
+        seq,
+    ))
+    .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowIndex_result"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("success", TType::Struct, 0i16))
+        .map_err(tw)?;
+    o.write_struct_begin(&TStructIdentifier::new("ShowIndexResponse"))
+        .map_err(tw)?;
+    o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
+        .map_err(tw)?;
+    o.write_i64(code).map_err(tw)?;
+    o.write_field_end().map_err(tw)?;
+    for (name, id, val) in [
+        ("error_msg", 2i16, msg),
+        ("db_name", 3i16, db),
+        ("table_name", 4i16, table),
+        ("index_name", 5i16, index),
+        ("index_comment", 6i16, ""),
+        ("index_type", 7i16, kind),
+        ("index_column_names", 8i16, columns),
+        ("index_column_ids", 9i16, ""),
+        ("index_function_info", 10i16, ""),
+        ("other_parameters", 11i16, ""),
+        ("store_dir", 12i16, ""),
+        ("segment_index_count", 13i16, ""),
+    ] {
+        o.write_field_begin(&TFieldIdentifier::new(name, TType::String, id))
+            .map_err(tw)?;
+        o.write_string(val).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+    }
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?; // ShowIndexResponse
+    o.write_field_end().map_err(tw)?;
+    o.write_field_stop().map_err(tw)?;
+    o.write_struct_end().map_err(tw)?; // ShowIndex_result
+    Ok(())
 }
 
 // -------- ShowTable --------
