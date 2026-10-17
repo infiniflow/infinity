@@ -3171,7 +3171,7 @@ impl Engine {
                 if unnest_rows.is_some() {
                     override_rows = unnest_rows;
                 }
-                let plan = plan_select(
+                let mut plan = plan_select(
                     items,
                     &tables,
                     join.as_ref(),
@@ -3182,6 +3182,8 @@ impl Engine {
                     *limit,
                     *offset,
                 )?;
+                // `SELECT sum(c1) AS s` names the output column `s`.
+                apply_select_aliases(&mut plan, &aliases);
                 // A full-text `threshold=` filter is answered by the index: the
                 // score needs corpus statistics a row-local predicate cannot see,
                 // so resolve the qualifying rows once and feed them down.
@@ -5752,17 +5754,6 @@ impl Engine {
                     let mut qv: Vec<f64> = query_items
                         .iter()
                         .filter_map(|x| x.parse::<f64>().ok())
-                        .map(|x| {
-                            if bit_col {
-                                if x != 0.0 {
-                                    1.0
-                                } else {
-                                    0.0
-                                }
-                            } else {
-                                x
-                            }
-                        })
                         .collect();
                     // The SDK packs a bit query into bytes (LSB first); expand
                     // it to one bit per position unless it is already un-packed.
@@ -5783,6 +5774,11 @@ impl Engine {
                                 bits.truncate(dim);
                             }
                             qv = bits;
+                        } else {
+                            qv = qv
+                                .into_iter()
+                                .map(|x| if x != 0.0 { 1.0 } else { 0.0 })
+                                .collect();
                         }
                     }
                     if qv.is_empty() {
@@ -5923,6 +5919,24 @@ impl Engine {
         // rather than failing the flush.
         let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
         Ok(())
+    }
+}
+
+/// Renames the projection's output columns with the select-list aliases.
+fn apply_select_aliases(plan: &mut LogicalPlan, aliases: &[Option<String>]) {
+    match plan {
+        LogicalPlan::Projection { names, .. } => {
+            for (n, a) in names.iter_mut().zip(aliases.iter()) {
+                if let Some(a) = a {
+                    *n = a.clone();
+                }
+            }
+        }
+        LogicalPlan::Sort { input, .. }
+        | LogicalPlan::Limit { input, .. }
+        | LogicalPlan::Offset { input, .. }
+        | LogicalPlan::Filter { input, .. } => apply_select_aliases(input, aliases),
+        _ => {}
     }
 }
 
