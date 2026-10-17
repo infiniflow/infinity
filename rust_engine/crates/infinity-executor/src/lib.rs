@@ -3399,7 +3399,6 @@ impl Engine {
         let delims: Option<Vec<char>> = match_columns(&m.column)
             .iter()
             .find_map(|c| self.index_delims(table, c));
-        let tokenize = |s: &str| -> Vec<String> { tokenize_text(s, &delims) };
         // One entry per matched column: `(schema index, field boost, delimiters)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
         // column next to a `standard` one must not share the other's analyzer.
@@ -3417,7 +3416,7 @@ impl Engine {
                 Some((ci, boost, self.index_delims(table, name)))
             })
             .collect();
-        let terms: Vec<String> = tokenize(&query_clean)
+        let terms: Vec<String> = tokenize_text(&query_clean, &delims)
             .into_iter()
             .filter(|t| t != "or" && t != "and")
             .collect();
@@ -3471,7 +3470,7 @@ impl Engine {
                 .collect::<Vec<_>>()
                 .join(" ");
             let live = self.store.get(&del_key(table, seq))?.is_none();
-            docs.push((seq, row, tokenize(&text), live));
+            docs.push((seq, row, tokenize_index_text(&text, &delims), live));
         }
         let boolean = params.split(';').any(|p| {
             p.split_once('=')
@@ -3515,7 +3514,7 @@ impl Engine {
             1.0
         } else {
             docs.iter()
-                .map(|(_, _, toks, _)| toks.len().saturating_sub(1) as f64)
+                .map(|(_, _, toks, _)| toks.len() as f64)
                 .sum::<f64>()
                 / docs.len() as f64
         };
@@ -3553,7 +3552,7 @@ impl Engine {
                         Some(other) => other.to_slt_string(),
                         None => String::new(),
                     };
-                    let ftoks = tokenize_text(&text, d);
+                    let ftoks = tokenize_index_text(&text, d);
                     let fset: std::collections::HashSet<&str> =
                         ftoks.iter().map(|x| x.as_str()).collect();
                     let kw = matches!(d, Some(dd) if dd.is_empty());
@@ -3579,7 +3578,7 @@ impl Engine {
             for t in toks {
                 *counts.entry(t.as_str()).or_insert(0) += 1;
             }
-            let len = toks.len().saturating_sub(1) as f64;
+            let len = toks.len() as f64;
             let mut score = 0.0f64;
             let mut hits = 0usize;
             if keyword_field {
@@ -3717,7 +3716,7 @@ impl Engine {
                         Some(o) => o.to_slt_string(),
                         None => String::new(),
                     };
-                    tokenize_text(&text, d).into_iter().collect()
+                    tokenize_index_text(&text, d).into_iter().collect()
                 })
                 .collect();
             let mut score = 0.0f64;
@@ -5193,23 +5192,31 @@ fn tensor_score(q: &[Vec<f64>], doc_text: &str, col: ElemType, qry: ElemType) ->
 /// Splits `s` into lower-cased tokens using the delimiters implied by a
 /// full-text analyzer: `Some([])` splits on whitespace, `Some(chars)` splits on
 /// those characters only, and `None` uses the standard (alphanumeric) tokeniser.
-fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+fn split_words(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
     let parts: Vec<String> = match delims {
         Some(d) if d.is_empty() => s.split_whitespace().map(str::to_string).collect(),
         Some(d) => s
             .split(|c: char| d.contains(&c))
             .map(str::to_string)
             .collect(),
+        // `standard` divides on `@#$` (already non-alphanumeric here) and
+        // **unites** `/` (`analyzer_pool_impl.cpp:270-277`): `2012/02/14` becomes
+        // `20120214`, so `/` is kept while splitting and then dropped.
         None => s
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .map(str::to_string)
+            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '/')
+            .map(|t| t.replace('/', ""))
             .collect(),
     };
-    let words: Vec<String> = parts
+    parts
         .into_iter()
         .map(|t| t.to_ascii_lowercase())
         .filter(|t| !t.is_empty())
-        .collect();
+        .collect()
+}
+
+/// Query-side tokens: the standard analyzer's stem replaces the word.
+fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+    let words = split_words(s, delims);
     // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
     // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
     // — so the `None` (standard) case stems English. `keyword`/`whitespace`(±chars)
@@ -5219,6 +5226,31 @@ fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
     } else {
         words
     }
+}
+
+/// The **index-side** tokenizer. The C++ `standard` analyzer emits each token
+/// *and* its English stem when the two differ; it does not replace the token.
+/// The engine's own statistics prove it: for a five-row probe table the C++
+/// lengths are 2,4,6,5,4 for token counts 2,3,4,4,2 — every extra term is a
+/// stem that differs (`multiple`->`multipl`, `many`->`mani`, `words`->`word`,
+/// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. Query terms stay
+/// stem-only (a boolean query for `second text multiple` scores 3, not 4).
+fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
+    let words = split_words(s, delims);
+    if delims.is_some() {
+        return words;
+    }
+    let mut out = Vec::with_capacity(words.len());
+    for t in words {
+        let stem = stem_english(&t);
+        if stem != t {
+            out.push(t);
+            out.push(stem);
+        } else {
+            out.push(t);
+        }
+    }
+    out
 }
 
 /// The C++ default analyzer's English stemmer (`STEM_LANG_ENGLISH`).
