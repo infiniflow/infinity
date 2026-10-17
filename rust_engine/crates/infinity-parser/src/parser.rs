@@ -2370,6 +2370,37 @@ mod tests {
     }
 
     #[test]
+    fn search_chained_fusion_keeps_the_last_tail() {
+        // `…, FUSION('rrf'), FUSION('match_tensor', '…')` chains two fusion tails;
+        // the outer (last) one decides the final score.
+        let s = one(
+            "SELECT title FROM t SEARCH MATCH TEXT ('body', 'off', 'topn=4'), \
+             MATCH TENSOR (x, [1.0, 0.0], 'float', 'maxsim', 'topn=2'), \
+             FUSION('rrf'), FUSION('match_tensor', 'column_name=x;topn=2')",
+        );
+        match s {
+            Statement::Select {
+                search: Some(sc), ..
+            } => {
+                assert_eq!(sc.matches.len(), 2);
+                assert_eq!(sc.fusion.as_deref(), Some("match_tensor"));
+                assert_eq!(sc.fusion_params.as_deref(), Some("column_name=x;topn=2"));
+            }
+            other => panic!("expected search, got {other:?}"),
+        }
+        // A single tail with no params keeps `None` params.
+        match one("SELECT a FROM t SEARCH MATCH TEXT ('b', 'x'), FUSION('rrf')") {
+            Statement::Select {
+                search: Some(sc), ..
+            } => {
+                assert_eq!(sc.fusion.as_deref(), Some("rrf"));
+                assert_eq!(sc.fusion_params, None);
+            }
+            other => panic!("expected search, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn drop_if_exists_and_copy_and_utility() {
         assert_eq!(
             one("DROP TABLE IF EXISTS t"),
