@@ -1792,7 +1792,8 @@ fn type_sql(logic_type: i32, physical: &PhysicalWire) -> String {
             element_type,
             ..
         } => format!("SPARSE({}, {dimension})", element_type_name(*element_type)),
-        PhysicalWire::None => scalar_sql(logic_type),
+        // A scalar array element's descriptor carries no shape.
+        PhysicalWire::Scalar(_) | PhysicalWire::None => scalar_sql(logic_type),
     }
 }
 
@@ -2442,6 +2443,10 @@ fn array_info(text: &str) -> Option<(i32, i32, PhysicalWire)> {
     }
     let (logic, physical) = element_type_meta(inner);
     let col = logic_to_column_type(logic);
+    let physical = match physical {
+        PhysicalWire::None => PhysicalWire::Scalar(logic),
+        p => p,
+    };
     Some((logic, col, physical))
 }
 
@@ -2953,6 +2958,10 @@ pub enum PhysicalWire {
         element_logic_type: i32,
         element: Box<PhysicalWire>,
     },
+    /// A scalar array element still carries an (empty) physical descriptor:
+    /// the reference sends `NumberType`/`VarcharType` and SDKs require
+    /// `physical_type` to be present to decode the element stream.
+    Scalar(i32),
 }
 
 /// A minimal `ColumnDef` (`thrift` field ids: 1 id, 2 name, 3 data_type).
@@ -3085,6 +3094,29 @@ fn write_data_type(
     o.write_field_end().map_err(tw)?;
     match physical {
         PhysicalWire::None => {}
+        PhysicalWire::Scalar(logic) => {
+            // `PhysicalType{1: NumberType{}}` / `{2: VarcharType{}}`: the
+            // payload is empty, but SDKs check that the field is present.
+            let (field, name) = if matches!(logic, 11 | 22 | 23) {
+                (2i16, "varchar_type")
+            } else {
+                (1i16, "number_type")
+            };
+            o.write_field_begin(&TFieldIdentifier::new("physical_type", TType::Struct, 2i16))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new("PhysicalType"))
+                .map_err(tw)?;
+            o.write_field_begin(&TFieldIdentifier::new(name, TType::Struct, field))
+                .map_err(tw)?;
+            o.write_struct_begin(&TStructIdentifier::new(name))
+                .map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+            o.write_field_stop().map_err(tw)?;
+            o.write_struct_end().map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
         PhysicalWire::Embedding {
             dimension,
             element_type,
@@ -7417,7 +7449,7 @@ mod tests {
             rresp.column_defs[0].physical,
             PhysicalWire::Array {
                 element_logic_type: 3, // Integer
-                element: Box::new(PhysicalWire::None),
+                element: Box::new(PhysicalWire::Scalar(3)), // ColumnInt32
             }
         );
 
