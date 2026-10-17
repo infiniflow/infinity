@@ -467,14 +467,9 @@ impl Parser {
                 // `SELECT …, body HIGHLIGHT body, doctitle FROM …`
                 let highlight = if self.eat_kw("HIGHLIGHT") {
                     let mut cols = Vec::new();
-                    loop {
-                        match self.peek().clone() {
-                            Token::Ident(c) => {
-                                self.advance();
-                                cols.push(c);
-                            }
-                            _ => break,
-                        }
+                    while let Token::Ident(c) = self.peek().clone() {
+                        self.advance();
+                        cols.push(c);
                         if self.peek() == &Token::Comma {
                             self.advance();
                         } else {

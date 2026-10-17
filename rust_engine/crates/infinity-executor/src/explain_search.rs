@@ -783,7 +783,10 @@ pub fn fragment_lines(p: &SearchPlan) -> Option<Vec<String>> {
     let fusion_list: Vec<(String, String)> = if !p.search.fusions.is_empty() {
         p.search.fusions.clone()
     } else if let Some(f) = &p.search.fusion {
-        vec![(f.clone(), p.search.fusion_params.clone().unwrap_or_default())]
+        vec![(
+            f.clone(),
+            p.search.fusion_params.clone().unwrap_or_default(),
+        )]
     } else {
         Vec::new()
     };
@@ -877,12 +880,16 @@ pub fn fragment_lines(p: &SearchPlan) -> Option<Vec<String>> {
 
     let has_limit = p.limit.is_some();
     let leaf_base = 2u64;
-    let limit_id = if has_limit { Some(leaf_base + matches.len() as u64) } else { None };
+    let limit_id = if has_limit {
+        Some(leaf_base + matches.len() as u64)
+    } else {
+        None
+    };
     let fusion_base = leaf_base + matches.len() as u64 + u64::from(has_limit);
     let project_id = fusion_base + fusion_list.len() as u64;
     let sink_id = project_id + 3;
     let source_id = project_id + 4;
-    let frag_type = if fused { "SerialMaterialize" } else { "SerialMaterialize" };
+    let frag_type = "SerialMaterialize";
 
     let mut leaf_blocks: Vec<Vec<String>> = Vec::new();
     for (i, m) in matches.iter().enumerate() {

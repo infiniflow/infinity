@@ -1780,7 +1780,10 @@ impl Engine {
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
         let mut res = self.execute_stmt_inner(stmt)?;
         if let Statement::Select {
-            highlight, search, from, ..
+            highlight,
+            search,
+            from,
+            ..
         } = stmt
         {
             if !highlight.is_empty() {
@@ -1800,7 +1803,12 @@ impl Engine {
         search: Option<&SearchClause>,
         table: Option<&str>,
     ) {
-        let QueryResult::Rows { columns: names, rows, .. } = res else {
+        let QueryResult::Rows {
+            columns: names,
+            rows,
+            ..
+        } = res
+        else {
             return;
         };
         let Some(query) = search.and_then(|s| {
@@ -3534,6 +3542,8 @@ impl Engine {
         // filtered from the result), so gather every stored row first.
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        // (row id, row, per-column tokens with positions, live)
+        #[allow(clippy::type_complexity)]
         let mut docs: Vec<(usize, Vec<Value>, Vec<Vec<(String, u32)>>, bool)> = Vec::new();
         for (k, v) in self.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
@@ -5528,8 +5538,9 @@ fn highlight_text(text: &str, qterms: &[String], delims: &Option<Vec<char>>) -> 
     let mut matches: Vec<(usize, usize)> = Vec::new();
     if delims.is_none() {
         for (start, end, word, stem) in standard_token_spans(text) {
-            let hit = qterms.iter().any(|q| *q == word) || {
-                stem.as_deref().is_some_and(|s| qterms.iter().any(|q| q == s))
+            let hit = qterms.contains(&word) || {
+                stem.as_deref()
+                    .is_some_and(|s| qterms.iter().any(|q| q == s))
             };
             if hit {
                 matches.push((start, end));
@@ -5635,9 +5646,8 @@ fn split_sentences(text: &str) -> Vec<String> {
 static ENGLISH_STEMMER: std::sync::OnceLock<rust_stemmers::Stemmer> = std::sync::OnceLock::new();
 
 fn stem_english(token: &str) -> String {
-    let s = ENGLISH_STEMMER.get_or_init(|| {
-        rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English)
-    });
+    let s = ENGLISH_STEMMER
+        .get_or_init(|| rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English));
     s.stem(token).to_string()
 }
 
@@ -5679,7 +5689,7 @@ fn phrase_freq(at: &HashMap<u32, Vec<&str>>, unit: &[String]) -> usize {
         let mut ok = true;
         for (k, q) in unit.iter().enumerate().skip(1) {
             match at.get(&(start + k as u32)) {
-                Some(ts) if ts.iter().any(|t| *t == q.as_str()) => {}
+                Some(ts) if ts.contains(&q.as_str()) => {}
                 _ => {
                     ok = false;
                     break;
