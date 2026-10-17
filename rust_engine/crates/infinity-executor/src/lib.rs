@@ -6340,7 +6340,13 @@ impl Engine {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
-            if im.table != table && !im.table.ends_with(&format!(".{table}")) {
+            // The index metadata may hold either a qualified or a short table
+            // name, so match fully when both are qualified and by short name
+            // when either side is unqualified.
+            let same_table = im.table == table
+                || (im.table.rsplit('.').next() == table.rsplit('.').next()
+                    && (!im.table.contains('.') || !table.contains('.')));
+            if !same_table {
                 continue;
             }
             let Some(col) = schema.iter().position(|c| c == &im.column) else {
