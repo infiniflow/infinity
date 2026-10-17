@@ -3908,6 +3908,7 @@ fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<
 fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut method, mut opts) = (String::new(), String::new());
+    let mut tensor: Option<(String, String, i32, String)> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -3916,11 +3917,24 @@ fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
         match f.id {
             Some(1) => method = ip.read_string().map_err(tw)?,
             Some(2) => opts = ip.read_string().map_err(tw)?,
+            // `optional_match_tensor_expr`: the fused MaxSim query.
+            Some(3) if f.field_type == TType::Struct => tensor = read_tensor_parts(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    if let Some((col, vec, elem, _)) = tensor {
+        let extra = format!(
+            "column_name={col};search_tensor={vec};tensor_data_type={}",
+            knn_element(elem)
+        );
+        opts = if opts.is_empty() {
+            extra
+        } else {
+            format!("{opts};{extra}")
+        };
+    }
     if method.is_empty() {
         return Ok(None);
     }
@@ -4164,8 +4178,11 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     )))
 }
 
-/// `MATCH TENSOR (col, [..], 'elem', 'method'[, 'opts'])`.
-fn read_tensor_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+/// Reads a `MatchTensorExpr` as `(column, [vector], element type, options)`.
+#[allow(clippy::type_complexity)]
+fn read_tensor_parts(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Option<(String, String, i32, String)>> {
     ip.read_struct_begin().map_err(tw)?;
     let mut method = String::new();
     let mut col = String::new();
@@ -4194,13 +4211,23 @@ fn read_tensor_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     if col.is_empty() {
         return Ok(None);
     }
+    let _ = method; // the search method is passed positionally in the SQL
+    Ok(Some((col, vec, elem, opts)))
+}
+
+/// `MATCH TENSOR (col, [..], 'elem', 'method'[, 'opts'])`.
+fn read_tensor_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    let Some((col, vec, elem, opts)) = read_tensor_parts(ip)? else {
+        return Ok(None);
+    };
+    let _ = &opts;
     let tail = if opts.is_empty() {
         String::new()
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
     Ok(Some(format!(
-        "MATCH TENSOR ({col}, {vec}, '{}', '{method}'{tail})",
+        "MATCH TENSOR ({col}, {vec}, '{}', 'maxsim'{tail})",
         knn_element(elem)
     )))
 }
