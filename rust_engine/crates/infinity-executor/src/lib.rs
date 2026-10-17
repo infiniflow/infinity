@@ -1983,26 +1983,29 @@ impl Engine {
                     Some(i) => i,
                     None => return Err(Error::Invalid(format!("unknown column '{column}'"))),
                 };
-                // rewrite rows without the dropped column
-                let mut t = self.txn.begin();
-                for (seq, _) in &rows {
-                    t.put(del_key(table, *seq), b"1".to_vec());
-                }
-                let mut next = self.next_row_seq(table)?;
-                for (_, row) in &rows {
-                    let mut nr = row.clone();
-                    if idx < nr.len() {
-                        nr.remove(idx);
+                // rewrite rows without the dropped column (an empty table has
+                // nothing to rewrite, and committing an empty txn is an error)
+                if !rows.is_empty() {
+                    let mut t = self.txn.begin();
+                    for (seq, _) in &rows {
+                        t.put(del_key(table, *seq), b"1".to_vec());
                     }
-                    let encoded = nr
-                        .iter()
-                        .map(|v| v.to_slt_string())
-                        .collect::<Vec<_>>()
-                        .join("\t");
-                    t.put(row_key(table, next), encoded.into_bytes());
-                    next += 1;
+                    let mut next = self.next_row_seq(table)?;
+                    for (_, row) in &rows {
+                        let mut nr = row.clone();
+                        if idx < nr.len() {
+                            nr.remove(idx);
+                        }
+                        let encoded = nr
+                            .iter()
+                            .map(|v| v.to_slt_string())
+                            .collect::<Vec<_>>()
+                            .join("\t");
+                        t.put(row_key(table, next), encoded.into_bytes());
+                        next += 1;
+                    }
+                    self.txn.commit(t)?;
                 }
-                self.txn.commit(t)?;
                 self.reset_row_counter(table);
                 self.catalog.drop_column(table, column)?;
                 if let Some(im) = self
