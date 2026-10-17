@@ -1731,6 +1731,39 @@ mod tests {
     }
 
     #[test]
+    fn a_dropped_column_leaves_its_id_unused_in_the_mirror() {
+        // C++ never reuses a column id: after dropping the middle column the
+        // files are `0.col` and `2.col` (there is no `1.col`).
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open(dir.path()).unwrap();
+        engine
+            .execute("CREATE TABLE t (a INT, b INT, c INT);")
+            .unwrap();
+        engine.execute("INSERT INTO t VALUES (1, 2, 3);").unwrap();
+        engine.execute("ALTER TABLE t DROP COLUMN b;").unwrap();
+        assert_eq!(engine.write_cpp_blocks("t").unwrap(), 1);
+
+        let db_dir = dir.path().join("data").join("db_0");
+        let tbl_dir = std::fs::read_dir(&db_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| {
+                p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("tbl_"))
+            })
+            .expect("table directory");
+        let block = tbl_dir.join("seg_0").join("blk_0");
+        assert!(block.join("0.col").exists());
+        assert!(!block.join("1.col").exists());
+        assert!(block.join("2.col").exists());
+
+        let (columns, rows) = engine.read_cpp_blocks("t").unwrap();
+        assert_eq!(columns, vec!["a", "c"]);
+        assert_eq!(rows, vec![vec!["1".to_string(), "3".to_string()]]);
+    }
+
+    #[test]
     fn sparse_shape_parsing() {
         // Index width follows the bound, as the engine's describe_type does.
         assert_eq!(sparse_shape("SPARSE(FLOAT,100)"), Some((6, 2, 1)));
