@@ -729,9 +729,22 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
         let keys: Vec<String> = s
             .iter()
             .filter_map(|x| {
-                let a = x.as_arr()?;
-                let col = a.first()?.as_str()?;
-                let dir = a.get(1).and_then(Json::as_str).unwrap_or("asc");
+                // `[col, "asc"]` (thrift-like) or `{col: "asc"}` (the REST SDK)
+                if let Some(a) = x.as_arr() {
+                    let col = a.first()?.as_str()?;
+                    let dir = a.get(1).and_then(Json::as_str).unwrap_or("asc");
+                    return Some(format!(
+                        "{col} {}",
+                        if dir.eq_ignore_ascii_case("desc") {
+                            "DESC"
+                        } else {
+                            "ASC"
+                        }
+                    ));
+                }
+                let obj = x.as_obj()?;
+                let (col, dir) = obj.first()?;
+                let dir = dir.as_str().unwrap_or("asc");
                 Some(format!(
                     "{col} {}",
                     if dir.eq_ignore_ascii_case("desc") {
@@ -827,6 +840,9 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         };
     }
 
+    if std::env::var_os("INF_DEBUG_SQL").is_some() {
+        eprintln!("[HTTP] {method} {path} {body}");
+    }
     let doc = if body.trim().is_empty() {
         Json::Obj(Vec::new())
     } else {
@@ -1048,6 +1064,53 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 _ => err_response(3022, &format!("table '{table}' does not exist")),
             }
         }
+        ("POST", ["databases", db, "tables", table, "columns"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let fields = match doc.get("fields").and_then(Json::as_arr) {
+                Some(f) if !f.is_empty() => f,
+                _ => return err_response(3013, "syntax: no column definition"),
+            };
+            let mut cols = Vec::new();
+            for f in fields {
+                let name = f.get("name").and_then(Json::as_str).unwrap_or("");
+                let ty = f.get("type").and_then(Json::as_str).unwrap_or("varchar");
+                if safe_ident(name).is_none() {
+                    return err_response(3013, "syntax: invalid column name");
+                }
+                cols.push(format!("{name} {}", type_to_sql(ty)));
+            }
+            match run(&format!(
+                "ALTER TABLE {db}.{table} ADD COLUMN ({});",
+                cols.join(", ")
+            )) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("DELETE", ["databases", db, "tables", table, "columns"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let names: Vec<&str> = doc
+                .get("column_names")
+                .and_then(Json::as_arr)
+                .map(|a| a.iter().filter_map(Json::as_str).collect())
+                .unwrap_or_default();
+            let mut resp = ok_json();
+            for n in names {
+                if safe_ident(n).is_none() {
+                    return err_response(3003, "invalid column name");
+                }
+                match run(&format!("ALTER TABLE {db}.{table} DROP COLUMN {n};")) {
+                    Ok(_) => {}
+                    Err(e) => return e,
+                }
+            }
+            resp.push_str("");
+            (200, resp)
+        }
         ("GET", ["databases", db, "tables", table, "columns"]) => {
             let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
                 return (404, String::new());
@@ -1196,6 +1259,176 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 ),
                 None => err_response(3023, &format!("index '{index}' does not exist")),
             }
+        }
+        ("GET", ["databases", db, "tables", table, "meta"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let explain = match doc.get("explain_type").and_then(Json::as_str) {
+                Some(t) => t.to_ascii_uppercase(),
+                None => "PHYSICAL".into(),
+            };
+            let output: Vec<String> = doc
+                .get("output")
+                .and_then(Json::as_arr)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(Json::as_str)
+                        .map(String::from)
+                        .collect()
+                })
+                .unwrap_or_else(|| vec!["*".into()]);
+            let filter = doc.get("filter").and_then(Json::as_str).unwrap_or("");
+            let mut inner = format!("SELECT {} FROM {db}.{table}", output.join(", "));
+            if !filter.is_empty() {
+                inner.push_str(&format!(" WHERE {filter}"));
+            }
+            let kind = match explain.as_str() {
+                "LOGICAL" => "LOGICAL",
+                "OPT" | "UNOPT" => "LOGICAL",
+                "PIPELINE" | "FRAGMENT" => "PHYSICAL",
+                _ => "PHYSICAL",
+            };
+            let sql = format!("EXPLAIN {kind} {inner};");
+            match run(&sql) {
+                Ok(results) => {
+                    let (cols, rows) = rows_of(results);
+                    // the SDK renders every value under its column name
+                    let mut out = String::new();
+                    if let Some(first) = rows.first() {
+                        for (i, v) in first.iter().enumerate() {
+                            let name = cols.get(i).cloned().unwrap_or_else(|| "explain".into());
+                            if i > 0 {
+                                out.push(',');
+                            }
+                            out.push_str(&format!(
+                                "{{\"{}\":\"{}\"}}",
+                                json_escape(&name),
+                                json_escape(v)
+                            ));
+                        }
+                    }
+                    (
+                        200,
+                        format!("{{\"error_code\":0,\"error_msg\":\"OK\",\"output\":[{out}]}}"),
+                    )
+                }
+                Err(e) => e,
+            }
+        }
+        // ---- import / export / rename / compact / optimize ----
+        ("PUT", ["databases", db, "tables", table]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
+            let format = doc
+                .get("file_type")
+                .and_then(Json::as_str)
+                .unwrap_or("csv")
+                .to_ascii_uppercase();
+            let delim = doc.get("delimiter").and_then(Json::as_str).unwrap_or(",");
+            let header = doc
+                .get("header")
+                .and_then(|v| match v {
+                    Json::Bool(b) => Some(*b),
+                    _ => None,
+                })
+                .unwrap_or(false);
+            let sql = format!(
+                "COPY {db}.{table} FROM {path} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header});",
+                delim.replace('\'', "''")
+            );
+            match run(&sql) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("GET", ["databases", db, "table", table]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let path = quote_sql(doc.get("file_path").and_then(Json::as_str).unwrap_or(""));
+            let format = doc
+                .get("file_type")
+                .and_then(Json::as_str)
+                .unwrap_or("csv")
+                .to_ascii_uppercase();
+            let delim = doc.get("delimiter").and_then(Json::as_str).unwrap_or(",");
+            let header = doc
+                .get("header")
+                .and_then(|v| match v {
+                    Json::Bool(b) => Some(*b),
+                    _ => None,
+                })
+                .unwrap_or(false);
+            let sql = format!(
+                "COPY {db}.{table} TO {path} WITH (DELIMITER '{}', FORMAT {format}, HEADER {header});",
+                delim.replace('\'', "''")
+            );
+            match run(&sql) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("POST", ["databases", db, "tables", table, "rename"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let new_name = doc
+                .get("new_table_name")
+                .and_then(Json::as_str)
+                .unwrap_or("");
+            let Some(new_name) = safe_ident(new_name) else {
+                return err_response(3003, "invalid table name");
+            };
+            match run(&format!("ALTER TABLE {db}.{table} RENAME TO {new_name};")) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("PUT", ["databases", db, "tables", table, "compact"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            match run(&format!("COMPACT TABLE {db}.{table};")) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("PUT", ["databases", db, "tables", table, "optimize"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            match run(&format!("COMPACT TABLE {db}.{table};")) {
+                Ok(_) => (200, ok_json()),
+                Err(e) => e,
+            }
+        }
+        ("GET", ["databases", db, "tables", table, "segments"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            // one segment per table in this engine; report its blocks
+            let rows = engine.row_count(&format!("{db}.{table}")).unwrap_or(0);
+            (
+                200,
+                format!(
+                    "{{\"error_code\":0,\"error_msg\":\"OK\",\"segments\":[{{\"segment_id\":0,\"row_count\":{rows},\"block_count\":1,\"status\":\"sealed\"}}]}}"
+                ),
+            )
+        }
+        ("GET", ["databases", db, "tables", table, "segments", _seg, "blocks"]) => {
+            let (Some(db), Some(table)) = (safe_ident(db), safe_ident(table)) else {
+                return (404, String::new());
+            };
+            let rows = engine.row_count(&format!("{db}.{table}")).unwrap_or(0);
+            (
+                200,
+                format!(
+                    "{{\"error_code\":0,\"error_msg\":\"OK\",\"blocks\":[{{\"block_id\":0,\"row_count\":{rows}}}]}}"
+                ),
+            )
         }
         // ---- docs: insert / delete / update / search ----
         ("POST", ["databases", db, "tables", table, "docs"]) => {

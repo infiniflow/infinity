@@ -1938,19 +1938,23 @@ impl Engine {
                 let _ = meta;
                 let rows = self.fetch_rows_with_ids(table)?;
                 let mut next = self.next_row_seq(new_name)?;
-                let mut t = self.txn.begin();
-                for (seq, row) in &rows {
-                    // retire the old row, write it under the new table name
-                    t.put(del_key(table, *seq), b"1".to_vec());
-                    let encoded = row
-                        .iter()
-                        .map(|v| v.to_slt_string())
-                        .collect::<Vec<_>>()
-                        .join("\t");
-                    t.put(row_key(new_name, next), encoded.into_bytes());
-                    next += 1;
+                // An empty table has nothing to move: committing an empty
+                // transaction is an error, so only open one when needed.
+                if !rows.is_empty() {
+                    let mut t = self.txn.begin();
+                    for (seq, row) in &rows {
+                        // retire the old row, write it under the new table name
+                        t.put(del_key(table, *seq), b"1".to_vec());
+                        let encoded = row
+                            .iter()
+                            .map(|v| v.to_slt_string())
+                            .collect::<Vec<_>>()
+                            .join("\t");
+                        t.put(row_key(new_name, next), encoded.into_bytes());
+                        next += 1;
+                    }
+                    self.txn.commit(t)?;
                 }
-                self.txn.commit(t)?;
                 for (k, _) in self.store.scan_prefix(&row_prefix(table))? {
                     self.store.delete(&k)?;
                 }
