@@ -18,7 +18,7 @@
 | 撕裂尾（torn tail）必须被容忍并丢弃 | `infinity-storage: torn_tail_is_ignored` | ✅ |
 | 空事务必须被拒绝 | `infinity-txn: empty_txn_rejected` | ✅ |
 | 重名表 / 重名列必须被拒绝 | `infinity-catalog: duplicate_name_is_rejected`；executor `defaults_and_alter_add_column`（重复列） | ✅ |
-| 张量维度/嵌套不合法必须报错 | executor：`TENSORARRAY` 三重嵌套校验（`statement error`） | ✅ 部分（见 §4 缺口） |
+| 张量维度/嵌套不合法必须报错 | executor：`TENSORARRAY` 三重嵌套与维度校验（`.slt` 的 `statement error` 记录） | ✅ |
 
 ## 2. 存储 / 事务不变量
 
@@ -46,7 +46,7 @@
 | 向量索引：Flat 精确 top-1 | `infinity-index/vector: flat_exact_top1` | ✅ |
 | HNSW 能找到精确解，且**召回率**达标 | `infinity-index/vector: hnsw_finds_exact_vector`、`hnsw_recall_vs_flat` | ✅ |
 | 全文倒排：分词、单词查询、AND 查询与排序、top-k 截断 | `infinity-index/fulltext: tokenize_basic`、`single_term_lookup`、`and_query_and_ranking`、`top_k_limits`；**打分单调性**：`infinity-executor: fulltext_score`（见 §4 G5） | ✅ |
-| A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | — | **缺口**：Rust 侧索引未落盘为独立的块文件族，尚无「文件集合/发布/合并/清理」契约测试 |
+| A3 逐索引**文件集合/发布/合并/清理**契约（向量 `.idx`、全文 `.dic/.pos/.spill/.len`） | `infinity-storage/tests/index_file_family.rs`（见 §4 G2） | ✅ |
 | `DROP INDEX` 后重建 | `infinity-executor: index_drop_recreate`（DROP 前后与重建后查询结果一致；重建后写入的新行可见） | ✅ |
 
 ## 4. 显式登记的例外与缺口（Gate G 要求）
@@ -68,5 +68,6 @@ cd rust_engine && cargo test --workspace
 RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
 ```
 
-> 结论：Gate G 的**清单已产出**；配置校验（G1）、索引文件族（G2）、跨底座崩溃回归（G3）、
-> miri/sanitizer（G4）为**已登记缺口**，尚未满足「纳入门槛」的条件。
+> 结论：Gate G 的**清单已产出且 G1–G5 全部闭合**——配置值域校验（G1）、索引文件族契约（G2）、
+> 跨底座崩溃回归（G3）、miri/ASan/TSan（G4，受 pinned nightly MSRV 限制的范围）、全文打分单调性（G5）
+> 均带回归测试。§5.1 的**精确分值与 C++/iresearch 对齐**仍是独立任务（Gate A 打分项）。
