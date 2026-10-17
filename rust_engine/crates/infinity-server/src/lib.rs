@@ -1068,8 +1068,11 @@ fn handle_connection(
                                 // `{2: snapshot_name, 3: scope}`
                                 eng.restore_database_snapshot(&get(2))
                             } else {
-                                eng.execute(&format!("RESTORE TABLE SNAPSHOT {};", get(2)))
-                                    .map(|_| ())
+                                eng.execute(&format!(
+                                    "RESTORE TABLE SNAPSHOT {};",
+                                    sql_name(&get(2))
+                                ))
+                                .map(|_| ())
                             };
                             match res {
                                 Ok(()) => CommonResponse {
@@ -1129,13 +1132,17 @@ fn handle_connection(
                         };
                         run_common(
                             engine.as_ref(),
-                            &format!("CREATE SNAPSHOT {snap} ON TABLE {full};"),
+                            &format!("CREATE SNAPSHOT {} ON TABLE {full};", sql_name(&snap)),
                             sid,
                         )
                     } else if name == "DropSnapshot" {
                         // {1: session_id, 2: snapshot}
                         let snap = get(2);
-                        run_common(engine.as_ref(), &format!("DROP SNAPSHOT {snap};"), sid)
+                        run_common(
+                            engine.as_ref(),
+                            &format!("DROP SNAPSHOT {};", sql_name(&snap)),
+                            sid,
+                        )
                     } else if name == "Optimize" {
                         // Merge the index chunks that earlier memory dumps left
                         // behind, as the reference's optimize does.
@@ -1854,6 +1861,23 @@ pub(crate) fn render_default(d: &str) -> String {
         t.to_string()
     } else {
         format!("'{}'", t.replace('\'', "''"))
+    }
+}
+
+/// Renders `name` as a SQL identifier: plain names pass through, anything
+/// else (dashes, dots, spaces) is double-quoted, which the parser accepts.
+fn sql_name(name: &str) -> String {
+    let plain = !name.is_empty()
+        && name
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic() || c == '_')
+            .unwrap_or(false)
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if plain {
+        name.to_string()
+    } else {
+        format!("\"{}\"", name.replace('"', ""))
     }
 }
 

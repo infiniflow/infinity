@@ -86,6 +86,19 @@ impl Parser {
         }
     }
 
+    /// A name that may also be written as a double-quoted literal
+    /// (`CREATE SNAPSHOT "snap-1" …`): snapshot/table names in the reference
+    /// come straight from the RPC and may contain dashes.
+    fn expect_name(&mut self) -> Result<String> {
+        match self.peek() {
+            Token::Str(_) => match self.advance() {
+                Token::Str(s) => Ok(s),
+                _ => unreachable!(),
+            },
+            _ => self.expect_ident(),
+        }
+    }
+
     /// Reads a (possibly `db.table`-qualified) table name, keeping the dotted
     /// form so the executor can resolve it against the current database.
     /// Consumes a balanced `( … )` run holding a subquery and returns its SQL
@@ -159,7 +172,7 @@ impl Parser {
             "CREATE" => {
                 self.advance();
                 if self.eat_kw("SNAPSHOT") {
-                    let name = self.expect_ident()?;
+                    let name = self.expect_name()?;
                     self.expect_kw("ON")?;
                     self.expect_kw("TABLE")?;
                     let table = self.expect_table_name()?;
@@ -295,7 +308,7 @@ impl Parser {
                     Ok(Statement::DropDatabase { name, if_exists })
                 } else if self.eat_kw("SNAPSHOT") {
                     self.eat_if_exists();
-                    let name = self.expect_ident()?;
+                    let name = self.expect_name()?;
                     Ok(Statement::DropSnapshot { name })
                 } else if self.eat_kw("INDEX") {
                     let if_exists = self.eat_if_exists();
@@ -333,7 +346,7 @@ impl Parser {
                 self.advance();
                 self.expect_kw("TABLE")?;
                 self.expect_kw("SNAPSHOT")?;
-                let name = self.expect_ident()?;
+                let name = self.expect_name()?;
                 Ok(Statement::RestoreSnapshot { name })
             }
             "USE" => {
