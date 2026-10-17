@@ -846,6 +846,26 @@ impl Parser {
         }
         if self.peek() == &Token::LParen {
             let save = self.pos;
+            // `(c2 + 1) IN (8, 9, 10)`: a parenthesised *expression* followed by
+            // `IN`, which is not a grouped predicate.
+            if let Ok(left) = self.expr() {
+                if matches!(self.peek(), Token::Ident(s) if s.eq_ignore_ascii_case("IN")) {
+                    self.advance();
+                    self.expect(Token::LParen)?;
+                    let mut values = Vec::new();
+                    while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                        values.push(self.expr()?);
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    self.expect(Token::RParen)?;
+                    return Ok(Predicate::In(left, values, false));
+                }
+            }
+            self.pos = save;
             self.advance();
             if let Ok(p) = self.or_predicate() {
                 if self.peek() == &Token::RParen {
