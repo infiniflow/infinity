@@ -3431,6 +3431,17 @@ fn pexpr_name_impl(e: &PExpr, canonical: bool) -> String {
                 pexpr_name_impl(&a[1], canonical)
             )
         }
+        // Pseudo-columns (`_score`, `_distance`, …) are named upper-case and
+        // without the empty argument list.
+        PExpr::Call(n, a)
+            if a.is_empty()
+                && matches!(
+                    n.to_ascii_lowercase().as_str(),
+                    "score" | "distance" | "similarity" | "row_id"
+                ) =>
+        {
+            n.to_ascii_uppercase()
+        }
         // The analysed AVG is `sum(x) / count(x)`, and so is its name.
         PExpr::Call(n, a) if n.eq_ignore_ascii_case("avg") && a.len() == 1 => {
             let arg = match &a[0] {
@@ -3770,6 +3781,9 @@ fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opt
     let mut fusions: Vec<String> = Vec::new();
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
+        if std::env::var_os("INF_DEBUG_SQL").is_some() {
+            eprintln!("[SEARCH] field {:?} {:?}", f.id, f.field_type);
+        }
         if f.field_type == TType::Stop {
             break;
         }
@@ -3809,6 +3823,9 @@ fn read_generic_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<O
     ip.read_struct_begin().map_err(tw)?;
     let mut out = None;
     let f = ip.read_field_begin().map_err(tw)?;
+    if std::env::var_os("INF_DEBUG_SQL").is_some() {
+        eprintln!("[MATCH] field {:?} {:?}", f.id, f.field_type);
+    }
     match (f.id, f.field_type) {
         (Some(4), TType::Struct) => out = Some(read_match_text_sql(ip)?),
         (Some(1), TType::Struct) => out = read_knn_sql(ip)?,
@@ -3894,16 +3911,18 @@ fn read_embedding_literal(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Resu
         }
         if let TType::List = f.field_type {
             let l = ip.read_list_begin().map_err(tw)?;
+            // The *element* type is in the list header, not the field header.
+            let elem_type = l.element_type;
             vals.clear();
             for _ in 0..l.size {
-                match f.field_type {
+                match elem_type {
                     TType::Bool => vals.push(ip.read_bool().map_err(tw)?.to_string()),
                     TType::I16 => vals.push(ip.read_i16().map_err(tw)?.to_string()),
                     TType::I32 => vals.push(ip.read_i32().map_err(tw)?.to_string()),
                     TType::I64 => vals.push(ip.read_i64().map_err(tw)?.to_string()),
                     TType::Double => vals.push(fmt_number(ip.read_double().map_err(tw)?)),
                     _ => {
-                        ip.skip(f.field_type).map_err(tw)?;
+                        ip.skip(elem_type).map_err(tw)?;
                     }
                 }
             }
@@ -3966,12 +3985,15 @@ fn knn_metric(code: i32) -> &'static str {
 }
 
 fn knn_element(code: i32) -> &'static str {
+    // Thrift `ElementType`: 0 bit, 1 uint8, 2 int8, 3 int16, 4 int32,
+    // 5 int64, 6 float32, 7 float64, 8 float16, 9 bfloat16.
     match code {
         0 => "bit",
-        1 | 2 => "int8",
+        1 => "uint8",
+        2 => "int8",
         3 => "int16",
-        4 => "int",
-        5 => "bigint",
+        4 => "int32",
+        5 => "int64",
         6 => "float",
         7 => "double",
         8 => "float16",
@@ -4562,6 +4584,13 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
             if let Some(t) = map.get(&key) {
                 return t.clone();
             }
+            // Pseudo-columns: 32-bit scores, 64-bit row id.
+            if matches!(key.as_str(), "score" | "distance" | "similarity") {
+                return "FLOAT".to_string();
+            }
+            if key == "row_id" {
+                return "BIGINT".to_string();
+            }
             // `Cast(x AS T)` is announced as `T`.
             if let Some(rest) = key
                 .strip_prefix("cast(")
@@ -4625,6 +4654,8 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
                     // transcendental functions widen to DOUBLE.
                     "sqrt" | "pow" | "power" | "exp" | "ln" | "log" | "log2" | "log10" | "sin"
                     | "cos" | "tan" => "DOUBLE".to_string(),
+                    // Pseudo-columns are 32-bit scores.
+                    "score" | "distance" | "similarity" => "FLOAT".to_string(),
                     // `min`/`max` keep the argument's type.
                     _ => base,
                 };

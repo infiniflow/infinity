@@ -5079,9 +5079,35 @@ impl Engine {
                 None => 10,
             }
         } else {
-            m.args.iter().rev().find_map(arg_int).unwrap_or(10).max(0) as usize
+            let n = m.args.iter().rev().find_map(arg_int).unwrap_or(10);
+            if n <= 0 {
+                return Err(Error::Invalid(
+                    "invalid parameter: topn must be a positive integer".into(),
+                ));
+            }
+            n as usize
         };
-        let params = arg_str(m.args.get(3)).unwrap_or_default();
+        // `MATCH VECTOR` carries its options after `topn`; `SPARSE`/`TENSOR`
+        // carry them in the last argument.
+        let params_idx = if is_tensor || is_sparse { 3 } else { 4 };
+        let params = arg_str(m.args.get(params_idx)).unwrap_or_default();
+        for part in params.split(';').filter(|p| !p.trim().is_empty()) {
+            let key = part
+                .split('=')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase();
+            let known = matches!(
+                key.as_str(),
+                "topn" | "threshold" | "ef" | "io_limit" | "distance" | "similarity"
+            );
+            if !known {
+                return Err(Error::Invalid(format!(
+                    "invalid parameter: unknown option '{key}'"
+                )));
+            }
+        }
         let threshold = with_opts
             .and_then(parse_threshold)
             .or_else(|| parse_threshold(&params));
