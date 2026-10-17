@@ -4655,6 +4655,24 @@ impl Engine {
             groups
         };
         let n_docs = docs.len().max(1);
+        // Document frequency per (field, term). Computing it inside `idf_of`
+        // made scoring O(rows^2); one pass here turns it into a lookup.
+        let dfs: Vec<HashMap<String, usize>> = (0..cols.len())
+            .map(|f| {
+                let mut m: HashMap<String, usize> = HashMap::new();
+                for (_, _, fields, _) in &docs {
+                    // A term counts once per document, however often it occurs.
+                    let mut seen: std::collections::HashSet<&str> =
+                        std::collections::HashSet::new();
+                    for (t, _) in &fields[f] {
+                        if seen.insert(t.as_str()) {
+                            *m.entry(t.clone()).or_insert(0) += 1;
+                        }
+                    }
+                }
+                m
+            })
+            .collect();
         // One BM25 corpus per column (Lucene keeps statistics per field).
         let avg_lens: Vec<f64> = (0..cols.len())
             .map(|f| {
@@ -4745,11 +4763,7 @@ impl Engine {
                     at.entry(*pos).or_default().push(t.as_str());
                 }
                 let idf_of = |term: &str| -> f64 {
-                    let df = docs
-                        .iter()
-                        .filter(|(_, _, fs, _)| fs[f].iter().any(|(x, _)| x == term))
-                        .count()
-                        .max(1) as f64;
+                    let df = dfs[f].get(term).copied().unwrap_or(0).max(1) as f64;
                     (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
                 };
                 if keyword_field {
@@ -4819,8 +4833,11 @@ impl Engine {
                 .then(a.0.cmp(&b.0))
         });
         scored.truncate(topn);
-        let mut by_id: HashMap<usize, Vec<Value>> =
-            self.fetch_rows_with_ids(table)?.into_iter().collect();
+        let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
+        let mut by_id: HashMap<usize, Vec<Value>> = self
+            .fetch_some_rows_with_ids(table, &wanted)?
+            .into_iter()
+            .collect();
         let mut out = Vec::new();
         for (seq, score) in scored {
             let mut row = by_id.remove(&seq).unwrap_or_default();
