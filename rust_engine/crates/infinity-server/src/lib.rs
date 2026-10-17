@@ -684,8 +684,23 @@ fn handle_connection(
                         error_msg: "OK".into(),
                         session_id: sid,
                     };
+                    // The reference rejects a single INSERT batch above one
+                    // block's worth of rows (8192).
+                    if req.rows.is_empty() {
+                        resp = CommonResponse {
+                            error_code: 3014,
+                            error_msg: "insert without values".into(),
+                            session_id: sid,
+                        };
+                    } else if req.rows.len() > 8192 {
+                        resp = CommonResponse {
+                            error_code: 3014,
+                            error_msg: "Insert batch row limit shouldn't more than 8193".into(),
+                            session_id: sid,
+                        };
+                    }
                     let mut i = 0usize;
-                    while i < req.rows.len() {
+                    while resp.error_code == OK && i < req.rows.len() {
                         let (cols, _) = &req.rows[i];
                         let mut batch: Vec<String> = Vec::new();
                         while i < req.rows.len() && &req.rows[i].0 == cols {
@@ -779,11 +794,34 @@ fn handle_connection(
                                 if !req.star && req.names.len() == columns.len() {
                                     columns = req.names.clone();
                                 }
-                                select_response_from_typed(
+                                let mut resp = select_response_from_typed(
                                     &columns,
                                     &declared_types(eng, &req.table_name, &columns),
                                     &rows,
-                                )
+                                );
+                                if req.total_hits {
+                                    // The count is the result set *before*
+                                    // LIMIT/OFFSET.
+                                    let mut all = req.clone();
+                                    all.limit = None;
+                                    all.offset = None;
+                                    let total = eng
+                                        .execute(&all.to_sql())
+                                        .map(|rs| {
+                                            rs.into_iter()
+                                                .map(|r| {
+                                                    if let QueryResult::Rows { rows, .. } = r {
+                                                        rows.len()
+                                                    } else {
+                                                        0
+                                                    }
+                                                })
+                                                .sum::<usize>()
+                                        })
+                                        .unwrap_or(0);
+                                    resp.extra_result = format!("{{\"total_hits_count\":{total}}}");
+                                }
+                                resp
                             }
                             Err(e) => err(e.to_string()),
                         },
@@ -1490,7 +1528,16 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
     let cols: Vec<String> = req
         .columns
         .iter()
-        .map(|c| format!("{} {}", c.name, column_sql_type(c)))
+        .map(|c| {
+            let mut col = format!("{} {}", c.name, column_sql_type(c));
+            if c.not_null {
+                col.push_str(" NOT NULL");
+            }
+            if let Some(d) = &c.default {
+                col.push_str(&format!(" DEFAULT {d}"));
+            }
+            col
+        })
         .collect();
     // `db_name` names the target database; an unqualified table would otherwise
     // land in `default_db`.
@@ -1713,6 +1760,8 @@ fn push_element(chunk: &mut Vec<u8>, elem: i32, f: f64) {
         5 => chunk.extend_from_slice(&(f as i64).to_le_bytes()),
         7 => chunk.extend_from_slice(&f.to_le_bytes()),
         8 => chunk.extend_from_slice(&f32_to_f16_bits(f as f32).to_le_bytes()),
+        // `bfloat16_t` keeps the top half of the `f32` (truncation).
+        9 => chunk.extend_from_slice(&(((f as f32).to_bits() >> 16) as u16).to_le_bytes()),
         _ => chunk.extend_from_slice(&(f as f32).to_le_bytes()),
     }
 }
@@ -2385,6 +2434,16 @@ pub fn rows_to_column_fields_typed(
                 6 => {
                     let f: f64 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
                     chunk.extend_from_slice(&f.to_le_bytes());
+                }
+                7 => {
+                    // ColumnFloat16: IEEE half precision.
+                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    chunk.extend_from_slice(&f32_to_f16_bits(f).to_le_bytes());
+                }
+                8 => {
+                    // ColumnBFloat16: the C++ bfloat16_t keeps the top 16 bits.
+                    let f: f32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0.0);
+                    chunk.extend_from_slice(&((f.to_bits() >> 16) as u16).to_le_bytes());
                 }
                 0 => chunk.push(
                     if cell
@@ -3139,6 +3198,9 @@ pub struct SelectReq {
     /// The client-facing names, which follow the C++ `Name()` printer (a cast
     /// prints as `Cast(c3 AS Varchar)`, string arguments lose their quotes).
     pub names: Vec<String>,
+    /// The same names without catalog-name canonicalisation, used for
+    /// projections that are also group keys (`abs(...)` stays lower case).
+    pub raw_names: Vec<String>,
     pub star: bool,
     /// Optional `WHERE` clause already rendered as SQL.
     pub where_sql: Option<String>,
@@ -3146,7 +3208,12 @@ pub struct SelectReq {
     pub order_by: Vec<(String, bool)>,
     /// Group keys, already rendered as SQL text.
     pub group_by: Vec<String>,
+    /// Optional `HAVING` clause already rendered as SQL.
+    pub having_sql: Option<String>,
     pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    /// `total_hits_count` option: report how many rows matched before LIMIT.
+    pub total_hits: bool,
 }
 
 impl SelectReq {
@@ -3169,6 +3236,9 @@ impl SelectReq {
         if !self.group_by.is_empty() {
             sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
         }
+        if let Some(h) = &self.having_sql {
+            sql.push_str(&format!(" HAVING {h}"));
+        }
         if !self.order_by.is_empty() {
             let keys: Vec<String> = self
                 .order_by
@@ -3179,6 +3249,9 @@ impl SelectReq {
         }
         if let Some(n) = self.limit {
             sql.push_str(&format!(" LIMIT {n}"));
+        }
+        if let Some(n) = self.offset {
+            sql.push_str(&format!(" OFFSET {n}"));
         }
         sql.push(';');
         sql
@@ -3237,6 +3310,23 @@ pub fn pexpr_sql(e: &PExpr) -> String {
 /// SQL quotes, a cast prints as `Cast(<arg> AS <type>)`, and the registered
 /// function name is used (the catalog knows `ABS`, not `abs`).
 pub fn pexpr_name(e: &PExpr) -> String {
+    pexpr_name_impl(e, true)
+}
+
+/// The name a *group key* keeps: the function name is the one the client sent
+/// (`abs(...)`), not the catalog's registered spelling (`ABS(...)`).
+pub fn pexpr_name_raw(e: &PExpr) -> String {
+    pexpr_name_impl(e, false)
+}
+
+fn pexpr_name_impl(e: &PExpr, canonical: bool) -> String {
+    let fname = |n: &str| {
+        if canonical {
+            canonical_fn_name(n).to_string()
+        } else {
+            n.to_string()
+        }
+    };
     match e {
         PExpr::Column(c) => c.clone(),
         PExpr::Value(v) => v.to_display(),
@@ -3245,7 +3335,7 @@ pub fn pexpr_name(e: &PExpr) -> String {
         PExpr::Call(n, a) if is_filter_fn(n) => {
             let text = |i: usize| match a.get(i) {
                 Some(PExpr::Value(ValueLit::Str(s))) => s.clone(),
-                Some(other) => pexpr_name(other),
+                Some(other) => pexpr_name_impl(other, canonical),
                 None => String::new(),
             };
             let options = if a.len() > 2 {
@@ -3258,16 +3348,35 @@ pub fn pexpr_name(e: &PExpr) -> String {
         PExpr::Call(n, a) if a.len() == 2 && is_binary_op(n) => {
             format!(
                 "({} {} {})",
-                pexpr_name(&a[0]),
+                pexpr_name_impl(&a[0], canonical),
                 canonical_op_name(n),
-                pexpr_name(&a[1])
+                pexpr_name_impl(&a[1], canonical)
             )
         }
-        PExpr::Call(n, a) => {
-            let args = a.iter().map(pexpr_name).collect::<Vec<_>>().join(", ");
-            format!("{}({args})", canonical_fn_name(n))
+        // The analysed AVG is `sum(x) / count(x)`, and so is its name.
+        PExpr::Call(n, a) if n.eq_ignore_ascii_case("avg") && a.len() == 1 => {
+            let arg = match &a[0] {
+                PExpr::Column(c) if c == "*" => "star".to_string(),
+                other => pexpr_name_impl(other, canonical),
+            };
+            format!("(sum({arg}) / count({arg}))")
         }
-        PExpr::Cast(inner, ty) => format!("Cast({} AS {})", pexpr_name(inner), ty),
+        PExpr::Call(n, a) => {
+            // A star argument is named `star` by the C++ printer
+            // (`count(*)` comes back as `count(star)`).
+            let args = a
+                .iter()
+                .map(|x| match x {
+                    PExpr::Column(c) if c == "*" => "star".to_string(),
+                    other => pexpr_name_impl(other, canonical),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{}({args})", fname(n))
+        }
+        PExpr::Cast(inner, ty) => {
+            format!("Cast({} AS {})", pexpr_name_impl(inner, canonical), ty)
+        }
         PExpr::Other => String::new(),
     }
 }
@@ -3596,6 +3705,13 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                     (None, [only]) if name.eq_ignore_ascii_case("not") => {
                         pred = Some(format!("(NOT {})", pexpr_sql(only)));
                     }
+                    // `IS [NOT] NULL` arrive as `is_null`/`is_not_null`.
+                    (None, [only]) if name.eq_ignore_ascii_case("is_null") => {
+                        pred = Some(format!("({} IS NULL)", pexpr_sql(only)));
+                    }
+                    (None, [only]) if name.eq_ignore_ascii_case("is_not_null") => {
+                        pred = Some(format!("({} IS NOT NULL)", pexpr_sql(only)));
+                    }
                     (None, [l, r])
                         if (name.eq_ignore_ascii_case("and")
                             || name.eq_ignore_ascii_case("or"))
@@ -3691,22 +3807,28 @@ fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
 }
 
 /// Reads a `ParsedExpr` in its `ColumnExpr` form (`ParsedExprType` union field 2).
+#[allow(clippy::type_complexity)] // (sql, display, raw, star)
 fn read_select_item(
     ip: &mut TBinaryInputProtocol<&mut impl Read>,
-) -> Result<(Vec<String>, Vec<String>, bool)> {
+) -> Result<(Vec<String>, Vec<String>, Vec<String>, bool)> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
-    let (mut names, mut display, mut star) = (Vec::new(), Vec::new(), false);
+    let (mut names, mut display, mut raw, mut star) = (Vec::new(), Vec::new(), Vec::new(), false);
+    let mut alias: Option<String> = None;
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
         if fd.field_type == TType::Stop {
             break;
         }
-        if fd.id == Some(1) {
+        if fd.id == Some(2) && fd.field_type == TType::String {
+            // `ParsedExpr.alias_name`: `sum(c1) AS sum1`.
+            alias = Some(ip.read_string().map_err(tw)?);
+        } else if fd.id == Some(1) {
             ip.read_struct_begin().map_err(tw)?; // ParsedExprType union
             let uf = ip.read_field_begin().map_err(tw)?;
             if uf.id == Some(2) && uf.field_type == TType::Struct {
                 let (n, s) = read_column_expr(ip)?;
                 display.extend(n.iter().cloned());
+                raw.extend(n.iter().cloned());
                 names = n;
                 star = s;
             } else if uf.id == Some(3) && uf.field_type == TType::Struct {
@@ -3725,12 +3847,14 @@ fn read_select_item(
                 let e = PExpr::Call(name, args);
                 names.push(pexpr_sql(&e));
                 display.push(pexpr_name(&e));
+                raw.push(pexpr_name_raw(&e));
             } else if uf.id == Some(12) && uf.field_type == TType::Struct {
                 // A cast: the engine gets SQL, the client the C++ `Name()`
                 // spelling (`Cast(c3 AS Varchar)`).
                 let e = read_cast_pexpr(ip)?;
                 names.push(pexpr_sql(&e));
                 display.push(pexpr_name(&e));
+                raw.push(pexpr_name_raw(&e));
             } else if uf.field_type == TType::Struct {
                 // consume the nested expression struct explicitly (a `skip` on
                 // a struct holding lists can under-consume)
@@ -3756,7 +3880,20 @@ fn read_select_item(
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
-    Ok((names, display, star))
+    if let Some(alias) = alias {
+        if !names.is_empty() {
+            if let Some(sql) = names.last_mut() {
+                *sql = format!("{sql} AS {alias}");
+            }
+        }
+        if let Some(d) = display.last_mut() {
+            *d = alias.clone();
+        }
+        if let Some(r) = raw.last_mut() {
+            *r = alias;
+        }
+    }
+    Ok((names, display, raw, star))
 }
 
 /// Reads an `order_by_list` (`list<OrderByExpr{1: ParsedExpr, 2: bool asc}>`),
@@ -3805,11 +3942,15 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         table_name: String::new(),
         columns: Vec::new(),
         names: Vec::new(),
+        raw_names: Vec::new(),
         star: false,
         where_sql: None,
         order_by: Vec::new(),
         group_by: Vec::new(),
+        having_sql: None,
         limit: None,
+        offset: None,
+        total_hits: false,
     };
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -3823,9 +3964,10 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, display, star) = read_select_item(ip)?;
+                    let (names, display, raw, star) = read_select_item(ip)?;
                     r.columns.extend(names);
                     r.names.extend(display);
+                    r.raw_names.extend(raw);
                     r.star |= star;
                 }
                 ip.read_list_end().map_err(tw)?;
@@ -3843,10 +3985,19 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
                 }
                 ip.read_list_end().map_err(tw)?;
             }
+            Some(9) if f.field_type == TType::Struct => r.having_sql = read_where(ip)?,
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     r.limit = Some(n);
                 }
+            }
+            Some(11) if f.field_type == TType::Struct => {
+                if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
+                    r.offset = Some(n);
+                }
+            }
+            Some(13) if f.field_type == TType::Bool => {
+                r.total_hits = ip.read_bool().map_err(tw)?;
             }
             Some(12) => r.order_by = read_order_by(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
@@ -3858,6 +4009,15 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     if !r.star && r.columns.is_empty() {
         // 3050 EMPTY_SELECT_FIELDS: `output([])` must not degrade into `*`.
         return Err(Error::Invalid("empty select fields".into()));
+    }
+    // A projection that is also a group key keeps the client's spelling.
+    for (i, sql) in r.columns.iter().enumerate() {
+        if !r.group_by.iter().any(|g| g.eq_ignore_ascii_case(sql)) {
+            continue;
+        }
+        if let (Some(raw), true) = (r.raw_names.get(i).cloned(), i < r.names.len()) {
+            r.names[i] = raw;
+        }
     }
     Ok(r)
 }
@@ -3930,8 +4090,12 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
                     // Date parts and string metrics are integers.
                     "year" | "month" | "day" | "hour" | "minute" | "second" | "dayofmonth"
                     | "dayofyear" | "dayofweek" | "weekday" | "week" | "weekofyear" | "quarter"
-                    | "century" | "decade" | "epoch" | "era" | "length" | "char_length"
-                    | "character_length" | "position" | "strpos" => "BIGINT".to_string(),
+                    | "century" | "decade" | "epoch" | "era" | "length" | "position" | "strpos" => {
+                        "BIGINT".to_string()
+                    }
+                    // `char_length` is a 32-bit count in the reference
+                    // (`UnaryFunctionWithFailure<VarcharT, IntegerT, ...>`).
+                    "char_length" | "character_length" => "INTEGER".to_string(),
                     // Text functions return text.
                     "substring"
                     | "substr"
@@ -4107,9 +4271,9 @@ impl ValueLit {
             ValueLit::Str(s) => format!("'{}'", s.replace('\'', "''")),
             ValueLit::Bool(b) => {
                 if *b {
-                    "1".to_string()
+                    "true".to_string()
                 } else {
-                    "0".to_string()
+                    "false".to_string()
                 }
             }
             ValueLit::Null => "NULL".to_string(),
@@ -5624,11 +5788,15 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         table_name: String::new(),
         columns: Vec::new(),
         names: Vec::new(),
+        raw_names: Vec::new(),
         star: false,
         where_sql: None,
         order_by: Vec::new(),
         group_by: Vec::new(),
+        having_sql: None,
         limit: None,
+        offset: None,
+        total_hits: false,
     };
     let mut explain_type = 4; // Physical
     ip.read_struct_begin().map_err(tw)?; // Explain_args
@@ -5646,7 +5814,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
             Some(4) => {
                 let l = ip.read_list_begin().map_err(tw)?;
                 for _ in 0..l.size {
-                    let (names, _, star) = read_select_item(ip)?;
+                    let (names, _, _, star) = read_select_item(ip)?;
                     req.columns.extend(names);
                     req.star |= star;
                 }

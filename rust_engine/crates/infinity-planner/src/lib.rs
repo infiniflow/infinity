@@ -571,6 +571,8 @@ pub fn plan_select(
     let schema = combined_schema(tables);
     let mut plan = build_source(tables, join)?;
     let mut out_names = schema.clone();
+    // (visible width, visible names) when ORDER BY needed a hidden column
+    let mut hidden_order: Option<(usize, Vec<String>)> = None;
 
     if let Some(pred) = where_pred {
         plan = LogicalPlan::Filter {
@@ -740,6 +742,27 @@ pub fn plan_select(
                 _ => return Err(Error::Invalid("projection must reference columns".into())),
             }
         }
+        // `ORDER BY` may name a column that is not projected. Carry it as a
+        // hidden trailing column and drop it again after the sort.
+        let visible = names.len();
+        for ok in order_by {
+            let col = match &ok.expr {
+                Some(ExprAst::Column(c)) => c.clone(),
+                Some(_) => continue,
+                None => ok.column.clone(),
+            };
+            if names.iter().any(|n| n == &col) {
+                continue;
+            }
+            let Ok(idx) = resolve_column(&schema, &col) else {
+                continue;
+            };
+            exprs.push(Expr::Column(idx));
+            names.push(col);
+        }
+        if names.len() > visible {
+            hidden_order = Some((visible, names[..visible].to_vec()));
+        }
         plan = LogicalPlan::Projection {
             input: Box::new(plan),
             exprs,
@@ -762,6 +785,14 @@ pub fn plan_select(
         plan = LogicalPlan::Sort {
             input: Box::new(plan),
             keys,
+        };
+    }
+
+    if let Some((visible, names)) = hidden_order {
+        plan = LogicalPlan::Projection {
+            input: Box::new(plan),
+            exprs: (0..visible).map(Expr::Column).collect(),
+            names,
         };
     }
 
