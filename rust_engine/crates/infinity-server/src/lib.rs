@@ -1836,6 +1836,22 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
             session_id: req.session_id,
         };
     };
+    // A table needs at least one column (`Status::NoColumnDefined`).
+    if req.columns.is_empty() {
+        return CommonResponse {
+            error_code: 3048,
+            error_msg: "no column defined".into(),
+            session_id: req.session_id,
+        };
+    }
+    // `ConflictType::kReplace` is not supported by the reference engine.
+    if req.conflict == 2 {
+        return CommonResponse {
+            error_code: 3032,
+            error_msg: "not supported: ConflictType::kReplace".into(),
+            session_id: req.session_id,
+        };
+    }
     // A column name must start with a letter and contain only word characters.
     for c in &req.columns {
         if c.name.is_empty() {
@@ -1866,7 +1882,8 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
         .columns
         .iter()
         .map(|c| {
-            let mut col = format!("{} {}", c.name, column_sql_type(c));
+            // The reference lowercases identifiers.
+            let mut col = format!("{} {}", c.name.to_ascii_lowercase(), column_sql_type(c));
             if c.not_null {
                 col.push_str(" NOT NULL");
             }
@@ -1886,6 +1903,14 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
     } else {
         format!("{}.{}", req.db_name, req.table_name)
     };
+    // `ConflictType::kIgnore`: creating an existing table is a no-op.
+    if req.conflict == 0 && engine.table_exists(&table) {
+        return CommonResponse {
+            error_code: OK,
+            error_msg: "OK".into(),
+            session_id: req.session_id,
+        };
+    }
     let sql = format!("CREATE TABLE {table} ({});", cols.join(", "));
     // The SDK's `sparse,0,…` type carries dimension 0, which SQL DDL rejects.
     match with_zero_dimension_sparse(|| engine.execute(&sql)) {
@@ -3266,6 +3291,8 @@ pub struct CreateTableReq {
     pub table_name: String,
     pub columns: Vec<ColumnDefWire>,
     pub session_id: i64,
+    /// `CreateOption.conflict_type`: 0 ignore, 1 error, 2 replace.
+    pub conflict: i32,
 }
 
 fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ColumnDefWire> {
@@ -3477,6 +3504,7 @@ pub fn read_create_table_args(
         table_name: String::new(),
         columns: Vec::new(),
         session_id: 0,
+        conflict: 1,
     };
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -3494,6 +3522,23 @@ pub fn read_create_table_args(
                 ip.read_list_end().map_err(tw)?;
             }
             Some(6) => req.session_id = ip.read_i64().map_err(tw)?,
+            Some(7) => {
+                // CreateOption { 1: conflict_type, 2: properties }
+                ip.read_struct_begin().map_err(tw)?;
+                loop {
+                    let o = ip.read_field_begin().map_err(tw)?;
+                    if o.field_type == TType::Stop {
+                        break;
+                    }
+                    if o.id == Some(1) && o.field_type == TType::I32 {
+                        req.conflict = ip.read_i32().map_err(tw)?;
+                    } else {
+                        ip.skip(o.field_type).map_err(tw)?;
+                    }
+                    ip.read_field_end().map_err(tw)?;
+                }
+                ip.read_struct_end().map_err(tw)?;
+            }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -7194,6 +7239,7 @@ mod tests {
                 comment: String::new(),
             }],
             session_id: 1,
+            conflict: 1,
         };
         assert_eq!(create_table(&addr, &req).unwrap().error_code, OK);
         // creating the same table again must fail: the engine kept the state

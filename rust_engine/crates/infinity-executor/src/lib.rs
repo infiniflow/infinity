@@ -5744,8 +5744,14 @@ impl Engine {
                     k.trim().eq_ignore_ascii_case("topn").then_some(v.trim())
                 })
                 .next_back();
+            // The SDK sends the count positionally; `WITH (topn=…)` is the
+            // option spelling. Default 10.
+            let bare = raw.trim();
             match value {
-                None => 10,
+                None => match bare.parse::<i64>() {
+                    Ok(n) if n > 0 => n as usize,
+                    _ => 10,
+                },
                 Some(v) => match v.parse::<i64>() {
                     Ok(n) if n > 0 && n <= i64::from(u32::MAX / 100) => n as usize,
                     Ok(_) => {
@@ -6046,6 +6052,18 @@ impl Engine {
     /// inspect the on-disk key space).
     pub fn store(&self) -> &std::sync::Arc<dyn MetaStore> {
         &self.store
+    }
+
+    /// TRUE when `table` exists (the name is qualified with the session's
+    /// database when unqualified).
+    pub fn table_exists(&self, table: &str) -> bool {
+        let db = self.db();
+        let name = if table.contains('.') {
+            table.to_ascii_lowercase()
+        } else {
+            format!("{db}.{}", table.to_ascii_lowercase())
+        };
+        matches!(self.catalog.get_table_by_name(&name), Ok(Some(_)))
     }
 
     /// Number of live (non-deleted) rows in `table`.
@@ -6450,36 +6468,47 @@ fn tensor_maxsim(q: &[Vec<f64>], d: &[Vec<f64>], col: ElemType, qry: ElemType) -
     for qv in q {
         let mut best = f32::NEG_INFINITY;
         for dv in d {
-            if dv.len() != qv.len() {
+            // A stored tensor row may concatenate several `dim`-sized vectors
+            // (the C++ writer emits one flat list); compare each slice.
+            let pieces: Vec<&[f64]> = if qv.is_empty() {
                 continue;
-            }
-            let score = if col == ElemType::Bit {
-                if qry == ElemType::Bit {
-                    // Hamming distance: higher score means more different.
-                    let diff = qv
-                        .iter()
-                        .zip(dv)
-                        .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
-                        .count();
-                    -(diff as f32)
+            } else if dv.len() == qv.len() {
+                vec![dv.as_slice()]
+            } else if dv.len() % qv.len() == 0 {
+                dv.chunks(qv.len()).collect()
+            } else {
+                continue;
+            };
+            for piece in pieces {
+                let dv = piece;
+                let score = if col == ElemType::Bit {
+                    if qry == ElemType::Bit {
+                        // Hamming distance: higher score means more different.
+                        let diff = qv
+                            .iter()
+                            .zip(dv)
+                            .filter(|(a, b)| (**a != 0.0) != (**b != 0.0))
+                            .count();
+                        -(diff as f32)
+                    } else {
+                        let mut acc = 0f32;
+                        for (a, b) in qv.iter().zip(dv) {
+                            if *b != 0.0 {
+                                acc += quantize_elem(*a, qry);
+                            }
+                        }
+                        acc
+                    }
                 } else {
                     let mut acc = 0f32;
                     for (a, b) in qv.iter().zip(dv) {
-                        if *b != 0.0 {
-                            acc += quantize_elem(*a, qry);
-                        }
+                        acc += quantize_elem(*a, qry) * quantize_elem(*b, col);
                     }
                     acc
+                };
+                if score > best {
+                    best = score;
                 }
-            } else {
-                let mut acc = 0f32;
-                for (a, b) in qv.iter().zip(dv) {
-                    acc += quantize_elem(*a, qry) * quantize_elem(*b, col);
-                }
-                acc
-            };
-            if score > best {
-                best = score;
             }
         }
         if best.is_finite() {
