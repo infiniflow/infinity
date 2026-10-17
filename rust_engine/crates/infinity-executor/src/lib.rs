@@ -1931,7 +1931,7 @@ impl Engine {
             .retain(|k, _| !k.starts_with(&key_prefix));
         for im in self.catalog.list_indexes()? {
             if im.table == name {
-                let _ = self.catalog.drop_index(&im.name);
+                let _ = self.catalog.drop_index_on(&im.table, &im.name);
             }
         }
         Ok(existed)
@@ -2268,7 +2268,7 @@ impl Engine {
                 drop(guard);
                 for im in self.catalog.list_indexes()? {
                     if im.table == *table {
-                        let _ = self.catalog.drop_index(&im.name);
+                        let _ = self.catalog.drop_index_on(&im.table, &im.name);
                         self.catalog.create_index_typed(
                             &im.name,
                             new_name,
@@ -2341,7 +2341,7 @@ impl Engine {
                     .into_iter()
                     .find(|i| i.table == *table && i.column == *column)
                 {
-                    let _ = self.catalog.drop_index(&im.name);
+                    let _ = self.catalog.drop_index_on(&im.table, &im.name);
                 }
                 self.indexes
                     .lock()

@@ -164,7 +164,14 @@ impl IndexMeta {
         .into_bytes()
     }
     fn decode(name: &[u8], bytes: &[u8]) -> Result<Self> {
-        let name = String::from_utf8_lossy(name).to_string();
+        let key = String::from_utf8_lossy(name).to_string();
+        // Index names are scoped per table, so the key carries
+        // `{table}\x1f{name}`; only the part after the separator is the name.
+        let name = key
+            .rsplit('\x1f')
+            .next()
+            .unwrap_or(key.as_str())
+            .to_string();
         let s = String::from_utf8_lossy(bytes);
         // Older records carried just `table\tcolumn`; newer ones append the
         // index type and the `WITH` options.
@@ -196,8 +203,10 @@ impl IndexMeta {
     }
 }
 
-fn index_key(name: &str) -> Vec<u8> {
-    format!("idx:{name}").into_bytes()
+/// Index names are scoped to a table (the reference allows the same name on
+/// two tables), so the key carries both parts.
+fn index_key(table: &str, name: &str) -> Vec<u8> {
+    format!("idx:{table}\x1f{name}").into_bytes()
 }
 
 /// Catalog façade over a `MetaStore`.
@@ -738,12 +747,21 @@ impl Catalog {
         };
         if self.cpp_only {
             let mut indexes = self.cpp_indexes()?;
-            indexes.retain(|i| i.name != name);
+            indexes.retain(|i| !(i.name == name && i.table == table));
             indexes.push(meta.clone());
             self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
             return Ok(meta);
         }
-        self.store.put(&index_key(name), meta.encode().as_slice())?;
+        self.store
+            .put(&index_key(table, name), meta.encode().as_slice())?;
+        // Drop a pre-scoping `idx:{name}` record for the same table so the
+        // index is not listed twice.
+        let legacy = format!("idx:{name}").into_bytes();
+        if let Some(v) = self.store.get(&legacy)? {
+            if IndexMeta::decode(name.as_bytes(), &v)?.table == table {
+                self.store.delete(&legacy)?;
+            }
+        }
         Ok(meta)
     }
 
@@ -758,7 +776,8 @@ impl Catalog {
             .collect()
     }
 
-    /// Drops an index by name. Returns `true` if it existed.
+    /// Drops every index named `name` (the plain `DROP INDEX name` statement
+    /// has no table qualifier).
     pub fn drop_index(&self, name: &str) -> Result<bool> {
         if self.cpp_only {
             let mut indexes = self.cpp_indexes()?;
@@ -770,9 +789,49 @@ impl Catalog {
             self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
             return Ok(true);
         }
-        let existed = self.store.get(&index_key(name))?.is_some();
-        self.store.delete(&index_key(name))?;
+        let mut existed = false;
+        for (k, _) in self.store.scan_prefix(INDEX_PREFIX)? {
+            let meta = match self.store.get(&k)? {
+                Some(v) => IndexMeta::decode(&k[INDEX_PREFIX.len()..], &v)?,
+                None => continue,
+            };
+            if meta.name == name {
+                self.store.delete(&k)?;
+                existed = true;
+            }
+        }
         Ok(existed)
+    }
+
+    /// Drops `table`'s index named `name`. Two tables may own an index with the
+    /// same name, so callers that know the table must use this form.
+    pub fn drop_index_on(&self, table: &str, name: &str) -> Result<bool> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        if self.cpp_only {
+            let mut indexes = self.cpp_indexes()?;
+            let before = indexes.len();
+            indexes.retain(|i| !(i.name == name && (i.table == table || i.table == short)));
+            if indexes.len() == before {
+                return Ok(false);
+            }
+            self.rewrite_cpp(&self.cpp_databases()?, &self.cpp_tables()?, &indexes)?;
+            return Ok(true);
+        }
+        let key = index_key(table, name);
+        if self.store.get(&key)?.is_some() {
+            self.store.delete(&key)?;
+            return Ok(true);
+        }
+        // Pre-scoping record: only remove it when it belongs to this table.
+        let legacy = format!("idx:{name}").into_bytes();
+        if let Some(v) = self.store.get(&legacy)? {
+            let meta = IndexMeta::decode(name.as_bytes(), &v)?;
+            if meta.table == table || meta.table == short {
+                self.store.delete(&legacy)?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn flush(&self) -> Result<()> {

@@ -1394,7 +1394,10 @@ impl Engine {
             .catalog
             .list_indexes()?
             .into_iter()
-            .find(|im| im.name == index_name)
+            .find(|im| {
+                im.name == index_name
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            })
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         // A MULTIVECTOR holds several sub-vectors per row; the C++ mirror is a
@@ -1535,7 +1538,10 @@ impl Engine {
             .catalog
             .list_indexes()?
             .into_iter()
-            .find(|im| im.name == index_name)
+            .find(|im| {
+                im.name == index_name
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            })
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let col = meta
             .columns
@@ -1807,7 +1813,10 @@ impl Engine {
             .catalog
             .list_indexes()?
             .into_iter()
-            .find(|im| im.name == index_name)
+            .find(|im| {
+                im.name == index_name
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            })
             .map(|im| im.column)
             .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
         let (count, chunk) = self.cpp_ivf_chunk(&table, &column, centroid_count)?;
