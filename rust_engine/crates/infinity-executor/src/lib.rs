@@ -3697,6 +3697,23 @@ impl Engine {
         hidden: &[String],
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         let schema = self.table_schema(table)?;
+        // A full-text search runs through an index; without one the C++ engine
+        // refuses the statement.
+        if m.kind.eq_ignore_ascii_case("text") {
+            let indexes = self.catalog.list_indexes().unwrap_or_default();
+            for col in match_columns(&m.column) {
+                let has = indexes.iter().any(|im| {
+                    im.table == table
+                        && im.column == col
+                        && im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                });
+                if !has {
+                    return Err(Error::Invalid(format!(
+                        "fulltext index does not exist for column '{col}'"
+                    )));
+                }
+            }
+        }
         let params = arg_str(m.args.get(1)).unwrap_or_default();
         // `threshold=<f>` keeps only documents scoring at least `f`
         let threshold: Option<f64> = params

@@ -864,6 +864,18 @@ impl Parser {
                     self.expect(Token::RParen)?;
                     return Ok(Predicate::In(left, values, false));
                 }
+                // `(c2) = 'x'`, `(f(x)) LIKE 'a%'`: a parenthesised *expression*
+                // followed by a comparison is not a grouped predicate.
+                let is_cmp = match self.peek() {
+                    Token::Op(s) => cmp_op(s).is_some(),
+                    Token::Ident(s) => {
+                        s.eq_ignore_ascii_case("IS") || s.eq_ignore_ascii_case("LIKE")
+                    }
+                    _ => false,
+                };
+                if is_cmp {
+                    return self.comparison_from(left);
+                }
             }
             self.pos = save;
             self.advance();
@@ -880,6 +892,11 @@ impl Parser {
 
     fn comparison(&mut self) -> Result<Predicate> {
         let left = self.expr()?;
+        self.comparison_from(left)
+    }
+
+    /// The tail of a comparison, once its left operand has been parsed.
+    fn comparison_from(&mut self, left: ExprAst) -> Result<Predicate> {
         if self.eat_kw("IS") {
             let neg = self.eat_kw("NOT");
             self.expect_kw("NULL")?;

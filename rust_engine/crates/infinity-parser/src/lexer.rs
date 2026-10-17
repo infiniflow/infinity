@@ -143,14 +143,23 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
             '\'' => {
                 i += 1;
                 let mut s = String::new();
-                while i < chars.len() && chars[i] != '\'' {
+                loop {
+                    if i >= chars.len() {
+                        return Err(Error::Invalid("unterminated string literal".into()));
+                    }
+                    if chars[i] == '\'' {
+                        // `''` inside a literal is an escaped quote.
+                        if i + 1 < chars.len() && chars[i + 1] == '\'' {
+                            s.push('\'');
+                            i += 2;
+                            continue;
+                        }
+                        i += 1; // closing quote
+                        break;
+                    }
                     s.push(chars[i]);
                     i += 1;
                 }
-                if i >= chars.len() {
-                    return Err(Error::Invalid("unterminated string literal".into()));
-                }
-                i += 1; // closing quote
                 out.push(Token::Str(s));
             }
             c if c.is_ascii_digit()

@@ -3270,6 +3270,10 @@ pub struct SelectReq {
     pub total_hits: bool,
     /// `(alias, expression SQL)` pairs, so WHERE/ORDER BY can name a projection.
     pub aliases: Vec<(String, String)>,
+    /// `HIGHLIGHT` columns.
+    pub highlight: Vec<String>,
+    /// Rendered `SEARCH ...` tail (match clauses + fusions).
+    pub search_sql: Option<String>,
 }
 
 impl SelectReq {
@@ -3285,7 +3289,14 @@ impl SelectReq {
         } else {
             format!("{}.{}", self.db_name, self.table_name)
         };
-        let mut sql = format!("SELECT {} FROM {}", cols, table);
+        let mut sql = format!("SELECT {cols}");
+        if !self.highlight.is_empty() {
+            sql.push_str(&format!(" HIGHLIGHT {}", self.highlight.join(", ")));
+        }
+        sql.push_str(&format!(" FROM {table}"));
+        if let Some(srch) = &self.search_sql {
+            sql.push_str(&format!(" SEARCH {srch}"));
+        }
         if let Some(w) = &self.where_sql {
             sql.push_str(&format!(" WHERE {}", substitute_aliases(w, &self.aliases)));
         }
@@ -3751,6 +3762,357 @@ fn substitute_aliases(text: &str, aliases: &[(String, String)]) -> String {
     out
 }
 
+/// Reads a `SearchExpr` (`{1: list<GenericMatchExpr>, 2: list<FusionExpr>}`)
+/// and renders the engine's `SEARCH …` tail.
+fn read_search_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut parts: Vec<String> = Vec::new();
+    let mut fusions: Vec<String> = Vec::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match (f.id, f.field_type) {
+            (Some(1), TType::List) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    if let Some(m) = read_generic_match(ip)? {
+                        parts.push(m);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            (Some(2), TType::List) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    if let Some(fs) = read_fusion_expr(ip)? {
+                        fusions.push(fs);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    if parts.is_empty() && fusions.is_empty() {
+        return Ok(None);
+    }
+    parts.extend(fusions);
+    Ok(Some(parts.join(", ")))
+}
+
+/// Reads a `GenericMatchExpr` union and renders one `MATCH …` clause.
+fn read_generic_match(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut out = None;
+    let f = ip.read_field_begin().map_err(tw)?;
+    match (f.id, f.field_type) {
+        (Some(4), TType::Struct) => out = Some(read_match_text_sql(ip)?),
+        (Some(1), TType::Struct) => out = read_knn_sql(ip)?,
+        (Some(2), TType::Struct) => out = read_sparse_sql(ip)?,
+        (Some(3), TType::Struct) => out = read_tensor_sql(ip)?,
+        _ => ip.skip(f.field_type).map_err(tw)?,
+    }
+    let _ = ip.read_field_end();
+    let _ = ip.read_field_begin(); // stop of the union
+    ip.read_struct_end().map_err(tw)?;
+    Ok(out)
+}
+
+/// `MATCH TEXT ('fields', 'text'[, 'options'])`.
+fn read_match_text_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
+    ip.read_struct_begin().map_err(tw)?;
+    let (mut fields, mut text, mut opts) = (String::new(), String::new(), String::new());
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => fields = ip.read_string().map_err(tw)?,
+            Some(2) => text = ip.read_string().map_err(tw)?,
+            Some(3) => opts = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    let tail = if opts.is_empty() {
+        String::new()
+    } else {
+        format!(", '{}'", opts.replace('\'', "''"))
+    };
+    Ok(format!(
+        "MATCH TEXT ('{}', '{}'{tail})",
+        fields.replace('\'', "''"),
+        text.replace('\'', "''")
+    ))
+}
+
+/// `FUSION('method'[, 'options'])`.
+fn read_fusion_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let (mut method, mut opts) = (String::new(), String::new());
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => method = ip.read_string().map_err(tw)?,
+            Some(2) => opts = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    if method.is_empty() {
+        return Ok(None);
+    }
+    let tail = if opts.is_empty() {
+        String::new()
+    } else {
+        format!(", '{}'", opts.replace('\'', "''"))
+    };
+    Ok(Some(format!(
+        "FUSION('{}'{tail})",
+        method.replace('\'', "''")
+    )))
+}
+
+/// Reads `EmbeddingData` and renders `[v0,v1,…]`.
+fn read_embedding_literal(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut vals: Vec<String> = Vec::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        if let TType::List = f.field_type {
+            let l = ip.read_list_begin().map_err(tw)?;
+            vals.clear();
+            for _ in 0..l.size {
+                match f.field_type {
+                    TType::Bool => vals.push(ip.read_bool().map_err(tw)?.to_string()),
+                    TType::I16 => vals.push(ip.read_i16().map_err(tw)?.to_string()),
+                    TType::I32 => vals.push(ip.read_i32().map_err(tw)?.to_string()),
+                    TType::I64 => vals.push(ip.read_i64().map_err(tw)?.to_string()),
+                    TType::Double => vals.push(fmt_number(ip.read_double().map_err(tw)?)),
+                    _ => {
+                        ip.skip(f.field_type).map_err(tw)?;
+                    }
+                }
+            }
+            ip.read_list_end().map_err(tw)?;
+        } else {
+            ip.skip(f.field_type).map_err(tw)?;
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    Ok(format!("[{}]", vals.join(",")))
+}
+
+/// A compact decimal for a vector literal (always with a fractional part).
+fn fmt_number(f: f64) -> String {
+    let s = format!("{f}");
+    if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
+        s
+    } else {
+        format!("{s}.0")
+    }
+}
+
+/// Reads a list of `InitParameter` into `k=v` pairs joined by `,`.
+fn read_init_params(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
+    let l = ip.read_list_begin().map_err(tw)?;
+    let mut out: Vec<String> = Vec::new();
+    for _ in 0..l.size {
+        let (mut k, mut v) = (String::new(), String::new());
+        ip.read_struct_begin().map_err(tw)?;
+        loop {
+            let f = ip.read_field_begin().map_err(tw)?;
+            if f.field_type == TType::Stop {
+                break;
+            }
+            match f.id {
+                Some(1) => k = ip.read_string().map_err(tw)?,
+                Some(2) => v = ip.read_string().map_err(tw)?,
+                _ => ip.skip(f.field_type).map_err(tw)?,
+            }
+            ip.read_field_end().map_err(tw)?;
+        }
+        ip.read_struct_end().map_err(tw)?;
+        if !k.is_empty() {
+            out.push(format!("{k}={v}"));
+        }
+    }
+    ip.read_list_end().map_err(tw)?;
+    Ok(out.join(","))
+}
+
+fn knn_metric(code: i32) -> &'static str {
+    match code {
+        0 => "l2",
+        1 => "cosine",
+        2 => "ip",
+        3 => "hamming",
+        _ => "l2",
+    }
+}
+
+fn knn_element(code: i32) -> &'static str {
+    match code {
+        0 => "bit",
+        1 | 2 => "int8",
+        3 => "int16",
+        4 => "int",
+        5 => "bigint",
+        6 => "float",
+        7 => "double",
+        8 => "float16",
+        9 => "bfloat16",
+        _ => "float",
+    }
+}
+
+/// `MATCH VECTOR (col, [..], 'elem', 'metric', topn[, 'opts'])`.
+fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut col = String::new();
+    let mut vec = String::from("[]");
+    let mut elem = 6i32;
+    let mut metric = 0i32;
+    let mut topn = 10i64;
+    let mut opts = String::new();
+    let mut query_expr: Option<String> = None;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) if f.field_type == TType::Struct => {
+                let (names, _) = read_column_expr(ip)?;
+                col = names.into_iter().next().unwrap_or_default();
+            }
+            Some(2) if f.field_type == TType::Struct => vec = read_embedding_literal(ip)?,
+            Some(3) => elem = ip.read_i32().map_err(tw)?,
+            Some(4) => metric = ip.read_i32().map_err(tw)?,
+            Some(5) => topn = ip.read_i64().map_err(tw)?,
+            Some(6) if f.field_type == TType::List => opts = read_init_params(ip)?,
+            Some(8) if f.field_type == TType::Struct => {
+                let (name, args) = read_function_expr(ip)?;
+                query_expr = Some(pexpr_sql(&PExpr::Call(name, args)));
+            }
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    if col.is_empty() {
+        return Ok(None);
+    }
+    let vector = query_expr.unwrap_or(vec);
+    let tail = if opts.is_empty() {
+        String::new()
+    } else {
+        format!(", '{}'", opts.replace('\'', "''"))
+    };
+    Ok(Some(format!(
+        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail})",
+        knn_element(elem),
+        knn_metric(metric)
+    )))
+}
+
+/// `MATCH SPARSE (col, {i:v,…}, 'metric', topn[, 'opts'])`.
+fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut col = String::new();
+    let mut sparse = String::from("{}");
+    let mut metric = String::new();
+    let mut topn = 10i64;
+    let mut opts = String::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) if f.field_type == TType::Struct => {
+                let (names, _) = read_column_expr(ip)?;
+                col = names.into_iter().next().unwrap_or_default();
+            }
+            Some(2) if f.field_type == TType::Struct => {
+                sparse = read_constant_expr(ip)?.to_sql();
+            }
+            Some(3) => metric = ip.read_string().map_err(tw)?,
+            Some(4) => topn = ip.read_i64().map_err(tw)?,
+            Some(5) if f.field_type == TType::List => opts = read_init_params(ip)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    if col.is_empty() {
+        return Ok(None);
+    }
+    let tail = if opts.is_empty() {
+        String::new()
+    } else {
+        format!(", '{}'", opts.replace('\'', "''"))
+    };
+    Ok(Some(format!(
+        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail})"
+    )))
+}
+
+/// `MATCH TENSOR (col, [..], 'elem', 'method'[, 'opts'])`.
+fn read_tensor_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
+    ip.read_struct_begin().map_err(tw)?;
+    let mut method = String::new();
+    let mut col = String::new();
+    let mut elem = 6i32;
+    let mut vec = String::from("[]");
+    let mut opts = String::new();
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => method = ip.read_string().map_err(tw)?,
+            Some(2) if f.field_type == TType::Struct => {
+                let (names, _) = read_column_expr(ip)?;
+                col = names.into_iter().next().unwrap_or_default();
+            }
+            Some(3) => elem = ip.read_i32().map_err(tw)?,
+            Some(4) if f.field_type == TType::Struct => vec = read_embedding_literal(ip)?,
+            Some(5) => opts = ip.read_string().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    if col.is_empty() {
+        return Ok(None);
+    }
+    let tail = if opts.is_empty() {
+        String::new()
+    } else {
+        format!(", '{}'", opts.replace('\'', "''"))
+    };
+    Ok(Some(format!(
+        "MATCH TENSOR ({col}, {vec}, '{}', '{method}'{tail})",
+        knn_element(elem)
+    )))
+}
+
 fn sql_op(name: &str) -> Option<&'static str> {
     Some(match name {
         "=" | "==" => "=",
@@ -4067,6 +4429,8 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         offset: None,
         total_hits: false,
         aliases: Vec::new(),
+        highlight: Vec::new(),
+        search_sql: None,
     };
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -4088,6 +4452,16 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
                 }
                 ip.read_list_end().map_err(tw)?;
             }
+            Some(5) if f.field_type == TType::List => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    if let PExpr::Column(c) = read_pexpr(ip)? {
+                        r.highlight.push(c);
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(6) if f.field_type == TType::Struct => r.search_sql = read_search_expr(ip)?,
             Some(7) if f.field_type == TType::Struct => r.where_sql = read_where(ip)?,
             Some(8) if f.field_type == TType::List => {
                 // group_by_list: one ParsedExpr per group key.
@@ -6008,6 +6382,8 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         offset: None,
         total_hits: false,
         aliases: Vec::new(),
+        highlight: Vec::new(),
+        search_sql: None,
     };
     let mut explain_type = 4; // Physical
     ip.read_struct_begin().map_err(tw)?; // Explain_args
