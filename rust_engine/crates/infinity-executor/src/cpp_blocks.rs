@@ -1400,10 +1400,7 @@ impl Engine {
             std::collections::BTreeMap::new();
         let mut lengths: Vec<u32> = Vec::with_capacity(rows.len());
         for (doc, (_, row)) in rows.iter().enumerate() {
-            let text = row
-                .get(col)
-                .map(|v| v.to_slt_string())
-                .unwrap_or_default();
+            let text = row.get(col).map(|v| v.to_slt_string()).unwrap_or_default();
             let terms = crate::tokenize_index_text(&text, &delims);
             lengths.push(terms.len() as u32);
             for t in terms {
@@ -1444,10 +1441,9 @@ impl Engine {
         let dic = inv::encode_dic(&region, &fst.finish());
         let len = inv::encode_column_lengths(&lengths);
 
-        let dir = self.blocks_root().join(format!(
-            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0",
-            meta.id
-        ));
+        let dir = self
+            .blocks_root()
+            .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id));
         std::fs::create_dir_all(&dir).map_err(|e| Error::Io {
             path: dir.clone(),
             source: e,

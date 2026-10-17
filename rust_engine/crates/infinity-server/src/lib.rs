@@ -663,12 +663,25 @@ fn handle_connection(
                             run_common(engine.as_ref(), &sql, sid)
                         }
                         "DropTable" if !name2.is_empty() => {
-                            let sql = if conflict == Some(0) {
-                                format!("DROP TABLE IF EXISTS {}", qualify(&name2))
+                            let full = qualify(&name2);
+                            let exists = engine
+                                .as_ref()
+                                .and_then(|e| e.catalog().get_table_by_name(&full).ok().flatten())
+                                .is_some();
+                            if !exists && conflict != Some(0) {
+                                CommonResponse {
+                                    error_code: 3022,
+                                    error_msg: format!("table '{name2}' does not exist"),
+                                    session_id: sid,
+                                }
                             } else {
-                                format!("DROP TABLE {}", qualify(&name2))
-                            };
-                            run_common(engine.as_ref(), &sql, sid)
+                                let sql = if conflict == Some(0) {
+                                    format!("DROP TABLE IF EXISTS {full}")
+                                } else {
+                                    format!("DROP TABLE {full}")
+                                };
+                                run_common(engine.as_ref(), &sql, sid)
+                            }
                         }
                         "DropIndex" if !name3.is_empty() && conflict == Some(0) => run_common(
                             engine.as_ref(),

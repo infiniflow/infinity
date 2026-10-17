@@ -1910,37 +1910,6 @@ impl Engine {
     fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
-                // A sparse column's element type must be a float and its
-                // dimension positive.
-                for c in columns {
-                    let up = c.type_text.to_ascii_uppercase();
-                    if up.starts_with("SPARSE(") {
-                        let inner =
-                            c.type_text[c.type_text.find('(').unwrap() + 1..].trim_end_matches(')');
-                        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
-                        let elem = parts
-                            .first()
-                            .map(|s| s.to_ascii_lowercase())
-                            .unwrap_or_default();
-                        if !matches!(elem.as_str(), "float" | "float32" | "double" | "bit") {
-                            return Err(Error::Invalid(format!(
-                                "invalid element type '{elem}' for a sparse column"
-                            )));
-                        }
-                        // `SPARSE(elem, dim)` or `SPARSE(elem, index_type, dim)`
-                        let dim: i64 = parts
-                            .iter()
-                            .rev()
-                            .find_map(|s| s.parse::<i64>().ok())
-                            .unwrap_or(0);
-                        if dim <= 0 {
-                            return Err(Error::Invalid(format!(
-                                "invalid sparse dimension {dim} for column '{}'",
-                                c.name
-                            )));
-                        }
-                    }
-                }
                 // A vector-like column's declared dimension must be positive.
                 for c in columns {
                     if !declares_dimension(&c.type_text) {
@@ -5152,6 +5121,16 @@ impl Engine {
         let metric = arg_str(m.args.get(if is_sparse { 1 } else { 2 }))
             .unwrap_or_else(|| if is_sparse { "ip".into() } else { "l2".into() })
             .to_ascii_lowercase();
+        // A zero-dimension sparse column cannot be searched.
+        if is_sparse {
+            let up = decl.to_ascii_uppercase();
+            if up.contains(", 0)") || up.contains(",0)") {
+                return Err(Error::Invalid(format!(
+                    "invalid sparse dimension for column '{}'",
+                    m.column
+                )));
+            }
+        }
         // Sparse vectors only support inner product.
         if is_sparse && metric != "ip" {
             return Err(Error::Invalid(format!(
