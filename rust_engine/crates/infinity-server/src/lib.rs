@@ -3131,6 +3131,33 @@ pub fn pexpr_sql(e: &PExpr) -> String {
     }
 }
 
+/// True when the expression is a predicate (a comparison, a connective, `IN`
+/// or `NOT`) rather than a value.
+fn is_predicate_pexpr(e: &PExpr) -> bool {
+    match e {
+        PExpr::Call(n, args) => {
+            let n = n.to_ascii_lowercase();
+            matches!(
+                n.as_str(),
+                "=" | "=="
+                    | "!="
+                    | "<>"
+                    | "<"
+                    | "<="
+                    | ">"
+                    | ">="
+                    | "and"
+                    | "or"
+                    | "not"
+                    | "in"
+                    | "not_in"
+                    | "between"
+            ) && !args.is_empty()
+        }
+        _ => false,
+    }
+}
+
 /// Arithmetic/comparison operators the SDK encodes as two-argument functions.
 fn is_binary_op(name: &str) -> bool {
     matches!(
@@ -3323,12 +3350,19 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                         pred = Some(format!("(NOT {})", pexpr_sql(only)));
                     }
                     (None, [l, r])
-                        if name.eq_ignore_ascii_case("and") || name.eq_ignore_ascii_case("or") =>
+                        if (name.eq_ignore_ascii_case("and")
+                            || name.eq_ignore_ascii_case("or"))
+                            && is_predicate_pexpr(l)
+                            && is_predicate_pexpr(r) =>
                     {
                         let joiner = name.to_ascii_lowercase();
                         pred = Some(format!("({} {joiner} {})", pexpr_sql(l), pexpr_sql(r)));
                     }
-                    _ => {}
+                    _ => {
+                        return Err(Error::Invalid(
+                            "parser: the filter must be a boolean expression".into(),
+                        ));
+                    }
                 }
             } else if uf.id == Some(11) && uf.field_type == TType::Struct {
                 // `InExpr { 1: left_operand, 2: arguments, 3: in_type }` —
@@ -3361,7 +3395,10 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                 let op = if in_type { "IN" } else { "NOT IN" };
                 pred = Some(format!("({} {op} ({list}))", pexpr_sql(&left)));
             } else {
-                ip.skip(uf.field_type).map_err(tw)?;
+                // A bare column / star is not a predicate.
+                return Err(Error::Invalid(
+                    "parser: the filter must be a boolean expression".into(),
+                ));
             }
             let _ = ip.read_field_end();
             let _ = ip.read_field_begin();
