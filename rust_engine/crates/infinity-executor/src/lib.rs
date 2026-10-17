@@ -5070,9 +5070,10 @@ impl Engine {
         // query array.)
         if !is_sparse {
             let col_elem = tensor_elem_type(decl);
-            // A bit query only matches a bit column, and vice versa.
-            if (col_elem == ElemType::Bit)
-                != (elem_type_of_optional(m.args.get(1)) == Some(ElemType::Bit))
+            // A *bit* query only matches a bit column; a float query against a
+            // bit column is fine (the stored bits are read as 0/1).
+            if elem_type_of_optional(m.args.get(1)) == Some(ElemType::Bit)
+                && col_elem != ElemType::Bit
             {
                 return Err(Error::Invalid(
                     "query element type does not match the column's".into(),
