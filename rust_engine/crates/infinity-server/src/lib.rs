@@ -509,24 +509,32 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_update_args(&mut ip)?
                     };
-                    let resp = match &engine {
-                        Some(eng) => match eng.execute(&req.to_sql()) {
-                            Ok(_) => CommonResponse {
-                                error_code: OK,
-                                error_msg: "OK".into(),
-                                session_id: req.session_id,
-                            },
-                            Err(e) => CommonResponse {
-                                error_code: e.status_code(),
-                                error_msg: e.to_string(),
-                                session_id: req.session_id,
-                            },
-                        },
-                        None => CommonResponse {
-                            error_code: 1,
-                            error_msg: "no engine bound".into(),
+                    let resp = if req.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
+                        CommonResponse {
+                            error_code: 7012,
+                            error_msg: "parser: the filter must be a boolean expression".into(),
                             session_id: req.session_id,
-                        },
+                        }
+                    } else {
+                        match &engine {
+                            Some(eng) => match eng.execute(&req.to_sql()) {
+                                Ok(_) => CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: req.session_id,
+                                },
+                                Err(e) => CommonResponse {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    session_id: req.session_id,
+                                },
+                            },
+                            None => CommonResponse {
+                                error_code: 1,
+                                error_msg: "no engine bound".into(),
+                                session_id: req.session_id,
+                            },
+                        }
                     };
                     write_reply_common(&mut writer, "Update", seq, &resp)?;
                 }
@@ -4475,9 +4483,9 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                         pred = Some(pexpr_sql(&PExpr::Call(name.clone(), args.clone())));
                     }
                     _ => {
-                        return Err(Error::Invalid(
-                            "parser: the filter must be a boolean expression".into(),
-                        ));
+                        // A non-boolean function (`_row_id()`, `*`, …) — report
+                        // it after the request is fully read.
+                        not_predicate = true;
                     }
                 }
             } else if uf.id == Some(11) && uf.field_type == TType::Struct {
