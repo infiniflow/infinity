@@ -867,6 +867,9 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         .collect();
 
     let run = |sql: &str| -> std::result::Result<Vec<QueryResult>, (u16, String)> {
+        if std::env::var_os("INFINITY_DEBUG_SQL").is_some() {
+            eprintln!("http sql: {sql}");
+        }
         engine.execute(sql).map_err(|e| engine_err(&e))
     };
 
@@ -1114,15 +1117,20 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                     def.push_str(" NOT NULL");
                 }
                 // A declared default must be applied to the rows already stored.
-                if let Some(d) = f.get("default").map(|v| v.as_str().unwrap_or("")) {
-                    def.push_str(&format!(" DEFAULT {}", crate::render_default(d)));
+                if let Some(d) = f.get("default") {
+                    let lit = match d {
+                        Json::Str(s) => quote_sql(s),
+                        other => render_json(other),
+                    };
+                    def.push_str(&format!(" DEFAULT {lit}"));
                 }
                 cols.push(def);
             }
-            match run(&format!(
-                "ALTER TABLE {db}.{table} ADD COLUMN ({});",
-                cols.join(", ")
-            )) {
+            let stmt = format!("ALTER TABLE {db}.{table} ADD COLUMN ({});", cols.join(", "));
+            if std::env::var_os("INFINITY_DEBUG_SQL").is_some() {
+                eprintln!("http add_columns: {stmt}");
+            }
+            match run(&stmt) {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
             }
