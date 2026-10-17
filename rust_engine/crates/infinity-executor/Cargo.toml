@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+rust-stemmers.workspace = true
 infinity-common.workspace = true
 infinity-storage.workspace = true
 infinity-catalog.workspace = true

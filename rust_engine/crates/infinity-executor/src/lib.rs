@@ -5205,11 +5205,30 @@ fn tokenize_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
             .map(str::to_string)
             .collect(),
     };
-    parts
+    let words: Vec<String> = parts
         .into_iter()
         .map(|t| t.to_ascii_lowercase())
         .filter(|t| !t.is_empty())
-        .collect()
+        .collect();
+    // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
+    // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
+    // — so the `None` (standard) case stems English. `keyword`/`whitespace`(±chars)
+    // do not.
+    if delims.is_none() {
+        words.into_iter().map(|t| stem_english(&t)).collect()
+    } else {
+        words
+    }
+}
+
+/// The C++ default analyzer's English stemmer (`STEM_LANG_ENGLISH`).
+static ENGLISH_STEMMER: std::sync::OnceLock<rust_stemmers::Stemmer> = std::sync::OnceLock::new();
+
+fn stem_english(token: &str) -> String {
+    let s = ENGLISH_STEMMER.get_or_init(|| {
+        rust_stemmers::Stemmer::create(rust_stemmers::Algorithm::English)
+    });
+    s.stem(token).to_string()
 }
 
 /// Splits a field-query group body into terms, keeping a quoted phrase together

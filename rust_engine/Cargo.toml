@@ -21,6 +21,7 @@ license = "Apache-2.0"
 repository = "https://github.com/infiniflow/infinity"
 
 [workspace.dependencies]
+rust-stemmers = "1.2"
 infinity-common = { path = "crates/infinity-common" }
 infinity-storage = { path = "crates/infinity-storage" }
 infinity-catalog = { path = "crates/infinity-catalog" }
