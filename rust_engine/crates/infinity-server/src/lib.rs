@@ -3159,9 +3159,9 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                     ip.read_field_end().map_err(tw)?;
                 }
                 ip.read_struct_end().map_err(tw)?;
-                if let (Some(op), [PExpr::Column(c), PExpr::Value(v)]) = (sql_op(&name), &args[..])
-                {
-                    pred = Some(format!("{c} {op} {}", v.to_sql()));
+                // Either side may be an expression (`sqrt(c1) = 2`).
+                if let (Some(op), [l, r]) = (sql_op(&name), &args[..]) {
+                    pred = Some(format!("{} {op} {}", pexpr_sql(l), pexpr_sql(r)));
                 }
             } else {
                 ip.skip(uf.field_type).map_err(tw)?;
