@@ -1177,6 +1177,7 @@ fn uses_row_id(items: &[SelectItem]) -> bool {
             ExprAst::Func { name, args } => {
                 name.eq_ignore_ascii_case("ROW_ID") || args.iter().any(in_expr)
             }
+            ExprAst::Column(c) => c.eq_ignore_ascii_case("_row_id"),
             ExprAst::Binary(a, _, b)
             | ExprAst::Cmp(a, _, b)
             | ExprAst::And(a, b)
@@ -1187,6 +1188,7 @@ fn uses_row_id(items: &[SelectItem]) -> bool {
     }
     items.iter().any(|it| match it {
         SelectItem::Func { name, .. } => name.eq_ignore_ascii_case("ROW_ID"),
+        SelectItem::Column(name) => name.eq_ignore_ascii_case("_row_id"),
         SelectItem::Expr(e) => in_expr(e),
         _ => false,
     })

@@ -85,10 +85,21 @@ pub fn resolve_column(schema: &[String], name: &str) -> Result<usize> {
     }
 }
 
+/// Resolves a select-list column, mapping the `_row_id` system column onto the
+/// hidden `#_row_id` scan column the executor appends for `ROW_ID()`.
+fn resolve_output_column(schema: &[String], name: &str) -> Result<usize> {
+    if name.eq_ignore_ascii_case("_row_id") {
+        if let Some(i) = schema.iter().position(|c| c == "#_row_id") {
+            return Ok(i);
+        }
+    }
+    resolve_column(schema, name)
+}
+
 /// Compiles a parsed scalar expression against a table schema.
 pub fn compile_expr(e: &ExprAst, schema: &[String]) -> Result<Expr> {
     Ok(match e {
-        ExprAst::Column(c) => Expr::Column(resolve_column(schema, c)?),
+        ExprAst::Column(c) => Expr::Column(resolve_output_column(schema, c)?),
         ExprAst::Literal(l) => Expr::Literal(Value::from_literal(l)),
         ExprAst::Binary(a, op, b) => Expr::Binary(
             Box::new(compile_expr(a, schema)?),
@@ -724,7 +735,7 @@ pub fn plan_select(
         for it in items {
             match it {
                 SelectItem::Column(name) => {
-                    exprs.push(Expr::Column(resolve_column(&schema, name)?));
+                    exprs.push(Expr::Column(resolve_output_column(&schema, name)?));
                     names.push(name.clone());
                 }
                 SelectItem::Func { name, args } => {

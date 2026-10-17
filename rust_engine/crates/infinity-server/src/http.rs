@@ -795,6 +795,17 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
 /// the reference does (`(c1 + c2)`).
 fn named_output(o: &str) -> String {
     let t = o.trim();
+    // The REST DSL names the pseudo-columns with a leading underscore.
+    for (alias, expr) in [
+        ("_row_id", "row_id()"),
+        ("_score", "score()"),
+        ("_distance", "distance()"),
+        ("_similarity", "similarity()"),
+    ] {
+        if t.eq_ignore_ascii_case(alias) {
+            return expr.to_string();
+        }
+    }
     if t.starts_with('(') || t == "*" || t == "count(*)" {
         return t.to_string();
     }
