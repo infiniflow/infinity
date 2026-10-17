@@ -518,6 +518,7 @@ QueryContext::query(sql)
   - `POST/PUT/DELETE/GET /databases/{db}/tables/{t}/docs`（插入/更新/删除/查询 DSL：`output/filter/sort/group_by/having/limit/offset/highlight/search/fusion/option.total_hits_count`）
   - 冲突选项（create/drop）按 SDK 常量校验（非法→3074），标识符须以字母开头（3003）
 - 实测（`pytest --http`，未改 SDK）：`test_database + test_table + test_basic + test_select` 合计 **103 passed / 12 failed / 3 skipped**（`test_select` 53/66，`test_table` 26/27，`test_database` 22/22，`test_basic` 通过）。
+- Thrift `test_knn` 由 51 failed 收敛到 **12 failed / 361 passed / 6 skipped**：本轮修复向量元素类型校验、bit 维度按 8 打包、`threshold=` 不被误认作索引名、MULTIVECTOR 的 MAXSIM、伪列命名/类型（SCORE/DISTANCE/SIMILARITY/ROW_ID）、`HAVING`/`OFFSET`/别名替换等。
 - 已实现路由：databases/tables/columns/indexes/docs、import（PUT table→COPY FROM）/export（GET table/{t}→COPY TO）/rename/compact/optimize/segments/blocks/add-drop columns/EXPLAIN meta；标识符统一小写（3003/3004）、create/drop 选项 3074/3075、`replace_if_exists`→3032、空列清单 3048、重复表 3017、缺表 3022。
 - 已知缺口：HTTP 下 JSON 函数/日期函数的列名与类型推断（`json_extract_*` 值仍按字符串）、`test_select_truncate`/`test_select_aggregate` 的数值渲染、快照路由、`after_disconnect` 用例（新连接走 Thrift 的混用场景）。
 
