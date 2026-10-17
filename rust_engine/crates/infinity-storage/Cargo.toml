@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 infinity-common.workspace = true
 fjall.workspace = true
+lz4_flex.workspace = true
 crc32fast.workspace = true
 # Optional RocksDB substrate for C++-compatible catalog KV (plan §2.6.1 item 4).
 # Off by default so the default build stays pure-Rust and fast; enable with

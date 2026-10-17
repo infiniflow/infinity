@@ -13,6 +13,40 @@ fn fe(e: fjall::Error) -> Error {
     Error::Storage(e.to_string())
 }
 
+/// Stored values larger than this are LZ4-compressed before they reach the
+/// LSM tree. Table rows are tab-separated text with thousands of floats, which
+/// compresses 3-4x; the codec is transparent to every caller.
+const COMPRESS_MIN: usize = 512;
+/// A compressed value starts with this pair; all legacy values are UTF-8 text,
+/// so they never collide with it.
+const LZ4_MAGIC: [u8; 2] = [0xC1, 0x4C];
+
+fn encode_value(value: &[u8]) -> Vec<u8> {
+    if value.len() < COMPRESS_MIN {
+        return value.to_vec();
+    }
+    let packed = lz4_flex::compress_prepend_size(value);
+    if packed.len() + LZ4_MAGIC.len() >= value.len() {
+        return value.to_vec();
+    }
+    let mut out = Vec::with_capacity(LZ4_MAGIC.len() + packed.len());
+    out.extend_from_slice(&LZ4_MAGIC);
+    out.extend_from_slice(&packed);
+    out
+}
+
+fn decode_value(value: &[u8]) -> Vec<u8> {
+    if value.len() > LZ4_MAGIC.len()
+        && value[0] == LZ4_MAGIC[0]
+        && value[1] == LZ4_MAGIC[1]
+    {
+        if let Ok(raw) = lz4_flex::decompress_size_prepended(&value[LZ4_MAGIC.len()..]) {
+            return raw;
+        }
+    }
+    value.to_vec()
+}
+
 /// A transactional key-value store for metadata.
 pub trait MetaStore: Send + Sync {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
@@ -45,11 +79,11 @@ impl FjallMetaStore {
 
 impl MetaStore for FjallMetaStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.ks.get(key).map_err(fe)?.map(|v| v.to_vec()))
+        Ok(self.ks.get(key).map_err(fe)?.map(|v| decode_value(&v)))
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.ks.insert(key, value).map_err(fe)
+        self.ks.insert(key, encode_value(value)).map_err(fe)
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
@@ -59,7 +93,8 @@ impl MetaStore for FjallMetaStore {
     fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()> {
         let mut batch = self.db.batch();
         for (k, v) in items {
-            batch.insert(&self.ks, k.as_slice(), v.as_slice());
+            let stored = encode_value(v);
+            batch.insert(&self.ks, k.as_slice(), stored.as_slice());
         }
         batch.commit().map_err(fe)
     }
@@ -68,7 +103,7 @@ impl MetaStore for FjallMetaStore {
         let mut out = Vec::new();
         for kv in self.ks.prefix(prefix) {
             let (k, v) = kv.into_inner().map_err(fe)?;
-            out.push((k.to_vec(), v.to_vec()));
+            out.push((k.to_vec(), decode_value(&v)));
         }
         Ok(out)
     }
@@ -87,6 +122,24 @@ mod tests {
         let dir = tempdir().unwrap();
         let s = FjallMetaStore::open(dir.path(), "catalog").unwrap();
         (dir, s)
+    }
+
+    #[test]
+    fn compressed_values_roundtrip() {
+        let (_d, s) = open();
+        // A row-shaped value: thousands of repeated float fields.
+        let mut text = String::new();
+        for i in 0..4000 {
+            text.push_str(&format!("{:.6},", (i % 97) as f64 * 0.25));
+        }
+        s.put(b"row", text.as_bytes()).unwrap();
+        assert_eq!(s.get(b"row").unwrap().unwrap(), text.as_bytes());
+        s.atomic_write(&[(b"row2".to_vec(), text.as_bytes().to_vec())])
+            .unwrap();
+        assert_eq!(s.get(b"row2").unwrap().unwrap(), text.as_bytes());
+        let scan = s.scan_prefix(b"row").unwrap();
+        assert_eq!(scan.len(), 2);
+        assert_eq!(scan[0].1, text.as_bytes());
     }
 
     #[test]

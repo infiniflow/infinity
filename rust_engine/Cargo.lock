@@ -376,6 +376,7 @@ dependencies = [
  "crc32fast",
  "fjall",
  "infinity-common",
+ "lz4_flex",
  "rocksdb",
  "tempfile",
 ]
