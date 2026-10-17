@@ -1931,6 +1931,25 @@ impl Engine {
     fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
+                // A sparse column written as `SPARSE(elem, dim)` must declare a
+                // positive dimension (the 3-part SDK form may carry 0).
+                for c in columns {
+                    let up = c.type_text.to_ascii_uppercase();
+                    if up.starts_with("SPARSE(") {
+                        let inner =
+                            c.type_text[c.type_text.find('(').unwrap() + 1..].trim_end_matches(')');
+                        let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+                        if parts.len() == 2 {
+                            let dim: i64 = parts[1].parse().unwrap_or(0);
+                            if dim <= 0 {
+                                return Err(Error::Invalid(format!(
+                                    "invalid sparse dimension {dim} for column '{}'",
+                                    c.name
+                                )));
+                            }
+                        }
+                    }
+                }
                 // A vector-like column's declared dimension must be positive.
                 for c in columns {
                     if !declares_dimension(&c.type_text) {
@@ -2823,7 +2842,14 @@ impl Engine {
                 assignments,
                 where_pred,
             } => {
+                // The reference requires a filter on UPDATE.
+                if where_pred.is_none() {
+                    return Err(Error::Invalid(
+                        "syntax: UPDATE requires a WHERE clause".into(),
+                    ));
+                }
                 let schema = self.table_schema(table)?;
+                let types = self.column_types(table)?;
                 let not_nulls = self
                     .catalog
                     .get_table_by_name(table)?
@@ -2832,6 +2858,41 @@ impl Engine {
                 let mut asg = Vec::new();
                 for (c, e) in assignments {
                     let idx = infinity_planner::resolve_column(&schema, c)?;
+                    // A boolean column only takes true/false, not 1/0.
+                    let ty = types
+                        .get(idx)
+                        .map(|t| t.to_ascii_uppercase())
+                        .unwrap_or_default();
+                    if ty.starts_with("BOOLEAN") || ty.starts_with("BOOL") {
+                        if let infinity_parser::ExprAst::Literal(l) = e {
+                            use infinity_parser::Literal as L;
+                            if matches!(l, L::Int(_) | L::Float(_)) {
+                                return Err(Error::Invalid(
+                                    "parser: Boolean type should be true or false".into(),
+                                ));
+                            }
+                        }
+                    }
+                    // An array value cannot be stored in a scalar column.
+                    if matches!(
+                        e,
+                        infinity_parser::ExprAst::Literal(infinity_parser::Literal::Array(_))
+                    ) {
+                        let structured = ty.starts_with("ARRAY")
+                            || ty.starts_with("VECTOR")
+                            || ty.starts_with("EMBEDDING")
+                            || ty.starts_with("TENSOR")
+                            || ty.starts_with("MULTIVECTOR")
+                            || ty.starts_with("SPARSE")
+                            || ty.starts_with("JSON")
+                            || ty.starts_with("VARCHAR")
+                            || ty.starts_with("TEXT");
+                        if !structured {
+                            return Err(Error::Invalid(format!(
+                                "not supported type conversion: an array value cannot be stored in column '{c}'"
+                            )));
+                        }
+                    }
                     if not_nulls.get(idx).copied().unwrap_or(false)
                         && matches!(
                             e,
@@ -3426,6 +3487,16 @@ impl Engine {
     /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
     pub fn compact_table(&self, table: &str) -> Result<()> {
         let rows = self.fetch_rows_with_ids(table)?;
+        if std::env::var_os("INFINITY_DEBUG_RECOVER").is_some() {
+            eprintln!(
+                "compact: {} rows={} first={:?} last={:?} store_keys={}",
+                table,
+                rows.len(),
+                rows.first().map(|r| r.0),
+                rows.last().map(|r| r.0),
+                self.store.scan_prefix(&row_prefix(table))?.len()
+            );
+        }
         for (i, (old, _)) in rows.iter().enumerate() {
             if *old == i {
                 continue;
