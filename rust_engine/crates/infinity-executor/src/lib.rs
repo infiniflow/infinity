@@ -1392,6 +1392,8 @@ pub struct Engine {
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
     index_analyzers: Mutex<HashMap<String, String>>,
+    /// `CREATE INDEX … COMMENT '…'`, keyed by `"<table>#<index>"`.
+    index_comments: Mutex<HashMap<String, String>>,
     /// cached `SELECT` results keyed by the statement text
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// the database new unqualified table names are resolved against
@@ -1452,6 +1454,7 @@ impl Engine {
             vector_indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
+            index_comments: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
@@ -3322,6 +3325,24 @@ impl Engine {
             .types)
     }
 
+    /// Records the comment given to `CREATE INDEX` (the SDK reads it back from
+    /// `SHOW INDEX`).
+    pub fn set_index_comment(&self, table: &str, index: &str, comment: &str) {
+        self.index_comments
+            .lock()
+            .unwrap()
+            .insert(format!("{table}#{index}"), comment.to_string());
+    }
+
+    /// The comment recorded for `index` on `table`, if any.
+    pub fn index_comment(&self, table: &str, index: &str) -> Option<String> {
+        self.index_comments
+            .lock()
+            .unwrap()
+            .get(&format!("{table}#{index}"))
+            .cloned()
+    }
+
     /// True unless `result_cache` is explicitly `off`.
     /// Rows a single imported segment can hold (`1024 * 8192`).
     pub const SEGMENT_ROW_CAPACITY: usize = 1024 * 8192;
@@ -3458,7 +3479,54 @@ impl Engine {
     ) -> Result<()> {
         let schema = self.table_schema(table)?;
         let Some(ci) = schema.iter().position(|c| c == column) else {
-            // a functional-index target is validated separately
+            // A functional-index target must be a call to a known scalar.
+            // A plain arithmetic target (`c1 + 5`) is a valid functional index;
+            // only a call `fn(...)` has to name a known scalar.
+            let fname = column
+                .split('(')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase();
+            if !column.contains('(') {
+                return Ok(());
+            }
+            const KNOWN: &[&str] = &[
+                "abs",
+                "ceil",
+                "char_length",
+                "character_length",
+                "datepart",
+                "day",
+                "exp",
+                "floor",
+                "length",
+                "ln",
+                "log",
+                "log10",
+                "log2",
+                "lower",
+                "ltrim",
+                "md5",
+                "month",
+                "pow",
+                "power",
+                "reverse",
+                "round",
+                "rtrim",
+                "sqrt",
+                "substr",
+                "substring",
+                "trim",
+                "trunc",
+                "upper",
+                "year",
+            ];
+            if !KNOWN.contains(&fname.as_str()) {
+                return Err(Error::Invalid(format!(
+                    "invalid function '{fname}' in an index expression"
+                )));
+            }
             return Ok(());
         };
         let ty = self
@@ -3512,11 +3580,26 @@ impl Engine {
                         | ElemType::Int32
                         | ElemType::Int64
                 );
+                let bit_elem = tensor_elem_type(&ty) == ElemType::Bit;
                 for (k, v) in opts {
+                    if !matches!(
+                        k.as_str(),
+                        "M" | "EF_CONSTRUCTION" | "METRIC" | "ENCODE" | "BUILD_TYPE" | "LSG_CONFIG"
+                    ) {
+                        return Err(Error::Invalid(format!(
+                            "invalid index parameter: unsupported HNSW option '{k}'"
+                        )));
+                    }
                     if k == "ENCODE" && v.eq_ignore_ascii_case("lvq") && int_elem {
                         return Err(Error::Invalid(
                             "LVQ encoding is not supported for integer embeddings".into(),
                         ));
+                    }
+                    // `hamming` is only defined on bit vectors.
+                    if k == "METRIC" && v.eq_ignore_ascii_case("hamming") && !bit_elem {
+                        return Err(Error::Invalid(format!(
+                            "invalid index parameter: metric 'hamming' requires a bit embedding, got '{ty}'"
+                        )));
                     }
                 }
             }
@@ -3559,11 +3642,21 @@ impl Engine {
                 }
                 for (k, v) in opts {
                     if k == "ANALYZER" {
-                        let v = v.to_ascii_uppercase();
-                        if v == "JIEBA" || v == "NGRAM" {
-                            return Err(Error::Invalid(format!(
-                                "unsupported fulltext analyzer '{v}'"
-                            )));
+                        let a = v
+                            .trim()
+                            .trim_matches(|c| c == '\'' || c == '"')
+                            .to_ascii_lowercase();
+                        // `standard`, `keyword`, `whitespace`/`whitespace-…` and the
+                        // CJK/English pipelines are the analyzers the engine has.
+                        let known = matches!(
+                            a.as_str(),
+                            "standard" | "english" | "chinese" | "keyword" | "whitespace"
+                        ) || a.starts_with("whitespace-")
+                            || a.starts_with("whitespace_")
+                            || a.starts_with("sparsegram")
+                            || a == "rankfeatures";
+                        if !known {
+                            return Err(Error::Invalid(format!("analyzer '{a}' not found")));
                         }
                     }
                 }
