@@ -1948,8 +1948,8 @@ impl Engine {
     fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
-                // A sparse column written as `SPARSE(elem, dim)` must declare a
-                // positive dimension (the 3-part SDK form may carry 0).
+                // A sparse column written as `SPARSE(elem, dim)` may declare 0
+                // (an unknown bound); a negative one is invalid.
                 for c in columns {
                     let up = c.type_text.to_ascii_uppercase();
                     if up.starts_with("SPARSE(") {
@@ -1958,7 +1958,7 @@ impl Engine {
                         let parts: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
                         if parts.len() == 2 {
                             let dim: i64 = parts[1].parse().unwrap_or(0);
-                            if dim <= 0 {
+                            if dim < 0 {
                                 return Err(Error::Invalid(format!(
                                     "invalid sparse dimension {dim} for column '{}'",
                                     c.name
