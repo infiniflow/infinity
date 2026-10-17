@@ -1958,6 +1958,11 @@ impl Engine {
                 })
             }
             Statement::AlterTableDropColumn { table, column } => {
+                // Dropping a column that does not exist is `COLUMN_NOT_EXIST`.
+                let schema = self.table_schema(table)?;
+                if !schema.iter().any(|c| c == column) {
+                    return Err(Error::NotFound(format!("column '{column}'")));
+                }
                 // an index still referencing the column blocks the drop
                 if self
                     .catalog
@@ -2029,6 +2034,15 @@ impl Engine {
                 })
             }
             Statement::AlterTableAdd { table, columns } => {
+                // A column may not be added twice (`DUPLICATE_COLUMN_NAME`).
+                let existing = self.table_schema(table)?;
+                let mut seen: Vec<String> = existing.clone();
+                for c in columns {
+                    if seen.iter().any(|n| n.eq_ignore_ascii_case(&c.name)) {
+                        return Err(Error::Invalid(format!("duplicate column: '{}'", c.name)));
+                    }
+                    seen.push(c.name.clone());
+                }
                 // `ADD COLUMN … NOT NULL` requires a default for existing rows.
                 for c in columns {
                     if c.not_null && c.default.is_none() {

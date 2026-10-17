@@ -697,9 +697,7 @@ fn handle_connection(
                 // `RenameTable` is executed for real; the rest are engine-level
                 // maintenance that the in-memory engine has nothing to do for, so
                 // they report success rather than `unknown method`.
-                "AddColumns"
-                | "DropColumns"
-                | "Optimize"
+                "Optimize"
                 | "Compact"
                 | "Cleanup"
                 | "Flush"
@@ -779,6 +777,57 @@ fn handle_connection(
                         },
                     };
                     write_result_response(&mut writer, seq, "Explain", &resp)?;
+                }
+                "AddColumns" => {
+                    let (db, table, cols, sid) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_alter_add_args(&mut ip)?
+                    };
+                    let full = if db.is_empty() {
+                        table
+                    } else {
+                        format!("{db}.{table}")
+                    };
+                    let defs: Vec<String> = cols
+                        .iter()
+                        .map(|c| {
+                            let mut def = format!("{} {}", c.name, column_sql_type(c));
+                            if c.not_null {
+                                def.push_str(" NOT NULL");
+                            }
+                            if let Some(d) = &c.default {
+                                def.push_str(&format!(" DEFAULT {d}"));
+                            }
+                            def
+                        })
+                        .collect();
+                    let sql = format!("ALTER TABLE {full} ADD COLUMN {}", defs.join(", "));
+                    let resp = run_common(engine.as_ref(), &sql, sid);
+                    write_reply_common(&mut writer, "AddColumns", seq, &resp)?;
+                }
+                "DropColumns" => {
+                    let (db, table, names, sid) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_alter_drop_args(&mut ip)?
+                    };
+                    let full = if db.is_empty() {
+                        table
+                    } else {
+                        format!("{db}.{table}")
+                    };
+                    let mut resp = CommonResponse {
+                        error_code: OK,
+                        error_msg: "OK".into(),
+                        session_id: sid,
+                    };
+                    for name in names {
+                        let sql = format!("ALTER TABLE {full} DROP COLUMN {name}");
+                        resp = run_common(engine.as_ref(), &sql, sid);
+                        if resp.error_code != OK {
+                            break;
+                        }
+                    }
+                    write_reply_common(&mut writer, "DropColumns", seq, &resp)?;
                 }
                 "Import" => {
                     let req = {
@@ -2147,6 +2196,10 @@ pub enum PhysicalWire {
 pub struct ColumnDefWire {
     pub id: i32,
     pub name: String,
+    /// `ConstantExpr` rendered as a SQL literal (`'x'`, `1`, `1.5`, `true`).
+    pub default: Option<String>,
+    /// `Constraint::NotNull` is present.
+    pub not_null: bool,
     /// `LogicType` enum ordinal (caller-supplied).
     pub logic_type: i32,
     /// The physical descriptor for non-scalar columns (embedding/sparse).
@@ -2416,6 +2469,8 @@ pub struct CreateTableReq {
 fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<ColumnDefWire> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut id, mut name, mut lt) = (0i32, String::new(), 0i32);
+    let mut default: Option<String> = None;
+    let mut not_null = false;
     let mut physical = PhysicalWire::None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -2444,6 +2499,26 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                 }
                 ip.read_struct_end().map_err(tw)?;
             }
+            // `4: list<Constraint>` — 0 PrimaryKey, 1 NotNull, 2 Null, 3 Unique.
+            Some(4) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    if ip.read_i32().map_err(tw)? == 1 {
+                        not_null = true;
+                    }
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            // `5: ConstantExpr` — the column's DEFAULT.
+            Some(5) if f.field_type == TType::Struct => {
+                default = match read_constant_expr(ip)? {
+                    ValueLit::Str(v) => Some(format!("'{}'", v.replace('\'', "''"))),
+                    ValueLit::Int(v) => Some(v.to_string()),
+                    ValueLit::Float(v) => Some(format!("{v}")),
+                    ValueLit::Bool(v) => Some(if v { "true".into() } else { "false".into() }),
+                    _ => None,
+                };
+            }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -2452,6 +2527,8 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
     Ok(ColumnDefWire {
         id,
         name,
+        default,
+        not_null,
         logic_type: lt,
         physical,
     })
@@ -3154,6 +3231,8 @@ pub fn select_response_from_typed(
             ColumnDefWire {
                 id: i as i32,
                 name: name.clone(),
+                default: None,
+                not_null: false,
                 logic_type,
                 physical,
             }
@@ -4276,6 +4355,72 @@ pub fn write_show_table_response(
     Ok(())
 }
 
+/// `AddColumnsRequest { 1: db, 2: table, 3: list<ColumnDef>, 4: session_id }`.
+fn read_alter_add_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(String, String, Vec<ColumnDefWire>, i64)> {
+    let (mut db, mut table, mut cols, mut sid) = (String::new(), String::new(), Vec::new(), 0i64);
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => db = ip.read_string().map_err(tw)?,
+            Some(2) => table = ip.read_string().map_err(tw)?,
+            Some(3) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    cols.push(read_column_def(ip)?);
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(4) => sid = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((db, table, cols, sid))
+}
+
+/// `DropColumnsRequest { 1: db, 2: table, 3: list<string>, 4: session_id }`.
+fn read_alter_drop_args(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(String, String, Vec<String>, i64)> {
+    let (mut db, mut table, mut names, mut sid) = (String::new(), String::new(), Vec::new(), 0i64);
+    ip.read_struct_begin().map_err(tw)?;
+    let _ = ip.read_field_begin().map_err(tw)?;
+    ip.read_struct_begin().map_err(tw)?;
+    loop {
+        let f = ip.read_field_begin().map_err(tw)?;
+        if f.field_type == TType::Stop {
+            break;
+        }
+        match f.id {
+            Some(1) => db = ip.read_string().map_err(tw)?,
+            Some(2) => table = ip.read_string().map_err(tw)?,
+            Some(3) => {
+                let l = ip.read_list_begin().map_err(tw)?;
+                for _ in 0..l.size {
+                    names.push(ip.read_string().map_err(tw)?);
+                }
+                ip.read_list_end().map_err(tw)?;
+            }
+            Some(4) => sid = ip.read_i64().map_err(tw)?,
+            _ => ip.skip(f.field_type).map_err(tw)?,
+        }
+        ip.read_field_end().map_err(tw)?;
+    }
+    ip.read_struct_end().map_err(tw)?;
+    end_args(ip)?;
+    Ok((db, table, names, sid))
+}
+
 /// `ExplainRequest`: the `SelectRequest` prefix plus `13: ExplainType`.
 fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(SelectReq, i32)> {
     let mut req = SelectReq {
@@ -4469,6 +4614,8 @@ mod tests {
             columns: vec![ColumnDefWire {
                 id: 0,
                 name: "id".into(),
+                default: None,
+                not_null: false,
                 logic_type: 5,
                 physical: PhysicalWire::None,
             }],

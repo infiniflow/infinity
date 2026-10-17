@@ -20,12 +20,16 @@ fn main() {
             ColumnDefWire {
                 id: 0,
                 name: "id".into(),
+                default: None,
+                not_null: false,
                 logic_type: 5,
                 physical: PhysicalWire::None,
             },
             ColumnDefWire {
                 id: 1,
                 name: "name".into(),
+                default: None,
+                not_null: false,
                 logic_type: 2,
                 physical: PhysicalWire::None,
             },
