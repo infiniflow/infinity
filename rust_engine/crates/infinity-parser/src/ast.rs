@@ -260,6 +260,9 @@ pub struct SearchClause {
     pub matches: Vec<MatchClause>,
     pub fusion: Option<String>,
     pub fusion_params: Option<String>,
+    /// Every `FUSION(name, params)` tail in chain order (`fusion`/`fusion_params`
+    /// keep the last one, which decides the final score).
+    pub fusions: Vec<(String, String)>,
     pub using_index: Option<String>,
     pub with_opts: Option<String>,
 }
@@ -274,6 +277,8 @@ pub enum ExplainKind {
     #[default]
     Physical,
     Logical,
+    /// `EXPLAIN FRAGMENT`: the multi-fragment physical plan.
+    Fragment,
 }
 
 #[allow(clippy::large_enum_variant)]

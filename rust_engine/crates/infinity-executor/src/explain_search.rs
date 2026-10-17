@@ -764,3 +764,200 @@ fn pred_cols(p: &Predicate, out: &mut Vec<String>) {
         }
     }
 }
+
+/// `EXPLAIN FRAGMENT` for a `SEARCH MATCH …` plan, reproducing
+/// `ExplainFragment::Explain` + `FragmentBuilder`: the main fragment is a linear
+/// chain (`SINK -> PROJECT -> [FUSION …] -> MATCH/MatchTensorScan -> SOURCE`),
+/// and each search leaf becomes its own fragment behind a local queue.
+///
+/// Node ids follow the C++ planner: leaves are 2, 3, … in clause order, the
+/// `FUSION` operators sit above them in application order, `PROJECT` above
+/// them, and the sink/source are `PROJECT + 3` / `PROJECT + 4` (the planner
+/// consumes two private nodes in between). Child fragments then take the next
+/// two ids each.
+pub fn fragment_lines(p: &SearchPlan) -> Option<Vec<String>> {
+    let matches = &p.search.matches;
+    if matches.is_empty() {
+        return None;
+    }
+    let fusion_list: Vec<(String, String)> = if !p.search.fusions.is_empty() {
+        p.search.fusions.clone()
+    } else if let Some(f) = &p.search.fusion {
+        vec![(f.clone(), p.search.fusion_params.clone().unwrap_or_default())]
+    } else {
+        Vec::new()
+    };
+    let fused = !fusion_list.is_empty();
+    if !fused && matches.len() != 1 {
+        return None;
+    }
+    for m in matches {
+        let kind = m.kind.to_ascii_uppercase();
+        if !matches!(kind.as_str(), "TEXT" | "VECTOR" | "TENSOR" | "SPARSE") {
+            return None;
+        }
+    }
+
+    let alias = p.table.split('.').next_back().unwrap_or(p.table);
+    let db = p
+        .table
+        .split_once('.')
+        .map(|(d, _)| d)
+        .unwrap_or("default_db");
+
+    let mut filter_cols: Vec<String> = Vec::new();
+    if let Some(w) = p.where_pred {
+        pred_cols(w, &mut filter_cols);
+    }
+    let mut regular: Vec<String> = Vec::new();
+    for c in &filter_cols {
+        if p.indexed.iter().any(|x| x == c) {
+            continue;
+        }
+        add_col(&mut regular, c);
+    }
+    for it in p.items {
+        if let SelectItem::Column(c) = it {
+            add_col(&mut regular, c);
+        }
+    }
+    let mut ids: HashMap<String, usize> = HashMap::new();
+    for (i, c) in regular.iter().enumerate() {
+        ids.insert(c.clone(), i);
+    }
+    let score_id = regular.len();
+    let rowid_id = regular.len() + 1;
+    let proj: Vec<String> = p
+        .items
+        .iter()
+        .filter_map(|it| render_item(it, &ids, score_id, rowid_id))
+        .collect();
+
+    // Children of a fusion only expose the filter columns plus the score/rowid.
+    let mut child_out: Vec<String> = if fused {
+        filter_cols
+            .iter()
+            .filter(|c| !p.indexed.iter().any(|x| x.as_str() == c.as_str()))
+            .cloned()
+            .collect()
+    } else {
+        regular.clone()
+    };
+    add_col(&mut child_out, "__score");
+    add_col(&mut child_out, "__rowid");
+
+    let idx_annotation = |c: &str| -> String {
+        match p.schema.iter().position(|x| x == c) {
+            Some(i) => format!("{c} (#1.{i})"),
+            None => c.to_string(),
+        }
+    };
+    let leaf_annotation = |c: &str| -> String {
+        match ids.get(c) {
+            Some(i) => format!("{c} (#{i})"),
+            None => c.to_string(),
+        }
+    };
+    let indexed_any = filter_cols.iter().any(|c| p.indexed.iter().any(|x| x == c));
+    let index_filter = match p.where_pred {
+        Some(w) if indexed_any => render_pred_ids(w, &idx_annotation),
+        _ => "None".to_string(),
+    };
+    let leftover_filter = match p.where_pred {
+        Some(w) if !indexed_any => render_pred_ids(w, &leaf_annotation),
+        _ => "None".to_string(),
+    };
+    let knn_filter = p.where_pred.map(|w| {
+        if indexed_any {
+            render_pred_ids(w, &idx_annotation)
+        } else {
+            render_pred_ids(w, &leaf_annotation)
+        }
+    });
+
+    let has_limit = p.limit.is_some();
+    let leaf_base = 2u64;
+    let limit_id = if has_limit { Some(leaf_base + matches.len() as u64) } else { None };
+    let fusion_base = leaf_base + matches.len() as u64 + u64::from(has_limit);
+    let project_id = fusion_base + fusion_list.len() as u64;
+    let sink_id = project_id + 3;
+    let source_id = project_id + 4;
+    let frag_type = if fused { "SerialMaterialize" } else { "SerialMaterialize" };
+
+    let mut leaf_blocks: Vec<Vec<String>> = Vec::new();
+    for (i, m) in matches.iter().enumerate() {
+        let kind = m.kind.to_ascii_uppercase();
+        let mut block = Vec::new();
+        if !render_leaf(
+            &mut block,
+            &kind,
+            m,
+            1,
+            alias,
+            db,
+            &child_out,
+            &index_filter,
+            &leftover_filter,
+            knn_filter.clone(),
+            p.schema,
+            p.types,
+            leaf_base + i as u64,
+        ) {
+            return None;
+        }
+        leaf_blocks.push(block);
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("FRAGMENT (1, {frag_type})"));
+    lines.push(format!("-> SINK ({sink_id}) Result"));
+    lines.push(format!("-> PROJECT ({project_id})"));
+    lines.push("   - table index: #4".to_string());
+    lines.push(format!("   - expressions: [{}]", proj.join(", ")));
+    if let Some(lid) = limit_id {
+        lines.push(format!("-> LIMIT ({lid})"));
+        lines.push(format!("   - limit: {}", p.limit.unwrap_or(0)));
+        lines.push(format!("   - output columns: [{}]", child_out.join(", ")));
+    }
+    for (i, (name, params)) in fusion_list.iter().enumerate().rev() {
+        let id = fusion_base + i as u64;
+        let params = canonical_fusion_params(params);
+        lines.push(format!("-> FUSION ({id})"));
+        lines.push(format!("   - fusion: #FUSION('{name}', '{params}')"));
+        lines.push(format!("   - output columns: [{}]", child_out.join(", ")));
+    }
+    // A fused plan keeps every search leaf in its own fragment, so the main
+    // fragment only carries the projection and the fusion chain.
+    if !fused {
+        for block in &leaf_blocks {
+            for l in block {
+                lines.push(l.strip_prefix(' ').unwrap_or(l).to_string());
+            }
+        }
+        lines.push(format!("-> SOURCE ({source_id}) Table"));
+        lines.push(String::new());
+        return Some(lines);
+    }
+    let children: Vec<String> = (0..matches.len())
+        .map(|i| format!("FRAGMENT #{}, {frag_type}", 2 + i))
+        .collect();
+    lines.push(format!(
+        "-> SOURCE ({source_id}) LocalQueue: {}",
+        children.join(", ")
+    ));
+    lines.push(String::new());
+    let mut next = source_id + 1;
+    for (i, block) in leaf_blocks.iter().enumerate() {
+        lines.push(format!("FRAGMENT ({}, {frag_type})", 2 + i));
+        lines.push(format!("-> SINK ({next}) LocalQueue"));
+        next += 1;
+        for l in block {
+            lines.push(l.strip_prefix(' ').unwrap_or(l).to_string());
+        }
+        lines.push(format!("-> SOURCE ({next}) Table"));
+        next += 1;
+        lines.push(String::new());
+        lines.push(String::new());
+    }
+    Some(lines)
+}

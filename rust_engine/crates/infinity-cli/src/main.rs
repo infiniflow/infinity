@@ -462,7 +462,11 @@ fn run_conformance(slt_dir: &str) -> infinity_common::Result<()> {
                             }
                         }
                         let mut got = rows;
-                        let mut exp: Vec<String> = expected.iter().map(|s| norm(s)).collect();
+                        // sqllogictest writes `(empty)` for an empty value.
+                        let mut exp: Vec<String> = expected
+                            .iter()
+                            .map(|s| if s == "(empty)" { String::new() } else { norm(s) })
+                            .collect();
                         if rowsort {
                             got.sort();
                             exp.sort();

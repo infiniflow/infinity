@@ -2186,7 +2186,7 @@ impl Engine {
                     } if join.is_none() => {
                         let meta = self.table_meta(t)?;
                         let indexed = self.indexed_columns(t)?;
-                        crate::explain_search::explain_search(&crate::explain_search::SearchPlan {
+                        let plan = crate::explain_search::SearchPlan {
                             items,
                             table: t,
                             search: s,
@@ -2197,7 +2197,12 @@ impl Engine {
                             types: &meta.types,
                             indexed: &indexed,
                             multi: self.multi_segment(t),
-                        })
+                        };
+                        if matches!(kind, infinity_parser::ExplainKind::Fragment) {
+                            crate::explain_search::fragment_lines(&plan)
+                        } else {
+                            crate::explain_search::explain_search(&plan)
+                        }
                     }
                     Statement::Select {
                         items,

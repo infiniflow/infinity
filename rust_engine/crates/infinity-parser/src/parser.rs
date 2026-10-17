@@ -760,6 +760,10 @@ impl Parser {
                         self.advance();
                         ExplainKind::Physical
                     }
+                    Token::Ident(s) if s.eq_ignore_ascii_case("fragment") => {
+                        self.advance();
+                        ExplainKind::Fragment
+                    }
                     _ => ExplainKind::Physical,
                 };
                 let inner = self.statement()?;
@@ -1320,6 +1324,10 @@ impl Parser {
                 } else {
                     out.fusion_params = None;
                 }
+                out.fusions.push((
+                    out.fusion.clone().unwrap_or_default(),
+                    out.fusion_params.clone().unwrap_or_default(),
+                ));
                 self.expect(Token::RParen)?;
             }
             break;
