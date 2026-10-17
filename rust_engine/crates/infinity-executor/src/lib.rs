@@ -2611,7 +2611,7 @@ impl Engine {
                                 .get(i)
                                 .cloned()
                                 .flatten()
-                                .unwrap_or_default(),
+                                .unwrap_or_else(|| "(empty)".to_string()),
                         ]
                     })
                     .collect();
