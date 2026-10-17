@@ -5554,9 +5554,12 @@ fn read_index_info(
                 ip.read_list_end().map_err(tw)?;
             }
             Some(4) if f.field_type == TType::Struct => {
-                // A functional index carries a bare `FunctionExpr`.
+                // A functional index carries a bare `FunctionExpr`; some clients
+                // send an empty one, which is not an expression.
                 let (name, args) = read_function_expr(ip)?;
-                out.function = Some(pexpr_sql(&PExpr::Call(name, args)));
+                if !name.trim().is_empty() {
+                    out.function = Some(pexpr_sql(&PExpr::Call(name, args)));
+                }
             }
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
