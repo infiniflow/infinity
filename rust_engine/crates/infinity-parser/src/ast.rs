@@ -401,5 +401,8 @@ pub enum Statement {
         offset: Option<u64>,
         search: Option<Box<SearchClause>>,
         distinct: bool,
+        /// `HIGHLIGHT <col>, …` after the select list: those output columns are
+        /// rendered with `<em>…</em>` around the query term occurrences.
+        highlight: Vec<String>,
     },
 }

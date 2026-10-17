@@ -464,6 +464,27 @@ impl Parser {
                 self.advance();
                 let distinct = self.eat_kw("DISTINCT");
                 let (items, aliases) = self.select_items()?;
+                // `SELECT …, body HIGHLIGHT body, doctitle FROM …`
+                let highlight = if self.eat_kw("HIGHLIGHT") {
+                    let mut cols = Vec::new();
+                    loop {
+                        match self.peek().clone() {
+                            Token::Ident(c) => {
+                                self.advance();
+                                cols.push(c);
+                            }
+                            _ => break,
+                        }
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    cols
+                } else {
+                    Vec::new()
+                };
                 let from = if self.eat_kw("FROM") {
                     if self.peek() == &Token::LParen {
                         // A derived table: `FROM (SELECT …)`. The subquery's SQL is
@@ -630,6 +651,7 @@ impl Parser {
                     offset,
                     search,
                     distinct,
+                    highlight,
                 })
             }
             "DELETE" => {
@@ -2175,6 +2197,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
         assert_eq!(
@@ -2195,6 +2218,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
     }
@@ -2252,6 +2276,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
     }
@@ -2286,6 +2311,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
         assert_eq!(
@@ -2315,6 +2341,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
     }
@@ -2341,6 +2368,7 @@ mod tests {
                 offset: None,
                 search: None,
                 distinct: false,
+                highlight: vec![],
             }
         );
     }

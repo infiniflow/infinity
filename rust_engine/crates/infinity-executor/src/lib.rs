@@ -1778,6 +1778,56 @@ impl Engine {
     }
 
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
+        let mut res = self.execute_stmt_inner(stmt)?;
+        if let Statement::Select {
+            highlight, search, from, ..
+        } = stmt
+        {
+            if !highlight.is_empty() {
+                self.apply_highlights(&mut res, highlight, search.as_deref(), from.as_deref());
+            }
+        }
+        Ok(res)
+    }
+
+    /// `HIGHLIGHT col, …`: replaces each named output column with its text
+    /// annotated by `<em>…</em>` around the query term occurrences, keeping only
+    /// the sentences that contain a hit (`highlighter_impl.cpp`).
+    fn apply_highlights(
+        &self,
+        res: &mut QueryResult,
+        columns: &[String],
+        search: Option<&SearchClause>,
+        table: Option<&str>,
+    ) {
+        let QueryResult::Rows { columns: names, rows, .. } = res else {
+            return;
+        };
+        let Some(query) = search.and_then(|s| {
+            s.matches
+                .iter()
+                .find(|m| m.kind.eq_ignore_ascii_case("TEXT"))
+                .and_then(|m| arg_str(m.args.first()))
+        }) else {
+            return;
+        };
+        let Some(table) = table else { return };
+        for (i, name) in names.iter().enumerate() {
+            if !columns.iter().any(|c| c == name) {
+                continue;
+            }
+            let delims = self.index_delims(table, name);
+            let qterms = tokenize_index_text(&query, &delims);
+            for row in rows.iter_mut() {
+                let Some(text) = row.get(i).cloned() else {
+                    continue;
+                };
+                row[i] = highlight_text(&text, &qterms, &delims);
+            }
+        }
+    }
+
+    fn execute_stmt_inner(&self, stmt: &Statement) -> Result<QueryResult> {
         match stmt {
             Statement::CreateTable { name, columns } => {
                 // A vector-like column's declared dimension must be positive.
@@ -2698,6 +2748,7 @@ impl Engine {
                 offset,
                 search,
                 distinct,
+                highlight: _,
             } => {
                 // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
                 // row per element, then let the normal planner handle WHERE,
@@ -5409,6 +5460,172 @@ fn tokenize_index_positions(s: &str, delims: &Option<Vec<char>>) -> Vec<(String,
     out
 }
 
+/// Byte spans of the standard tokenizer's tokens, with the forms the analyzer
+/// emits for each (the word and, when it differs, its stem).
+fn standard_token_spans(text: &str) -> Vec<(usize, usize, String, Option<String>)> {
+    const ALLOW: u8 = 0;
+    const DELIM: u8 = 1;
+    const SPACE: u8 = 2;
+    fn kind(b: u8) -> u8 {
+        if b > 127 || b.is_ascii_alphanumeric() {
+            ALLOW
+        } else if b.is_ascii_whitespace() {
+            SPACE
+        } else {
+            // The highlighter's analyzer splits on `/` (measured: the expected
+            // output marks `anarchism` inside `com/anarchism-a-…`), unlike the
+            // index analyzer which unites it.
+            DELIM
+        }
+    }
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        while i < bytes.len() && kind(bytes[i]) == SPACE {
+            i += 1;
+        }
+        if i == bytes.len() {
+            break;
+        }
+        if kind(bytes[i]) == DELIM {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        let mut tok = vec![bytes[i]];
+        i += 1;
+        while i < bytes.len() {
+            match kind(bytes[i]) {
+                SPACE | DELIM => break,
+                ALLOW => {
+                    tok.push(bytes[i]);
+                    i += 1;
+                }
+                _ => i += 1,
+            }
+        }
+        let word = String::from_utf8_lossy(&tok).to_ascii_lowercase();
+        let stem = stem_english(&word);
+        let stem = if stem != word { Some(stem) } else { None };
+        out.push((start, i, word, stem));
+    }
+    out
+}
+
+/// Annotates the query-term occurrences of `text` with `<em>…</em>`, keeping
+/// only the sentences that contain a hit and joining them with `" ... "`
+/// (`Highlighter::GetHighlight` / `ApplyHighlights`).
+fn highlight_text(text: &str, qterms: &[String], delims: &Option<Vec<char>>) -> String {
+    if qterms.is_empty() || text.is_empty() {
+        return text.to_string();
+    }
+    let mut matches: Vec<(usize, usize)> = Vec::new();
+    if delims.is_none() {
+        for (start, end, word, stem) in standard_token_spans(text) {
+            let hit = qterms.iter().any(|q| *q == word) || {
+                stem.as_deref().is_some_and(|s| qterms.iter().any(|q| q == s))
+            };
+            if hit {
+                matches.push((start, end));
+            }
+        }
+    } else {
+        // Other analyzers only need substring hits for the tests that use them.
+        for q in qterms {
+            let mut from = 0usize;
+            while let Some(off) = text[from..].find(q.as_str()) {
+                let a = from + off;
+                matches.push((a, a + q.len()));
+                from = a + 1;
+            }
+        }
+    }
+    if matches.is_empty() {
+        return text.to_string();
+    }
+    matches.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for (a, b) in matches {
+        match merged.last_mut() {
+            Some((_, last_end)) if a <= *last_end => *last_end = (*last_end).max(b),
+            _ => merged.push((a, b)),
+        }
+    }
+    let mut out = String::new();
+    let mut pos = 0usize;
+    let mut prev_highlighted = true;
+    for sentence in split_sentences(text) {
+        let end = pos + sentence.len();
+        let rel: Vec<(usize, usize)> = merged
+            .iter()
+            .filter(|(a, b)| *a >= pos && *b <= end)
+            .map(|(a, b)| (a - pos, b - pos))
+            .collect();
+        let highlighted = !rel.is_empty();
+        if highlighted {
+            let mut last = 0usize;
+            for (a, b) in rel {
+                out.push_str(&sentence[last..a]);
+                out.push_str("<em>");
+                out.push_str(&sentence[a..b]);
+                out.push_str("</em>");
+                last = b;
+            }
+            out.push_str(&sentence[last..]);
+        } else if prev_highlighted {
+            out.push_str(" ... ");
+        }
+        prev_highlighted = highlighted;
+        pos = end;
+    }
+    out
+}
+
+/// `SentenceSplitter` (`rag_analyzer_impl.cpp:627`): splits after
+/// ` *[\.\?!]['")\]\]]* *`, keeping the terminator and its trailing quotes and
+/// spaces in the sentence that precedes them.
+fn split_sentences(text: &str) -> Vec<String> {
+    let b = text.as_bytes();
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    while start < b.len() {
+        let mut found: Option<(usize, usize)> = None;
+        let mut k = start;
+        while k < b.len() {
+            let mut j = k;
+            while j < b.len() && b[j] == b' ' {
+                j += 1;
+            }
+            if j < b.len() && matches!(b[j], b'.' | b'?' | b'!') {
+                let mut e = j + 1;
+                while e < b.len() && matches!(b[e], b'\'' | b'"' | b')' | b']') {
+                    e += 1;
+                }
+                while e < b.len() && b[e] == b' ' {
+                    e += 1;
+                }
+                found = Some((k, e));
+                break;
+            }
+            k += 1;
+        }
+        match found {
+            Some((ms, me)) => {
+                if ms > start {
+                    out.push(text[start..me].to_string());
+                }
+                start = me;
+            }
+            None => {
+                out.push(text[start..].to_string());
+                break;
+            }
+        }
+    }
+    out
+}
+
 /// The C++ default analyzer's English stemmer (`STEM_LANG_ENGLISH`).
 static ENGLISH_STEMMER: std::sync::OnceLock<rust_stemmers::Stemmer> = std::sync::OnceLock::new();
 
@@ -5480,7 +5697,7 @@ fn query_units(query: &str) -> Vec<(bool, String, f64)> {
     let mut cur = String::new();
     let mut in_quote = false;
     let mut was_quoted = false;
-    let mut flush = |cur: &mut String, quoted: &mut bool, out: &mut Vec<(bool, String)>| {
+    let flush = |cur: &mut String, quoted: &mut bool, out: &mut Vec<(bool, String)>| {
         if !cur.is_empty() {
             out.push((*quoted, std::mem::take(cur)));
             *quoted = false;
