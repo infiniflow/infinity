@@ -2770,15 +2770,7 @@ impl Engine {
                 assignments,
                 where_pred,
             } => {
-                // The reference requires a filter: an unfiltered UPDATE is a
-                // syntax error.
-                if where_pred.is_none() {
-                    return Err(Error::Invalid(
-                        "syntax: UPDATE requires a WHERE clause".into(),
-                    ));
-                }
                 let schema = self.table_schema(table)?;
-                let types = self.column_types(table)?;
                 let not_nulls = self
                     .catalog
                     .get_table_by_name(table)?
@@ -2787,31 +2779,6 @@ impl Engine {
                 let mut asg = Vec::new();
                 for (c, e) in assignments {
                     let idx = infinity_planner::resolve_column(&schema, c)?;
-                    // An array value cannot be stored in a scalar column.
-                    if matches!(
-                        e,
-                        infinity_parser::ExprAst::Literal(infinity_parser::Literal::Array(_))
-                    ) {
-                        let ty = types
-                            .get(idx)
-                            .map(|t| t.to_ascii_uppercase())
-                            .unwrap_or_default();
-                        let structured = ty.starts_with("ARRAY")
-                            || ty.starts_with("VECTOR")
-                            || ty.starts_with("EMBEDDING")
-                            || ty.starts_with("TENSOR")
-                            || ty.starts_with("MULTIVECTOR")
-                            || ty.starts_with("SPARSE")
-                            || ty.starts_with("JSON")
-                            // a varchar column accepts any rendering
-                            || ty.starts_with("VARCHAR")
-                            || ty.starts_with("TEXT");
-                        if !structured {
-                            return Err(Error::Invalid(format!(
-                                "not supported type conversion: an array value cannot be stored in column '{c}'"
-                            )));
-                        }
-                    }
                     if not_nulls.get(idx).copied().unwrap_or(false)
                         && matches!(
                             e,
@@ -5131,22 +5098,6 @@ impl Engine {
             return Err(Error::Invalid(format!(
                 "invalid distance type '{metric}' for a sparse column"
             )));
-        }
-        // Known metrics only, and `hamming` is defined on bit vectors alone.
-        if !is_sparse
-            && !matches!(
-                metric.as_str(),
-                "l2" | "ip" | "cosine" | "cos" | "hamming" | "maxsim"
-            )
-        {
-            return Err(Error::Invalid(format!(
-                "not supported: distance type '{metric}'"
-            )));
-        }
-        if !is_sparse && metric == "hamming" && tensor_elem_type(decl) != ElemType::Bit {
-            return Err(Error::Invalid(
-                "not supported: hamming distance requires a bit vector".into(),
-            ));
         }
         let topn = if is_tensor {
             // topn lives in the trailing parameter string; the default is 10.
