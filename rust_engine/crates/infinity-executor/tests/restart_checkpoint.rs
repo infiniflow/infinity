@@ -29,7 +29,7 @@ fn state_survives_restart_after_wal_truncation() {
         e.flush().unwrap();
     }
     // checkpoint: drop every WAL record (all durable in the KV base already)
-    WalManager::truncate_up_to_ts(dir.path().join("wal.log"), u64::MAX).unwrap();
+    WalManager::truncate_up_to_ts(dir.path().join("wal").join("wal.log"), u64::MAX).unwrap();
 
     // restart 1: the KV base alone reconstructs the state
     {
@@ -76,7 +76,7 @@ fn deleting_the_wal_file_after_checkpoint_keeps_state() {
         e.execute("INSERT INTO t VALUES (7);").unwrap();
         e.flush().unwrap();
     }
-    std::fs::remove_file(dir.path().join("wal.log")).unwrap();
+    std::fs::remove_file(dir.path().join("wal").join("wal.log")).unwrap();
     let e = open(dir.path());
     assert_eq!(count(&e), 1, "state lost when the compacted WAL is gone");
 }

@@ -22,10 +22,10 @@ fn catalog_dir(dir: &Path) -> PathBuf {
     dir.join("catalog")
 }
 fn kv_dir(dir: &Path) -> PathBuf {
-    dir.join("kv")
+    dir.join("persistence")
 }
 fn wal_path(dir: &Path) -> PathBuf {
-    dir.join("wal.log")
+    dir.join("wal").join("wal.log")
 }
 
 fn open_catalog(dir: &Path) -> infinity_common::Result<Catalog> {
@@ -34,6 +34,10 @@ fn open_catalog(dir: &Path) -> infinity_common::Result<Catalog> {
 
 fn open_txn(dir: &Path) -> infinity_common::Result<(TxnManager, Arc<dyn MetaStore>)> {
     let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(kv_dir(dir), "default")?);
+    std::fs::create_dir_all(dir.join("wal")).map_err(|e| infinity_common::Error::Io {
+        path: dir.join("wal"),
+        source: e,
+    })?;
     let m = TxnManager::open(wal_path(dir), store.clone())?;
     Ok((m, store))
 }

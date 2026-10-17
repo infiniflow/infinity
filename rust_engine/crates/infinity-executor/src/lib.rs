@@ -1460,10 +1460,15 @@ impl Engine {
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
         #[cfg(feature = "rocksdb-store")]
         let store: Arc<dyn MetaStore> =
-            Arc::new(infinity_storage::RocksMetaStore::open(dir.join("kv"))?);
+            Arc::new(infinity_storage::RocksMetaStore::open(dir.join("persistence"))?);
         #[cfg(not(feature = "rocksdb-store"))]
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir.join("kv"), "default")?);
-        let txn = TxnManager::open(dir.join("wal.log"), store.clone())?;
+        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir.join("persistence"), "default")?);
+        let wal_dir = dir.join("wal");
+        std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
+            path: wal_dir.clone(),
+            source: e,
+        })?;
+        let txn = TxnManager::open(wal_dir.join("wal.log"), store.clone())?;
         txn.recover(0)?;
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)

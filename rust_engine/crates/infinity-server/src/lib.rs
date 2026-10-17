@@ -631,7 +631,23 @@ fn handle_connection(
                     let conflict: Option<i64> = [3i16, 4, 5]
                         .iter()
                         .find_map(|id| fields.get(id).and_then(|v| v.parse::<i64>().ok()));
+                    // A database name must start with a letter and contain only
+                    // word characters (the reference rejects the rest with 3003).
+                    let bad_db = !db.is_empty()
+                        && !(db
+                            .chars()
+                            .next()
+                            .map(|c| c.is_ascii_alphabetic())
+                            .unwrap_or(false)
+                            && db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
                     let resp = match name.as_str() {
+                        "CreateDatabase" | "DropDatabase" if bad_db || db.is_empty() => {
+                            CommonResponse {
+                                error_code: 3003, // INVALID_IDENTIFIER_NAME
+                                error_msg: format!("invalid database name '{db}'"),
+                                session_id: sid,
+                            }
+                        }
                         "CreateDatabase" if !db.is_empty() => {
                             let sql = if conflict == Some(0) {
                                 format!("CREATE DATABASE IF NOT EXISTS {db}")
