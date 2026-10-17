@@ -1426,6 +1426,22 @@ impl Engine {
         Ok(engine)
     }
 
+    /// Runs a derived-table subquery (`FROM (SELECT …)`), returning its columns
+    /// and rows so the outer query can scan them.
+    fn derived_table(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        for r in self.execute(sql)? {
+            if let QueryResult::Rows { columns, rows } = r {
+                // `QueryResult` renders cells as text; the scan works on values.
+                let rows = rows
+                    .into_iter()
+                    .map(|r| r.iter().map(|c| parse_value(c)).collect())
+                    .collect();
+                return Ok((columns, rows));
+            }
+        }
+        Ok((Vec::new(), Vec::new()))
+    }
+
     /// Best-effort database id for a (possibly qualified) table name.
     ///
     /// The catalog tracks table ids but not database ids, so the id is the
@@ -1595,7 +1611,12 @@ impl Engine {
             }
             Statement::Select { from, join, .. } => {
                 if let Some(t) = from.as_mut() {
-                    *t = q(t);
+                    // A derived table holds the subquery's SQL, not a table name.
+                    // (A table may legitimately be called `select3`, so require the
+                    // keyword and its trailing space.)
+                    if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
+                        *t = q(t);
+                    }
                 }
                 if let Some(j) = join.as_mut() {
                     j.table = q(&j.table);
@@ -2737,8 +2758,22 @@ impl Engine {
                     }
                 }
                 let items: &[SelectItem] = &items_owned;
+                // `FROM (SELECT …)`: run the subquery first and scan its result.
+                // Its columns become a synthetic table so names resolve.
+                let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
+                    Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
+                        Some(self.derived_table(f.trim())?)
+                    }
+                    _ => None,
+                };
+                let from_derived: Option<String> = if derived.is_some() {
+                    Some("__derived".to_string())
+                } else {
+                    from.clone()
+                };
+                let from = &from_derived;
                 // SUM/AVG require a numeric argument.
-                if let Some(t) = from.as_ref() {
+                if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
                     self.validate_aggregate_args(t, items)?;
                 }
                 if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
@@ -2752,7 +2787,11 @@ impl Engine {
                 }
                 let mut tables: Vec<(String, Vec<String>)> = Vec::new();
                 if let Some(t) = from {
-                    tables.push((t.clone(), self.table_schema(t)?));
+                    let cols = match &derived {
+                        Some((cols, _)) => cols.clone(),
+                        None => self.table_schema(t)?,
+                    };
+                    tables.push((t.clone(), cols));
                 }
                 let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
                 if let Some((name, rows)) = unnest_expansion {
@@ -2766,7 +2805,8 @@ impl Engine {
                 }
                 // SEARCH MATCH: run the search first, then expose its result rows
                 // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
-                let mut override_rows: Option<Vec<Vec<Value>>> = None;
+                // A derived table's rows are the scan source from the start.
+                let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
                 if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
                     let pred = match where_pred.as_ref() {
                         Some(p) => Some(infinity_planner::predicate_expr(p, &tables[0].1)?),
@@ -5459,6 +5499,39 @@ mod tests {
                 .unwrap();
         }
         e.flush().unwrap();
+    }
+
+    #[test]
+    fn a_derived_table_scans_the_subquery_result() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE d (id INT, s VARCHAR);").unwrap();
+        e.execute("INSERT INTO d VALUES (1,'a'), (2,'b'), (3,'c');")
+            .unwrap();
+        // The outer query scans the subquery's rows, and may filter/sort them.
+        assert_eq!(
+            rows(&e, "SELECT id FROM (SELECT id FROM d) ORDER BY id DESC;"),
+            vec![
+                vec!["3".to_string()],
+                vec!["2".to_string()],
+                vec!["1".to_string()]
+            ]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM (SELECT id FROM d WHERE id > 1) ORDER BY id;"
+            ),
+            vec![vec!["2".to_string()], vec!["3".to_string()]]
+        );
+        // A table legitimately named `select3` is not mistaken for a subquery.
+        e.execute("CREATE TABLE select3 (c1 INT, c2 INT, c3 INT);")
+            .unwrap();
+        e.execute("INSERT INTO select3 VALUES (1,2,3);").unwrap();
+        assert_eq!(
+            rows(&e, "SELECT c3, c2, c1 from select3;"),
+            vec![vec!["3".to_string(), "2".to_string(), "1".to_string()]]
+        );
     }
 
     #[test]

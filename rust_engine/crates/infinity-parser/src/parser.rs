@@ -88,6 +88,31 @@ impl Parser {
 
     /// Reads a (possibly `db.table`-qualified) table name, keeping the dotted
     /// form so the executor can resolve it against the current database.
+    /// Consumes a balanced `( … )` run holding a subquery and returns its SQL
+    /// text, with string literals re-quoted so the executor can parse it again.
+    fn paren_subquery_sql(&mut self) -> Result<String> {
+        self.expect(Token::LParen)?;
+        let mut toks: Vec<Token> = Vec::new();
+        let mut depth = 1i32;
+        while depth > 0 {
+            match self.advance() {
+                Token::LParen => {
+                    depth += 1;
+                    toks.push(Token::LParen);
+                }
+                Token::RParen => {
+                    depth -= 1;
+                    if depth > 0 {
+                        toks.push(Token::RParen);
+                    }
+                }
+                Token::Eof => return self.err("unterminated subquery"),
+                t => toks.push(t),
+            }
+        }
+        Ok(render_tokens_as_sql(&toks))
+    }
+
     fn expect_table_name(&mut self) -> Result<String> {
         match self.advance() {
             Token::Ident(mut s) => {
@@ -440,7 +465,14 @@ impl Parser {
                 let distinct = self.eat_kw("DISTINCT");
                 let (items, aliases) = self.select_items()?;
                 let from = if self.eat_kw("FROM") {
-                    Some(self.expect_table_name()?)
+                    if self.peek() == &Token::LParen {
+                        // A derived table: `FROM (SELECT …)`. The subquery's SQL is
+                        // kept as the "table"; the executor runs it and scans the
+                        // result.
+                        Some(self.paren_subquery_sql()?)
+                    } else {
+                        Some(self.expect_table_name()?)
+                    }
                 } else {
                     None
                 };
@@ -1826,6 +1858,40 @@ fn validate_fulltext_options(opts: &str) -> Result<()> {
 /// a plain column; a function call whose first argument is a column and whose
 /// remaining arguments are atoms; or a top-level expression over a single
 /// column. Aggregates, multi-column and function-of-expression forms fail.
+/// Renders tokens back into SQL text (string literals re-quoted) so a captured
+/// subquery can be re-parsed by the executor.
+fn render_tokens_as_sql(toks: &[Token]) -> String {
+    let mut out = String::new();
+    for (i, t) in toks.iter().enumerate() {
+        if i > 0 && !matches!(t, Token::Comma | Token::RParen | Token::Semicolon) {
+            out.push(' ');
+        }
+        match t {
+            Token::Str(s) => {
+                out.push('\'');
+                out.push_str(&s.replace('\'', "''"));
+                out.push('\'');
+            }
+            Token::Ident(s) => out.push_str(s),
+            Token::Int(i) => out.push_str(&i.to_string()),
+            Token::Float(f) => out.push_str(&fmt_float(*f)),
+            Token::Op(o) => out.push_str(o),
+            Token::Star => out.push('*'),
+            Token::LParen => out.push('('),
+            Token::RParen => out.push(')'),
+            Token::Comma => out.push(','),
+            Token::Colon => out.push(':'),
+            Token::Semicolon => out.push(';'),
+            Token::Eof => break,
+            Token::LBracket => out.push('['),
+            Token::RBracket => out.push(']'),
+            Token::LBrace => out.push('{'),
+            Token::RBrace => out.push('}'),
+        }
+    }
+    out
+}
+
 fn index_column_from(toks: &[Token]) -> Result<String> {
     if toks.is_empty() {
         return Err(Error::Invalid("empty index expression".into()));
