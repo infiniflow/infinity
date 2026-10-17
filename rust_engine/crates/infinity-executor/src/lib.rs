@@ -4118,11 +4118,61 @@ impl Engine {
             return Err(Error::NotFound(format!("table '{table}'")));
         }
         let resolved = resolve_data_path(path);
-        // Tolerate missing fixtures (statement-level success, no rows loaded).
-        let text = match std::fs::read_to_string(&resolved) {
-            Ok(t) => t,
+        // Read raw bytes: `FORMAT FVECS` is binary, everything else is text.
+        // Missing fixtures stay a statement-level success with no rows.
+        let bytes_in = match std::fs::read(&resolved) {
+            Ok(b) => b,
             Err(_) => return Ok(QueryResult::Inserted { count: 0 }),
         };
+        // `FORMAT FVECS` is a binary vector file: `i32 dim` then `dim` f32s per
+        // record. It can only target a table whose single column is the vector.
+        if opts
+            .iter()
+            .any(|(k, v)| k == "FORMAT" && v.eq_ignore_ascii_case("FVECS"))
+        {
+            let types = self.column_types(table)?;
+            if types.len() != 1 {
+                return Err(Error::Invalid(format!(
+                    "import: fvecs needs a table with exactly one vector column, got {}",
+                    types.len()
+                )));
+            }
+            let mut rows: Vec<Vec<Literal>> = Vec::new();
+            let bytes = bytes_in.as_slice();
+            let mut pos = 0usize;
+            while pos + 4 <= bytes.len() {
+                let dim = i32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap()) as usize;
+                pos += 4;
+                // A record must fit; a truncated/garbage header is a format error.
+                if dim == 0 || pos + dim * 4 > bytes.len() {
+                    return Err(Error::Invalid(
+                        "import: malformed fvecs file (bad record header)".into(),
+                    ));
+                }
+                let vals: Vec<String> = (0..dim)
+                    .map(|i| {
+                        let b = &bytes[pos + i * 4..pos + i * 4 + 4];
+                        format!("{}", f32::from_le_bytes(b.try_into().unwrap()))
+                    })
+                    .collect();
+                pos += dim * 4;
+                rows.push(vec![Literal::Str(format!("[{}]", vals.join(",")))]);
+            }
+            if rows.is_empty() || pos != bytes.len() {
+                return Err(Error::Invalid(
+                    "import: malformed fvecs file (trailing bytes)".into(),
+                ));
+            }
+            let base = self.reserve_rows(table, rows.len(), true)?;
+            let mut t = self.txn.begin();
+            for (k, row) in rows.iter().enumerate() {
+                let encoded = encode_row(row, &types);
+                t.put(row_key(table, base + k), encoded.into_bytes());
+            }
+            self.txn.commit(t)?;
+            return Ok(QueryResult::Inserted { count: rows.len() });
+        }
+        let text = String::from_utf8_lossy(&bytes_in).into_owned();
         let delim = opts
             .iter()
             .find(|(k, _)| k == "DELIMITER")
