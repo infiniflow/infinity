@@ -5087,29 +5087,21 @@ impl Engine {
                 }
             }
         }
-        // An integer-element column only accepts a matching query element type.
-        // (For VECTOR/TENSOR the query element type is the argument after the
-        // query array.)
-        if !is_sparse {
+        // A VECTOR column only accepts a query of its own element type; a bit
+        // column also accepts a float query (the bits are read as 0/1). A
+        // tensor query is cast to the stored element type, so it is exempt.
+        if !is_sparse && !is_tensor {
             let col_elem = tensor_elem_type(decl);
-            // A *bit* query only matches a bit column; a float query against a
-            // bit column is fine (the stored bits are read as 0/1).
-            if elem_type_of_optional(m.args.get(1)) == Some(ElemType::Bit)
-                && col_elem != ElemType::Bit
-            {
+            let q_elem = elem_type_of_optional(m.args.get(1)).unwrap_or(ElemType::Float32);
+            let ok = if col_elem == ElemType::Bit {
+                matches!(q_elem, ElemType::Bit | ElemType::Float32)
+            } else {
+                q_elem == col_elem
+            };
+            if !ok {
                 return Err(Error::Invalid(
                     "query element type does not match the column's".into(),
                 ));
-            }
-            if matches!(col_elem, ElemType::Int8 | ElemType::UInt8) {
-                let q_elem = arg_str(m.args.get(1))
-                    .map(|s| elem_type_of(&s))
-                    .unwrap_or(ElemType::Float32);
-                if q_elem != col_elem {
-                    return Err(Error::Invalid(
-                        "query element type does not match the column's".into(),
-                    ));
-                }
             }
         }
         let metric = arg_str(m.args.get(if is_sparse { 1 } else { 2 }))
