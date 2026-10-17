@@ -2673,7 +2673,9 @@ pub fn pexpr_sql(e: &PExpr) -> String {
 }
 
 /// Reads a `FunctionExpr`: `{1: string function_name, 2: list<ParsedExpr> arguments}`.
-fn read_function_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(String, Vec<PExpr>)> {
+fn read_function_expr(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<(String, Vec<PExpr>)> {
     ip.read_struct_begin().map_err(tw)?;
     let (mut name, mut args) = (String::new(), Vec::new());
     loop {
