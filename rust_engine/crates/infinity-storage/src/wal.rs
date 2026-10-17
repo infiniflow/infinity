@@ -132,6 +132,21 @@ impl WalManager {
         self.file.sync_all().map_err(|e| Error::io(&self.path, e))
     }
 
+    /// Seals the active log as `wal.log.{seal_ts}` and starts a fresh one.
+    /// Rotation is O(1); the sealed segment can be deleted once every record it
+    /// holds is applied to the KV store.
+    pub fn rotate(&mut self, seal_ts: TxnTimeStamp) -> Result<()> {
+        self.file.sync_all().map_err(|e| Error::io(&self.path, e))?;
+        let sealed = self.path.with_extension(format!("log.{seal_ts}"));
+        std::fs::rename(&self.path, &sealed).map_err(|e| Error::io(&sealed, e))?;
+        self.file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .map_err(|e| Error::io(&self.path, e))?;
+        Ok(())
+    }
+
     /// Current size of the WAL in bytes.
     pub fn file_size(&self) -> Result<u64> {
         Ok(self
@@ -241,6 +256,24 @@ impl WalManager {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn rotation_seals_the_active_log() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("wal.log");
+        let mut w = WalManager::open(&path).unwrap();
+        w.append(&WalRecord::new(1, 1, vec![1])).unwrap();
+        w.rotate(1).unwrap();
+        w.append(&WalRecord::new(2, 2, vec![2])).unwrap();
+        assert!(dir.path().join("wal.log.1").exists());
+        assert_eq!(WalManager::read_all(&path).unwrap().len(), 1);
+        assert_eq!(
+            WalManager::read_all(dir.path().join("wal.log.1"))
+                .unwrap()
+                .len(),
+            1
+        );
+    }
 
     #[test]
     fn streaming_truncate_keeps_only_newer_records() {

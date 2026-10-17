@@ -80,13 +80,15 @@ pub struct TxnManager {
     /// marker written into each batch must never regress, or a concurrent
     /// checkpoint would keep a much longer WAL than necessary.
     max_applied: AtomicU64,
+    /// Highest commit timestamp appended to the active log (rotation seal).
+    last_appended: AtomicU64,
 }
 
 impl TxnManager {
     /// Opens the manager, seeding counters from any existing WAL (recovery).
     pub fn open(wal_path: impl Into<PathBuf>, store: Arc<dyn MetaStore>) -> Result<Self> {
         let wal_path = wal_path.into();
-        let recs = WalManager::read_all(&wal_path)?;
+        let recs = read_all_segments(&wal_path)?;
         let applied_ts = store
             .get(APPLIED_TS_KEY)?
             .and_then(|v| {
@@ -106,6 +108,7 @@ impl TxnManager {
             // the KV store is the other source of the timestamp high-water mark.
             next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
             max_applied: AtomicU64::new(applied_ts),
+            last_appended: AtomicU64::new(max_ts),
         })
     }
 
@@ -145,7 +148,7 @@ impl TxnManager {
     /// Idempotent: re-applying is safe.
     pub fn recover(&self, checkpoint_ts: TxnTimeStamp) -> Result<usize> {
         let mut applied = 0;
-        for rec in WalManager::read_all(&self.wal_path)? {
+        for rec in read_all_segments(&self.wal_path)? {
             if rec.commit_ts > checkpoint_ts {
                 let writes = decode_writes(&rec.payload)?;
                 if !writes.is_empty() {
@@ -179,12 +182,22 @@ impl TxnManager {
             return Ok(false);
         }
         let mut wal = self.wal.lock().unwrap();
-        const MIN_TRUNCATE_BYTES: u64 = 16 * 1024 * 1024;
-        if wal.file_size()? < MIN_TRUNCATE_BYTES {
-            return Ok(false);
+        // Rotate a full active log (O(1)), then drop every sealed segment whose
+        // records are all applied. This keeps the log's footprint bounded
+        // without ever copying the remaining tail.
+        const SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
+        if wal.file_size()? >= SEGMENT_BYTES {
+            let seal = self.last_appended.load(Ordering::SeqCst).max(applied);
+            wal.rotate(seal)?;
         }
-        wal.truncate_up_to_streaming(applied)?;
-        Ok(true)
+        let mut dropped = false;
+        for (path, seal_ts) in sealed_segments(&self.wal_path)? {
+            if seal_ts <= applied {
+                std::fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
+                dropped = true;
+            }
+        }
+        Ok(dropped)
     }
 
     pub fn flush(&self) -> Result<()> {
@@ -195,6 +208,38 @@ impl TxnManager {
     pub fn wal_path(&self) -> &PathBuf {
         &self.wal_path
     }
+}
+
+/// Sealed WAL segments next to `wal_path`, as `(path, seal timestamp)`, oldest
+/// first. `rotate()` names them `wal.log.{seal_ts}`.
+fn sealed_segments(wal_path: &std::path::Path) -> Result<Vec<(PathBuf, TxnTimeStamp)>> {
+    let dir = wal_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if let Some(ts) = name
+                .strip_prefix("wal.log.")
+                .and_then(|t| t.parse::<TxnTimeStamp>().ok())
+            {
+                out.push((entry.path(), ts));
+            }
+        }
+    }
+    out.sort_by_key(|(_, ts)| *ts);
+    Ok(out)
+}
+
+/// Reads every sealed segment in timestamp order, then the active log.
+fn read_all_segments(wal_path: &std::path::Path) -> Result<Vec<WalRecord>> {
+    let mut out = Vec::new();
+    for (path, _) in sealed_segments(wal_path)? {
+        out.extend(WalManager::read_all(&path)?);
+    }
+    out.extend(WalManager::read_all(wal_path)?);
+    Ok(out)
 }
 
 /// Key of the applied-commit-timestamp marker in the row/meta store.
