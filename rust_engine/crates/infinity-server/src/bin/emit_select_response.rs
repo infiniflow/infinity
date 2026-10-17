@@ -24,6 +24,7 @@ fn main() {
                 not_null: false,
                 logic_type: 5,
                 physical: PhysicalWire::None,
+                comment: String::new(),
             },
             ColumnDefWire {
                 id: 1,
@@ -32,6 +33,7 @@ fn main() {
                 not_null: false,
                 logic_type: 2,
                 physical: PhysicalWire::None,
+                comment: String::new(),
             },
         ],
         column_fields: rows_to_column_fields(&columns, &rows),

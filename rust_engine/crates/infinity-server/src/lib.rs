@@ -1823,6 +1823,9 @@ fn run_create_table(engine: Option<&Engine>, req: &CreateTableReq) -> CommonResp
             if let Some(d) = &c.default {
                 col.push_str(&format!(" DEFAULT {}", render_default(d)));
             }
+            if !c.comment.is_empty() {
+                col.push_str(&format!(" COMMENT '{}'", c.comment.replace('\'', "''")));
+            }
             col
         })
         .collect();
@@ -2902,6 +2905,8 @@ pub struct ColumnDefWire {
     pub logic_type: i32,
     /// The physical descriptor for non-scalar columns (embedding/sparse).
     pub physical: PhysicalWire,
+    /// `ColumnDef.comment`
+    pub comment: String,
 }
 
 /// A minimal `SelectResponse` (fields 1..=5).
@@ -3168,6 +3173,7 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
     ip.read_struct_begin().map_err(tw)?;
     let (mut id, mut name, mut lt) = (0i32, String::new(), 0i32);
     let mut default: Option<String> = None;
+    let mut comment = String::new();
     let mut not_null = false;
     let mut physical = PhysicalWire::None;
     loop {
@@ -3208,6 +3214,9 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
                 ip.read_list_end().map_err(tw)?;
             }
             // `5: ConstantExpr` — the column's DEFAULT.
+            Some(6) if f.field_type == TType::String => {
+                comment = ip.read_string().map_err(tw)?;
+            }
             Some(5) if f.field_type == TType::Struct => {
                 default = match read_constant_expr(ip)? {
                     ValueLit::Str(v) => Some(format!("'{}'", v.replace('\'', "''"))),
@@ -3229,6 +3238,7 @@ fn read_column_def(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Colu
         not_null,
         logic_type: lt,
         physical,
+        comment,
     })
 }
 
@@ -5061,6 +5071,7 @@ pub fn select_response_from_typed(
                 not_null: false,
                 logic_type,
                 physical,
+                comment: String::new(),
             }
         })
         .collect();
