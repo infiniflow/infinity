@@ -82,6 +82,9 @@ pub struct TxnManager {
     max_applied: AtomicU64,
     /// Highest commit timestamp appended to the active log (rotation seal).
     last_appended: AtomicU64,
+    /// Highest commit timestamp whose batch has been fsynced to the KV store;
+    /// only records up to this point may be dropped from the log.
+    synced: AtomicU64,
 }
 
 impl TxnManager {
@@ -109,6 +112,7 @@ impl TxnManager {
             next_ts: AtomicU64::new(max_ts.max(applied_ts) + 1),
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
+            synced: AtomicU64::new(applied_ts),
         })
     }
 
@@ -178,6 +182,7 @@ impl TxnManager {
     /// keeps recovery correct; this only bounds the log's size, as the
     /// reference does at a checkpoint.
     pub fn truncate_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {
+        let applied = applied.min(self.synced.load(Ordering::SeqCst));
         if applied == 0 {
             return Ok(false);
         }
@@ -202,7 +207,17 @@ impl TxnManager {
 
     pub fn flush(&self) -> Result<()> {
         self.wal.lock().unwrap().flush()?;
-        self.store.flush()
+        self.store.flush()?;
+        // Everything the KV holds is now durable, so the log up to this point
+        // can be dropped by the next checkpoint.
+        let applied = self.max_applied.load(Ordering::SeqCst);
+        self.synced.fetch_max(applied, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// Highest commit timestamp that the KV store has fsynced.
+    pub fn synced_ts(&self) -> TxnTimeStamp {
+        self.synced.load(Ordering::SeqCst)
     }
 
     pub fn wal_path(&self) -> &PathBuf {

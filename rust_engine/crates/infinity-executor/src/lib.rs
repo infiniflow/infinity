@@ -6490,6 +6490,13 @@ impl Engine {
         }
     }
 
+    /// Rotates and prunes the WAL without touching the KV store. Called by the
+    /// periodic checkpoint loop so a slow `flush` cannot let the log grow
+    /// unbounded; only fsynced records are dropped.
+    pub fn checkpoint_wal(&self) {
+        let _ = self.txn.truncate_wal_up_to(self.txn.synced_ts());
+    }
+
     /// Runs the reference's optimize pass over the index mirrors: a mirror
     /// whose newest chunk does not cover every live row gets a merged chunk.
     pub fn optimize_indexes(&self) -> Result<()> {

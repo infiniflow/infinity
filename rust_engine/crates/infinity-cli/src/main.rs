@@ -133,6 +133,9 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(secs));
             match weak.upgrade() {
                 Some(e) => {
+                    // Cheap first: bound the WAL even if the full checkpoint
+                    // (fsyncing a large LSM) takes a while.
+                    e.checkpoint_wal();
                     let _ = e.flush();
                 }
                 None => break,
