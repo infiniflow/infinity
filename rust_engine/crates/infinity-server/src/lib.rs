@@ -3833,6 +3833,13 @@ fn read_constant_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<V
             is_float: true,
         },
         18 => ValueLit::Brackets(brackets), // CurlyBracketsArray
+        // Date(13)/Time(14)/Interval(15)/DateTime(16)/Timestamp(17): the SDK
+        // carries the rendered text, which the engine parses back.
+        13..=17 => match (s, i) {
+            (Some(text), _) => ValueLit::Str(text),
+            (None, Some(days)) => ValueLit::Int(days),
+            _ => ValueLit::Null,
+        },
         _ => ValueLit::Null,
     })
 }
