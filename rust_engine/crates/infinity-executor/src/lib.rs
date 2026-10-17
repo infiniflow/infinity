@@ -3393,15 +3393,13 @@ impl Engine {
             .next_back()
             .unwrap_or(table)
             .to_ascii_lowercase();
-        let batches = self
-            .write_batches
-            .lock()
-            .unwrap()
-            .get(key)
-            .copied()
-            .unwrap_or(1)
-            .max(1);
         let rows = self.row_count(table).unwrap_or(0);
+        let batches = match self.write_batches.lock().unwrap().get(key).copied() {
+            Some(b) => b.max(1),
+            // Never written in this process: an empty table has no segment,
+            // a table loaded from disk has at least one.
+            None => usize::from(rows > 0),
+        };
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
     }
 
