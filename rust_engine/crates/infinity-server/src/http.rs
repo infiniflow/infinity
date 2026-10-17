@@ -1087,6 +1087,21 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                     return err_response(3013, "syntax: invalid column name");
                 }
                 let mut def = format!("{name} {}", type_to_sql(ty));
+                // `constraints: ["not null"]` is part of the column definition.
+                let not_null = f
+                    .get("constraints")
+                    .and_then(Json::as_arr)
+                    .map(|cs| {
+                        cs.iter().any(|c| {
+                            c.as_str()
+                                .map(|s| s.eq_ignore_ascii_case("not null") || s == "not_null")
+                                .unwrap_or(false)
+                        })
+                    })
+                    .unwrap_or(false);
+                if not_null {
+                    def.push_str(" NOT NULL");
+                }
                 // A declared default must be applied to the rows already stored.
                 if let Some(d) = f.get("default").map(|v| v.as_str().unwrap_or("")) {
                     def.push_str(&format!(" DEFAULT {}", crate::render_default(d)));
