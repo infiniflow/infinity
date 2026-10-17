@@ -1612,6 +1612,17 @@ fn index_key(table: &str, column: &str) -> String {
     format!("{table}.{column}")
 }
 
+/// Only a plain secondary index materialises into the string-keyed
+/// `SecondaryIndex` map. Vector/fulltext/sparse indexes are served by their own
+/// search paths, and mirroring a 2048-dim vector into a per-row string key
+/// would cost gigabytes on a large table.
+fn is_secondary_kind(index_type: &str) -> bool {
+    let t = index_type.trim();
+    t.is_empty()
+        || t.eq_ignore_ascii_case("SECONDARY")
+        || t.eq_ignore_ascii_case("SECONDARYFUNCTIONAL")
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_capacity(dir, 4)
@@ -1729,10 +1740,11 @@ impl Engine {
     fn rebuild_indexes(&self) -> Result<()> {
         for im in self.catalog.list_indexes()? {
             // skip functional-index targets (not plain columns)
-            if self
-                .table_schema(&im.table)?
-                .iter()
-                .any(|c| c == &im.column)
+            if is_secondary_kind(&im.index_type)
+                && self
+                    .table_schema(&im.table)?
+                    .iter()
+                    .any(|c| c == &im.column)
             {
                 self.build_index(&im.table, &im.column)?;
             }
@@ -2363,7 +2375,7 @@ impl Engine {
                     .catalog
                     .list_indexes()?
                     .into_iter()
-                    .filter(|i| i.table == *table)
+                    .filter(|i| i.table == *table && is_secondary_kind(&i.index_type))
                     .map(|i| i.column)
                     .collect();
                 for col in remaining {
@@ -2731,7 +2743,9 @@ impl Engine {
                 }
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
-                if self.table_schema(table)?.iter().any(|c| c == column) {
+                if is_secondary_kind(index_type)
+                    && self.table_schema(table)?.iter().any(|c| c == column)
+                {
                     self.build_index(table, column)?;
                 }
                 Ok(QueryResult::CreatedIndex {
@@ -2972,7 +2986,7 @@ impl Engine {
                     None => None,
                 };
                 let mut to_del = Vec::new();
-                for (seq, row) in self.fetch_rows_with_ids(table)? {
+                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref())? {
                     let matches = match &pred {
                         Some(e) => e.eval_predicate(&row),
                         None => true,
@@ -3066,7 +3080,7 @@ impl Engine {
                 };
                 let mut to_del = Vec::new();
                 let mut new_rows = Vec::new();
-                for (seq, row) in self.fetch_rows_with_ids(table)? {
+                for (seq, row) in self.rows_for_predicate(table, where_pred.as_ref())? {
                     let matches = match &pred {
                         Some(e) => e.eval_predicate(&row),
                         None => true,
@@ -3083,22 +3097,29 @@ impl Engine {
                     }
                 }
                 if !to_del.is_empty() {
-                    // update = delete + append within a single transaction
-                    let mut next_seq = self.next_row_seq(table)?;
+                    // update = delete + append within a single transaction. The
+                    // appended rows take ids from the same reservation counter
+                    // as INSERT (a fresh scan would materialise the whole table).
+                    let first_seq = self.reserve_rows(table, new_rows.len(), false)?;
                     let mut t = self.txn.begin();
                     for seq in &to_del {
                         t.put(del_key(table, *seq), b"1".to_vec());
                     }
-                    for nr in &new_rows {
+                    for (k, nr) in new_rows.iter().enumerate() {
                         let encoded = nr
                             .iter()
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(table, next_seq), encoded.into_bytes());
-                        next_seq += 1;
+                        t.put(row_key(table, first_seq + k), encoded.into_bytes());
                     }
                     self.txn.commit(t)?;
+                    // The secondary indexes must see the rewritten rows.
+                    for (k, nr) in new_rows.iter().enumerate() {
+                        let texts: Vec<String> =
+                            nr.iter().map(|v| v.to_slt_string()).collect();
+                        self.update_indexes_on_insert_text(table, first_seq + k, &texts)?;
+                    }
                 }
                 Ok(QueryResult::Updated {
                     count: to_del.len(),
@@ -3565,13 +3586,24 @@ impl Engine {
 
     /// Maintains declared indexes on insert.
     fn update_indexes_on_insert(&self, table: &str, seq: usize, values: &[Literal]) -> Result<()> {
+        let texts: Vec<String> = values.iter().map(|v| v.to_slt_string()).collect();
+        self.update_indexes_on_insert_text(table, seq, &texts)
+    }
+
+    /// Same, for rows already rendered in their stored text form (UPDATE).
+    fn update_indexes_on_insert_text(
+        &self,
+        table: &str,
+        seq: usize,
+        values: &[String],
+    ) -> Result<()> {
         let schema = self.table_schema(table)?;
         let mut idxs = self.indexes.lock().unwrap();
         for (k, idx) in idxs.iter_mut() {
             if let Some(col) = k.strip_prefix(&format!("{table}.")) {
                 if let Some(ci) = schema.iter().position(|c| c == col) {
                     if let Some(v) = values.get(ci) {
-                        idx.insert(v.to_slt_string().as_bytes(), seq as u64);
+                        idx.insert(v.as_bytes(), seq as u64);
                     }
                 }
             }
@@ -3645,6 +3677,58 @@ impl Engine {
             rows.push((seq, cells));
         }
         Ok(rows)
+    }
+
+    fn fetch_some_rows_with_ids(
+        &self,
+        table: &str,
+        ids: &[u64],
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut out = Vec::with_capacity(ids.len());
+        for &id in ids {
+            let seq = id as usize;
+            // A stale index entry may point at a tombstoned row.
+            if self.store.get(&del_key(table, seq))?.is_some() {
+                continue;
+            }
+            if let Some(v) = self.store.get(&row_key(table, seq))? {
+                out.push((seq, self.parse_stored_row(&defaults, &v)));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Rows matched by an equality on an indexed column, or the whole table
+    /// when no such index applies. Point deletes/updates over a big table must
+    /// not materialise every row.
+    fn rows_for_predicate(
+        &self,
+        table: &str,
+        where_pred: Option<&Predicate>,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        if let Some((col, CmpOp::Eq, val)) = where_pred.and_then(|p| p.as_column_literal()) {
+            if let Some(ids) = self.index_lookup(table, col, val) {
+                return self.fetch_some_rows_with_ids(table, &ids);
+            }
+        }
+        self.fetch_rows_with_ids(table)
+    }
+
+    /// Parses a stored row, padding trailing cells from the column defaults.
+    fn parse_stored_row(&self, defaults: &[Option<String>], v: &[u8]) -> Vec<Value> {
+        let mut cells: Vec<Value> = String::from_utf8_lossy(v)
+            .split('\t')
+            .map(parse_value)
+            .collect();
+        while cells.len() < defaults.len() {
+            let i = cells.len();
+            cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                Some(d) => Value::from_literal(&default_literal(d)),
+                None => Value::Null,
+            });
+        }
+        cells
     }
 
     /// Per-column declared type text for `table`.
