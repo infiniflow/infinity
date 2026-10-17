@@ -1459,10 +1459,12 @@ impl Engine {
         // The row/meta store: RocksDB when the `rocksdb-store` feature is on
         // (the substrate the C++ engine's catalog uses), fjall otherwise.
         #[cfg(feature = "rocksdb-store")]
-        let store: Arc<dyn MetaStore> =
-            Arc::new(infinity_storage::RocksMetaStore::open(dir.join("persistence"))?);
+        let store: Arc<dyn MetaStore> = Arc::new(infinity_storage::RocksMetaStore::open(
+            dir.join("persistence"),
+        )?);
         #[cfg(not(feature = "rocksdb-store"))]
-        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(dir.join("persistence"), "default")?);
+        let store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dir.join("persistence"), "default")?);
         let wal_dir = dir.join("wal");
         std::fs::create_dir_all(&wal_dir).map_err(|e| Error::Io {
             path: wal_dir.clone(),
@@ -3346,6 +3348,16 @@ impl Engine {
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
             .types)
+    }
+
+    /// The names of the stored snapshots (`CREATE SNAPSHOT`).
+    pub fn snapshot_names(&self) -> Result<Vec<String>> {
+        let mut out = Vec::new();
+        for (k, _) in self.store.scan_prefix(b"snap:")? {
+            out.push(String::from_utf8_lossy(&k[5..]).to_string());
+        }
+        out.sort();
+        Ok(out)
     }
 
     /// Records the comment given to `CREATE INDEX` (the SDK reads it back from

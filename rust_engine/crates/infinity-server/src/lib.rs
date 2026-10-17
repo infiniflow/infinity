@@ -1056,6 +1056,23 @@ fn handle_connection(
                             &format!("ALTER TABLE {full} RENAME TO {new_name};"),
                             sid,
                         )
+                    } else if name == "CreateTableSnapshot" {
+                        // {1: session_id, 2: db, 3: table, 4: snapshot}
+                        let (db, table, snap) = (get(2), get(3), get(4));
+                        let full = if db.is_empty() {
+                            table
+                        } else {
+                            format!("{db}.{table}")
+                        };
+                        run_common(
+                            engine.as_ref(),
+                            &format!("CREATE SNAPSHOT {snap} ON TABLE {full};"),
+                            sid,
+                        )
+                    } else if name == "DropSnapshot" {
+                        // {1: session_id, 2: snapshot}
+                        let snap = get(2);
+                        run_common(engine.as_ref(), &format!("DROP SNAPSHOT {snap};"), sid)
                     } else {
                         CommonResponse {
                             error_code: OK,
@@ -1573,7 +1590,11 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         skip_struct(&mut ip)?;
                     }
-                    write_list_snapshots_response(&mut writer, seq)?;
+                    let names = engine
+                        .as_ref()
+                        .and_then(|e| e.snapshot_names().ok())
+                        .unwrap_or_default();
+                    write_list_snapshots_response(&mut writer, seq, &names)?;
                 }
                 other => {
                     {
@@ -5872,7 +5893,7 @@ pub fn write_show_current_node_response(
 
 /// Writes a `ListSnapshots` REPLY with the given snapshot names
 /// (`ListSnapshotsResponse.snapshots` is a list of `Snapshot` structs).
-pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32) -> Result<()> {
+pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32, names: &[String]) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
     o.write_message_begin(&TMessageIdentifier::new(
         "ListSnapshots",
@@ -5896,8 +5917,30 @@ pub fn write_list_snapshots_response(w: &mut impl Write, seq: i32) -> Result<()>
     o.write_field_end().map_err(tw)?;
     o.write_field_begin(&TFieldIdentifier::new("snapshots", TType::List, 3i16))
         .map_err(tw)?;
-    o.write_list_begin(&TListIdentifier::new(TType::Struct, 0))
+    o.write_list_begin(&TListIdentifier::new(TType::Struct, names.len() as i32))
         .map_err(tw)?;
+    for n in names {
+        // SnapshotInfo {1: name, 2: scope, 3: time, 4: commit, 5: size}
+        o.write_struct_begin(&TStructIdentifier::new("SnapshotInfo"))
+            .map_err(tw)?;
+        for (field, id, value) in [
+            ("name", 1i16, n.clone()),
+            ("scope", 2i16, "table".to_string()),
+            ("time", 3i16, String::new()),
+            ("size", 5i16, String::new()),
+        ] {
+            o.write_field_begin(&TFieldIdentifier::new(field, TType::String, id))
+                .map_err(tw)?;
+            o.write_string(&value).map_err(tw)?;
+            o.write_field_end().map_err(tw)?;
+        }
+        o.write_field_begin(&TFieldIdentifier::new("commit", TType::I64, 4i16))
+            .map_err(tw)?;
+        o.write_i64(0).map_err(tw)?;
+        o.write_field_end().map_err(tw)?;
+        o.write_field_stop().map_err(tw)?;
+        o.write_struct_end().map_err(tw)?;
+    }
     o.write_list_end().map_err(tw)?;
     o.write_field_end().map_err(tw)?;
     o.write_field_stop().map_err(tw)?;
