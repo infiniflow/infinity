@@ -63,8 +63,6 @@ impl Error {
             Error::Invalid(m) if m.starts_with("analyzer '") && m.ends_with("not found") => 3077,
             // 3061 INVALID_INDEX_PARAM.
             Error::Invalid(m) if m.starts_with("invalid index parameter") => 3061,
-            // 3023 INDEX_NOT_EXIST.
-            Error::Invalid(m) if m.starts_with("index '") && m.ends_with("does not exist") => 3023,
             // 3018 DUPLICATE_INDEX_NAME.
             Error::Invalid(m) if m.starts_with("index '") && m.ends_with("already exists") => 3018,
             // 3033 DROPPING_USING_DB: `DROP DATABASE default_db`.
