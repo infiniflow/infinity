@@ -3049,7 +3049,7 @@ pub struct SelectReq {
     /// Optional `WHERE` clause already rendered as SQL.
     pub where_sql: Option<String>,
     /// Optional `(column, ascending)` order key.
-    pub order_by: Option<(String, bool)>,
+    pub order_by: Vec<(String, bool)>,
     /// Group keys, already rendered as SQL text.
     pub group_by: Vec<String>,
     pub limit: Option<i64>,
@@ -3075,11 +3075,13 @@ impl SelectReq {
         if !self.group_by.is_empty() {
             sql.push_str(&format!(" GROUP BY {}", self.group_by.join(", ")));
         }
-        if let Some((c, asc)) = &self.order_by {
-            sql.push_str(&format!(
-                " ORDER BY {c} {}",
-                if *asc { "ASC" } else { "DESC" }
-            ));
+        if !self.order_by.is_empty() {
+            let keys: Vec<String> = self
+                .order_by
+                .iter()
+                .map(|(c, asc)| format!("{c} {}", if *asc { "ASC" } else { "DESC" }))
+                .collect();
+            sql.push_str(&format!(" ORDER BY {}", keys.join(", ")));
         }
         if let Some(n) = self.limit {
             sql.push_str(&format!(" LIMIT {n}"));
@@ -3508,9 +3510,9 @@ fn read_select_item(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Ve
 
 /// Reads an `order_by_list` (`list<OrderByExpr{1: ParsedExpr, 2: bool asc}>`),
 /// returning the first `(column, ascending)`.
-fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<(String, bool)>> {
+fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Vec<(String, bool)>> {
     let l = ip.read_list_begin().map_err(tw)?;
-    let mut out = None;
+    let mut out: Vec<(String, bool)> = Vec::new();
     for _ in 0..l.size {
         ip.read_struct_begin().map_err(tw)?; // OrderByExpr
         let mut col = String::new();
@@ -3532,8 +3534,8 @@ fn read_order_by(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option
             ip.read_field_end().map_err(tw)?;
         }
         ip.read_struct_end().map_err(tw)?;
-        if out.is_none() && !col.is_empty() {
-            out = Some((col, asc));
+        if !col.is_empty() {
+            out.push((col, asc));
         }
     }
     ip.read_list_end().map_err(tw)?;
@@ -3553,7 +3555,7 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
         columns: Vec::new(),
         star: false,
         where_sql: None,
-        order_by: None,
+        order_by: Vec::new(),
         group_by: Vec::new(),
         limit: None,
     };
@@ -5315,7 +5317,7 @@ fn read_explain_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(S
         columns: Vec::new(),
         star: false,
         where_sql: None,
-        order_by: None,
+        order_by: Vec::new(),
         group_by: Vec::new(),
         limit: None,
     };
