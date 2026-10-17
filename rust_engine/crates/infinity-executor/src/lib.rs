@@ -5072,6 +5072,12 @@ impl Engine {
         let metric = arg_str(m.args.get(if is_sparse { 1 } else { 2 }))
             .unwrap_or_else(|| if is_sparse { "ip".into() } else { "l2".into() })
             .to_ascii_lowercase();
+        // Sparse vectors only support inner product.
+        if is_sparse && metric != "ip" {
+            return Err(Error::Invalid(format!(
+                "invalid distance type '{metric}' for a sparse column"
+            )));
+        }
         let topn = if is_tensor {
             // topn lives in the trailing parameter string; the default is 10.
             match arg_str(m.args.get(3)) {
@@ -5100,7 +5106,14 @@ impl Engine {
                 .to_ascii_lowercase();
             let known = matches!(
                 key.as_str(),
-                "topn" | "threshold" | "ef" | "io_limit" | "distance" | "similarity"
+                "topn"
+                    | "threshold"
+                    | "ef"
+                    | "io_limit"
+                    | "distance"
+                    | "similarity"
+                    | "alpha"
+                    | "beta"
             );
             if !known {
                 return Err(Error::Invalid(format!(

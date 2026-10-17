@@ -3946,10 +3946,12 @@ fn fmt_number(f: f64) -> String {
     }
 }
 
-/// Reads a list of `InitParameter` into `k=v` pairs joined by `,`.
-fn read_init_params(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<String> {
+/// Reads a list of `InitParameter` into `k=v` pairs.
+fn read_init_params(
+    ip: &mut TBinaryInputProtocol<&mut impl Read>,
+) -> Result<Vec<(String, String)>> {
     let l = ip.read_list_begin().map_err(tw)?;
-    let mut out: Vec<String> = Vec::new();
+    let mut out: Vec<(String, String)> = Vec::new();
     for _ in 0..l.size {
         let (mut k, mut v) = (String::new(), String::new());
         ip.read_struct_begin().map_err(tw)?;
@@ -3967,11 +3969,30 @@ fn read_init_params(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Str
         }
         ip.read_struct_end().map_err(tw)?;
         if !k.is_empty() {
-            out.push(format!("{k}={v}"));
+            out.push((k, v));
         }
     }
     ip.read_list_end().map_err(tw)?;
-    Ok(out.join(","))
+    Ok(out)
+}
+
+/// Splits `opt_params` into the plain `WITH` options and the index hints the
+/// SQL grammar takes outside the parentheses.
+fn split_index_hints(params: &[(String, String)]) -> (String, String) {
+    let mut opts: Vec<String> = Vec::new();
+    let mut hints = String::new();
+    for (k, v) in params {
+        if k.eq_ignore_ascii_case("index_name") {
+            hints.push_str(&format!(" USING INDEX ({v})"));
+        } else if k.eq_ignore_ascii_case("ignore_index") {
+            if v.eq_ignore_ascii_case("true") {
+                hints.push_str(" IGNORE INDEX");
+            }
+        } else {
+            opts.push(format!("{k}={v}"));
+        }
+    }
+    (opts.join(","), hints)
 }
 
 fn knn_metric(code: i32) -> &'static str {
@@ -4010,7 +4031,7 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     let mut elem = 6i32;
     let mut metric = 0i32;
     let mut topn = 10i64;
-    let mut opts = String::new();
+    let mut params: Vec<(String, String)> = Vec::new();
     let mut query_expr: Option<String> = None;
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
@@ -4026,7 +4047,7 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
             Some(3) => elem = ip.read_i32().map_err(tw)?,
             Some(4) => metric = ip.read_i32().map_err(tw)?,
             Some(5) => topn = ip.read_i64().map_err(tw)?,
-            Some(6) if f.field_type == TType::List => opts = read_init_params(ip)?,
+            Some(6) if f.field_type == TType::List => params = read_init_params(ip)?,
             Some(8) if f.field_type == TType::Struct => {
                 let (name, args) = read_function_expr(ip)?;
                 query_expr = Some(pexpr_sql(&PExpr::Call(name, args)));
@@ -4039,14 +4060,27 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     if col.is_empty() {
         return Ok(None);
     }
+    // `index_name` and `ignore_index` are mutually exclusive.
+    let named = params
+        .iter()
+        .any(|(k, _)| k.eq_ignore_ascii_case("index_name"));
+    let ignoring = params
+        .iter()
+        .any(|(k, v)| k.eq_ignore_ascii_case("ignore_index") && v.eq_ignore_ascii_case("true"));
+    if named && ignoring {
+        return Err(Error::Invalid(
+            "syntax: index_name and ignore_index cannot be used together".into(),
+        ));
+    }
     let vector = query_expr.unwrap_or(vec);
+    let (opts, hints) = split_index_hints(&params);
     let tail = if opts.is_empty() {
         String::new()
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
     Ok(Some(format!(
-        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail})",
+        "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}{tail}){hints}",
         knn_element(elem),
         knn_metric(metric)
     )))
@@ -4059,7 +4093,7 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     let mut sparse = String::from("{}");
     let mut metric = String::new();
     let mut topn = 10i64;
-    let mut opts = String::new();
+    let mut params: Vec<(String, String)> = Vec::new();
     loop {
         let f = ip.read_field_begin().map_err(tw)?;
         if f.field_type == TType::Stop {
@@ -4075,7 +4109,7 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
             }
             Some(3) => metric = ip.read_string().map_err(tw)?,
             Some(4) => topn = ip.read_i64().map_err(tw)?,
-            Some(5) if f.field_type == TType::List => opts = read_init_params(ip)?,
+            Some(5) if f.field_type == TType::List => params = read_init_params(ip)?,
             _ => ip.skip(f.field_type).map_err(tw)?,
         }
         ip.read_field_end().map_err(tw)?;
@@ -4084,13 +4118,14 @@ fn read_sparse_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Opti
     if col.is_empty() {
         return Ok(None);
     }
+    let (opts, hints) = split_index_hints(&params);
     let tail = if opts.is_empty() {
         String::new()
     } else {
         format!(", '{}'", opts.replace('\'', "''"))
     };
     Ok(Some(format!(
-        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail})"
+        "MATCH SPARSE ({col}, {sparse}, '{metric}', {topn}{tail}){hints}"
     )))
 }
 

@@ -59,6 +59,8 @@ impl Error {
             Error::Invalid(m) if m.starts_with("index '") && m.ends_with("does not exist") => 3023,
             // 3053 FTS_INDEX_NOT_EXIST.
             Error::Invalid(m) if m.starts_with("fulltext index does not exist") => 3053,
+            // 3010 INVALID_KNN_DISTANCE_TYPE (sparse only supports `ip`).
+            Error::Invalid(m) if m.starts_with("invalid distance type") => 3010,
             // 3009 INVALID_INDEX_DEFINITION (index kind vs column type).
             Error::Invalid(m) if m.contains("index requires a") => 3009,
             // 3077 ANALYZER_NOT_FOUND.
