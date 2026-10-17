@@ -509,6 +509,8 @@ QueryContext::query(sql)
 - **HTTP 模式（`--http`）全部用例通过**（`tools/run_http_api.py`，与 CI 一致）。
 - 前置：Thrift 线兼容（`TBinaryProtocol` + `client_version==37` + **逐类型二进制布局 spec**）；**跨语言 golden 报文**测试通过。
 
+- **Gate B 进展（2026-10-17）**：`Import` 与 `Explain` 两个 RPC 已实现（此前 `Import` 直接返回 OK、`Explain` 返回 `unknown method`），错误统一按 C++ `ErrorCode` 回（`Error::status_code`：7012 PARSER_ERROR / 3013 / 3014 / 3021–3024），`BOOLEAN` 列的非 true/false 值按 C++ 行为报 `parser: Boolean type should be true or false`。`test_py_import.py` 由 56 failed 降到 **11 failed / 223 passed**，`test_explain.py` 通过。整目录对跑 = 1382 passed / 202 failed / 675 errors（含 `/var/infinity` 权限噪音；用 bwrap `--tmpfs /var --dir /var/infinity` 后该类 ERROR 消失）。**跑法见 `~/.codebuddy/.../memory/reference_pysdk_rust_server.md`：务必 `--unshare-net` 起独立 loopback，避免与并行会话争 23817。** 剩余大头是 `AddColumns/DropColumns`、`Export`、`SetConfig` 等 RPC 与各类负例的具体错误码。
+
 ### Gate C — 持久化与恢复
 - `python/restart_test` 通过；`test/sql/snapshot` 通过；**WAL 崩溃恢复**用例通过。
 - **对象存储 / MinIO** 用例通过（对应 CI 的 minio job）。
