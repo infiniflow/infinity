@@ -477,7 +477,8 @@ fn cell_json(value: &str, ty: &str) -> String {
     if value.eq_ignore_ascii_case("null") || value.is_empty() {
         return "null".to_string();
     }
-    let numeric = up.starts_with("INT")
+    let numeric = up.is_empty()
+        || up.starts_with("INT")
         || up.starts_with("UINT")
         || up.starts_with("TINYINT")
         || up.starts_with("SMALLINT")
@@ -494,6 +495,30 @@ fn cell_json(value: &str, ty: &str) -> String {
         }
     }
     format!("\"{}\"", json_escape(value))
+}
+
+/// The REST spelling of a declared type (`Integer` -> `integer`).
+fn rest_type_name(decl: &str) -> String {
+    let up = decl.to_ascii_uppercase();
+    for (prefix, name) in [
+        ("TINYINT", "tinyint"),
+        ("SMALLINT", "smallint"),
+        ("BIGINT", "bigint"),
+        ("INTEGER", "integer"),
+        ("INT", "int"),
+        ("FLOAT16", "float16"),
+        ("BFLOAT16", "bfloat16"),
+        ("FLOAT", "float"),
+        ("DOUBLE", "double"),
+        ("BOOLEAN", "boolean"),
+        ("VARCHAR", "varchar"),
+        ("JSON", "json"),
+    ] {
+        if up.starts_with(prefix) {
+            return name.to_string();
+        }
+    }
+    decl.to_string()
 }
 
 /// `[[{"col": v, "col_bitmap": true}, …], …]`
@@ -1035,7 +1060,9 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                         .iter()
                         .map(|r| {
                             format!(
-                                "{{\"column_name\":\"{}\",\"column_type\":\"{}\",\"default\":{},\"comment\":{},\"constraints\":[]}}",
+                                "{{\"name\":\"{}\",\"type\":\"{}\",\"column_name\":\"{}\",\"column_type\":\"{}\",\"default\":{},\"comment\":{},\"constraints\":[]}}",
+                                json_escape(r.first().map(String::as_str).unwrap_or("")),
+                                json_escape(&rest_type_name(r.get(1).map(String::as_str).unwrap_or(""))),
                                 json_escape(r.first().map(String::as_str).unwrap_or("")),
                                 json_escape(r.get(1).map(String::as_str).unwrap_or("")),
                                 match r.get(2).map(String::as_str).unwrap_or("") {
