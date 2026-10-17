@@ -1699,7 +1699,11 @@ fn classify_column(declared: &str, rows: &[Vec<String>], ci: usize) -> ColKind {
         "DATE" => ColKind::Scalar(16),                   // ColumnDate
         "TIME" => ColKind::Scalar(17),                   // ColumnTime
         "DATETIME" | "TIMESTAMP" => ColKind::Scalar(18), // ColumnDateTime
-        _ => ColKind::Scalar(infer_column_type(rows, ci)),
+        // A declared scalar type wins over inference: the rendered value
+        // (`1.500000`) would otherwise be announced as Float64 even for a
+        // `FLOAT` column.
+        "" => ColKind::Scalar(infer_column_type(rows, ci)),
+        _ => ColKind::Scalar(named_type(declared).1),
     }
 }
 
@@ -3326,7 +3330,14 @@ pub fn select_response_from(columns: &[String], rows: &[Vec<String>]) -> SelectR
 /// physical descriptor. Unknown columns map to an empty string (inferred).
 pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<String> {
     let mut map: HashMap<String, String> = HashMap::new();
-    if let Ok(rs) = engine.execute(&format!("SHOW TABLE {table} COLUMNS;")) {
+    // `SHOW TABLE` resolves unqualified names against `default_db`; qualify
+    // explicitly so a session-level `USE` cannot hide the schema.
+    let qualified = if table.contains('.') {
+        table.to_string()
+    } else {
+        format!("default_db.{table}")
+    };
+    if let Ok(rs) = engine.execute(&format!("SHOW TABLE {qualified} COLUMNS;")) {
         for r in rs {
             if let QueryResult::Rows { rows, .. } = r {
                 for row in rows {
