@@ -32,8 +32,12 @@ if [[ -d "$root/python/restart_test" ]]; then
     mkdir -p "$data/tmp"
     cp "$root"/test/data/csv/* "$data/" 2>/dev/null || true
     echo "restart_test: bwrap sandbox, fixtures at $data"
+    # `--unshare-pid` is required: the harness kills *every* process named
+    # `infinity` before each start, which fails on an unprivileged user when a
+    # foreign process matches. A private PID namespace scopes that to the run.
     run=( bwrap --dev-bind / / --tmpfs /var --dir /var/infinity \
           --bind "$data" /var/infinity/test_data --dir /var/infinity/log \
+          --unshare-pid --proc /proc \
           -- "${run[@]}" )
   fi
   ( cd "$root/python" && "${run[@]}" ) || status=1
