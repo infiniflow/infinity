@@ -1594,6 +1594,12 @@ pub struct Engine {
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
+    /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
+    /// trigger (the reference only dumps when a quota is configured).
+    memindex_quota: std::sync::atomic::AtomicU64,
+    /// Estimated bytes buffered in each HNSW memory index since its last dump,
+    /// keyed by `"<table>.<column>"`.
+    index_pending_bytes: Mutex<HashMap<String, usize>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1659,6 +1665,8 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
             row_counters: Mutex::new(HashMap::new()),
+            memindex_quota: std::sync::atomic::AtomicU64::new(0),
+            index_pending_bytes: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -1692,9 +1700,10 @@ impl Engine {
     /// Best-effort database id for a (possibly qualified) table name.
     ///
     /// The catalog tracks table ids but not database ids, so the id is the
-    /// database's position in the sorted name list — deterministic, and equal
-    /// to C++'s own counter for databases created in name order. Unqualified
-    /// names resolve against `default_db`.
+    /// database's position in the catalog's listing (`default_db` first), made
+    /// 1-based to match the reference: `default_db` is `db_1`, the first user
+    /// database `db_2`, and so on. Unqualified names resolve against
+    /// `default_db`.
     fn database_id_of(&self, table: &str) -> u64 {
         let db = if table.contains('.') {
             table.split('.').next().unwrap_or("default_db")
@@ -1706,7 +1715,8 @@ impl Engine {
             .unwrap_or_default()
             .iter()
             .position(|d| d == db)
-            .unwrap_or(0) as u64
+            .map(|p| p as u64 + 1)
+            .unwrap_or(1)
     }
 
     /// Rebuilds all declared indexes from stored rows (called on open).
@@ -2928,6 +2938,9 @@ impl Engine {
                         }
                     }
                 }
+                // A memory index that already exceeds its quota is dumped
+                // before these rows join it.
+                self.note_index_insert(table, rows.len());
                 // one transaction -> one WAL record + one KV batch (batched durability)
                 let mut t = self.txn.begin();
                 for (k, row) in rows.iter().enumerate() {
@@ -3586,12 +3599,25 @@ impl Engine {
     fn fetch_rows_with_ids(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        // Collect tombstones with one prefix scan: a point lookup per row
+        // would add O(rows) KV round trips to every full scan.
+        let dpref = del_prefix(table);
+        let mut deleted: std::collections::HashSet<usize> = Default::default();
+        for (k, _) in self.store.scan_prefix(&dpref)? {
+            if let Some(raw) = k.get(dpref.len()..) {
+                if let Ok(s) = std::str::from_utf8(raw) {
+                    if let Ok(n) = s.parse::<usize>() {
+                        deleted.insert(n);
+                    }
+                }
+            }
+        }
         let mut rows = Vec::new();
         for (k, v) in self.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
-            if self.store.get(&del_key(table, seq))?.is_some() {
+            if deleted.contains(&seq) {
                 continue; // deleted
             }
             let mut cells: Vec<Value> = String::from_utf8_lossy(&v)
@@ -4996,6 +5022,7 @@ impl Engine {
                 ));
             }
             let base = self.reserve_rows(table, rows.len(), true)?;
+            self.note_index_insert(table, rows.len());
             let mut t = self.txn.begin();
             for (k, row) in rows.iter().enumerate() {
                 let encoded = encode_row(row, &types);
@@ -5080,6 +5107,7 @@ impl Engine {
             if !batch.is_empty() {
                 let base = self.reserve_rows(table, batch.len(), first_batch)?;
                 first_batch = false;
+                self.note_index_insert(table, batch.len());
                 let mut t = self.txn.begin();
                 for (k, row) in batch.iter().enumerate() {
                     let encoded = encode_row(row, &types_for_scan);
@@ -5213,6 +5241,7 @@ impl Engine {
             return Ok(QueryResult::Inserted { count: 0 });
         }
         let base = self.reserve_rows(table, rows.len(), true)?;
+        self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
             let encoded = encode_row(row, types);
@@ -5985,6 +6014,15 @@ impl Engine {
             if qv.is_empty() || qv.len() != loaded.index.dims() {
                 return None;
             }
+            // The graph is usable as a candidate filter only when it was built
+            // over every live row. Rows inserted after the last dump are absent
+            // from it, and pruning to the graph would drop them entirely, so
+            // fall back to the exhaustive scan in that case.
+            let labels: std::collections::HashSet<usize> =
+                loaded.labels.iter().map(|s| *s as usize).collect();
+            if rows.iter().any(|(seq, _)| !labels.contains(seq)) {
+                return None;
+            }
             let k = (topn * 4).max(64).min(loaded.labels.len());
             Some(
                 loaded
@@ -6084,7 +6122,10 @@ impl Engine {
                         let multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
                         // Un-packed bits already line up on `dim` boundaries;
                         // only a byte-packed query needs expanding.
-                        if dim > 0 && qv.len() % dim != 0 && (qv.len() * 8) % dim == 0 {
+                        if dim > 0
+                            && !qv.len().is_multiple_of(dim)
+                            && (qv.len() * 8).is_multiple_of(dim)
+                        {
                             let mut bits = Vec::with_capacity(qv.len() * 8);
                             for b in &qv {
                                 let byte = *b as u8;
@@ -6254,6 +6295,82 @@ impl Engine {
         // rather than failing the flush.
         let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
         Ok(())
+    }
+
+    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
+    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
+    /// keeps every row in memory until a checkpoint.
+    pub fn set_memindex_quota(&self, bytes: u64) {
+        self.memindex_quota
+            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Accounts `count` rows about to be inserted into `table` against each
+    /// HNSW memory index. When the buffer already exceeds the quota, the
+    /// reference dumps it **before** taking the new rows, which is what this
+    /// reproduces (one `chunk_{n}.idx` per dump).
+    fn note_index_insert(&self, table: &str, count: usize) {
+        let quota = self
+            .memindex_quota
+            .load(std::sync::atomic::Ordering::Relaxed) as usize;
+        if quota == 0 || count == 0 {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        let Ok(types) = self.column_types(table) else {
+            return;
+        };
+        let Ok(indexes) = self.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("HNSW") {
+                continue;
+            }
+            if im.table != table && !im.table.ends_with(&format!(".{table}")) {
+                continue;
+            }
+            let Some(col) = schema.iter().position(|c| c == &im.column) else {
+                continue;
+            };
+            let dim = types.get(col).and_then(|t| type_dim(t)).unwrap_or(0);
+            // A vector node carries its payload plus graph bookkeeping; the
+            // constant term keeps small dimensions over the quota in the same
+            // number of rows as the reference.
+            let bytes = (dim * 4 + 256) * count;
+            let key = index_key(&im.table, &im.column);
+            let dump = {
+                let mut pending = self.index_pending_bytes.lock().unwrap();
+                let cur = pending.entry(key).or_insert(0);
+                if *cur >= quota {
+                    // The dump empties the memory index; this batch is the
+                    // first thing in the next one.
+                    *cur = bytes;
+                    true
+                } else {
+                    *cur += bytes;
+                    false
+                }
+            };
+            if dump {
+                let _ = self.dump_cpp_hnsw_index(&im.table, &im.name);
+            }
+        }
+    }
+
+    /// Runs the reference's optimize pass over the index mirrors: a mirror
+    /// whose newest chunk does not cover every live row gets a merged chunk.
+    pub fn optimize_indexes(&self) -> Result<()> {
+        self.optimize_cpp_index_chunks()
+    }
+
+    /// `Cleanup`: flush, then drop the chunks that a previous optimize merged
+    /// away, matching what the reference's cleanup thread removes.
+    pub fn cleanup(&self) -> Result<()> {
+        self.flush()?;
+        self.cleanup_cpp_index_chunks()
     }
 }
 

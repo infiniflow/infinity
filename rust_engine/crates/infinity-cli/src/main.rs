@@ -79,6 +79,11 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     }
     let addr = std::env::var("INFINITY_BIND").unwrap_or_else(|_| "0.0.0.0:23817".into());
     let engine = Arc::new(Engine::open(&root)?);
+    // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
+    // chunk once it reaches this size.
+    engine.set_memindex_quota(parse_size_bytes(
+        &toml_value(&text, "memindex_memory_quota").unwrap_or_default(),
+    ));
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
@@ -89,6 +94,21 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             match weak.upgrade() {
                 Some(e) => {
                     let _ = e.flush();
+                }
+                None => break,
+            }
+        });
+    }
+    // `[storage] optimize_interval` — the background optimizer appends a merged
+    // index chunk once the memory dumps have left more than one behind.
+    let opt = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
+    if opt > 0 {
+        let weak = Arc::downgrade(&engine);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(opt));
+            match weak.upgrade() {
+                Some(e) => {
+                    let _ = e.optimize_indexes();
                 }
                 None => break,
             }
@@ -113,6 +133,24 @@ fn parse_interval_secs(text: &str) -> u64 {
     };
     let value: f64 = num.trim().parse().unwrap_or(0.0);
     (value * scale).round() as u64
+}
+
+/// Parses a size like `1KB`, `512MB`, `8GB` or a bare byte count.
+fn parse_size_bytes(text: &str) -> u64 {
+    let t = text.trim().to_ascii_uppercase();
+    let (num, scale) = if let Some(v) = t.strip_suffix("KB") {
+        (v, 1024.0)
+    } else if let Some(v) = t.strip_suffix("MB") {
+        (v, 1024.0 * 1024.0)
+    } else if let Some(v) = t.strip_suffix("GB") {
+        (v, 1024.0 * 1024.0 * 1024.0)
+    } else if let Some(v) = t.strip_suffix('B') {
+        (v, 1.0)
+    } else {
+        (t.as_str(), 1.0)
+    };
+    let value: f64 = num.trim().parse().unwrap_or(0.0);
+    (value * scale) as u64
 }
 
 fn main() {

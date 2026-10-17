@@ -35,6 +35,29 @@ pub struct LoadedVectorIndex {
     pub labels: Vec<u32>,
 }
 
+/// `chunk_{id}.idx` files under `dir`, ordered by chunk id. The reference
+/// appends one chunk per memory-index dump and merges them on optimize.
+fn hnsw_chunks(dir: &std::path::Path) -> Vec<(u64, PathBuf)> {
+    let mut chunks: Vec<(u64, PathBuf)> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    let id = name
+                        .strip_prefix("chunk_")?
+                        .strip_suffix(".idx")?
+                        .parse::<u64>()
+                        .ok()?;
+                    Some((id, e.path()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    chunks.sort_by_key(|(id, _)| *id);
+    chunks
+}
+
 /// Maps an element-type name to the SDK `ElementType` code. `None` for bit
 /// elements, which this writer does not pack.
 fn element_code(elem: &str) -> Option<i32> {
@@ -1339,9 +1362,28 @@ impl Engine {
     }
 
     /// Writes `table`'s index as a C++ HNSW chunk file under
-    /// `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_0.idx`,
+    /// `{data_dir}/data/db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_{n}.idx`,
     /// returning how many vectors were written (task #70).
+    ///
+    /// A chunk is only written when the mirror has none yet: re-writing it on
+    /// every checkpoint would not match the reference, which appends a chunk per
+    /// memory-index dump.
     pub fn write_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_cpp_hnsw_chunk(table, index_name, false)
+    }
+
+    /// Appends a fresh chunk, as the reference's memory-index dump does. Rows
+    /// added since the previous dump end up in the new chunk.
+    pub fn dump_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<usize> {
+        self.write_cpp_hnsw_chunk(table, index_name, true)
+    }
+
+    fn write_cpp_hnsw_chunk(
+        &self,
+        table: &str,
+        index_name: &str,
+        new_chunk: bool,
+    ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
             .catalog
@@ -1378,11 +1420,104 @@ impl Engine {
             path: dir.clone(),
             source: e,
         })?;
-        std::fs::write(dir.join("chunk_0.idx"), &chunk).map_err(|e| Error::Io {
+        let chunks = hnsw_chunks(&dir);
+        if !new_chunk && !chunks.is_empty() {
+            return Ok(count);
+        }
+        let name = format!(
+            "chunk_{}.idx",
+            chunks.last().map(|(id, _)| id + 1).unwrap_or(0)
+        );
+        std::fs::write(dir.join(name), &chunk).map_err(|e| Error::Io {
             path: dir.clone(),
             source: e,
         })?;
         Ok(count)
+    }
+
+    /// Optimizes every HNSW mirror: when the newest chunk does not cover all
+    /// live rows, writes a merged chunk with the whole table (the reference's
+    /// optimize step). A mirror whose newest chunk already covers the table is
+    /// left untouched, so repeated optimize ticks are no-ops.
+    pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
+        for im in self.catalog.list_indexes()? {
+            if !im.index_type.eq_ignore_ascii_case("HNSW") {
+                continue;
+            }
+            let Ok(rows) = self.row_count(&im.table) else {
+                continue;
+            };
+            let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
+                continue;
+            };
+            if hnsw_chunks(&dir).is_empty() {
+                continue;
+            }
+            let covered = self
+                .cpp_hnsw_chunk_path(&im.table, &im.name)
+                .ok()
+                .and_then(|p| std::fs::read(p).ok())
+                .and_then(|b| {
+                    knn_format::decode_hnsw_chunk(
+                        &b,
+                        4,
+                        knn_format::VERTEX_L0_SIZE,
+                        knn_format::VERTEX_LX_SIZE,
+                    )
+                    .ok()
+                })
+                .map(|c| c.header.cur_vec_num as usize)
+                .unwrap_or(0);
+            if covered != rows {
+                let _ = self.dump_cpp_hnsw_index(&im.table, &im.name);
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes every HNSW chunk except the newest one (the reference's cleanup
+    /// step marks the merged-away chunks deprecated and then deletes them).
+    pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
+        for im in self.catalog.list_indexes()? {
+            if !im.index_type.eq_ignore_ascii_case("HNSW") {
+                continue;
+            }
+            let Some(dir) = self.cpp_hnsw_dir(&im.table, &im.name) else {
+                continue;
+            };
+            let chunks = hnsw_chunks(&dir);
+            if let Some((keep, _)) = chunks.last() {
+                for (id, path) in &chunks {
+                    if id != keep {
+                        let _ = std::fs::remove_file(path);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The directory holding `table`'s HNSW mirror, if the table exists.
+    fn cpp_hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
+        let table = self.qualified_table(table);
+        let meta = self.catalog.get_table_by_name(&table).ok()??;
+        let index_id = self.cpp_index_position(&table, index_name).ok()?;
+        let db_id = self.database_id_of(&table);
+        Some(
+            self.blocks_root()
+                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}/seg_0", meta.id)),
+        )
+    }
+
+    /// The newest chunk file of `table`'s HNSW mirror.
+    fn cpp_hnsw_chunk_path(&self, table: &str, index_name: &str) -> Result<PathBuf> {
+        let dir = self
+            .cpp_hnsw_dir(table, index_name)
+            .ok_or_else(|| Error::NotFound(format!("index '{index_name}'")))?;
+        hnsw_chunks(&dir)
+            .pop()
+            .map(|(_, p)| p)
+            .ok_or_else(|| Error::NotFound(format!("no HNSW mirror at {}", dir.display())))
     }
 
     /// Writes `table`'s full-text index as the C++ `.dic`/`.pos`/`.len` chunk
@@ -1498,16 +1633,7 @@ impl Engine {
         Vec<knn_format::HnswGraphVertex>,
     )> {
         let table = self.qualified_table(table);
-        let meta = self
-            .catalog
-            .get_table_by_name(&table)?
-            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let index_id = self.cpp_index_position(&table, index_name)?;
-        let db_id = self.database_id_of(&table);
-        let path = self.blocks_root().join(format!(
-            "db_{db_id}/tbl_{}/idx_{index_id}/seg_0/chunk_0.idx",
-            meta.id
-        ));
+        let path = self.cpp_hnsw_chunk_path(&table, index_name)?;
         let bytes = std::fs::read(&path)
             .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
         let chunk = knn_format::decode_hnsw_chunk(
@@ -1826,7 +1952,7 @@ mod tests {
         assert_eq!(engine.write_cpp_blocks("t").unwrap(), 2);
         // The C++ file names exist under the mirror root (`tbl_{id}` uses the
         // catalog's table id, so discover it rather than hardcoding).
-        let db_dir = dir.path().join("data").join("db_0");
+        let db_dir = dir.path().join("data").join("db_1");
         let tbl_dir = std::fs::read_dir(&db_dir)
             .unwrap()
             .filter_map(|e| e.ok())
@@ -1876,7 +2002,7 @@ mod tests {
         engine.execute("ALTER TABLE t DROP COLUMN b;").unwrap();
         assert_eq!(engine.write_cpp_blocks("t").unwrap(), 1);
 
-        let db_dir = dir.path().join("data").join("db_0");
+        let db_dir = dir.path().join("data").join("db_1");
         let tbl_dir = std::fs::read_dir(&db_dir)
             .unwrap()
             .filter_map(|e| e.ok())
@@ -2075,7 +2201,7 @@ mod tests {
 
         assert_eq!(engine.write_cpp_blocks("ts").unwrap(), 2);
         // The outline holds the raw element bytes: 3 vectors * dim 3 * 4 bytes.
-        let db_dir = dir.path().join("data").join("db_0");
+        let db_dir = dir.path().join("data").join("db_1");
         let tbl_dir = std::fs::read_dir(&db_dir)
             .unwrap()
             .filter_map(|e| e.ok())

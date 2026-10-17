@@ -867,8 +867,11 @@ fn handle_connection(
                                     column_fields: Vec::new(),
                                     extra_result: String::new(),
                                 };
+                                // The request was fully consumed: reply with the
+                                // validation error and keep the connection alive
+                                // (closing here makes SDKs mark it dead even
+                                // though the error was delivered).
                                 write_select_response(&mut writer, seq, &resp)?;
-                                close_after_reply = true;
                                 return Ok(());
                             }
                         }
@@ -982,7 +985,11 @@ fn handle_connection(
                         read_string_request(&mut ip)?
                     };
                     let resp = match engine.as_ref() {
-                        Some(eng) => match eng.flush() {
+                        Some(eng) => match if name == "Cleanup" {
+                            eng.cleanup()
+                        } else {
+                            eng.flush()
+                        } {
                             Ok(()) => CommonResponse {
                                 error_code: OK,
                                 error_msg: "OK".into(),
@@ -1129,6 +1136,28 @@ fn handle_connection(
                         // {1: session_id, 2: snapshot}
                         let snap = get(2);
                         run_common(engine.as_ref(), &format!("DROP SNAPSHOT {snap};"), sid)
+                    } else if name == "Optimize" {
+                        // Merge the index chunks that earlier memory dumps left
+                        // behind, as the reference's optimize does.
+                        match engine.as_ref() {
+                            Some(eng) => match eng.optimize_indexes() {
+                                Ok(()) => CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: sid,
+                                },
+                                Err(e) => CommonResponse {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    session_id: sid,
+                                },
+                            },
+                            None => CommonResponse {
+                                error_code: 1,
+                                error_msg: "no engine bound".into(),
+                                session_id: sid,
+                            },
+                        }
                     } else {
                         CommonResponse {
                             error_code: OK,
