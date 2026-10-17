@@ -4325,6 +4325,19 @@ impl Engine {
                     let (Some(col), Some(tag)) = (parts.first(), parts.get(1)) else {
                         continue;
                     };
+                    // The scoring column needs a `rankfeatures` full-text index.
+                    let analyzer = self
+                        .index_analyzers
+                        .lock()
+                        .unwrap()
+                        .get(&index_key(table, col))
+                        .cloned()
+                        .unwrap_or_default();
+                    if !analyzer.eq_ignore_ascii_case("rankfeatures") {
+                        return Err(Error::Invalid(format!(
+                            "rank_features requires a rankfeatures index on '{col}'"
+                        )));
+                    }
                     let Some(ci) = schema.iter().position(|c| c == col) else {
                         continue;
                     };
