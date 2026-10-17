@@ -830,7 +830,15 @@ fn handle_connection(
                                 }
                                 resp
                             }
-                            Err(e) => err(e.to_string()),
+                            // Keep the engine's C++ error code (3023, 3053, …)
+                            // so SDK assertions on `args[0]` hold.
+                            Err(e) => SelectResponseWire {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                column_defs: Vec::new(),
+                                column_fields: Vec::new(),
+                                extra_result: String::new(),
+                            },
                         },
                         None => err("no engine bound".into()),
                     };

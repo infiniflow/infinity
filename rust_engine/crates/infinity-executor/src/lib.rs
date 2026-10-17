@@ -251,6 +251,11 @@ fn elem_type_of(token: &str) -> ElemType {
     }
 }
 
+/// The query element type named by a `MATCH …` argument, if it names one.
+fn elem_type_of_optional(arg: Option<&ExprAst>) -> Option<ElemType> {
+    arg_str(arg).map(|s| elem_type_of(&s))
+}
+
 /// The element type declared inside a `TENSOR(<elem>, <dim>)` type text.
 fn tensor_elem_type(type_text: &str) -> ElemType {
     let t = type_text.to_ascii_uppercase();
@@ -5031,6 +5036,13 @@ impl Engine {
             Some(i) => i,
             None => return Ok((Vec::new(), hidden)),
         };
+        let decl = types.get(col_idx).map(String::as_str).unwrap_or("");
+        if !is_embedding_type(decl) && !is_tensor_type(decl) && !is_sparse_type(decl) {
+            return Err(Error::Invalid(format!(
+                "syntax: column '{}' is not a vector column",
+                m.column
+            )));
+        }
         let query_items = match m.args.first() {
             Some(ExprAst::Literal(Literal::Array(items))) => items.clone(),
             _ => Vec::new(),
@@ -5057,7 +5069,15 @@ impl Engine {
         // (For VECTOR/TENSOR the query element type is the argument after the
         // query array.)
         if !is_sparse {
-            let col_elem = tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
+            let col_elem = tensor_elem_type(decl);
+            // A bit query only matches a bit column, and vice versa.
+            if (col_elem == ElemType::Bit)
+                != (elem_type_of_optional(m.args.get(1)) == Some(ElemType::Bit))
+            {
+                return Err(Error::Invalid(
+                    "query element type does not match the column's".into(),
+                ));
+            }
             if matches!(col_elem, ElemType::Int8 | ElemType::UInt8) {
                 let q_elem = arg_str(m.args.get(1))
                     .map(|s| elem_type_of(&s))
