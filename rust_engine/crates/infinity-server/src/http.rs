@@ -480,7 +480,7 @@ fn column_types(engine: &Engine, table: &str) -> Vec<(String, String)> {
 /// A JSON cell for a result value, typed from the declared column type.
 fn cell_json(value: &str, ty: &str) -> String {
     let up = ty.to_ascii_uppercase();
-    if value.eq_ignore_ascii_case("null") || value.is_empty() {
+    if value.eq_ignore_ascii_case("null") {
         return "null".to_string();
     }
     let numeric = up.is_empty()
@@ -540,10 +540,11 @@ fn output_json(columns: &[String], types: &[String], rows: &[Vec<String>]) -> St
                     let name = columns.get(i).cloned().unwrap_or_default();
                     let ty = types.get(i).cloned().unwrap_or_default();
                     format!(
-                        "{{\"{}\":{},\"{}_bitmap\":true}}",
+                        "{{\"{}\":{},\"{}_bitmap\":{}}}",
                         json_escape(&name),
                         cell_json(v, &ty),
-                        json_escape(&name)
+                        json_escape(&name),
+                        !v.eq_ignore_ascii_case("null")
                     )
                 })
                 .collect::<Vec<_>>()
@@ -594,7 +595,8 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                 .collect()
         })
         .unwrap_or_else(|| vec!["*".to_string()]);
-    let mut sql = format!("SELECT {} FROM {db}.{table}", output.join(", "));
+    let named: Vec<String> = output.iter().map(|o| named_output(o)).collect();
+    let mut sql = format!("SELECT {} FROM {db}.{table}", named.join(", "));
 
     if let Some(h) = body.get("highlight").and_then(Json::as_arr) {
         let cols: Vec<&str> = h.iter().filter_map(Json::as_str).collect();
@@ -602,7 +604,7 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
             // HIGHLIGHT follows the select list
             sql = format!(
                 "SELECT {} HIGHLIGHT {} FROM {db}.{table}",
-                output.join(", "),
+                named.join(", "),
                 cols.join(", ")
             );
         }
@@ -789,6 +791,23 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
     sql
 }
 
+/// Wraps a bare arithmetic expression so the engine names it `(a + b)`, as
+/// the reference does (`(c1 + c2)`).
+fn named_output(o: &str) -> String {
+    let t = o.trim();
+    if t.starts_with('(') || t == "*" || t == "count(*)" {
+        return t.to_string();
+    }
+    let has_op = [" + ", " - ", " * ", " / ", " % "]
+        .iter()
+        .any(|op| t.contains(op));
+    if has_op {
+        format!("({t})")
+    } else {
+        t.to_string()
+    }
+}
+
 fn sql_value_arr(v: &Json) -> String {
     match v {
         Json::Arr(items) => format!(
@@ -867,9 +886,6 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         .collect();
 
     let run = |sql: &str| -> std::result::Result<Vec<QueryResult>, (u16, String)> {
-        if std::env::var_os("INFINITY_DEBUG_SQL").is_some() {
-            eprintln!("http sql: {sql}");
-        }
         engine.execute(sql).map_err(|e| engine_err(&e))
     };
 
@@ -949,12 +965,15 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
         }
         // ---- tables ----
         ("POST", ["databases", db, "tables", table]) => {
-            let (Some(db), Some(table)) = (ident(db), ident(table)) else {
-                return (404, String::new());
+            let Some(db) = ident(db) else {
+                return err_response(3003, "invalid database name");
+            };
+            let Some(table) = ident(table) else {
+                return err_response(3004, "invalid table name");
             };
             let fields = doc.get("fields").and_then(Json::as_arr).unwrap_or(&[]);
             if fields.is_empty() {
-                return err_response(3013, "syntax: a table needs at least one column");
+                return err_response(3048, "no column defined");
             }
             let mut cols = Vec::new();
             for f in fields {
@@ -1127,9 +1146,6 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
                 cols.push(def);
             }
             let stmt = format!("ALTER TABLE {db}.{table} ADD COLUMN ({});", cols.join(", "));
-            if std::env::var_os("INFINITY_DEBUG_SQL").is_some() {
-                eprintln!("http add_columns: {stmt}");
-            }
             match run(&stmt) {
                 Ok(_) => (200, ok_json()),
                 Err(e) => e,
@@ -1592,6 +1608,9 @@ pub fn route(engine: &Engine, method: &str, path: &str, body: &str) -> (u16, Str
             let full = format!("{db}.{table}");
             let types = column_types(engine, &full);
             let sql = docs_sql(&doc, &db, &table);
+            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                eprintln!("[HTTP-SQL] {sql}");
+            }
             match run(&sql) {
                 Ok(results) => {
                     let (cols, rows) = rows_of(results);
