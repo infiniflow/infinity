@@ -542,6 +542,11 @@ QueryContext::query(sql)
 - **Gate B — Go SDK 已全绿（2026-10-17 夜）**：`go test ./tests/ -count=1`（未改 SDK，私有端口 23900 + 独立数据目录）**374 passed / 0 failed，542 秒**；不含本轮临时诊断用例的基线为 **373/373**。最后三项的根因：① `array,int` 列的 `SelectResponse` 里元素 `DataType` 缺少 `physical_type`，Go 端 `parseSingleArrayElement` 见到 `PhysicalType == nil` 直接返回空数组并把元素字节当长度反复解析（36 行垃圾）→ 新增 `PhysicalWire::Scalar(NumberType/VarcharType)`；② tensor 的 `topn` 只解析不校验（`topn=-1/0/100000000` 全放行）→ 按 C++ 的 u32×100 上限校验并取**最后一个** `topn=`（C++ 是 map 覆盖）；③ SDK 把 `filter("uc2 > 1")` 发成 `WHERE unnest(c2) > 1`，而谓词在展开后的行上求值 → 把谓词/HAVING/GROUP BY 里的 `UNNEST(col)` 改写成展开列的别名。
 - **Gate B — Python `test_knn` 已全绿（2026-10-17 夜）**：`pytest test_knn.py -q` **373 passed / 6 skipped / 0 failed，709 秒**（此前 16 failed）。`test_show` **24 passed / 1 skipped**、`test_update` **48 passed**、`test_table` **27 passed**（修：`CreateOption.conflict_type` 的 Ignore 为幂等成功、Replace 返回 3032、空列 3048、列名小写化）。
 
+### Gate B — Go SDK 复测（2026-10-17 深夜，Rust 服务 + 私有 netns）
+- `go test -c ./tests` 后在同一 `bwrap --unshare-net` 沙箱内启动 Rust 服务（23817）并运行：整包只有 **`TestKNNWithGivenIndexNameAndIgnoreIndex`（l2/ip 两个子用例）失败**，其余全部通过（Go 未加 `-test.v` 时只打印失败项）。
+- 失败签名：`index_name` + `ignore_index=true` 的 SELECT 先正确返回 3013，随后服务端关闭连接（`Connection is closed` / `SelectResponse ... connection reset by peer`）。怀疑该请求的 Thrift 结构未被 `read_select_args`/`read_search_expr` 完整消费，回包后残留字节让下一帧解析失败而断开；需按字段逐字节核对（与 Python 侧 HTTP 无关）。
+- 跑法：`go test -c -o /tmp/go_tests.test ./tests`；沙箱内 `INFINITY_BIND=127.0.0.1:23817`，并把 `test/data/**` 扁平复制到 `/var/infinity/test_data/`（Go 用例按该路径取夹具）。
+
 ### Gate C — 持久化与恢复
 - **Gate C 复验（2026-10-17 夜，未改 `python/restart_test`，仅把端口改成私有 23910、把 runner 里「kill 掉所有名字含 infinity 的进程」收窄为只 kill 自己启的那个实例，以免误杀并行会话）**：`test_basic` 1/1、`test_alter` **6/6**、`test_drop` 1/1、`test_compact` 3/3、`test_cleanup` 10/10、`test_database_snapshot_restart` 1/1、`test_system_snapshot_restart` 3/3、`test_snapshot` **6/7**。`test_snapshot` 唯一失败 `test_snapshot_large_data` 首次报 `invalid embedding data type 'l2'`，单独重跑 **1 passed**，属偶发（同文件其余 6 例含 `test_snapshot_basic_restart` 均过，此前记录的「恢复后被 WAL 复活 5 行」已不复现）。
 - **环境坑（记录）**：`/tmp` 与根盘共 205 GB，历史上 100+ 个 `gb*-data` 测试数据目录把它占满（100%），大导入（311 MB CSV→8.4M 行）因此报 `No space left on device` 并让服务端被杀、后续用例连锁连接失败。**测量前必须 `df -h /` 并让数据目录落在 `/home`**（本机 `/home` 651 GB）。
