@@ -187,6 +187,8 @@ fn match_is_min_heap(m: &MatchClause) -> bool {
 /// Record / field separators used inside a snapshot blob.
 const SNAP_REC: char = '\u{1d}';
 const SNAP_FLD: char = '\u{1c}';
+/// Separates the per-table blobs of a database snapshot.
+const DB_SNAP_SEP: char = '\u{1b}';
 
 /// The declared dimension of a `TENSOR(FLOAT,d)` / `EMBEDDING(FLOAT,d)` column.
 fn type_dim(type_text: &str) -> Option<usize> {
@@ -1797,17 +1799,25 @@ impl Engine {
 
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     fn bump_writes(&self, table: &str) {
-        let key = table.split('.').next_back().unwrap_or(table).to_string();
+        let key = table
+            .split('.')
+            .next_back()
+            .unwrap_or(table)
+            .to_ascii_lowercase();
         *self.write_batches.lock().unwrap().entry(key).or_insert(0) += 1;
     }
 
     /// True when `table` has been written in more than one batch.
     fn multi_segment(&self, table: &str) -> bool {
-        let key = table.split('.').next_back().unwrap_or(table);
+        let key = table
+            .split('.')
+            .next_back()
+            .unwrap_or(table)
+            .to_ascii_lowercase();
         self.write_batches
             .lock()
             .unwrap()
-            .get(key)
+            .get(&key)
             .copied()
             .unwrap_or(0)
             >= 2
@@ -2604,55 +2614,8 @@ impl Engine {
                 })
             }
             Statement::CreateSnapshot { name, table } => {
-                let meta = self
-                    .catalog
-                    .get_table_by_name(table)?
-                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-                let rows = self.fetch_rows_with_ids(table)?;
-                let mut out = String::new();
-                out.push_str(&meta.name);
-                out.push(SNAP_REC);
-                out.push_str(&meta.columns.join(&SNAP_FLD.to_string()));
-                out.push(SNAP_REC);
-                let defs: Vec<String> = meta
-                    .defaults
-                    .iter()
-                    .map(|d| match d {
-                        Some(v) => format!("1{v}"),
-                        None => "0".to_string(),
-                    })
-                    .collect();
-                out.push_str(&defs.join(&SNAP_FLD.to_string()));
-                out.push(SNAP_REC);
-                let nns: Vec<String> = meta
-                    .not_nulls
-                    .iter()
-                    .map(|b| if *b { "1" } else { "0" }.to_string())
-                    .collect();
-                out.push_str(&nns.join(&SNAP_FLD.to_string()));
-                out.push(SNAP_REC);
-                out.push_str(&meta.types.join(&SNAP_FLD.to_string()));
-                out.push(SNAP_REC);
-                // the snapshot also carries the table's index declarations
-                let idxs: Vec<String> = self
-                    .catalog
-                    .list_indexes()?
-                    .into_iter()
-                    .filter(|im| im.table == *table)
-                    .map(|im| format!("{}{SNAP_FLD}{}", im.name, im.column))
-                    .collect();
-                out.push_str(&idxs.join(&SNAP_REC.to_string()));
-                out.push(SNAP_REC);
-                for (_, row) in &rows {
-                    out.push_str(
-                        &row.iter()
-                            .map(|v| v.to_slt_string())
-                            .collect::<Vec<_>>()
-                            .join(&SNAP_FLD.to_string()),
-                    );
-                    out.push(SNAP_REC);
-                }
-                self.store.put(&snap_key(name), out.as_bytes())?;
+                let blob = self.snapshot_table_blob(table)?;
+                self.store.put(&snap_key(name), blob.as_bytes())?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -2673,76 +2636,7 @@ impl Engine {
                     .store
                     .get(&snap_key(name))?
                     .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
-                let text = String::from_utf8_lossy(&data).to_string();
-                let mut recs = text.split(SNAP_REC);
-                let table = recs.next().unwrap_or_default().to_string();
-                let columns: Vec<String> = recs
-                    .next()
-                    .unwrap_or_default()
-                    .split(SNAP_FLD)
-                    .map(|s| s.to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-                let defaults: Vec<Option<String>> = recs
-                    .next()
-                    .unwrap_or_default()
-                    .split(SNAP_FLD)
-                    .map(|s| s.strip_prefix('1').map(|v| v.to_string()))
-                    .collect();
-                let not_nulls: Vec<bool> = recs
-                    .next()
-                    .unwrap_or_default()
-                    .split(SNAP_FLD)
-                    .map(|s| s == "1")
-                    .collect();
-                let types: Vec<String> = recs
-                    .next()
-                    .unwrap_or_default()
-                    .split(SNAP_FLD)
-                    .map(|s| s.to_string())
-                    .collect();
-                let indexes: Vec<(String, String)> = recs
-                    .next()
-                    .unwrap_or_default()
-                    .split(SNAP_REC)
-                    .filter(|s| !s.is_empty())
-                    .filter_map(|s| s.split_once(SNAP_FLD))
-                    .map(|(n, c)| (n.to_string(), c.to_string()))
-                    .collect();
-                let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
-                // replace any current incarnation of the table
-                if self.catalog.get_table_by_name(&table)?.is_some() {
-                    self.catalog.drop_table(&table)?;
-                    for (k, _) in self.store.scan_prefix(&row_prefix(&table))? {
-                        self.store.delete(&k)?;
-                    }
-                    for (k, _) in self.store.scan_prefix(&del_prefix(&table))? {
-                        self.store.delete(&k)?;
-                    }
-                }
-                self.catalog.create_table_typed(
-                    &table,
-                    &columns,
-                    &defaults,
-                    &not_nulls,
-                    &types,
-                    &vec![None; columns.len()],
-                )?;
-                for (i, r) in rows.iter().enumerate() {
-                    if !r.is_empty() {
-                        // the snapshot blob separates cells with SNAP_FLD; the row
-                        // store uses tabs
-                        let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
-                        self.store.put(&row_key(&table, i), &encoded.into_bytes())?;
-                    }
-                }
-                // re-create the snapshot's indexes
-                for (name, column) in indexes {
-                    self.catalog.create_index(&name, &table, &column)?;
-                    if self.table_schema(&table)?.iter().any(|c| c == &column) {
-                        self.build_index(&table, &column)?;
-                    }
-                }
+                self.restore_table_blob(&String::from_utf8_lossy(&data))?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -3474,7 +3368,11 @@ impl Engine {
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
     pub fn segment_count(&self, table: &str) -> usize {
-        let key = table.split('.').next_back().unwrap_or(table);
+        let key = &table
+            .split('.')
+            .next_back()
+            .unwrap_or(table)
+            .to_ascii_lowercase();
         let batches = self
             .write_batches
             .lock()
@@ -3485,6 +3383,209 @@ impl Engine {
             .max(1);
         let rows = self.row_count(table).unwrap_or(0);
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
+    }
+
+    /// Encodes one table (schema, indexes, rows) into the snapshot blob format
+    /// written by `CREATE SNAPSHOT … ON TABLE` and by database snapshots.
+    fn snapshot_table_blob(&self, table: &str) -> Result<String> {
+        let meta = self
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let rows = self.fetch_rows_with_ids(table)?;
+        let mut out = String::new();
+        out.push_str(&meta.name);
+        out.push(SNAP_REC);
+        out.push_str(&meta.columns.join(&SNAP_FLD.to_string()));
+        out.push(SNAP_REC);
+        let defs: Vec<String> = meta
+            .defaults
+            .iter()
+            .map(|d| match d {
+                Some(v) => format!("1{v}"),
+                None => "0".to_string(),
+            })
+            .collect();
+        out.push_str(&defs.join(&SNAP_FLD.to_string()));
+        out.push(SNAP_REC);
+        let nns: Vec<String> = meta
+            .not_nulls
+            .iter()
+            .map(|b| if *b { "1" } else { "0" }.to_string())
+            .collect();
+        out.push_str(&nns.join(&SNAP_FLD.to_string()));
+        out.push(SNAP_REC);
+        out.push_str(&meta.types.join(&SNAP_FLD.to_string()));
+        out.push(SNAP_REC);
+        // The snapshot carries the table's indexes: name, column, type and the
+        // `WITH (…)` options, so a restore recreates the same index kinds.
+        let idxs: Vec<String> = self
+            .catalog
+            .list_indexes()?
+            .into_iter()
+            .filter(|im| im.table == *table)
+            .map(|im| {
+                let opts = im
+                    .options
+                    .iter()
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!(
+                    "{}{SNAP_FLD}{}{SNAP_FLD}{}{SNAP_FLD}{}",
+                    im.name, im.column, im.index_type, opts
+                )
+            })
+            .collect();
+        out.push_str(&idxs.join(&SNAP_REC.to_string()));
+        out.push(SNAP_REC);
+        for (_, row) in &rows {
+            out.push_str(
+                &row.iter()
+                    .map(|v| v.to_slt_string())
+                    .collect::<Vec<_>>()
+                    .join(&SNAP_FLD.to_string()),
+            );
+            out.push(SNAP_REC);
+        }
+        Ok(out)
+    }
+
+    /// Recreates a table from a blob written by [`Self::snapshot_table_blob`],
+    /// replacing any current incarnation of it.
+    fn restore_table_blob(&self, text: &str) -> Result<()> {
+        let mut recs = text.split(SNAP_REC);
+        let table = recs.next().unwrap_or_default().to_string();
+        let columns: Vec<String> = recs
+            .next()
+            .unwrap_or_default()
+            .split(SNAP_FLD)
+            .map(|s| s.to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let defaults: Vec<Option<String>> = recs
+            .next()
+            .unwrap_or_default()
+            .split(SNAP_FLD)
+            .map(|s| s.strip_prefix('1').map(|v| v.to_string()))
+            .collect();
+        let not_nulls: Vec<bool> = recs
+            .next()
+            .unwrap_or_default()
+            .split(SNAP_FLD)
+            .map(|s| s == "1")
+            .collect();
+        let types: Vec<String> = recs
+            .next()
+            .unwrap_or_default()
+            .split(SNAP_FLD)
+            .map(|s| s.to_string())
+            .collect();
+        // name FLD column [FLD type [FLD options]]
+        let indexes: Vec<(String, String, String, Vec<(String, String)>)> = recs
+            .next()
+            .unwrap_or_default()
+            .split(SNAP_REC)
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let mut f = s.split(SNAP_FLD);
+                let name = f.next().unwrap_or_default().to_string();
+                let column = f.next().unwrap_or_default().to_string();
+                let ty = f.next().unwrap_or_default().to_string();
+                let opts = f
+                    .next()
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter(|p| !p.is_empty())
+                    .filter_map(|p| p.split_once('='))
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect();
+                (name, column, ty, opts)
+            })
+            .collect();
+        let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
+        // replace any current incarnation of the table
+        if self.catalog.get_table_by_name(&table)?.is_some() {
+            self.catalog.drop_table(&table)?;
+            for (k, _) in self.store.scan_prefix(&row_prefix(&table))? {
+                self.store.delete(&k)?;
+            }
+            for (k, _) in self.store.scan_prefix(&del_prefix(&table))? {
+                self.store.delete(&k)?;
+            }
+        }
+        self.catalog.create_table_typed(
+            &table,
+            &columns,
+            &defaults,
+            &not_nulls,
+            &types,
+            &vec![None; columns.len()],
+        )?;
+        for (i, r) in rows.iter().enumerate() {
+            if !r.is_empty() {
+                // the snapshot blob separates cells with SNAP_FLD; the row
+                // store uses tabs
+                let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
+                self.store.put(&row_key(&table, i), &encoded.into_bytes())?;
+            }
+        }
+        // re-create the snapshot's indexes
+        for (name, column, ty, opts) in indexes {
+            self.catalog
+                .create_index_typed(&name, &table, &column, &ty, &opts)?;
+            if self.table_schema(&table)?.iter().any(|c| c == &column) {
+                self.build_index(&table, &column)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// `CREATE DATABASE SNAPSHOT <name> FOR <db>`: every table of `db` (with
+    /// its schema and indexes) is written into one snapshot record.
+    pub fn create_database_snapshot(&self, name: &str, db: &str) -> Result<()> {
+        let prefix = format!("{db}.");
+        let mut out = String::new();
+        for meta in self
+            .catalog
+            .list_tables()?
+            .into_iter()
+            .filter(|m| m.name.starts_with(&prefix))
+        {
+            if !out.is_empty() {
+                out.push(DB_SNAP_SEP);
+            }
+            out.push_str(&self.snapshot_table_blob(&meta.name)?);
+        }
+        self.store.put(&snap_key(name), out.as_bytes())?;
+        Ok(())
+    }
+
+    /// Restores every table of a database snapshot.
+    pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
+        let data = self
+            .store
+            .get(&snap_key(name))?
+            .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
+        let text = String::from_utf8_lossy(&data).to_string();
+        // The snapshot's tables are named `<db>.<table>`; recreate the
+        // databases first (they may have been dropped since the snapshot).
+        let mut databases: Vec<String> = Vec::new();
+        for blob in text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()) {
+            let table = blob.split(SNAP_REC).next().unwrap_or_default();
+            if let Some((db, _)) = table.split_once('.') {
+                if !databases.iter().any(|d| d == db) {
+                    databases.push(db.to_string());
+                }
+            }
+        }
+        for db in &databases {
+            self.catalog.create_database(db, true)?;
+        }
+        for blob in text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()) {
+            self.restore_table_blob(blob)?;
+        }
+        Ok(())
     }
 
     /// Merges every segment of `table` into one: the live rows are re-keyed
@@ -3522,7 +3623,11 @@ impl Engine {
         for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
             self.store.delete(&k)?;
         }
-        let key = table.split('.').next_back().unwrap_or(table).to_string();
+        let key = table
+            .split('.')
+            .next_back()
+            .unwrap_or(table)
+            .to_ascii_lowercase();
         self.row_counters
             .lock()
             .unwrap()
@@ -3724,7 +3829,12 @@ impl Engine {
                 for (k, v) in opts {
                     if !matches!(
                         k.as_str(),
-                        "M" | "EF_CONSTRUCTION" | "METRIC" | "ENCODE" | "BUILD_TYPE" | "LSG_CONFIG"
+                        "M" | "EF_CONSTRUCTION"
+                            | "METRIC"
+                            | "ENCODE"
+                            | "BUILD_TYPE"
+                            | "LSG_CONFIG"
+                            | "BLOCK_SIZE"
                     ) {
                         return Err(Error::Invalid(format!(
                             "invalid index parameter: unsupported HNSW option '{k}'"

@@ -615,11 +615,14 @@ fn handle_connection(
                     let db = fields.get(&1).cloned().unwrap_or_default();
                     let name2 = fields.get(&2).cloned().unwrap_or_default();
                     let name3 = fields.get(&3).cloned().unwrap_or_default();
+                    // Identifiers are case-insensitive; the engine keeps
+                    // lower-case names, so existence checks must use them too.
                     let qualify = |t: &str| -> String {
+                        let t = t.to_ascii_lowercase();
                         if t.is_empty() || t.contains('.') || db.is_empty() {
-                            t.to_string()
+                            t
                         } else {
-                            format!("{db}.{t}")
+                            format!("{}.{t}", db.to_ascii_lowercase())
                         }
                     };
                     // `ConflictType`: 0 = Ignore, 1 = Error, 2 = Replace. The option
@@ -947,6 +950,48 @@ fn handle_connection(
                     };
                     write_reply_common(&mut writer, "Compact", seq, &resp)?;
                 }
+                // Database snapshots are stored as one blob per database; a
+                // `RestoreSnapshot` with `scope="database"` restores it (the
+                // table scope falls through to the SQL statement).
+                "CreateDatabaseSnapshot" | "RestoreSnapshot" => {
+                    let (sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let get = |id: i16| fields.get(&id).cloned().unwrap_or_default();
+                    let resp = match engine.as_ref() {
+                        Some(eng) => {
+                            let res = if name == "CreateDatabaseSnapshot" {
+                                // `{2: db_name, 3: snapshot_name}`
+                                eng.create_database_snapshot(&get(3), &get(2))
+                            } else if get(3).eq_ignore_ascii_case("database") {
+                                // `{2: snapshot_name, 3: scope}`
+                                eng.restore_database_snapshot(&get(2))
+                            } else {
+                                eng.execute(&format!("RESTORE TABLE SNAPSHOT {};", get(2)))
+                                    .map(|_| ())
+                            };
+                            match res {
+                                Ok(()) => CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: sid,
+                                },
+                                Err(e) => CommonResponse {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    session_id: sid,
+                                },
+                            }
+                        }
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: sid,
+                        },
+                    };
+                    write_reply_common(&mut writer, &name, seq, &resp)?;
+                }
                 // `RenameTable` is executed for real; the rest are engine-level
                 // maintenance that the in-memory engine has nothing to do for, so
                 // they report success rather than `unknown method`.
@@ -955,10 +1000,8 @@ fn handle_connection(
                 | "AlterIndex"
                 | "DumpIndex"
                 | "CreateTableSnapshot"
-                | "CreateDatabaseSnapshot"
                 | "CreateSystemSnapshot"
                 | "DropSnapshot"
-                | "RestoreSnapshot"
                 | "RenameTable" => {
                     let (sid, fields) = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
@@ -1221,7 +1264,7 @@ fn handle_connection(
                         .unwrap_or(0);
                     let rows: Vec<Vec<String>> = (0..n).map(|i| vec![i.to_string()]).collect();
                     let resp = select_response_from_typed(&["segment_id".to_string()], &[], &rows);
-                    write_select_response(&mut writer, seq, &resp)?;
+                    write_result_response(&mut writer, seq, "ShowSegments", &resp)?;
                 }
                 "ShowBlocks" => {
                     let (sid, db, table, segment) = {
@@ -1240,7 +1283,7 @@ fn handle_connection(
                         .unwrap_or(0);
                     let rows: Vec<Vec<String>> = (0..blocks).map(|i| vec![i.to_string()]).collect();
                     let resp = select_response_from_typed(&["block_id".to_string()], &[], &rows);
-                    write_select_response(&mut writer, seq, &resp)?;
+                    write_result_response(&mut writer, seq, "ShowBlocks", &resp)?;
                 }
                 "Import" => {
                     let req = {
@@ -1334,7 +1377,7 @@ fn handle_connection(
                             extra_result: String::new(),
                         },
                     };
-                    write_select_response(&mut writer, seq, &resp)?;
+                    write_result_response(&mut writer, seq, "ShowColumns", &resp)?;
                 }
                 "ListTable" => {
                     let (_sid, fields) = {
@@ -4479,6 +4522,8 @@ fn read_select_item(
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    // An empty `alias_name` is not an alias.
+    let alias = alias.filter(|a| !a.trim().is_empty());
     if let Some(alias) = alias {
         if !names.is_empty() {
             if let Some(sql) = names.last_mut() {
