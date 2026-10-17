@@ -3131,6 +3131,20 @@ pub fn pexpr_sql(e: &PExpr) -> String {
     }
 }
 
+/// Functions that return a boolean, usable directly as a filter.
+fn is_boolean_fn(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "regex"
+            | "filter_text"
+            | "filter_fulltext"
+            | "filter_sparse"
+            | "contains"
+            | "startswith"
+            | "endswith"
+    )
+}
+
 /// True when the expression is a predicate (a comparison, a connective, `IN`
 /// or `NOT`) rather than a value.
 fn is_predicate_pexpr(e: &PExpr) -> bool {
@@ -3357,6 +3371,11 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                     {
                         let joiner = name.to_ascii_lowercase();
                         pred = Some(format!("({} {joiner} {})", pexpr_sql(l), pexpr_sql(r)));
+                    }
+                    // A boolean-valued function (`regex(c1, 'bc')`) is a
+                    // predicate on its own.
+                    (None, _) if is_boolean_fn(&name) => {
+                        pred = Some(pexpr_sql(&PExpr::Call(name.clone(), args.clone())));
                     }
                     _ => {
                         return Err(Error::Invalid(
