@@ -4500,12 +4500,22 @@ fn read_knn_sql(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<
     let ignoring = params
         .iter()
         .any(|(k, v)| k.eq_ignore_ascii_case("ignore_index") && v.eq_ignore_ascii_case("true"));
-    if named && ignoring {
-        return Err(Error::Invalid(
-            "syntax: index_name and ignore_index cannot be used together".into(),
-        ));
-    }
     let vector = query_expr.unwrap_or(vec);
+    if named && ignoring {
+        // Reject it in the *engine* (not while decoding), so the whole request
+        // is consumed first and the connection stays usable for the next call.
+        let name = params
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("index_name"))
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default();
+        return Ok(Some(format!(
+            "MATCH VECTOR ({col}, {vector}, '{}', '{}', {topn}, 'index_name={};ignore_index=true')",
+            knn_element(elem),
+            knn_metric(metric),
+            name.replace('\'', "''")
+        )));
+    }
     let (opts, hints) = split_index_hints(&params);
     let tail = if opts.is_empty() {
         String::new()
