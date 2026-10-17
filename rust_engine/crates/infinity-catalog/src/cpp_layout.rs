@@ -256,10 +256,9 @@ pub fn default_constant_expr(text: &str) -> Option<infinity_expression::json::Js
         return Some(value_format::constant_expr_double(f));
     }
     // The engine stores a string default in its **unquoted** `.slt` form
-    // (`defaults_and_alter_add_column`), so anything left is a string constant.
-    if t.is_empty() {
-        return None;
-    }
+    // (`defaults_and_alter_add_column`), so anything left is a string constant —
+    // including an explicitly empty `DEFAULT ''` (callers only pass `Some`).
+
     Some(value_format::constant_expr_string(t))
 }
 
