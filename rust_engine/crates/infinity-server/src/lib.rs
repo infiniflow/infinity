@@ -3668,9 +3668,10 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
                     "substring" | "substr" | "trim" | "ltrim" | "rtrim" | "upper" | "lower"
                     | "concat" | "replace" | "lpad" | "rpad" => "VARCHAR".to_string(),
                     // Scalar numeric functions.
-                    "sqrt" | "abs" | "round" | "trunc" | "truncate" | "ceil" | "ceiling"
-                    | "floor" | "pow" | "power" | "exp" | "ln" | "log" | "log2" | "log10"
-                    | "sin" | "cos" | "tan" => "DOUBLE".to_string(),
+                    // `trunc`/`round`/`abs` keep the argument's type; the
+                    // transcendental functions widen to DOUBLE.
+                    "sqrt" | "pow" | "power" | "exp" | "ln" | "log" | "log2" | "log10" | "sin"
+                    | "cos" | "tan" => "DOUBLE".to_string(),
                     // `min`/`max` keep the argument's type.
                     _ => base,
                 };
