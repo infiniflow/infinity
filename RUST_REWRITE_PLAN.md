@@ -517,8 +517,9 @@ QueryContext::query(sql)
   - `POST/DELETE/GET /databases[/{db}]`、`/databases/{db}/tables[/{t}]`、`/columns`、`/indexes[/{i}]`
   - `POST/PUT/DELETE/GET /databases/{db}/tables/{t}/docs`（插入/更新/删除/查询 DSL：`output/filter/sort/group_by/having/limit/offset/highlight/search/fusion/option.total_hits_count`）
   - 冲突选项（create/drop）按 SDK 常量校验（非法→3074），标识符须以字母开头（3003）
-- 实测（`pytest --http`，未改 SDK）：`test_database` 22/22（1 skipped）、`test_basic` 通过；`test_select` **49 passed / 15 failed**（对比纯 Thrift 66/66）；`test_database+test_basic+test_table` 合计 **34 passed / 17 failed**。
-- 已知缺口：`rename_table`、`compact`、`optimize`、`segments/blocks`、`explain/meta`、`import/export`、`alter`、快照等路由未实现；JSON 函数与日期函数在 HTTP 模式下的列名/类型推断仍有偏差。
+- 实测（`pytest --http`，未改 SDK）：`test_database + test_table + test_basic + test_select` 合计 **103 passed / 12 failed / 3 skipped**（`test_select` 53/66，`test_table` 26/27，`test_database` 22/22，`test_basic` 通过）。
+- 已实现路由：databases/tables/columns/indexes/docs、import（PUT table→COPY FROM）/export（GET table/{t}→COPY TO）/rename/compact/optimize/segments/blocks/add-drop columns/EXPLAIN meta；标识符统一小写（3003/3004）、create/drop 选项 3074/3075、`replace_if_exists`→3032、空列清单 3048、重复表 3017、缺表 3022。
+- 已知缺口：HTTP 下 JSON 函数/日期函数的列名与类型推断（`json_extract_*` 值仍按字符串）、`test_select_truncate`/`test_select_aggregate` 的数值渲染、快照路由、`after_disconnect` 用例（新连接走 Thrift 的混用场景）。
 
 ### Gate C — 持久化与恢复
 - `python/restart_test` 通过；`test/sql/snapshot` 通过；**WAL 崩溃恢复**用例通过。
