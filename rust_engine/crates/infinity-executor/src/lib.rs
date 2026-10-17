@@ -825,11 +825,9 @@ fn reshape_tensor(s: &str, dim: usize) -> String {
     format!("[{}]", groups.join(","))
 }
 
-/// Recognises a bare `filter_text(…)`/`filter_fulltext(…)` predicate carrying a
-/// `threshold=`, returning `(column, query, options)`. Such a filter is
-/// answered by the full-text index (its BM25 needs corpus statistics), so the
-/// executor resolves it in one pass rather than testing row by row.
-fn fulltext_threshold_call(p: &Predicate) -> Option<(String, String, String)> {
+/// Recognises a bare `filter_text(…)`/`filter_fulltext(…)` predicate that needs
+/// the full-text index to answer, returning what it asked for.
+fn fulltext_index_call(p: &Predicate) -> Option<(String, String, String)> {
     let Predicate::IsTrue(ExprAst::Func { name, args }) = p else {
         return None;
     };
@@ -841,19 +839,15 @@ fn fulltext_threshold_call(p: &Predicate) -> Option<(String, String, String)> {
         Some(ExprAst::Literal(Literal::Str(v))) => Some(v.clone()),
         _ => None,
     };
-    let opts = s(2)?;
-    if !opts
-        .split(';')
-        .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="))
-    {
-        return None;
-    }
-    // `col@index` names the column plus an index hint.
     let column = s(0)?;
+    let (col, hint) = match column.split_once('@') {
+        Some((c, i)) => (c.to_string(), Some(i.to_string())),
+        None => (column, None),
+    };
     Some((
-        column.split('@').next().unwrap_or(&column).to_string(),
+        col,
         s(1)?,
-        opts,
+        format!("{}\u{1}{}", s(2)?, hint.unwrap_or_default()),
     ))
 }
 
@@ -1698,6 +1692,32 @@ impl Engine {
     }
 
     /// `(column, index name)` pairs of `table`, for the EXPLAIN regex rewrite.
+    /// The analyzer recorded for the index named `index_name` on `table`, i.e.
+    /// the analyzer of the column that index covers.
+    fn analyzer_of_index(&self, table: &str, index_name: &str) -> Option<String> {
+        let short = table.split('.').next_back().unwrap_or(table);
+        if let Some(a) = self
+            .index_analyzers
+            .lock()
+            .unwrap()
+            .get(&format!("{table}#{index_name}"))
+        {
+            return Some(a.clone());
+        }
+        let column = self
+            .catalog
+            .list_indexes()
+            .ok()?
+            .into_iter()
+            .find(|im| im.name == index_name && (im.table == short || im.table == table))?
+            .column;
+        self.index_analyzers
+            .lock()
+            .unwrap()
+            .get(&index_key(table, &column))
+            .cloned()
+    }
+
     fn index_name_pairs(&self, table: &str) -> Result<Vec<(String, String)>> {
         let short = table.split('.').next_back().unwrap_or(table);
         Ok(self
@@ -2218,11 +2238,15 @@ impl Engine {
                     .create_index_typed(name, table, column, index_type, opts)?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
-                    let a = a.trim().trim_matches(|c| c == '\'' || c == '"');
-                    self.index_analyzers
-                        .lock()
-                        .unwrap()
-                        .insert(index_key(table, column), a.to_ascii_lowercase());
+                    let a = a
+                        .trim()
+                        .trim_matches(|c| c == '\'' || c == '"')
+                        .to_ascii_lowercase();
+                    let mut analyzers = self.index_analyzers.lock().unwrap();
+                    // By column, for the match path; and by index name, because two
+                    // indexes on one column can have different analyzers.
+                    analyzers.insert(index_key(table, column), a.clone());
+                    analyzers.insert(format!("{table}#{name}"), a);
                 }
                 // a functional-index target is not a plain column, so there is
                 // no materialised index to build
@@ -2815,33 +2839,76 @@ impl Engine {
                 // so resolve the qualifying rows once and feed them down.
                 if override_rows.is_none() && join.is_none() {
                     if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
-                        if let Some((col, query, opts)) = fulltext_threshold_call(p) {
-                            let m = MatchClause {
-                                kind: "TEXT".into(),
-                                column: col,
-                                args: vec![
-                                    ExprAst::Literal(Literal::Str(query)),
-                                    ExprAst::Literal(Literal::Str(opts)),
-                                ],
-                                filter: None,
-                            };
-                            let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
-                            let mut ids: Vec<u64> = rows
-                                .iter()
-                                .filter_map(|r| match r.iter().rev().nth(3) {
-                                    Some(Value::Int(i)) => Some(*i as u64),
-                                    _ => None,
-                                })
-                                .collect();
-                            // Table order, not score order: this is a WHERE filter.
-                            ids.sort_unstable();
-                            let mut out = self.fetch_rows_by_ids(t, &ids)?;
-                            if rowid_col {
-                                for (r, id) in out.iter_mut().zip(ids.iter()) {
-                                    r.push(Value::Int(*id as i64));
+                        if let Some((col, query, packed)) = fulltext_index_call(p) {
+                            let (opts, hint) = packed.split_once('\u{1}').unwrap_or((&packed, ""));
+                            // Only a `threshold=` filter (needs corpus stats) or a
+                            // query targeted at a gram index (needs substring
+                            // semantics) departs from the row-local term match.
+                            let sparsegram = !hint.is_empty()
+                                && self
+                                    .analyzer_of_index(t, hint)
+                                    .map(|a| a.to_ascii_lowercase().starts_with("sparsegram"))
+                                    .unwrap_or(false);
+                            let has_threshold = opts
+                                .split(';')
+                                .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="));
+                            if !sparsegram && !has_threshold {
+                                override_rows = None;
+                            } else if sparsegram {
+                                let schema = self.table_schema(t)?;
+                                let needle = query.trim().trim_matches('"').to_lowercase();
+                                let keep: Vec<u64> = match schema.iter().position(|c| c == &col) {
+                                    None => Vec::new(),
+                                    Some(ci) => self
+                                        .fetch_rows_with_ids(t)?
+                                        .into_iter()
+                                        .filter(|(_, r)| match r.get(ci) {
+                                            Some(Value::Str(s)) => {
+                                                s.to_lowercase().contains(&needle)
+                                            }
+                                            Some(v) => {
+                                                v.to_slt_string().to_lowercase().contains(&needle)
+                                            }
+                                            None => false,
+                                        })
+                                        .map(|(id, _)| id as u64)
+                                        .collect(),
+                                };
+                                let mut out = self.fetch_rows_by_ids(t, &keep)?;
+                                if rowid_col {
+                                    for (r, id) in out.iter_mut().zip(keep.iter()) {
+                                        r.push(Value::Int(*id as i64));
+                                    }
                                 }
+                                override_rows = Some(out);
+                            } else {
+                                let m = MatchClause {
+                                    kind: "TEXT".into(),
+                                    column: col,
+                                    args: vec![
+                                        ExprAst::Literal(Literal::Str(query)),
+                                        ExprAst::Literal(Literal::Str(opts.to_string())),
+                                    ],
+                                    filter: None,
+                                };
+                                let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
+                                let mut ids: Vec<u64> = rows
+                                    .iter()
+                                    .filter_map(|r| match r.iter().rev().nth(3) {
+                                        Some(Value::Int(i)) => Some(*i as u64),
+                                        _ => None,
+                                    })
+                                    .collect();
+                                // Table order, not score order: this is a WHERE filter.
+                                ids.sort_unstable();
+                                let mut out = self.fetch_rows_by_ids(t, &ids)?;
+                                if rowid_col {
+                                    for (r, id) in out.iter_mut().zip(ids.iter()) {
+                                        r.push(Value::Int(*id as i64));
+                                    }
+                                }
+                                override_rows = Some(out);
                             }
-                            override_rows = Some(out);
                         }
                     }
                 }
