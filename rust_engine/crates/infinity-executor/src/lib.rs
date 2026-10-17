@@ -1357,7 +1357,7 @@ pub struct Engine {
     write_batches: Mutex<HashMap<String, usize>>,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
-    row_counters: Mutex<HashMap<String, usize>>,
+    row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1668,15 +1668,29 @@ impl Engine {
     }
 
     /// Reserves a contiguous block of `n` row ids for `table`.
-    fn reserve_rows(&self, table: &str, n: usize) -> Result<usize> {
+    fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<usize> {
         let mut counters = self.row_counters.lock().unwrap();
         let key = table.split('.').next_back().unwrap_or(table).to_string();
-        let next = match counters.get(&key) {
+        let (mut seg, mut off, sealed) = match counters.get(&key) {
             Some(v) => *v,
-            None => self.next_row_seq(table)?,
+            None => {
+                let next = self.next_row_seq(table)?;
+                ((next >> 32) as u32, (next & 0xffff_ffff) as u32, false)
+            }
         };
-        counters.insert(key, next + n);
-        Ok(next)
+        // The C++ row id is `segment_id << 32 | offset`. A `COPY` always seals
+        // the segment it writes, and an `INSERT` that follows one opens a new
+        // segment, while consecutive `INSERT`s keep appending to the same one —
+        // which is why two `COPY`s of 99 rows yield ids 0…98 and
+        // 4294967296…4294967394, but two one-row `INSERT`s yield 0 and 1.
+        if (new_segment && off > 0) || (!new_segment && sealed) {
+            seg += 1;
+            off = 0;
+        }
+        let base = ((seg as usize) << 32) | off as usize;
+        off = off.saturating_add(n as u32);
+        counters.insert(key, (seg, off, new_segment));
+        Ok(base)
     }
 
     /// Forgets any cached row-id counter for `table` (used after an operation
@@ -2550,7 +2564,7 @@ impl Engine {
                 }
                 // Reserve a contiguous block of row ids: two sessions inserting
                 // concurrently must not pick the same base sequence.
-                let base = self.reserve_rows(table, rows.len())?;
+                let base = self.reserve_rows(table, rows.len(), false)?;
                 let types = self.column_types(table)?;
                 // tensor-like values must match the declared dimension, and
                 // sparse values must be in range
@@ -3349,6 +3363,23 @@ impl Engine {
             .filter_map(|p| p.split_once('='))
             .find(|(k, _)| k.trim().eq_ignore_ascii_case("threshold"))
             .and_then(|(_, v)| v.trim().parse().ok());
+        // `bm25_param_delta_term` / `bm25_param_delta_phrase` add
+        // `idf * delta` to each matching unit: `TermDocIterator::InitBM25Info`
+        // folds them into `f4 = delta / (k1 + 1)` which is added to the
+        // frequency term and then scaled by `idf * (k1 + 1) * weight`.
+        let bm25_param = |name: &str| -> f64 {
+            params
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case(name))
+                .and_then(|(_, v)| v.trim().parse().ok())
+                .unwrap_or(0.0)
+        };
+        // `bm25_param_delta` is a shorthand that sets both
+        // (`bound_select_statement_impl.cpp:256-257`).
+        let delta_both = bm25_param("bm25_param_delta");
+        let delta_term = bm25_param("bm25_param_delta_term") + delta_both;
+        let delta_phrase = bm25_param("bm25_param_delta_phrase") + delta_both;
         // `operator=and` requires every query term (`or` is the default)
         let require_all = params.split(';').any(|p| {
             p.split_once('=')
@@ -3359,16 +3390,6 @@ impl Engine {
                 .unwrap_or(false)
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
-        // Per-term boosts (`term^2.0`) are stripped before tokenising.
-        // Quoted phrases: the analyzer decides what a `"a b"` group tokenises
-        // to (a single token for `whitespace-<chars>`, several for `standard`),
-        // so the quote marks themselves are stripped before tokenising.
-        let query_clean = query
-            .replace('"', "")
-            .split_whitespace()
-            .map(|w| w.split('^').next().unwrap_or(w))
-            .collect::<Vec<_>>()
-            .join(" ");
         // field boosts from `col^w` / `col@index^w`
         let field_boosts: Vec<f64> = m
             .column
@@ -3399,6 +3420,13 @@ impl Engine {
         let delims: Option<Vec<char>> = match_columns(&m.column)
             .iter()
             .find_map(|c| self.index_delims(table, c));
+        // One unit per quoted phrase / bare word. The analyzer decides what a
+        // `"a b"` group tokenises to, so quotes are stripped first.
+        let units: Vec<(bool, Vec<String>)> = query_units(&query)
+            .into_iter()
+            .map(|(phrase, text)| (phrase, tokenize_text(&text, &delims)))
+            .filter(|(_, toks)| !toks.is_empty())
+            .collect();
         // One entry per matched column: `(schema index, field boost, delimiters)`.
         // `similarity=boolean` scores each field on its own, so a `keyword`
         // column next to a `standard` one must not share the other's analyzer.
@@ -3406,7 +3434,14 @@ impl Engine {
             .column
             .split(',')
             .filter_map(|spec| {
-                let name = spec.split('^').next().unwrap_or(spec).trim();
+                let name = spec
+                    .split('^')
+                    .next()
+                    .unwrap_or(spec)
+                    .split('@')
+                    .next()
+                    .unwrap_or(spec)
+                    .trim();
                 let boost = spec
                     .split('^')
                     .nth(1)
@@ -3416,8 +3451,9 @@ impl Engine {
                 Some((ci, boost, self.index_delims(table, name)))
             })
             .collect();
-        let terms: Vec<String> = tokenize_text(&query_clean, &delims)
-            .into_iter()
+        let terms: Vec<String> = units
+            .iter()
+            .flat_map(|(_, u)| u.iter().cloned())
             .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
@@ -3442,7 +3478,7 @@ impl Engine {
         // filtered from the result), so gather every stored row first.
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
-        let mut docs: Vec<(usize, Vec<Value>, Vec<String>, bool)> = Vec::new();
+        let mut docs: Vec<(usize, Vec<Value>, Vec<Vec<(String, u32)>>, bool)> = Vec::new();
         for (k, v) in self.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
@@ -3460,17 +3496,21 @@ impl Engine {
                     None => Value::Null,
                 });
             }
-            let text: String = cols
+            // Tokenise every matched column on its own: BM25 keeps per-field
+            // statistics and a `doctitle,body^5` query sums them.
+            let fields: Vec<Vec<(String, u32)>> = cols
                 .iter()
-                .map(|&i| match row.get(i) {
-                    Some(Value::Str(s)) => s.clone(),
-                    Some(other) => other.to_slt_string(),
-                    None => String::new(),
+                .map(|&i| {
+                    let text = match row.get(i) {
+                        Some(Value::Str(s)) => s.clone(),
+                        Some(other) => other.to_slt_string(),
+                        None => String::new(),
+                    };
+                    tokenize_index_positions(&text, &delims)
                 })
-                .collect::<Vec<_>>()
-                .join(" ");
+                .collect();
             let live = self.store.get(&del_key(table, seq))?.is_none();
-            docs.push((seq, row, tokenize_index_text(&text, &delims), live));
+            docs.push((seq, row, fields, live));
         }
         let boolean = params.split(';').any(|p| {
             p.split_once('=')
@@ -3510,20 +3550,23 @@ impl Engine {
             groups
         };
         let n_docs = docs.len().max(1);
-        let avg_len: f64 = if docs.is_empty() {
-            1.0
-        } else {
-            docs.iter()
-                .map(|(_, _, toks, _)| toks.len() as f64)
-                .sum::<f64>()
-                / docs.len() as f64
-        };
-        let avg_len = if avg_len <= 0.0 { 1.0 } else { avg_len };
+        // One BM25 corpus per column (Lucene keeps statistics per field).
+        let avg_lens: Vec<f64> = (0..cols.len())
+            .map(|f| {
+                let sum: f64 = docs.iter().map(|d| d.2[f].len() as f64).sum();
+                let a = sum / docs.len().max(1) as f64;
+                if a <= 0.0 {
+                    1.0
+                } else {
+                    a
+                }
+            })
+            .collect();
         // A `keyword`/`whitespace` field scores constantly: one field-boost
         // point per matching document (not per query term).
         let keyword_field = matches!(&delims, Some(d) if d.is_empty());
         let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (seq, row, toks, live) in &docs {
+        for (seq, row, fields, live) in &docs {
             if !live {
                 continue;
             }
@@ -3574,48 +3617,78 @@ impl Engine {
                 }
                 continue;
             }
-            let mut counts: HashMap<&str, usize> = HashMap::new();
-            for t in toks {
-                *counts.entry(t.as_str()).or_insert(0) += 1;
-            }
-            let len = toks.len() as f64;
             let mut score = 0.0f64;
-            let mut hits = 0usize;
-            if keyword_field {
-                for term in &terms {
-                    if counts.contains_key(term.as_str()) {
-                        hits += 1;
+            // Units matched in *any* field, for `minimum_should_match`.
+            let mut unit_hits = vec![false; units.len()];
+            for (f, toks) in fields.iter().enumerate() {
+                if toks.is_empty() {
+                    continue;
+                }
+                let boost = field_boosts.get(f).copied().unwrap_or(1.0);
+                let len = toks.len() as f64;
+                let avg_len = avg_lens[f];
+                let mut counts: HashMap<&str, usize> = HashMap::new();
+                // `(term, position)` pairs, for phrase matching.
+                let mut at: HashMap<u32, Vec<&str>> = HashMap::new();
+                for (t, pos) in toks {
+                    *counts.entry(t.as_str()).or_insert(0) += 1;
+                    at.entry(*pos).or_default().push(t.as_str());
+                }
+                let idf_of = |term: &str| -> f64 {
+                    let df = docs
+                        .iter()
+                        .filter(|(_, _, fs, _)| fs[f].iter().any(|(x, _)| x == term))
+                        .count()
+                        .max(1) as f64;
+                    (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
+                };
+                if keyword_field {
+                    let mut any = false;
+                    for (ui, (_, unit)) in units.iter().enumerate() {
+                        if unit.iter().any(|t| counts.contains_key(t.as_str())) {
+                            unit_hits[ui] = true;
+                            any = true;
+                        }
+                    }
+                    if any {
+                        score += boost;
+                    }
+                    continue;
+                }
+                for (ui, (phrase, unit)) in units.iter().enumerate() {
+                    if *phrase && unit.len() > 1 {
+                        // A phrase scores like one term whose `tf` is the phrase
+                        // frequency and whose `idf` is the sum over its terms
+                        // (Lucene `PhraseWeight`).
+                        let freq = phrase_freq(&at, unit);
+                        if freq == 0 {
+                            continue;
+                        }
+                        unit_hits[ui] = true;
+                        let idf_sum: f64 = unit.iter().map(|t| idf_of(t)).sum();
+                        let tf = freq as f64;
+                        let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                        score += idf_sum * (norm + delta_phrase) * boost;
+                        continue;
+                    }
+                    for term in unit {
+                        let tf = match counts.get(term.as_str()) {
+                            Some(c) => *c as f64,
+                            None => continue,
+                        };
+                        unit_hits[ui] = true;
+                        let idf = idf_of(term);
+                        let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
+                        score += idf * (norm + delta_term) * boost;
                     }
                 }
-                if hits > 0 {
-                    score = field_boosts.first().copied().unwrap_or(1.0);
-                }
             }
-            for (ti, term) in terms.iter().enumerate() {
-                if keyword_field {
-                    break;
-                }
-                let tf = match counts.get(term.as_str()) {
-                    Some(c) => *c as f64,
-                    None => continue,
-                };
-                hits += 1;
-                // A single-column query applies that column's boost to every
-                // query term.
-                let field = if cols.len() == 1 {
-                    field_boosts.first().copied().unwrap_or(1.0)
-                } else {
-                    field_boosts.get(ti).copied().unwrap_or(1.0)
-                };
-                let df = docs
-                    .iter()
-                    .filter(|(_, _, t, _)| t.iter().any(|x| x == term))
-                    .count()
-                    .max(1) as f64;
-                let idf = (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln();
-                let norm = 2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * len / avg_len));
-                score += idf * norm * field;
-            }
+            let hits: usize = units
+                .iter()
+                .zip(unit_hits.iter())
+                .filter(|(_, m)| **m)
+                .map(|((_, u), _)| u.len())
+                .sum();
             for (ci, tags) in &rank_features {
                 let cell = row.get(*ci).map(|v| v.to_slt_string()).unwrap_or_default();
                 score += rank_features_bonus(&cell, tags);
@@ -3902,7 +3975,7 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let base = self.reserve_rows(table, rows.len())?;
+        let base = self.reserve_rows(table, rows.len(), true)?;
         let types = self.column_types(table)?;
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
@@ -4030,7 +4103,7 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let base = self.reserve_rows(table, rows.len())?;
+        let base = self.reserve_rows(table, rows.len(), true)?;
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
             let encoded = encode_row(row, types);
@@ -4934,7 +5007,12 @@ fn arg_str(e: Option<&ExprAst>) -> Option<String> {
 fn match_columns(target: &str) -> Vec<String> {
     target
         .split(',')
-        .map(|c| c.split('^').next().unwrap_or(c).trim().to_string())
+        // `col@index^5` names the column, the index to search it with, and an
+        // optional boost.
+        .map(|c| {
+            let c = c.split('^').next().unwrap_or(c);
+            c.split('@').next().unwrap_or(c).trim().to_string()
+        })
         .filter(|c| !c.is_empty())
         .collect()
 }
@@ -5307,6 +5385,29 @@ fn tokenize_index_text(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
     out
 }
 
+/// Index-side tokens **with their position**. The C++ analyzer emits a token's
+/// original and its stem at the same offset (`common_analyzer_impl.cpp`
+/// re-uses `offset_` for both), so both share a position; `offset_` itself
+/// advances once per raw token. Phrase queries need this.
+fn tokenize_index_positions(s: &str, delims: &Option<Vec<char>>) -> Vec<(String, u32)> {
+    let words = split_words(s, delims);
+    let mut out = Vec::with_capacity(words.len());
+    for (pos, word) in words.into_iter().enumerate() {
+        if delims.is_some() {
+            out.push((word, pos as u32));
+            continue;
+        }
+        let stem = stem_english(&word);
+        if stem != word {
+            out.push((word, pos as u32));
+            out.push((stem, pos as u32));
+        } else {
+            out.push((word, pos as u32));
+        }
+    }
+    out
+}
+
 /// The C++ default analyzer's English stemmer (`STEM_LANG_ENGLISH`).
 static ENGLISH_STEMMER: std::sync::OnceLock<rust_stemmers::Stemmer> = std::sync::OnceLock::new();
 
@@ -5338,6 +5439,74 @@ fn split_query_terms(s: &str) -> Vec<String> {
         out.push(cur);
     }
     out
+}
+
+/// Counts the occurrences of `unit` at consecutive positions in a document.
+/// Both the original token and its stem live at one position, so a query term
+/// matches a position when either form is there.
+fn phrase_freq(at: &HashMap<u32, Vec<&str>>, unit: &[String]) -> usize {
+    if unit.is_empty() {
+        return 0;
+    }
+    let mut n = 0usize;
+    for (start, terms) in at {
+        if !terms.iter().any(|t| *t == unit[0]) {
+            continue;
+        }
+        let mut ok = true;
+        for (k, q) in unit.iter().enumerate().skip(1) {
+            match at.get(&(start + k as u32)) {
+                Some(ts) if ts.iter().any(|t| *t == q.as_str()) => {}
+                _ => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok {
+            n += 1;
+        }
+    }
+    n
+}
+
+/// Splits a `MATCH TEXT` query into scoring units, keeping quoted groups
+/// together: `"second default text"` is one phrase unit that only matches where
+/// its tokens sit at consecutive positions, while bare words are single-term
+/// units. `term^2.0` boosts are stripped here — boosts are applied per field.
+fn query_units(query: &str) -> Vec<(bool, String)> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quote = false;
+    let mut was_quoted = false;
+    let mut flush = |cur: &mut String, quoted: &mut bool, out: &mut Vec<(bool, String)>| {
+        if !cur.is_empty() {
+            out.push((*quoted, std::mem::take(cur)));
+            *quoted = false;
+        }
+    };
+    for c in query.chars() {
+        match c {
+            '"' => {
+                flush(&mut cur, &mut was_quoted, &mut out);
+                in_quote = !in_quote;
+            }
+            c if c.is_whitespace() && !in_quote => flush(&mut cur, &mut was_quoted, &mut out),
+            c => {
+                if in_quote {
+                    was_quoted = true;
+                }
+                cur.push(c);
+            }
+        }
+    }
+    flush(&mut cur, &mut was_quoted, &mut out);
+    out.into_iter()
+        .map(|(q, t)| {
+            let t = t.split('^').next().unwrap_or(&t).to_string();
+            (q, t)
+        })
+        .collect()
 }
 
 /// A `MATCH TEXT ('', '(doc:"a b")^4.5 (doc2:c doc2:d)^3', …)` clause names its
