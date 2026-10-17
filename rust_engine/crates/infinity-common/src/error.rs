@@ -50,6 +50,9 @@ impl Error {
         match self {
             // 7012 PARSER_ERROR: data that does not parse for the column type.
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
+            // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the
+            // target column.
+            Error::Invalid(m) if m.starts_with("import:") => 3037,
             // 3032 NOT_SUPPORTED (e.g. dropping a column an index still uses,
             // or a value whose shape the column type cannot hold).
             Error::Invalid(m)

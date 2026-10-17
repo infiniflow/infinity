@@ -466,7 +466,13 @@ fn validate_tensor_dimension(type_text: &str, lit: &str) -> Result<()> {
     let groups = innermost_groups(lit);
     if groups.len() == 1 {
         let n = groups[0].len();
-        if n != 0 && !n.is_multiple_of(dim) {
+        // An embedding is exactly `dim` wide; a tensor may hold k*dim elements.
+        if n != 0 && embedding && n != dim {
+            return Err(Error::Invalid(format!(
+                "embedding dimension mismatch: expected {dim}, got {n}"
+            )));
+        }
+        if n != 0 && !embedding && !n.is_multiple_of(dim) {
             return Err(Error::Invalid(format!(
                 "tensor dimension mismatch: expected a multiple of {dim}, got {n}"
             )));
@@ -4115,6 +4121,15 @@ impl Engine {
             }
             let fields: Vec<String> = csv_fields(line, delim);
             let mut cells: Vec<String> = fields.iter().map(|f| normalize_cell(f)).collect();
+            // Extra CSV columns cannot be dropped silently. Missing ones are
+            // padded with the column default / NULL.
+            if cells.len() > types_for_scan.len() {
+                return Err(Error::Invalid(format!(
+                    "import: the file has {} columns but the table has {}",
+                    cells.len(),
+                    types_for_scan.len()
+                )));
+            }
             // an empty CSV cell takes the column default when one is declared
             for (i, c) in cells.iter_mut().enumerate() {
                 if c.is_empty() {
@@ -4126,8 +4141,13 @@ impl Engine {
             // skip rows whose typed (sparse) cells are malformed
             for (i, c) in cells.iter().enumerate() {
                 if let Some(t) = types_for_scan.get(i) {
-                    // a malformed typed cell is a hard error
-                    validate_insert_value(t, c.trim())?;
+                    // A cell that does not fit the column is a file-format error
+                    // (`IMPORT_FILE_FORMAT_ERROR`).
+                    validate_insert_value(t, c.trim()).map_err(|e| match e {
+                        // An already-classified parse error keeps its code.
+                        Error::Invalid(m) if m.starts_with("parser:") => Error::Invalid(m),
+                        other => Error::Invalid(format!("import: {other}")),
+                    })?;
                 }
             }
             rows.push(cells.into_iter().map(Literal::Str).collect());

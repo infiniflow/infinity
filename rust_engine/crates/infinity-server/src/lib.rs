@@ -3431,7 +3431,27 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
         .iter()
         .map(|c| {
             let key = c.rsplit('.').next().unwrap_or(c).to_ascii_lowercase();
-            map.get(&key).cloned().unwrap_or_default()
+            if let Some(t) = map.get(&key) {
+                return t.clone();
+            }
+            // An aggregate result takes its argument's type, widening the sum
+            // (and count/avg) to 64 bits, exactly as the C++ engine does.
+            if let Some((func, arg)) = key.strip_suffix(')').and_then(|s| s.split_once('(')) {
+                let arg = arg.trim();
+                let base = map.get(arg).cloned().unwrap_or_default();
+                let up = base.to_ascii_uppercase();
+                let is_float = up.contains("FLOAT") || up.contains("DOUBLE") || up.contains("REAL");
+                let is_int = up.contains("INT") || up.contains("HUGEINT");
+                return match func.trim() {
+                    "count" => "BIGINT".to_string(),
+                    "avg" => "DOUBLE".to_string(),
+                    "sum" if is_float => "DOUBLE".to_string(),
+                    "sum" if is_int => "BIGINT".to_string(),
+                    // `min`/`max` keep the argument's type.
+                    _ => base,
+                };
+            }
+            String::new()
         })
         .collect()
 }
