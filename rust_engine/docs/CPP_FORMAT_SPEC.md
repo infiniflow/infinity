@@ -588,3 +588,52 @@ u8[pos_list_len]
 **已查证：自定义 MergeOperator 无语义影响**（此前列为待冻结项）。C++ 在 `kv_store_impl.cpp:308,333` 为 RocksDB 实例注册 `String2UInt64AddOperator`（`src/storage/common/rocksdb_merge_operator_impl.cpp:28-49`）：`Merge` 把已存在的值与操作数**各自按十进制字符串** `stoull` 后相加，再 `std::to_string` 写回（已存在值缺失时按 0）。**但全仓库没有任何 `->Merge(` 调用点**（仅 `Put/Get/Delete/GetIterator`），因此该算子从不产生 merge 记录，磁盘上永远是普通键值。结论：**读写互通不需要它**——Rust 侧不注册也不影响；只有当 C++ 将来开始 `Merge` 时才会出现。
 
 **§8.6 全部冻结完毕**：catalog 的键（§8.2）、列值（`ColumnDef`/`DataType`）、索引值（`IndexBase` 全部十种类型）、默认值（`ConstantExpr`）、SPARSE `type_info`（`SparseInfo`）都已逐字段复刻并有 pin 测试；MergeOperator 经查证无语义影响。
+
+## 8.7 本轮新增冻结的事实（2026-10-17，均以源码行号为准）
+
+这些是在**把 C++ 键空间做成唯一 catalog**（§2.6.1 第 ④ 项）与补齐向量索引持久化/查询路径时，逐条实测出来、且此前文档未记的口径。
+
+### 8.7.1 元素类型名：C++ 内部名 vs 引擎拼写
+
+`EmbeddingDataType` 的**内部名**（`element_name`）与**引擎 SQL 拼写**不同，二者在 catalog 里只存序号，所以读写两侧必须各自归一化：
+
+| `EmbeddingDataType` | C++ 内部名（旧 Rust 回写值，**错**） | 引擎拼写（`.slt` 期望，**对**） |
+|---|---|---|
+| FLOAT32 | `FLOAT32` | `float` |
+| FLOAT64 | `FLOAT64` | `double` |
+| BIT / UINT8 / INT8 / INT16 / INT32 / INT64 | `BIT`/`UINT8`/… | `bit`/`uint8`/`int8`/… |
+| FLOAT16 / BFLOAT16 | `FLOAT16`/`BFLOAT16` | `float16`/`bfloat16` |
+
+`data_type_of_text` 读侧先 `to_ascii_uppercase()` 再匹配，故小写拼写可安全回写。另：`element_code` 必须把 **`UNSIGNED TINYINT`** 归到 `UINT8`（此前误判为 `INT8`，`test_knn_hnsw_u8` 因此失败）。`LogicalType` 侧同理补上 **`HUGEINT`=5**（服务端线上 `logic_type=5` 会发 `HUGEINT`，缺它会让任何 `CREATE TABLE` 失败）。
+
+### 8.7.2 函数索引的记录形态（`SECONDARYFUNCTIONAL`）
+
+`CREATE INDEX i ON t (sqrt(c1))` 的 `IndexMeta::column` 是**表达式文本**而非列名。C++ 侧对应 `IndexSecondaryFunctional`（`index_secondary_functional_impl.cpp:67-77`），字段来自 `logical_planner_impl.cpp:970-979` 的 `IndexSecondaryFunctional::Make`：
+
+- `column_names` = 表达式引用的**基列**（C++ 从 `index_info->column_name_` 取，单列）；
+- `func_col_params` = `FunctionExpression::ExtractFunctionInfo()`（字符串）；
+- `func_return_type` = `FunctionExpression::Type()`（`DataType::Serialize()` 对象）；
+- `function_expression` = **内嵌 JSON 对象**（`Serialize()` 里 `nlohmann::json::parse(function_expression_json_str_)`，故是对象不是字符串）；
+- 另有 `cardinality`（`"low"`/`"high"`）。
+
+Rust 侧写出的近似记录把**引擎的表达式文本**放进 `func_col_params`（读侧据此还原 `IndexMeta::column`），`function_expression` 只给 `{"name":"<func>"}`，`func_return_type` 暂用基列类型——**对 C++ 的 reparse 语义不完整**，但记录本身是合法且可往返的。
+
+### 8.7.3 引擎特有的「仅名字」索引
+
+`CREATE INDEX i ON t (c1 + 5)` 的 parser 对「顶层表达式」**故意不物化**（`index_column_from` 返回空串），因此没有 C++ `IndexBase` 可写。这类索引的名字落在表 tag `tbl|{db_id}|{table_id}|rust_name_only_indexes`（逗号分隔）——C++ 会忽略未知 tag，Rust 读侧据此恢复该索引存在、可 `DROP`。**这是本引擎的扩展键，不在 C++ 格式内。**
+
+### 8.7.4 analyzer 必须**按索引名**登记
+
+同一列可以同时挂两个 FULLTEXT 索引（如 `sparsegram-3-12` 与 `standard`），`filter_fulltext('col@index', …)` 的答案取决于**该索引**的 analyzer。按「表.列」登记会被后建的索引覆盖，故 Rust 侧同时按 `{table}#{index_name}` 记一份。
+
+语义差异：普通 analyzer 的过滤器是**词元 AND**；`sparsegram-*` 索引要求查询**连续出现**（各 n-gram 俱在）＝**子串**语义。
+
+### 8.7.5 `Varchar` 槽的不动点
+
+`Varchar` = 24 位长度 + union：**≤13 字节内联进槽**，更长的才进 outline（5 字节前缀 + 8 字节偏移）。读写两侧都必须遵守该不动点；此前的实现「总是走 outline、读侧对 >13 字节回占位符」会让长字符串镜像回读损坏。
+
+### 8.7.6 向量索引镜像与 FUSION 组合（引擎侧实现的口径）
+
+- HNSW：`56` 字节头 + plain 向量区 + 图区 + `u32` 标签数组，写在 `db_{db}/tbl_{tbl}/idx_{id}/seg_0/chunk_0.idx`；索引 id 取该表内的**索引序号**（与 `write_cpp_layout` 一致）。与 C++ 自建的索引**不逐字节相同**（建图 RNG 不同），但偏移全部显式，故**格式可读**；查询时把该图读回内存（`HnswIndex::from_parts`）并按 `max(4*topn,64)`（以行数封顶）取候选后**精确打分**。
+- IVF：`4×u32` 头 + `f32` 质心 + 每 part（`u32` 个数 + 段偏移 + 原始向量），`kPlain` 布局。
+- FUSION：`rrf` 按 `Σ 1/(rank_constant+rank)`（rank_constant 默认 60）；`weighted_sum`/`max` 按每子权重与 `none|minmax(默认)|l2|atan` 归一化，L2/Hamming 子取负或 `1-s`；`match_tensor` **忽略各子的分数**，只用其**行集**并按 `search_tensor` 对 `column_name` 重排；`topn`/`window_size` 默认 100（`match_tensor` 为 10）。
