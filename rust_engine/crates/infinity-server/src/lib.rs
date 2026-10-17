@@ -4398,6 +4398,8 @@ fn sql_op(name: &str) -> Option<&'static str> {
 fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<String>> {
     ip.read_struct_begin().map_err(tw)?; // ParsedExpr
     let mut pred = None;
+    // A ColumnExpr/ConstantExpr is not a predicate ("filter('c1')").
+    let mut not_predicate = false;
     loop {
         let fd = ip.read_field_begin().map_err(tw)?;
         if fd.field_type == TType::Stop {
@@ -4509,10 +4511,10 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
                 let op = if in_type { "IN" } else { "NOT IN" };
                 pred = Some(format!("({} {op} ({list}))", pexpr_sql(&left)));
             } else {
-                // A bare column / star is not a predicate.
-                return Err(Error::Invalid(
-                    "parser: the filter must be a boolean expression".into(),
-                ));
+                // A bare column / star is not a predicate; report it after the
+                // whole request is read (see NON_BOOLEAN_FILTER).
+                not_predicate = true;
+                ip.skip(uf.field_type).map_err(tw)?;
             }
             let _ = ip.read_field_end();
             let _ = ip.read_field_begin();
@@ -4523,8 +4525,16 @@ fn read_where(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Option<St
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    if not_predicate && pred.is_none() {
+        // The whole request is already consumed; the caller turns this marker
+        // into a 7012 response without desynchronising the stream.
+        return Ok(Some(NON_BOOLEAN_FILTER.to_string()));
+    }
     Ok(pred)
 }
+
+/// Marker for a filter that is not a boolean expression.
+const NON_BOOLEAN_FILTER: &str = "__NON_BOOLEAN_FILTER__";
 
 /// Reads a `ColumnExpr`: `{1: list<string> column_name, 2: bool star}`.
 fn read_column_expr(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<(Vec<String>, bool)> {
@@ -4738,7 +4748,13 @@ pub fn read_select_args(
                 ip.read_list_end().map_err(tw)?;
             }
             Some(6) if f.field_type == TType::Struct => r.search_sql = read_search_expr(ip)?,
-            Some(7) if f.field_type == TType::Struct => r.where_sql = read_where(ip)?,
+            Some(7) if f.field_type == TType::Struct => {
+                r.where_sql = read_where(ip)?;
+                if r.where_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
+                    bad.push("parser: the filter must be a boolean expression".to_string());
+                    r.where_sql = None;
+                }
+            }
             Some(8) if f.field_type == TType::List => {
                 // group_by_list: one ParsedExpr per group key.
                 let l = ip.read_list_begin().map_err(tw)?;
@@ -4751,7 +4767,13 @@ pub fn read_select_args(
                 }
                 ip.read_list_end().map_err(tw)?;
             }
-            Some(9) if f.field_type == TType::Struct => r.having_sql = read_where(ip)?,
+            Some(9) if f.field_type == TType::Struct => {
+                r.having_sql = read_where(ip)?;
+                if r.having_sql.as_deref() == Some(NON_BOOLEAN_FILTER) {
+                    bad.push("parser: the filter must be a boolean expression".to_string());
+                    r.having_sql = None;
+                }
+            }
             Some(10) if f.field_type == TType::Struct => {
                 if let PExpr::Value(ValueLit::Int(n)) = read_pexpr(ip)? {
                     r.limit = Some(n);
