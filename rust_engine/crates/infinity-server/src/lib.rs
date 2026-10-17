@@ -6626,6 +6626,9 @@ fn read_import_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result<Imp
         ip.read_field_end().map_err(tw)?;
     }
     ip.read_struct_end().map_err(tw)?;
+    // Consume the enclosing `Import_args` stop byte: leaving it unread shifts
+    // every later request on the connection by one byte.
+    end_args(ip)?;
     Ok(args)
 }
 
