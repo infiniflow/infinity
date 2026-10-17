@@ -505,7 +505,7 @@ QueryContext::query(sql)
 
 ### Gate B — SDK 协议兼容（硬门槛，核心验收面）
 - **`python/test_pysdk` 全部用例通过**（连 23817，未修改 SDK）。
-- **`go/tests` 全部用例通过**（`go test ./tests/...`，未修改 SDK）。
+- **`go/tests` 全部用例通过**（未修改 SDK）。**已达成（2026-10-18）**：`cd go/tests && GOPROXY=off go test -count=1 ./...` → `ok github.com/infiniflow/infinity-go-sdk/tests 359.558s`，**31 个测试文件 / 375 个 `Test*` 全部通过**（bwrap 私有 netns + `/tmp/gbfix` 作为 `/var/infinity/test_data`；首次跑出的 24 个 Import 失败全部是夹具路径问题——该目录需扁平化放 CSV/JSON/FVECS，补齐 `pysdk_test.{csv,json,jsonl}`、`test_empty.*` 后归零）。
 - **HTTP 模式（`--http`）全部用例通过**（`tools/run_http_api.py`，与 CI 一致）。
 - 前置：Thrift 线兼容（`TBinaryProtocol` + `client_version==37` + **逐类型二进制布局 spec**）；**跨语言 golden 报文**测试通过。
 
