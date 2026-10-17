@@ -5099,6 +5099,12 @@ impl Engine {
                 "invalid distance type '{metric}' for a sparse column"
             )));
         }
+        // `hamming` is defined on bit vectors only.
+        if metric == "hamming" && tensor_elem_type(decl) != ElemType::Bit {
+            return Err(Error::Invalid(
+                "not supported: hamming distance requires a bit vector".into(),
+            ));
+        }
         let topn = if is_tensor {
             // topn lives in the trailing parameter string; the default is 10.
             match arg_str(m.args.get(3)) {
