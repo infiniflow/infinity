@@ -1235,6 +1235,22 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
     if is_sparse_type(type_text) {
         return validate_sparse_literal(type_text, lit);
     }
+    // A column that stores a vector/tensor/array cannot take a bare scalar;
+    // the C++ engine rejects this as NOT_SUPPORTED.
+    let v = lit.trim();
+    if (is_embedding_type(type_text)
+        || is_tensor_type(type_text)
+        || is_array_type(type_text)
+        || is_sparse_type(type_text))
+        && !v.is_empty()
+        && !v.eq_ignore_ascii_case("null")
+        && !v.starts_with('[')
+    {
+        return Err(Error::Invalid(format!(
+            "not supported: column type '{}' requires an array value",
+            type_text.trim()
+        )));
+    }
     validate_tensor_dimension(type_text, lit)
 }
 
