@@ -3710,6 +3710,43 @@ impl Engine {
         Ok(out)
     }
 
+    /// Live rows with only column `idx` parsed. A vector scan over a wide table
+    /// must not decode every column: the text of all rows is what made
+    /// concurrent KNN queries exhaust memory.
+    fn fetch_rows_with_ids_projected(
+        &self,
+        table: &str,
+        idx: usize,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let prefix = row_prefix(table);
+        let dpref = del_prefix(table);
+        let mut deleted: std::collections::HashSet<usize> = Default::default();
+        for (k, _) in self.store.scan_prefix(&dpref)? {
+            if let Some(raw) = k.get(dpref.len()..) {
+                if let Ok(s) = std::str::from_utf8(raw) {
+                    if let Ok(n) = s.parse::<usize>() {
+                        deleted.insert(n);
+                    }
+                }
+            }
+        }
+        let mut rows = Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            if deleted.contains(&seq) {
+                continue;
+            }
+            let text = String::from_utf8_lossy(&v);
+            let cell = text.split('\t').nth(idx).unwrap_or("");
+            let mut cells = vec![Value::Null; idx + 1];
+            cells[idx] = parse_value(cell);
+            rows.push((seq, cells));
+        }
+        Ok(rows)
+    }
+
     /// Rows matched by an equality on an indexed column, or the whole table
     /// when no such index applies. Point deletes/updates over a big table must
     /// not materialise every row.
@@ -6110,7 +6147,13 @@ impl Engine {
             ));
         }
 
-        let rows = self.fetch_rows_with_ids(table)?;
+        // Score from the vector column alone unless a filter needs the other
+        // columns. Rows are fetched in full only for the surviving top-n.
+        let rows = if pred.is_none() && in_filter.is_none() && search_filter.is_none() {
+            self.fetch_rows_with_ids_projected(table, col_idx)?
+        } else {
+            self.fetch_rows_with_ids(table)?
+        };
         // A `bit` sparse column scores and renders as an integer.
         let bit_sparse = is_sparse && types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
         // Walk a persisted HNSW graph instead of every row when one is loaded
@@ -6358,7 +6401,11 @@ impl Engine {
         }
         scored.truncate(topn);
 
-        let mut by_id: HashMap<usize, Vec<Value>> = rows.into_iter().collect();
+        let wanted: Vec<u64> = scored.iter().map(|(seq, _, _)| *seq as u64).collect();
+        let mut by_id: HashMap<usize, Vec<Value>> = self
+            .fetch_some_rows_with_ids(table, &wanted)?
+            .into_iter()
+            .collect();
         let num = |f: f64| {
             if bit_sparse {
                 Value::Int(f as i64)
