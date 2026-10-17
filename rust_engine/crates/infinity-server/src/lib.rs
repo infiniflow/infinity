@@ -1325,7 +1325,17 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_show_config_args(&mut ip)?
                     };
-                    let value = engine.as_ref().and_then(|e| e.config_get(&name));
+                    let value = engine
+                        .as_ref()
+                        .and_then(|e| e.config_get(&name))
+                        // Read-only informational entries the reference always
+                        // answers, even though nothing sets them.
+                        .or_else(|| match name.as_str() {
+                            "version" => Some("0.0.0".to_string()),
+                            "profile" => Some(String::new()),
+                            "mem_index_capacity" => Some("0".to_string()),
+                            _ => None,
+                        });
                     write_show_config_response(&mut writer, seq, sid, &name, value.as_deref())?;
                 }
                 "ShowSegments" => {

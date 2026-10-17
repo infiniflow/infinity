@@ -3402,6 +3402,10 @@ impl Engine {
             .unwrap_or(1)
             .max(1);
         let rows = self.row_count(table).unwrap_or(0);
+        if rows == 0 {
+            // An empty table has no segment yet.
+            return 0;
+        }
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
     }
 
@@ -5349,8 +5353,7 @@ impl Engine {
                     // form with eight bits per item.
                     let bit_col = tensor_elem_type(decl) == ElemType::Bit;
                     let n = query_items.len();
-                    let ok = !query_items.is_empty()
-                        && (n == d || (bit_col && n * 8 == d));
+                    let ok = !query_items.is_empty() && (n == d || (bit_col && n * 8 == d));
                     if !ok {
                         return Err(Error::Invalid(format!(
                             "query embedding has {} dimensions, but column '{}' expects {}",
