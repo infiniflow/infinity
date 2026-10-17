@@ -5442,6 +5442,16 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    /// The rows of a `SELECT`, as rendered strings.
+    fn rows(e: &Engine, sql: &str) -> Vec<Vec<String>> {
+        for r in e.execute(sql).unwrap() {
+            if let QueryResult::Rows { rows, .. } = r {
+                return rows;
+            }
+        }
+        Vec::new()
+    }
+
     fn seed(e: &Engine) {
         e.execute("CREATE TABLE t (id INT, name VARCHAR);").unwrap();
         for (i, n) in [(1, "c"), (2, "a"), (3, "b"), (4, "a")] {
@@ -5449,6 +5459,81 @@ mod tests {
                 .unwrap();
         }
         e.flush().unwrap();
+    }
+
+    #[test]
+    fn match_tensor_fusion_reranks_by_the_search_tensor() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE tf (title VARCHAR, t TENSOR(FLOAT,2), body VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO tf VALUES ('a', [[1,0]], 'off'), ('b', [[0,1]], 'off');")
+            .unwrap();
+        // The rerank ignores the children's BM25: only the tensor similarity counts.
+        let rows = rows(
+            &e,
+            "SELECT title, ROUND(SCORE(), 4) FROM tf SEARCH MATCH TEXT ('body', 'off', 'topn=4'), \
+             FUSION('match_tensor', 'column_name=t;search_tensor=[[10.0,0.0]];\
+             tensor_data_type=float;match_method=MaxSim;topn=2');",
+        );
+        assert_eq!(
+            rows,
+            vec![
+                vec!["a".to_string(), "10.000000".to_string()],
+                vec!["b".to_string(), "0.000000".to_string()],
+            ]
+        );
+    }
+
+    #[test]
+    fn fulltext_threshold_filter_uses_the_index_score() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ft (num INT, doc VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO ft VALUES (1,'alpha'), (2,'alpha beta'), (3,'gamma delta');")
+            .unwrap();
+        e.execute("CREATE INDEX ft_idx ON ft (doc) USING FULLTEXT;")
+            .unwrap();
+        // A threshold is a *score* filter, which only the index can answer.
+        let keep = rows(
+            &e,
+            "SELECT num FROM ft WHERE filter_fulltext('doc','alpha','threshold=0.0001');",
+        );
+        assert_eq!(keep, vec![vec!["1".to_string()], vec!["2".to_string()]]);
+        let none = rows(
+            &e,
+            "SELECT num FROM ft WHERE filter_fulltext('doc','alpha','threshold=999');",
+        );
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn a_gram_index_filter_requires_the_query_contiguously() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE g (id INT, doc VARCHAR);").unwrap();
+        e.execute(
+            "INSERT INTO g VALUES (1,'harmful chemical reaction'), \
+             (2,'chemical processes are harmful');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX g_sg ON g (doc) USING FULLTEXT WITH (analyzer='sparsegram-3-12');")
+            .unwrap();
+        e.execute("CREATE INDEX g_std ON g (doc) USING FULLTEXT WITH (analyzer='standard');")
+            .unwrap();
+        // The gram index needs the query contiguous; the regular one accepts the
+        // terms apart. Same filter, different index named by `@`.
+        let gram = rows(
+            &e,
+            "SELECT id FROM g WHERE filter_fulltext('doc@g_sg','harmful chemical','operator=and');",
+        );
+        assert_eq!(gram, vec![vec!["1".to_string()]]);
+        let regular = rows(
+            &e,
+            "SELECT id FROM g WHERE filter_fulltext('doc','harmful chemical','operator=and');",
+        );
+        assert_eq!(regular.len(), 2);
     }
 
     #[test]
