@@ -31,6 +31,6 @@ fn main() {
         Err(_) => -1,
     };
     let mut out = std::io::stdout().lock();
-    write_delete_response(&mut out, seq, deleted.max(0)).expect("write reply");
+    write_delete_response(&mut out, seq, 0, "OK", deleted.max(0)).expect("write reply");
     out.flush().expect("flush");
 }

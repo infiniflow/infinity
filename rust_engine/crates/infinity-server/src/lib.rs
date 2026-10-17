@@ -476,23 +476,27 @@ fn handle_connection(
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
                         read_delete_args(&mut ip)?
                     };
-                    let deleted = match &engine {
+                    let (code, msg, deleted) = match &engine {
                         Some(eng) => match eng.execute(&req.to_sql()) {
-                            Ok(rs) => rs
-                                .into_iter()
-                                .map(|r| {
-                                    if let QueryResult::Deleted { count } = r {
-                                        count as i64
-                                    } else {
-                                        0
-                                    }
-                                })
-                                .sum::<i64>(),
-                            Err(_) => -1,
+                            Ok(rs) => {
+                                let deleted = rs
+                                    .into_iter()
+                                    .map(|r| {
+                                        if let QueryResult::Deleted { count } = r {
+                                            count as i64
+                                        } else {
+                                            0
+                                        }
+                                    })
+                                    .sum::<i64>();
+                                (OK, "OK".to_string(), deleted.max(0))
+                            }
+                            // A missing table is a request error, not `0 rows`.
+                            Err(e) => (e.status_code(), e.to_string(), 0),
                         },
-                        None => -1,
+                        None => (1, "no engine bound".to_string(), 0),
                     };
-                    write_delete_response(&mut writer, seq, deleted.max(0))?;
+                    write_delete_response(&mut writer, seq, code, &msg, deleted)?;
                 }
                 "Update" => {
                     let req = {
@@ -608,6 +612,26 @@ fn handle_connection(
                             };
                             run_common(engine.as_ref(), &sql, sid)
                         }
+                        "GetDatabase" if !db.is_empty() => {
+                            let exists = engine
+                                .as_ref()
+                                .and_then(|eng| eng.catalog().list_databases().ok())
+                                .map(|dbs| dbs.iter().any(|d| d.eq_ignore_ascii_case(&db)))
+                                .unwrap_or(false);
+                            if exists {
+                                CommonResponse {
+                                    error_code: OK,
+                                    error_msg: "OK".into(),
+                                    session_id: sid,
+                                }
+                            } else {
+                                CommonResponse {
+                                    error_code: 3021, // DB_NOT_EXIST
+                                    error_msg: format!("Database: {db} doesn't exist."),
+                                    session_id: sid,
+                                }
+                            }
+                        }
                         "DropDatabase" if !db.is_empty() => {
                             let sql = if conflict == Some(0) {
                                 format!("DROP DATABASE IF EXISTS {db}")
@@ -695,7 +719,23 @@ fn handle_connection(
                 "Select" => {
                     let req = {
                         let mut ip = TBinaryInputProtocol::new(&mut reader, true);
-                        read_select_args(&mut ip)?
+                        match read_select_args(&mut ip) {
+                            Ok(r) => r,
+                            // A malformed select list is reported through the
+                            // SelectResponse (the SDK turns error_code into an
+                            // InfinityException), not a thrift exception.
+                            Err(e) => {
+                                let resp = SelectResponseWire {
+                                    error_code: e.status_code(),
+                                    error_msg: e.to_string(),
+                                    column_defs: Vec::new(),
+                                    column_fields: Vec::new(),
+                                    extra_result: String::new(),
+                                };
+                                write_select_response(&mut writer, seq, &resp)?;
+                                return Ok(());
+                            }
+                        }
                     };
                     let err = |msg: String| SelectResponseWire {
                         error_code: 1,
@@ -781,11 +821,46 @@ fn handle_connection(
                     };
                     write_reply_common(&mut writer, "Flush", seq, &resp)?;
                 }
+                // `Compact` merges the table's segments into one.
+                "Compact" => {
+                    let (sid, fields) = {
+                        let mut ip = TBinaryInputProtocol::new(&mut reader, true);
+                        read_string_request(&mut ip)?
+                    };
+                    let (db, table) = (
+                        fields.get(&2).cloned().unwrap_or_default(),
+                        fields.get(&3).cloned().unwrap_or_default(),
+                    );
+                    let full = if db.is_empty() {
+                        table
+                    } else {
+                        format!("{db}.{table}")
+                    };
+                    let resp = match engine.as_ref() {
+                        Some(eng) => match eng.compact_table(&full) {
+                            Ok(()) => CommonResponse {
+                                error_code: OK,
+                                error_msg: "OK".into(),
+                                session_id: sid,
+                            },
+                            Err(e) => CommonResponse {
+                                error_code: e.status_code(),
+                                error_msg: e.to_string(),
+                                session_id: sid,
+                            },
+                        },
+                        None => CommonResponse {
+                            error_code: 1,
+                            error_msg: "no engine bound".into(),
+                            session_id: sid,
+                        },
+                    };
+                    write_reply_common(&mut writer, "Compact", seq, &resp)?;
+                }
                 // `RenameTable` is executed for real; the rest are engine-level
                 // maintenance that the in-memory engine has nothing to do for, so
                 // they report success rather than `unknown method`.
                 "Optimize"
-                | "Compact"
                 | "Cleanup"
                 | "Command"
                 | "AlterIndex"
@@ -1250,7 +1325,15 @@ fn handle_connection(
                             .count() as i64,
                         None => 0,
                     };
-                    write_show_database_response(&mut writer, seq, &db, table_count, "")?;
+                    // Identifiers are normalised to lower case, so `SHOW DATABASE`
+                    // echoes the canonical name even for `"DEFAULT_DB"`.
+                    write_show_database_response(
+                        &mut writer,
+                        seq,
+                        &db.to_ascii_lowercase(),
+                        table_count,
+                        "",
+                    )?;
                 }
                 "CreateIndex" => {
                     let req = {
@@ -2279,6 +2362,14 @@ pub fn rows_to_column_fields_typed(
                 .filter(|v| !v.eq_ignore_ascii_case("null"));
             let valid = cell.is_some();
             match code {
+                1 => {
+                    let n: i8 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
+                    chunk.push(n as u8);
+                }
+                2 => {
+                    let n: i16 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
+                    chunk.extend_from_slice(&n.to_le_bytes());
+                }
                 3 => {
                     let n: i32 = cell.and_then(|v| v.trim().parse().ok()).unwrap_or(0);
                     chunk.extend_from_slice(&n.to_le_bytes());
@@ -3622,6 +3713,15 @@ fn read_select_item(
                 // A projected function: send it to the engine as expression text
                 // (`year(c1)`), which is also the output column name.
                 let (name, args) = read_function_expr(ip)?;
+                // `AND`/`OR` are only defined on booleans; a projection like
+                // `c1 + 0.1 AND c2 - 1.0` is a type error, not a NULL column.
+                if (name.eq_ignore_ascii_case("and") || name.eq_ignore_ascii_case("or"))
+                    && !args.iter().all(is_predicate_pexpr)
+                {
+                    return Err(Error::Invalid(
+                        "parser: AND/OR operands must be boolean expressions".into(),
+                    ));
+                }
                 let e = PExpr::Call(name, args);
                 names.push(pexpr_sql(&e));
                 display.push(pexpr_name(&e));
@@ -3755,6 +3855,10 @@ pub fn read_select_args(ip: &mut TBinaryInputProtocol<&mut impl Read>) -> Result
     }
     ip.read_struct_end().map_err(tw)?; // SelectRequest
     end_args(ip)?; // Select_args
+    if !r.star && r.columns.is_empty() {
+        // 3050 EMPTY_SELECT_FIELDS: `output([])` must not degrade into `*`.
+        return Err(Error::Invalid("empty select fields".into()));
+    }
     Ok(r)
 }
 
@@ -4859,7 +4963,13 @@ pub fn read_delete_call(r: &mut impl Read) -> Result<(i32, DeleteReq)> {
 }
 
 /// Writes a `Delete` REPLY.
-pub fn write_delete_response(w: &mut impl Write, seq: i32, deleted_rows: i64) -> Result<()> {
+pub fn write_delete_response(
+    w: &mut impl Write,
+    seq: i32,
+    error_code: i64,
+    error_msg: &str,
+    deleted_rows: i64,
+) -> Result<()> {
     let mut o = TBinaryOutputProtocol::new(w, true);
     o.write_message_begin(&TMessageIdentifier::new("Delete", TMessageType::Reply, seq))
         .map_err(tw)?;
@@ -4871,11 +4981,11 @@ pub fn write_delete_response(w: &mut impl Write, seq: i32, deleted_rows: i64) ->
         .map_err(tw)?;
     o.write_field_begin(&TFieldIdentifier::new("error_code", TType::I64, 1i16))
         .map_err(tw)?;
-    o.write_i64(0).map_err(tw)?;
+    o.write_i64(error_code).map_err(tw)?;
     o.write_field_end().map_err(tw)?;
     o.write_field_begin(&TFieldIdentifier::new("error_msg", TType::String, 2i16))
         .map_err(tw)?;
-    o.write_string("OK").map_err(tw)?;
+    o.write_string(error_msg).map_err(tw)?;
     o.write_field_end().map_err(tw)?;
     o.write_field_begin(&TFieldIdentifier::new("deleted_rows", TType::I64, 3i16))
         .map_err(tw)?;

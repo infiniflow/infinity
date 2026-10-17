@@ -50,11 +50,15 @@ impl Error {
         match self {
             // 7012 PARSER_ERROR: data that does not parse for the column type.
             Error::Invalid(m) if m.starts_with("parser:") => 7012,
+            // 3050 EMPTY_SELECT_FIELDS.
+            Error::Invalid(m) if m.starts_with("empty select fields") => 3050,
             // 3037 IMPORT_FILE_FORMAT_ERROR: a CSV/JSON cell does not fit the
             // target column.
             Error::Invalid(m) if m.starts_with("import:") => 3037,
             // 3018 DUPLICATE_INDEX_NAME.
             Error::Invalid(m) if m.starts_with("index '") && m.ends_with("already exists") => 3018,
+            // 3033 DROPPING_USING_DB: `DROP DATABASE default_db`.
+            Error::Invalid(m) if m.starts_with("dropping the current database") => 3033,
             // 3032 NOT_SUPPORTED (e.g. dropping a column an index still uses,
             // or a value whose shape the column type cannot hold).
             Error::Invalid(m)
@@ -73,6 +77,11 @@ impl Error {
                 3013
             }
             Error::Invalid(_) => 3014,
+            // 3016 DUPLICATE_DATABASE_NAME.
+            Error::Catalog(m) if m.starts_with("database") && m.ends_with("already exists") => 3016,
+            // 3021 DB_NOT_EXIST for the catalog's own "database ... does not
+            // exist" wording (the message text is kept for the client).
+            Error::Catalog(m) if m.starts_with("database") && m.ends_with("does not exist") => 3021,
             Error::NotFound(m) => {
                 let m = m.to_ascii_lowercase();
                 if m.starts_with("database") || m.starts_with("db ") {

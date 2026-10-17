@@ -2115,6 +2115,13 @@ impl Engine {
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
             Statement::DropDatabase { name, if_exists } => {
+                // The default database backs every session, so the C++ engine
+                // refuses to drop it (3033 DROPPING_USING_DB).
+                if name.eq_ignore_ascii_case("default_db") {
+                    return Err(Error::Invalid(
+                        "dropping the current database is not allowed".into(),
+                    ));
+                }
                 let existed = self.catalog.drop_database(name, *if_exists)?;
                 if existed || *if_exists {
                     // drop every table registered under this database
@@ -3333,6 +3340,45 @@ impl Engine {
             .max(1);
         let rows = self.row_count(table).unwrap_or(0);
         batches.max(rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1))
+    }
+
+    /// Merges every segment of `table` into one: the live rows are re-keyed
+    /// contiguously from row id 0, tombstones are dropped and the write-batch
+    /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
+    pub fn compact_table(&self, table: &str) -> Result<()> {
+        let rows = self.fetch_rows_with_ids(table)?;
+        for (i, (old, _)) in rows.iter().enumerate() {
+            if *old == i {
+                continue;
+            }
+            let v = self
+                .store
+                .get(&row_key(table, *old))?
+                .ok_or_else(|| Error::Storage("row vanished during compaction".into()))?;
+            self.store.put(&row_key(table, i), &v)?;
+            self.store.delete(&row_key(table, *old))?;
+        }
+        for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
+            self.store.delete(&k)?;
+        }
+        let key = table.split('.').next_back().unwrap_or(table).to_string();
+        self.row_counters
+            .lock()
+            .unwrap()
+            .insert(key.clone(), (0, rows.len() as u32, true));
+        self.write_batches.lock().unwrap().insert(key, 1);
+        // Block-level indexes and cached results refer to the old row ids.
+        let prefix = format!("{table}.");
+        self.indexes
+            .lock()
+            .unwrap()
+            .retain(|k, _| !k.starts_with(&prefix));
+        self.vector_indexes
+            .lock()
+            .unwrap()
+            .retain(|k, _| !k.starts_with(&prefix));
+        self.result_cache.lock().unwrap().clear();
+        Ok(())
     }
 
     /// Rows held by `segment` of `table` (used by `ShowBlocks`).
