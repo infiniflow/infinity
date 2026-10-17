@@ -254,6 +254,22 @@ fn elem_type_of(token: &str) -> ElemType {
 }
 
 /// The query element type named by a `MATCH …` argument, if it names one.
+/// Like [`elem_type_of`] but rejects an unknown type name.
+fn elem_type_named(token: &str) -> Option<ElemType> {
+    let t: String = token
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    match t.as_str() {
+        "FLOAT" | "FLOAT32" | "FLOAT16" | "FP16" | "HALF" | "BFLOAT16" | "BF16" | "DOUBLE"
+        | "FLOAT64" | "BIT" | "INT8" | "TINYINT" | "UINT8" | "UNSIGNEDTINYINT" | "UTINYINT"
+        | "UNSIGNEDINT8" | "INT16" | "SMALLINT" | "INT32" | "INT" | "INTEGER" | "INT64"
+        | "BIGINT" | "LONG" => Some(elem_type_of(token)),
+        _ => None,
+    }
+}
+
 fn elem_type_of_optional(arg: Option<&ExprAst>) -> Option<ElemType> {
     arg_str(arg).map(|s| elem_type_of(&s))
 }
@@ -5744,6 +5760,15 @@ impl Engine {
                 "invalid distance type '{metric}' for a sparse column"
             )));
         }
+        // A `MATCH VECTOR` names the query element type; an unknown one is an
+        // error (the reference reports `INVALID_EMBEDDING_DATA_TYPE`).
+        if !is_tensor && !is_sparse {
+            if let Some(s) = arg_str(m.args.get(1)) {
+                if elem_type_named(&s).is_none() {
+                    return Err(Error::Invalid(format!("invalid embedding data type '{s}'")));
+                }
+            }
+        }
         // `hamming` is defined on bit vectors only.
         if metric == "hamming" && tensor_elem_type(decl) != ElemType::Bit {
             return Err(Error::Invalid(
@@ -5814,11 +5839,47 @@ impl Engine {
                     | "similarity"
                     | "alpha"
                     | "beta"
+                    // index hints the SDK passes through; the planner picks the
+                    // index itself, so they are accepted and ignored.
+                    | "index_name"
+                    | "ignore_index"
+                    | "index_type"
             );
             if !known {
                 return Err(Error::Invalid(format!(
                     "invalid parameter: unknown option '{key}'"
                 )));
+            }
+        }
+        // `index_name=…` selects a specific index; naming one that does not
+        // exist is an error, and combining it with `ignore_index=true` is
+        // contradictory.
+        let option_value = |name: &str| {
+            params.split(';').find_map(|p| {
+                let (k, v) = p.split_once('=')?;
+                k.trim()
+                    .eq_ignore_ascii_case(name)
+                    .then(|| v.trim().to_string())
+            })
+        };
+        if option_value("index_name").is_some()
+            && option_value("ignore_index")
+                .map(|v| v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false)
+        {
+            return Err(Error::Invalid(
+                "syntax: cannot combine index_name with ignore_index".into(),
+            ));
+        }
+        if let Some(want) = option_value("index_name") {
+            let short = table.split('.').next_back().unwrap_or(table);
+            let exists = self
+                .catalog
+                .list_indexes()?
+                .iter()
+                .any(|im| im.name == want && (im.table == *table || im.table == short));
+            if !exists {
+                return Err(Error::NotFound(format!("index '{want}'")));
             }
         }
         let threshold = with_opts
@@ -5896,9 +5957,12 @@ impl Engine {
                     // declared element type both drive the rounding precision.
                     let col_elem =
                         tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
-                    let qry_elem = arg_str(m.args.get(1))
-                        .map(|s| elem_type_of(&s))
-                        .unwrap_or(ElemType::Float32);
+                    let qry_elem = match arg_str(m.args.get(1)) {
+                        None => ElemType::Float32,
+                        Some(s) => elem_type_named(&s).ok_or_else(|| {
+                            Error::Invalid(format!("invalid tensor data type '{s}'"))
+                        })?,
+                    };
                     let score = tensor_score(
                         &q,
                         v,

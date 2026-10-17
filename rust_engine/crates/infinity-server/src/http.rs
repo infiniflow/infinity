@@ -658,24 +658,34 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
         let mut parts: Vec<String> = Vec::new();
         for e in search {
             let method = e.get("match_method").and_then(Json::as_str).unwrap_or("");
-            let topn = e.get("topn").and_then(Json::as_f64).unwrap_or(10.0) as i64;
-            let params = e
-                .get("params")
-                .and_then(Json::as_obj)
-                .map(|o| {
-                    o.iter()
-                        .map(|(k, v)| {
-                            format!(
-                                "{k}={}",
-                                v.as_str()
-                                    .map(|s| s.to_string())
-                                    .unwrap_or_else(|| render_json(v))
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(";")
-                })
-                .unwrap_or_default();
+            // An integer topn ≥ 1; anything else becomes -1 so the engine
+            // reports the reference's invalid-topn error.
+            let topn: i64 = match e.get("topn") {
+                None => 10,
+                Some(Json::Num(n)) if n.fract() == 0.0 && *n >= 1.0 => *n as i64,
+                Some(_) => -1,
+            };
+            // `params` is a dict in the SDK, but tests also send the raw
+            // `topn=…` string (or a scalar); anything that is not a dict or a
+            // string must be rejected by the engine, so it becomes an unknown
+            // option.
+            let params = match e.get("params") {
+                None | Some(Json::Null) => String::new(),
+                Some(Json::Str(s)) => s.clone(),
+                Some(Json::Obj(o)) => o
+                    .iter()
+                    .map(|(k, v)| {
+                        format!(
+                            "{k}={}",
+                            v.as_str()
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| render_json(v))
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(";"),
+                Some(_) => "__invalid_param__".to_string(),
+            };
             match method {
                 "dense" => {
                     let field = e.get("fields").and_then(Json::as_str).unwrap_or("");
@@ -683,10 +693,11 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                         .get("query_vector")
                         .map(sql_value_arr)
                         .unwrap_or("[]".into());
-                    let elem = e
-                        .get("element_type")
-                        .and_then(Json::as_str)
-                        .unwrap_or("float");
+                    let elem = match e.get("element_type") {
+                        None => "float".to_string(),
+                        Some(Json::Str(s)) => s.clone(),
+                        Some(_) => "__invalid__".to_string(),
+                    };
                     let metric = e.get("metric_type").and_then(Json::as_str).unwrap_or("l2");
                     let mut opts = format!("topn={topn}");
                     if !params.is_empty() {
@@ -698,7 +709,13 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                     ));
                 }
                 "text" => {
-                    let field = e.get("fields").and_then(Json::as_str).unwrap_or("");
+                    let field = match e.get("fields") {
+                        None => "",
+                        Some(Json::Str(s)) => s,
+                        // A non-string field list is invalid; the engine will
+                        // report the unknown column.
+                        Some(_) => "__invalid__",
+                    };
                     let text = e.get("matching_text").and_then(Json::as_str).unwrap_or("");
                     let mut opts = format!("topn={topn}");
                     if !params.is_empty() {
@@ -732,10 +749,12 @@ fn docs_sql(body: &Json, db: &str, table: &str) -> String {
                         .get("query_tensor")
                         .map(sql_value_arr)
                         .unwrap_or("[]".into());
-                    let elem = e
-                        .get("element_type")
-                        .and_then(Json::as_str)
-                        .unwrap_or("float");
+                    let elem = match e.get("element_type") {
+                        None => "float".to_string(),
+                        Some(Json::Str(s)) => s.clone(),
+                        // A non-string type is invalid; let the engine reject it.
+                        Some(_) => "__invalid__".to_string(),
+                    };
                     let mut opts = format!("topn={topn}");
                     if !params.is_empty() {
                         opts = format!("{opts};{params}");
