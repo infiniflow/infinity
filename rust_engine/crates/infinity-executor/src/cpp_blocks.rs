@@ -39,7 +39,7 @@ pub struct LoadedVectorIndex {
 /// own row store. The C++ block mirror duplicates every row, so mirroring a
 /// multi-gigabyte table would double its disk footprint; the mirror is a
 /// best-effort interop artifact, not the system of record.
-const MIRROR_BUDGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+const MIRROR_BUDGET_BYTES: usize = 1024 * 1024 * 1024;
 
 /// Rough encoded bytes per row, from the declared column types.
 fn estimated_row_bytes(types: &[String]) -> usize {

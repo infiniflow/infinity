@@ -128,14 +128,22 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
     if secs > 0 {
+        // The WAL rotates on its own tick: a full checkpoint (which rewrites
+        // the C++-format mirror) can take minutes on a large table, and must not
+        // leave the log growing the whole time.
+        let weak = Arc::downgrade(&engine);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(secs.min(1)));
+            match weak.upgrade() {
+                Some(e) => e.checkpoint_wal(),
+                None => break,
+            }
+        });
         let weak = Arc::downgrade(&engine);
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(secs));
             match weak.upgrade() {
                 Some(e) => {
-                    // Cheap first: bound the WAL even if the full checkpoint
-                    // (fsyncing a large LSM) takes a while.
-                    e.checkpoint_wal();
                     let _ = e.flush();
                 }
                 None => break,
