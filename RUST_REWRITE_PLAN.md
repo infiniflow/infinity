@@ -527,6 +527,12 @@ QueryContext::query(sql)
 - 根因：**服务端未设置 TCP_NODELAY**，小请求/小回复触发 Nagle + delayed ACK（Linux 40 ms 定时器）。
 - 修复：`infinity-server`/HTTP/PG 三个监听在 accept 后 `set_nodelay(true)`；同一条单行 INSERT 从 **43 ms → 0.072 ms**（~600×）。原先"慢/超时"的失败项（Go 全量、多文件 420s 上限）需要用新二进制重新测量，不能再引用旧结论。
 
+### Gate B — Go SDK 复测（2026-10-17 晚，TCP_NODELAY + 协议修复后）
+- `cd go && go test ./tests/`（连 Rust 服务，未改 SDK）：**326 passed / 44 failed，~70s**（此前 58 个顶层失败后 600s 超时、840s panic）。
+- 本轮修的协议层不变量：`ShowSegments/ShowBlocks/ShowColumns` 必须用各自的方法名回复（thrift-go 会校验，名字不对既报错又让连接错位→后续 `Disconnect` 挂死）；空 `alias_name` 不是别名（`SELECT count(*) AS`）；空的 `IndexInfo.function_expr` 不是函数索引（Go 会发空结构体，曾让全部 CreateIndex 失败）；`GetTable` 缺表返回 3022；建表列名非法 3005/3044、空列名 3042；标识符大小写不敏感（`qualify_tables` 与 server 的存在性检查都转小写）。
+- 剩余的 44 个失败里绝大多数是**同一个根因**：`TestImportExceedingRows` 导入 326 MB / 8.4M 行 CSV 时进程被 OOM 杀掉，随后整批用例连锁失败（"EOF"/连接拒绝）。**下一步：COPY 改成分块流式读取 + 分批提交**（当前整文件读入内存），即可解除这批连锁失败。
+- 方法论修正：单文件/单用例的"超时"不再当作功能缺失；每次测量必须（a）绑定夹具目录、(b) 检查服务端存活、(c) 以失败签名分组，而不是按用例名逐个修。
+
 ### Gate C — 持久化与恢复
 - `python/restart_test` 通过；`test/sql/snapshot` 通过；**WAL 崩溃恢复**用例通过。
 - **对象存储 / MinIO** 用例通过（对应 CI 的 minio job）。
