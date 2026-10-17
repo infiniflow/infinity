@@ -728,6 +728,12 @@ fn handle_connection(
                                         req.star, req.columns, columns
                                     );
                                 }
+                                if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                                    eprintln!(
+                                        "[COLS] star={} req={:?} got={:?}",
+                                        req.star, req.columns, columns
+                                    );
+                                }
                                 // A projected expression is named by the SQL
                                 // text the client sent (`(c1 + c2)`).
                                 if !req.star && req.columns.len() == columns.len() {
@@ -3514,11 +3520,23 @@ pub fn declared_types(engine: &Engine, table: &str, columns: &[String]) -> Vec<S
                 let up = base.to_ascii_uppercase();
                 let is_float = up.contains("FLOAT") || up.contains("DOUBLE") || up.contains("REAL");
                 let is_int = up.contains("INT") || up.contains("HUGEINT");
-                return match func.trim() {
+                return match func.trim().to_ascii_lowercase().as_str() {
                     "count" => "BIGINT".to_string(),
                     "avg" => "DOUBLE".to_string(),
                     "sum" if is_float => "DOUBLE".to_string(),
                     "sum" if is_int => "BIGINT".to_string(),
+                    // Date parts and string metrics are integers.
+                    "year" | "month" | "day" | "hour" | "minute" | "second" | "dayofmonth"
+                    | "dayofyear" | "dayofweek" | "weekday" | "week" | "weekofyear" | "quarter"
+                    | "century" | "decade" | "epoch" | "era" | "length" | "char_length"
+                    | "character_length" | "position" | "strpos" => "BIGINT".to_string(),
+                    // Text functions return text.
+                    "substring" | "substr" | "trim" | "ltrim" | "rtrim" | "upper" | "lower"
+                    | "concat" | "replace" | "lpad" | "rpad" => "VARCHAR".to_string(),
+                    // Scalar numeric functions.
+                    "sqrt" | "abs" | "round" | "trunc" | "truncate" | "ceil" | "ceiling"
+                    | "floor" | "pow" | "power" | "exp" | "ln" | "log" | "log2" | "log10"
+                    | "sin" | "cos" | "tan" => "DOUBLE".to_string(),
                     // `min`/`max` keep the argument's type.
                     _ => base,
                 };
@@ -3541,6 +3559,12 @@ pub fn select_response_from_typed(
         .enumerate()
         .map(|(i, name)| {
             let declared = types.get(i).map(String::as_str).unwrap_or("");
+            if std::env::var_os("INF_DEBUG_SQL").is_some() {
+                eprintln!(
+                    "[COLDEF] name={name} declared={declared:?} value={:?}",
+                    rows.first().and_then(|r| r.get(i))
+                );
+            }
             let (logic_type, physical) = match classify_column(declared, rows, i) {
                 ColKind::Embedding(dim, elem) => (
                     LOGIC_EMBEDDING,
