@@ -460,7 +460,13 @@ pub fn item_label(it: &SelectItem) -> String {
     match it {
         SelectItem::Aggregate(a) => agg_label(a.func, &a.args),
         SelectItem::Column(c) => c.clone(),
-        SelectItem::Func { name, .. } => name.to_ascii_lowercase(),
+        // The C++ engine names an un-aliased function column after the
+        // expression text (`year(c1)`, `datepart(c4, c1)`), not the bare name.
+        SelectItem::Func { name, args } => format!(
+            "{}({})",
+            name.to_ascii_lowercase(),
+            args.iter().map(key_text).collect::<Vec<_>>().join(", ")
+        ),
         SelectItem::Literal(_) => "c0".to_string(),
         SelectItem::Expr(e) => key_text(e),
         SelectItem::Star => "*".to_string(),

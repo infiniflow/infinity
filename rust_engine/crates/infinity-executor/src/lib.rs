@@ -6749,4 +6749,48 @@ mod tests {
             "[0]"
         );
     }
+
+    /// Invariant G5 (full-text): the index analyzer emits the word **and** its
+    /// stem, while query analysis emits the stem only. Measured against the C++
+    /// engine (doc_len 2,4,6,5,4 and doc_len_sum 21 on the five-row probe).
+    #[test]
+    fn analyzer_emits_word_and_stem_only_on_the_index_side() {
+        let none: Option<Vec<char>> = None;
+        assert_eq!(
+            tokenize_index_text("second text multiple", &none),
+            vec!["second", "text", "multiple", "multipl"]
+        );
+        assert_eq!(
+            tokenize_text("second text multiple", &none),
+            vec!["second", "text", "multipl"]
+        );
+    }
+
+    /// Invariant G5: the standard tokenizer is the C++ byte table — `/` unites
+    /// (`2012/02/14` -> `20120214`), while `_`, `.` and `,` split.
+    #[test]
+    fn standard_tokenizer_matches_the_cpp_byte_table() {
+        assert_eq!(standard_tokenize("2012/02/14"), vec!["20120214"]);
+        assert_eq!(standard_tokenize("x/y"), vec!["xy"]);
+        assert_eq!(
+            standard_tokenize("www.example.com/path"),
+            vec!["www", "example", "compath"]
+        );
+        assert_eq!(standard_tokenize("a_b"), vec!["a", "b"]);
+        assert_eq!(standard_tokenize("1,234"), vec!["1", "234"]);
+        assert_eq!(standard_tokenize("a@b#c$d"), vec!["a", "b", "c", "d"]);
+    }
+
+    /// Invariant G5: a highlighted cell keeps only the sentences with a hit and
+    /// joins them with `" ... "`.
+    #[test]
+    fn highlight_keeps_hit_sentences_and_marks_terms() {
+        let none: Option<Vec<char>> = None;
+        let q = tokenize_index_text("anarchism", &none);
+        let text = "Anarchism is a philosophy. Cats sleep. Anarchism spread.";
+        assert_eq!(
+            highlight_text(text, &q, &none),
+            "<em>Anarchism</em> is a philosophy.  ... <em>Anarchism</em> spread."
+        );
+    }
 }
