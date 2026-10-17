@@ -2341,7 +2341,10 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
                 let levels = array_levels(declared);
                 match cell {
@@ -2366,7 +2369,10 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
                 let (idx, val) = cell.map(parse_sparse_literal).unwrap_or_default();
                 let nnz = idx.len() as u32;
@@ -2409,7 +2415,10 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
                 let cell = cell.unwrap_or("");
                 if column_type == 12 {
@@ -2442,7 +2451,10 @@ pub fn rows_to_column_fields_typed(
             let mut chunk: Vec<u8> = Vec::new();
             let mut masks = Vec::with_capacity(rows.len());
             for r in rows {
-                let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+                let cell = r
+                    .get(ci)
+                    .map(String::as_str)
+                    .filter(|v| !v.eq_ignore_ascii_case("null"));
                 masks.push(cell.is_some());
                 let vals: Vec<f64> = cell
                     .map(|v| {
@@ -2472,7 +2484,10 @@ pub fn rows_to_column_fields_typed(
         let mut chunk: Vec<u8> = Vec::new();
         let mut masks = Vec::with_capacity(rows.len());
         for r in rows {
-            let cell = r.get(ci).map(String::as_str).filter(|v| *v != "null");
+            let cell = r
+                .get(ci)
+                .map(String::as_str)
+                .filter(|v| !v.eq_ignore_ascii_case("null"));
             let valid = cell.is_some();
             match code {
                 1 => {
@@ -6033,7 +6048,6 @@ pub fn read_show_table_call(r: &mut impl Read) -> Result<(i32, String, String, i
 }
 
 /// Writes a `ShowTable` REPLY.
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 pub fn write_show_table_response(
     w: &mut impl Write,
