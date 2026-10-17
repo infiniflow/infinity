@@ -36,10 +36,7 @@ fn encode_value(value: &[u8]) -> Vec<u8> {
 }
 
 fn decode_value(value: &[u8]) -> Vec<u8> {
-    if value.len() > LZ4_MAGIC.len()
-        && value[0] == LZ4_MAGIC[0]
-        && value[1] == LZ4_MAGIC[1]
-    {
+    if value.len() > LZ4_MAGIC.len() && value[0] == LZ4_MAGIC[0] && value[1] == LZ4_MAGIC[1] {
         if let Ok(raw) = lz4_flex::decompress_size_prepended(&value[LZ4_MAGIC.len()..]) {
             return raw;
         }
