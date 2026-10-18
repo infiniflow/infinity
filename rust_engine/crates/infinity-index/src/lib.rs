@@ -45,6 +45,12 @@ impl SecondaryIndex {
         Self::default()
     }
 
+    /// Removes and returns every entry, leaving the index empty. Used when a
+    /// memory tail is dumped into a sealed segment.
+    pub fn take(&mut self) -> BTreeMap<Vec<u8>, Vec<RowID>> {
+        std::mem::take(&mut self.map)
+    }
+
     /// Persists to `path` (length-prefixed entries). Durable via `sync_all`.
     pub fn flush_to(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();

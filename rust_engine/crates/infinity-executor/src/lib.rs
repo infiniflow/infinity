@@ -2187,32 +2187,24 @@ pub struct Engine {
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
     /// On-disk secondary-index segments (the reference's PGM chunks): one
-    /// mmap reader per `ROW_ID` segment, with its base row id.
-    /// Low-cardinality secondary chunks (unique keys + roaring bitmaps), used
-    /// for boolean columns like the reference's `LowCardinalityTag`.
+    /// mmap reader per `ROW_ID` segment, with its base row id. The memory map
+    /// only holds the tail written since the last dump.
     #[allow(clippy::type_complexity)]
-    secondary_low: Mutex<
-        HashMap<
-            String,
-            (
-                usize,
-                Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>,
-            ),
-        >,
-    >,
+    secondary_low:
+        Mutex<HashMap<String, Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>>>,
     #[allow(clippy::type_complexity)]
     secondary_disk: Mutex<
         HashMap<
             String,
-            (
-                usize,
-                Vec<(
-                    u64,
-                    Arc<infinity_storage::secondary_segment::SecondarySegmentReader>,
-                )>,
-            ),
+            Vec<(
+                u64,
+                Arc<infinity_storage::secondary_segment::SecondarySegmentReader>,
+            )>,
         >,
     >,
+    /// Keys whose memory map is a tail backed by on-disk chunks (integer and
+    /// boolean columns). String-keyed indexes keep the whole map in memory.
+    secondary_disk_backed: Mutex<std::collections::HashSet<String>>,
     /// secondary indexes keyed by `"<table>.<column>"`
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// Vector indexes loaded from the C++ block mirror, keyed by
@@ -2386,6 +2378,7 @@ impl Engine {
             dir,
             secondary_low: Mutex::new(HashMap::new()),
             secondary_disk: Mutex::new(HashMap::new()),
+            secondary_disk_backed: Mutex::new(Default::default()),
             indexes: Mutex::new(HashMap::new()),
             vector_indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
@@ -2533,17 +2526,10 @@ impl Engine {
                     .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
             let dir = self.dir.join("secondary").join(key.replace('/', "_"));
-            let version = self
-                .write_batches
-                .lock()
-                .unwrap()
-                .get(table)
-                .copied()
-                .unwrap_or(0);
             let mut readers = Vec::new();
             for (segment, mut entries) in by_segment {
                 entries.sort_unstable_by_key(|(k, _)| *k);
-                let path = dir.join(format!("seg_{segment}_{}_{version}.idx", entries.len()));
+                let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
                 // Always rewrite: the name does not capture the data, and a
                 // stale chunk from an earlier run would shadow this one.
                 if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
@@ -2557,15 +2543,14 @@ impl Engine {
                     readers.push((segment << 32, Arc::new(reader)));
                 }
             }
-            if !readers.is_empty() {
-                self.secondary_disk
-                    .lock()
-                    .unwrap()
-                    .insert(key.clone(), (version, readers));
-            }
+            self.secondary_disk
+                .lock()
+                .unwrap()
+                .insert(key.clone(), readers);
         }
         // Boolean columns use the low-cardinality variant.
         self.secondary_low.lock().unwrap().remove(&key);
+        let mut disk_backed = int_column;
         {
             let is_bool = self
                 .column_types(table)
@@ -2574,6 +2559,7 @@ impl Engine {
                 .map(|t| t.trim().to_ascii_uppercase().starts_with("BOOL"))
                 .unwrap_or(false);
             if is_bool {
+                disk_backed = true;
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
                 for (seq, row) in self.fetch_rows_with_ids(table)? {
                     let Some(v) = row.get(col_idx) else { continue };
@@ -2582,13 +2568,6 @@ impl Engine {
                         .push((seq as u64 & 0xffff_ffff) as u32);
                 }
                 let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
-                let version = self
-                    .write_batches
-                    .lock()
-                    .unwrap()
-                    .get(table)
-                    .copied()
-                    .unwrap_or(0);
                 let mut readers = Vec::new();
                 for (segment, lists) in by_segment {
                     let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
@@ -2610,79 +2589,204 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                if !readers.is_empty() {
-                    self.secondary_low
-                        .lock()
-                        .unwrap()
-                        .insert(key.clone(), (version, readers));
-                }
+                self.secondary_low
+                    .lock()
+                    .unwrap()
+                    .insert(key.clone(), readers);
             }
         }
-        self.indexes.lock().unwrap().insert(key, idx);
+        // A disk-backed index keeps only rows written since the last dump in
+        // memory; the rest is served by the chunk readers.
+        if disk_backed {
+            self.secondary_disk_backed
+                .lock()
+                .unwrap()
+                .insert(key.clone());
+            self.indexes
+                .lock()
+                .unwrap()
+                .insert(key, SecondaryIndex::new());
+        } else {
+            self.secondary_disk_backed.lock().unwrap().remove(&key);
+            self.indexes.lock().unwrap().insert(key, idx);
+        }
         Ok(())
+    }
+
+    /// Dumps the memory tail of every disk-backed secondary index into new
+    /// chunks, so memory stays bounded by the rows written since the last dump.
+    fn seal_secondary_indexes(&self) {
+        let backed: Vec<String> = self
+            .secondary_disk_backed
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect();
+        if backed.is_empty() {
+            return;
+        }
+        let Ok(catalog_indexes) = self.catalog.list_indexes() else {
+            return;
+        };
+        for key in backed {
+            let Some(im) = catalog_indexes
+                .iter()
+                .find(|im| index_key(&im.table, &im.column) == key)
+            else {
+                continue;
+            };
+            let Ok(schema) = self.table_schema(&im.table) else {
+                continue;
+            };
+            let Some(ci) = schema.iter().position(|c| c == &im.column) else {
+                continue;
+            };
+            let Ok(types) = self.column_types(&im.table) else {
+                continue;
+            };
+            let ty = types
+                .get(ci)
+                .map(|t| t.trim().to_ascii_uppercase())
+                .unwrap_or_default();
+            let is_bool = ty.starts_with("BOOL");
+            let is_int = ty.starts_with("INT") || ty.starts_with("UINT");
+            if !is_bool && !is_int {
+                continue;
+            }
+            let tail = match self.indexes.lock().unwrap().get_mut(&key) {
+                Some(idx) => idx.take(),
+                None => continue,
+            };
+            if tail.is_empty() {
+                continue;
+            }
+            if is_int {
+                let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+                for (raw_key, ids) in &tail {
+                    let Some(text) = std::str::from_utf8(raw_key).ok() else {
+                        continue;
+                    };
+                    let Ok(v) = text.trim().parse::<i64>() else {
+                        continue;
+                    };
+                    let ordered = (v as u64) ^ (1u64 << 63);
+                    for id in ids {
+                        by_segment
+                            .entry(id >> 32)
+                            .or_default()
+                            .push((ordered, (*id & 0xffff_ffff) as u32));
+                    }
+                }
+                let dir = self.dir.join("secondary").join(key.replace('/', "_"));
+                let mut chunk = std::fs::read_dir(&dir)
+                    .map(|d| {
+                        d.filter_map(|e| e.ok())
+                            .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
+                            .count()
+                    })
+                    .unwrap_or(0);
+                let mut readers = Vec::new();
+                for (segment, mut entries) in by_segment {
+                    entries.sort_unstable_by_key(|(k, _)| *k);
+                    let path = dir.join(format!("seg_{segment}_tail{chunk}.idx"));
+                    chunk += 1;
+                    if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    if let Ok(reader) =
+                        infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
+                    {
+                        readers.push((segment << 32, Arc::new(reader)));
+                    }
+                }
+                self.secondary_disk
+                    .lock()
+                    .unwrap()
+                    .entry(key)
+                    .or_default()
+                    .extend(readers);
+            } else {
+                let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
+                for (raw_key, ids) in &tail {
+                    let text = String::from_utf8_lossy(raw_key);
+                    let bit = matches!(text.trim(), "true" | "1");
+                    for id in ids {
+                        by_segment.entry(id >> 32).or_default()[bit as usize]
+                            .push((*id & 0xffff_ffff) as u32);
+                    }
+                }
+                let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
+                let mut chunk = std::fs::read_dir(&dir)
+                    .map(|d| {
+                        d.filter_map(|e| e.ok())
+                            .filter(|e| e.path().extension().is_some_and(|x| x == "idx"))
+                            .count()
+                    })
+                    .unwrap_or(0);
+                let mut readers = Vec::new();
+                for (segment, lists) in by_segment {
+                    let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
+                    for (bit, list) in lists.iter().enumerate() {
+                        if !list.is_empty() {
+                            entries.push((bit as u64, list.clone()));
+                        }
+                    }
+                    entries.sort_by_key(|(k, _)| *k);
+                    let path = dir.join(format!("seg_{segment}_tail{chunk}.idx"));
+                    chunk += 1;
+                    if infinity_storage::secondary_lowcard::write_lowcard_segment(&path, &entries)
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    if let Ok(reader) =
+                        infinity_storage::secondary_lowcard::LowCardReader::open(&path)
+                    {
+                        readers.push((segment << 32, Arc::new(reader)));
+                    }
+                }
+                self.secondary_low
+                    .lock()
+                    .unwrap()
+                    .entry(key)
+                    .or_default()
+                    .extend(readers);
+            }
+        }
     }
 
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
         let key = index_key(table, column);
+        let known = self.indexes.lock().unwrap().contains_key(&key)
+            || self.secondary_disk.lock().unwrap().contains_key(&key)
+            || self.secondary_low.lock().unwrap().contains_key(&key);
+        if !known {
+            return None;
+        }
+        let want = value.to_slt_string();
+        let schema = self.table_schema(table).unwrap_or_default();
+        let col = schema.iter().position(|c| c == column);
+        let mut out: Vec<u64> = Vec::new();
+        let mut seen: std::collections::HashSet<u64> = Default::default();
+        // Sealed chunks are authoritative for the rows they cover; the memory
+        // map only holds the tail written since the last dump.
         if let Literal::Int(v) = value {
             let ordered = (*v as u64) ^ (1u64 << 63);
-            // Only a chunk set written at the current write generation is
-            // authoritative; rows inserted since then live only in the memory
-            // index, so fall through to it.
-            let generation = self
-                .write_batches
-                .lock()
-                .unwrap()
-                .get(table)
-                .copied()
-                .unwrap_or(0);
             let disks = self.secondary_disk.lock().unwrap();
-            if let Some((version, segments)) = disks.get(&key) {
-                if *version == generation {
-                    let want = value.to_slt_string();
-                    let schema = self.table_schema(table).unwrap_or_default();
-                    let col = schema.iter().position(|c| c == column);
-                    let mut out = Vec::new();
-                    for (base, reader) in segments {
-                        for off in reader.lookup(ordered) {
-                            let id = base | u64::from(off);
-                            // A chunk can outlive the row it points at (UPDATE,
-                            // DROP COLUMN). Only a live row whose current value
-                            // still equals the probe is a hit.
-                            if self
-                                .store
-                                .get(&del_key(table, id as usize))
-                                .ok()
-                                .flatten()
-                                .is_some()
-                            {
-                                continue;
-                            }
-                            let Some(raw) =
-                                self.store.get(&row_key(table, id as usize)).ok().flatten()
-                            else {
-                                continue;
-                            };
-                            let text = String::from_utf8_lossy(&raw);
-                            if let Some(ci) = col {
-                                if text.split('\t').nth(ci).map(str::trim) != Some(want.as_str()) {
-                                    continue;
-                                }
-                            }
+            if let Some(segments) = disks.get(&key) {
+                for (base, reader) in segments {
+                    for off in reader.lookup(ordered) {
+                        let id = base | u64::from(off);
+                        if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
                             out.push(id);
                         }
                     }
-                    // An empty result after validation means the chunk is stale
-                    // for this probe (rows re-keyed by UPDATE/DROP COLUMN), so
-                    // fall through to the memory index rather than reporting a
-                    // miss.
-                    if !out.is_empty() {
-                        return Some(out);
-                    }
                 }
             }
-        }
-        if let Literal::Str(text) = value {
+        } else if let Literal::Str(text) = value {
             let lower = text.trim().to_ascii_lowercase();
             let bit = if lower == "true" {
                 Some(1u64)
@@ -2691,36 +2795,58 @@ impl Engine {
             } else {
                 None
             };
-            let Some(bit) = bit else {
-                let idxs = self.indexes.lock().unwrap();
-                let idx = idxs.get(&key)?;
-                return Some(idx.lookup(value.to_slt_string().as_bytes()).to_vec());
-            };
-            let generation = self
-                .write_batches
-                .lock()
-                .unwrap()
-                .get(table)
-                .copied()
-                .unwrap_or(0);
-            let lows = self.secondary_low.lock().unwrap();
-            if let Some((version, segments)) = lows.get(&key) {
-                if *version == generation {
-                    let mut out = Vec::new();
+            if let Some(bit) = bit {
+                let lows = self.secondary_low.lock().unwrap();
+                if let Some(segments) = lows.get(&key) {
                     for (base, reader) in segments {
                         for off in reader.lookup(bit) {
-                            out.push(base | u64::from(off));
+                            let id = base | u64::from(off);
+                            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
+                                out.push(id);
+                            }
                         }
-                    }
-                    if !out.is_empty() {
-                        return Some(out);
                     }
                 }
             }
         }
-        let idxs = self.indexes.lock().unwrap();
-        let idx = idxs.get(&key)?;
-        Some(idx.lookup(value.to_slt_string().as_bytes()).to_vec())
+        // The tail: rows inserted after the last dump, or the whole map for
+        // string-keyed indexes (which have no C++ chunk form).
+        if let Some(idx) = self.indexes.lock().unwrap().get(&key) {
+            for id in idx.lookup(want.as_bytes()) {
+                if self.live_row_matches(table, *id, col, &want) && seen.insert(*id) {
+                    out.push(*id);
+                }
+            }
+        }
+        out.sort_unstable();
+        Some(out)
+    }
+
+    /// A chunk or tail entry is a hit only when the row is live and still holds
+    /// the probed value (UPDATE re-appends, DROP COLUMN re-keys).
+    fn live_row_matches(&self, table: &str, id: u64, col: Option<usize>, want: &str) -> bool {
+        if self
+            .store
+            .get(&del_key(table, id as usize))
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return false;
+        }
+        let Some(raw) = self.store.get(&row_key(table, id as usize)).ok().flatten() else {
+            return false;
+        };
+        match col {
+            Some(ci) => {
+                String::from_utf8_lossy(&raw)
+                    .split('\t')
+                    .nth(ci)
+                    .map(str::trim)
+                    == Some(want)
+            }
+            None => true,
+        }
     }
 
     fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
@@ -2885,6 +3011,18 @@ impl Engine {
             .lock()
             .unwrap()
             .retain(|k, _| !k.starts_with(&key_prefix));
+        self.secondary_disk
+            .lock()
+            .unwrap()
+            .retain(|k, _| !k.starts_with(&key_prefix));
+        self.secondary_low
+            .lock()
+            .unwrap()
+            .retain(|k, _| !k.starts_with(&key_prefix));
+        self.secondary_disk_backed
+            .lock()
+            .unwrap()
+            .retain(|k| !k.starts_with(&key_prefix));
         for im in self.catalog.list_indexes()? {
             if im.table == name {
                 let _ = self.catalog.drop_index_on(&im.table, &im.name);
@@ -3323,12 +3461,26 @@ impl Engine {
                     .map(|k| (k.clone(), k[old_prefix.len()..].to_string()))
                     .collect();
                 let mut guard = self.indexes.lock().unwrap();
-                for (old_key, column) in pairs {
-                    if let Some(v) = guard.remove(&old_key) {
-                        guard.insert(index_key(new_name, &column), v);
+                for (old_key, column) in &pairs {
+                    if let Some(v) = guard.remove(old_key) {
+                        guard.insert(index_key(new_name, column), v);
                     }
                 }
                 drop(guard);
+                // Chunk readers and the disk-backed marker are keyed by the old
+                // name; rebuild the new key from the renamed rows.
+                self.secondary_disk
+                    .lock()
+                    .unwrap()
+                    .retain(|k, _| !k.starts_with(&old_prefix));
+                self.secondary_low
+                    .lock()
+                    .unwrap()
+                    .retain(|k, _| !k.starts_with(&old_prefix));
+                self.secondary_disk_backed
+                    .lock()
+                    .unwrap()
+                    .retain(|k| !k.starts_with(&old_prefix));
                 for im in self.catalog.list_indexes()? {
                     if im.table == *table {
                         let _ = self.catalog.drop_index_on(&im.table, &im.name);
@@ -3340,6 +3492,9 @@ impl Engine {
                             &im.options,
                         )?;
                     }
+                }
+                for (_, column) in &pairs {
+                    let _ = self.build_index(new_name, column);
                 }
                 self.catalog.rename_table(table, new_name)?;
                 Ok(QueryResult::Rows {
@@ -8869,6 +9024,7 @@ impl Engine {
         // memindex dump at checkpoint.
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
+        self.seal_secondary_indexes();
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
         if let Some(client) = self.object_store.lock().unwrap().clone() {
@@ -10841,6 +10997,78 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
+    }
+
+    /// A secondary index keeps only post-dump rows in memory; `flush()` seals
+    /// the tail into a chunk and lookups merge chunks with the tail.
+    #[test]
+    fn secondary_index_seals_its_memory_tail() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sec (id INT, v INT);").unwrap();
+        e.execute("INSERT INTO sec VALUES (1, 10), (2, 20);")
+            .unwrap();
+        e.execute("CREATE INDEX idx_v ON sec (v);").unwrap();
+        let q = "SELECT id FROM sec WHERE v = 20;";
+        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
+
+        // New rows land in the memory tail and are visible immediately.
+        e.execute("INSERT INTO sec VALUES (3, 20);").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["3".to_string()]]
+        );
+        let key = e
+            .indexes
+            .lock()
+            .unwrap()
+            .keys()
+            .find(|k| k.ends_with(".v"))
+            .cloned()
+            .unwrap();
+        assert!(e.indexes.lock().unwrap().get(&key).unwrap().key_count() > 0);
+
+        // The dump drains the tail; the answer comes from the chunk + new tail.
+        e.flush().unwrap();
+        assert_eq!(e.indexes.lock().unwrap().get(&key).unwrap().key_count(), 0);
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["3".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT id FROM sec WHERE v = 10;"),
+            vec![vec!["1".to_string()]]
+        );
+
+        // Tombstoned rows are filtered from both forms.
+        e.execute("DELETE FROM sec WHERE id = 2;").unwrap();
+        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+    }
+
+    /// Boolean columns use the low-cardinality (roaring) chunks with the same
+    /// tail/dump lifecycle.
+    #[test]
+    fn low_card_secondary_index_seals_its_memory_tail() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE b (id INT, flag BOOL);").unwrap();
+        e.execute("INSERT INTO b VALUES (1, true), (2, false);")
+            .unwrap();
+        e.execute("CREATE INDEX idx_flag ON b (flag);").unwrap();
+        let q = "SELECT id FROM b WHERE flag = true;";
+        assert_eq!(rows(&e, q), vec![vec!["1".to_string()]]);
+        e.execute("INSERT INTO b VALUES (3, true);").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        e.flush().unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["3".to_string()]]
+        );
+        e.execute("DELETE FROM b WHERE id = 1;").unwrap();
+        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
     #[test]

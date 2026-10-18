@@ -421,7 +421,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **全文** | ✅ 内存段 + 多个封盘段 | ✅ `.dic`(TermMeta+FST) / `.pos` / `.len` / `.row`（段内序号→行号），`mmap` 读取 | ✅ 未封存段 | ✅ WAND 按 `blockmax_wand_iterator` 移植，默认用于单字段纯 OR；BM25 与 C++ 逐位一致 |
 | **HNSW** | ✅ 每个 `chunk_{n}.idx` 一段 + 一个内存段 | ✅ 加载并查询全部 chunk | ✅ 插入即建图，查询与落盘图并集 | ✅ 按 `hnsw_alg.cppm`：`TryUpdateEnterPoint` 先于构图、`SearchLayerNearest` 逆序、`SelectNeighborsHeuristic` 远→近、`ConnectNeighbors` 剪枝 `2M/M`、`M=16`/`ef_construction=200` |
 | **多向量** | ✅ 每 `ROW_ID` 段 `.emvb` + `.mvec`；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `EMVBIndex::SaveIndexInner` 布局：粗聚类、`doc_lens`/offsets、质心分配、每质心 doc 列表、残差 PQ（8 子空间/8 bit）、OPQ 旋转 | ✅ 内存尾 | ✅ MaxSim + inner top-n + 中心点预过滤；查询用原始 token 精确重排 |
-| **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；低基数 `RoaringBitmap::WriteAdv` | ✅ / ✅ | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数 |
+| **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段；`CREATE INDEX` 物化，INSERT 进内存尾，`flush()` 封段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；低基数 `RoaringBitmap::WriteAdv` | ✅ 内存尾（仅 DDL 后新行） | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数；lookup 合并「封盘段 + 尾段」 |
 | **稀疏** | ✅ 每 `ROW_ID` 段一个 BMP 索引；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `seg_*.bmp`，`bmp_cpp` 按 `BMPAlg::SaveToPtr` 的 `ivt+fwd+doc_ids`，地址对齐与 `GetSizeInBytesVecAligned` 一致 | ✅ 内存尾 | ✅ block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 裁剪、tail；`SEARCH MATCH SPARSE` 已接入 |
 | **IVF** | 镜像 | ✅ plain/SQ/PQ 编解码 | — | ❌ 检索未移植（仅格式与镜像） |
 
@@ -443,11 +443,10 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.1 架构对齐缺口（P0）
 
-1. **次级索引只有「DDL 时重建」**：chunk 仅在 `CREATE INDEX` / `open` / `ALTER` / 快照恢复时重建；任何 INSERT 令 write generation 前进后，查询整体回退到内存 BTree（`lib.rs:2311-2362`），内存索引随行数线性增长，未按段封存。
-2. **memindex 预算覆盖不全**：只有全文（`INFINITY_TEXT_SEGMENT_BYTES`/64 MiB）与 HNSW（`memindex_memory_quota`）有预算与 dump 生命周期；稀疏、多向量、次级的内存尾没有配额，也没有「封段后释放」。
-3. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
+1. **memindex 预算覆盖不全**：只有全文（`INFINITY_TEXT_SEGMENT_BYTES`/64 MiB）与 HNSW（`memindex_memory_quota`）有预算与 dump 生命周期；稀疏、多向量、次级的内存尾没有配额，也没有「封段后释放」。
+2. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
 
-> 稀疏与多向量的「写入期构建 + 封段 + 查询只读」已落地（#83/#84）。两者的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
+> 稀疏、多向量与次级索引的「写入期构建 + 封段 + 查询只读」已落地（#83/#84/#85）。三者的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
 #### 7.5.2 功能对齐缺口（P1）
 
