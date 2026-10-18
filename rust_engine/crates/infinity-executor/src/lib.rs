@@ -2431,6 +2431,52 @@ struct TableEntry {
     row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
     row_counter: Option<(u32, u32, bool)>,
+    /// Decoded rows of a **scalar-only** table (the reference's in-memory
+    /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
+    /// live row; any mutation that rewrites rows drops it.
+    row_cache: Option<RowCache>,
+}
+
+/// A table's decoded rows, bounded by [`ROW_CACHE_BUDGET_BYTES`].
+struct RowCache {
+    rows: Vec<(usize, Vec<Value>)>,
+    bytes: usize,
+}
+
+const ROW_CACHE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
+
+fn value_bytes(v: &Value) -> usize {
+    match v {
+        Value::Str(s) => s.len() + 24,
+        _ => 24,
+    }
+}
+
+impl RowCache {
+    fn push(&mut self, seq: usize, row: Vec<Value>) {
+        self.bytes += 24 + row.iter().map(value_bytes).sum::<usize>();
+        self.rows.push((seq, row));
+    }
+}
+
+/// Only scalar columns are cached: array/tensor/sparse cells have several
+/// textual representations, so their decoded form is not stable enough to
+/// reuse across write and scan paths.
+fn scalar_only(types: &[String]) -> bool {
+    types.iter().all(|t| {
+        let t = t.trim().to_ascii_uppercase();
+        !is_blob_type(&t)
+            && !t.contains("ARRAY")
+            && (t.starts_with("INT")
+                || t.starts_with("BIGINT")
+                || t.starts_with("SMALLINT")
+                || t.starts_with("TINYINT")
+                || t.starts_with("FLOAT")
+                || t.starts_with("DOUBLE")
+                || t.starts_with("REAL")
+                || t.starts_with("VARCHAR")
+                || t.starts_with("BOOL"))
+    })
 }
 
 /// Engine-wide runtime state.
@@ -2512,6 +2558,8 @@ pub struct Engine {
     /// Estimated bytes buffered in each HNSW memory index since its last dump,
     /// keyed by `"<table>.<column>"`.
     index_pending_bytes: Mutex<HashMap<String, usize>>,
+    /// Write batches since the last `malloc_trim` (see `insert_literals`).
+    batches_since_trim: std::sync::atomic::AtomicUsize,
     /// In-memory HNSW segment per vector column, keyed by
     /// `"<table>.<column>"`; the on-disk graph lives in `vector_indexes`.
     hnsw_mem: Mutex<HashMap<String, hnsw_mem::HnswIndexInMem>>,
@@ -2654,6 +2702,7 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             tables: Mutex::new(HashMap::new()),
             index_pending_bytes: Mutex::new(HashMap::new()),
+            batches_since_trim: std::sync::atomic::AtomicUsize::new(0),
             hnsw_mem: Mutex::new(HashMap::new()),
             hnsw_probed: Mutex::new(Default::default()),
             text_index: Mutex::new(HashMap::new()),
@@ -3400,6 +3449,54 @@ impl Engine {
             .unwrap_or(true)
     }
 
+    /// Appends a committed batch to the decoded-row cache, if the table has one.
+    fn append_row_cache(&self, table: &str, base: usize, encoded: &[String]) {
+        let key = self.table_key(table);
+        if !self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.row_cache.is_some())
+            .unwrap_or(false)
+        {
+            return;
+        }
+        // Decode through the same path as a scan: the stored text is the
+        // canonical rendering (e.g. a FLOAT column renders `1.000000` even when
+        // the literal was `1`).
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut decoded = Vec::with_capacity(encoded.len());
+        for text in encoded {
+            match self.parse_stored_row(table, &defaults, text.as_bytes()) {
+                Ok(values) => decoded.push(values),
+                Err(_) => return,
+            }
+        }
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&key) else {
+            return;
+        };
+        let Some(cache) = entry.row_cache.as_mut() else {
+            return;
+        };
+        for (k, values) in decoded.into_iter().enumerate() {
+            cache.push(base + k, values);
+        }
+        if cache.bytes > ROW_CACHE_BUDGET_BYTES {
+            entry.row_cache = None;
+        }
+    }
+
+    /// Drops the decoded-row cache; every mutation that rewrites or removes
+    /// rows calls it before the next scan.
+    fn invalidate_row_cache(&self, table: &str) {
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            entry.row_cache = None;
+        }
+    }
+
     /// The key of a table's [`TableEntry`]: the fully-qualified lower-case
     /// name (the C++ catalog's `db.table` key).
     fn table_key(&self, table: &str) -> String {
@@ -3688,11 +3785,26 @@ impl Engine {
         // A memory index that already exceeds its quota is dumped
         // before these rows join it.
         self.note_index_insert(table, rows.len());
+        // A scalar table's first batch in this process starts an empty decoded
+        // row cache; the batch is appended after the commit.
+        {
+            let key = self.table_key(table);
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            if entry.row_cache.is_none() && entry.write_batches == 0 && scalar_only(&types) {
+                entry.row_cache = Some(RowCache {
+                    rows: Vec::new(),
+                    bytes: 0,
+                });
+            }
+        }
         // one transaction -> one WAL record + one KV batch (batched durability)
         let mut t = self.txn.begin();
+        let mut encoded_rows: Vec<String> = Vec::with_capacity(rows.len());
         for (k, row) in rows.iter().enumerate() {
             let encoded = self.encode_row_stored(table, row, &types)?;
-            t.put(row_key(table, base + k), encoded.into_bytes());
+            t.put(row_key(table, base + k), encoded.as_bytes().to_vec());
+            encoded_rows.push(encoded);
         }
         self.txn.commit(t)?;
         // With no index of any kind in memory there is nothing to maintain;
@@ -3707,8 +3819,21 @@ impl Engine {
             }
         }
         self.bump_writes(table);
-        // Give the allocator's per-batch scratch back to the OS.
-        infinity_storage::trim_allocator();
+        self.append_row_cache(table, base, &encoded_rows);
+        // Give the allocator's per-batch scratch back to the OS. Trimming on
+        // every batch walks the whole heap; once every few batches is enough
+        // to keep RSS flat and avoids adding milliseconds to each commit.
+        self.batches_since_trim
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if self
+            .batches_since_trim
+            .load(std::sync::atomic::Ordering::Relaxed)
+            >= 8
+        {
+            self.batches_since_trim
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+            infinity_storage::trim_allocator();
+        }
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -3717,6 +3842,7 @@ impl Engine {
     /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
     /// concurrent deleters get `kTxnConflict`.
     fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
+        self.invalidate_row_cache(table);
         for seq in deletes {
             txn.delete(del_key(table, *seq));
         }
@@ -3964,6 +4090,7 @@ impl Engine {
                 })
             }
             Statement::AlterTableDropColumn { table, column } => {
+                self.invalidate_row_cache(table);
                 // Dropping a column that does not exist is `COLUMN_NOT_EXIST`.
                 let schema = self.table_schema(table)?;
                 if !schema.iter().any(|c| c == column) {
@@ -4015,6 +4142,8 @@ impl Engine {
                     self.txn.commit(t)?;
                 }
                 self.reset_row_counter(table);
+                // The rewrite moved every row to a new sequence id.
+                self.invalidate_row_cache(table);
                 self.storage.catalog.drop_column(table, column)?;
                 if let Some(im) = self
                     .storage
@@ -4047,6 +4176,8 @@ impl Engine {
                 })
             }
             Statement::AlterTableAdd { table, columns } => {
+                // Rows cached before the new columns lack their defaults.
+                self.invalidate_row_cache(table);
                 // A column may not be added twice (`DUPLICATE_COLUMN_NAME`).
                 let existing = self.table_schema(table)?;
                 let mut seen: Vec<String> = existing.clone();
@@ -5335,6 +5466,25 @@ impl Engine {
     /// Rows shorter than the schema (e.g. after `ALTER TABLE ADD COLUMN`) are
     /// padded with their column defaults.
     fn fetch_rows_with_ids(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+        let key = self.table_key(table);
+        let cached = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.row_cache.as_ref().map(|c| (c.rows.clone(), c.bytes)));
+        if let Some((rows, bytes)) = cached {
+            // The cache is authoritative only while it covers every live row.
+            if rows.len() == self.row_count(table)? {
+                return Ok(rows);
+            }
+            let mut tables = self.tables.lock().unwrap();
+            if let Some(entry) = tables.get_mut(&key) {
+                if entry.row_cache.as_ref().map(|c| c.bytes) == Some(bytes) {
+                    entry.row_cache = None;
+                }
+            }
+        }
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         // Collect tombstones with one prefix scan: a point lookup per row
@@ -5367,6 +5517,21 @@ impl Engine {
                 });
             }
             rows.push((seq, cells));
+        }
+        if rows.len() == self.row_count(table)? {
+            let types = self.column_types(table).unwrap_or_default();
+            if scalar_only(&types) {
+                let bytes: usize = 24
+                    + rows
+                        .iter()
+                        .map(|(_, r)| r.iter().map(value_bytes).sum::<usize>())
+                        .sum::<usize>();
+                if bytes <= ROW_CACHE_BUDGET_BYTES {
+                    let mut tables = self.tables.lock().unwrap();
+                    tables.entry(key).or_default().row_cache =
+                        Some(RowCache { rows: rows.clone(), bytes });
+                }
+            }
         }
         Ok(rows)
     }
@@ -6651,6 +6816,7 @@ impl Engine {
     /// contiguously from row id 0, tombstones are dropped and the write-batch
     /// counter is reset, so `SHOW SEGMENTS` reports a single segment.
     pub fn compact_table(&self, table: &str) -> Result<()> {
+        self.invalidate_row_cache(table);
         let rows = self.fetch_rows_with_ids(table)?;
         // Renumber through the transaction so WAL replay reproduces the
         // compacted state: a row moved from `old` to `i` also leaves a
@@ -6689,6 +6855,8 @@ impl Engine {
             let entry = tables.entry(key).or_default();
             entry.row_counter = Some((0, rows.len() as u32, true));
             entry.write_batches = 1;
+            // Compaction renumbered every row.
+            entry.row_cache = None;
         }
         // Block-level indexes and cached results refer to the old row ids.
         let prefix = format!("{table}.");
@@ -12633,5 +12801,42 @@ mod tests {
             ),
             vec![vec!["11".to_string()]]
         );
+    }
+
+    /// Scalar tables keep a decoded row cache (the reference's in-memory
+    /// `DataBlock`s); array/vector tables do not, because their decoded form is
+    /// not stable across the write and scan paths.
+    #[test]
+    fn scalar_tables_use_the_row_cache() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE rc (id INT, name VARCHAR);").unwrap();
+        e.execute("INSERT INTO rc VALUES (1,'a'),(2,'b');").unwrap();
+        assert_eq!(rows(&e, "SELECT * FROM rc;").len(), 2);
+        let key = e.table_key("rc");
+        assert!(e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|t| t.row_cache.as_ref())
+            .is_some());
+        assert_eq!(
+            rows(&e, "SELECT id FROM rc WHERE id = 2;"),
+            vec![vec!["2".to_string()]]
+        );
+
+        e.execute("CREATE TABLE av (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute("INSERT INTO av VALUES (1,[0.0,0.0]);").unwrap();
+        assert_eq!(rows(&e, "SELECT * FROM av;").len(), 1);
+        let key = e.table_key("av");
+        assert!(e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|t| t.row_cache.as_ref())
+            .is_none());
     }
 }
