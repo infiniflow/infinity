@@ -1,87 +1,340 @@
-//! Sparse retrieval ported from the reference's BMP index
-//! (`src/storage/knn_index/sparse/{bmp_ivt,bmp_fwd,bmp_alg}.cppm`).
+//! Block-max sparse retrieval, ported class by class from the reference
+//! (`src/storage/knn_index/sparse/{bmp_fwd,bmp_ivt,bmp_alg}.cppm`).
 //!
-//! The index splits the document space into blocks of [`BMP_BLOCK_SIZE`] rows.
-//! For every term it keeps, per block, the posting offsets/scores and the
-//! block's maximum score, plus the term's k-th largest score. A query then:
+//! [`BlockFwd`] groups documents into blocks of [`BMP_BLOCK_SIZE`] and keeps,
+//! per block, every term with its within-block offsets and scores.
+//! [`BMPIvt`] is the inverted index over completed blocks: per term, the block
+//! ids, the block maxima and the postings. [`BmpAlg`] (= C++ `BMPAlg`) wires
+//! the two together and implements `SearchKnn`.
+//!
+//! The reference's mmap variants (`BMPOwnMem::kFalse`) are represented by
+//! `infinity-storage::bmp_cpp`, which reads the same byte layout.
+//!
+//! A query:
 //!
 //!   1. derives `threshold = max(term_score * kth(topk))`,
 //!   2. accumulates a per-block upper bound from the terms' block maxima
 //!      (`Calculate2`),
 //!   3. visits blocks with `upper_bound >= threshold`, highest bound first,
-//!   4. scores the block exactly and stops once `upper_bound * alpha` is below
-//!      the current k-th score,
-//!   5. optionally scans the tail rows that do not fill a whole block.
-//!
-//! This replaces the executor's brute-force "dot product over every row".
+//!   4. scores the block from the forward index (`GetScores`) and stops once
+//!      `upper_bound * alpha` is below the current k-th score,
+//!   5. optionally scores the tail rows that do not fill a whole block.
 
 use std::collections::{BinaryHeap, HashMap};
 
 /// `BMP_BLOCK_SIZE` (`src/common/default_values.cppm:184`).
 pub const BMP_BLOCK_SIZE: usize = 16;
 
-/// One term's postings, grouped by block.
-#[derive(Debug, Default, Clone)]
-struct TermPostings {
-    /// `(block id, [(offset in block, score)])`.
-    blocks: Vec<(u32, Vec<(u16, f32)>)>,
-    /// Maximum score per block, parallel to `blocks`.
+/// A sparse vector: `(index, value)` pairs sorted by index.
+pub type SparseVec = Vec<(u32, f32)>;
+
+/// `BMPAlgBase::SearchKnn` options.
+/// C++: `BmpSearchOptions` (`bmp_util.cppm:104`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BmpSearchOptions {
+    pub alpha: f32,
+    pub beta: f32,
+    pub use_tail: bool,
+}
+
+impl Default for BmpSearchOptions {
+    fn default() -> Self {
+        Self {
+            alpha: 1.0,
+            beta: 1.0,
+            use_tail: true,
+        }
+    }
+}
+
+/// One term's postings inside a block.
+/// C++: an entry of `BlockTerms<..., kTrue>` / `BlockTermsIter::Value`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BlockTerm {
+    pub term_id: u32,
+    /// Offsets of the matching documents inside the block.
+    pub block_offsets: Vec<u16>,
+    /// Score of each document, parallel to `block_offsets`.
+    pub values: Vec<f32>,
+}
+
+/// Documents buffered until a block fills.
+/// C++: `TailFwd<DataType, IdxType>` (`bmp_fwd.cppm`).
+#[derive(Clone, Debug, Default)]
+pub struct TailFwd {
+    docs: Vec<SparseVec>,
+}
+
+impl TailFwd {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// C++: `TailFwd::AddDoc`; returns the number of buffered documents.
+    pub fn add_doc(&mut self, doc: &[(u32, f32)]) -> usize {
+        self.docs.push(doc.to_vec());
+        self.docs.len()
+    }
+
+    pub fn len(&self) -> usize {
+        self.docs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+    }
+
+    /// C++: `GetTailTerms`.
+    pub fn get_tail_terms(&self) -> &[SparseVec] {
+        &self.docs
+    }
+
+    /// C++: `ToBlockFwd` — groups the buffered documents by term. The
+    /// reference sorts by term only; ties are ordered by document offset here
+    /// so the block layout is deterministic.
+    pub fn to_block_fwd(&self) -> Vec<BlockTerm> {
+        let mut pairs: Vec<(u32, u16, f32)> = Vec::new();
+        for (offset, doc) in self.docs.iter().enumerate() {
+            for &(term, value) in doc {
+                pairs.push((term, offset as u16, value));
+            }
+        }
+        pairs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut out: Vec<BlockTerm> = Vec::new();
+        for (term, offset, value) in pairs {
+            match out.last_mut() {
+                Some(last) if last.term_id == term => {
+                    last.block_offsets.push(offset);
+                    last.values.push(value);
+                }
+                _ => out.push(BlockTerm {
+                    term_id: term,
+                    block_offsets: vec![offset],
+                    values: vec![value],
+                }),
+            }
+        }
+        out
+    }
+
+    /// C++: `GetScores` — dot product of each buffered document with the
+    /// query, in document order.
+    pub fn get_scores(&self, query: &[(u32, f32)]) -> Vec<f32> {
+        let mut res = vec![0.0f32; self.docs.len()];
+        for (offset, doc) in self.docs.iter().enumerate() {
+            let mut j = 0;
+            for &(term, q_score) in query {
+                while j < doc.len() && doc[j].0 < term {
+                    j += 1;
+                }
+                if j == doc.len() {
+                    break;
+                }
+                if doc[j].0 == term {
+                    res[offset] += q_score * doc[j].1;
+                    j += 1;
+                }
+            }
+        }
+        res
+    }
+}
+
+/// The forward index: per block, its terms sorted by term id.
+/// C++: `BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>` (`bmp_fwd.cppm`).
+#[derive(Clone, Debug)]
+pub struct BlockFwd {
+    block_size: usize,
+    blocks: Vec<Vec<BlockTerm>>,
+    tail: TailFwd,
+}
+
+impl BlockFwd {
+    /// C++: `BlockFwd(block_size)`.
+    pub fn new(block_size: usize) -> Self {
+        Self {
+            block_size: block_size.max(1),
+            blocks: Vec::new(),
+            tail: TailFwd::new(),
+        }
+    }
+
+    /// C++: `AddDoc` — buffers a document and returns the documents of a block
+    /// that just completed (the caller feeds them to the inverted index).
+    pub fn add_doc(&mut self, doc: &[(u32, f32)]) -> Option<TailFwd> {
+        if self.tail.add_doc(doc) < self.block_size {
+            return None;
+        }
+        let done = std::mem::take(&mut self.tail);
+        self.blocks.push(done.to_block_fwd());
+        Some(done)
+    }
+
+    /// C++: `GetBlockTerms`.
+    pub fn get_block_terms(&self, block_id: usize) -> &[BlockTerm] {
+        self.blocks.get(block_id).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    /// C++: `GetScoresTail`.
+    pub fn get_scores_tail(&self, query: &[(u32, f32)]) -> Vec<f32> {
+        self.tail.get_scores(query)
+    }
+
+    /// C++: `Prefetch` (a SIMD hint; nothing to do here).
+    pub fn prefetch(&self, _block_id: usize) {}
+
+    /// C++: `GetTailFwd`.
+    pub fn take_tail_fwd(&mut self) -> TailFwd {
+        std::mem::take(&mut self.tail)
+    }
+
+    pub fn block_size(&self) -> usize {
+        self.block_size
+    }
+
+    /// Number of *complete* blocks; the partial block lives in the tail.
+    pub fn block_num(&self) -> usize {
+        self.blocks.len()
+    }
+}
+
+/// Per-term postings over completed blocks: the block ids with their maximum
+/// score, plus every score for the top-k threshold.
+/// C++: `BlockPostings` + `BlockData<..., kCompressed, kTrue>` (`bmp_ivt.cppm`).
+#[derive(Clone, Debug, Default)]
+pub struct Postings {
+    block_ids: Vec<u32>,
     block_max: Vec<f32>,
     /// Scores across all documents, descending (for `kth(topk)`).
     sorted_scores: Vec<f32>,
 }
 
-impl TermPostings {
-    fn kth(&self, topk: usize) -> f32 {
+impl Postings {
+    /// C++: `BlockPostings::kth` — the k-th largest score of the term.
+    pub fn kth(&self, topk: usize) -> f32 {
         if topk == 0 {
             return 0.0;
         }
         self.sorted_scores.get(topk - 1).copied().unwrap_or(0.0)
     }
+
+    /// C++: `BlockData::block_ids`.
+    pub fn block_ids(&self) -> &[u32] {
+        &self.block_ids
+    }
+
+    /// C++: `BlockData::max_scores`.
+    pub fn max_scores(&self) -> &[f32] {
+        &self.block_max
+    }
 }
 
-/// A sparse vector: `(index, value)` pairs sorted by index.
-pub type SparseVec = Vec<(u32, f32)>;
-
-/// Block-max sparse index over a fixed document set.
-#[derive(Debug, Default)]
-pub struct BmpIndex {
-    block_size: usize,
-    docs: Vec<SparseVec>,
-    terms: HashMap<u32, TermPostings>,
+/// The inverted index over completed blocks.
+/// C++: `BMPIvt<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>`.
+#[derive(Clone, Debug, Default)]
+pub struct BMPIvt {
+    postings: HashMap<u32, Postings>,
+    term_num: usize,
 }
 
-impl BmpIndex {
-    pub fn builder(block_size: usize) -> Self {
+impl BMPIvt {
+    /// C++: `BMPIvt(term_num)`.
+    pub fn new(term_num: usize) -> Self {
         Self {
-            block_size: block_size.max(1),
-            docs: Vec::new(),
-            terms: HashMap::new(),
+            postings: HashMap::new(),
+            term_num,
         }
     }
 
-    /// Appends a document (`docs.len()` is its id).
-    pub fn add(&mut self, doc: &[(u32, f32)]) -> usize {
-        let doc_id = self.docs.len();
-        let block = (doc_id / self.block_size) as u32;
-        let offset = (doc_id % self.block_size) as u16;
-        for &(term, score) in doc {
-            let entry = self.terms.entry(term).or_default();
-            match entry.blocks.last_mut() {
-                Some((b, list)) if *b == block => list.push((offset, score)),
-                _ => {
-                    entry.blocks.push((block, vec![(offset, score)]));
-                    entry.block_max.push(score);
+    /// C++: `AddBlock` — records, for every term present in the block, the
+    /// block id and the term's maximum score in that block.
+    pub fn add_block(&mut self, block_id: u32, docs: &[SparseVec]) {
+        // C++ `std::unordered_map<IdxType, DataType> max_scores`.
+        let mut max_scores: HashMap<u32, f32> = HashMap::new();
+        for doc in docs {
+            for &(term, score) in doc {
+                let entry = max_scores.entry(term).or_insert(score);
+                if score > *entry {
+                    *entry = score;
                 }
             }
-            let max = entry.block_max.last_mut().expect("just pushed");
-            if score > *max {
-                *max = score;
-            }
-            entry.sorted_scores.push(score);
         }
+        for (term, max) in max_scores {
+            let entry = self.postings.entry(term).or_default();
+            entry.block_ids.push(block_id);
+            entry.block_max.push(max);
+            for doc in docs {
+                for &(t, score) in doc {
+                    if t == term {
+                        entry.sorted_scores.push(score);
+                    }
+                }
+            }
+        }
+    }
+
+    /// C++: `GetPostings`.
+    pub fn get_postings(&self, term: u32) -> Option<&Postings> {
+        self.postings.get(&term)
+    }
+
+    /// C++: `Optimize(topk, ivt_scores)` — settles the k-th score table.
+    /// The reference keeps one k-th value per term; we keep the full ordered
+    /// list so any `topk` can be answered.
+    pub fn build(&mut self) {
+        for postings in self.postings.values_mut() {
+            postings
+                .sorted_scores
+                .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        }
+    }
+
+    /// C++: `term_num`.
+    pub fn term_num(&self) -> usize {
+        self.term_num.max(self.postings.len())
+    }
+}
+
+/// Block-max pruning index: `BMPIvt` + `BlockFwd` + the document ids.
+/// C++: `BMPAlg<DataType, IdxType, BMPCompressType::kCompressed, kTrue>`.
+#[derive(Clone, Debug)]
+pub struct BmpAlg {
+    ivt: BMPIvt,
+    fwd: BlockFwd,
+    docs: Vec<SparseVec>,
+}
+
+impl Default for BmpAlg {
+    fn default() -> Self {
+        Self::new(BMP_BLOCK_SIZE)
+    }
+}
+
+impl BmpAlg {
+    /// C++: `BMPAlg(term_num, block_size)`.
+    pub fn new(block_size: usize) -> Self {
+        Self {
+            ivt: BMPIvt::new(0),
+            fwd: BlockFwd::new(block_size),
+            docs: Vec::new(),
+        }
+    }
+
+    /// C++: `AddDoc` — appends a document (`docs.len()` is its id) and, when a
+    /// block completes, feeds the block to the inverted index.
+    pub fn add_doc(&mut self, doc: &[(u32, f32)]) -> usize {
+        let doc_id = self.docs.len();
         self.docs.push(doc.to_vec());
+        if let Some(block) = self.fwd.add_doc(doc) {
+            let block_id = self.fwd.block_num() as u32 - 1;
+            self.ivt.add_block(block_id, block.get_tail_terms());
+        }
         doc_id
+    }
+
+    /// C++: `BMPIvt::Optimize` — must run before [`BmpAlg::search_knn`].
+    pub fn build(&mut self) {
+        self.ivt.build();
     }
 
     pub fn len(&self) -> usize {
@@ -97,27 +350,12 @@ impl BmpIndex {
         self.docs.get(doc).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    /// Finalises the per-term k-th score table.
-    pub fn build(&mut self) {
-        for entry in self.terms.values_mut() {
-            entry
-                .sorted_scores
-                .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-        }
-    }
-
     /// `BMPAlgBase::SearchKnn` (`bmp_alg.cppm:53`).
-    ///
-    /// `alpha` is the block-pruning factor, `beta` keeps the top `beta` share of
-    /// the query terms (1.0 = all), `use_tail` scans the rows after the last
-    /// full block.
-    pub fn search(
+    pub fn search_knn(
         &self,
         query: &[(u32, f32)],
         topk: usize,
-        alpha: f32,
-        beta: f32,
-        use_tail: bool,
+        options: BmpSearchOptions,
     ) -> Vec<(usize, f32)> {
         if topk == 0 || self.docs.is_empty() {
             return Vec::new();
@@ -126,24 +364,25 @@ impl BmpIndex {
 
         // `beta < 1` keeps the strongest query terms.
         let mut q: Vec<(u32, f32)> = query.to_vec();
-        if beta < 1.0 {
-            let keep = ((query.len() as f32) * beta).ceil() as usize;
+        if options.beta < 1.0 {
+            let keep = ((query.len() as f32) * options.beta).ceil() as usize;
             q.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             q.truncate(keep.max(1));
             q.sort_by_key(|(term, _)| *term);
         }
 
-        let block_num = self.docs.len() / self.block_size;
+        let block_size = self.fwd.block_size();
+        let block_num = self.fwd.block_num();
         let mut upper_bounds = vec![0.0f32; block_num.max(1)];
         let mut threshold = 0.0f32;
         for &(term, q_score) in &q {
-            let Some(postings) = self.terms.get(&term) else {
+            let Some(postings) = self.ivt.get_postings(term) else {
                 continue;
             };
             threshold = threshold.max(q_score * postings.kth(topk));
-            for (i, (block, _)) in postings.blocks.iter().enumerate() {
+            for (i, block) in postings.block_ids().iter().enumerate() {
                 if (*block as usize) < upper_bounds.len() {
-                    upper_bounds[*block as usize] += q_score * postings.block_max[i];
+                    upper_bounds[*block as usize] += q_score * postings.max_scores()[i];
                 }
             }
         }
@@ -165,25 +404,29 @@ impl BmpIndex {
 
         let mut stopped = false;
         for (ub_score, block_id) in block_scores {
-            let start = block_id as usize * self.block_size;
-            for doc in start..(start + self.block_size).min(self.docs.len()) {
-                let score = dot(query, &self.docs[doc]);
-                push_topk(&mut best, score, doc, topk);
+            self.fwd.prefetch(block_id as usize);
+            let terms = self.fwd.get_block_terms(block_id as usize);
+            let scores = get_scores(terms, &q, block_size);
+            let start = block_id as usize * block_size;
+            for (offset, score) in scores.into_iter().enumerate() {
+                let doc = start + offset;
+                if doc < self.docs.len() {
+                    push_topk(&mut best, score, doc, topk);
+                }
             }
             if best.len() == topk {
                 let min_score = best.peek().map(|r| (r.0).0).unwrap_or(0.0);
                 // Same float-rounding tolerance as the block filter: a block
                 // whose bound only ties the k-th score can still hold it.
-                if ub_score * alpha < min_score * (1.0 - 1e-6) {
+                if ub_score * options.alpha < min_score * (1.0 - 1e-6) {
                     stopped = true;
                     break;
                 }
             }
         }
-        if use_tail && !stopped {
-            for doc in block_num * self.block_size..self.docs.len() {
-                let score = dot(query, &self.docs[doc]);
-                push_topk(&mut best, score, doc, topk);
+        if options.use_tail && !stopped {
+            for (i, score) in self.fwd.get_scores_tail(&q).into_iter().enumerate() {
+                push_topk(&mut best, score, block_num * block_size + i, topk);
             }
         }
 
@@ -195,6 +438,28 @@ impl BmpIndex {
         });
         out
     }
+}
+
+/// C++: `BMPAlgBase::GetScores` — accumulates each block term's postings into
+/// the block's per-document scores.
+fn get_scores(terms: &[BlockTerm], query: &[(u32, f32)], block_size: usize) -> Vec<f32> {
+    let mut res = vec![0.0f32; block_size];
+    let mut i = 0;
+    for term in terms {
+        while i < query.len() && query[i].0 < term.term_id {
+            i += 1;
+        }
+        if i == query.len() {
+            break;
+        }
+        if query[i].0 == term.term_id {
+            let q_score = query[i].1;
+            for (offset, value) in term.block_offsets.iter().zip(&term.values) {
+                res[*offset as usize] += q_score * value;
+            }
+        }
+    }
+    res
 }
 
 /// `HeapResultHandler::AddResult`: keep the largest `topk` scores.
@@ -229,6 +494,7 @@ impl Ord for OrdF32 {
 }
 
 /// Inner product of two index-sorted sparse vectors.
+#[cfg(test)]
 fn dot(a: &[(u32, f32)], b: &[(u32, f32)]) -> f32 {
     let (mut i, mut j, mut s) = (0usize, 0usize, 0.0f32);
     while i < a.len() && j < b.len() {
@@ -269,12 +535,98 @@ mod tests {
             .collect()
     }
 
+    /// Ported from `test_bmp_fwd_ut.cpp`: every document's terms must be
+    /// recoverable from the block terms, and only complete blocks are kept.
+    #[test]
+    fn block_fwd_groups_docs_into_blocks() {
+        let data = dataset(1000, 5, 3);
+        let mut fwd = BlockFwd::new(BMP_BLOCK_SIZE);
+        let mut completed = 0;
+        for doc in &data {
+            if fwd.add_doc(doc).is_some() {
+                completed += 1;
+            }
+        }
+        assert_eq!(fwd.block_size(), BMP_BLOCK_SIZE);
+        assert_eq!(fwd.block_num(), 1000 / BMP_BLOCK_SIZE);
+        assert_eq!(completed, fwd.block_num());
+
+        for block_id in 0..fwd.block_num() {
+            let terms = fwd.get_block_terms(block_id);
+            let mut rebuilt: Vec<SparseVec> = vec![Vec::new(); BMP_BLOCK_SIZE];
+            for term in terms {
+                for (offset, value) in term.block_offsets.iter().zip(&term.values) {
+                    rebuilt[*offset as usize].push((term.term_id, *value));
+                }
+            }
+            for (offset, doc) in rebuilt.iter_mut().enumerate() {
+                doc.sort_by_key(|(t, _)| *t);
+                let src = &data[block_id * BMP_BLOCK_SIZE + offset];
+                assert_eq!(doc, src, "block {block_id} offset {offset}");
+            }
+            // Terms are sorted so `GetScores` can walk the query once.
+            assert!(terms.windows(2).all(|w| w[0].term_id < w[1].term_id));
+        }
+        // The partial block stays in the tail.
+        assert_eq!(fwd.take_tail_fwd().len(), 1000 % BMP_BLOCK_SIZE);
+    }
+
+    /// Ported from `test_bmp_ivt_ut.cpp`: per term the postings keep the block
+    /// ids, the block maxima and the k-th score.
+    #[test]
+    fn bmp_ivt_keeps_block_maxima_and_kth() {
+        let data = dataset(1000, 5, 5);
+        let mut alg = BmpAlg::new(BMP_BLOCK_SIZE);
+        for doc in &data {
+            alg.add_doc(doc);
+        }
+        alg.build();
+
+        // Recompute the expected per-term block maxima from the raw documents.
+        let block_num = alg.fwd.block_num();
+        let mut expected: HashMap<u32, Vec<f32>> = HashMap::new();
+        for block_id in 0..block_num {
+            let mut max: HashMap<u32, f32> = HashMap::new();
+            for doc in &data[block_id * BMP_BLOCK_SIZE..(block_id + 1) * BMP_BLOCK_SIZE] {
+                for &(term, score) in doc {
+                    let e = max.entry(term).or_insert(score);
+                    if score > *e {
+                        *e = score;
+                    }
+                }
+            }
+            for (term, score) in max {
+                expected.entry(term).or_default().push(score);
+            }
+        }
+        for (term, maxima) in expected {
+            let postings = alg.ivt.get_postings(term).expect("term present");
+            assert_eq!(postings.block_ids().len(), maxima.len());
+            assert_eq!(postings.max_scores(), maxima.as_slice());
+            // `kth` is the k-th largest term score across the *complete* blocks
+            // (`Optimize` is fed `GetIvtScores`, which excludes the tail).
+            let mut all: Vec<f32> = data[..block_num * BMP_BLOCK_SIZE]
+                .iter()
+                .map(|d| {
+                    d.iter()
+                        .find(|(t, _)| *t == term)
+                        .map(|(_, s)| *s)
+                        .unwrap_or(0.0)
+                })
+                .collect();
+            all.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+            for k in [1usize, 10, 100] {
+                assert_eq!(postings.kth(k), all[k - 1], "term {term} k {k}");
+            }
+        }
+    }
+
     #[test]
     fn matches_brute_force() {
         let data = dataset(500, 8, 7);
-        let mut index = BmpIndex::builder(BMP_BLOCK_SIZE);
+        let mut index = BmpAlg::new(BMP_BLOCK_SIZE);
         for d in &data {
-            index.add(d);
+            index.add_doc(d);
         }
         index.build();
 
@@ -285,9 +637,8 @@ mod tests {
             state ^= state << 17;
             // One term: the block bound equals the term's max, so pruning is
             // exact and the result must match the brute-force top-k.
-            let query: Vec<(u32, f32)> =
+            let mut query: Vec<(u32, f32)> =
                 vec![((state % 64) as u32, ((state % 90) as f32 + 10.0) / 100.0)];
-            let mut query = query;
             query.sort_by_key(|(t, _)| *t);
             query.dedup_by_key(|(t, _)| *t);
 
@@ -305,7 +656,7 @@ mod tests {
             exact.truncate(10);
 
             let got: Vec<(usize, f32)> = index
-                .search(&query, 10, 1.0, 1.0, true)
+                .search_knn(&query, 10, BmpSearchOptions::default())
                 .into_iter()
                 .filter(|(_, s)| *s > 0.0)
                 .collect();
@@ -321,19 +672,56 @@ mod tests {
     #[test]
     fn beta_keeps_the_strongest_terms() {
         let data = dataset(200, 4, 11);
-        let mut index = BmpIndex::builder(BMP_BLOCK_SIZE);
+        let mut index = BmpAlg::new(BMP_BLOCK_SIZE);
         for d in &data {
-            index.add(d);
+            index.add_doc(d);
         }
         index.build();
         let query = vec![(1u32, 0.9f32), (2, 0.1), (3, 0.2)];
-        let all = index.search(&query, 5, 0.9, 1.0, true);
+        let all = index.search_knn(&query, 5, BmpSearchOptions::default());
         // beta = 0.34 keeps only the first term; the result must still be a
         // prefix-consistent top-k over that reduced query.
-        let reduced = index.search(&query, 5, 0.9, 0.34, true);
+        let reduced = index.search_knn(
+            &query,
+            5,
+            BmpSearchOptions {
+                beta: 0.34,
+                ..Default::default()
+            },
+        );
         assert!(reduced.len() <= all.len());
         assert!(reduced
             .iter()
             .all(|(doc, _)| all.iter().any(|(d, _)| d == doc)));
+    }
+
+    #[test]
+    fn tail_documents_are_scored_when_the_block_does_not_fill() {
+        let data = dataset(BMP_BLOCK_SIZE + 3, 4, 13);
+        let mut index = BmpAlg::new(BMP_BLOCK_SIZE);
+        for d in &data {
+            index.add_doc(d);
+        }
+        index.build();
+        assert_eq!(index.fwd.block_num(), 1);
+
+        let query = vec![(7u32, 1.0f32)];
+        let mut exact: Vec<(usize, f32)> = data
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (i, dot(&query, d)))
+            .filter(|(_, s)| *s > 0.0)
+            .collect();
+        exact.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        let got = index.search_knn(&query, exact.len(), BmpSearchOptions::default());
+        assert_eq!(got.len(), exact.len());
+        for (g, e) in got.iter().zip(exact.iter()) {
+            assert_eq!(g.0, e.0);
+            assert!((g.1 - e.1).abs() < 1e-6);
+        }
     }
 }

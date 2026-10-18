@@ -2057,6 +2057,18 @@ struct SparseIndex {
     sealed: Vec<(u64, Arc<infinity_storage::bmp_cpp::BmpCppReader>)>,
     next_chunk: u64,
     tail_bytes: usize,
+    /// Bumped on every tail mutation; the in-memory BMP index below is rebuilt
+    /// when it lags (the reference's `BMPAlg` held by the mem index).
+    tail_generation: u64,
+    tail_index: std::sync::Mutex<Option<SparseTailBmp>>,
+}
+
+/// The in-memory `BMPAlg` over the sparse tail, plus the `ROW_ID` of each
+/// indexed document (`BMPAlg` documents are dense ids).
+struct SparseTailBmp {
+    generation: u64,
+    alg: infinity_index::sparse::BmpAlg,
+    seqs: Vec<u64>,
 }
 
 fn sparse_doc_bytes(doc: &[(i32, f32)]) -> usize {
@@ -2079,6 +2091,8 @@ impl SparseIndex {
             sealed: Vec::new(),
             next_chunk,
             tail_bytes: 0,
+            tail_generation: 0,
+            tail_index: std::sync::Mutex::new(None),
         }
     }
 
@@ -2088,11 +2102,13 @@ impl SparseIndex {
         }
         self.tail_bytes += sparse_doc_bytes(&doc);
         self.tail.insert(seq, doc);
+        self.tail_generation += 1;
     }
 
     fn remove(&mut self, seq: u64) {
         if let Some(old) = self.tail.remove(&seq) {
             self.tail_bytes = self.tail_bytes.saturating_sub(sparse_doc_bytes(&old));
+            self.tail_generation += 1;
         }
     }
 
@@ -2120,6 +2136,7 @@ impl SparseIndex {
                 .push((seq & 0xffff_ffff, doc));
         }
         self.tail_bytes = 0;
+        self.tail_generation += 1;
         for (segment, mut docs) in by_segment {
             docs.sort_by_key(|(row, _)| *row);
             let term_num = docs
@@ -2166,21 +2183,46 @@ impl SparseIndex {
                 }
             }
         }
-        for (seq, doc) in &self.tail {
-            if dead.contains(seq) {
-                continue;
+        // The memory segment is the reference's in-memory `BMPAlg`: rebuild it
+        // when the tail changed since the last query.
+        let qv: Vec<(u32, f32)> = query.iter().map(|(t, v)| (*t as u32, *v)).collect();
+        let mut guard = self.tail_index.lock().unwrap();
+        if guard
+            .as_ref()
+            .map(|t| t.generation != self.tail_generation)
+            .unwrap_or(true)
+        {
+            let mut alg = infinity_index::sparse::BmpAlg::new(
+                infinity_index::sparse::BMP_BLOCK_SIZE,
+            );
+            let mut seqs = Vec::with_capacity(self.tail.len());
+            for (seq, doc) in &self.tail {
+                let doc32: Vec<(u32, f32)> =
+                    doc.iter().map(|(t, v)| (*t as u32, *v)).collect();
+                alg.add_doc(&doc32);
+                seqs.push(*seq);
             }
-            let score: f32 = query
-                .iter()
-                .map(|(term, weight)| {
-                    doc.iter()
-                        .find(|(t, _)| t == term)
-                        .map(|(_, value)| weight * value)
-                        .unwrap_or(0.0)
-                })
-                .sum();
-            hits.push((*seq, score));
+            alg.build();
+            *guard = Some(SparseTailBmp {
+                generation: self.tail_generation,
+                alg,
+                seqs,
+            });
         }
+        if let Some(tail) = guard.as_ref() {
+            for (doc, score) in tail.alg.search_knn(
+                &qv,
+                k + dead.len(),
+                infinity_index::sparse::BmpSearchOptions::default(),
+            ) {
+                if let Some(seq) = tail.seqs.get(doc) {
+                    if !dead.contains(seq) {
+                        hits.push((*seq, score));
+                    }
+                }
+            }
+        }
+        drop(guard);
         hits.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)
