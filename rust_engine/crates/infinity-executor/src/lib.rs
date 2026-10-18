@@ -1862,7 +1862,7 @@ pub struct Engine {
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// Vector indexes loaded from the C++ block mirror, keyed by
     /// `"<table>.<column>"` (plan #70: the persisted HNSW graph, on disk).
-    vector_indexes: Mutex<HashMap<String, Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
+    vector_indexes: Mutex<HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
@@ -2103,6 +2103,7 @@ impl Engine {
     fn rebuild_indexes(&self) -> Result<()> {
         // A new index may have appeared since the last write.
         self.hnsw_probed.lock().unwrap().clear();
+        self.vector_indexes.lock().unwrap().clear();
         for im in self.catalog.list_indexes()? {
             // skip functional-index targets (not plain columns)
             if is_secondary_kind(&im.index_type)
@@ -2117,11 +2118,12 @@ impl Engine {
             // can walk it (best-effort: a table without a mirror just brute
             // forces).
             if im.index_type.eq_ignore_ascii_case("HNSW") {
-                if let Ok(loaded) = self.load_vector_index(&im.table, &im.name) {
-                    self.vector_indexes
-                        .lock()
-                        .unwrap()
-                        .insert(index_key(&im.table, &im.column), Arc::new(loaded));
+                let segments = self.load_vector_indexes(&im.table, &im.name);
+                if !segments.is_empty() {
+                    self.vector_indexes.lock().unwrap().insert(
+                        index_key(&im.table, &im.column),
+                        segments.into_iter().map(Arc::new).collect(),
+                    );
                 }
             }
         }
@@ -7299,7 +7301,7 @@ impl Engine {
                 return None;
             }
             let col_name = match_columns(&m.column).first()?.clone();
-            let loaded = self
+            let segments = self
                 .vector_indexes
                 .lock()
                 .unwrap()
@@ -7314,22 +7316,27 @@ impl Engine {
                 .filter_map(|x| x.parse::<f64>().ok())
                 .map(|x| x as f32)
                 .collect();
-            if qv.is_empty() || qv.len() != loaded.index.dims() {
+            if qv.is_empty() || segments.is_empty() {
                 return None;
             }
-            // The graph is usable as a candidate filter only when it was built
-            // over every live row. Rows inserted after the last dump are absent
-            // from it, and pruning to the graph would drop them entirely, so
-            // fall back to the exhaustive scan in that case.
-            let mut covered: std::collections::HashSet<usize> =
-                loaded.labels.iter().map(|s| *s as usize).collect();
-            let k = (topn * 4).max(64).min(loaded.labels.len().max(1));
-            let mut candidates: std::collections::HashSet<usize> = loaded
-                .index
-                .search(&qv, k)
-                .into_iter()
-                .map(|(node, _)| loaded.labels[node] as usize)
-                .collect();
+            // Every sealed segment is its own graph; the query searches each
+            // and merges (`HnswIndexHandler` over segment indexes). The union of
+            // their labels must cover the live rows, else the exact scan runs.
+            let mut covered: std::collections::HashSet<usize> = Default::default();
+            let mut candidates: std::collections::HashSet<usize> = Default::default();
+            for seg in &segments {
+                if seg.index.dims() != qv.len() {
+                    return None;
+                }
+                covered.extend(seg.labels.iter().map(|s| *s as usize));
+                let k = (topn * 4).max(64).min(seg.labels.len().max(1));
+                candidates.extend(
+                    seg.index
+                        .search(&qv, k)
+                        .into_iter()
+                        .map(|(node, _)| seg.labels[node] as usize),
+                );
+            }
             // The in-memory segment: rows written after the last dump. The
             // reference searches every segment and merges the results.
             if let Some(mem) = self

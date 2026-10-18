@@ -1708,6 +1708,68 @@ impl Engine {
     /// `SEARCH MATCH VECTOR` can walk the graph that is on disk (plan #70).
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
         let (header, labels, vectors, vertices) = self.read_cpp_hnsw_parts(table, index_name)?;
+        Self::assemble_loaded_index(header, labels, vectors, vertices)
+    }
+
+    /// Every sealed HNSW chunk of `index_name`, oldest first. The reference
+    /// keeps one graph per segment (`chunk_{n}.idx`); a query searches each and
+    /// merges. Missing/undecodable chunks are skipped so one bad segment cannot
+    /// disable the index.
+    pub fn load_vector_indexes(&self, table: &str, index_name: &str) -> Vec<LoadedVectorIndex> {
+        let table = self.qualified_table(table);
+        let Some(dir) = self.cpp_hnsw_dir(&table, index_name) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (_, path) in hnsw_chunks(&dir) {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(chunk) = knn_format::decode_hnsw_chunk(
+                &bytes,
+                4,
+                knn_format::VERTEX_L0_SIZE,
+                knn_format::VERTEX_LX_SIZE,
+            ) else {
+                continue;
+            };
+            let dim = chunk.header.dim as usize;
+            let mut vectors = Vec::with_capacity(chunk.header.cur_vec_num as usize);
+            for i in 0..chunk.header.cur_vec_num as usize {
+                let at = i * dim * 4;
+                if at + dim * 4 > chunk.vectors.len() {
+                    break;
+                }
+                vectors.push(
+                    chunk.vectors[at..at + dim * 4]
+                        .chunks_exact(4)
+                        .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+                        .collect(),
+                );
+            }
+            let Ok(vertices) = knn_format::decode_graph_region(
+                &chunk.graph,
+                chunk.header.cur_vec_num as usize,
+                chunk.header.mmax0,
+                chunk.header.mmax,
+            ) else {
+                continue;
+            };
+            if let Ok(loaded) =
+                Self::assemble_loaded_index(chunk.header, chunk.labels.clone(), vectors, vertices)
+            {
+                out.push(loaded);
+            }
+        }
+        out
+    }
+
+    fn assemble_loaded_index(
+        header: knn_format::HnswHeader,
+        labels: Vec<u32>,
+        vectors: Vec<Vec<f32>>,
+        vertices: Vec<knn_format::HnswGraphVertex>,
+    ) -> Result<LoadedVectorIndex> {
         let levels: Vec<usize> = vertices
             .iter()
             .map(|v| v.layer_count.max(0) as usize)
@@ -1730,9 +1792,7 @@ impl Engine {
             }
         }
         if vectors.is_empty() {
-            return Err(Error::Invalid(format!(
-                "index '{index_name}' mirror has no vectors"
-            )));
+            return Err(Error::Invalid(format!("HNSW mirror has no vectors")));
         }
         let entry = Some((header.enterpoint.max(0) as usize).min(vectors.len() - 1));
         let index = HnswIndex::from_parts(
