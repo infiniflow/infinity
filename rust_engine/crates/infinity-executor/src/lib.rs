@@ -7376,9 +7376,10 @@ impl Engine {
                 .into_iter()
                 .map(|(i, v)| (i as u32, v as f32))
                 .collect();
-            let mut index =
-                infinity_index::sparse::BmpIndex::builder(infinity_index::sparse::BMP_BLOCK_SIZE);
-            let mut ids: Vec<usize> = Vec::with_capacity(rows.len());
+            // One BMP index per segment (`ROW_ID` high bits) and merged
+            // results, matching the reference's per-segment sparse indexes.
+            let mut segments: HashMap<u64, (infinity_index::sparse::BmpIndex, Vec<usize>)> =
+                HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
                     continue;
@@ -7387,15 +7388,35 @@ impl Engine {
                     .into_iter()
                     .map(|(i, x)| (i as u32, x as f32))
                     .collect();
-                index.add(&sv);
-                ids.push(*seq);
+                let segment = (*seq as u64) >> 32;
+                let entry = segments.entry(segment).or_insert_with(|| {
+                    (
+                        infinity_index::sparse::BmpIndex::builder(
+                            infinity_index::sparse::BMP_BLOCK_SIZE,
+                        ),
+                        Vec::new(),
+                    )
+                });
+                entry.0.add(&sv);
+                entry.1.push(*seq);
             }
-            index.build();
-            index
-                .search(&qv, topn.max(1), 0.9, 1.0, true)
-                .into_iter()
-                .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score as f64)))
-                .collect()
+            let mut best: HashMap<usize, f64> = HashMap::new();
+            for (_, (mut index, ids)) in segments {
+                index.build();
+                for (doc, score) in index.search(&qv, topn.max(1), 0.9, 1.0, true) {
+                    if let Some(seq) = ids.get(doc) {
+                        let score = score as f64;
+                        best.entry(*seq)
+                            .and_modify(|s| {
+                                if score > *s {
+                                    *s = score
+                                }
+                            })
+                            .or_insert(score);
+                    }
+                }
+            }
+            best
         })();
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
         for (seq, row) in &rows {
