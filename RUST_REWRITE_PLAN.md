@@ -534,6 +534,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 - golden：`rust_engine/golden/cpp_0.7.4_bench.txt`（由 `tools/bench_sdk_driver.py` 对 C++ 0.7.4 生成，三阶段：insert 20000 行 / 全量 select / 点查）。
 - 当前证据（2026-10-19，`./scripts/run_gate_e.sh golden/cpp_0.7.4_bench.txt`，同一驱动对 Rust 服务）：C++ 均值 0.1004 s，Rust 均值 0.1747 s，**+74.04%**（未达 `<7%`）。分阶段：insert 0.426294 s vs 0.290944 s（+46%，无索引时跳过逐行索引钩子后）、全量 select 0.060875 s vs 0.009105 s（+568%）、点查 0.037036 s vs 0.001152 s（+3114%）。
 - 根因与 #91 相同：行存 + 每次全表扫描/逐行解码；C++ 以列存块 + 列裁剪读。`run_gate_e.sh` 在有 golden 时必须走 SDK 驱动（此前误用 CLI 内部 bench，阶段不同、比较无效）。
+- 读路径分解（20k 行、release）：`fetch_rows_with_ids` 仅 **6–7 ms**（已接近 C++ 整个 select 的 9 ms）；`SELECT *` 共 **36 ms**，其余 ~29 ms 在逻辑计划/pipeline 的逐行 `Value` 克隆与 `Value → String` 结果物化；点查首次 ~20–43 ms（同样的计划/物化开销），重复执行 19 µs（命中结果缓存）。因此 Gate E 的下一杠杆不是 KV，而是**类型化/列式结果路径**（避免 `Vec<Vec<String>>` 物化），属 #91 的列式运行时部分。
 
 ### 8.7 Gate F — 工程质量
 
