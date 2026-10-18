@@ -29,7 +29,7 @@ use infinity_planner::{plan_select, LogicalPlan};
 #[cfg(not(feature = "rocksdb-store"))]
 use infinity_storage::FjallMetaStore;
 use infinity_storage::MetaStore;
-use infinity_txn::TxnManager;
+use infinity_txn::{Txn, TxnManager};
 use tokio::sync::mpsc;
 
 mod explain;
@@ -2253,6 +2253,11 @@ pub struct Engine {
     /// them out of the KV row turns ~40 KB/row of anonymous memory into
     /// reclaimable file pages (Gate C).
     row_blobs: Mutex<HashMap<String, Arc<Mutex<std::fs::File>>>>,
+    /// `(table, seq) -> commit ts` of the delete that removed the row, for the
+    /// reference's `kTxnConflict` check (`conflict_check_ut.cpp`).
+    delete_ts: Mutex<HashMap<(String, usize), u64>>,
+    /// Serialises delete validation + commit so the first committer wins.
+    delete_lock: Mutex<()>,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
@@ -2437,6 +2442,8 @@ impl Engine {
             write_batches: Mutex::new(HashMap::new()),
             cpp_block_generation: Mutex::new(HashMap::new()),
             row_blobs: Mutex::new(HashMap::new()),
+            delete_ts: Mutex::new(HashMap::new()),
+            delete_lock: Mutex::new(()),
             row_counters: Mutex::new(HashMap::new()),
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
@@ -3452,6 +3459,33 @@ impl Engine {
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
+    /// Validates a delete set against the transaction's begin timestamp, then
+    /// commits and records the tombstones' commit ts. Mirrors the reference's
+    /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
+    /// concurrent deleters get `kTxnConflict`.
+    fn commit_with_deletes(&self, table: &str, deletes: &[usize], txn: Txn) -> Result<u64> {
+        let _guard = self.delete_lock.lock().unwrap();
+        let begin = txn.begin_ts;
+        {
+            let seen = self.delete_ts.lock().unwrap();
+            for seq in deletes {
+                if let Some(&ts) = seen.get(&(table.to_string(), *seq)) {
+                    if ts >= begin {
+                        return Err(Error::TxnConflict(format!(
+                            "row {seq} of '{table}' was changed by a newer transaction"
+                        )));
+                    }
+                }
+            }
+        }
+        let commit_ts = self.txn.commit(txn)?;
+        let mut seen = self.delete_ts.lock().unwrap();
+        for seq in deletes {
+            seen.insert((table.to_string(), *seq), commit_ts);
+        }
+        Ok(commit_ts)
+    }
+
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
         let mut res = self.execute_stmt_inner(stmt)?;
         if let Statement::Select {
@@ -4356,7 +4390,7 @@ impl Engine {
                     for seq in &to_del {
                         t.put(del_key(table, *seq), b"1".to_vec());
                     }
-                    self.txn.commit(t)?;
+                    self.commit_with_deletes(table, &to_del, t)?;
                     self.drop_text_index_rows(table, &to_del);
                     self.drop_vector_cache_rows(table, &to_del);
                 }
@@ -4471,7 +4505,7 @@ impl Engine {
                     for seq in &to_del {
                         t.put(del_key(table, *seq), b"1".to_vec());
                     }
-                    self.txn.commit(t)?;
+                    self.commit_with_deletes(table, &to_del, t)?;
                     for (k, nr) in new_rows.iter().enumerate() {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
                         self.update_indexes_on_insert_text(table, base + k, &texts)?;
@@ -12074,6 +12108,62 @@ mod tests {
         );
         e.execute("DELETE FROM ss WHERE id = 2;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+    }
+
+    /// Port of the reference's `ConflictCheckTest.conflict_check_delete`: three
+    /// transactions delete the same row, the first commit wins and the other
+    /// two get `kTxnConflict`; overlapping sets behave the same way.
+    #[test]
+    fn delete_conflicts_follow_the_reference() {
+        fn stale_delete(e: &Engine, table: &str, seq: usize) -> Txn {
+            let mut txn = e.txn.begin();
+            txn.put(del_key(table, seq), b"1".to_vec());
+            txn
+        }
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dc (v INT);").unwrap();
+        e.execute("INSERT INTO dc VALUES (0),(1),(2),(3),(4),(5),(6);")
+            .unwrap();
+        let table = "default_db.dc";
+        let seqs: Vec<usize> = e
+            .fetch_rows_with_ids(table)
+            .unwrap()
+            .iter()
+            .map(|(seq, _)| *seq)
+            .collect();
+
+        let t1 = stale_delete(&e, table, seqs[0]);
+        let t2 = stale_delete(&e, table, seqs[0]);
+        let t3 = stale_delete(&e, table, seqs[0]);
+        e.commit_with_deletes(table, &[seqs[0]], t1).unwrap();
+        assert!(matches!(
+            e.commit_with_deletes(table, &[seqs[0]], t2),
+            Err(Error::TxnConflict(_))
+        ));
+        assert!(matches!(
+            e.commit_with_deletes(table, &[seqs[0]], t3),
+            Err(Error::TxnConflict(_))
+        ));
+        assert_eq!(e.row_count("dc").unwrap(), 6);
+
+        // A transaction that starts after the winning commit is not stale.
+        let t4 = stale_delete(&e, table, seqs[1]);
+        e.commit_with_deletes(table, &[seqs[1]], t4).unwrap();
+        assert_eq!(e.row_count("dc").unwrap(), 5);
+
+        // Overlapping delete sets: the later committer conflicts on the shared
+        // row even though it has its own disjoint write.
+        let mut a = stale_delete(&e, table, seqs[2]);
+        a.put(del_key(table, seqs[3]), b"1".to_vec());
+        let b = stale_delete(&e, table, seqs[2]);
+        e.commit_with_deletes(table, &[seqs[2], seqs[3]], a)
+            .unwrap();
+        assert!(matches!(
+            e.commit_with_deletes(table, &[seqs[2]], b),
+            Err(Error::TxnConflict(_))
+        ));
+        assert_eq!(e.row_count("dc").unwrap(), 3);
     }
 
     #[test]

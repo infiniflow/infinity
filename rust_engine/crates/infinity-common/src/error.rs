@@ -28,6 +28,11 @@ pub enum Error {
     #[error("transaction error: {0}")]
     Txn(String),
 
+    /// The reference's `kTxnConflict` (4002): another transaction changed a row
+    /// this one had already read/deleted.
+    #[error("transaction conflict: {0}")]
+    TxnConflict(String),
+
     #[error("not found: {0}")]
     NotFound(String),
 
@@ -133,6 +138,8 @@ impl Error {
                     3022
                 }
             }
+            // 4002 TXN_CONFLICT.
+            Error::TxnConflict(_) => 4002,
             // Everything else keeps the generic code the reference uses for
             // internal failures.
             _ => 1,
