@@ -1875,6 +1875,7 @@ pub struct Engine {
     /// mmap reader per `ROW_ID` segment, with its base row id.
     /// Low-cardinality secondary chunks (unique keys + roaring bitmaps), used
     /// for boolean columns like the reference's `LowCardinalityTag`.
+    #[allow(clippy::type_complexity)]
     secondary_low: Mutex<
         HashMap<
             String,
