@@ -439,15 +439,25 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 ### 7.5 已知缺口
 
-按优先级排列：
+按「架构对齐 → 功能对齐 → 验收达标」排序。P0 是后续所有性能/内存工作的前置。
 
-1. **Gate C 重档内存**（`test_multiple_index_types_import` 3/5 档失败）：250k 行 ×（2048 维向量 + 1024 维多向量 + 稀疏 + 文本）在 6 个读线程下服务端 RSS 峰值约 **20 GB** 后被杀。已排除：磁盘（换 651 GB 盘仍失败）、WAL（峰值 383 MB，结束为 0）、postings（加 512 MiB 预算后 RSS 不变）。**尚未分解**：HNSW 内存图、LSM/导入路径、行物化三者各自的占比。方向是给内存索引设总预算并在 dump 后释放，或改列存。
-2. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 #1 同源。
-3. **多向量查询侧近似**：C++ 第二步用残差码字近似、第三步 PLAID 候选裁剪；当前是「质心预过滤 + 原始 token 精确重排」。残差码本与码字已持久化，改近似只需解码路径。
-4. **全文非 OR 路径**：`boolean` / `rank_features` / `filter` 分支仍走整行扫描（需要整行求值）；短语与 filter 未走 WAND。
-5. **IVF 检索**：只有格式与镜像，无 `SearchKnn`。
-6. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
-7. **EXPLAIN**：已实现（`explain.rs` / `explain_search.rs`），Gate A 全绿；附录 D 保留的规则供维护参考。
+#### 7.5.1 架构对齐缺口（P0）
+
+1. **索引构建时机未对齐**：C++ 在写入/封段时构建索引，查询只读；当前稀疏与多向量在**查询路径里**从行存重建并写盘（`lib.rs:7671` sparse、`7769` multivector），因此每次查询都付出全表构建成本，段文件也无法复用。EMVB 只作为互通产物写出，检索仍走 `.mvec` 的精确 MaxSim。
+2. **次级索引只有「DDL 时重建」**：chunk 仅在 `CREATE INDEX` / `open` / `ALTER` / 快照恢复时重建；任何 INSERT 令 write generation 前进后，查询整体回退到内存 BTree（`lib.rs:2311-2362`），内存索引随行数线性增长，未按段封存。
+3. **memindex 预算覆盖不全**：只有全文（`INFINITY_TEXT_SEGMENT_BYTES`/64 MiB）与 HNSW（`memindex_memory_quota`）有预算与 dump 生命周期；稀疏、多向量、次级的内存形态没有配额，也没有「封段后释放」。
+4. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
+
+#### 7.5.2 功能对齐缺口（P1）
+
+5. **多向量查询侧近似**：C++ 第二步用残差码字近似、第三步 PLAID 候选裁剪；当前是「质心预过滤 + 原始 token 精确重排」。残差码本与码字已持久化，补齐只需解码路径 + 候选剪枝。
+6. **全文非 OR 路径**：WAND 当前只覆盖「单字段 + 单 token + 纯 OR」（`lib.rs:5879-5891` 的条件），`boolean` / `rank_features` / `min_should_match` / `delta_term` / 短语 / 多字段 / filter 仍走整行扫描。
+7. **IVF 检索**：只有格式编解码与镜像，无 `SearchKnn`（nprobe/距离/合并）。
+
+#### 7.5.3 验收缺口（P2）
+
+8. **Gate C 重档内存**（`test_multiple_index_types_import` 3/5 档失败）：250k 行 ×（2048 维向量 + 1024 维多向量 + 稀疏 + 文本）在 6 个读线程下服务端 RSS 峰值约 **20 GB** 后被杀。已排除：磁盘（换 651 GB 盘仍失败）、WAL（峰值 383 MB，结束为 0）、postings（加 512 MiB 预算后 RSS 不变）。**尚未分解**：HNSW 内存图、LSM/导入路径、行物化三者各自的占比。修复依赖 7.5.1-1/2/3。
+9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。
 
 ---
 
