@@ -35,6 +35,7 @@ pub fn write_bmp_segment(
 ) -> Result<(), FormatError> {
     let block_size = block_size.max(1) as u32;
     // term -> (block, offset) -> score, in block order.
+    #[allow(clippy::type_complexity)]
     let mut terms: std::collections::BTreeMap<u32, Vec<(u32, Vec<(u16, f32)>)>> =
         std::collections::BTreeMap::new();
     for (doc_id, doc) in docs.iter().enumerate() {
