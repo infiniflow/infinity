@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fulltext;
+pub mod sparse;
 pub mod vector;
 
 use std::collections::BTreeMap;
