@@ -456,8 +456,8 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.3 验收缺口（P2）
 
-8. **Gate C 重档内存**（`test_multiple_index_types_import` 3/5 档失败）：250k 行 ×（2048 维向量 + 1024 维多向量 + 稀疏 + 文本）在 6 个读线程下服务端 RSS 峰值约 **20 GB** 后被杀。已排除：磁盘（换 651 GB 盘仍失败）、WAL（峰值 383 MB，结束为 0）、postings（加 512 MiB 预算后 RSS 不变）。**尚未分解**：HNSW 内存图、LSM/导入路径、行物化三者各自的占比。修复依赖 7.5.1-1/2/3。
-9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。
+8. **Gate C 重档内存**（`test_multiple_index_types_import`）：2026-10-18 用统一 memindex 预算（默认 4 GiB）重跑 5.toml 档，服务端 RSS 在 **5 分 51 秒达到 14.8 GB**（30 GB 机器，无 swap），仍会随导入继续增长。已排除/已修复：索引内存尾现在按预算封段并释放、HNSW dump 后释放内存图、镜像跳过 >1 GiB 的表。**剩余主因**：行存把 2048 维向量/多向量/稀疏值以十进制文本写进 KV（≈40 KB/行，LZ4 后仍 ~15 GB），这不是索引预算能覆盖的；需要**紧凑/列式的行存储**（二进制向量单元格或直接以块文件为权威行存）。
+9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden log 仍缺失。
 
 ---
 
@@ -505,7 +505,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 - sift `knn_query_benchmark`（1/8 线程）与全文基准，对比 golden log；门限与 `tools/ci_tools/check_benchmark_result.py:44` 一致（**<7%** 均值回归）。
 - 测量控制（强制）：可比硬件、相同数据集/配置、等价驱动、重复次数、召回率指标；P99 / RSS 显式保留或移除。
-- 当前证据：同机 A/B 见 §7.5-2；官方 golden log 需 CI 工件（仓库与 `yzc/benchmark_golden` 分支均无）。
+- 当前证据：同机 A/B 见 §7.5.3-9；`run_gate_e.sh` 的**自基线**（同一二进制跑两次，2000 行）差 **2.60%**，通过 `<7%` 检查；官方 golden log 需 CI 工件（仓库与 `yzc/benchmark_golden` 分支均无），因此对 C++ 的 `<7%` 仍未关闭。
 
 ### 8.7 Gate F — 工程质量
 
