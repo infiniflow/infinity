@@ -11,8 +11,11 @@
 //!   * `{index_dir}/{base_name}.pos` — the per-term postings slices.
 //!   * `{index_dir}/{base_name}.len` — `u32[row_count]` document lengths.
 //!
-//! Row ids are stored as segment offsets (`row - base_row_id`) because the
-//! reference's `docid_t` is 32-bit; the reader adds `base_row_id` back.
+//! The reference's `docid_t` is a segment offset because its segments hold a
+//! contiguous row-id range. Our rows live in a flat KV store, so a segment can
+//! span two insert batches whose row ids differ by 2^32. Postings therefore use
+//! a dense document ordinal (0..doc_count), and an auxiliary `.row` file holds
+//! the row id of each ordinal (8 bytes each) so the reader can map back.
 //!
 //! The `.pos` slice uses the reference framing
 //! (`VInt doc_skip_len, VInt doc_len, doc_skip, doc_list, VInt pos_skip_len,
@@ -41,6 +44,11 @@ use crate::inverted_format::{
     FULLTEXT_POSTING_SUFFIX, POSTING_MINI_BLOCK,
 };
 
+/// Auxiliary file: `u64[doc_count]` row ids, one per dense document ordinal.
+/// The reference does not need it (a segment is a contiguous row range); ours is
+/// a flat KV store, so the mapping has to be stored.
+pub const FULLTEXT_ROW_SUFFIX: &str = ".row";
+
 /// Writes one segment's full-text index.
 ///
 /// `docs` must be sorted by row id and `postings` must be sorted by term
@@ -49,7 +57,7 @@ use crate::inverted_format::{
 pub fn write_segment_index(
     index_dir: &str,
     base_name: &str,
-    base_row_id: u64,
+    _base_row_id: u64,
     docs: &[(u64, u32)],
     postings: &BTreeMap<String, Vec<(u64, u32)>>,
     flags: TermMetaFlags,
@@ -58,6 +66,13 @@ pub fn write_segment_index(
 
     let lengths: Vec<u32> = docs.iter().map(|(_, len)| *len).collect();
     let len_bytes = encode_column_lengths(&lengths);
+    let mut rows: Vec<u8> = Vec::with_capacity(docs.len() * 8);
+    let mut ordinal: std::collections::HashMap<u64, u32> =
+        std::collections::HashMap::with_capacity(docs.len());
+    for (i, (row, _)) in docs.iter().enumerate() {
+        ordinal.insert(*row, i as u32);
+        rows.extend_from_slice(&row.to_le_bytes());
+    }
 
     let mut pos: Vec<u8> = Vec::new();
     let mut metas: Vec<TermMeta> = Vec::with_capacity(postings.len());
@@ -74,15 +89,12 @@ pub fn write_segment_index(
             let mut deltas: Vec<u32> = Vec::with_capacity(chunk.len());
             let mut tfs: Vec<u32> = Vec::with_capacity(chunk.len());
             for (row, tf) in chunk {
-                // `docid_t` is the segment offset; the first delta is the
-                // absolute offset (the reference starts `last_doc_id_` at 0).
-                let doc = (*row)
-                    .checked_sub(base_row_id)
-                    .and_then(|d| u32::try_from(d).ok())
-                    .ok_or_else(|| FormatError::Truncated {
-                        need: (*row - base_row_id) as usize,
-                        got: u32::MAX as usize,
-                    })?;
+                // Dense document ordinal within the segment (see the module
+                // docs); the first delta is the absolute ordinal.
+                let doc = *ordinal.get(row).ok_or(FormatError::Truncated {
+                    need: docs.len(),
+                    got: 0,
+                })?;
                 deltas.push(doc.wrapping_sub(last));
                 tfs.push(*tf);
                 last = doc;
@@ -124,6 +136,7 @@ pub fn write_segment_index(
     write(FULLTEXT_DICT_SUFFIX, &dic)?;
     write(FULLTEXT_POSTING_SUFFIX, &pos)?;
     write(FULLTEXT_LENGTH_SUFFIX, &len_bytes)?;
+    write(FULLTEXT_ROW_SUFFIX, &rows)?;
     Ok(())
 }
 
@@ -134,8 +147,9 @@ pub struct SegmentIndexReader {
     dic: Mmap,
     pos: Mmap,
     len: Mmap,
+    /// Row id per dense document ordinal.
+    rows: Vec<u64>,
     flags: TermMetaFlags,
-    base_row_id: u64,
 }
 
 impl SegmentIndexReader {
@@ -149,7 +163,7 @@ impl SegmentIndexReader {
     pub fn open(
         dir: &str,
         base_name: &str,
-        base_row_id: u64,
+        _base_row_id: u64,
         flags: TermMetaFlags,
     ) -> Result<Self, FormatError> {
         let map = |suffix: &str| -> Result<Mmap, FormatError> {
@@ -160,13 +174,34 @@ impl SegmentIndexReader {
             // sealed).
             unsafe { Mmap::map(&file) }.map_err(|e| FormatError::Io(e.to_string()))
         };
+        let rows_map = map(FULLTEXT_ROW_SUFFIX)?;
+        let rows: Vec<u64> = rows_map
+            .chunks_exact(8)
+            .map(|b| u64::from_le_bytes(b.try_into().unwrap()))
+            .collect();
         Ok(Self {
             dic: map(FULLTEXT_DICT_SUFFIX)?,
             pos: map(FULLTEXT_POSTING_SUFFIX)?,
             len: map(FULLTEXT_LENGTH_SUFFIX)?,
+            rows,
             flags,
-            base_row_id,
         })
+    }
+
+    /// Row ids in ordinal order.
+    pub fn rows(&self) -> &[u64] {
+        &self.rows
+    }
+
+    /// Dense ordinal of `row`, if the segment holds it.
+    pub fn ordinal(&self, row: u64) -> Option<u32> {
+        self.rows.binary_search(&row).ok().map(|i| i as u32)
+    }
+
+    /// The document length of `row` (BM25 `dl`), looked up through the ordinal
+    /// table so sparse row ids work.
+    pub fn doc_len_of_row(&self, row: u64) -> Option<u32> {
+        self.doc_len(self.ordinal(row)?)
     }
 
     /// The document length at segment offset `doc` (the BM25 `dl`).
@@ -222,7 +257,10 @@ impl SegmentIndexReader {
         let mut last: u32 = 0;
         for (doc, tf) in docs.into_iter().zip(tfs) {
             last = last.wrapping_add(doc);
-            out.push((self.base_row_id + u64::from(last), tf));
+            // An ordinal beyond the `.row` table would mean a corrupt index.
+            if let Some(row) = self.rows.get(last as usize) {
+                out.push((*row, tf));
+            }
         }
         Ok(out)
     }
@@ -234,9 +272,10 @@ mod tests {
 
     #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<(u64, u32)>>) {
-        // Three documents at segment offsets 0..2, base row id 1<<32.
+        // 300 documents whose row ids start at 1<<32: a later insert batch. The
+        // `.row` table keeps them addressable even though the ids are sparse.
         let base = 1u64 << 32;
-        let docs = vec![(base, 4u32), (base + 1, 6), (base + 2, 2)];
+        let docs: Vec<(u64, u32)> = (0..300).map(|i| (base + i, (i % 7 + 2) as u32)).collect();
         let mut postings: BTreeMap<String, Vec<(u64, u32)>> = BTreeMap::new();
         postings.insert("alpha".into(), vec![(base, 1), (base + 2, 2)]);
         postings.insert("beta".into(), vec![(base + 1, 3)]);
@@ -271,9 +310,10 @@ mod tests {
             TermMetaFlags::default(),
         )
         .unwrap();
-        assert_eq!(reader.doc_count(), 3);
-        assert_eq!(reader.doc_len(0), Some(4));
-        assert_eq!(reader.doc_len(2), Some(2));
+        assert_eq!(reader.doc_count(), 300);
+        assert_eq!(reader.doc_len(0), Some(2));
+        assert_eq!(reader.doc_len(2), Some(4));
+        assert_eq!(reader.doc_len_of_row(base + 2), Some(4));
 
         assert_eq!(
             reader.postings("alpha").unwrap(),

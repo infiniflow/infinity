@@ -1609,7 +1609,7 @@ struct SealedSegment {
 
 impl SealedSegment {
     fn contains(&self, row: u64) -> bool {
-        row >= self.base_row_id && row - self.base_row_id < u64::from(self.docs)
+        self.reader.ordinal(row).is_some()
     }
 }
 
@@ -1743,7 +1743,7 @@ impl TextIndex {
                     .iter()
                     .rev()
                     .find(|s| s.contains(*d))
-                    .and_then(|s| s.reader.doc_len((*d - s.base_row_id) as u32))
+                    .and_then(|s| s.reader.doc_len_of_row(*d))
                     .unwrap_or(1);
                 doc_len.insert(*d, dl);
             }
