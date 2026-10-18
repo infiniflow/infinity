@@ -2032,6 +2032,151 @@ impl MultiVectorIndex {
     }
 }
 
+/// One sparse (BMP) index in the reference's two forms: sealed `seg_*.bmp`
+/// chunks written with `BMPAlg::SaveToPtr`'s layout, and the memory tail.
+struct SparseIndex {
+    width: infinity_storage::bmp_cpp::IdxWidth,
+    dir: PathBuf,
+    /// `ROW_ID -> (term, weight)` for documents not yet dumped.
+    tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
+    /// One mmap reader per dumped chunk, with the `ROW_ID` segment it covers.
+    sealed: Vec<(u64, Arc<infinity_storage::bmp_cpp::BmpCppReader>)>,
+    next_chunk: u64,
+    tail_bytes: usize,
+}
+
+fn sparse_doc_bytes(doc: &[(i32, f32)]) -> usize {
+    doc.len() * 8
+}
+
+impl SparseIndex {
+    fn new(dir: PathBuf, width: infinity_storage::bmp_cpp::IdxWidth) -> Self {
+        let next_chunk = std::fs::read_dir(&dir)
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "bmp"))
+                    .count() as u64
+            })
+            .unwrap_or(0);
+        Self {
+            width,
+            dir,
+            tail: Default::default(),
+            sealed: Vec::new(),
+            next_chunk,
+            tail_bytes: 0,
+        }
+    }
+
+    fn insert(&mut self, seq: u64, doc: Vec<(i32, f32)>) {
+        if let Some(old) = self.tail.remove(&seq) {
+            self.tail_bytes = self.tail_bytes.saturating_sub(sparse_doc_bytes(&old));
+        }
+        self.tail_bytes += sparse_doc_bytes(&doc);
+        self.tail.insert(seq, doc);
+    }
+
+    fn remove(&mut self, seq: u64) {
+        if let Some(old) = self.tail.remove(&seq) {
+            self.tail_bytes = self.tail_bytes.saturating_sub(sparse_doc_bytes(&old));
+        }
+    }
+
+    fn doc_count(&self) -> usize {
+        self.tail.len()
+            + self
+                .sealed
+                .iter()
+                .map(|(_, r)| r.doc_count())
+                .sum::<usize>()
+    }
+
+    /// Dumps the memory tail into per-segment BMP chunks.
+    fn seal(&mut self) {
+        if self.tail.is_empty() {
+            return;
+        }
+        #[allow(clippy::type_complexity)]
+        let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<(i32, f32)>)>> =
+            Default::default();
+        for (seq, doc) in std::mem::take(&mut self.tail) {
+            by_segment
+                .entry(seq >> 32)
+                .or_default()
+                .push((seq & 0xffff_ffff, doc));
+        }
+        self.tail_bytes = 0;
+        for (segment, mut docs) in by_segment {
+            docs.sort_by_key(|(row, _)| *row);
+            let term_num = docs
+                .iter()
+                .flat_map(|(_, e)| e.iter().map(|(t, _)| *t + 1))
+                .max()
+                .unwrap_or(0)
+                .max(1) as usize;
+            let name = format!("seg_{segment}_{}_{}.bmp", self.next_chunk, docs.len());
+            self.next_chunk += 1;
+            let path = self.dir.join(name);
+            if infinity_storage::bmp_cpp::write_bmp_file(
+                &path,
+                infinity_index::sparse::BMP_BLOCK_SIZE,
+                self.width,
+                &docs,
+                term_num,
+            )
+            .is_err()
+            {
+                continue;
+            }
+            if let Ok(reader) = infinity_storage::bmp_cpp::BmpCppReader::open(&path, self.width) {
+                self.sealed.push((segment, Arc::new(reader)));
+            }
+        }
+    }
+
+    /// Top-k over sealed chunks and the memory tail, skipping tombstones.
+    fn search(
+        &self,
+        query: &[(i32, f32)],
+        k: usize,
+        dead: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f32)> {
+        let mut hits: Vec<(u64, f32)> = Vec::new();
+        for (segment, reader) in &self.sealed {
+            // Ask for enough candidates that tombstoned rows cannot starve the
+            // top-k; `search` clamps to the chunk's document count.
+            for (row, score) in reader.search(query, k + dead.len(), 0.9) {
+                let seq = (segment << 32) | u64::from(row as u32);
+                if !dead.contains(&seq) {
+                    hits.push((seq, score));
+                }
+            }
+        }
+        for (seq, doc) in &self.tail {
+            if dead.contains(seq) {
+                continue;
+            }
+            let score: f32 = query
+                .iter()
+                .map(|(term, weight)| {
+                    doc.iter()
+                        .find(|(t, _)| t == term)
+                        .map(|(_, value)| weight * value)
+                        .unwrap_or(0.0)
+                })
+                .sum();
+            hits.push((*seq, score));
+        }
+        hits.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        hits.truncate(k);
+        hits
+    }
+}
+
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
 pub struct Engine {
     catalog: Catalog,
@@ -2110,6 +2255,8 @@ pub struct Engine {
     text_index: Mutex<HashMap<String, SharedTextIndex>>,
     /// Multi-vector indexes, keyed by `"<table>.<column>"`.
     mv_index: Mutex<HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>>,
+    /// Sparse (BMP) indexes, keyed by `"<table>.<column>"`.
+    sparse_index: Mutex<HashMap<String, Arc<std::sync::RwLock<SparseIndex>>>>,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
 }
 
@@ -2261,6 +2408,7 @@ impl Engine {
             hnsw_probed: Mutex::new(Default::default()),
             text_index: Mutex::new(HashMap::new()),
             mv_index: Mutex::new(HashMap::new()),
+            sparse_index: Mutex::new(HashMap::new()),
             vector_cache: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
@@ -3654,6 +3802,18 @@ impl Engine {
                         .and_then(|ty| type_dim(&ty));
                     if let Some(dims) = dims {
                         let _ = self.multivector_index_for(table, column, dims);
+                    }
+                }
+                // The sparse BMP index is materialised the same way.
+                if index_type.eq_ignore_ascii_case("BMP") {
+                    let width = self
+                        .table_schema(table)
+                        .ok()
+                        .and_then(|s| s.iter().position(|c| c == column))
+                        .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                        .map(|ty| sparse_idx_width(&ty));
+                    if let Some(width) = width {
+                        let _ = self.sparse_index_for(table, column, width);
                     }
                 }
                 Ok(QueryResult::CreatedIndex {
@@ -5129,11 +5289,152 @@ impl Engine {
         }
     }
 
+    /// Builds (once) the sparse BMP index of a column, dumping every segment so
+    /// later queries only map the chunk files. Inserts append to the memory
+    /// tail and `flush()` seals it.
+    fn sparse_index_for(
+        &self,
+        table: &str,
+        column: &str,
+        width: infinity_storage::bmp_cpp::IdxWidth,
+    ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
+        let key = index_key(table, column);
+        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
+        if let Some(idx) = self.sparse_index.lock().unwrap().get(&key) {
+            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
+            if complete >= reserved {
+                return Ok(idx.clone());
+            }
+        }
+        let schema = self.table_schema(table)?;
+        let ci = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let dir = self.dir.join("sparse").join(key.replace('/', "_"));
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().is_some_and(|x| x == "bmp") {
+                    let _ = std::fs::remove_file(p);
+                }
+            }
+        }
+        let mut index = SparseIndex::new(dir, width);
+        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            // A NULL sparse cell has no postings; only stored values are indexed.
+            let Some(Value::Str(text)) = cells.get(ci) else {
+                continue;
+            };
+            let entries: Vec<(i32, f32)> = parse_sparse_str(text)
+                .into_iter()
+                .map(|(i, x)| (i as i32, x as f32))
+                .collect();
+            index.insert(seq as u64, entries);
+        }
+        index.seal();
+        let shared = Arc::new(std::sync::RwLock::new(index));
+        self.sparse_index
+            .lock()
+            .unwrap()
+            .insert(key, shared.clone());
+        Ok(shared)
+    }
+
+    /// Keeps existing sparse indexes in step with an inserted/rewritten row.
+    fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+        let prefix = format!("{table}.");
+        let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
+            .sparse_index
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if indexes.is_empty() {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        for (key, shared) in indexes {
+            let column = &key[prefix.len()..];
+            let Some(ci) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            let mut index = shared.write().unwrap();
+            index.remove(seq as u64);
+            let Some(text) = cells.get(ci) else { continue };
+            // A NULL cell stores the literal `null`; it has no postings.
+            if text.trim().eq_ignore_ascii_case("null") {
+                continue;
+            }
+            let entries: Vec<(i32, f32)> = parse_sparse_str(text)
+                .into_iter()
+                .map(|(i, x)| (i as i32, x as f32))
+                .collect();
+            index.insert(seq as u64, entries);
+        }
+    }
+
+    /// Dumps every sparse memory tail into its BMP chunks (called by `flush`).
+    fn seal_sparse_indexes(&self) {
+        let indexes: Vec<Arc<std::sync::RwLock<SparseIndex>>> = self
+            .sparse_index
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect();
+        for shared in indexes {
+            shared.write().unwrap().seal();
+        }
+    }
+
+    /// Removes the sparse chunks of `table` (or one column) from disk and cache.
+    fn drop_sparse_storage(&self, table: &str, column: Option<&str>) {
+        let prefix = match column {
+            Some(c) => index_key(table, c),
+            None => format!("{table}."),
+        };
+        let mut map = self.sparse_index.lock().unwrap();
+        let keys: Vec<String> = map
+            .keys()
+            .filter(|k| match column {
+                Some(_) => *k == &prefix,
+                None => k.starts_with(&prefix),
+            })
+            .cloned()
+            .collect();
+        for key in keys {
+            if let Some(idx) = map.remove(&key) {
+                if let Ok(dir) = idx.read().map(|g| g.dir.clone()) {
+                    let _ = std::fs::remove_dir_all(dir);
+                }
+            }
+        }
+    }
+
+    /// Tombstoned sequence ids of a table; index hits are validated against it.
+    fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
+        let dp = del_prefix(table);
+        let mut dead: std::collections::HashSet<u64> = Default::default();
+        for (k, _) in self.store.scan_prefix(&dp)? {
+            if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
+                dead.insert(seq);
+            }
+        }
+        Ok(dead)
+    }
+
     /// Keeps existing inverted indexes in step with an inserted/rewritten row.
     fn update_text_indexes(&self, table: &str, seq: usize, cells: &[String]) {
-        // The multi-vector index shares this DML hook: it is the one place every
-        // write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes through.
+        // The multi-vector and sparse indexes share this DML hook: it is the one
+        // place every write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes
+        // through.
         self.update_multivector_indexes(table, seq, cells);
+        self.update_sparse_indexes(table, seq, cells);
         let prefix = format!("{table}.");
         let indexes: Vec<(String, SharedTextIndex)> = self
             .text_index
@@ -5195,6 +5496,7 @@ impl Engine {
             let _ = std::fs::remove_dir_all(dir);
         }
         self.drop_multivector_storage(table, column);
+        self.drop_sparse_storage(table, column);
     }
 
     /// Drops deleted rows from every inverted index of `table`.
@@ -7853,13 +8155,7 @@ impl Engine {
                             .cloned()
                             .unwrap_or_default();
                         let index = self.multivector_index_for(table, &column, dims)?;
-                        let dp = del_prefix(table);
-                        let mut dead: std::collections::HashSet<u64> = Default::default();
-                        for (k, _) in self.store.scan_prefix(&dp)? {
-                            if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
-                                dead.insert(seq);
-                            }
-                        }
+                        let dead = self.tombstone_set(table)?;
                         let hits = index.read().unwrap().search(&query, topn.max(1), &dead);
                         let scored: Vec<(u64, f64)> = hits
                             .into_iter()
@@ -7885,6 +8181,52 @@ impl Engine {
                         return Ok((out, hidden));
                     }
                 }
+            }
+        }
+
+        // Sparse: answer from the write-time BMP index when no predicate needs
+        // the other columns; it already covers every live row.
+        if is_sparse
+            && !types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false)
+            && pred.is_none()
+            && in_filter.is_none()
+            && search_filter.is_none()
+        {
+            let width = sparse_idx_width(types.get(col_idx).map(String::as_str).unwrap_or(""));
+            let qv: Vec<(i32, f32)> = parse_sparse(&query_items)
+                .into_iter()
+                .map(|(i, v)| (i as i32, v as f32))
+                .collect();
+            if !qv.is_empty() {
+                let column = match_columns(&m.column)
+                    .first()
+                    .cloned()
+                    .unwrap_or_default();
+                let index = self.sparse_index_for(table, &column, width)?;
+                let dead = self.tombstone_set(table)?;
+                let hits = index.read().unwrap().search(&qv, topn.max(1), &dead);
+                let scored: Vec<(u64, f64)> = hits
+                    .into_iter()
+                    .map(|(seq, score)| (seq, f64::from(score)))
+                    .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                    .collect();
+                let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
+                let mut by_id: HashMap<usize, Vec<Value>> = self
+                    .fetch_some_rows_with_ids(table, &wanted)?
+                    .into_iter()
+                    .collect();
+                let mut out = Vec::new();
+                for (seq, score) in scored {
+                    let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                        continue;
+                    };
+                    row.push(Value::Int(seq as i64));
+                    row.push(Value::Float(score));
+                    row.push(Value::Float(-score));
+                    row.push(Value::Float(score));
+                    out.push(row);
+                }
+                return Ok((out, hidden));
             }
         }
 
@@ -8523,9 +8865,10 @@ impl Engine {
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
         self.flush_cpp_blocks()?;
-        // Dump the multi-vector memory tails into their segment files, the
-        // reference's memindex dump at checkpoint.
+        // Dump the index memory tails into their segment files, the reference's
+        // memindex dump at checkpoint.
         self.seal_multivector_indexes();
+        self.seal_sparse_indexes();
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
         if let Some(client) = self.object_store.lock().unwrap().clone() {
@@ -10434,6 +10777,69 @@ mod tests {
         assert_eq!(
             rows(&e, q),
             vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
+    /// The sparse BMP index is built once, appended at write time, and dumped
+    /// by `flush()`; queries read the chunk files instead of rebuilding.
+    #[test]
+    fn sparse_index_is_built_at_write_time() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sp (id INT, v SPARSE(FLOAT,100));")
+            .unwrap();
+        e.execute("INSERT INTO sp VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+            .unwrap();
+        let q = "SELECT id FROM sp SEARCH MATCH SPARSE \
+                 (v, [0:1.0,20:2.0], 'ip', 3);";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["1".to_string()]]
+        );
+        let idx_dir = std::fs::read_dir(dir.path().join("sparse"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let count = |ext: &str| {
+            std::fs::read_dir(&idx_dir)
+                .unwrap()
+                .filter_map(|x| x.ok())
+                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
+                .count()
+        };
+        assert_eq!(count("bmp"), 1);
+
+        // The write-time tail is visible before the dump.
+        e.execute("INSERT INTO sp VALUES (3, [0:4.0,20:4.0]);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["3".to_string()],
+                vec!["2".to_string()],
+                vec!["1".to_string()]
+            ]
+        );
+
+        // `flush()` seals the tail as a second chunk and the ranking holds.
+        e.flush().unwrap();
+        assert_eq!(count("bmp"), 2);
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["3".to_string()],
+                vec!["2".to_string()],
+                vec!["1".to_string()]
+            ]
+        );
+
+        // Tombstoned rows never appear.
+        e.execute("DELETE FROM sp WHERE id = 3;").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["1".to_string()]]
         );
     }
 
