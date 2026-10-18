@@ -1575,6 +1575,10 @@ fn parse_value(cell: &str) -> Value {
 /// (`src/storage/invertedindex/memory_indexer*`).
 struct TextIndex {
     delims: Option<Vec<char>>,
+    /// Documents counted for the corpus statistics. Counted per scanned row, so
+    /// a table with duplicate sequence ids still matches the scan.
+    n_docs: usize,
+    total_len: u64,
     docs: HashMap<u32, u32>,
     postings: HashMap<String, Vec<(u32, u32, Vec<u32>)>>,
     live: std::collections::HashSet<u32>,
@@ -3868,7 +3872,7 @@ impl Engine {
         // rows; compare against the cheap reservation counter and rebuild.
         let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
-            let complete = idx.read().map(|g| g.docs.len()).unwrap_or(0);
+            let complete = idx.read().map(|g| g.n_docs).unwrap_or(0);
             if complete >= reserved {
                 return Ok(idx.clone());
             }
@@ -3880,6 +3884,8 @@ impl Engine {
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
         let mut index = TextIndex {
             delims,
+            n_docs: 0,
+            total_len: 0,
             docs: HashMap::new(),
             postings: HashMap::new(),
             bytes: 0,
@@ -4945,11 +4951,6 @@ impl Engine {
         // of the table is cheaper to scan than to gather.
         #[allow(clippy::type_complexity)]
         let index_view: Option<(Vec<usize>, Vec<(usize, f64, HashMap<String, usize>)>)> = (|| {
-            // The index path is still rolling out: its corpus statistics must
-            // match the scan byte-for-byte before it becomes the default.
-            if std::env::var("INFINITY_TEXT_INDEX").ok().as_deref() != Some("1") {
-                return None;
-            }
             if boolean
                 || !rank_features.is_empty()
                 || in_filter.is_some()
@@ -4964,8 +4965,8 @@ impl Engine {
                 let name = schema.get(*ci)?.clone();
                 let index = self.text_index_for(table, &name, d.clone()).ok()?;
                 let guard = index.read().ok()?;
-                let n = guard.docs.len();
-                let sum: usize = guard.docs.values().map(|l| *l as usize).sum();
+                let n = guard.n_docs;
+                let sum = guard.total_len as usize;
                 let avg = if n == 0 {
                     1.0
                 } else {
