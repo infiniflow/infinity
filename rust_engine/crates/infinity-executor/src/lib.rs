@@ -3274,6 +3274,38 @@ impl Engine {
                 distinct,
                 highlight: _,
             } => {
+                // `SELECT count(*)` with no other clause is answered from the key
+                // counts alone; the generic path materialises every row.
+                if join.is_none()
+                    && where_pred.is_none()
+                    && group_by.is_empty()
+                    && having.is_none()
+                    && order_by.is_empty()
+                    && limit.is_none()
+                    && offset.is_none()
+                    && search.is_none()
+                    && !*distinct
+                    && items.len() == 1
+                    && aliases.len() <= 1
+                {
+                    if let infinity_parser::SelectItem::Aggregate(a) = &items[0] {
+                        // `AggFunc` is not re-exported; the debug name is stable.
+                        if format!("{:?}", a.func) == "Count" && a.args.is_empty() && !a.distinct {
+                            if let Some(t) = from.as_ref() {
+                                let n = self.row_count(t)?;
+                                let name = aliases
+                                    .first()
+                                    .cloned()
+                                    .flatten()
+                                    .unwrap_or_else(|| "count(star)".to_string());
+                                return Ok(QueryResult::Rows {
+                                    columns: vec![name],
+                                    rows: vec![vec![n.to_string()]],
+                                });
+                            }
+                        }
+                    }
+                }
                 // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
                 // row per element, then let the normal planner handle WHERE,
                 // GROUP BY and aggregates over the expanded relation.
