@@ -24,6 +24,7 @@
 | `NewTxn::Delete/Commit` 冲突检查 | `Txn::delete` + `TxnManager::commit` | 删除键在提交时按 `begin_ts` 校验 | ✅ |
 | `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
+| `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search` | ✅ |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -41,7 +42,7 @@
 | `BlockMaxWandIterator`（pivot/NextShallow/block-max） | `Engine::wand_scan` 自由函数 | 控制流已移植，但**没有类**（无 `Next()`/游标对象）；需拆成 `BlockMaxWandIterator` 结构 |
 | `BM25Ranker` | `wand_scan` 内联公式 | 需独立 `Bm25Ranker`，供扫描路径与 WAND 共用 |
 | `MemoryIndexer` / `Indexer` / `IndexReader` | `TextIndex` + `SegmentIndexReader` + 查询期 `MergedIndex` | 构建/落盘/读取职责混在 `TextIndex` 与执行器；需拆出 `MemoryIndexer`、`Indexer`、`IndexReader` |
-| `HnswIndexInMem` / `HnswIndexHandler` | `MemHnsw`（执行器字段）+ `infinity_index::vector::HnswIndex` | 缺独立的 handler/segment 抽象；内存段与落盘段由 `Engine` 直接拼装 |
+| `HnswIndexHandler`（多 segment 合并） | `Engine::vector_candidates` | 内存段已拆为 `HnswIndexInMem`；handler/segment 合并仍在执行器 |
 | `EMVBIndex` / `PLAIDIndex` / `MultiVectorIndexHandler` | `MultiVectorIndex`（执行器）+ `EmvbPqIndex` | 构建、候选、merge 在一个结构里；需按 C++ 拆成 index + handler |
 | `BMPIvt` / `BMPFwd` / `BMPSearch` | `infinity_index::sparse::BmpIndex` + `bmp_cpp` | 内存形态与磁盘形态分离，但缺少 C++ 的 `BMPIvt`/`BMPFwd` 类边界 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |

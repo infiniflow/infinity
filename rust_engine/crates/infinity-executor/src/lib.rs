@@ -36,6 +36,7 @@ mod explain;
 
 mod explain_search;
 
+mod hnsw_mem;
 mod wand;
 
 mod cpp_blocks;
@@ -1821,13 +1822,6 @@ type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
 /// The in-memory form of a vector index: the rows written since the last dump.
 /// The reference keeps one `HnswIndexInMem` per segment; a query searches this
 /// segment and merges it with the sealed (on-disk) ones.
-struct MemHnsw {
-    dims: usize,
-    index: infinity_index::vector::HnswIndex,
-    /// Row id per added vector (the graph's labels).
-    rows: Vec<u64>,
-}
-
 /// Bounds how many full-table scans (full-text or vector) run at once. Each
 /// such scan materialises a large share of the table, so several concurrent
 /// readers can exhaust the process's memory even when a single query fits.
@@ -2277,7 +2271,7 @@ pub struct Engine {
     scan_gate: ScanGate,
     /// In-memory HNSW segment per vector column, keyed by
     /// `"<table>.<column>"`; the on-disk graph lives in `vector_indexes`.
-    hnsw_mem: Mutex<HashMap<String, MemHnsw>>,
+    hnsw_mem: Mutex<HashMap<String, hnsw_mem::HnswIndexInMem>>,
     /// Tables already checked for an HNSW index (avoids a catalog lookup per
     /// inserted row).
     hnsw_probed: Mutex<std::collections::HashSet<String>>,
@@ -5392,8 +5386,7 @@ impl Engine {
             if v.len() != mem.dims {
                 continue;
             }
-            mem.index.add(&v);
-            mem.rows.push(seq);
+            mem.insert(seq, &v);
         }
         if live_segment {
             return;
@@ -5433,17 +5426,10 @@ impl Engine {
             let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
             let mem = map
                 .entry(index_key(table, &im.column))
-                .or_insert_with(|| MemHnsw {
-                    dims,
-                    index: infinity_index::vector::HnswIndex::new(dims, m, efc, 64),
-                    rows: Vec::new(),
-                });
+                .or_insert_with(|| hnsw_mem::HnswIndexInMem::new(dims, m, efc));
             let Some(text) = cells.get(ci) else { continue };
             let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
-            if v.len() == mem.dims {
-                mem.index.add(&v);
-                mem.rows.push(seq);
-            }
+            mem.insert(seq, &v);
         }
     }
 
@@ -8851,13 +8837,9 @@ impl Engine {
                 .unwrap()
                 .get(&index_key(table, &col_name))
             {
-                if mem.dims == qv.len() {
-                    for (node, _) in mem.index.search(&qv, (topn * 4).max(64)) {
-                        if let Some(row) = mem.rows.get(node) {
-                            candidates.insert(*row as usize);
-                            covered.insert(*row as usize);
-                        }
-                    }
+                for (row, _) in mem.search(&qv, (topn * 4).max(64)) {
+                    candidates.insert(row as usize);
+                    covered.insert(row as usize);
                 }
             }
             let uncovered = if let Some(c) = &cache {
