@@ -203,6 +203,8 @@ impl HnswIndex {
     }
 
     fn random_level(&mut self) -> usize {
+        // `GenerateRandomLayer` (`hnsw_alg.cppm`): `-log(U(0,1)) * mult`,
+        // `mult = 1 / ln(M)`.
         let u = self.rng.unit().max(1e-12);
         (-u.ln() * self.ml) as usize
     }
@@ -216,67 +218,23 @@ impl HnswIndex {
         }
     }
 
-    pub fn add(&mut self, v: &[f32]) -> usize {
-        assert_eq!(v.len(), self.dims, "dimension mismatch");
-        let node = self.data.len();
-        self.data.push(v.to_vec());
-        let level = self.random_level();
-        self.levels.push(level);
-        for l in 0..=level {
-            self.ensure(l, node);
-        }
-
-        if self.entry.is_none() {
-            self.entry = Some(node);
-            self.max_level = level;
-            return node;
-        }
-
-        // `Build` in the reference: descend greedily through the layers above
-        // this node's level, then link it layer by layer from the top down.
-        let mut ep = self.entry.unwrap();
-        for l in ((level + 1)..=self.max_level).rev() {
-            ep = self.greedy(v, ep, l);
-        }
-        for l in (0..=level.min(self.max_level)).rev() {
-            let cands = self.search_layer(v, &[ep], self.ef_construction, l);
-            let neighbors = self.select_neighbors_heuristic(&cands, self.m);
-            if let Some((_, first)) = neighbors.first() {
-                ep = *first;
-            }
-            self.ensure(l, node);
-            self.ensure(l, ep);
-            for (_, nb) in &neighbors {
-                self.ensure(l, *nb);
-            }
-            self.links[l][node] = neighbors.iter().map(|(_, nb)| *nb).collect();
-            let max_m = if l == 0 { self.m * 2 } else { self.m };
-            for (_, nb) in neighbors {
-                self.ensure(l, nb);
-                if !self.links[l][nb].contains(&node) {
-                    self.links[l][nb].push(node);
-                }
-                self.prune(l, nb, max_m);
-            }
-        }
-        if level > self.max_level {
-            self.max_level = level;
-            self.entry = Some(node);
-        }
-        node
-    }
-
-    /// The reference's `SelectNeighborsHeuristic`: walk the candidates closest
-    /// first and keep one only when it is closer to the query than to every
-    /// neighbour already kept (this spreads the links over directions).
+    /// `SelectNeighborsHeuristic` (`hnsw_alg.cppm:231`). Candidates closer than
+    /// an already-kept neighbour are dropped; the returned list is ordered
+    /// **farthest first**, which is what `Build` uses for its next entry point.
     fn select_neighbors_heuristic(&self, cands: &[(f32, usize)], m: usize) -> Vec<(f32, usize)> {
         let mut sorted = cands.to_vec();
-        sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        if sorted.len() < m {
+            sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            return sorted;
+        }
+        sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         let mut kept: Vec<(f32, usize)> = Vec::with_capacity(m);
         for (d, node) in sorted {
             if kept.len() == m {
                 break;
             }
+            // Keep the candidate unless some kept neighbour is closer to it
+            // than the query is.
             let dominated = kept
                 .iter()
                 .any(|(_, s)| l2_sq(&self.data[node], &self.data[*s]) < d);
@@ -284,60 +242,120 @@ impl HnswIndex {
                 kept.push((d, node));
             }
         }
+        kept.reverse();
         kept
     }
 
-    /// Drops the worst links of `node` on `layer` beyond `max_m`, re-running the
-    /// selection heuristic over the current neighbourhood.
-    fn prune(&mut self, layer: usize, node: usize, max_m: usize) {
-        if self.links[layer][node].len() <= max_m {
+    /// `ConnectNeighbors` (`hnsw_alg.cppm:259`): add the reverse link, pruning
+    /// the target's list to `2 * M` on layer 0 and `M` above.
+    fn connect_neighbors(&mut self, target: usize, node: usize, layer: usize) {
+        self.ensure(layer, target);
+        let max_m = if layer == 0 { self.m * 2 } else { self.m };
+        if self.links[layer][target].len() < max_m {
+            self.links[layer][target].push(node);
             return;
         }
-        let q = self.data[node].clone();
-        let cands: Vec<(f32, usize)> = self.links[layer][node]
-            .iter()
-            .map(|&nb| (l2_sq(&q, &self.data[nb]), nb))
-            .collect();
+        let mut cands: Vec<(f32, usize)> = Vec::with_capacity(self.links[layer][target].len() + 1);
+        cands.push((l2_sq(&self.data[target], &self.data[node]), node));
+        for &nb in &self.links[layer][target] {
+            cands.push((l2_sq(&self.data[target], &self.data[nb]), nb));
+        }
         let kept = self.select_neighbors_heuristic(&cands, max_m);
-        self.links[layer][node] = kept.into_iter().map(|(_, nb)| nb).collect();
+        self.links[layer][target] = kept.into_iter().map(|(_, n)| n).collect();
     }
 
-    fn greedy(&self, q: &[f32], start: usize, layer: usize) -> usize {
+    /// `Build` (`hnsw_alg.cppm:390`): take the new random layer, update the
+    /// entry point **before** searching (the old entry stays the start), descend
+    /// greedily to the node's layer, then link it layer by layer from the top.
+    pub fn add(&mut self, v: &[f32]) -> usize {
+        assert_eq!(v.len(), self.dims, "dimension mismatch");
+        let node = self.data.len();
+        self.data.push(v.to_vec());
+        let q_layer = self.random_level();
+
+        let (max_layer, mut ep) = match self.entry {
+            None => {
+                self.levels.push(q_layer);
+                self.entry = Some(node);
+                self.max_level = q_layer;
+                for l in 0..=q_layer {
+                    self.ensure(l, node);
+                }
+                return node;
+            }
+            Some(old_ep) => {
+                if q_layer > self.max_level {
+                    let old = (self.max_level, old_ep);
+                    self.max_level = q_layer;
+                    self.entry = Some(node);
+                    old
+                } else {
+                    (self.max_level, old_ep)
+                }
+            }
+        };
+
+        self.levels.push(q_layer);
+        for l in 0..=q_layer {
+            self.ensure(l, node);
+        }
+        let query = self.data[node].to_vec();
+
+        let mut cur = max_layer as i64;
+        while cur > q_layer as i64 {
+            ep = self.search_layer_nearest(&query, ep, cur as usize);
+            cur -= 1;
+        }
+        let mut l = q_layer.min(max_layer) as i64;
+        while l >= 0 {
+            let cands = self.search_layer(&query, ep, self.ef_construction, l as usize);
+            let neighbors = self.select_neighbors_heuristic(&cands, self.m);
+            if neighbors.is_empty() {
+                l -= 1;
+                continue;
+            }
+            // The reference continues from the **farthest** kept neighbour.
+            ep = neighbors[0].1;
+            self.links[l as usize][node] = neighbors.iter().map(|(_, n)| *n).collect();
+            for (_, nb) in &neighbors {
+                self.connect_neighbors(*nb, node, l as usize);
+            }
+            l -= 1;
+        }
+        node
+    }
+
+    /// `SearchLayerNearest` (`hnsw_alg.cppm:204`): greedy walk, scanning a
+    /// node's neighbours in reverse order and moving to any closer one.
+    fn search_layer_nearest(&self, q: &[f32], start: usize, layer: usize) -> usize {
         let mut cur = start;
+        let mut cur_d = l2_sq(q, &self.data[cur]);
         loop {
-            let mut best = cur;
-            let mut best_d = l2_sq(q, &self.data[cur]);
-            if layer < self.links.len() && cur < self.links[layer].len() {
-                for &nb in &self.links[layer][cur] {
+            let mut changed = false;
+            if let Some(list) = self.links.get(layer).and_then(|l| l.get(cur)) {
+                for &nb in list.iter().rev() {
                     let d = l2_sq(q, &self.data[nb]);
-                    if d < best_d {
-                        best_d = d;
-                        best = nb;
+                    if d < cur_d {
+                        cur = nb;
+                        cur_d = d;
+                        changed = true;
                     }
                 }
             }
-            if best == cur {
+            if !changed {
                 return cur;
             }
-            cur = best;
         }
     }
 
-    /// Beam search at `layer` starting from `entries`, keeping the `ef` best.
-    fn search_layer(
-        &self,
-        q: &[f32],
-        entries: &[usize],
-        ef: usize,
-        layer: usize,
-    ) -> Vec<(f32, usize)> {
-        let mut visited: HashSet<usize> = entries.iter().copied().collect();
-        let mut candidates: Vec<(f32, usize)> = entries
-            .iter()
-            .map(|&e| (l2_sq(q, &self.data[e]), e))
-            .collect();
-        candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        let mut result = candidates.clone();
+    /// `SearchLayer` (`hnsw_alg.cppm:124`): best-first beam keeping `ef`
+    /// results. A candidate is expanded while the result set is not full or its
+    /// distance does not exceed the current worst (`<=`, as in the reference).
+    fn search_layer(&self, q: &[f32], ep: usize, ef: usize, layer: usize) -> Vec<(f32, usize)> {
+        let mut visited: HashSet<usize> = HashSet::new();
+        visited.insert(ep);
+        let mut candidates: Vec<(f32, usize)> = vec![(l2_sq(q, &self.data[ep]), ep)];
+        let mut result: Vec<(f32, usize)> = candidates.clone();
 
         while !candidates.is_empty() {
             let (cd, c) = candidates.remove(0);
@@ -345,18 +363,23 @@ impl HnswIndex {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            if layer < self.links.len() && c < self.links[layer].len() {
-                for &nb in &self.links[layer][c] {
-                    if visited.insert(nb) {
-                        let d = l2_sq(q, &self.data[nb]);
-                        let worst = result.last().map(|x| x.0).unwrap_or(f32::INFINITY);
-                        if result.len() < ef || d < worst {
-                            candidates.push((d, nb));
-                            candidates.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                            result.push((d, nb));
-                            result.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                            result.truncate(ef);
-                        }
+            if let Some(list) = self.links.get(layer).and_then(|l| l.get(c)) {
+                for &nb in list {
+                    if nb >= self.data.len() || !visited.insert(nb) {
+                        continue;
+                    }
+                    let d = l2_sq(q, &self.data[nb]);
+                    let worst = result.last().map(|x| x.0).unwrap_or(f32::INFINITY);
+                    if result.len() < ef || d <= worst {
+                        candidates.push((d, nb));
+                        candidates.sort_by(|a, b| {
+                            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        result.push((d, nb));
+                        result.sort_by(|a, b| {
+                            a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        result.truncate(ef);
                     }
                 }
             }
@@ -372,11 +395,11 @@ impl HnswIndex {
         let mut cur = entry;
         let mut l = self.max_level as i64;
         while l > 0 {
-            cur = self.greedy(q, cur, l as usize);
+            cur = self.search_layer_nearest(q, cur, l as usize);
             l -= 1;
         }
         let ef = self.ef_search.max(k);
-        let mut res = self.search_layer(q, &[cur], ef, 0);
+        let mut res = self.search_layer(q, cur, ef, 0);
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
