@@ -21,6 +21,12 @@
 //! through the SIMD-BP128/VByte codec in [`crate::inverted_format`]. Position
 //! lists are empty here: BM25 scoring does not read them, and a segment built
 //! without positions is exactly the reference's `of_position_list`-less index.
+//!
+//! `.dic` and `.len` are byte-identical to the reference. The `.pos` framing is
+//! too, but its block bodies currently use `encode_u32_block`'s
+//! `CompositeCodec::encodeArray` framing; the reference's per-field encoder uses
+//! its own `IntEncoder` prefix, so byte-exact `.pos` interop is still open (the
+//! codec itself is bit-compatible — see `docs/CPP_FORMAT_SPEC.md` §9.3.5).
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
