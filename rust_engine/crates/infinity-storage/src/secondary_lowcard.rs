@@ -209,7 +209,7 @@ impl LowCardReader {
         }
         // Walk to this key's bitmap: every earlier entry carries a size prefix.
         let mut at = 4 + self.count * 8;
-        for i in 0..lo {
+        for _ in 0..lo {
             let size = i32::from_le_bytes(self.map[at..at + 4].try_into().unwrap()) as usize;
             at += 4 + size;
         }
