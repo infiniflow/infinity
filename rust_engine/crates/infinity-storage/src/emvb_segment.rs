@@ -298,7 +298,7 @@ pub fn encode_emvb(
                 .collect(),
         );
     }
-    let subspace_num = if dims % 8 == 0 { 8 } else { 1 };
+    let subspace_num = if dims.is_multiple_of(8) { 8 } else { 1 };
     let pq = train_residual_pq(dims, subspace_num, 8, &residuals);
 
     let mut out = Vec::new();
