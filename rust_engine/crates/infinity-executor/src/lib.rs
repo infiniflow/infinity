@@ -2596,15 +2596,9 @@ impl Engine {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::Invalid(format!("unknown column '{column}'")))?;
-        let mut idx = SecondaryIndex::new();
-        // key by the *storage* sequence id (not the positional index: a rewrite
-        // such as DROP COLUMN re-appends rows under new seqs)
-        for (seq, row) in self.fetch_rows_with_ids(table)? {
-            if let Some(v) = row.get(col_idx) {
-                idx.insert(v.to_slt_string().as_bytes(), seq as u64);
-            }
-        }
-        // Integer columns also get the reference's per-segment PGM chunks.
+        // Every secondary column has a chunk form, so the build only reads the
+        // indexed column (not the wide vectors in the same row): `index_lookup`
+        // merges the chunks with the in-memory tail.
         let key = index_key(table, column);
         self.secondary_disk.lock().unwrap().remove(&key);
         let type_upper = self
@@ -2617,7 +2611,7 @@ impl Engine {
         let is_bool = type_upper.starts_with("BOOL");
         if int_column {
             let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
-            for (seq, row) in self.fetch_rows_with_ids(table)? {
+            for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                 let Some(Value::Int(v)) = row.get(col_idx) else {
                     continue;
                 };
@@ -2633,7 +2627,7 @@ impl Engine {
             // VARCHAR (and JSON) keys are hashed to u64, exactly like the
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
             let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
-            for (seq, row) in self.fetch_rows_with_ids(table)? {
+            for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                 let Some(v) = row.get(col_idx) else {
                     continue;
                 };
@@ -2647,12 +2641,10 @@ impl Engine {
         }
         // Boolean columns use the low-cardinality variant.
         self.secondary_low.lock().unwrap().remove(&key);
-        // Every scalar/JSON secondary column now has a chunk form.
-        let disk_backed = true;
         {
             if is_bool {
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
-                for (seq, row) in self.fetch_rows_with_ids(table)? {
+                for (seq, row) in self.fetch_rows_with_ids_projected_all(table, col_idx)? {
                     let Some(v) = row.get(col_idx) else { continue };
                     let key = matches!(v, Value::Int(1)) || v.to_slt_string() == "true";
                     by_segment.entry((seq as u64) >> 32).or_default()[key as usize]
@@ -2686,21 +2678,15 @@ impl Engine {
                     .insert(key.clone(), readers);
             }
         }
-        // A disk-backed index keeps only rows written since the last dump in
-        // memory; the rest is served by the chunk readers.
-        if disk_backed {
-            self.secondary_disk_backed
-                .lock()
-                .unwrap()
-                .insert(key.clone());
-            self.indexes
-                .lock()
-                .unwrap()
-                .insert(key, SecondaryIndex::new());
-        } else {
-            self.secondary_disk_backed.lock().unwrap().remove(&key);
-            self.indexes.lock().unwrap().insert(key, idx);
-        }
+        // The memory map is only the tail written since the last dump.
+        self.secondary_disk_backed
+            .lock()
+            .unwrap()
+            .insert(key.clone());
+        self.indexes
+            .lock()
+            .unwrap()
+            .insert(key, SecondaryIndex::new());
         Ok(())
     }
 
