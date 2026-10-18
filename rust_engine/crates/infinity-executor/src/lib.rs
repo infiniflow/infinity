@@ -1858,6 +1858,20 @@ pub struct Engine {
     exchange_capacity: usize,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
+    /// On-disk secondary-index segments (the reference's PGM chunks): one
+    /// mmap reader per `ROW_ID` segment, with its base row id.
+    secondary_disk: Mutex<
+        HashMap<
+            String,
+            (
+                usize,
+                Vec<(
+                    u64,
+                    Arc<infinity_storage::secondary_segment::SecondarySegmentReader>,
+                )>,
+            ),
+        >,
+    >,
     /// secondary indexes keyed by `"<table>.<column>"`
     indexes: Mutex<HashMap<String, SecondaryIndex>>,
     /// Vector indexes loaded from the C++ block mirror, keyed by
@@ -2025,6 +2039,7 @@ impl Engine {
             rt,
             exchange_capacity: exchange_capacity.max(1),
             dir,
+            secondary_disk: Mutex::new(HashMap::new()),
             indexes: Mutex::new(HashMap::new()),
             vector_indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
@@ -2144,16 +2159,129 @@ impl Engine {
                 idx.insert(v.to_slt_string().as_bytes(), seq as u64);
             }
         }
-        self.indexes
-            .lock()
-            .unwrap()
-            .insert(index_key(table, column), idx);
+        // Integer columns also get the reference's per-segment PGM chunks.
+        let key = index_key(table, column);
+        self.secondary_disk.lock().unwrap().remove(&key);
+        let int_column = self
+            .column_types(table)
+            .ok()
+            .and_then(|t| t.get(col_idx).cloned())
+            .map(|t| {
+                let t = t.trim().to_ascii_uppercase();
+                t.starts_with("INT") || t.starts_with("UINT")
+            })
+            .unwrap_or(false);
+        if int_column {
+            let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+            for (seq, row) in self.fetch_rows_with_ids(table)? {
+                let Some(Value::Int(v)) = row.get(col_idx) else {
+                    continue;
+                };
+                // Order-preserving mapping of i64 into u64.
+                let ordered = (*v as u64) ^ (1u64 << 63);
+                by_segment
+                    .entry((seq as u64) >> 32)
+                    .or_default()
+                    .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
+            }
+            let dir = self.dir.join("secondary").join(key.replace('/', "_"));
+            let version = self
+                .write_batches
+                .lock()
+                .unwrap()
+                .get(table)
+                .copied()
+                .unwrap_or(0);
+            let mut readers = Vec::new();
+            for (segment, mut entries) in by_segment {
+                entries.sort_unstable_by_key(|(k, _)| *k);
+                let path = dir.join(format!("seg_{segment}_{}_{version}.idx", entries.len()));
+                // Always rewrite: the name does not capture the data, and a
+                // stale chunk from an earlier run would shadow this one.
+                if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
+                    .is_err()
+                {
+                    continue;
+                }
+                if let Ok(reader) =
+                    infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
+                {
+                    readers.push((segment << 32, Arc::new(reader)));
+                }
+            }
+            if !readers.is_empty() {
+                self.secondary_disk
+                    .lock()
+                    .unwrap()
+                    .insert(key.clone(), (version, readers));
+            }
+        }
+        self.indexes.lock().unwrap().insert(key, idx);
         Ok(())
     }
 
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
+        let key = index_key(table, column);
+        if let Literal::Int(v) = value {
+            let ordered = (*v as u64) ^ (1u64 << 63);
+            // Only a chunk set written at the current write generation is
+            // authoritative; rows inserted since then live only in the memory
+            // index, so fall through to it.
+            let generation = self
+                .write_batches
+                .lock()
+                .unwrap()
+                .get(table)
+                .copied()
+                .unwrap_or(0);
+            let disks = self.secondary_disk.lock().unwrap();
+            if let Some((version, segments)) = disks.get(&key) {
+                if *version == generation {
+                    let want = value.to_slt_string();
+                    let schema = self.table_schema(table).unwrap_or_default();
+                    let col = schema.iter().position(|c| c == column);
+                    let mut out = Vec::new();
+                    for (base, reader) in segments {
+                        for off in reader.lookup(ordered) {
+                            let id = base | u64::from(off);
+                            // A chunk can outlive the row it points at (UPDATE,
+                            // DROP COLUMN). Only a live row whose current value
+                            // still equals the probe is a hit.
+                            if self
+                                .store
+                                .get(&del_key(table, id as usize))
+                                .ok()
+                                .flatten()
+                                .is_some()
+                            {
+                                continue;
+                            }
+                            let Some(raw) =
+                                self.store.get(&row_key(table, id as usize)).ok().flatten()
+                            else {
+                                continue;
+                            };
+                            let text = String::from_utf8_lossy(&raw);
+                            if let Some(ci) = col {
+                                if text.split('\t').nth(ci).map(str::trim) != Some(want.as_str()) {
+                                    continue;
+                                }
+                            }
+                            out.push(id);
+                        }
+                    }
+                    // An empty result after validation means the chunk is stale
+                    // for this probe (rows re-keyed by UPDATE/DROP COLUMN), so
+                    // fall through to the memory index rather than reporting a
+                    // miss.
+                    if !out.is_empty() {
+                        return Some(out);
+                    }
+                }
+            }
+        }
         let idxs = self.indexes.lock().unwrap();
-        let idx = idxs.get(&index_key(table, column))?;
+        let idx = idxs.get(&key)?;
         Some(idx.lookup(value.to_slt_string().as_bytes()).to_vec())
     }
 
@@ -7422,26 +7550,21 @@ impl Engine {
                     .replace('/', "_"),
                 );
                 let path = dir.join(format!("seg_{segment}_{}_{version}.bmp", ids.len()));
-                let docs: Vec<Vec<(u32, f32)>> = if path.exists() {
-                    Vec::new()
-                } else {
-                    (0..index.len())
-                        .map(|doc| {
-                            index
-                                .doc(doc)
-                                .iter()
-                                .map(|(t, s)| (*t, *s))
-                                .collect::<Vec<_>>()
-                        })
-                        .collect()
-                };
-                if !path.exists()
-                    && infinity_storage::bmp_segment::write_bmp_segment(
-                        &path,
-                        infinity_index::sparse::BMP_BLOCK_SIZE,
-                        &docs,
-                    )
-                    .is_err()
+                let docs: Vec<Vec<(u32, f32)>> = (0..index.len())
+                    .map(|doc| {
+                        index
+                            .doc(doc)
+                            .iter()
+                            .map(|(t, s)| (*t, *s))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect();
+                if infinity_storage::bmp_segment::write_bmp_segment(
+                    &path,
+                    infinity_index::sparse::BMP_BLOCK_SIZE,
+                    &docs,
+                )
+                .is_err()
                 {
                     continue;
                 }
@@ -7534,11 +7657,10 @@ impl Engine {
                     .replace('/', "_"),
                 );
                 let path = dir.join(format!("seg_{segment}_{}_{version}.mvec", docs.len()));
-                if !path.exists()
-                    && infinity_storage::multivector_segment::write_multivector_segment(
-                        &path, dims, &docs,
-                    )
-                    .is_err()
+                if infinity_storage::multivector_segment::write_multivector_segment(
+                    &path, dims, &docs,
+                )
+                .is_err()
                 {
                     continue;
                 }
