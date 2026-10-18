@@ -447,6 +447,8 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 **无。** 索引构建时机（#83/#84/#85）、统一 memindex 预算（#86）、唯一 C++ catalog（#69）均已落地；所有索引读路径均为「多封盘段 + 至多一个内存段」：全文、HNSW、稀疏、多向量、次级（含 VARCHAR/JSON 的 u64 哈希键 PGM chunk）、IVF（chunk + 内存段）。
 
+> **C++ 对齐的内存/性能路线**：C++ 以**列存块文件为权威数据**（`BlockManager`/buffer manager 以 `buffer_manager_size` 做 LRU 限额），memindex 另有 4 GiB 配额，flush 只把内存块落成块文件。当前的 row sidecar + `malloc_trim` 只是过渡措施；要根治 Gate C/E，必须把 `cpp_blocks` 从「镜像」升级为权威行存：写路径直接写块文件、行存只保留 `ROW_ID -> 块位置`，读路径走列块（投影已具备），并引入 buffer manager 的固定内存上限。
+
 > 稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
 #### 7.5.2 功能对齐缺口（P1）
