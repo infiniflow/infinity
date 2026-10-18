@@ -24,7 +24,6 @@
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::path::Path;
 
 use memmap2::Mmap;
 
@@ -227,6 +226,7 @@ impl SegmentIndexReader {
 mod tests {
     use super::*;
 
+    #[allow(clippy::type_complexity)]
     fn sample() -> (Vec<(u64, u32)>, BTreeMap<String, Vec<(u64, u32)>>) {
         // Three documents at segment offsets 0..2, base row id 1<<32.
         let base = 1u64 << 32;
@@ -306,7 +306,7 @@ mod tests {
         .unwrap();
         let bytes = std::fs::read(format!("{index_dir}/ft_0000000000000000.len")).unwrap();
         assert_eq!(bytes, vec![7, 0, 0, 0, 9, 0, 0, 0]);
-        let path = Path::new(index_dir).join("ft_0000000000000000.dic");
+        let path = std::path::Path::new(index_dir).join("ft_0000000000000000.dic");
         assert!(path.exists());
     }
 }
