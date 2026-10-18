@@ -7359,6 +7359,37 @@ impl Engine {
             }
             Some(candidates)
         })();
+        // One BMP index per query over the scanned rows: sparse vectors use the
+        // ported block-max scoring; other kinds leave this empty.
+        let bmp_scores: HashMap<usize, f64> = (|| {
+            if !is_sparse || bit_sparse || pred.is_some() || in_filter.is_some() {
+                return HashMap::new();
+            }
+            let qv: Vec<(u32, f32)> = parse_sparse(&query_items)
+                .into_iter()
+                .map(|(i, v)| (i as u32, v as f32))
+                .collect();
+            let mut index =
+                infinity_index::sparse::BmpIndex::builder(infinity_index::sparse::BMP_BLOCK_SIZE);
+            let mut ids: Vec<usize> = Vec::with_capacity(rows.len());
+            for (seq, row) in &rows {
+                let Some(Value::Str(v)) = row.get(col_idx) else {
+                    continue;
+                };
+                let sv: Vec<(u32, f32)> = parse_sparse_str(v)
+                    .into_iter()
+                    .map(|(i, x)| (i as u32, x as f32))
+                    .collect();
+                index.add(&sv);
+                ids.push(*seq);
+            }
+            index.build();
+            index
+                .search(&qv, topn.max(1), 0.9, 1.0, true)
+                .into_iter()
+                .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score as f64)))
+                .collect()
+        })();
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
         for (seq, row) in &rows {
             // The WHERE predicate filters candidates *before* top-N ranking.
@@ -7381,6 +7412,17 @@ impl Engine {
                 if !cands.contains(seq) {
                     continue;
                 }
+            }
+            // Sparse: score with the BMP block-max index (the reference's
+            // `bmp_alg.cppm:SearchKnn`) instead of a per-row dot product.
+            let bmp_dot = if is_sparse && !bit_sparse {
+                bmp_scores.get(seq).copied()
+            } else {
+                None
+            };
+            if let Some(dot) = bmp_dot {
+                scored.push((*seq, dot, -dot));
+                continue;
             }
             if let Some(Value::Str(v)) = row.get(col_idx) {
                 if is_tensor {
