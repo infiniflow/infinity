@@ -1595,6 +1595,13 @@ const TEXT_INDEX_BUDGET_BYTES: usize = 512 * 1024 * 1024;
 
 type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
 
+struct VectorCache {
+    dims: usize,
+    rows: Vec<(usize, Vec<f64>)>,
+    live: std::collections::HashSet<usize>,
+}
+type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
+
 /// Bounds how many full-table scans (full-text or vector) run at once. Each
 /// such scan materialises a large share of the table, so several concurrent
 /// readers can exhaust the process's memory even when a single query fits.
@@ -1676,6 +1683,7 @@ pub struct Engine {
     scan_gate: ScanGate,
     /// Inverted indexes, keyed by `"<table>.<column>"`.
     text_index: Mutex<HashMap<String, SharedTextIndex>>,
+    vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
@@ -1807,6 +1815,7 @@ impl Engine {
                     .unwrap_or(2),
             ),
             text_index: Mutex::new(HashMap::new()),
+            vector_cache: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -3111,6 +3120,7 @@ impl Engine {
                     self.update_indexes_on_insert(table, base + k, row)?;
                     let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
                     self.update_text_indexes(table, base + k, &texts);
+                    self.update_vector_caches(table, base + k, &texts);
                 }
                 self.bump_writes(table);
                 Ok(QueryResult::Inserted { count: rows.len() })
@@ -3138,6 +3148,7 @@ impl Engine {
                     }
                     self.txn.commit(t)?;
                     self.drop_text_index_rows(table, &to_del);
+                    self.drop_vector_cache_rows(table, &to_del);
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),
@@ -3253,6 +3264,7 @@ impl Engine {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
                         self.update_indexes_on_insert_text(table, *seq, &texts)?;
                         self.update_text_indexes(table, *seq, &texts);
+                        self.update_vector_caches(table, *seq, &texts);
                     }
                 }
                 Ok(QueryResult::Updated {
@@ -3890,6 +3902,100 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    fn vector_cache_for(
+        &self,
+        table: &str,
+        column: &str,
+        dims: usize,
+    ) -> Result<SharedVectorCache> {
+        let key = index_key(table, column);
+        // A bulk load may bypass the incremental hooks; the key count is the
+        // authority on how many live rows the cache must hold.
+        let expected = self
+            .store
+            .count_prefix(&row_prefix(table))?
+            .saturating_sub(self.store.count_prefix(&del_prefix(table))?);
+        if let Some(cache) = self.vector_cache.lock().unwrap().get(&key) {
+            // `!=` also catches a structural rewrite (DROP COLUMN re-keys rows),
+            // which leaves the cache holding seqs that are now tombstoned.
+            if cache.read().map(|g| g.live.len()).unwrap_or(0) == expected {
+                return Ok(cache.clone());
+            }
+        }
+        let schema = self.table_schema(table)?;
+        let col = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let mut cache = VectorCache {
+            dims,
+            rows: Vec::new(),
+            live: Default::default(),
+        };
+        for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
+            if let Some(Value::Str(text)) = cells.get(col) {
+                let v = parse_vec_str(text);
+                if v.len() == dims {
+                    cache.rows.push((seq, v));
+                    cache.live.insert(seq);
+                }
+            }
+        }
+        let shared = Arc::new(std::sync::RwLock::new(cache));
+        self.vector_cache
+            .lock()
+            .unwrap()
+            .insert(key, shared.clone());
+        Ok(shared)
+    }
+
+    fn update_vector_caches(&self, table: &str, seq: usize, cells: &[String]) {
+        let prefix = format!("{table}.");
+        let caches: Vec<(String, SharedVectorCache)> = self
+            .vector_cache
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if caches.is_empty() {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        for (key, shared) in caches {
+            let column = &key[prefix.len()..];
+            let Some(ci) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            let Some(text) = cells.get(ci) else { continue };
+            let v = parse_vec_str(text);
+            let mut cache = shared.write().unwrap();
+            if v.len() != cache.dims {
+                continue;
+            }
+            match cache.rows.iter_mut().find(|(s, _)| *s == seq) {
+                Some(entry) => entry.1 = v,
+                None => cache.rows.push((seq, v)),
+            }
+            cache.live.insert(seq);
+        }
+    }
+
+    fn drop_vector_cache_rows(&self, table: &str, seqs: &[usize]) {
+        let prefix = format!("{table}.");
+        for (key, shared) in self.vector_cache.lock().unwrap().iter() {
+            if key.starts_with(&prefix) {
+                let mut cache = shared.write().unwrap();
+                for seq in seqs {
+                    cache.live.remove(seq);
+                }
+            }
+        }
     }
 
     /// Builds (once) the inverted index for a text column from its live rows.
@@ -6537,9 +6643,32 @@ impl Engine {
             ));
         }
 
+        let cache: Option<SharedVectorCache> = (|| {
+            if is_sparse || is_tensor {
+                return None;
+            }
+            if pred.is_some() || in_filter.is_some() || search_filter.is_some() {
+                return None;
+            }
+            let decl = types.get(col_idx)?.to_ascii_uppercase();
+            if decl.contains("MULTI") || !decl.contains("FLOAT") || decl.contains("INT") {
+                return None;
+            }
+            if !matches!(metric.as_str(), "l2" | "cosine" | "ip") {
+                return None;
+            }
+            let dims = type_dim(types.get(col_idx)?)?;
+            if dims == 0 {
+                return None;
+            }
+            let col = match_columns(&m.column).first()?.clone();
+            self.vector_cache_for(table, &col, dims).ok()
+        })();
         // Score from the vector column alone unless a filter needs the other
         // columns. Rows are fetched in full only for the surviving top-n.
-        let rows = if pred.is_none() && in_filter.is_none() && search_filter.is_none() {
+        let rows = if cache.is_some() {
+            Vec::new()
+        } else if pred.is_none() && in_filter.is_none() && search_filter.is_none() {
             self.fetch_rows_with_ids_projected(table, col_idx)?
         } else {
             self.fetch_rows_with_ids(table)?
@@ -6580,7 +6709,14 @@ impl Engine {
             // fall back to the exhaustive scan in that case.
             let labels: std::collections::HashSet<usize> =
                 loaded.labels.iter().map(|s| *s as usize).collect();
-            if rows.iter().any(|(seq, _)| !labels.contains(seq)) {
+            let uncovered = if let Some(c) = &cache {
+                c.read()
+                    .map(|g| g.live.iter().any(|s| !labels.contains(s)))
+                    .unwrap_or(true)
+            } else {
+                rows.iter().any(|(seq, _)| !labels.contains(seq))
+            };
+            if uncovered {
                 return None;
             }
             let k = (topn * 4).max(64).min(loaded.labels.len());
@@ -6768,6 +6904,27 @@ impl Engine {
                 }
             }
         }
+        if let Some(shared) = &cache {
+            let qv: Vec<f64> = query_items
+                .iter()
+                .filter_map(|x| x.parse::<f64>().ok())
+                .collect();
+            let guard = shared.read().unwrap();
+            if !qv.is_empty() && qv.len() == guard.dims {
+                for (seq, v) in &guard.rows {
+                    if !guard.live.contains(seq) {
+                        continue;
+                    }
+                    if let Some(cands) = &vector_candidates {
+                        if !cands.contains(seq) {
+                            continue;
+                        }
+                    }
+                    let (sim, dist) = vector_score(&qv, v, &metric);
+                    scored.push((*seq, sim, dist));
+                }
+            }
+        }
         let use_sim = is_sparse || is_tensor || matches!(metric.as_str(), "cosine" | "ip");
         scored.sort_by(|a, b| {
             let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
@@ -6805,7 +6962,11 @@ impl Engine {
         };
         let mut out = Vec::new();
         for (seq, sim, dist) in scored {
-            let mut row = by_id.remove(&seq).unwrap_or_default();
+            // A stale sequence id (a row re-keyed by DROP COLUMN or compacted)
+            // has no stored row; emitting an empty row would add a phantom hit.
+            let Some(mut row) = by_id.remove(&seq) else {
+                continue;
+            };
             row.push(Value::Int(seq as i64));
             row.push(num(sim));
             row.push(Value::Float(dist));
