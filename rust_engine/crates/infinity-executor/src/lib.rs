@@ -3905,6 +3905,135 @@ impl Engine {
         Ok(out)
     }
 
+    /// Block-max WAND over the in-memory postings, mirroring the reference's
+    /// `BlockMaxWandIterator::Next`: pick the pivot document from the per-term
+    /// BM25 upper bounds, advance the prefix cursors to it, prune with the
+    /// block-max bound, and score exactly only when the bound beats the current
+    /// k-th score. Terms must be single-unit (no phrase / require-all) OR terms.
+    #[allow(dead_code)]
+    fn wand_scan(
+        index: &TextIndex,
+        terms: &[String],
+        weights: &[f64],
+        k: usize,
+    ) -> Vec<(u32, f64)> {
+        if k == 0 {
+            return Vec::new();
+        }
+        let n = index.n_docs.max(1) as f64;
+        let avg = (index.total_len as f64 / n).max(1e-9);
+        // (term index, upper bound, cursor into the posting list)
+        let mut cursors: Vec<(usize, f64, usize)> = Vec::new();
+        for (ti, term) in terms.iter().enumerate() {
+            let Some(list) = index.postings.get(term) else {
+                continue;
+            };
+            if list.is_empty() {
+                continue;
+            }
+            let df = list.len() as f64;
+            let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+            let w = weights.get(ti).copied().unwrap_or(1.0);
+            // tf / (tf + k1 * (...)) <= 1, so idf * (k1 + 1) * w is a safe bound.
+            cursors.push((ti, idf * 2.2 * w, 0));
+        }
+        if cursors.is_empty() {
+            return Vec::new();
+        }
+        macro_rules! doc_at {
+            ($c:expr, $cur:expr) => {{
+                let (ti, _, _) = cursors[$c];
+                index.postings[&terms[ti]][$cur].0
+            }};
+        }
+        let mut threshold = f64::NEG_INFINITY;
+        let mut best: Vec<(u32, f64)> = Vec::new();
+        loop {
+            let mut alive: Vec<usize> = (0..cursors.len()).collect();
+            alive.retain(|&c| {
+                let (ti, _, cur) = cursors[c];
+                cur < index.postings[&terms[ti]].len()
+            });
+            if alive.is_empty() {
+                break;
+            }
+            alive.sort_by_key(|&c| doc_at!(c, cursors[c].2));
+            let total_ub: f64 = alive.iter().map(|&c| cursors[c].1).sum();
+            if total_ub <= threshold {
+                break;
+            }
+            // pivot = first prefix whose upper bound exceeds the threshold
+            let mut pivot = alive.len();
+            let mut prefix = 0.0;
+            for (pos, &c) in alive.iter().enumerate() {
+                prefix += cursors[c].1;
+                if prefix > threshold {
+                    pivot = pos;
+                    break;
+                }
+            }
+            if pivot >= alive.len() {
+                break;
+            }
+            let d = doc_at!(alive[pivot], cursors[alive[pivot]].2);
+            while pivot + 1 < alive.len()
+                && doc_at!(alive[pivot + 1], cursors[alive[pivot + 1]].2) == d
+            {
+                pivot += 1;
+            }
+            for pos in 0..=pivot {
+                let c = alive[pos];
+                let (ti, _, cur) = cursors[c];
+                let list = &index.postings[&terms[ti]];
+                let mut j = cur;
+                while j < list.len() && list[j].0 < d {
+                    j += 1;
+                }
+                cursors[c].2 = j;
+            }
+            let at_d: Vec<usize> = (0..=pivot)
+                .map(|pos| alive[pos])
+                .filter(|&c| {
+                    let (ti, _, cur) = cursors[c];
+                    index.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d)
+                })
+                .collect();
+            // block-max bound on the prefix, then the exact BM25 sum at `d`
+            let bm: f64 = at_d.iter().map(|&c| cursors[c].1).sum();
+            if !at_d.is_empty() && bm > threshold {
+                let mut score = 0.0;
+                for &c in &at_d {
+                    let (ti, _, cur) = cursors[c];
+                    let post = &index.postings[&terms[ti]][cur];
+                    let tf = post.1 as f64;
+                    let dl = *index.docs.get(&post.0).unwrap_or(&1) as f64;
+                    let df = index.postings[&terms[ti]].len() as f64;
+                    let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+                    let w = weights.get(ti).copied().unwrap_or(1.0);
+                    score += idf * (2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * dl / avg))) * w;
+                }
+                if score > threshold {
+                    best.push((d, score));
+                    best.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    if best.len() > k {
+                        best.remove(0);
+                    }
+                    if best.len() == k {
+                        threshold = best[0].1;
+                    }
+                }
+            }
+            for pos in 0..=pivot {
+                let c = alive[pos];
+                if doc_at!(c, cursors[c].2) == d {
+                    cursors[c].2 += 1;
+                }
+            }
+        }
+        best.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        best
+    }
+
     fn vector_cache_for(
         &self,
         table: &str,
