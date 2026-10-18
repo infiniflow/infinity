@@ -407,6 +407,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 - `cpp_format`：数据文件框架、块 `version`、列体 `[data_region][null_bitmap]`、`ColumnLayout`/`pack_column`、整块目录、日期时间与 f16/bf16。
 - **列式投影读路径（#87）**：仅含列清单的 `SELECT` 在「C++ 块镜像的写入代次 == 当前 write generation」时，只解码所需列（`read_cpp_blocks_selected`），不读行存、不解析宽列；镜像过期或存在过滤/排序时自动回退。
+- **行内宽值旁路（临时内存措施，待列存替换）**：向量/多向量/稀疏单元格以 LZ4 压缩后存入 `rowdata/<table>.bin`，KV 行只保留 `\x01B{offset}:{len}` 引用，读路径统一经 `decode_cell` 还原。C++ 的目标形态是**列存块文件作为权威数据**；这里的 sidecar 只是把不可回收的匿名内存换成可回收的文件页，属于过渡手段。
 - `cpp_blocks`（执行器）：把真实表镜像成 C++ 块文件（每 8192 行一块），`flush()` 自动镜像并可脱离 KV 读回。覆盖定宽标量、`VARCHAR`/`JSON`、`EMBEDDING`/`VECTOR`、`TENSOR`/`MULTIVECTOR`、`SPARSE`、嵌套 `ARRAY`、`TENSORARRAY`、`EMBEDDING(BIT)`、`SPARSE(BIT)`；`TENSOR(BIT)`/`TENSORARRAY(BIT)` 按设计返回错误。
 - `catalog_format` / `value_format` / `cpp_layout`：全部 catalog 键、`DataType`/`ColumnDef`/`IndexBase`（十种）逐字段复刻；`Engine::flush` 写入 C++ 键空间，`Engine::open` 可从 C++ 键空间导入 schema。
 - `inverted_format`：LEB128、TermMeta、`.len`、`.pos` 框架、FST 尾块（CRC-32/IEEE）。
@@ -422,9 +423,9 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **全文** | ✅ 内存段 + 多个封盘段 | ✅ `.dic`(TermMeta+FST) / `.pos` / `.len` / `.row`（段内序号→行号），`mmap` 读取 | ✅ 未封存段 | ✅ WAND 按 `blockmax_wand_iterator` 移植，默认用于单字段纯 OR；BM25 与 C++ 逐位一致 |
 | **HNSW** | ✅ 每个 `chunk_{n}.idx` 一段 + 一个内存段 | ✅ 加载并查询全部 chunk | ✅ 插入即建图，查询与落盘图并集 | ✅ 按 `hnsw_alg.cppm`：`TryUpdateEnterPoint` 先于构图、`SearchLayerNearest` 逆序、`SelectNeighborsHeuristic` 远→近、`ConnectNeighbors` 剪枝 `2M/M`、`M=16`/`ef_construction=200` |
 | **多向量** | ✅ 每 `ROW_ID` 段 `.emvb` + `.mvec`；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `EMVBIndex::SaveIndexInner` 布局：粗聚类、`doc_lens`/offsets、质心分配、每质心 doc 列表、残差 PQ（8 子空间/8 bit）、OPQ 旋转 | ✅ 内存尾 | ✅ MaxSim + inner top-n；候选由持久化残差 PQ 打分（EMVB 第 2 步），最终按原始 token 精确重排 |
-| **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段；`CREATE INDEX` 物化，INSERT 进内存尾，`flush()` 封段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；低基数 `RoaringBitmap::WriteAdv` | ✅ 内存尾（仅 DDL 后新行） | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数；lookup 合并「封盘段 + 尾段」 |
+| **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段；`CREATE INDEX` 物化，INSERT 进内存尾，`flush()` 封段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；VARCHAR/JSON 键按 libstdc++ `std::hash<string_view>`（MurmurHash64A）存 u64；低基数用 `RoaringBitmap::WriteAdv` | ✅ 内存尾（仅上次封段后的行） | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数；lookup 合并「封盘段 + 尾段」 |
 | **稀疏** | ✅ 每 `ROW_ID` 段一个 BMP 索引；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `seg_*.bmp`，`bmp_cpp` 按 `BMPAlg::SaveToPtr` 的 `ivt+fwd+doc_ids`，地址对齐与 `GetSizeInBytesVecAligned` 一致 | ✅ 内存尾 | ✅ block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 裁剪、tail；`SEARCH MATCH SPARSE` 已接入 |
-| **IVF** | ✅ 每 `chunk_<id>.idx` 一段 | ✅ plain/SQ/PQ 编解码 | — | ✅ **plain 检索已接入**：质心选择（l2/ip/cosine）+ `nprobe` 个 part 扫描 + 候选精确重排；SQ/PQ 仅格式编解码（镜像尚未写这两种编码） |
+| **IVF** | ✅ 每 `chunk_<id>.idx` 一段 + 一个内存段 | ✅ plain/SQ/PQ 编解码 | ✅ 内存段：上次镜像后的向量 | ✅ **plain 检索已接入**：质心选择（l2/ip/cosine）+ `nprobe` 个 part 扫描 + 内存段并入候选 + 精确重排；SQ/PQ 仅格式编解码（镜像尚未写这两种编码） |
 
 **全文的段生命周期**：内存段达预算（默认 64 MiB，`INFINITY_TEXT_SEGMENT_BYTES` 覆盖）即写出 `ft_{rowid:016x}.{dic,pos,len}`；查询合并「封盘段 + 内存尾段」，语料统计与 postings 均按段合并；UPDATE 重写的行用 `overridden` 屏蔽旧副本。强制 4 KiB 预算跑完整 Gate A 仍 1752/129/1536。
 
@@ -444,7 +445,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.1 架构对齐缺口（P0）
 
-**无。** 索引构建时机（#83/#84/#85）、统一 memindex 预算（#86）与唯一 C++ catalog（#69）均已落地。
+**无。** 索引构建时机（#83/#84/#85）、统一 memindex 预算（#86）、唯一 C++ catalog（#69）均已落地；所有索引读路径均为「多封盘段 + 至多一个内存段」：全文、HNSW、稀疏、多向量、次级（含 VARCHAR/JSON 的 u64 哈希键 PGM chunk）、IVF（chunk + 内存段）。
 
 > 稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
@@ -456,7 +457,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.3 验收缺口（P2）
 
-8. **Gate C 重档内存**（`test_multiple_index_types_import`）：2026-10-18 用统一 memindex 预算（默认 4 GiB）重跑 5.toml 档，服务端 RSS 在 **5 分 51 秒达到 14.8 GB**（30 GB 机器，无 swap），仍会随导入继续增长。已排除/已修复：索引内存尾现在按预算封段并释放、HNSW dump 后释放内存图、镜像跳过 >1 GiB 的表。**剩余主因**：行存把 2048 维向量/多向量/稀疏值以十进制文本写进 KV（≈40 KB/行，LZ4 后仍 ~15 GB），这不是索引预算能覆盖的；需要**紧凑/列式的行存储**（二进制向量单元格或直接以块文件为权威行存）。
+8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）后，5.toml 档 RSS 稳态约 **9.4 GB @ 5:01**，峰值仍到 **18–19 GB** 并在 7–10 分钟被 OOM 杀掉（30 GB 机器，其他会话常占 ~10 GB）。字符串次级索引与 IVF 内存段已按 C++ 形态补齐，不再是主因。**剩余主因**：向量仍以列文本进 KV/文件，HNSW 内存图与 flush 瞬时缓冲叠加；C++ 的解法是**列存块文件为权威数据 + buffer manager 限额**，需要把行存换成列存才能根治。
 9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden log 仍缺失。
 
 ---

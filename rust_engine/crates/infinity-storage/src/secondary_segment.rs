@@ -21,6 +21,37 @@ use memmap2::Mmap;
 use std::fs::File;
 use std::path::Path;
 
+/// libstdc++'s `std::hash<std::string_view>` (`_Hash_bytes`, MurmurHash64A with
+/// seed `0xc70f6907`), which is what the reference stores for VARCHAR keys
+/// (`secondary_index_data.cppm:106-110`).
+pub fn hash_varchar(text: &str) -> u64 {
+    const SEED: u64 = 0xc70f_6907;
+    const M: u64 = 0xc6a4_a793_5bd1_e995;
+    const R: u32 = 47;
+    let data = text.as_bytes();
+    let mut h = SEED ^ (data.len() as u64).wrapping_mul(M);
+    let mut chunks = data.chunks_exact(8);
+    for chunk in &mut chunks {
+        let mut k = u64::from_le_bytes(chunk.try_into().unwrap());
+        k = k.wrapping_mul(M);
+        k ^= k >> R;
+        k = k.wrapping_mul(M);
+        h ^= k;
+        h = h.wrapping_mul(M);
+    }
+    let tail = chunks.remainder();
+    for (i, byte) in tail.iter().enumerate() {
+        h ^= u64::from(*byte) << (8 * i);
+    }
+    if !tail.is_empty() {
+        h = h.wrapping_mul(M);
+    }
+    h ^= h >> R;
+    h = h.wrapping_mul(M);
+    h ^= h >> R;
+    h
+}
+
 use crate::cpp_format::FormatError;
 
 const PGM_EPSILON: u64 = 4;
@@ -292,6 +323,16 @@ impl SecondarySegmentReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn varchar_hash_matches_libstdcxx() {
+        // Reference values from g++ `std::hash<std::string_view>`.
+        assert_eq!(hash_varchar(""), 6142509188972423790);
+        assert_eq!(hash_varchar("a"), 4993892634952068459);
+        assert_eq!(hash_varchar("abc"), 3663726644998027833);
+        assert_eq!(hash_varchar("hello world"), 5577293430985752569);
+        assert_eq!(hash_varchar("default text"), 7918694999526961961);
+    }
 
     #[test]
     fn pgm_lookup_matches_binary_search() {

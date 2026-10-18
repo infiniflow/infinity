@@ -14,6 +14,23 @@
 // cannot change while mapped.
 #![deny(unsafe_code)]
 
+/// Releases free heap pages back to the OS (glibc). A no-op on other targets.
+/// Long imports allocate per-batch buffers; without this the allocator retains
+/// them and RSS looks like a leak (Gate C).
+#[allow(unsafe_code)]
+pub fn trim_allocator() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        // SAFETY: glibc's `malloc_trim` only returns already-free heap pages.
+        unsafe {
+            malloc_trim(0);
+        }
+    }
+}
+
 pub mod bmp_cpp;
 pub mod bmp_segment;
 pub mod catalog_format;

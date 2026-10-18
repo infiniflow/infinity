@@ -12,6 +12,8 @@
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
+use std::io::Write;
+use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -1981,13 +1983,14 @@ impl MultiVectorIndex {
                 continue;
             }
             // The reference's EMVB chunk (coarse centroids, document tables and
-            // inverted lists) lives beside the raw-token segment.
-            let emvb: Vec<(u32, Vec<Vec<f32>>)> = docs
+            // inverted lists) lives beside the raw-token segment. Borrow the
+            // token rows so sealing does not duplicate the vectors.
+            let emvb: Vec<(u32, &[Vec<f32>])> = docs
                 .iter()
                 .zip(ids.iter())
-                .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.clone()))
+                .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
                 .collect();
-            let _ = infinity_storage::emvb_segment::write_emvb_segment(
+            let _ = infinity_storage::emvb_segment::write_emvb_segment_refs(
                 &path.with_extension("emvb"),
                 self.dims,
                 (segment & 0xffff_ffff) as u32,
@@ -2227,6 +2230,9 @@ pub struct Engine {
     vector_indexes: Mutex<HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>>,
     /// IVF chunks loaded from the C++ mirror, keyed by `"<table>.<column>"`.
     ivf_indexes: Mutex<HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>>,
+    /// IVF memory segment: rows written since the last mirror dump, merged with
+    /// the sealed chunks at query time (the reference's in-memory index).
+    ivf_mem: Mutex<HashMap<String, Vec<(u64, Vec<f32>)>>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
@@ -2243,6 +2249,10 @@ pub struct Engine {
     /// Write generation at which the C++ block mirror of each table was last
     /// flushed; a projection can read the mirror only when it matches.
     cpp_block_generation: Mutex<HashMap<String, usize>>,
+    /// Append-only sidecar files holding wide vector-like cell values. Keeping
+    /// them out of the KV row turns ~40 KB/row of anonymous memory into
+    /// reclaimable file pages (Gate C).
+    row_blobs: Mutex<HashMap<String, Arc<Mutex<std::fs::File>>>>,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
@@ -2346,6 +2356,12 @@ fn is_secondary_kind(index_type: &str) -> bool {
         || t.eq_ignore_ascii_case("SECONDARYFUNCTIONAL")
 }
 
+/// Wide values of these columns are kept in the row sidecar instead of the KV
+/// row (Gate C memory).
+fn is_blob_type(t: &str) -> bool {
+    is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
+}
+
 /// How `wand_scan` turns matched terms into a score. The reference scores
 /// `similarity=boolean` as one point per matched term (per field), while the
 /// default is BM25.
@@ -2412,6 +2428,7 @@ impl Engine {
             indexes: Mutex::new(HashMap::new()),
             vector_indexes: Mutex::new(HashMap::new()),
             ivf_indexes: Mutex::new(HashMap::new()),
+            ivf_mem: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
             index_comments: Mutex::new(HashMap::new()),
@@ -2419,6 +2436,7 @@ impl Engine {
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
             cpp_block_generation: Mutex::new(HashMap::new()),
+            row_blobs: Mutex::new(HashMap::new()),
             row_counters: Mutex::new(HashMap::new()),
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
@@ -2516,15 +2534,44 @@ impl Engine {
             }
             if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
+                let key = index_key(&im.table, &im.column);
+                self.ivf_mem.lock().unwrap().entry(key.clone()).or_default();
                 if !segments.is_empty() {
-                    self.ivf_indexes.lock().unwrap().insert(
-                        index_key(&im.table, &im.column),
-                        segments.into_iter().map(Arc::new).collect(),
-                    );
+                    self.ivf_indexes
+                        .lock()
+                        .unwrap()
+                        .insert(key, segments.into_iter().map(Arc::new).collect());
                 }
             }
         }
         Ok(())
+    }
+
+    /// Writes one `keys + offsets + PGM` chunk per `ROW_ID` segment and installs
+    /// the readers (the reference's high-cardinality `SaveIndexInner`).
+    fn write_secondary_pgm_chunks(&self, key: &str, by_segment: HashMap<u64, Vec<(u64, u32)>>) {
+        let dir = self.dir.join("secondary").join(key.replace('/', "_"));
+        let mut readers = Vec::new();
+        for (segment, mut entries) in by_segment {
+            entries.sort_unstable_by_key(|(k, _)| *k);
+            let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
+            // Always rewrite: the name does not capture the data, and a stale
+            // chunk from an earlier run would shadow this one.
+            if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
+                .is_err()
+            {
+                continue;
+            }
+            if let Ok(reader) =
+                infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
+            {
+                readers.push((segment << 32, Arc::new(reader)));
+            }
+        }
+        self.secondary_disk
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), readers);
     }
 
     fn build_index(&self, table: &str, column: &str) -> Result<()> {
@@ -2544,15 +2591,14 @@ impl Engine {
         // Integer columns also get the reference's per-segment PGM chunks.
         let key = index_key(table, column);
         self.secondary_disk.lock().unwrap().remove(&key);
-        let int_column = self
+        let type_upper = self
             .column_types(table)
             .ok()
             .and_then(|t| t.get(col_idx).cloned())
-            .map(|t| {
-                let t = t.trim().to_ascii_uppercase();
-                t.starts_with("INT") || t.starts_with("UINT")
-            })
-            .unwrap_or(false);
+            .map(|t| t.trim().to_ascii_uppercase())
+            .unwrap_or_default();
+        let int_column = type_upper.starts_with("INT") || type_upper.starts_with("UINT");
+        let is_bool = type_upper.starts_with("BOOL");
         if int_column {
             let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
             for (seq, row) in self.fetch_rows_with_ids(table)? {
@@ -2566,41 +2612,29 @@ impl Engine {
                     .or_default()
                     .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
-            let dir = self.dir.join("secondary").join(key.replace('/', "_"));
-            let mut readers = Vec::new();
-            for (segment, mut entries) in by_segment {
-                entries.sort_unstable_by_key(|(k, _)| *k);
-                let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
-                // Always rewrite: the name does not capture the data, and a
-                // stale chunk from an earlier run would shadow this one.
-                if infinity_storage::secondary_segment::write_secondary_segment(&path, &entries)
-                    .is_err()
-                {
+            self.write_secondary_pgm_chunks(&key, by_segment);
+        } else if !is_bool {
+            // VARCHAR (and JSON) keys are hashed to u64, exactly like the
+            // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
+            let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
+            for (seq, row) in self.fetch_rows_with_ids(table)? {
+                let Some(v) = row.get(col_idx) else {
                     continue;
-                }
-                if let Ok(reader) =
-                    infinity_storage::secondary_segment::SecondarySegmentReader::open(&path)
-                {
-                    readers.push((segment << 32, Arc::new(reader)));
-                }
+                };
+                let ordered = infinity_storage::secondary_segment::hash_varchar(&v.to_slt_string());
+                by_segment
+                    .entry((seq as u64) >> 32)
+                    .or_default()
+                    .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.secondary_disk
-                .lock()
-                .unwrap()
-                .insert(key.clone(), readers);
+            self.write_secondary_pgm_chunks(&key, by_segment);
         }
         // Boolean columns use the low-cardinality variant.
         self.secondary_low.lock().unwrap().remove(&key);
-        let mut disk_backed = int_column;
+        // Every scalar/JSON secondary column now has a chunk form.
+        let disk_backed = true;
         {
-            let is_bool = self
-                .column_types(table)
-                .ok()
-                .and_then(|t| t.get(col_idx).cloned())
-                .map(|t| t.trim().to_ascii_uppercase().starts_with("BOOL"))
-                .unwrap_or(false);
             if is_bool {
-                disk_backed = true;
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
                 for (seq, row) in self.fetch_rows_with_ids(table)? {
                     let Some(v) = row.get(col_idx) else { continue };
@@ -2719,9 +2753,6 @@ impl Engine {
                 .unwrap_or_default();
             let is_bool = ty.starts_with("BOOL");
             let is_int = ty.starts_with("INT") || ty.starts_with("UINT");
-            if !is_bool && !is_int {
-                continue;
-            }
             let tail = match self.indexes.lock().unwrap().get_mut(&key) {
                 Some(idx) => idx.take(),
                 None => continue,
@@ -2729,16 +2760,21 @@ impl Engine {
             if tail.is_empty() {
                 continue;
             }
-            if is_int {
+            if !is_bool {
                 let mut by_segment: HashMap<u64, Vec<(u64, u32)>> = HashMap::new();
                 for (raw_key, ids) in &tail {
                     let Some(text) = std::str::from_utf8(raw_key).ok() else {
                         continue;
                     };
-                    let Ok(v) = text.trim().parse::<i64>() else {
-                        continue;
+                    let ordered = if is_int {
+                        match text.trim().parse::<i64>() {
+                            Ok(v) => (v as u64) ^ (1u64 << 63),
+                            Err(_) => continue,
+                        }
+                    } else {
+                        // VARCHAR/JSON: the reference hashes the key.
+                        infinity_storage::secondary_segment::hash_varchar(text)
                     };
-                    let ordered = (v as u64) ^ (1u64 << 63);
                     for id in ids {
                         by_segment
                             .entry(id >> 32)
@@ -2948,10 +2984,23 @@ impl Engine {
                         }
                     }
                 }
+            } else {
+                // VARCHAR/JSON chunks store the reference's u64 key hash.
+                let ordered = infinity_storage::secondary_segment::hash_varchar(&want);
+                let disks = self.secondary_disk.lock().unwrap();
+                if let Some(segments) = disks.get(&key) {
+                    for (base, reader) in segments {
+                        for off in reader.lookup(ordered) {
+                            let id = base | u64::from(off);
+                            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
+                                out.push(id);
+                            }
+                        }
+                    }
+                }
             }
         }
-        // The tail: rows inserted after the last dump, or the whole map for
-        // string-keyed indexes (which have no C++ chunk form).
+        // The tail: rows inserted after the last dump.
         if let Some(idx) = self.indexes.lock().unwrap().get(&key) {
             for id in idx.lookup(want.as_bytes()) {
                 if self.live_row_matches(table, *id, col, &want) && seen.insert(*id) {
@@ -2991,15 +3040,11 @@ impl Engine {
     }
 
     fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
+        let defaults = self.table_defaults(table).unwrap_or_default();
         let mut rows = Vec::new();
         for &id in ids {
             if let Some(v) = self.store.get(&row_key(table, id as usize))? {
-                rows.push(
-                    String::from_utf8_lossy(&v)
-                        .split('\t')
-                        .map(parse_value)
-                        .collect(),
-                );
+                rows.push(self.parse_stored_row(table, &defaults, &v)?);
             }
         }
         Ok(rows)
@@ -3391,7 +3436,7 @@ impl Engine {
         // one transaction -> one WAL record + one KV batch (batched durability)
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
-            let encoded = encode_row(row, &types);
+            let encoded = self.encode_row_stored(table, row, &types)?;
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
         self.txn.commit(t)?;
@@ -3402,6 +3447,8 @@ impl Engine {
             self.update_vector_caches(table, base + k, &texts);
         }
         self.bump_writes(table);
+        // Give the allocator's per-batch scratch back to the OS.
+        infinity_storage::trim_allocator();
         Ok(QueryResult::Inserted { count: rows.len() })
     }
 
@@ -4111,6 +4158,15 @@ impl Engine {
                     if let Some(width) = width {
                         let _ = self.sparse_index_for(table, column, width);
                     }
+                }
+                // An IVF index keeps a memory segment for rows written before
+                // the next mirror dump.
+                if index_type.eq_ignore_ascii_case("IVF") {
+                    self.ivf_mem
+                        .lock()
+                        .unwrap()
+                        .entry(index_key(table, column))
+                        .or_default();
                 }
                 Ok(QueryResult::CreatedIndex {
                     name: name.clone(),
@@ -5018,10 +5074,7 @@ impl Engine {
             if deleted.contains(&seq) {
                 continue; // deleted
             }
-            let mut cells: Vec<Value> = String::from_utf8_lossy(&v)
-                .split('\t')
-                .map(parse_value)
-                .collect();
+            let mut cells = self.parse_stored_row(table, &defaults, &v)?;
             while cells.len() < defaults.len() {
                 let i = cells.len();
                 cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
@@ -5045,10 +5098,7 @@ impl Engine {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
-            let mut cells: Vec<Value> = String::from_utf8_lossy(&v)
-                .split('\t')
-                .map(parse_value)
-                .collect();
+            let mut cells = self.parse_stored_row(table, &defaults, &v)?;
             while cells.len() < defaults.len() {
                 let i = cells.len();
                 cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
@@ -5125,6 +5175,101 @@ impl Engine {
         ))
     }
 
+    fn blob_file(&self, table: &str) -> Result<Arc<Mutex<std::fs::File>>> {
+        let key = table.to_ascii_lowercase();
+        if let Some(f) = self.row_blobs.lock().unwrap().get(&key) {
+            return Ok(f.clone());
+        }
+        let dir = self.dir.join("rowdata");
+        std::fs::create_dir_all(&dir).map_err(|e| Error::Invalid(format!("row blob dir: {e}")))?;
+        let path = dir.join(format!("{}.bin", key.replace('.', "_")));
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .append(true)
+            .open(&path)
+            .map_err(|e| Error::Invalid(format!("row blob {}: {e}", path.display())))?;
+        let shared = Arc::new(Mutex::new(file));
+        self.row_blobs.lock().unwrap().insert(key, shared.clone());
+        Ok(shared)
+    }
+
+    fn append_blob(&self, table: &str, bytes: &[u8]) -> Result<(u64, u64)> {
+        let file = self.blob_file(table)?;
+        let mut file = file.lock().unwrap();
+        let offset = file
+            .metadata()
+            .map_err(|e| Error::Invalid(format!("row blob size: {e}")))?
+            .len();
+        // Decimal vector text compresses ~2.5x; the sidecar stays in page cache,
+        // so its size directly bounds RSS during a long import.
+        let packed = lz4_flex::compress_prepend_size(bytes);
+        file.write_all(&packed)
+            .map_err(|e| Error::Invalid(format!("row blob write: {e}")))?;
+        Ok((offset, packed.len() as u64))
+    }
+
+    fn read_blob(&self, table: &str, offset: u64, len: usize) -> Result<Vec<u8>> {
+        let file = self.blob_file(table)?;
+        let file = file.lock().unwrap();
+        let mut buf = vec![0u8; len];
+        file.read_exact_at(&mut buf, offset)
+            .map_err(|e| Error::Invalid(format!("row blob read: {e}")))?;
+        lz4_flex::decompress_size_prepended(&buf)
+            .map_err(|e| Error::Invalid(format!("row blob decompress: {e}")))
+    }
+
+    /// Flushes dirty sidecar pages so they become clean, reclaimable page
+    /// cache instead of accumulating as unswappable dirty memory (Gate C).
+    fn sync_row_blobs(&self) {
+        let files: Vec<Arc<Mutex<std::fs::File>>> =
+            self.row_blobs.lock().unwrap().values().cloned().collect();
+        for file in files {
+            if let Ok(file) = file.lock() {
+                let _ = file.sync_data();
+            }
+        }
+    }
+
+    /// Decodes one stored cell. Wide vector-like cells live in the sidecar and
+    /// carry a `\x01B{offset}:{len}` reference.
+    fn decode_cell(&self, table: &str, cell: &str) -> Result<Value> {
+        if let Some(rest) = cell.strip_prefix('\u{1}').and_then(|r| r.strip_prefix('B')) {
+            let (offset, len) = rest
+                .split_once(':')
+                .ok_or_else(|| Error::Invalid("corrupt row blob reference".into()))?;
+            let offset: u64 = offset
+                .parse()
+                .map_err(|_| Error::Invalid("corrupt row blob offset".into()))?;
+            let len: usize = len
+                .parse()
+                .map_err(|_| Error::Invalid("corrupt row blob length".into()))?;
+            let bytes = self.read_blob(table, offset, len)?;
+            return Ok(parse_value(&String::from_utf8_lossy(&bytes)));
+        }
+        Ok(parse_value(cell))
+    }
+
+    /// [`encode_row`] plus sidecar offload for wide vector-like cells.
+    fn encode_row_stored(&self, table: &str, row: &[Literal], types: &[String]) -> Result<String> {
+        let rendered = encode_row(row, types);
+        if !types.iter().any(|t| is_blob_type(t)) {
+            return Ok(rendered);
+        }
+        let mut cells: Vec<String> = rendered.split('\t').map(str::to_string).collect();
+        for (i, ty) in types.iter().enumerate() {
+            if !is_blob_type(ty) {
+                continue;
+            }
+            let Some(cell) = cells.get(i) else { continue };
+            if cell.len() > 64 && cell != "null" {
+                let (offset, len) = self.append_blob(table, cell.as_bytes())?;
+                cells[i] = format!("\u{1}B{offset}:{len}");
+            }
+        }
+        Ok(cells.join("\t"))
+    }
+
     fn fetch_some_rows_with_ids(
         &self,
         table: &str,
@@ -5139,7 +5284,7 @@ impl Engine {
                 continue;
             }
             if let Some(v) = self.store.get(&row_key(table, seq))? {
-                out.push((seq, self.parse_stored_row(&defaults, &v)));
+                out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
             }
         }
         Ok(out)
@@ -5495,6 +5640,10 @@ impl Engine {
             .filter(|(k, _)| k.starts_with(&prefix))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
+        // The HNSW/IVF memory indexes are maintained regardless of whether a
+        // query cache exists.
+        self.note_hnsw_insert(table, seq as u64, cells);
+        self.note_ivf_insert(table, seq as u64, cells);
         if caches.is_empty() {
             return;
         }
@@ -5518,7 +5667,43 @@ impl Engine {
             }
             cache.live.insert(seq);
         }
-        self.note_hnsw_insert(table, seq as u64, cells);
+    }
+
+    /// Feeds a row into the IVF memory segment (rows written since the last
+    /// mirror dump), the reference's in-memory IVF form.
+    fn note_ivf_insert(&self, table: &str, seq: u64, cells: &[String]) {
+        let prefix = format!("{table}.");
+        if !self
+            .ivf_mem
+            .lock()
+            .unwrap()
+            .keys()
+            .any(|k| k.starts_with(&prefix))
+        {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        let Ok(types) = self.column_types(table) else {
+            return;
+        };
+        let mut map = self.ivf_mem.lock().unwrap();
+        for (key, rows) in map.iter_mut() {
+            if !key.starts_with(&prefix) {
+                continue;
+            }
+            let column = &key[prefix.len()..];
+            let Some(ci) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            let Some(text) = cells.get(ci) else { continue };
+            let v: Vec<f32> = parse_vec_str(text).iter().map(|x| *x as f32).collect();
+            let dims = types.get(ci).and_then(|t| type_dim(t)).unwrap_or(0);
+            if !v.is_empty() && (dims == 0 || v.len() == dims) {
+                rows.push((seq, v));
+            }
+        }
     }
 
     fn drop_vector_cache_rows(&self, table: &str, seqs: &[usize]) {
@@ -5966,7 +6151,7 @@ impl Engine {
             let text = String::from_utf8_lossy(&v);
             let cell = text.split('\t').nth(idx).unwrap_or("");
             let mut cells = vec![Value::Null; idx + 1];
-            cells[idx] = parse_value(cell);
+            cells[idx] = self.decode_cell(table, cell)?;
             rows.push((seq, cells));
         }
         Ok(rows)
@@ -5991,7 +6176,7 @@ impl Engine {
             // A stored row may omit trailing columns that carry a DEFAULT; the
             // index builders must see the same value a scan would.
             let cell = match text.split('\t').nth(idx) {
-                Some(c) => parse_value(c),
+                Some(c) => self.decode_cell(table, c)?,
                 None => match defaults.get(idx).and_then(|d| d.as_deref()) {
                     Some(d) => Value::from_literal(&default_literal(d)),
                     None => Value::Null,
@@ -6023,7 +6208,7 @@ impl Engine {
             let mut cells = vec![Value::Null; text.split('\t').count()];
             for &c in cols {
                 if let Some(cell) = text.split('\t').nth(c) {
-                    cells[c] = parse_value(cell);
+                    cells[c] = self.decode_cell(table, cell)?;
                 }
             }
             out.push((seq, cells));
@@ -6048,11 +6233,17 @@ impl Engine {
     }
 
     /// Parses a stored row, padding trailing cells from the column defaults.
-    fn parse_stored_row(&self, defaults: &[Option<String>], v: &[u8]) -> Vec<Value> {
-        let mut cells: Vec<Value> = String::from_utf8_lossy(v)
-            .split('\t')
-            .map(parse_value)
-            .collect();
+    fn parse_stored_row(
+        &self,
+        table: &str,
+        defaults: &[Option<String>],
+        v: &[u8],
+    ) -> Result<Vec<Value>> {
+        let text = String::from_utf8_lossy(v);
+        let mut cells: Vec<Value> = Vec::new();
+        for cell in text.split('\t') {
+            cells.push(self.decode_cell(table, cell)?);
+        }
         while cells.len() < defaults.len() {
             let i = cells.len();
             cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
@@ -6060,7 +6251,7 @@ impl Engine {
                 None => Value::Null,
             });
         }
-        cells
+        Ok(cells)
     }
 
     /// Per-column declared type text for `table`.
@@ -7384,10 +7575,7 @@ impl Engine {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
-            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
-                .split('\t')
-                .map(parse_value)
-                .collect();
+            let mut row = self.parse_stored_row(table, &defaults, &v)?;
             while row.len() < defaults.len() {
                 let i = row.len();
                 row.push(match defaults.get(i).and_then(|d| d.as_deref()) {
@@ -7722,7 +7910,7 @@ impl Engine {
                 self.note_index_insert(table, batch.len());
                 let mut t = self.txn.begin();
                 for (k, row) in batch.iter().enumerate() {
-                    let encoded = encode_row(row, &types_for_scan);
+                    let encoded = self.encode_row_stored(table, row, &types_for_scan)?;
                     t.put(row_key(table, base + k), encoded.into_bytes());
                 }
                 self.txn.commit(t)?;
@@ -7858,7 +8046,7 @@ impl Engine {
         self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
         for (k, row) in rows.iter().enumerate() {
-            let encoded = encode_row(row, types);
+            let encoded = self.encode_row_stored(table, row, types)?;
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
         self.txn.commit(t)?;
@@ -8764,7 +8952,14 @@ impl Engine {
                 .get(&index_key(table, &col_name))
                 .cloned()
             {
-                if segments.is_empty() {
+                let mem: Vec<(u64, Vec<f32>)> = self
+                    .ivf_mem
+                    .lock()
+                    .unwrap()
+                    .get(&index_key(table, &col_name))
+                    .cloned()
+                    .unwrap_or_default();
+                if segments.is_empty() && mem.is_empty() {
                     return None;
                 }
                 let nprobe = with_opts
@@ -8776,6 +8971,11 @@ impl Engine {
                     .unwrap_or(1);
                 let mut covered: std::collections::HashSet<usize> = Default::default();
                 let mut candidates: std::collections::HashSet<usize> = Default::default();
+                // The memory segment: rows written since the last mirror dump.
+                for (seq, _) in &mem {
+                    covered.insert(*seq as usize);
+                    candidates.insert(*seq as usize);
+                }
                 for seg in &segments {
                     for part in &seg.parts {
                         for (offset, _) in part {
@@ -9387,6 +9587,9 @@ impl Engine {
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
         self.flush_cpp_blocks()?;
+        // Write back the row sidecars: dirty file pages cannot be reclaimed and
+        // are what pushes a long import into the OOM killer.
+        self.sync_row_blobs();
         // Dump the index memory tails into their segment files, the reference's
         // memindex dump at checkpoint.
         self.seal_multivector_indexes();
@@ -11636,7 +11839,26 @@ mod tests {
         .unwrap();
         e.execute("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
             .unwrap();
+        // Rows written before the dump live in the IVF memory segment and are
+        // merged with the sealed chunks.
+        e.execute("INSERT INTO iv VALUES (5,[0.9,0.1]);").unwrap();
+        let key = e
+            .ivf_mem
+            .lock()
+            .unwrap()
+            .keys()
+            .next()
+            .cloned()
+            .unwrap_or_else(|| panic!("ivf_mem is empty"));
+        assert!(!e.ivf_mem.lock().unwrap().get(&key).unwrap().is_empty());
+        let q = "SELECT id FROM iv SEARCH MATCH VECTOR \
+                 (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["5".to_string()], vec!["2".to_string()]]
+        );
         e.flush().unwrap();
+        assert!(e.ivf_mem.lock().unwrap().get(&key).unwrap().is_empty());
         assert!(e
             .ivf_indexes
             .lock()
@@ -11644,12 +11866,8 @@ mod tests {
             .values()
             .any(|segments| !segments.is_empty()));
         assert_eq!(
-            rows(
-                &e,
-                "SELECT id FROM iv SEARCH MATCH VECTOR \
-                 (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);"
-            ),
-            vec![vec!["2".to_string()], vec!["1".to_string()]]
+            rows(&e, q),
+            vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
     }
 
@@ -11772,6 +11990,90 @@ mod tests {
             .unwrap();
         assert!(e.try_cpp_projection("p", &items).unwrap().is_none());
         assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
+    }
+
+    /// Wide vector-like cells are kept in an append-only sidecar; the KV row
+    /// holds only a short reference, and reads (including after restart)
+    /// reconstruct the original value.
+    #[test]
+    fn wide_vectors_live_in_the_row_sidecar() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sb (id INT, v EMBEDDING(FLOAT,64), s SPARSE(FLOAT,64));")
+            .unwrap();
+        let vector = (0..64)
+            .map(|i| format!("{i}.0"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sparse = (0..20)
+            .map(|i| format!("{i}:1.0"))
+            .collect::<Vec<_>>()
+            .join(",");
+        e.execute(&format!(
+            "INSERT INTO sb VALUES (1, [{vector}], [{sparse}]);"
+        ))
+        .unwrap();
+        let raw = e
+            .store()
+            .get(&row_key("default_db.sb", 0))
+            .unwrap()
+            .unwrap();
+        assert!(raw.len() < 200, "row is {} bytes", raw.len());
+        assert!(
+            raw.contains(&1u8),
+            "row carries a blob reference: {:?}",
+            String::from_utf8_lossy(&raw)
+        );
+        let blob = dir.path().join("rowdata").join("default_db_sb.bin");
+        assert!(std::fs::metadata(&blob).unwrap().len() > 0);
+
+        let vector = rows(&e, "SELECT v FROM sb;");
+        assert_eq!(vector.len(), 1);
+        assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
+        assert!(vector[0][0].contains("63"));
+
+        e.flush().unwrap();
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        let vector = rows(&e, "SELECT v FROM sb;");
+        assert!(vector[0][0].starts_with("[0"), "{:?}", vector[0]);
+        assert_eq!(rows(&e, "SELECT id FROM sb;"), vec![vec!["1".to_string()]]);
+    }
+
+    /// VARCHAR secondary indexes seal hashed keys into PGM chunks and keep only
+    /// the tail in memory, like the reference's `ConvertToOrderedKeyValue`.
+    #[test]
+    fn string_secondary_index_seals_hashed_chunks() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ss (id INT, name VARCHAR);")
+            .unwrap();
+        e.execute("INSERT INTO ss VALUES (1,'a'),(2,'b');").unwrap();
+        e.execute("CREATE INDEX ss_n ON ss (name);").unwrap();
+        let q = "SELECT id FROM ss WHERE name = 'b';";
+        assert_eq!(rows(&e, q), vec![vec!["2".to_string()]]);
+        e.execute("INSERT INTO ss VALUES (3,'b');").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["3".to_string()]]
+        );
+        let key = e
+            .indexes
+            .lock()
+            .unwrap()
+            .keys()
+            .find(|k| k.ends_with(".name"))
+            .cloned()
+            .unwrap();
+        assert!(e.indexes.lock().unwrap().get(&key).unwrap().key_count() > 0);
+        e.flush().unwrap();
+        assert_eq!(e.indexes.lock().unwrap().get(&key).unwrap().key_count(), 0);
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["2".to_string()], vec!["3".to_string()]]
+        );
+        e.execute("DELETE FROM ss WHERE id = 2;").unwrap();
+        assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
     }
 
     #[test]

@@ -1090,6 +1090,14 @@ impl Engine {
                 && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
             {
                 self.write_cpp_blocks(&meta.name)?;
+                // The mirror now covers every row; the IVF memory segment is
+                // redundant and would double-count candidates.
+                let prefix = format!("{}.", meta.name);
+                for (k, rows) in self.ivf_mem.lock().unwrap().iter_mut() {
+                    if k.starts_with(&prefix) {
+                        rows.clear();
+                    }
+                }
                 let short = meta
                     .name
                     .split('.')

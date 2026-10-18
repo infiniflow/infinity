@@ -147,6 +147,10 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
             match weak.upgrade() {
                 Some(e) => {
                     let _ = e.flush();
+                    // A dump frees large transient buffers (row batches, index
+                    // tails, a rebuilt HNSW graph); return those pages to the OS
+                    // so RSS tracks live data on long imports (Gate C).
+                    trim_allocator();
                 }
                 None => break,
             }
@@ -171,6 +175,21 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
     println!("serving on {}", server.local_addr()?);
     server.run();
 }
+
+/// Releases free heap pages back to the OS (glibc). A no-op elsewhere.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn trim_allocator() {
+    unsafe extern "C" {
+        fn malloc_trim(pad: usize) -> i32;
+    }
+    // SAFETY: glibc's `malloc_trim` only returns already-free heap pages.
+    unsafe {
+        malloc_trim(0);
+    }
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn trim_allocator() {}
 
 /// Parses a duration like `1s`, `500ms`, `1.5s` or `0s` into whole seconds.
 fn parse_interval_secs(text: &str) -> u64 {

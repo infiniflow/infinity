@@ -18,6 +18,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bin="${INFINITY_SERVER_BIN:-$here/../target/release/infinity}"
 data_dir="${INFINITY_DATA:-/var/infinity}"
 mkdir -p "$data_dir"
+# Long imports allocate large per-batch buffers; two glibc arenas keep the
+# allocator from retaining freed pages across threads (Gate C RSS).
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
 # The harness only speaks Thrift on 23817; keep a foreign server already holding
 # 23820 from affecting this run.
 export INFINITY_HTTP_BIND="${INFINITY_HTTP_BIND:-127.0.0.1:0}"
@@ -27,6 +30,9 @@ if [[ "${1:-}" == --config=* ]]; then
   if [[ ! -f "$cfg" && -f "$here/../../$cfg" ]]; then
     set -- "--config=$here/../../$cfg"
   fi
-  exec "$bin" "$@"
+  "$bin" "$@"
+  code=$?
+  echo "$(date '+%F %T') exit=$code args=$*" >> "${INFINITY_SHIM_LOG:-/tmp/infinity_shim.log}"
+  exit $code
 fi
 exec "$bin" serve "$data_dir"
