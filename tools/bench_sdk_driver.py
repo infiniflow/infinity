@@ -22,8 +22,18 @@ def main() -> int:
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 23917
     rows = int(sys.argv[3]) if len(sys.argv) > 3 else 20000
 
-    obj = infinity.connect(NetworkAddress(host, port))
-    db = obj.get_database("default_db")
+    # The reference server answers 2008 (Infinity is initing) until recovery
+    # finishes, so connect lazily with the same retry the test harness uses.
+    deadline = time.time() + 120
+    while True:
+        try:
+            obj = infinity.connect(NetworkAddress(host, port))
+            db = obj.get_database("default_db")
+            break
+        except Exception:
+            if time.time() > deadline:
+                raise
+            time.sleep(1)
     db.drop_table("bench_t", ConflictType.Ignore)
     t = db.create_table(
         "bench_t", {"id": {"type": "int"}, "name": {"type": "varchar"}}
