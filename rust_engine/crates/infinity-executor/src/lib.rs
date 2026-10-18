@@ -1706,11 +1706,11 @@ fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
         pos.entry(term.as_str()).or_default().push(*at);
     }
     for (term, positions) in pos {
-        index
-            .postings
-            .entry(term.to_string())
-            .or_default()
-            .push((seq, positions.len() as u32, positions));
+        index.postings.entry(term.to_string()).or_default().push((
+            seq,
+            positions.len() as u32,
+            positions,
+        ));
     }
 }
 
@@ -4906,6 +4906,57 @@ impl Engine {
         // filtered from the result), so gather every stored row first.
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
+        // When no filter, rank-feature or boolean mode is involved the inverted
+        // indexes decide the row set and supply the corpus statistics
+        // (doc count, average field length, df). A query whose terms cover most
+        // of the table is cheaper to scan than to gather.
+        #[allow(clippy::type_complexity)]
+        let index_view: Option<(Vec<usize>, Vec<(usize, f64, HashMap<String, usize>)>)> = (|| {
+            if boolean
+                || !rank_features.is_empty()
+                || in_filter.is_some()
+                || opt_filter.is_some()
+                || pred.is_some()
+            {
+                return None;
+            }
+            let mut set: std::collections::HashSet<usize> = Default::default();
+            let mut stats: Vec<(usize, f64, HashMap<String, usize>)> = Vec::new();
+            for (ci, _, d) in &field_specs {
+                let name = schema.get(*ci)?.clone();
+                let index = self.text_index_for(table, &name, d.clone()).ok()?;
+                let guard = index.read().ok()?;
+                let n = guard.docs.len();
+                let sum: usize = guard.docs.values().map(|l| *l as usize).sum();
+                let avg = if n == 0 {
+                    1.0
+                } else {
+                    let a = sum as f64 / n as f64;
+                    if a <= 0.0 {
+                        1.0
+                    } else {
+                        a
+                    }
+                };
+                let mut df: HashMap<String, usize> = HashMap::new();
+                for t in &terms {
+                    if let Some(list) = guard.postings.get(t) {
+                        df.insert(t.clone(), list.len());
+                        for (doc, _, _) in list {
+                            set.insert(*doc as usize);
+                        }
+                    }
+                }
+                stats.push((n, avg, df));
+            }
+            let total = stats.first().map(|st| st.0).unwrap_or(0);
+            if total == 0 || set.len() * 2 > total {
+                return None;
+            }
+            Some((set.into_iter().collect(), stats))
+        })(
+        );
+        let _ = &prefix;
         // Per document we keep only what scoring needs: the tokenised fields,
         // whether it is live and passes the filters, and the pre-computed
         // rank-features / boolean contributions. Keeping the full row here made
@@ -4914,14 +4965,11 @@ impl Engine {
         #[allow(clippy::type_complexity)]
         let mut docs: Vec<(usize, Vec<Vec<(String, u32)>>, bool, bool, f64, usize, f64)> =
             Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
-            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
-                .parse()
-                .unwrap_or(0);
-            let mut row: Vec<Value> = String::from_utf8_lossy(&v)
-                .split('\t')
-                .map(parse_value)
-                .collect();
+        let scanned: Vec<(usize, Vec<Value>)> = match &index_view {
+            Some((ids, _)) => self.fetch_rows_cols(table, ids, &cols)?,
+            None => self.fetch_rows_with_ids(table)?,
+        };
+        for (seq, mut row) in scanned {
             // Rows loaded before a column was added (or from a narrower COPY)
             // take the column's default value, not NULL.
             while row.len() < defaults.len() {
@@ -4985,37 +5033,49 @@ impl Engine {
                 .collect();
             docs.push((seq, fields, live, filters_hold, rank_bonus, bhits, bscore));
         }
-        let n_docs = docs.len().max(1);
+        let n_docs = match &index_view {
+            Some((_, stats)) => stats.first().map(|st| st.0).unwrap_or(1),
+            None => docs.len(),
+        }
+        .max(1);
         // Document frequency per (field, term). Computing it inside `idf_of`
         // made scoring O(rows^2); one pass here turns it into a lookup.
-        let dfs: Vec<HashMap<String, usize>> = (0..cols.len())
-            .map(|f| {
-                let mut m: HashMap<String, usize> = HashMap::new();
-                for (_, fields, ..) in &docs {
-                    // A term counts once per document, however often it occurs.
-                    let mut seen: std::collections::HashSet<&str> =
-                        std::collections::HashSet::new();
-                    for (t, _) in &fields[f] {
-                        if seen.insert(t.as_str()) {
-                            *m.entry(t.clone()).or_insert(0) += 1;
+        let dfs: Vec<HashMap<String, usize>> = if let Some((_, stats)) = &index_view {
+            stats.iter().map(|st| st.2.clone()).collect()
+        } else {
+            (0..cols.len())
+                .map(|f| {
+                    let mut m: HashMap<String, usize> = HashMap::new();
+                    for (_, fields, ..) in &docs {
+                        // A term counts once per document, however often it occurs.
+                        let mut seen: std::collections::HashSet<&str> =
+                            std::collections::HashSet::new();
+                        for (t, _) in &fields[f] {
+                            if seen.insert(t.as_str()) {
+                                *m.entry(t.clone()).or_insert(0) += 1;
+                            }
                         }
                     }
-                }
-                m
-            })
-            .collect();
+                    m
+                })
+                .collect()
+        };
         // One BM25 corpus per column (Lucene keeps statistics per field).
-        let avg_lens: Vec<f64> = (0..cols.len())
-            .map(|f| {
-                let sum: f64 = docs.iter().map(|d| d.1[f].len() as f64).sum();
-                let a = sum / docs.len().max(1) as f64;
-                if a <= 0.0 {
-                    1.0
-                } else {
-                    a
-                }
-            })
-            .collect();
+        let avg_lens: Vec<f64> = if let Some((_, stats)) = &index_view {
+            stats.iter().map(|st| st.1).collect()
+        } else {
+            (0..cols.len())
+                .map(|f| {
+                    let sum: f64 = docs.iter().map(|d| d.1[f].len() as f64).sum();
+                    let a = sum / docs.len().max(1) as f64;
+                    if a <= 0.0 {
+                        1.0
+                    } else {
+                        a
+                    }
+                })
+                .collect()
+        };
         // A `keyword`/`whitespace` field scores constantly: one field-boost
         // point per matching document (not per query term).
         let keyword_field = matches!(&delims, Some(d) if d.is_empty());
