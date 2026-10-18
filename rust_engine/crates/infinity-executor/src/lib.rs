@@ -1601,7 +1601,6 @@ struct TextIndex {
 
 /// One sealed segment's index: the mmap'd reader plus the corpus counts.
 struct SealedSegment {
-    base_row_id: u64,
     docs: u32,
     total_len: u64,
     reader: infinity_storage::fulltext_segment::SegmentIndexReader,
@@ -1688,7 +1687,6 @@ impl TextIndex {
             return false;
         };
         self.segments.push(SealedSegment {
-            base_row_id,
             docs: docs.len() as u32,
             total_len: self.total_len,
             reader,
