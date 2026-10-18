@@ -7490,10 +7490,7 @@ impl Engine {
                 return HashMap::new();
             }
             let query: Vec<Vec<f32>> = q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
-            let mut segments: HashMap<
-                u64,
-                (infinity_index::multivector::MultiVectorIndex, Vec<usize>),
-            > = HashMap::new();
+            let mut segments: HashMap<u64, (Vec<Vec<Vec<f32>>>, Vec<usize>)> = HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
                     continue;
@@ -7510,20 +7507,47 @@ impl Engine {
                 }
                 let doc: Vec<Vec<f32>> = flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
                 let segment = (*seq as u64) >> 32;
-                let entry = segments.entry(segment).or_insert_with(|| {
-                    (
-                        infinity_index::multivector::MultiVectorIndex::new(dims),
-                        Vec::new(),
-                    )
-                });
-                entry.0.add(doc);
+                let entry = segments.entry(segment).or_default();
+                entry.0.push(doc);
                 entry.1.push(*seq);
             }
             let mut best: HashMap<usize, f64> = HashMap::new();
             let mut per_segment: Vec<Vec<(usize, f32)>> = Vec::new();
-            for (_, (index, ids)) in segments {
-                let hits: Vec<(usize, f32)> = index
-                    .search(&query, topn.max(1), 0)
+            let version = self
+                .write_batches
+                .lock()
+                .unwrap()
+                .get(table)
+                .copied()
+                .unwrap_or(0);
+            for (segment, (docs, ids)) in segments {
+                // Persist the segment once; later queries map the file.
+                let dir = self.dir.join("multivector").join(
+                    index_key(
+                        table,
+                        &match_columns(&m.column)
+                            .first()
+                            .cloned()
+                            .unwrap_or_default(),
+                    )
+                    .replace('/', "_"),
+                );
+                let path = dir.join(format!("seg_{segment}_{}_{version}.mvec", docs.len()));
+                if !path.exists()
+                    && infinity_storage::multivector_segment::write_multivector_segment(
+                        &path, dims, &docs,
+                    )
+                    .is_err()
+                {
+                    continue;
+                }
+                let Ok(reader) =
+                    infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
+                else {
+                    continue;
+                };
+                let hits: Vec<(usize, f32)> = reader
+                    .search(&query, topn.max(1))
                     .into_iter()
                     .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
                     .collect();

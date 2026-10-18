@@ -26,6 +26,7 @@ pub mod metastore;
 /// the `rocksdb-store` feature.
 #[cfg(feature = "rocksdb-store")]
 pub mod metastore_rocks;
+pub mod multivector_segment;
 pub mod mvcc;
 pub mod s3;
 pub mod wal;
