@@ -969,6 +969,7 @@ impl Engine {
     pub fn write_cpp_blocks(&self, table: &str) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -1086,7 +1087,7 @@ impl Engine {
     /// packable (array/tensor/sparse/embedding) are skipped rather than
     /// mis-encoded.
     pub fn flush_cpp_blocks(&self) -> Result<()> {
-        for meta in self.catalog.list_tables()? {
+        for meta in self.storage.catalog.list_tables()? {
             let rows = self.approx_row_count(&meta.name);
             let per_row = estimated_row_bytes(&meta.types);
             if meta.types.iter().all(|t| column_type_of(t).is_some())
@@ -1113,6 +1114,7 @@ impl Engine {
                 .blocks_root()
                 .join(format!("db_{db_id}/tbl_{}", meta.id));
             let live: Vec<String> = self
+                .storage
                 .catalog
                 .list_indexes()?
                 .iter()
@@ -1131,7 +1133,7 @@ impl Engine {
         }
         // Vector indexes mirror alongside the rows. This is best-effort: an
         // index whose column is not an embedding column simply has no mirror.
-        for im in self.catalog.list_indexes()? {
+        for im in self.storage.catalog.list_indexes()? {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let _ = self.write_cpp_hnsw_index(&im.table, &im.name);
             } else if im.index_type.eq_ignore_ascii_case("FULLTEXT") {
@@ -1159,6 +1161,7 @@ impl Engine {
     pub fn load_cpp_blocks(&self, table: &str) -> Result<usize> {
         let qualified = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&qualified)?
             .ok_or_else(|| Error::NotFound(format!("table '{qualified}'")))?;
@@ -1190,7 +1193,7 @@ impl Engine {
     /// A table whose columns the block format cannot express simply has no
     /// mirror; that (and only that) is skipped silently.
     pub fn recover_cpp_blocks(&self) -> Result<()> {
-        for meta in self.catalog.list_tables()? {
+        for meta in self.storage.catalog.list_tables()? {
             if !self.fetch_rows_with_ids(&meta.name)?.is_empty() {
                 continue;
             }
@@ -1223,7 +1226,11 @@ impl Engine {
         let (version, columns) = cpp_format::read_block(root, id)?;
         let bytes = infinity_storage::buffer::block_bytes(&columns);
         let columns = Arc::new(columns);
-        self.context.buffer.lock().unwrap().put(id, columns.clone(), bytes);
+        self.context
+            .buffer
+            .lock()
+            .unwrap()
+            .put(id, columns.clone(), bytes);
         Ok((version, columns))
     }
 
@@ -1250,6 +1257,7 @@ impl Engine {
     pub fn cpp_block_row_count(&self, table: &str) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -1280,6 +1288,7 @@ impl Engine {
     ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -1392,6 +1401,7 @@ impl Engine {
     fn cpp_index_position(&self, table: &str, index_name: &str) -> Result<usize> {
         let short = table.split('.').next_back().unwrap_or(table);
         let ids: Vec<(String, u64)> = self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -1474,11 +1484,13 @@ impl Engine {
     ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let column = self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -1551,7 +1563,7 @@ impl Engine {
     /// optimize step). A mirror whose newest chunk already covers the table is
     /// left untouched, so repeated optimize ticks are no-ops.
     pub fn optimize_cpp_index_chunks(&self) -> Result<()> {
-        for im in self.catalog.list_indexes()? {
+        for im in self.storage.catalog.list_indexes()? {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
@@ -1589,7 +1601,7 @@ impl Engine {
     /// Removes every HNSW chunk except the newest one (the reference's cleanup
     /// step marks the merged-away chunks deprecated and then deletes them).
     pub fn cleanup_cpp_index_chunks(&self) -> Result<()> {
-        for im in self.catalog.list_indexes()? {
+        for im in self.storage.catalog.list_indexes()? {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
                 continue;
             }
@@ -1611,7 +1623,7 @@ impl Engine {
     /// The directory holding `table`'s HNSW mirror, if the table exists.
     fn cpp_hnsw_dir(&self, table: &str, index_name: &str) -> Option<PathBuf> {
         let table = self.qualified_table(table);
-        let meta = self.catalog.get_table_by_name(&table).ok()??;
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let index_id = self.cpp_index_position(&table, index_name).ok()?;
         let db_id = self.database_id_of(&table);
         Some(
@@ -1639,10 +1651,12 @@ impl Engine {
 
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let im = self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -1976,11 +1990,13 @@ impl Engine {
     ) -> Result<usize> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
         let index_id = self.cpp_index_position(&table, index_name)?;
         let column = self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -2070,6 +2086,7 @@ impl Engine {
     ) -> Result<(Vec<f32>, VectorRows)> {
         let table = self.qualified_table(table);
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(&table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -2098,7 +2115,6 @@ impl Engine {
         Ok((centroids, out))
     }
 }
-
 
 /// Serializes an existing graph as a C++ HNSW chunk (header, plain vector
 /// region, graph region, `u32` labels).

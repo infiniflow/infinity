@@ -1627,13 +1627,7 @@ impl MemoryIndexer {
 
     /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
     /// document would push the segment past `budget`, leaving it unchanged.
-    fn insert(
-        &mut self,
-        seq: u64,
-        text: &str,
-        delims: &Option<Vec<char>>,
-        budget: usize,
-    ) -> bool {
+    fn insert(&mut self, seq: u64, text: &str, delims: &Option<Vec<char>>, budget: usize) -> bool {
         let toks = tokenize_index_positions(text, delims);
         // ~32 B per posting entry plus the positions and the term string.
         let mut cost = 64usize;
@@ -2375,13 +2369,11 @@ impl SparseIndex {
             .map(|t| t.generation != self.tail_generation)
             .unwrap_or(true)
         {
-            let mut alg = infinity_index::sparse::BmpAlg::new(
-                infinity_index::sparse::BMP_BLOCK_SIZE,
-            );
+            let mut alg =
+                infinity_index::sparse::BmpAlg::new(infinity_index::sparse::BMP_BLOCK_SIZE);
             let mut seqs = Vec::with_capacity(self.tail.len());
             for (seq, doc) in &self.tail {
-                let doc32: Vec<(u32, f32)> =
-                    doc.iter().map(|(t, v)| (*t as u32, *v)).collect();
+                let doc32: Vec<(u32, f32)> = doc.iter().map(|(t, v)| (*t as u32, *v)).collect();
                 alg.add_doc(&doc32);
                 seqs.push(*seq);
             }
@@ -2416,6 +2408,14 @@ impl SparseIndex {
     }
 }
 
+/// The storage layer: the catalog and the KV store.
+///
+/// C++: `Storage` (`src/storage/storage.cppm`) — the owner of databases,
+/// tables and their metadata. The `Engine` composes it.
+pub struct Storage {
+    catalog: Catalog,
+    store: Arc<dyn MetaStore>,
+}
 
 /// Per-table write bookkeeping and row-id allocation.
 ///
@@ -2460,9 +2460,9 @@ struct Context {
 
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
 pub struct Engine {
-    catalog: Catalog,
+    /// Catalog + KV store (the reference's `Storage`).
+    storage: Storage,
     txn: TxnManager,
-    store: Arc<dyn MetaStore>,
     rt: tokio::runtime::Runtime,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
@@ -2622,9 +2622,8 @@ impl Engine {
             .build()
             .map_err(|e| Error::Invalid(format!("tokio runtime: {e}")))?;
         let engine = Self {
-            catalog,
+            storage: Storage { catalog, store },
             txn,
-            store,
             rt,
             context: Context {
                 exchange_capacity: exchange_capacity.max(1),
@@ -2667,10 +2666,12 @@ impl Engine {
         // If this directory was written by the C++ engine (its catalog keys are
         // in the catalog store, but the native catalog is empty), take over its
         // schema so the engine can open a C++-produced directory (§2.6.1).
-        if engine.catalog.list_tables()?.is_empty() && !engine.catalog.is_cpp_only() {
+        if engine.storage.catalog.list_tables()?.is_empty() && !engine.storage.catalog.is_cpp_only()
+        {
             let _ = engine
+                .storage
                 .catalog
-                .import_cpp_layout(engine.catalog.store().as_ref());
+                .import_cpp_layout(engine.storage.catalog.store().as_ref());
         }
         Ok(engine)
     }
@@ -2704,7 +2705,8 @@ impl Engine {
         } else {
             "default_db"
         };
-        self.catalog
+        self.storage
+            .catalog
             .list_databases()
             .unwrap_or_default()
             .iter()
@@ -2718,7 +2720,7 @@ impl Engine {
         // A new index may have appeared since the last write.
         self.hnsw_probed.lock().unwrap().clear();
         self.vector_indexes.lock().unwrap().clear();
-        for im in self.catalog.list_indexes()? {
+        for im in self.storage.catalog.list_indexes()? {
             // skip functional-index targets (not plain columns)
             if is_secondary_kind(&im.index_type)
                 && self
@@ -2885,7 +2887,7 @@ impl Engine {
     /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
     /// query in the same process sees what `flush()` just mirrored.
     fn reload_vector_indexes(&self) {
-        let Ok(indexes) = self.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
         for im in indexes {
@@ -2922,7 +2924,7 @@ impl Engine {
         if backed.is_empty() {
             return;
         }
-        let Ok(catalog_indexes) = self.catalog.list_indexes() else {
+        let Ok(catalog_indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
         for key in backed {
@@ -3118,7 +3120,7 @@ impl Engine {
             .keys()
             .cloned()
             .collect();
-        let Ok(indexes) = self.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
         for key in keys {
@@ -3219,6 +3221,7 @@ impl Engine {
     /// the probed value (UPDATE re-appends, DROP COLUMN re-keys).
     fn live_row_matches(&self, table: &str, id: u64, col: Option<usize>, want: &str) -> bool {
         if self
+            .storage
             .store
             .get(&del_key(table, id as usize))
             .ok()
@@ -3227,7 +3230,13 @@ impl Engine {
         {
             return false;
         }
-        let Some(raw) = self.store.get(&row_key(table, id as usize)).ok().flatten() else {
+        let Some(raw) = self
+            .storage
+            .store
+            .get(&row_key(table, id as usize))
+            .ok()
+            .flatten()
+        else {
             return false;
         };
         match col {
@@ -3246,7 +3255,7 @@ impl Engine {
         let defaults = self.table_defaults(table).unwrap_or_default();
         let mut rows = Vec::new();
         for &id in ids {
-            if let Some(v) = self.store.get(&row_key(table, id as usize))? {
+            if let Some(v) = self.storage.store.get(&row_key(table, id as usize))? {
                 rows.push(self.parse_stored_row(table, &defaults, &v)?);
             }
         }
@@ -3299,8 +3308,8 @@ impl Engine {
             // Durability: a committed mutation must survive a crash, so both the
             // catalog and the row/meta KV are fsynced before acknowledging.
             if mutating {
-                self.catalog.flush()?;
-                self.store.flush()?;
+                self.storage.catalog.flush()?;
+                self.storage.store.flush()?;
             }
         }
         Ok(out)
@@ -3384,7 +3393,8 @@ impl Engine {
     /// index state could need it.
     fn has_index_declaration(&self, table: &str) -> bool {
         let short = table.split('.').next_back().unwrap_or(table);
-        self.catalog
+        self.storage
+            .catalog
             .list_indexes()
             .map(|is| is.iter().any(|i| i.table == short || i.table == table))
             .unwrap_or(true)
@@ -3404,10 +3414,10 @@ impl Engine {
     /// entries and index declarations, so a later CREATE TABLE with the same
     /// name starts empty.
     fn drop_table_all(&self, name: &str) -> Result<bool> {
-        let table_id = self.catalog.get_table_by_name(name)?.map(|m| m.id);
+        let table_id = self.storage.catalog.get_table_by_name(name)?.map(|m| m.id);
         let key = self.table_key(name);
         self.tables.lock().unwrap().remove(&key);
-        let existed = self.catalog.drop_table(name)?;
+        let existed = self.storage.catalog.drop_table(name)?;
         // The C++ block mirror of a dropped table is removed with it, so a
         // later restart cannot resurrect the data.
         if let Some(id) = table_id {
@@ -3421,11 +3431,11 @@ impl Engine {
                 }
             }
         }
-        for (k, _) in self.store.scan_prefix(&row_prefix(name))? {
-            self.store.delete(&k)?;
+        for (k, _) in self.storage.store.scan_prefix(&row_prefix(name))? {
+            self.storage.store.delete(&k)?;
         }
-        for (k, _) in self.store.scan_prefix(&del_prefix(name))? {
-            self.store.delete(&k)?;
+        for (k, _) in self.storage.store.scan_prefix(&del_prefix(name))? {
+            self.storage.store.delete(&k)?;
         }
         let key_prefix = format!("{name}.");
         self.indexes
@@ -3444,9 +3454,9 @@ impl Engine {
             .lock()
             .unwrap()
             .retain(|k| !k.starts_with(&key_prefix));
-        for im in self.catalog.list_indexes()? {
+        for im in self.storage.catalog.list_indexes()? {
             if im.table == name {
-                let _ = self.catalog.drop_index_on(&im.table, &im.name);
+                let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
             }
         }
         Ok(existed)
@@ -3454,6 +3464,7 @@ impl Engine {
 
     fn table_schema(&self, table: &str) -> Result<Vec<String>> {
         Ok(self
+            .storage
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
@@ -3537,7 +3548,8 @@ impl Engine {
     }
 
     fn table_meta(&self, table: &str) -> Result<infinity_catalog::TableMeta> {
-        self.catalog
+        self.storage
+            .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))
     }
@@ -3556,6 +3568,7 @@ impl Engine {
             return Some(a.clone());
         }
         let column = self
+            .storage
             .catalog
             .list_indexes()
             .ok()?
@@ -3572,6 +3585,7 @@ impl Engine {
     fn index_name_pairs(&self, table: &str) -> Result<Vec<(String, String)>> {
         let short = table.split('.').next_back().unwrap_or(table);
         Ok(self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -3585,6 +3599,7 @@ impl Engine {
     fn indexed_columns(&self, table: &str) -> Result<Vec<String>> {
         let short = table.split('.').next_back().unwrap_or(table);
         Ok(self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -3603,6 +3618,7 @@ impl Engine {
         rows: Vec<Vec<Literal>>,
     ) -> Result<QueryResult> {
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -3852,6 +3868,7 @@ impl Engine {
                 let comments: Vec<Option<String>> =
                     columns.iter().map(|c| c.comment.clone()).collect();
                 let t = self
+                    .storage
                     .catalog
                     .create_table_typed(name, &names, &defaults, &not_nulls, &types, &comments)?;
                 Ok(QueryResult::CreatedTable {
@@ -3861,10 +3878,11 @@ impl Engine {
             }
             Statement::RenameTable { table, new_name } => {
                 let meta = self
+                    .storage
                     .catalog
                     .get_table_by_name(table)?
                     .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-                if self.catalog.get_table_by_name(new_name)?.is_some() {
+                if self.storage.catalog.get_table_by_name(new_name)?.is_some() {
                     return Err(Error::Invalid(format!("table '{new_name}' already exists")));
                 }
                 let _ = meta;
@@ -3887,11 +3905,11 @@ impl Engine {
                     }
                     self.txn.commit(t)?;
                 }
-                for (k, _) in self.store.scan_prefix(&row_prefix(table))? {
-                    self.store.delete(&k)?;
+                for (k, _) in self.storage.store.scan_prefix(&row_prefix(table))? {
+                    self.storage.store.delete(&k)?;
                 }
-                for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
-                    self.store.delete(&k)?;
+                for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
+                    self.storage.store.delete(&k)?;
                 }
                 // move the secondary-index entries and declarations
                 let old_prefix = format!("{table}.");
@@ -3924,10 +3942,10 @@ impl Engine {
                     .lock()
                     .unwrap()
                     .retain(|k| !k.starts_with(&old_prefix));
-                for im in self.catalog.list_indexes()? {
+                for im in self.storage.catalog.list_indexes()? {
                     if im.table == *table {
-                        let _ = self.catalog.drop_index_on(&im.table, &im.name);
-                        self.catalog.create_index_typed(
+                        let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
+                        self.storage.catalog.create_index_typed(
                             &im.name,
                             new_name,
                             &im.column,
@@ -3939,7 +3957,7 @@ impl Engine {
                 for (_, column) in &pairs {
                     let _ = self.build_index(new_name, column);
                 }
-                self.catalog.rename_table(table, new_name)?;
+                self.storage.catalog.rename_table(table, new_name)?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -3953,6 +3971,7 @@ impl Engine {
                 }
                 // an index still referencing the column blocks the drop
                 if self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .iter()
@@ -3964,6 +3983,7 @@ impl Engine {
                 }
                 let rows = self.fetch_rows_with_ids(table)?;
                 let idx = match self
+                    .storage
                     .catalog
                     .get_table_by_name(table)?
                     .and_then(|m| m.columns.iter().position(|c| c == column))
@@ -3995,14 +4015,15 @@ impl Engine {
                     self.txn.commit(t)?;
                 }
                 self.reset_row_counter(table);
-                self.catalog.drop_column(table, column)?;
+                self.storage.catalog.drop_column(table, column)?;
                 if let Some(im) = self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .into_iter()
                     .find(|i| i.table == *table && i.column == *column)
                 {
-                    let _ = self.catalog.drop_index_on(&im.table, &im.name);
+                    let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
                 }
                 self.indexes
                     .lock()
@@ -4010,6 +4031,7 @@ impl Engine {
                     .remove(&index_key(table, column));
                 // remaining indexes now hold stale row ids: rebuild them
                 let remaining: Vec<String> = self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .into_iter()
@@ -4050,7 +4072,7 @@ impl Engine {
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
-                self.catalog.add_columns_typed(
+                self.storage.catalog.add_columns_typed(
                     table,
                     &names,
                     &defaults,
@@ -4072,7 +4094,7 @@ impl Engine {
                 name,
                 if_not_exists,
             } => {
-                self.catalog.create_database(name, *if_not_exists)?;
+                self.storage.catalog.create_database(name, *if_not_exists)?;
                 Ok(QueryResult::CreatedDatabase { name: name.clone() })
             }
             Statement::DropDatabase { name, if_exists } => {
@@ -4087,11 +4109,11 @@ impl Engine {
                         "dropping the current database is not allowed".into(),
                     ));
                 }
-                let existed = self.catalog.drop_database(name, *if_exists)?;
+                let existed = self.storage.catalog.drop_database(name, *if_exists)?;
                 if existed || *if_exists {
                     // drop every table registered under this database
                     let prefix = format!("{name}.");
-                    for t in self.catalog.list_tables()? {
+                    for t in self.storage.catalog.list_tables()? {
                         if t.name.starts_with(&prefix) {
                             self.drop_table_all(&t.name)?;
                         }
@@ -4105,6 +4127,7 @@ impl Engine {
             }),
             Statement::ShowTableIndex { table, index } => {
                 if !self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .iter()
@@ -4358,6 +4381,7 @@ impl Engine {
             } => {
                 self.validate_index(table, column, index_type, opts)?;
                 let duplicate = self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .iter()
@@ -4365,7 +4389,8 @@ impl Engine {
                 if duplicate && !*if_not_exists {
                     return Err(Error::Invalid(format!("index '{name}' already exists")));
                 }
-                self.catalog
+                self.storage
+                    .catalog
                     .create_index_typed(name, table, column, index_type, opts)?;
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 if let Some((_, a)) = opts.iter().find(|(k, _)| k == "ANALYZER") {
@@ -4444,6 +4469,7 @@ impl Engine {
             }
             Statement::DropIndex { name, if_exists } => {
                 let target = self
+                    .storage
                     .catalog
                     .list_indexes()
                     .unwrap_or_default()
@@ -4454,7 +4480,7 @@ impl Engine {
                     .as_ref()
                     .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
                     .unwrap_or(false);
-                let existed = self.catalog.drop_index(name)?;
+                let existed = self.storage.catalog.drop_index(name)?;
                 if existed {
                     if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
                         self.drop_text_index_storage(&table, Some(&column));
@@ -4486,7 +4512,8 @@ impl Engine {
                         "config '{key}' is unavailable while result_cache is off"
                     )));
                 }
-                self.context.config
+                self.context
+                    .config
                     .lock()
                     .unwrap()
                     .insert(key.to_ascii_lowercase(), value.clone());
@@ -4509,7 +4536,8 @@ impl Engine {
                 let v = if cache_var == "cache_result_num" {
                     self.result_cache.lock().unwrap().len().to_string()
                 } else {
-                    self.context.config
+                    self.context
+                        .config
                         .lock()
                         .unwrap()
                         .get(&key.to_ascii_lowercase())
@@ -4523,6 +4551,7 @@ impl Engine {
             }
             Statement::ShowTableColumns { table } => {
                 let meta = self
+                    .storage
                     .catalog
                     .get_table_by_name(table)?
                     .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -4551,17 +4580,17 @@ impl Engine {
             }
             Statement::CreateSnapshot { name, table } => {
                 let blob = self.snapshot_table_blob(table)?;
-                self.store.put(&snap_key(name), blob.as_bytes())?;
+                self.storage.store.put(&snap_key(name), blob.as_bytes())?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
                 })
             }
             Statement::DropSnapshot { name } => {
-                if self.store.get(&snap_key(name))?.is_none() {
+                if self.storage.store.get(&snap_key(name))?.is_none() {
                     return Err(Error::NotFound(format!("snapshot '{name}'")));
                 }
-                self.store.delete(&snap_key(name))?;
+                self.storage.store.delete(&snap_key(name))?;
                 Ok(QueryResult::Rows {
                     columns: vec![],
                     rows: vec![],
@@ -4569,6 +4598,7 @@ impl Engine {
             }
             Statement::RestoreSnapshot { name } => {
                 let data = self
+                    .storage
                     .store
                     .get(&snap_key(name))?
                     .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
@@ -4576,7 +4606,7 @@ impl Engine {
                 // Restoring into an existing table is refused, as in the
                 // reference (`DROP TABLE` first).
                 let table = blob.split(SNAP_REC).next().unwrap_or_default().to_string();
-                if !table.is_empty() && self.catalog.get_table_by_name(&table)?.is_some() {
+                if !table.is_empty() && self.storage.catalog.get_table_by_name(&table)?.is_some() {
                     return Err(Error::Invalid(format!("table '{table}' already exists")));
                 }
                 self.restore_table_blob(&blob)?;
@@ -4630,6 +4660,7 @@ impl Engine {
                 let schema = self.table_schema(table)?;
                 let types = self.column_types(table)?;
                 let not_nulls = self
+                    .storage
                     .catalog
                     .get_table_by_name(table)?
                     .map(|m| m.not_nulls)
@@ -5240,8 +5271,12 @@ impl Engine {
                 )
             }
         };
-        self.rt
-            .block_on(pipeline(columns, rows, stages, self.context.exchange_capacity))
+        self.rt.block_on(pipeline(
+            columns,
+            rows,
+            stages,
+            self.context.exchange_capacity,
+        ))
     }
 
     /// Maintains declared indexes on insert.
@@ -5283,11 +5318,11 @@ impl Engine {
     fn next_row_seq(&self, table: &str) -> Result<usize> {
         let prefix = row_prefix(table);
         let mut max = 0usize;
-        for (k, _v) in self.store.scan_prefix(&prefix)? {
+        for (k, _v) in self.storage.store.scan_prefix(&prefix)? {
             if let Ok(seq) = String::from_utf8_lossy(&k[prefix.len()..]).parse::<usize>() {
                 // A compacted (renumbered) row is tombstoned at its old id;
                 // it must not push the next id past the live range.
-                if self.store.get(&del_key(table, seq))?.is_some() {
+                if self.storage.store.get(&del_key(table, seq))?.is_some() {
                     continue;
                 }
                 max = max.max(seq + 1);
@@ -5306,7 +5341,7 @@ impl Engine {
         // would add O(rows) KV round trips to every full scan.
         let dpref = del_prefix(table);
         let mut deleted: std::collections::HashSet<usize> = Default::default();
-        for (k, _) in self.store.scan_prefix(&dpref)? {
+        for (k, _) in self.storage.store.scan_prefix(&dpref)? {
             if let Some(raw) = k.get(dpref.len()..) {
                 if let Ok(s) = std::str::from_utf8(raw) {
                     if let Ok(n) = s.parse::<usize>() {
@@ -5316,7 +5351,7 @@ impl Engine {
             }
         }
         let mut rows = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -5343,7 +5378,7 @@ impl Engine {
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         let mut rows = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -5434,12 +5469,7 @@ impl Engine {
             .open(&path)
             .map_err(|e| Error::Invalid(format!("row blob {}: {e}", path.display())))?;
         let shared = Arc::new(Mutex::new(file));
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(key)
-            .or_default()
-            .row_blob = Some(shared.clone());
+        self.tables.lock().unwrap().entry(key).or_default().row_blob = Some(shared.clone());
         Ok(shared)
     }
 
@@ -5534,10 +5564,10 @@ impl Engine {
         for &id in ids {
             let seq = id as usize;
             // A stale index entry may point at a tombstoned row.
-            if self.store.get(&del_key(table, seq))?.is_some() {
+            if self.storage.store.get(&del_key(table, seq))?.is_some() {
                 continue;
             }
-            if let Some(v) = self.store.get(&row_key(table, seq))? {
+            if let Some(v) = self.storage.store.get(&row_key(table, seq))? {
                 out.push((seq, self.parse_stored_row(table, &defaults, &v)?));
             }
         }
@@ -5579,9 +5609,10 @@ impl Engine {
         // A bulk load may bypass the incremental hooks; the key count is the
         // authority on how many live rows the cache must hold.
         let expected = self
+            .storage
             .store
             .count_prefix(&row_prefix(table))?
-            .saturating_sub(self.store.count_prefix(&del_prefix(table))?);
+            .saturating_sub(self.storage.store.count_prefix(&del_prefix(table))?);
         // Hold the map lock across a rebuild: concurrent readers noticing the
         // same gap would each allocate a copy. A 250 ms floor keeps a
         // write-heavy workload from rebuilding on every query.
@@ -5666,7 +5697,7 @@ impl Engine {
                 return;
             }
         }
-        let Ok(indexes) = self.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
         let Ok(types) = self.column_types(table) else {
@@ -5798,7 +5829,7 @@ impl Engine {
         let key = index_key(table, column);
         // A bulk load that bypasses the DML hooks would leave the index short of
         // rows; compare against the cheap reservation counter and rebuild.
-        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
+        let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
             let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
             if complete >= reserved {
@@ -5842,7 +5873,7 @@ impl Engine {
         dims: usize,
     ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
         let key = index_key(table, column);
-        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
+        let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.mv_index.lock().unwrap().get(&key) {
             let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
             if complete >= reserved {
@@ -5976,7 +6007,7 @@ impl Engine {
         width: infinity_storage::bmp_cpp::IdxWidth,
     ) -> Result<Arc<std::sync::RwLock<SparseIndex>>> {
         let key = index_key(table, column);
-        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
+        let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.sparse_index.lock().unwrap().get(&key) {
             let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
             if complete >= reserved {
@@ -6097,7 +6128,7 @@ impl Engine {
     fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
         let dp = del_prefix(table);
         let mut dead: std::collections::HashSet<u64> = Default::default();
-        for (k, _) in self.store.scan_prefix(&dp)? {
+        for (k, _) in self.storage.store.scan_prefix(&dp)? {
             if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
                 dead.insert(seq);
             }
@@ -6201,7 +6232,7 @@ impl Engine {
         let prefix = row_prefix(table);
         let dpref = del_prefix(table);
         let mut deleted: std::collections::HashSet<usize> = Default::default();
-        for (k, _) in self.store.scan_prefix(&dpref)? {
+        for (k, _) in self.storage.store.scan_prefix(&dpref)? {
             if let Some(raw) = k.get(dpref.len()..) {
                 if let Ok(s) = std::str::from_utf8(raw) {
                     if let Ok(n) = s.parse::<usize>() {
@@ -6211,7 +6242,7 @@ impl Engine {
             }
         }
         let mut rows = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -6238,7 +6269,7 @@ impl Engine {
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         let mut rows = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -6268,10 +6299,10 @@ impl Engine {
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         let mut out = Vec::with_capacity(ids.len());
         for &seq in ids {
-            if self.store.get(&del_key(table, seq))?.is_some() {
+            if self.storage.store.get(&del_key(table, seq))?.is_some() {
                 continue;
             }
-            let Some(v) = self.store.get(&row_key(table, seq))? else {
+            let Some(v) = self.storage.store.get(&row_key(table, seq))? else {
                 continue;
             };
             let text = String::from_utf8_lossy(&v);
@@ -6327,6 +6358,7 @@ impl Engine {
     /// Per-column declared type text for `table`.
     fn column_types(&self, table: &str) -> Result<Vec<String>> {
         Ok(self
+            .storage
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
@@ -6336,7 +6368,7 @@ impl Engine {
     /// The names of the stored snapshots (`CREATE SNAPSHOT`).
     pub fn snapshot_names(&self) -> Result<Vec<String>> {
         let mut out = Vec::new();
-        for (k, _) in self.store.scan_prefix(b"snap:")? {
+        for (k, _) in self.storage.store.scan_prefix(b"snap:")? {
             out.push(String::from_utf8_lossy(&k[5..]).to_string());
         }
         out.sort();
@@ -6373,7 +6405,13 @@ impl Engine {
     pub fn segment_count(&self, table: &str) -> usize {
         let key = self.table_key(table);
         let rows = self.row_count(table).unwrap_or(0);
-        let batches = match self.tables.lock().unwrap().get(&key).map(|e| e.write_batches) {
+        let batches = match self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.write_batches)
+        {
             Some(b) => b.max(1),
             // Never written in this process: an empty table has no segment,
             // a table loaded from disk has at least one.
@@ -6386,6 +6424,7 @@ impl Engine {
     /// written by `CREATE SNAPSHOT … ON TABLE` and by database snapshots.
     fn snapshot_table_blob(&self, table: &str) -> Result<String> {
         let meta = self
+            .storage
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
@@ -6417,6 +6456,7 @@ impl Engine {
         // The snapshot carries the table's indexes: name, column, type and the
         // `WITH (…)` options, so a restore recreates the same index kinds.
         let idxs: Vec<String> = self
+            .storage
             .catalog
             .list_indexes()?
             .into_iter()
@@ -6506,16 +6546,16 @@ impl Engine {
             .collect();
         let rows: Vec<String> = recs.map(|s| s.to_string()).collect();
         // replace any current incarnation of the table
-        if self.catalog.get_table_by_name(&table)?.is_some() {
-            self.catalog.drop_table(&table)?;
-            for (k, _) in self.store.scan_prefix(&row_prefix(&table))? {
-                self.store.delete(&k)?;
+        if self.storage.catalog.get_table_by_name(&table)?.is_some() {
+            self.storage.catalog.drop_table(&table)?;
+            for (k, _) in self.storage.store.scan_prefix(&row_prefix(&table))? {
+                self.storage.store.delete(&k)?;
             }
-            for (k, _) in self.store.scan_prefix(&del_prefix(&table))? {
-                self.store.delete(&k)?;
+            for (k, _) in self.storage.store.scan_prefix(&del_prefix(&table))? {
+                self.storage.store.delete(&k)?;
             }
         }
-        self.catalog.create_table_typed(
+        self.storage.catalog.create_table_typed(
             &table,
             &columns,
             &defaults,
@@ -6528,12 +6568,15 @@ impl Engine {
                 // the snapshot blob separates cells with SNAP_FLD; the row
                 // store uses tabs
                 let encoded = r.split(SNAP_FLD).collect::<Vec<_>>().join("\t");
-                self.store.put(&row_key(&table, i), &encoded.into_bytes())?;
+                self.storage
+                    .store
+                    .put(&row_key(&table, i), &encoded.into_bytes())?;
             }
         }
         // re-create the snapshot's indexes
         for (name, column, ty, opts) in indexes {
-            self.catalog
+            self.storage
+                .catalog
                 .create_index_typed(&name, &table, &column, &ty, &opts)?;
             if self.table_schema(&table)?.iter().any(|c| c == &column) {
                 self.build_index(&table, &column)?;
@@ -6548,6 +6591,7 @@ impl Engine {
         let prefix = format!("{db}.");
         let mut out = String::new();
         for meta in self
+            .storage
             .catalog
             .list_tables()?
             .into_iter()
@@ -6558,26 +6602,27 @@ impl Engine {
             }
             out.push_str(&self.snapshot_table_blob(&meta.name)?);
         }
-        self.store.put(&snap_key(name), out.as_bytes())?;
+        self.storage.store.put(&snap_key(name), out.as_bytes())?;
         Ok(())
     }
 
     /// `CREATE SYSTEM SNAPSHOT <name>`: every table of every database.
     pub fn create_system_snapshot(&self, name: &str) -> Result<()> {
         let mut out = String::new();
-        for meta in self.catalog.list_tables()? {
+        for meta in self.storage.catalog.list_tables()? {
             if !out.is_empty() {
                 out.push(DB_SNAP_SEP);
             }
             out.push_str(&self.snapshot_table_blob(&meta.name)?);
         }
-        self.store.put(&snap_key(name), out.as_bytes())?;
+        self.storage.store.put(&snap_key(name), out.as_bytes())?;
         Ok(())
     }
 
     /// Restores every table of a database snapshot.
     pub fn restore_database_snapshot(&self, name: &str) -> Result<()> {
         let data = self
+            .storage
             .store
             .get(&snap_key(name))?
             .ok_or_else(|| Error::NotFound(format!("snapshot '{name}'")))?;
@@ -6594,7 +6639,7 @@ impl Engine {
             }
         }
         for db in &databases {
-            self.catalog.create_database(db, true)?;
+            self.storage.catalog.create_database(db, true)?;
         }
         for blob in text.split(DB_SNAP_SEP).filter(|s| !s.is_empty()) {
             self.restore_table_blob(blob)?;
@@ -6617,6 +6662,7 @@ impl Engine {
                 continue;
             }
             let v = self
+                .storage
                 .store
                 .get(&row_key(table, *old))?
                 .ok_or_else(|| Error::Storage("row vanished during compaction".into()))?;
@@ -6630,12 +6676,12 @@ impl Engine {
             // re-creates both, and the tombstone keeps the old row hidden.
             for (i, (old, _)) in rows.iter().enumerate() {
                 if *old != i {
-                    self.store.delete(&row_key(table, *old))?;
+                    self.storage.store.delete(&row_key(table, *old))?;
                 }
             }
         }
-        for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
-            self.store.delete(&k)?;
+        for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
+            self.storage.store.delete(&k)?;
         }
         let key = self.table_key(table);
         {
@@ -6691,7 +6737,8 @@ impl Engine {
 
     /// Every configuration knob's current value.
     pub fn config_all(&self) -> Vec<(String, String)> {
-        self.context.config
+        self.context
+            .config
             .lock()
             .unwrap()
             .iter()
@@ -6716,7 +6763,8 @@ impl Engine {
 
     /// Maximum cached entries (`cache_result_capacity`); unbounded by default.
     fn result_cache_capacity(&self) -> usize {
-        self.context.config
+        self.context
+            .config
             .lock()
             .unwrap()
             .get("cache_result_capacity")
@@ -6970,7 +7018,7 @@ impl Engine {
         // A full-text search runs through an index; without one the C++ engine
         // refuses the statement.
         if m.kind.eq_ignore_ascii_case("text") {
-            let indexes = self.catalog.list_indexes().unwrap_or_default();
+            let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
             for col in match_columns(&m.column) {
                 let has = indexes.iter().any(|im| {
                     im.table == table
@@ -7366,7 +7414,7 @@ impl Engine {
                     None => Value::Null,
                 });
             }
-            let live = self.store.get(&del_key(table, seq))?.is_none();
+            let live = self.storage.store.get(&del_key(table, seq))?.is_none();
             let filters_hold = in_filter
                 .as_ref()
                 .map(|p| p.eval_predicate(&row))
@@ -7630,7 +7678,7 @@ impl Engine {
         let prefix = row_prefix(table);
         let defaults = self.table_defaults(table).unwrap_or_default();
         let mut scored: Vec<(usize, f64)> = Vec::new();
-        for (k, v) in self.store.scan_prefix(&prefix)? {
+        for (k, v) in self.storage.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
@@ -7642,7 +7690,7 @@ impl Engine {
                     None => Value::Null,
                 });
             }
-            if self.store.get(&del_key(table, seq))?.is_some() {
+            if self.storage.store.get(&del_key(table, seq))?.is_some() {
                 continue;
             }
             if let Some(p) = pred {
@@ -7821,6 +7869,7 @@ impl Engine {
     /// Per-column defaults (as `.slt` text) for `table`.
     fn table_defaults(&self, table: &str) -> Result<Vec<Option<String>>> {
         Ok(self
+            .storage
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?
@@ -7831,7 +7880,7 @@ impl Engine {
     /// or the Infinity fixture path `/var/infinity/test_data/…`, which is mapped
     /// onto `INFINITY_DATA_DIR` (default `test/data`) if present.
     fn copy_from(&self, table: &str, path: &str, opts: &[(String, String)]) -> Result<QueryResult> {
-        if self.catalog.get_table_by_name(table)?.is_none() {
+        if self.storage.catalog.get_table_by_name(table)?.is_none() {
             return Err(Error::NotFound(format!("table '{table}'")));
         }
         let resolved = resolve_data_path(path);
@@ -8590,6 +8639,7 @@ impl Engine {
                     && !name.contains('=')
                     && !name.contains(';')
                     && !self
+                        .storage
                         .catalog
                         .list_indexes()?
                         .iter()
@@ -8610,6 +8660,7 @@ impl Engine {
                 .filter(|n| !n.is_empty())
             {
                 if !self
+                    .storage
                     .catalog
                     .list_indexes()?
                     .iter()
@@ -8819,6 +8870,7 @@ impl Engine {
         if let Some(want) = option_value("index_name") {
             let short = table.split('.').next_back().unwrap_or(table);
             let exists = self
+                .storage
                 .catalog
                 .list_indexes()?
                 .iter()
@@ -9186,8 +9238,11 @@ impl Engine {
                 }
             }
             merge.end();
-            let candidates: std::collections::HashSet<usize> =
-                merge.ids_by_idx(0).into_iter().map(|r| r as usize).collect();
+            let candidates: std::collections::HashSet<usize> = merge
+                .ids_by_idx(0)
+                .into_iter()
+                .map(|r| r as usize)
+                .collect();
             let uncovered = if let Some(c) = &cache {
                 c.read()
                     .map(|g| g.live.iter().any(|s| !covered.contains(s)))
@@ -9589,13 +9644,13 @@ impl Engine {
     }
 
     pub fn catalog(&self) -> &Catalog {
-        &self.catalog
+        &self.storage.catalog
     }
 
     /// The underlying row/meta store (exposed for tests and tooling that need to
     /// inspect the on-disk key space).
     pub fn store(&self) -> &std::sync::Arc<dyn MetaStore> {
-        &self.store
+        &self.storage.store
     }
 
     /// TRUE when `table` exists (the name is qualified with the session's
@@ -9607,7 +9662,7 @@ impl Engine {
         } else {
             format!("{db}.{}", table.to_ascii_lowercase())
         };
-        matches!(self.catalog.get_table_by_name(&name), Ok(Some(_)))
+        matches!(self.storage.catalog.get_table_by_name(&name), Ok(Some(_)))
     }
 
     /// Number of live (non-deleted) rows in `table`.
@@ -9620,8 +9675,8 @@ impl Engine {
         };
         // Counting keys avoids materialising every row: `SHOW TABLE` and
         // `count(*)` on a wide table otherwise decode gigabytes.
-        let total = self.store.count_prefix(&row_prefix(&name))?;
-        let deleted = self.store.count_prefix(&del_prefix(&name))?;
+        let total = self.storage.store.count_prefix(&row_prefix(&name))?;
+        let deleted = self.storage.store.count_prefix(&del_prefix(&name))?;
         Ok(total.saturating_sub(deleted))
     }
 
@@ -9629,7 +9684,7 @@ impl Engine {
         // Snapshot the applied timestamp *before* the fsync: everything up to
         // it is then durable, so the log prefix can be dropped afterwards.
         let applied = self.txn.applied_ts()?;
-        self.catalog.flush()?;
+        self.storage.catalog.flush()?;
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
         // Dump the index memory tails first. The caller only logs a `flush`
@@ -9673,8 +9728,11 @@ impl Engine {
         // mirror there. Best effort: a column type the C++ encoding does not
         // cover yet leaves the previous layout in place rather than failing the
         // flush.
-        if !self.catalog.is_cpp_only() {
-            let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
+        if !self.storage.catalog.is_cpp_only() {
+            let _ = self
+                .storage
+                .catalog
+                .write_cpp_layout(self.storage.catalog.store().as_ref());
         }
         mirror?;
         Ok(())
@@ -9695,7 +9753,8 @@ impl Engine {
     }
 
     pub fn set_memindex_quota(&self, bytes: u64) {
-        self.context.memindex_quota
+        self.context
+            .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
@@ -9707,7 +9766,7 @@ impl Engine {
         if keys.is_empty() {
             return;
         }
-        let indexes = self.catalog.list_indexes().unwrap_or_default();
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for key in keys {
             let Some((table, column)) = key.rsplit_once('.') else {
                 continue;
@@ -9744,7 +9803,7 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        let Ok(indexes) = self.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
         for im in indexes {
@@ -12519,16 +12578,28 @@ mod tests {
     fn hnsw_checkpoint_dumps_only_the_memory_segment() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));").unwrap();
-        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);").unwrap();
+        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));")
+            .unwrap();
+        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);")
+            .unwrap();
         let mut sql = String::from("INSERT INTO hv VALUES ");
         for i in 0..10 {
             sql.push_str(&format!("({i}, [{i}.0, 0.0, 0.0, 0.0])"));
-            if i < 9 { sql.push(','); }
+            if i < 9 {
+                sql.push(',');
+            }
         }
         sql.push(';');
         e.execute(&sql).unwrap();
-        assert_eq!(e.hnsw_mem.lock().unwrap().values().map(|m| m.len()).sum::<usize>(), 10);
+        assert_eq!(
+            e.hnsw_mem
+                .lock()
+                .unwrap()
+                .values()
+                .map(|m| m.len())
+                .sum::<usize>(),
+            10
+        );
 
         e.flush().unwrap();
         assert!(
@@ -12538,7 +12609,15 @@ mod tests {
 
         e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
             .unwrap();
-        assert_eq!(e.hnsw_mem.lock().unwrap().values().map(|m| m.len()).sum::<usize>(), 2);
+        assert_eq!(
+            e.hnsw_mem
+                .lock()
+                .unwrap()
+                .values()
+                .map(|m| m.len())
+                .sum::<usize>(),
+            2
+        );
 
         e.flush().unwrap();
         let indexed: usize = e
@@ -12548,7 +12627,10 @@ mod tests {
             .sum();
         assert_eq!(indexed, 12, "every row is in exactly one dumped chunk");
         assert_eq!(
-            rows(&e, "SELECT id FROM hv SEARCH MATCH VECTOR (v, [11.0,0.0,0.0,0.0], 'float', 'l2', 1);"),
+            rows(
+                &e,
+                "SELECT id FROM hv SEARCH MATCH VECTOR (v, [11.0,0.0,0.0,0.0], 'float', 'l2', 1);"
+            ),
             vec![vec!["11".to_string()]]
         );
     }
