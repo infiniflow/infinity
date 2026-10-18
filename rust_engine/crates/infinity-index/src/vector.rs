@@ -2,10 +2,12 @@
 //! [`HnswIndex`] (Hierarchical Navigable Small World), matching Infinity's
 //! `knn_index` family (plan §2.6).
 //!
-//! The HNSW here builds each node's per-layer adjacency from the **exact** m
-//! nearest nodes that share the layer (a correct, if O(n²)-to-build, graph), and
-//! queries it with greedy descent + a beam search at layer 0. This favors
-//! correctness over build speed; an incremental construction is a follow-up.
+//! Construction follows the reference implementation
+//! (`src/storage/knn_index/knn_hnsw/hnsw_alg.cppm`): each vector is inserted
+//! incrementally — a greedy descent above its random level, then a beam search
+//! with `ef_construction` candidates per layer, the neighbour-selection
+//! heuristic, and bidirectional links pruned to `2 * M` on layer 0 and `M`
+//! above. Queries use the same greedy descent + layer-0 beam search (`ef`).
 
 use std::collections::HashSet;
 
@@ -80,6 +82,7 @@ impl Rng {
 pub struct HnswIndex {
     dims: usize,
     m: usize,
+    ef_construction: usize,
     ef_search: usize,
     ml: f64,
     data: Vec<Vec<f32>>,
@@ -92,10 +95,11 @@ pub struct HnswIndex {
 }
 
 impl HnswIndex {
-    pub fn new(dims: usize, m: usize, _ef_construction: usize, ef_search: usize) -> Self {
+    pub fn new(dims: usize, m: usize, ef_construction: usize, ef_search: usize) -> Self {
         Self {
             dims,
             m,
+            ef_construction: ef_construction.max(m),
             ef_search,
             ml: 1.0 / (m as f64).ln(),
             data: Vec::new(),
@@ -186,6 +190,7 @@ impl HnswIndex {
         Self {
             dims,
             m,
+            ef_construction: m * 2,
             ef_search,
             ml: 1.0 / (m as f64).ln(),
             data,
@@ -227,17 +232,31 @@ impl HnswIndex {
             return node;
         }
 
-        // Connect to the exact m nearest existing nodes that share each layer.
-        for l in 0..=level {
-            let mut cands: Vec<(f32, usize)> = (0..node)
-                .filter(|&j| self.levels[j] >= l)
-                .map(|j| (l2_sq(&self.data[node], &self.data[j]), j))
-                .collect();
-            cands.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-            for (_, nb) in cands.into_iter().take(self.m) {
+        // `Build` in the reference: descend greedily through the layers above
+        // this node's level, then link it layer by layer from the top down.
+        let mut ep = self.entry.unwrap();
+        for l in ((level + 1)..=self.max_level).rev() {
+            ep = self.greedy(v, ep, l);
+        }
+        for l in (0..=level.min(self.max_level)).rev() {
+            let cands = self.search_layer(v, &[ep], self.ef_construction, l);
+            let neighbors = self.select_neighbors_heuristic(&cands, self.m);
+            if let Some((_, first)) = neighbors.first() {
+                ep = *first;
+            }
+            self.ensure(l, node);
+            self.ensure(l, ep);
+            for (_, nb) in &neighbors {
+                self.ensure(l, *nb);
+            }
+            self.links[l][node] = neighbors.iter().map(|(_, nb)| *nb).collect();
+            let max_m = if l == 0 { self.m * 2 } else { self.m };
+            for (_, nb) in neighbors {
                 self.ensure(l, nb);
-                self.links[l][node].push(nb);
-                self.links[l][nb].push(node);
+                if !self.links[l][nb].contains(&node) {
+                    self.links[l][nb].push(node);
+                }
+                self.prune(l, nb, max_m);
             }
         }
         if level > self.max_level {
@@ -245,6 +264,42 @@ impl HnswIndex {
             self.entry = Some(node);
         }
         node
+    }
+
+    /// The reference's `SelectNeighborsHeuristic`: walk the candidates closest
+    /// first and keep one only when it is closer to the query than to every
+    /// neighbour already kept (this spreads the links over directions).
+    fn select_neighbors_heuristic(&self, cands: &[(f32, usize)], m: usize) -> Vec<(f32, usize)> {
+        let mut sorted = cands.to_vec();
+        sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        let mut kept: Vec<(f32, usize)> = Vec::with_capacity(m);
+        for (d, node) in sorted {
+            if kept.len() == m {
+                break;
+            }
+            let dominated = kept
+                .iter()
+                .any(|(_, s)| l2_sq(&self.data[node], &self.data[*s]) < d);
+            if !dominated {
+                kept.push((d, node));
+            }
+        }
+        kept
+    }
+
+    /// Drops the worst links of `node` on `layer` beyond `max_m`, re-running the
+    /// selection heuristic over the current neighbourhood.
+    fn prune(&mut self, layer: usize, node: usize, max_m: usize) {
+        if self.links[layer][node].len() <= max_m {
+            return;
+        }
+        let q = self.data[node].clone();
+        let cands: Vec<(f32, usize)> = self.links[layer][node]
+            .iter()
+            .map(|&nb| (l2_sq(&q, &self.data[nb]), nb))
+            .collect();
+        let kept = self.select_neighbors_heuristic(&cands, max_m);
+        self.links[layer][node] = kept.into_iter().map(|(_, nb)| nb).collect();
     }
 
     fn greedy(&self, q: &[f32], start: usize, layer: usize) -> usize {
