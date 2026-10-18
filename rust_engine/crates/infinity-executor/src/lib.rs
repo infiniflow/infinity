@@ -3131,6 +3131,9 @@ impl Engine {
             if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
                 self.hnsw_mem.lock().unwrap().remove(&key);
                 self.index_pending_bytes.lock().unwrap().insert(key, 0);
+                // Re-probe HNSW indexes on the next insert so a fresh memory
+                // segment is created after this dump.
+                self.hnsw_probed.lock().unwrap().clear();
             }
         }
     }
@@ -9629,16 +9632,22 @@ impl Engine {
         self.catalog.flush()?;
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
-        self.flush_cpp_blocks()?;
-        // Write back the row sidecars: dirty file pages cannot be reclaimed and
-        // are what pushes a long import into the OOM killer.
-        self.sync_row_blobs();
-        // Dump the index memory tails into their segment files, the reference's
-        // memindex dump at checkpoint.
+        // Dump the index memory tails first. The caller only logs a `flush`
+        // error, so a failing block mirror (e.g. an unsupported column type)
+        // must not leave the memory tails unbounded — that is what pushed the
+        // heavy import into the OOM killer (Gate C).
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
+        self.dump_hnsw_segments();
+        // The C++ block mirror is best-effort: large tables are skipped by its
+        // budget and the row store remains authoritative.
+        let mirror = self.flush_cpp_blocks();
+        // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
+        // Write back the row sidecars: dirty file pages cannot be reclaimed and
+        // are what pushes a long import into the OOM killer.
+        self.sync_row_blobs();
         // Bound the page cache the way the reference's buffer manager does:
         // segment files and the row sidecar are written back and their clean
         // pages dropped, so RSS tracks live structures rather than file cache.
@@ -9667,6 +9676,7 @@ impl Engine {
         if !self.catalog.is_cpp_only() {
             let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
         }
+        mirror?;
         Ok(())
     }
 
@@ -9687,6 +9697,33 @@ impl Engine {
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context.memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Dumps every HNSW memory segment at a checkpoint (the reference's
+    /// memindex dump). Each dump writes only the rows buffered since the last
+    /// one; the segment is then emptied and the next insert starts a new one.
+    fn dump_hnsw_segments(&self) {
+        let keys: Vec<String> = self.hnsw_mem.lock().unwrap().keys().cloned().collect();
+        if keys.is_empty() {
+            return;
+        }
+        let indexes = self.catalog.list_indexes().unwrap_or_default();
+        for key in keys {
+            let Some((table, column)) = key.rsplit_once('.') else {
+                continue;
+            };
+            let found = indexes.iter().find(|im| {
+                im.column == column
+                    && (im.table == table || table.rsplit('.').next() == Some(im.table.as_str()))
+            });
+            let Some(im) = found else { continue };
+            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+                self.hnsw_mem.lock().unwrap().remove(&key);
+                self.index_pending_bytes.lock().unwrap().insert(key, 0);
+            }
+        }
+        // New rows after this checkpoint must form fresh memory segments.
+        self.hnsw_probed.lock().unwrap().clear();
     }
 
     /// Accounts `count` rows about to be inserted into `table` against each
@@ -9734,7 +9771,7 @@ impl Engine {
             let key = index_key(&im.table, &im.column);
             let dump = {
                 let mut pending = self.index_pending_bytes.lock().unwrap();
-                let cur = pending.entry(key).or_insert(0);
+                let cur = pending.entry(key.clone()).or_insert(0);
                 if *cur >= quota {
                     // The dump empties the memory index; this batch is the
                     // first thing in the next one.
@@ -9745,8 +9782,12 @@ impl Engine {
                     false
                 }
             };
-            if dump {
-                let _ = self.dump_cpp_hnsw_index(&im.table, &im.name);
+            if dump && self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+                // The dumped segment leaves memory; rows written after this
+                // checkpoint form the next one.
+                self.hnsw_mem.lock().unwrap().remove(&key);
+                self.index_pending_bytes.lock().unwrap().insert(key, 0);
+                self.hnsw_probed.lock().unwrap().clear();
             }
         }
     }
@@ -12469,5 +12510,46 @@ mod tests {
         // The reference keeps deleted documents until compaction.
         assert_eq!(mem.doc_count(), 1);
         assert_eq!(mem.postings["alpha"].len(), 1);
+    }
+
+    /// A checkpoint dumps only the memory segment; new rows form the next
+    /// segment and every row is indexed exactly once (Gate C: rebuilding the
+    /// whole graph per checkpoint caused the OOM).
+    #[test]
+    fn hnsw_checkpoint_dumps_only_the_memory_segment() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE hv (id INT, v EMBEDDING(FLOAT,4));").unwrap();
+        e.execute("CREATE INDEX hv_i ON hv (v) USING HNSW WITH (metric = l2);").unwrap();
+        let mut sql = String::from("INSERT INTO hv VALUES ");
+        for i in 0..10 {
+            sql.push_str(&format!("({i}, [{i}.0, 0.0, 0.0, 0.0])"));
+            if i < 9 { sql.push(','); }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        assert_eq!(e.hnsw_mem.lock().unwrap().values().map(|m| m.len()).sum::<usize>(), 10);
+
+        e.flush().unwrap();
+        assert!(
+            e.hnsw_mem.lock().unwrap().values().all(|m| m.is_empty()),
+            "the checkpoint empties the HNSW memory segment"
+        );
+
+        e.execute("INSERT INTO hv VALUES (10, [10.0,0.0,0.0,0.0]), (11, [11.0,0.0,0.0,0.0]);")
+            .unwrap();
+        assert_eq!(e.hnsw_mem.lock().unwrap().values().map(|m| m.len()).sum::<usize>(), 2);
+
+        e.flush().unwrap();
+        let indexed: usize = e
+            .load_vector_indexes("default_db.hv", "hv_i")
+            .iter()
+            .map(|seg| seg.labels.len())
+            .sum();
+        assert_eq!(indexed, 12, "every row is in exactly one dumped chunk");
+        assert_eq!(
+            rows(&e, "SELECT id FROM hv SEARCH MATCH VECTOR (v, [11.0,0.0,0.0,0.0], 'float', 'l2', 1);"),
+            vec![vec!["11".to_string()]]
+        );
     }
 }

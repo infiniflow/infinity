@@ -1446,47 +1446,7 @@ impl Engine {
             index.add(v);
             labels.push(*label);
         }
-        let m = index.m() as u64;
-        let (mmax0, mmax) = knn_format::get_mmax(m);
-        let mut header = knn_format::HnswHeader::plain(m, 200, index.len() as u64, dim as u64);
-        header.max_layer = index.max_level() as i32;
-        header.enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
-        let mut vector_region = Vec::with_capacity(index.len() * dim * 4);
-        for n in 0..index.len() {
-            for x in index.vector(n) {
-                vector_region.extend_from_slice(&x.to_le_bytes());
-            }
-        }
-        // Neighbour counts must not exceed the level's limit.
-        let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
-            .map(|n| {
-                let level = index.level_of(n);
-                let neighbors_l0 = index
-                    .neighbors(0, n)
-                    .iter()
-                    .take(mmax0 as usize)
-                    .map(|&x| x as u32)
-                    .collect();
-                let upper = (1..=level)
-                    .map(|l| {
-                        index
-                            .neighbors(l, n)
-                            .iter()
-                            .take(mmax as usize)
-                            .map(|&x| x as u32)
-                            .collect()
-                    })
-                    .collect();
-                knn_format::HnswGraphVertex {
-                    layer_count: level as i32,
-                    neighbors_l0,
-                    upper,
-                }
-            })
-            .collect();
-        let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
-        let chunk = knn_format::encode_hnsw_chunk(&header, &vector_region, &graph, &labels);
-        Ok((index.len(), chunk))
+        Ok(encode_hnsw_chunk_from(&index, &labels))
     }
 
     /// Writes `table`'s index as a C++ HNSW chunk file under
@@ -1542,7 +1502,27 @@ impl Engine {
                 )));
             }
         }
-        let (count, chunk) = self.cpp_hnsw_chunk(&table, &column)?;
+        // A checkpoint dumps the **memory segment** (rows since the previous
+        // dump), not a graph rebuilt from every row: rebuilding cost O(table)
+        // memory and time on every checkpoint and was the Gate C OOM driver.
+        // The full rebuild remains the fallback when no memory segment is
+        // loaded (e.g. materialising the mirror after a restart).
+        let key = crate::index_key(&table, &column);
+        let from_memory = if new_chunk {
+            self.hnsw_mem.lock().unwrap().get(&key).and_then(|mem| {
+                if mem.is_empty() {
+                    return None;
+                }
+                let labels: Vec<u32> = mem.rows().iter().map(|s| *s as u32).collect();
+                Some(encode_hnsw_chunk_from(mem.index(), &labels))
+            })
+        } else {
+            None
+        };
+        let (count, chunk) = match from_memory {
+            Some(v) => v,
+            None => self.cpp_hnsw_chunk(&table, &column)?,
+        };
         let db_id = self.database_id_of(&table);
         let dir = self
             .blocks_root()
@@ -2117,6 +2097,54 @@ impl Engine {
         }
         Ok((centroids, out))
     }
+}
+
+
+/// Serializes an existing graph as a C++ HNSW chunk (header, plain vector
+/// region, graph region, `u32` labels).
+fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>) {
+    let dim = index.dims();
+    let m = index.m() as u64;
+    let (mmax0, mmax) = knn_format::get_mmax(m);
+    let mut header = knn_format::HnswHeader::plain(m, 200, index.len() as u64, dim as u64);
+    header.max_layer = index.max_level() as i32;
+    header.enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
+    let mut vector_region = Vec::with_capacity(index.len() * dim * 4);
+    for n in 0..index.len() {
+        for x in index.vector(n) {
+            vector_region.extend_from_slice(&x.to_le_bytes());
+        }
+    }
+    // Neighbour counts must not exceed the level's limit.
+    let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
+        .map(|n| {
+            let level = index.level_of(n);
+            let neighbors_l0 = index
+                .neighbors(0, n)
+                .iter()
+                .take(mmax0 as usize)
+                .map(|&x| x as u32)
+                .collect();
+            let upper = (1..=level)
+                .map(|l| {
+                    index
+                        .neighbors(l, n)
+                        .iter()
+                        .take(mmax as usize)
+                        .map(|&x| x as u32)
+                        .collect()
+                })
+                .collect();
+            knn_format::HnswGraphVertex {
+                layer_count: level as i32,
+                neighbors_l0,
+                upper,
+            }
+        })
+        .collect();
+    let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
+    let chunk = knn_format::encode_hnsw_chunk(&header, &vector_region, &graph, labels);
+    (index.len(), chunk)
 }
 
 #[cfg(test)]

@@ -45,6 +45,16 @@ impl HnswIndexInMem {
             .collect()
     }
 
+    /// The graph, for dumping the segment as a C++ HNSW chunk.
+    pub fn index(&self) -> &infinity_index::vector::HnswIndex {
+        self.handler.index()
+    }
+
+    /// The row id of every node, in insertion order (the chunk's labels).
+    pub fn rows(&self) -> &[u64] {
+        &self.rows
+    }
+
     /// C++: `HnswIndexInMem::MemUsage` (the handler's graph).
     #[allow(dead_code)]
     pub fn mem_usage(&self) -> usize {
