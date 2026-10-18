@@ -1860,6 +1860,7 @@ pub struct Engine {
     dir: PathBuf,
     /// On-disk secondary-index segments (the reference's PGM chunks): one
     /// mmap reader per `ROW_ID` segment, with its base row id.
+    #[allow(clippy::type_complexity)]
     secondary_disk: Mutex<
         HashMap<
             String,
