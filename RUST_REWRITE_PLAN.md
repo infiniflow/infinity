@@ -252,7 +252,7 @@ RocksDB 只存元数据，负载为「低容量 + 事务 + 快照 + 计数器」
 
 - 定义 `MetaStore` trait（`get/put/delete/atomic_write/scan_prefix/flush`），键一律用 `catalog_format` 的 C++ 拼写。
 - 默认 `fjall`；`rocksdb-store` feature 切到 `MetaStoreRocks`，此时 `<dir>/catalog` 就是 C++ 引擎可打开的 RocksDB。
-- **已知残项**：C++ 键空间与原生键空间目前**并存**，尚未把 C++ 键空间做成唯一 catalog（§7.6）。
+- **C++ 键空间是唯一 catalog（`rocksdb-store`）**：`Catalog::with_store_cpp_only` 只读写 C++ 键（DDL 后整体重写、drop 走删除），引擎层已切换；默认构建仍为 fjall 原生 catalog（C++ 不可读）。
 - `fjall` 无内置 backup/restore → 版本化备份由 Infinity 自建（对应 R4）。
 - **构建坑（记录）**：`librocksdb-sys` 自带版本用本机 GCC 16 编不过；系统 RocksDB 头文件与 crate FFI 不匹配。最终用 **clang 编译 crate 自带版本**，在 `rust_engine/.cargo/config.toml` 的 `[env]` 设 `CC/CXX`。
 
@@ -443,9 +443,9 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.1 架构对齐缺口（P0）
 
-1. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
+**无。** 索引构建时机（#83/#84/#85）、统一 memindex 预算（#86）与唯一 C++ catalog（#69）均已落地。
 
-> 索引构建时机（#83/#84/#85）与统一 memindex 预算（#86，覆盖全文/HNSW/稀疏/多向量/次级，`memindex_memory_quota` 触发全量 dump 并释放内存形态）已落地。稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
+> 稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
 #### 7.5.2 功能对齐缺口（P1）
 

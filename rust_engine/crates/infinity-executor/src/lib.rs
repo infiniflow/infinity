@@ -2334,14 +2334,15 @@ impl Engine {
     pub fn open_with_capacity(dir: impl AsRef<Path>, exchange_capacity: usize) -> Result<Self> {
         let dir: PathBuf = dir.as_ref().to_path_buf();
         // The catalog lives at `<dir>/catalog`, the path the C++ engine uses for
-        // its catalog RocksDB. Under `rocksdb-store` the native catalog shares
-        // that one RocksDB with the C++ key space (see `flush`), so a C++ engine
-        // can open this directory's catalog; otherwise it is a fjall store.
+        // its catalog RocksDB. Under `rocksdb-store` the C++ key space is the
+        // **only** catalog (the native fjall key space is not written), so a
+        // C++ engine can open this directory's catalog; otherwise the catalog
+        // is a native fjall store.
         #[cfg(feature = "rocksdb-store")]
         let catalog = {
             let catalog_store: Arc<dyn MetaStore> =
                 Arc::new(infinity_storage::RocksMetaStore::open(dir.join("catalog"))?);
-            Catalog::with_store(catalog_store)
+            Catalog::with_store_cpp_only(catalog_store)
         };
         #[cfg(not(feature = "rocksdb-store"))]
         let catalog = Catalog::open(dir.join("catalog"))?;
@@ -2409,7 +2410,7 @@ impl Engine {
         // If this directory was written by the C++ engine (its catalog keys are
         // in the catalog store, but the native catalog is empty), take over its
         // schema so the engine can open a C++-produced directory (§2.6.1).
-        if engine.catalog.list_tables()?.is_empty() {
+        if engine.catalog.list_tables()?.is_empty() && !engine.catalog.is_cpp_only() {
             let _ = engine
                 .catalog
                 .import_cpp_layout(engine.catalog.store().as_ref());
@@ -9106,11 +9107,14 @@ impl Engine {
             let _ = infinity_storage::s3::sync_tree(&client, &root, "data");
         }
         // Mirror the catalog into the C++ key space / value encoding, in the
-        // catalog store at `<dir>/catalog` (the path the C++ engine uses), so a
-        // C++ engine can read this directory. Best effort: a column type the
-        // C++ encoding does not cover yet leaves the previous layout in place
-        // rather than failing the flush.
-        let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
+        // catalog store at `<dir>/catalog` (the path the C++ engine uses). A
+        // C++-only catalog already rewrites on every DDL, so nothing is left to
+        // mirror there. Best effort: a column type the C++ encoding does not
+        // cover yet leaves the previous layout in place rather than failing the
+        // flush.
+        if !self.catalog.is_cpp_only() {
+            let _ = self.catalog.write_cpp_layout(self.catalog.store().as_ref());
+        }
         Ok(())
     }
 
@@ -11223,6 +11227,32 @@ mod tests {
             "SELECT id FROM q SEARCH MATCH TENSOR (m, [1.0,0.0], 'float', 'maxsim', 'topn=2');"
         )
         .is_empty());
+    }
+
+    /// Under `rocksdb-store` the catalog is the C++ key space only: no native
+    /// `tbl:`/`db:`/`idx:` record may be written (plan #69).
+    #[cfg(feature = "rocksdb-store")]
+    #[test]
+    fn cpp_only_catalog_writes_no_native_keys() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE t (a INT, b VARCHAR);").unwrap();
+        e.execute("CREATE INDEX t_a ON t (a);").unwrap();
+        e.execute("INSERT INTO t VALUES (1, 'x');").unwrap();
+        let store = e.catalog().store();
+        for prefix in ["tbl:", "tblname:", "db:", "idx:"] {
+            assert!(
+                store.scan_prefix(prefix.as_bytes()).unwrap().is_empty(),
+                "native key prefix {prefix} survived"
+            );
+        }
+        assert!(!store.scan_prefix(b"catalog|tbl|").unwrap().is_empty());
+        assert!(!store.scan_prefix(b"catalog|idx|").unwrap().is_empty());
+        // The same directory reopens with the schema restored.
+        e.flush().unwrap();
+        drop(e);
+        let e = Engine::open(dir.path()).unwrap();
+        assert_eq!(rows(&e, "SELECT a FROM t;"), vec![vec!["1".to_string()]]);
     }
 
     #[test]
