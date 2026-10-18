@@ -185,6 +185,12 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 多向量 | 否 | 部分 | 是 | **未移植**：仍全表 MaxSim |
 | 稀疏 | 否 | 否 | 是 | **未移植**：全表打分 |
 
+**剩余移植清单（按依赖排序，下一步直接照做）**：
+
+1. **稀疏 BMP**（`src/storage/knn_index/sparse/`，约 2.8k 行）：`bmp_ivt.cppm` = term→posting（按 block 压缩的 doc offset + score，含 `kth(topk)`）；`bmp_fwd.cppm` = block 内的 term→(offsets,scores) 与 tail；`bmp_alg.cppm:SearchKnn` = ①按 `query_score * posting.kth(topk)` 求 `threshold`，②`Calculate2` 累加每 block 上界，③上界 ≥ threshold 的 block 按上界降序，④逐 block 精确打分并按 `ub*alpha < min_score` 提前终止，⑤`use_tail` 处理尾块。替换执行器现在「全表稀疏点积」。
+2. **多向量 EMVB/PLAID**（`src/storage/knn_index/{emvb,plaid,multivector}/`）：先移植 `emvb` 的 PQ 预过滤（子空间码本 + 候选截断），再按 `match_tensor` 的 MaxSim 聚合与 `MultiVectorResultHandler` 的 inner-topn 语义出分；替换全表 MaxSim。
+3. **HNSW 多封盘段**：把当前「一个落盘图 + 一个内存段」拆成 `Vec<sealed segment>`（每段一个 `chunk_{n}.idx`）+ 当前内存段；封段阈值与 `memindex_memory_quota`/`optimize_interval` 对齐（#79）。
+
 **验收口径**：每个移植算法在 `rust_engine/docs/CPP_FORMAT_SPEC.md` 记录对应的 `C++ 文件:行号`；移植后 Gate A 必须保持逐位一致；性能以 Gate E（对 C++ golden `<7%`）为准。**任何「自研更快」但不移植的替代都不算完成。**
 
 **任务 #67/#68 进展（2026-10-17）**：已产出 `rust_engine/docs/CPP_FORMAT_SPEC.md`，冻结**已核对**的字节级事实：①数据文件/快照文件通用布局（`magic=0x00dd3344`(u64) + `buffer_size`(size_t) + 补零数据区 + `checksum`(u64)，`data_file_worker_impl.cpp:68-116/119-155`，读取侧断言 `:160-172`）；②Catalog KV = RocksDB + 自定义 MergeOperator（`kv_store*.cppm/impl`、`rocksdb_merge_operator*`）；③倒排索引的模块构成与 FST 校验和结论（PoC F）；④BM25 统计量来源（`term_doc_iterator_impl.cpp:57-70`）；⑤SEARCH 语义。**§6 清单的 #1–#5 已全部冻结**（见该文件 §8、§9）：目录/文件命名、段块元数据（**不存在** `SegmentEntry/BlockEntry` 文件；元数据在 RocksDB KV，行数由块 `version` 文件推导）、块内列式编码（`[data_region (capacity*slot)][null_bitmap ((capacity+7)/8, bit=1 非空)]`、Varchar 两字 slot）、HNSW/IVF `chunk_{id}.idx`（**无 magic/version/checksum**）、全文 `.dic`(TermMeta+FST)/`.pos`(逐 term 块)/`.len`(裸 `u32[]`)。#6 的**键空间**亦已冻结（值编码/MergeOperator 待）；#7（WAL）、#8（PGM）仍待。
