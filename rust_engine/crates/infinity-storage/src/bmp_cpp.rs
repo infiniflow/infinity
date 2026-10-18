@@ -72,7 +72,7 @@ impl AlignedWriter {
     }
 
     fn pad(&mut self, align: usize) {
-        while (self.base + self.buf.len()) % align != 0 {
+        while !(self.base + self.buf.len()).is_multiple_of(align) {
             self.buf.push(0);
         }
     }
@@ -82,11 +82,13 @@ impl AlignedWriter {
         self.buf.extend_from_slice(&v.to_le_bytes());
     }
 
+    #[allow(dead_code)]
     fn i32(&mut self, v: i32) {
         self.pad(4);
         self.buf.extend_from_slice(&v.to_le_bytes());
     }
 
+    #[allow(dead_code)]
     fn f32(&mut self, v: f32) {
         self.pad(4);
         self.buf.extend_from_slice(&v.to_le_bytes());
@@ -129,6 +131,9 @@ impl AlignedWriter {
     }
 }
 
+/// A block's term list: `(term, [(offset in block, value)])`.
+type BlockTerms = Vec<(i32, Vec<(u8, f32)>)>;
+
 /// One document: `(row id, [(term, value)])`, terms sorted ascending.
 pub type SparseDoc = (u64, Vec<(i32, f32)>);
 
@@ -144,7 +149,7 @@ pub fn encode_bmp(
     // Per term: block maxima and k-th score.
     let mut term_blocks: Vec<Vec<(i32, f32)>> = vec![Vec::new(); term_num];
     // Per block: term -> [(offset in block, value)].
-    let mut blocks: Vec<Vec<(i32, Vec<(u8, f32)>)>> = Vec::with_capacity(block_num);
+    let mut blocks: Vec<BlockTerms> = Vec::with_capacity(block_num);
     for b in 0..block_num {
         let start = b * block_size;
         let end = (start + block_size).min(docs.len());
@@ -203,7 +208,7 @@ pub fn encode_bmp(
     // The offsets array sits after block_size/block_num; each block's bytes are
     // aligned to their absolute position, so the sizes are computed against the
     // final layout.
-    let block_bytes = |terms: &[(i32, Vec<(u8, f32)>)], base: usize| -> Vec<u8> {
+    let block_bytes = |terms: &BlockTerms, base: usize| -> Vec<u8> {
         let mut bw = AlignedWriter::new_at(base);
         let mut prefix: Vec<u64> = Vec::with_capacity(terms.len() + 1);
         prefix.push(0);
@@ -230,7 +235,7 @@ pub fn encode_bmp(
     // block_size, block_num and the offsets array are contiguous.
     let fwd_start = {
         let mut at = w.buf.len();
-        while at % 8 != 0 {
+        while !at.is_multiple_of(8) {
             at += 1;
         }
         at
@@ -288,7 +293,7 @@ pub struct BmpCppReader {
     /// Per term: `(block id, max score)`.
     ivt: Vec<Vec<(i32, f32)>>,
     /// Per block: `(term, [(offset, value)])`.
-    blocks: Vec<Vec<(i32, Vec<(u8, f32)>)>>,
+    blocks: Vec<BlockTerms>,
     doc_ids: Vec<u32>,
 }
 
@@ -317,11 +322,11 @@ impl BmpCppReader {
         let block_num = cur.u64_aligned()? as usize;
         let offsets = cur.u64s_aligned(block_num + 1)?;
         let data_start = cur.at;
-        let mut blocks: Vec<Vec<(i32, Vec<(u8, f32)>)>> = Vec::with_capacity(block_num);
-        for i in 0..block_num {
+        let mut blocks: Vec<BlockTerms> = Vec::with_capacity(block_num);
+        for &offset in offsets.iter().take(block_num) {
             let mut bc = Cursor {
                 buf: &map,
-                at: data_start + offsets[i] as usize,
+                at: data_start + offset as usize,
             };
             let terms = bc.u64_aligned()? as usize;
             let term_prefix = bc.u64s_aligned(terms + 1)?;
@@ -434,7 +439,7 @@ struct Cursor<'a> {
 
 impl<'a> Cursor<'a> {
     fn align(&mut self, align: usize) {
-        while self.at % align != 0 {
+        while !self.at.is_multiple_of(align) {
             self.at += 1;
         }
     }
@@ -547,7 +552,7 @@ mod tests {
         assert!(!hits.is_empty());
         // Every hit must agree with a brute-force dot product.
         for (row, score) in &hits {
-            let doc = &docs[*row as usize];
+            let doc = &docs[*row];
             let exact: f32 = q
                 .iter()
                 .map(|(t, qv)| {
