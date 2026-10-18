@@ -1873,6 +1873,17 @@ pub struct Engine {
     dir: PathBuf,
     /// On-disk secondary-index segments (the reference's PGM chunks): one
     /// mmap reader per `ROW_ID` segment, with its base row id.
+    /// Low-cardinality secondary chunks (unique keys + roaring bitmaps), used
+    /// for boolean columns like the reference's `LowCardinalityTag`.
+    secondary_low: Mutex<
+        HashMap<
+            String,
+            (
+                usize,
+                Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>,
+            ),
+        >,
+    >,
     #[allow(clippy::type_complexity)]
     secondary_disk: Mutex<
         HashMap<
@@ -2053,6 +2064,7 @@ impl Engine {
             rt,
             exchange_capacity: exchange_capacity.max(1),
             dir,
+            secondary_low: Mutex::new(HashMap::new()),
             secondary_disk: Mutex::new(HashMap::new()),
             indexes: Mutex::new(HashMap::new()),
             vector_indexes: Mutex::new(HashMap::new()),
@@ -2230,6 +2242,60 @@ impl Engine {
                     .insert(key.clone(), (version, readers));
             }
         }
+        // Boolean columns use the low-cardinality variant.
+        self.secondary_low.lock().unwrap().remove(&key);
+        {
+            let is_bool = self
+                .column_types(table)
+                .ok()
+                .and_then(|t| t.get(col_idx).cloned())
+                .map(|t| t.trim().to_ascii_uppercase().starts_with("BOOL"))
+                .unwrap_or(false);
+            if is_bool {
+                let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
+                for (seq, row) in self.fetch_rows_with_ids(table)? {
+                    let Some(v) = row.get(col_idx) else { continue };
+                    let key = matches!(v, Value::Int(1)) || v.to_slt_string() == "true";
+                    by_segment.entry((seq as u64) >> 32).or_default()[key as usize]
+                        .push((seq as u64 & 0xffff_ffff) as u32);
+                }
+                let dir = self.dir.join("secondary_low").join(key.replace('/', "_"));
+                let version = self
+                    .write_batches
+                    .lock()
+                    .unwrap()
+                    .get(table)
+                    .copied()
+                    .unwrap_or(0);
+                let mut readers = Vec::new();
+                for (segment, lists) in by_segment {
+                    let mut entries: Vec<(u64, Vec<u32>)> = Vec::new();
+                    for (bit, list) in lists.iter().enumerate() {
+                        if !list.is_empty() {
+                            entries.push((bit as u64, list.clone()));
+                        }
+                    }
+                    entries.sort_by_key(|(k, _)| *k);
+                    let path = dir.join(format!("seg_{segment}_{}.idx", entries.len()));
+                    if infinity_storage::secondary_lowcard::write_lowcard_segment(&path, &entries)
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    if let Ok(reader) =
+                        infinity_storage::secondary_lowcard::LowCardReader::open(&path)
+                    {
+                        readers.push((segment << 32, Arc::new(reader)));
+                    }
+                }
+                if !readers.is_empty() {
+                    self.secondary_low
+                        .lock()
+                        .unwrap()
+                        .insert(key.clone(), (version, readers));
+                }
+            }
+        }
         self.indexes.lock().unwrap().insert(key, idx);
         Ok(())
     }
@@ -2288,6 +2354,42 @@ impl Engine {
                     // for this probe (rows re-keyed by UPDATE/DROP COLUMN), so
                     // fall through to the memory index rather than reporting a
                     // miss.
+                    if !out.is_empty() {
+                        return Some(out);
+                    }
+                }
+            }
+        }
+        if let Literal::Str(text) = value {
+            let lower = text.trim().to_ascii_lowercase();
+            let bit = if lower == "true" {
+                Some(1u64)
+            } else if lower == "false" {
+                Some(0u64)
+            } else {
+                None
+            };
+            let Some(bit) = bit else {
+                let idxs = self.indexes.lock().unwrap();
+                let idx = idxs.get(&key)?;
+                return Some(idx.lookup(value.to_slt_string().as_bytes()).to_vec());
+            };
+            let generation = self
+                .write_batches
+                .lock()
+                .unwrap()
+                .get(table)
+                .copied()
+                .unwrap_or(0);
+            let lows = self.secondary_low.lock().unwrap();
+            if let Some((version, segments)) = lows.get(&key) {
+                if *version == generation {
+                    let mut out = Vec::new();
+                    for (base, reader) in segments {
+                        for off in reader.lookup(bit) {
+                            out.push(base | u64::from(off));
+                        }
+                    }
                     if !out.is_empty() {
                         return Some(out);
                     }
