@@ -459,7 +459,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.3 验收缺口（P2）
 
-8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）后，5.toml 档 RSS 稳态约 **9.4 GB @ 5:01**，峰值仍到 **18–19 GB** 并在 7–10 分钟被 OOM 杀掉（30 GB 机器，其他会话常占 ~10 GB）。字符串次级索引与 IVF 内存段已按 C++ 形态补齐，不再是主因。**剩余主因**：向量仍以列文本进 KV/文件，HNSW 内存图与 flush 瞬时缓冲叠加；C++ 的解法是**列存块文件为权威数据 + buffer manager 限额**，需要把行存换成列存才能根治。
+8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。结论：剩余部分就是行/向量数据本身，索引预算无法覆盖；必须按 C++ 的**列存块文件 + buffer manager**（`buffer_manager_size` LRU 限额）改造存储，sidecar 只是过渡。
 9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden log 仍缺失。
 
 ---
