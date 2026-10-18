@@ -450,7 +450,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 #### 7.5.2 功能对齐缺口（P1）
 
 5. **多向量查询侧**：持久化残差码字已接入（EMVB 第 2 步：粗质心 + 子空间码字打分，见 `EmvbPqIndex::prefilter`），最终候选仍按原始 token 精确重排；PLAID 的质心交互剪枝没有单独实现。
-6. **全文非 OR 路径**：WAND 已覆盖 filter、`similarity=boolean`、`minimum_should_match`、`delta_term`（`lib.rs` 的 `WandMode`）；短语、多字段加权、`rank_features` 仍走扫描路径（该路径本身已按索引裁剪候选行）。
+6. **全文非 OR 路径**：WAND 已覆盖 filter、`similarity=boolean`、`minimum_should_match`、`delta_term` 与多字段加权（`lib.rs` 的 `WandMode` + per-field 统计）；短语与 `rank_features` 仍走扫描路径（该路径本身已按索引裁剪候选行）。
 7. ~~IVF 检索~~：plain 已接入（#89）；SQ/PQ 编码的检索在镜像写出这两种编码前不可达。
 
 #### 7.5.3 验收缺口（P2）

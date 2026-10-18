@@ -2240,6 +2240,9 @@ pub struct Engine {
     /// number of write batches (`COPY`/`INSERT`) per table; a table with more
     /// than one batch is planned as several segments (a `MERGE` operator).
     write_batches: Mutex<HashMap<String, usize>>,
+    /// Write generation at which the C++ block mirror of each table was last
+    /// flushed; a projection can read the mirror only when it matches.
+    cpp_block_generation: Mutex<HashMap<String, usize>>,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
@@ -2415,6 +2418,7 @@ impl Engine {
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             write_batches: Mutex::new(HashMap::new()),
+            cpp_block_generation: Mutex::new(HashMap::new()),
             row_counters: Mutex::new(HashMap::new()),
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
@@ -4644,6 +4648,25 @@ impl Engine {
                     }
                     override_rows = Some(rows);
                 }
+                // Projection-only scan: read just the selected columns from the
+                // C++ block mirror when that mirror is as fresh as the row
+                // store (plan #87). `SELECT id, name` then avoids decoding the
+                // wide columns (embeddings, text) altogether.
+                if override_rows.is_none()
+                    && join.is_none()
+                    && search.is_none()
+                    && where_pred.is_none()
+                    && group_by.is_empty()
+                    && having.is_none()
+                    && order_by.is_empty()
+                    && limit.is_none()
+                    && offset.is_none()
+                    && !*distinct
+                {
+                    if let Some(t) = from.as_ref() {
+                        override_rows = self.try_cpp_projection(t, items)?;
+                    }
+                }
                 // `ROW_ID()` outside a SEARCH exposes the row's sequence number
                 // as a hidden scan column.
                 let mut rowid_col = false;
@@ -5036,6 +5059,70 @@ impl Engine {
             rows.push((seq, cells));
         }
         Ok(rows)
+    }
+
+    /// Projection-only `SELECT`: read the requested columns from the C++ block
+    /// mirror when it matches the current write generation. Returns `None` when
+    /// the mirror is stale or the projection is not a plain column list.
+    fn try_cpp_projection(
+        &self,
+        table: &str,
+        items: &[SelectItem],
+    ) -> Result<Option<Vec<Vec<Value>>>> {
+        let table = if table.contains('.') {
+            table.to_string()
+        } else {
+            format!("{}.{}", self.db(), table.to_ascii_lowercase())
+        };
+        let table = table.as_str();
+        let schema = self.table_schema(table)?;
+        let mut wanted: Vec<usize> = Vec::new();
+        for item in items {
+            match item {
+                SelectItem::Column(name) => {
+                    let base = name.split('.').next_back().unwrap_or(name);
+                    let Some(i) = schema.iter().position(|c| c == base) else {
+                        return Ok(None);
+                    };
+                    wanted.push(i);
+                }
+                _ => return Ok(None),
+            }
+        }
+        if wanted.is_empty() {
+            return Ok(None);
+        }
+        let short = table
+            .split('.')
+            .next_back()
+            .unwrap_or(table)
+            .to_ascii_lowercase();
+        let current = self
+            .write_batches
+            .lock()
+            .unwrap()
+            .get(&short)
+            .copied()
+            .unwrap_or(0);
+        if self
+            .cpp_block_generation
+            .lock()
+            .unwrap()
+            .get(&short)
+            .copied()
+            != Some(current)
+        {
+            return Ok(None);
+        }
+        if self.cpp_block_row_count(table)? != self.row_count(table)? {
+            return Ok(None);
+        }
+        let (_, rows) = self.read_cpp_blocks_selected(table, &wanted)?;
+        Ok(Some(
+            rows.into_iter()
+                .map(|r| r.iter().map(|c| parse_value(c)).collect())
+                .collect(),
+        ))
     }
 
     fn fetch_some_rows_with_ids(
@@ -11648,6 +11735,43 @@ mod tests {
                 vec!["2".to_string(), "2.000000".to_string()],
             ]
         );
+    }
+
+    /// `SELECT id, name` reads only those column files from the C++ block
+    /// mirror, and only while the mirror matches the row store.
+    #[test]
+    fn projection_reads_columns_from_the_block_mirror() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE p (id INT, name VARCHAR, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute(
+            "INSERT INTO p VALUES (1,'a',[0.0,0.0]),(2,'b',[1.0,0.0]),\
+             (3,'c',[0.0,1.0]);",
+        )
+        .unwrap();
+        e.flush().unwrap();
+        assert_eq!(e.cpp_block_row_count("p").unwrap(), 3);
+        let items = [
+            SelectItem::Column("id".to_string()),
+            SelectItem::Column("name".to_string()),
+        ];
+        let projected = e.try_cpp_projection("p", &items).unwrap();
+        assert!(projected.is_some());
+        assert_eq!(
+            rows(&e, "SELECT id, name FROM p;"),
+            vec![
+                vec!["1".to_string(), "a".to_string()],
+                vec!["2".to_string(), "b".to_string()],
+                vec!["3".to_string(), "c".to_string()],
+            ]
+        );
+        // A write after the flush makes the mirror stale: the planner must fall
+        // back to the row store instead of missing the new row.
+        e.execute("INSERT INTO p VALUES (4,'d',[1.0,1.0]);")
+            .unwrap();
+        assert!(e.try_cpp_projection("p", &items).unwrap().is_none());
+        assert_eq!(rows(&e, "SELECT id, name FROM p;").len(), 4);
     }
 
     #[test]

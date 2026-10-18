@@ -1090,6 +1090,23 @@ impl Engine {
                 && rows.saturating_mul(per_row) <= MIRROR_BUDGET_BYTES
             {
                 self.write_cpp_blocks(&meta.name)?;
+                let short = meta
+                    .name
+                    .split('.')
+                    .next_back()
+                    .unwrap_or(&meta.name)
+                    .to_ascii_lowercase();
+                let generation = self
+                    .write_batches
+                    .lock()
+                    .unwrap()
+                    .get(&short)
+                    .copied()
+                    .unwrap_or(0);
+                self.cpp_block_generation
+                    .lock()
+                    .unwrap()
+                    .insert(short, generation);
             }
             // A dropped index must not leave its `idx_{id}` mirror behind.
             let db_id = self.database_id_of(&meta.name);
@@ -1190,6 +1207,52 @@ impl Engine {
     /// This never consults the KV store, so a successful read proves the mirror
     /// carries the table on its own.
     pub fn read_cpp_blocks(&self, table: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        self.read_cpp_blocks_wanted(table, None)
+    }
+
+    /// Like [`Self::read_cpp_blocks`] but decodes only `wanted` columns; the
+    /// others are returned as `"null"`. This is the column-projected read path
+    /// for `SELECT id, name` (plan #87).
+    pub fn read_cpp_blocks_selected(
+        &self,
+        table: &str,
+        wanted: &[usize],
+    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        self.read_cpp_blocks_wanted(table, Some(wanted))
+    }
+
+    /// Number of rows the block mirror currently holds.
+    pub fn cpp_block_row_count(&self, table: &str) -> Result<usize> {
+        let table = self.qualified_table(table);
+        let meta = self
+            .catalog
+            .get_table_by_name(&table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let db_id = self.database_id_of(&table);
+        let root = self.blocks_root();
+        let mut rows = 0usize;
+        for block_index in 0..u16::MAX {
+            let dir = root.join(cpp_format::block_dir(db_id, meta.id, 0, block_index));
+            let Ok(bytes) = std::fs::read(dir.join(cpp_format::VERSION_FILE)) else {
+                break;
+            };
+            let Ok(version) = cpp_format::BlockVersionFile::decode(&bytes) else {
+                break;
+            };
+            rows += version
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count as usize)
+                .unwrap_or(0);
+        }
+        Ok(rows)
+    }
+
+    fn read_cpp_blocks_wanted(
+        &self,
+        table: &str,
+        wanted: Option<&[usize]>,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
         let table = self.qualified_table(table);
         let meta = self
             .catalog
@@ -1232,6 +1295,12 @@ impl Engine {
             for row in 0..row_count {
                 let mut out = Vec::with_capacity(types.len());
                 for (col, column_type) in types.iter().enumerate() {
+                    if let Some(wanted) = wanted {
+                        if !wanted.contains(&col) {
+                            out.push("null".to_string());
+                            continue;
+                        }
+                    }
                     let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
                     let Some(raw) = columns.iter().find(|c| c.column_id == column_id) else {
                         return Err(Error::Invalid(format!("block is missing column {col}")));
