@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fulltext;
+pub mod multivector;
 pub mod sparse;
 pub mod vector;
 
