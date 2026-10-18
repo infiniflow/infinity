@@ -1862,6 +1862,176 @@ impl Drop for ScanSlot<'_> {
     }
 }
 
+/// One multi-vector index in the reference's two forms: the sealed segment
+/// files (`seg_*.mvec` / `seg_*.emvb`, mapped read-only) and the memory tail
+/// holding rows inserted since the last dump. Building the tail at write time
+/// and dumping it on `flush()` keeps the query path read-only.
+struct MultiVectorIndex {
+    dims: usize,
+    dir: PathBuf,
+    /// `ROW_ID -> token rows` for documents not yet dumped.
+    tail: std::collections::BTreeMap<u64, Vec<Vec<f32>>>,
+    /// One mmap reader per dumped chunk plus the row id of every document.
+    #[allow(clippy::type_complexity)]
+    sealed: Vec<(
+        Arc<infinity_storage::multivector_segment::MultiVectorSegmentReader>,
+        Arc<Vec<u64>>,
+    )>,
+    /// Chunk ordinal used in file names.
+    next_chunk: u64,
+    /// Bytes held by `tail`, for the unified memindex budget.
+    tail_bytes: usize,
+}
+
+fn multivector_doc_bytes(doc: &[Vec<f32>]) -> usize {
+    doc.iter().map(|t| t.len() * 4 + 4).sum()
+}
+
+/// `MaxSim` over one in-memory document: sum over query rows of the best dot
+/// product against a stored row (the same formula as the mmap reader).
+fn maxsim_tokens(query: &[Vec<f32>], doc: &[Vec<f32>]) -> f32 {
+    let mut total = 0.0f32;
+    for q in query {
+        let mut best = f32::NEG_INFINITY;
+        for t in doc {
+            if t.len() != q.len() {
+                continue;
+            }
+            let score: f32 = q.iter().zip(t).map(|(a, b)| a * b).sum();
+            if score > best {
+                best = score;
+            }
+        }
+        if best != f32::NEG_INFINITY {
+            total += best;
+        }
+    }
+    total
+}
+
+impl MultiVectorIndex {
+    fn new(dir: PathBuf, dims: usize) -> Self {
+        let next_chunk = std::fs::read_dir(&dir)
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|x| x == "mvec"))
+                    .count() as u64
+            })
+            .unwrap_or(0);
+        Self {
+            dims,
+            dir,
+            tail: Default::default(),
+            sealed: Vec::new(),
+            next_chunk,
+            tail_bytes: 0,
+        }
+    }
+
+    fn doc_count(&self) -> usize {
+        self.tail.len()
+            + self
+                .sealed
+                .iter()
+                .map(|(r, _)| r.doc_count())
+                .sum::<usize>()
+    }
+
+    fn insert(&mut self, seq: u64, doc: Vec<Vec<f32>>) {
+        if let Some(old) = self.tail.remove(&seq) {
+            self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
+        }
+        self.tail_bytes += multivector_doc_bytes(&doc);
+        self.tail.insert(seq, doc);
+    }
+
+    fn remove(&mut self, seq: u64) {
+        if let Some(old) = self.tail.remove(&seq) {
+            self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
+        }
+    }
+
+    /// Dumps the memory tail into per-segment files (one `ROW_ID` segment per
+    /// file, the reference's chunk dump) and keeps their mmap readers.
+    fn seal(&mut self) {
+        if self.tail.is_empty() {
+            return;
+        }
+        #[allow(clippy::type_complexity)]
+        let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<Vec<f32>>)>> =
+            Default::default();
+        for (seq, doc) in std::mem::take(&mut self.tail) {
+            by_segment.entry(seq >> 32).or_default().push((seq, doc));
+        }
+        self.tail_bytes = 0;
+        for (segment, mut rows) in by_segment {
+            rows.sort_by_key(|(seq, _)| *seq);
+            let ids: Vec<u64> = rows.iter().map(|(seq, _)| *seq).collect();
+            let docs: Vec<Vec<Vec<f32>>> = rows.into_iter().map(|(_, doc)| doc).collect();
+            let name = format!("seg_{segment}_{}_{}.mvec", self.next_chunk, docs.len());
+            self.next_chunk += 1;
+            let path = self.dir.join(name);
+            if infinity_storage::multivector_segment::write_multivector_segment(
+                &path, self.dims, &docs,
+            )
+            .is_err()
+            {
+                continue;
+            }
+            // The reference's EMVB chunk (coarse centroids, document tables and
+            // inverted lists) lives beside the raw-token segment.
+            let emvb: Vec<(u32, Vec<Vec<f32>>)> = docs
+                .iter()
+                .zip(ids.iter())
+                .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.clone()))
+                .collect();
+            let _ = infinity_storage::emvb_segment::write_emvb_segment(
+                &path.with_extension("emvb"),
+                self.dims,
+                (segment & 0xffff_ffff) as u32,
+                &emvb,
+            );
+            if let Ok(reader) =
+                infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
+            {
+                self.sealed.push((Arc::new(reader), Arc::new(ids)));
+            }
+        }
+    }
+
+    /// Top-k over sealed chunks and the memory tail, skipping tombstoned rows.
+    fn search(
+        &self,
+        query: &[Vec<f32>],
+        k: usize,
+        dead: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f32)> {
+        let mut hits: Vec<(u64, f32)> = Vec::new();
+        for (reader, ids) in &self.sealed {
+            for (doc, score) in reader.search(query, reader.doc_count()) {
+                if let Some(seq) = ids.get(doc) {
+                    if !dead.contains(seq) {
+                        hits.push((*seq, score));
+                    }
+                }
+            }
+        }
+        for (seq, doc) in &self.tail {
+            if dead.contains(seq) || doc.is_empty() {
+                continue;
+            }
+            hits.push((*seq, maxsim_tokens(query, doc)));
+        }
+        hits.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        hits.truncate(k);
+        hits
+    }
+}
+
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
 pub struct Engine {
     catalog: Catalog,
@@ -1938,6 +2108,8 @@ pub struct Engine {
     hnsw_probed: Mutex<std::collections::HashSet<String>>,
     /// Inverted indexes, keyed by `"<table>.<column>"`.
     text_index: Mutex<HashMap<String, SharedTextIndex>>,
+    /// Multi-vector indexes, keyed by `"<table>.<column>"`.
+    mv_index: Mutex<HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>>,
     vector_cache: Mutex<HashMap<String, SharedVectorCache>>,
 }
 
@@ -2088,6 +2260,7 @@ impl Engine {
             hnsw_mem: Mutex::new(HashMap::new()),
             hnsw_probed: Mutex::new(Default::default()),
             text_index: Mutex::new(HashMap::new()),
+            mv_index: Mutex::new(HashMap::new()),
             vector_cache: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
@@ -3467,6 +3640,22 @@ impl Engine {
                 {
                     self.build_index(table, column)?;
                 }
+                // A multi-vector index is materialised when it is created, so
+                // queries only read segment files; later inserts go to the
+                // memory tail and `flush()` dumps it.
+                if index_type.eq_ignore_ascii_case("EMVB")
+                    || index_type.eq_ignore_ascii_case("PLAID")
+                {
+                    let dims = self
+                        .table_schema(table)
+                        .ok()
+                        .and_then(|s| s.iter().position(|c| c == column))
+                        .and_then(|i| self.column_types(table).ok()?.get(i).cloned())
+                        .and_then(|ty| type_dim(&ty));
+                    if let Some(dims) = dims {
+                        let _ = self.multivector_index_for(table, column, dims);
+                    }
+                }
                 Ok(QueryResult::CreatedIndex {
                     name: name.clone(),
                     table: table.clone(),
@@ -4805,8 +4994,146 @@ impl Engine {
         Ok(shared)
     }
 
+    /// Builds (once) the multi-vector index of a column from its rows: every
+    /// document goes to the memory tail and is dumped immediately, so later
+    /// queries only map the segment files. Subsequent inserts append to the
+    /// tail and `flush()` seals it (the reference's dump).
+    fn multivector_index_for(
+        &self,
+        table: &str,
+        column: &str,
+        dims: usize,
+    ) -> Result<Arc<std::sync::RwLock<MultiVectorIndex>>> {
+        let key = index_key(table, column);
+        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
+        if let Some(idx) = self.mv_index.lock().unwrap().get(&key) {
+            let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
+            if complete >= reserved {
+                return Ok(idx.clone());
+            }
+        }
+        let schema = self.table_schema(table)?;
+        let ci = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let dir = self.dir.join("multivector").join(key.replace('/', "_"));
+        // A rebuild rewrites the chunk set; drop stale files so the readers
+        // never mix two builds.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
+                    let _ = std::fs::remove_file(p);
+                }
+            }
+        }
+        let mut index = MultiVectorIndex::new(dir, dims);
+        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+            let text = match cells.get(ci) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => continue,
+            };
+            if let Some(doc) = parse_multivector_doc(&text, dims) {
+                index.insert(seq as u64, doc);
+            }
+        }
+        index.seal();
+        let shared = Arc::new(std::sync::RwLock::new(index));
+        self.mv_index.lock().unwrap().insert(key, shared.clone());
+        Ok(shared)
+    }
+
+    /// Keeps existing multi-vector indexes in step with an inserted/rewritten
+    /// row. Called from the shared DML hook so every write path is covered.
+    fn update_multivector_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+        let prefix = format!("{table}.");
+        let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
+            .mv_index
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if indexes.is_empty() {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        let Ok(types) = self.column_types(table) else {
+            return;
+        };
+        for (key, shared) in indexes {
+            let column = &key[prefix.len()..];
+            let Some(ci) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
+                continue;
+            };
+            if dims == 0 {
+                continue;
+            }
+            let mut index = shared.write().unwrap();
+            index.remove(seq as u64);
+            let Some(text) = cells.get(ci) else { continue };
+            if let Some(doc) = parse_multivector_doc(text, dims) {
+                index.insert(seq as u64, doc);
+            }
+        }
+    }
+
+    /// Dumbs every multi-vector memory tail to its segment files. Called by
+    /// `flush()` / checkpoint, mirroring the reference's memindex dump.
+    fn seal_multivector_indexes(&self) {
+        let indexes: Vec<Arc<std::sync::RwLock<MultiVectorIndex>>> =
+            self.mv_index.lock().unwrap().values().cloned().collect();
+        for shared in indexes {
+            shared.write().unwrap().seal();
+        }
+    }
+
+    /// Removes the multi-vector chunks of `table` (or one column) from disk and
+    /// from the cache; called when the table or its index is dropped.
+    fn drop_multivector_storage(&self, table: &str, column: Option<&str>) {
+        let prefix = match column {
+            Some(c) => index_key(table, c),
+            None => format!("{table}."),
+        };
+        let mut map = self.mv_index.lock().unwrap();
+        let keys: Vec<String> = map
+            .keys()
+            .filter(|k| match column {
+                Some(_) => *k == &prefix,
+                None => k.starts_with(&prefix),
+            })
+            .cloned()
+            .collect();
+        for key in keys {
+            if let Some(idx) = map.remove(&key) {
+                let dir = idx.read().map(|g| g.dir.clone()).ok();
+                if let Some(dir) = dir {
+                    if let Ok(entries) = std::fs::read_dir(&dir) {
+                        for entry in entries.flatten() {
+                            let p = entry.path();
+                            if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
+                                let _ = std::fs::remove_file(p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Keeps existing inverted indexes in step with an inserted/rewritten row.
     fn update_text_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+        // The multi-vector index shares this DML hook: it is the one place every
+        // write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes through.
+        self.update_multivector_indexes(table, seq, cells);
         let prefix = format!("{table}.");
         let indexes: Vec<(String, SharedTextIndex)> = self
             .text_index
@@ -4867,6 +5194,7 @@ impl Engine {
             let dir = self.dir.join("fulltext").join(key.replace('/', "_"));
             let _ = std::fs::remove_dir_all(dir);
         }
+        self.drop_multivector_storage(table, column);
     }
 
     /// Drops deleted rows from every inverted index of `table`.
@@ -7503,6 +7831,62 @@ impl Engine {
                 "cannot have both a filter option and a where clause".into(),
             ));
         }
+        // Multi-vector: answer from the write-time index (sealed chunks + the
+        // memory tail) when no predicate needs the other columns. The index
+        // covers every live row, so this path does not scan the table.
+        if is_tensor && pred.is_none() && in_filter.is_none() && search_filter.is_none() {
+            let decl_up = types
+                .get(col_idx)
+                .map(|t| t.to_ascii_uppercase())
+                .unwrap_or_default();
+            if decl_up.starts_with("MULTIVECTOR") && tensor_elem_type(&decl_up) != ElemType::Bit {
+                if let Some(dims) = type_dim(&decl_up) {
+                    let q_flat: Vec<f32> = query_items
+                        .iter()
+                        .filter_map(|x| x.trim().parse::<f32>().ok())
+                        .collect();
+                    if dims > 0 && !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
+                        let query: Vec<Vec<f32>> =
+                            q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
+                        let column = match_columns(&m.column)
+                            .first()
+                            .cloned()
+                            .unwrap_or_default();
+                        let index = self.multivector_index_for(table, &column, dims)?;
+                        let dp = del_prefix(table);
+                        let mut dead: std::collections::HashSet<u64> = Default::default();
+                        for (k, _) in self.store.scan_prefix(&dp)? {
+                            if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
+                                dead.insert(seq);
+                            }
+                        }
+                        let hits = index.read().unwrap().search(&query, topn.max(1), &dead);
+                        let scored: Vec<(u64, f64)> = hits
+                            .into_iter()
+                            .map(|(seq, score)| (seq, f64::from(score)))
+                            .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                            .collect();
+                        let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq).collect();
+                        let mut by_id: HashMap<usize, Vec<Value>> = self
+                            .fetch_some_rows_with_ids(table, &wanted)?
+                            .into_iter()
+                            .collect();
+                        let mut out = Vec::new();
+                        for (seq, score) in scored {
+                            let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                                continue;
+                            };
+                            row.push(Value::Int(seq as i64));
+                            row.push(Value::Float(score));
+                            row.push(Value::Float(-score));
+                            row.push(Value::Float(score));
+                            out.push(row);
+                        }
+                        return Ok((out, hidden));
+                    }
+                }
+            }
+        }
 
         let cache: Option<SharedVectorCache> = (|| {
             if is_sparse || is_tensor {
@@ -8139,6 +8523,9 @@ impl Engine {
         self.txn.flush()?;
         let _ = self.txn.truncate_wal_up_to(applied);
         self.flush_cpp_blocks()?;
+        // Dump the multi-vector memory tails into their segment files, the
+        // reference's memindex dump at checkpoint.
+        self.seal_multivector_indexes();
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
         if let Some(client) = self.object_store.lock().unwrap().clone() {
@@ -8492,6 +8879,22 @@ fn parse_vec_str(s: &str) -> Vec<f64> {
         .filter(|x| !x.is_empty())
         .filter_map(|x| x.parse::<f64>().ok())
         .collect()
+}
+
+/// Splits a stored multi-vector value into `dims`-sized token rows. Bit
+/// columns are scored as hamming and are not part of the MaxSim index.
+fn parse_multivector_doc(text: &str, dims: usize) -> Option<Vec<Vec<f32>>> {
+    let flat: Vec<f32> = text
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .split([',', '[', ']'])
+        .filter_map(|x| x.trim().parse::<f32>().ok())
+        .collect();
+    if dims == 0 || flat.is_empty() || !flat.len().is_multiple_of(dims) {
+        return None;
+    }
+    Some(flat.chunks_exact(dims).map(|c| c.to_vec()).collect())
 }
 
 /// Parses sparse items like `"0:1.0"` into `(index, value)` pairs.
@@ -9966,6 +10369,72 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    /// The multi-vector index is built once (first use), appended at write time,
+    /// and dumped by `flush()`; queries never rebuild it.
+    #[test]
+    fn multivector_index_is_built_at_write_time() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mv (id INT, v MULTIVECTOR(FLOAT,2));")
+            .unwrap();
+        e.execute("INSERT INTO mv VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, [[0.2,0.2]]);")
+            .unwrap();
+        let q = "SELECT id FROM mv SEARCH MATCH TENSOR \
+                 (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        let idx_dir = std::fs::read_dir(dir.path().join("multivector"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let count = |ext: &str| {
+            std::fs::read_dir(&idx_dir)
+                .unwrap()
+                .filter_map(|x| x.ok())
+                .filter(|x| x.path().extension().is_some_and(|y| y == ext))
+                .count()
+        };
+        // One chunk of raw tokens plus its EMVB chunk, written by the build.
+        assert_eq!(count("mvec"), 1);
+        assert_eq!(count("emvb"), 1);
+
+        // A later insert goes to the memory tail and ranks immediately.
+        e.execute("INSERT INTO mv VALUES (3, [[1.0,0.0]]);")
+            .unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["3".to_string()],
+                vec!["2".to_string()]
+            ]
+        );
+
+        // `flush()` dumps the tail as a second chunk; the query still agrees.
+        e.flush().unwrap();
+        assert_eq!(count("mvec"), 2);
+        assert_eq!(count("emvb"), 2);
+        assert_eq!(
+            rows(&e, q),
+            vec![
+                vec!["1".to_string()],
+                vec!["3".to_string()],
+                vec!["2".to_string()]
+            ]
+        );
+
+        // A tombstoned document is filtered out of the index hits.
+        e.execute("DELETE FROM mv WHERE id = 3;").unwrap();
+        assert_eq!(
+            rows(&e, q),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
     }
 
     #[test]
