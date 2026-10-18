@@ -230,7 +230,8 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 - **已明确决定的设计变更**（清单随决策更新，当前包括但不限于）：①调度器（`TaskScheduler`/`FragmentContext`/`BlockingQueue` → Tokio 按边并发，§4.4 D4）；②倒排 FST 复用 `fst` crate 的数据路径，C++ 尾块校验和自行实现（§4.2）；③SIMD 距离核、压缩、`mmap` 等底层原语允许用等价 crate（§3.4）。这些变更不要求同名类/方法一一对应，但须在 `CLASS_MAP.md` 登记。
 - **除上述清单外**，若确需合并、拆分或替换某个 C++ 类/方法，应先登记为**新的设计变更**（动机、影响范围、与 C++ 的对应关系），再实现；不允许默默简化。
 - 不得把多个 C++ 类合并成一个「上帝对象」或一组自由函数；不得以全表扫描代替索引迭代器、以单个内存 map 代替「segment + memindex」两形态、以行式 `Value` 代替列式 `ColumnVector` 而不登记。
-- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；「有意的设计变更」与「尚未一一对应」两张表必须与代码同步。
+- **C++ 单元测试随类移植**：`src/unit_test` 中针对某个 C++ 类的测试，若 Rust 已有对应类/方法，则该测试必须一并移植（同等场景与断言）并纳入 `cargo test`；依赖 C++ 内部表示、FFI 或尚未移植方法的用例，在 `CLASS_MAP.md` 的「未移植单测」表登记，**不得以 Gate A 通过替代**。
+- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；「有意的设计变更」「尚未一一对应」「未移植单测」三张表必须与代码同步。
 - 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项；Gate A 全绿**不代表**移植完成。
 
 ---

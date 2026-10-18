@@ -51,3 +51,35 @@
 - 每个 Rust `pub fn` 的文档注释写 `C++: path:line`。
 - 任何“简化”必须出现在「有意的设计变更」或「尚未一一对应」表里，不能默默省略。
 - Gate A 通过不等于移植完成：状态以本表 + 计划书 §7.3 为准。
+
+## C++ 单元测试对应
+
+规则：`src/unit_test` 中针对某 C++ 类的用例，若 Rust 已有对应类/方法，**必须**移植同等场景与断言并纳入 `cargo test`；不能移植的登记到「未移植单测」。
+
+### 已移植
+
+| C++ 用例 | Rust 类/方法 | Rust 测试 |
+|---|---|---|
+| `txn/conflict_check_ut.cpp::conflict_check_delete` | `Engine::commit_with_deletes` | `tests::delete_conflicts_follow_the_reference` |
+| `buffer/buffer_manager_ut.cpp`（容量/淘汰） | `buffer::BufferManager` | `buffer::tests::evicts_least_recently_used`、`shrinking_the_budget_evicts` |
+| `invertedindex/format/*`（posting/position 编解码） | `inverted_format` | 该模块的往返/边界单测 |
+| `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |
+| `knn/sparse` 的 block-max 检索 | `infinity_index::sparse::BmpIndex` / `bmp_cpp` | `sparse` / `bmp_cpp` 单测 |
+| `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
+
+### 未移植单测（Rust 类已存在）
+
+| C++ 用例 | 对应 Rust | 缺口 |
+|---|---|---|
+| `buffer/buffer_handle_ut.cpp`、`buffer_obj_ut.cpp` | `BufferManager`（无 handle/obj 抽象） | 类边界未拆，测试无法一一对应 |
+| `invertedindex/column_inverter_ut.cpp`、`format/*` 其余部分 | `TextIndex` / `inverted_format` | 构建器/格式读写测试未逐个移植 |
+| `invertedindex/search/*`（WAND/BM25/短语） | `Engine::wand_scan`（自由函数） | 先拆 `BlockMaxWandIterator`/`Bm25Ranker`，再移植 |
+| `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | 低基数/多类型/边界用例未逐个移植 |
+| `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | 层级/启发式/召回用例未逐个移植 |
+| `knn/sparse/*_ut.cpp` | `infinity_index::sparse` | alpha/beta/tail 边界用例未逐个移植 |
+| `knn/emvb/*_ut.cpp` | `MultiVectorIndex`/`EmvbPqIndex` | 量化/候选/OPQ 用例未移植 |
+| `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 任务级场景未移植 |
+
+### 未移植单测（Rust 类也未移植）
+
+`column_vector/*`、`definition/data_block_ut.cpp`、`common/loser_tree_ut.cpp`、`common/test_rcu_multimap_ut.cpp` 等属于尚未移植的 C++ 类（`ColumnVector`/`DataBlock`/`LoserTree`/RCU 容器），随对应类一起移植。
