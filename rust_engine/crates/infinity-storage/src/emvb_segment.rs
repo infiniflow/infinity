@@ -249,6 +249,20 @@ pub fn encode_emvb(
     start_segment_offset: u32,
     docs: &[(u32, Vec<Vec<f32>>)],
 ) -> Vec<u8> {
+    let refs: Vec<(u32, &[Vec<f32>])> = docs
+        .iter()
+        .map(|(row, tokens)| (*row, tokens.as_slice()))
+        .collect();
+    encode_emvb_refs(dims, start_segment_offset, &refs)
+}
+
+/// Like [`encode_emvb`] but borrowing the token rows, so sealing a segment does
+/// not duplicate every vector.
+pub fn encode_emvb_refs(
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+) -> Vec<u8> {
     let tokens: Vec<&[f32]> = docs
         .iter()
         .flat_map(|(_, t)| t.iter().map(|v| v.as_slice()))
@@ -279,7 +293,7 @@ pub fn encode_emvb(
         doc_lens.push(toks.len() as u32);
         doc_segment_offsets.push(*row);
         doc_offsets.push(offset);
-        for t in toks {
+        for t in *toks {
             let c = nearest(&centroids, dims, t);
             assignments.push(c);
             centroids_to_docid[c as usize].push(doc_id as u32);
@@ -355,6 +369,21 @@ pub fn write_emvb_segment(
     docs: &[(u32, Vec<Vec<f32>>)],
 ) -> Result<(), FormatError> {
     let bytes = encode_emvb(dims, start_segment_offset, docs);
+    write_bytes(path, bytes)
+}
+
+/// Like [`write_emvb_segment`] but with borrowed token rows.
+pub fn write_emvb_segment_refs(
+    path: &Path,
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+) -> Result<(), FormatError> {
+    let bytes = encode_emvb_refs(dims, start_segment_offset, docs);
+    write_bytes(path, bytes)
+}
+
+fn write_bytes(path: &Path, bytes: Vec<u8>) -> Result<(), FormatError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| FormatError::Io(format!("{}: {e}", parent.display())))?;

@@ -408,6 +408,7 @@ dependencies = [
  "infinity-planner",
  "infinity-storage",
  "infinity-txn",
+ "lz4_flex",
  "rust-stemmers",
  "tempfile",
  "tokio",
