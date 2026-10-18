@@ -1578,7 +1578,16 @@ struct TextIndex {
     docs: HashMap<u32, u32>,
     postings: HashMap<String, Vec<(u32, u32, Vec<u32>)>>,
     live: std::collections::HashSet<u32>,
+    /// Approximate memory held by the postings. The index is an optimisation:
+    /// once it would exceed the budget it is dropped and queries fall back to
+    /// the scan (which computes the same statistics), keeping memory bounded.
+    bytes: usize,
+    disabled: bool,
 }
+
+/// Cap for one in-memory inverted index. The heavy import tests build several
+/// indexes over 250k wide rows; without a cap the postings alone reached ~20 GB.
+const TEXT_INDEX_BUDGET_BYTES: usize = 512 * 1024 * 1024;
 
 type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
 
@@ -1671,7 +1680,25 @@ fn index_key(table: &str, column: &str) -> String {
 
 /// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
 fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
+    if index.disabled {
+        return;
+    }
     let toks = tokenize_index_positions(text, &index.delims);
+    // ~32 B per posting entry plus the positions and the term string.
+    let mut cost = 64usize;
+    for (term, _) in &toks {
+        cost += term.len() + 32;
+    }
+    if index.bytes + cost > TEXT_INDEX_BUDGET_BYTES {
+        index.postings.clear();
+        index.postings.shrink_to_fit();
+        index.docs.clear();
+        index.live.clear();
+        index.bytes = 0;
+        index.disabled = true;
+        return;
+    }
+    index.bytes += cost;
     index.docs.insert(seq, toks.len() as u32);
     index.live.insert(seq);
     let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
@@ -3822,6 +3849,8 @@ impl Engine {
             delims,
             docs: HashMap::new(),
             postings: HashMap::new(),
+            bytes: 0,
+            disabled: false,
             live: Default::default(),
         };
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, col)? {
@@ -5502,6 +5531,8 @@ impl Engine {
                 self.txn.commit(t)?;
                 for (k, row) in batch.iter().enumerate() {
                     self.update_indexes_on_insert(table, base + k, row)?;
+                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                    self.update_text_indexes(table, base + k, &texts);
                 }
                 total += batch.len();
             }
@@ -5636,6 +5667,8 @@ impl Engine {
         self.txn.commit(t)?;
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row)?;
+            let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+            self.update_text_indexes(table, base + k, &texts);
         }
         Ok(QueryResult::Inserted { count: rows.len() })
     }
