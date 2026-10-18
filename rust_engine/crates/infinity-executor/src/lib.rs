@@ -2232,6 +2232,7 @@ pub struct Engine {
     ivf_indexes: Mutex<HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>>,
     /// IVF memory segment: rows written since the last mirror dump, merged with
     /// the sealed chunks at query time (the reference's in-memory index).
+    #[allow(clippy::type_complexity)]
     ivf_mem: Mutex<HashMap<String, Vec<(u64, Vec<f32>)>>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
@@ -2258,6 +2259,11 @@ pub struct Engine {
     delete_ts: Mutex<HashMap<(String, usize), u64>>,
     /// Serialises delete validation + commit so the first committer wins.
     delete_lock: Mutex<()>,
+    /// Bounded LRU cache of decoded column blocks (the reference's
+    /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
+    buffer: Mutex<
+        infinity_storage::buffer::BufferManager<Vec<infinity_storage::cpp_format::RawBlockColumn>>,
+    >,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
@@ -2444,6 +2450,9 @@ impl Engine {
             row_blobs: Mutex::new(HashMap::new()),
             delete_ts: Mutex::new(HashMap::new()),
             delete_lock: Mutex::new(()),
+            buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
+                8 * 1024 * 1024 * 1024,
+            )),
             row_counters: Mutex::new(HashMap::new()),
             memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
@@ -9630,6 +9639,19 @@ impl Engine {
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
         self.reload_vector_indexes();
+        // Bound the page cache the way the reference's buffer manager does:
+        // segment files and the row sidecar are written back and their clean
+        // pages dropped, so RSS tracks live structures rather than file cache.
+        for sub in [
+            "rowdata",
+            "fulltext",
+            "multivector",
+            "sparse",
+            "secondary",
+            "secondary_low",
+        ] {
+            infinity_storage::drop_tree_cache(&self.dir.join(sub));
+        }
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
         if let Some(client) = self.object_store.lock().unwrap().clone() {
@@ -9656,6 +9678,12 @@ impl Engine {
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
     /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
     /// keeps every row in memory until a checkpoint.
+    /// Sets the column-block cache budget (the reference's
+    /// `[buffer] buffer_manager_size`).
+    pub fn set_buffer_manager_size(&self, bytes: usize) {
+        self.buffer.lock().unwrap().set_budget(bytes);
+    }
+
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);

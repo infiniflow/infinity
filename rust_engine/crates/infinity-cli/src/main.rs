@@ -126,6 +126,15 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         parse_size_bytes(&quota)
     };
     engine.set_memindex_quota(quota);
+    // `[buffer] buffer_manager_size` — the column-block cache budget (the
+    // reference defaults to 8 GiB).
+    let buffer = toml_value(&text, "buffer_manager_size").unwrap_or_default();
+    let buffer = if buffer.trim().is_empty() {
+        8 * 1024 * 1024 * 1024
+    } else {
+        parse_size_bytes(&buffer) as usize
+    };
+    engine.set_buffer_manager_size(buffer);
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());

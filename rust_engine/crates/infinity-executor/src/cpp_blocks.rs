@@ -11,7 +11,8 @@
 //! The mirror is additive: queries still run off the engine's own row store, so
 //! turning it on cannot change SQL results.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
@@ -19,7 +20,7 @@ use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
     push_embedding_element, read_embedding_element, time_to_secs, BlockColumn, BlockId,
-    BlockVersionFile, ColumnLayout, DEFAULT_BLOCK_CAPACITY,
+    BlockVersionFile, ColumnLayout, RawBlockColumn, DEFAULT_BLOCK_CAPACITY,
 };
 use infinity_storage::knn_format;
 
@@ -1065,6 +1066,7 @@ impl Engine {
                 segment_id: 0,
                 block_id: block_index as u16,
             };
+            self.buffer.lock().unwrap().invalidate(&id);
             cpp_format::write_block(&root, id, &block_columns, &version).map_err(|e| {
                 Error::Io {
                     path: root.join(cpp_format::block_dir(db_id, meta.id, 0, id.block_id)),
@@ -1210,6 +1212,32 @@ impl Engine {
         Ok(())
     }
 
+    /// Reads a block through the bounded buffer manager, loading it from disk on
+    /// a miss (the reference's `BufferManager::Get`).
+    fn read_block_cached(
+        &self,
+        root: &Path,
+        id: BlockId,
+    ) -> std::io::Result<(BlockVersionFile, Arc<Vec<RawBlockColumn>>)> {
+        if let Some(columns) = self.buffer.lock().unwrap().get(&id) {
+            let dir = root.join(cpp_format::block_dir(
+                id.db_id,
+                id.table_id,
+                id.segment_id,
+                id.block_id,
+            ));
+            let version =
+                BlockVersionFile::decode(&std::fs::read(dir.join(cpp_format::VERSION_FILE))?)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            return Ok((version, columns));
+        }
+        let (version, columns) = cpp_format::read_block(root, id)?;
+        let bytes = infinity_storage::buffer::block_bytes(&columns);
+        let columns = Arc::new(columns);
+        self.buffer.lock().unwrap().put(id, columns.clone(), bytes);
+        Ok((version, columns))
+    }
+
     /// Reads the block mirror back, returning `(columns, rows)`.
     ///
     /// This never consults the KV store, so a successful read proves the mirror
@@ -1288,7 +1316,7 @@ impl Engine {
                 segment_id: 0,
                 block_id: block_index,
             };
-            let (version, columns) = match cpp_format::read_block(&root, id) {
+            let (version, columns) = match self.read_block_cached(&root, id) {
                 Ok(v) => v,
                 Err(_) if block_index == 0 => {
                     return Err(Error::NotFound(format!("no blocks for table '{table}'")))

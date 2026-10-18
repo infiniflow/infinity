@@ -344,7 +344,7 @@ pub struct BlockColumn {
 }
 
 /// Block identifiers, used to build the C++ directory path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BlockId {
     pub db_id: u64,
     pub table_id: u64,
