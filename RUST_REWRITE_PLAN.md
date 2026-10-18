@@ -184,7 +184,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | HNSW | **是**（每个 `chunk_{n}.idx` 一段 + 一个内存段） | 是（`chunk_{n}.idx`，加载全部段） | **是**（`HnswIndexInMem`：插入即建图，查询与落盘图并集） | **已按 `hnsw_alg.cppm` 移植**：`TryUpdateEnterPoint` 先于构图、`SearchLayerNearest` 逆序扫描、`SelectNeighborsHeuristic` 返回「远→近」且 `Build` 从 `neighbors[0]` 继续、`ConnectNeighbors` 双向剪枝到 `2M/M`、`SearchLayer` 的 `<=` 与 top-k 语义；`M=16`、`ef_construction=200` 取自 `default_values.cppm` |
 | 多向量 | **是**（每段 `seg_*.mvec`，自有布局） | **是**（每 `ROW_ID` 段一份，查询 `merge_topk`） | **是 / 是** | **MaxSim + inner top-n 已移植并接入**（`infinity-index::multivector` + mmap 段读取）；**EMVB/PLAID 的 PQ 候选截断未移植**（逐段精确 MaxSim） |
 | 次级索引 | **是**（`seg_*.idx` = keys + u32 offsets + PGM，`SecondaryIndexDataBase::SaveIndexInner` 形状） | **是**（按 `ROW_ID` 段） | **是 / 是**（mmap 读 + 内存 BTree） | **PGM 已移植**（`PGMIndex<T,64,4>` 的分段线性模型，ε=4；查询用近似位置 + 有界二分 + 全量兜底）；**低基数 Bitmap 变体未移植**（整数列走 PGM） |
-| 稀疏 | **是**（按 `ROW_ID` 段位分组，每段一个 BMP 索引，查询合并） | **是**（每段写 `seg_*.bmp`，`infinity-storage::bmp_segment` 的 mmap 读取；自有布局，C++ 字节兼容待做） | **是 / 是** | **算法已移植并接入查询**（`infinity-index::sparse::BmpIndex`：block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 查询裁剪、tail；`SEARCH MATCH SPARSE` 已走该路径，Gate A 1536/1536）。**剩余**：按段构建 + 落盘（`bmp_index_file_worker.cppm`） |
+| 稀疏 | **是**（按 `ROW_ID` 段位分组，每段一个 BMP 索引，查询合并） | **是**（每段 `seg_*.bmp`，`infinity-storage::bmp_cpp` 按 `BMPAlg::SaveToPtr` 的 ivt+fwd+doc_ids 布局写读，地址对齐与 `GetSizeInBytesVecAligned` 一致） | **是 / 是** | **算法已移植并接入查询**（`infinity-index::sparse::BmpIndex`：block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 查询裁剪、tail；`SEARCH MATCH SPARSE` 已走该路径，Gate A 1536/1536）。**剩余**：按段构建 + 落盘（`bmp_index_file_worker.cppm`） |
 
 **剩余移植清单（按依赖排序，下一步直接照做）**：
 
