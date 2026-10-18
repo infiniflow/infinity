@@ -805,8 +805,76 @@ fn handle_connection(
                             session_id: sid,
                         };
                     }
+                    // A scalar batch goes straight to the executor: rendering
+                    // 1000 rows to SQL and re-parsing them cost ~13 ms per
+                    // batch, more than the insert itself. Values that need the
+                    // parser (arrays, tensors, sparse vectors) keep the SQL path.
+                    let direct = req.rows.iter().all(|(_, vals)| {
+                        vals.iter().all(|v| {
+                            matches!(
+                                v,
+                                ValueLit::Int(_)
+                                    | ValueLit::Float(_)
+                                    | ValueLit::Str(_)
+                                    | ValueLit::Null
+                            )
+                        })
+                    });
+                    if direct {
+                        let mut i = 0usize;
+                        while resp.error_code == OK && i < req.rows.len() {
+                            let cols = req.rows[i].0.clone();
+                            let mut rows_lit: Vec<Vec<infinity_parser::Literal>> = Vec::new();
+                            while i < req.rows.len() && req.rows[i].0 == cols {
+                                rows_lit.push(
+                                    req.rows[i]
+                                        .1
+                                        .iter()
+                                        .map(|v| match v {
+                                            ValueLit::Int(n) => infinity_parser::Literal::Int(*n),
+                                            ValueLit::Float(f) => {
+                                                infinity_parser::Literal::Float(*f)
+                                            }
+                                            ValueLit::Str(t) => {
+                                                infinity_parser::Literal::Str(t.clone())
+                                            }
+                                            ValueLit::Null => infinity_parser::Literal::Null,
+                                            _ => infinity_parser::Literal::Null,
+                                        })
+                                        .collect(),
+                                );
+                                i += 1;
+                            }
+                            let cols_opt = if cols.is_empty() {
+                                None
+                            } else {
+                                Some(cols.as_slice())
+                            };
+                            resp = match engine.as_ref() {
+                                Some(eng) => {
+                                    match eng.insert_literals(&table, cols_opt, rows_lit) {
+                                        Ok(_) => CommonResponse {
+                                            error_code: OK,
+                                            error_msg: "OK".into(),
+                                            session_id: sid,
+                                        },
+                                        Err(e) => CommonResponse {
+                                            error_code: e.status_code(),
+                                            error_msg: e.to_string(),
+                                            session_id: sid,
+                                        },
+                                    }
+                                }
+                                None => CommonResponse {
+                                    error_code: 1,
+                                    error_msg: "no engine bound".into(),
+                                    session_id: sid,
+                                },
+                            };
+                        }
+                    }
                     let mut i = 0usize;
-                    while resp.error_code == OK && i < req.rows.len() {
+                    while !direct && resp.error_code == OK && i < req.rows.len() {
                         let (cols, _) = &req.rows[i];
                         let mut batch: Vec<String> = Vec::new();
                         while i < req.rows.len() && &req.rows[i].0 == cols {
@@ -833,7 +901,16 @@ fn handle_connection(
                         if std::env::var_os("INF_DEBUG_SQL").is_some() {
                             eprintln!("[INSERT] {sql}");
                         }
+                        let t0 = std::time::Instant::now();
                         resp = run_common(engine.as_ref(), &sql, sid);
+                        if std::env::var_os("INF_DEBUG_INS").is_some() {
+                            eprintln!(
+                                "[INS] rpc rows={} sql={}B exec={:?}",
+                                batch.len(),
+                                sql.len(),
+                                t0.elapsed()
+                            );
+                        }
                         if resp.error_code != OK {
                             break;
                         }

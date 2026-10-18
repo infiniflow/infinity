@@ -2442,6 +2442,102 @@ impl Engine {
             .collect())
     }
 
+    /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
+    /// directly: rebuilding SQL text for a 1000-row batch and re-parsing it cost
+    /// more than the insert itself.
+    pub fn insert_literals(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        rows: Vec<Vec<Literal>>,
+    ) -> Result<QueryResult> {
+        let meta = self
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let schema = meta.columns.clone();
+        // An explicit column list must name existing columns; the C++
+        // engine reports this as a syntax error.
+        if let Some(cols) = columns.as_deref() {
+            for c in cols {
+                if !schema.iter().any(|s| s == c) {
+                    return Err(Error::Invalid(format!(
+                        "syntax: column '{c}' does not exist in table '{table}'"
+                    )));
+                }
+            }
+        }
+        let mut rows = align_insert_rows(&schema, &meta.defaults, columns, &rows);
+        // An integer column truncates a fractional value, as the
+        // reference's implicit cast does (`-6.3` -> `-6`).
+        for row in rows.iter_mut() {
+            for (i, cell) in row.iter_mut().enumerate() {
+                let int_col = meta
+                    .types
+                    .get(i)
+                    .map(|t| {
+                        let t = t.trim().to_ascii_uppercase();
+                        t.starts_with("INT")
+                            || t.starts_with("TINYINT")
+                            || t.starts_with("SMALLINT")
+                            || t.starts_with("BIGINT")
+                    })
+                    .unwrap_or(false);
+                if !int_col {
+                    continue;
+                }
+                if let Literal::Float(f) = cell {
+                    *cell = Literal::Int(*f as i64);
+                }
+            }
+        }
+        // enforce NOT NULL
+        for row in &rows {
+            for (i, nn) in meta.not_nulls.iter().enumerate() {
+                if *nn && matches!(row.get(i), Some(Literal::Null) | None) {
+                    return Err(Error::Invalid(format!(
+                        "null value in NOT NULL column '{}'",
+                        schema.get(i).cloned().unwrap_or_default()
+                    )));
+                }
+            }
+        }
+        if rows.is_empty() {
+            return Ok(QueryResult::Inserted { count: 0 });
+        }
+        // Reserve a contiguous block of row ids: two sessions inserting
+        // concurrently must not pick the same base sequence.
+        let base = self.reserve_rows(table, rows.len(), false)?;
+        let types = self.column_types(table)?;
+        // tensor-like values must match the declared dimension, and
+        // sparse values must be in range
+        for row in &rows {
+            for (i, cell) in row.iter().enumerate() {
+                if let Some(t) = types.get(i) {
+                    validate_insert_value(t, cell.to_slt_string().trim())?;
+                }
+            }
+        }
+        // A memory index that already exceeds its quota is dumped
+        // before these rows join it.
+        self.note_index_insert(table, rows.len());
+        // one transaction -> one WAL record + one KV batch (batched durability)
+        let mut t = self.txn.begin();
+        for (k, row) in rows.iter().enumerate() {
+            let encoded = encode_row(row, &types);
+            t.put(row_key(table, base + k), encoded.into_bytes());
+        }
+        self.txn.commit(t)?;
+        for (k, row) in rows.iter().enumerate() {
+            self.update_indexes_on_insert(table, base + k, row)?;
+            let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+            self.update_text_indexes(table, base + k, &texts);
+            self.update_vector_caches(table, base + k, &texts);
+        }
+        self.bump_writes(table);
+        Ok(QueryResult::Inserted { count: rows.len() })
+    }
+
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
         let mut res = self.execute_stmt_inner(stmt)?;
         if let Statement::Select {
@@ -3270,93 +3366,7 @@ impl Engine {
                 table,
                 columns,
                 rows,
-            } => {
-                let meta = self
-                    .catalog
-                    .get_table_by_name(table)?
-                    .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-                let schema = meta.columns.clone();
-                // An explicit column list must name existing columns; the C++
-                // engine reports this as a syntax error.
-                if let Some(cols) = columns.as_deref() {
-                    for c in cols {
-                        if !schema.iter().any(|s| s == c) {
-                            return Err(Error::Invalid(format!(
-                                "syntax: column '{c}' does not exist in table '{table}'"
-                            )));
-                        }
-                    }
-                }
-                let mut rows = align_insert_rows(&schema, &meta.defaults, columns.as_deref(), rows);
-                // An integer column truncates a fractional value, as the
-                // reference's implicit cast does (`-6.3` -> `-6`).
-                for row in rows.iter_mut() {
-                    for (i, cell) in row.iter_mut().enumerate() {
-                        let int_col = meta
-                            .types
-                            .get(i)
-                            .map(|t| {
-                                let t = t.trim().to_ascii_uppercase();
-                                t.starts_with("INT")
-                                    || t.starts_with("TINYINT")
-                                    || t.starts_with("SMALLINT")
-                                    || t.starts_with("BIGINT")
-                            })
-                            .unwrap_or(false);
-                        if !int_col {
-                            continue;
-                        }
-                        if let Literal::Float(f) = cell {
-                            *cell = Literal::Int(*f as i64);
-                        }
-                    }
-                }
-                // enforce NOT NULL
-                for row in &rows {
-                    for (i, nn) in meta.not_nulls.iter().enumerate() {
-                        if *nn && matches!(row.get(i), Some(Literal::Null) | None) {
-                            return Err(Error::Invalid(format!(
-                                "null value in NOT NULL column '{}'",
-                                schema.get(i).cloned().unwrap_or_default()
-                            )));
-                        }
-                    }
-                }
-                if rows.is_empty() {
-                    return Ok(QueryResult::Inserted { count: 0 });
-                }
-                // Reserve a contiguous block of row ids: two sessions inserting
-                // concurrently must not pick the same base sequence.
-                let base = self.reserve_rows(table, rows.len(), false)?;
-                let types = self.column_types(table)?;
-                // tensor-like values must match the declared dimension, and
-                // sparse values must be in range
-                for row in &rows {
-                    for (i, cell) in row.iter().enumerate() {
-                        if let Some(t) = types.get(i) {
-                            validate_insert_value(t, cell.to_slt_string().trim())?;
-                        }
-                    }
-                }
-                // A memory index that already exceeds its quota is dumped
-                // before these rows join it.
-                self.note_index_insert(table, rows.len());
-                // one transaction -> one WAL record + one KV batch (batched durability)
-                let mut t = self.txn.begin();
-                for (k, row) in rows.iter().enumerate() {
-                    let encoded = encode_row(row, &types);
-                    t.put(row_key(table, base + k), encoded.into_bytes());
-                }
-                self.txn.commit(t)?;
-                for (k, row) in rows.iter().enumerate() {
-                    self.update_indexes_on_insert(table, base + k, row)?;
-                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-                    self.update_text_indexes(table, base + k, &texts);
-                    self.update_vector_caches(table, base + k, &texts);
-                }
-                self.bump_writes(table);
-                Ok(QueryResult::Inserted { count: rows.len() })
-            }
+            } => self.insert_literals(table, columns.as_deref(), rows.clone()),
             Statement::Delete { table, where_pred } => {
                 let schema = self.table_schema(table)?;
                 let pred = match where_pred {

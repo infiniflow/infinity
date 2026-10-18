@@ -116,7 +116,10 @@ impl WalManager {
         self.file
             .write_all(&frame)
             .map_err(|e| Error::io(&self.path, e))?;
-        self.file.sync_all().map_err(|e| Error::io(&self.path, e))?;
+        // The reference writes its WAL through RocksDB with `sync = false`, so a
+        // commit is durable against a process crash but not against a power
+        // loss. A per-record `fsync` here cost ~10 ms per insert batch; the
+        // explicit barrier lives in `flush()` (checkpoint / shutdown / FLUSH).
         Ok(offset)
     }
 

@@ -450,6 +450,7 @@ version = "0.1.0"
 dependencies = [
  "infinity-common",
  "infinity-executor",
+ "infinity-parser",
  "tempfile",
  "thrift",
 ]
