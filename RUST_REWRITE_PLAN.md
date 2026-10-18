@@ -443,10 +443,9 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.1 架构对齐缺口（P0）
 
-1. **memindex 预算覆盖不全**：只有全文（`INFINITY_TEXT_SEGMENT_BYTES`/64 MiB）与 HNSW（`memindex_memory_quota`）有预算与 dump 生命周期；稀疏、多向量、次级的内存尾没有配额，也没有「封段后释放」。
-2. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
+1. **Catalog 双键空间**：C++ 键空间与原生键空间并存，尚未合并为唯一 catalog。
 
-> 稀疏、多向量与次级索引的「写入期构建 + 封段 + 查询只读」已落地（#83/#84/#85）。三者的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
+> 索引构建时机（#83/#84/#85）与统一 memindex 预算（#86，覆盖全文/HNSW/稀疏/多向量/次级，`memindex_memory_quota` 触发全量 dump 并释放内存形态）已落地。稀疏/多向量/次级的 filtered 查询仍走扫描路径（功能项，见 §7.5.2）。
 
 #### 7.5.2 功能对齐缺口（P1）
 

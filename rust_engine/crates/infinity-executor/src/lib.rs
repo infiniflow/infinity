@@ -2758,6 +2758,79 @@ impl Engine {
         }
     }
 
+    /// Total bytes buffered by every in-memory index form. The unified budget
+    /// covers full-text, HNSW, sparse, multi-vector and secondary tails.
+    fn memindex_bytes(&self) -> usize {
+        let mut total = 0usize;
+        for idx in self.text_index.lock().unwrap().values() {
+            if let Ok(g) = idx.read() {
+                total += g.bytes;
+            }
+        }
+        total += self
+            .index_pending_bytes
+            .lock()
+            .unwrap()
+            .values()
+            .sum::<usize>();
+        for idx in self.sparse_index.lock().unwrap().values() {
+            if let Ok(g) = idx.read() {
+                total += g.tail_bytes;
+            }
+        }
+        for idx in self.mv_index.lock().unwrap().values() {
+            if let Ok(g) = idx.read() {
+                total += g.tail_bytes;
+            }
+        }
+        total
+            + self
+                .indexes
+                .lock()
+                .unwrap()
+                .values()
+                .map(SecondaryIndex::approx_bytes)
+                .sum::<usize>()
+    }
+
+    /// Dumps every memory index when the unified budget is exceeded, mirroring
+    /// the reference's memindex dump. `memindex_memory_quota = 0` disables it.
+    fn enforce_memindex_quota(&self) {
+        let quota = self
+            .memindex_quota
+            .load(std::sync::atomic::Ordering::Relaxed) as usize;
+        if quota == 0 || self.memindex_bytes() <= quota {
+            return;
+        }
+        self.seal_multivector_indexes();
+        self.seal_sparse_indexes();
+        self.seal_secondary_indexes();
+        // HNSW: dump each memory segment, then release it. The dump rebuilds
+        // the graph from the live rows, so the memory form is no longer needed.
+        let keys: Vec<String> = self
+            .index_pending_bytes
+            .lock()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let Ok(indexes) = self.catalog.list_indexes() else {
+            return;
+        };
+        for key in keys {
+            let Some(im) = indexes
+                .iter()
+                .find(|im| index_key(&im.table, &im.column) == key)
+            else {
+                continue;
+            };
+            if self.dump_cpp_hnsw_index(&im.table, &im.name).is_ok() {
+                self.hnsw_mem.lock().unwrap().remove(&key);
+                self.index_pending_bytes.lock().unwrap().insert(key, 0);
+            }
+        }
+    }
+
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
         let key = index_key(table, column);
         let known = self.indexes.lock().unwrap().contains_key(&key)
@@ -5590,6 +5663,7 @@ impl Engine {
         // through.
         self.update_multivector_indexes(table, seq, cells);
         self.update_sparse_indexes(table, seq, cells);
+        self.enforce_memindex_quota();
         let prefix = format!("{table}.");
         let indexes: Vec<(String, SharedTextIndex)> = self
             .text_index
@@ -11069,6 +11143,86 @@ mod tests {
         );
         e.execute("DELETE FROM b WHERE id = 1;").unwrap();
         assert_eq!(rows(&e, q), vec![vec!["3".to_string()]]);
+    }
+
+    /// One quota governs every index form: when it is exceeded the tails are
+    /// dumped and released, and the results stay correct.
+    #[test]
+    fn memindex_quota_seals_every_tail() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        // Any positive budget is exceeded by the first row's tails.
+        e.set_memindex_quota(1);
+        e.execute("CREATE TABLE q (id INT, m MULTIVECTOR(FLOAT,2), s SPARSE(FLOAT,10), c INT);")
+            .unwrap();
+        e.execute("CREATE INDEX qi ON q (c);").unwrap();
+        e.execute("CREATE INDEX qm ON q (m) USING EMVB;").unwrap();
+        e.execute("CREATE INDEX qs ON q (s) USING BMP;").unwrap();
+        e.execute(
+            "INSERT INTO q VALUES (1, [[1.0,0.0]], [0:1.0, 1:2.0], 7), \
+             (2, [[0.0,1.0]], [1:3.0], 7);",
+        )
+        .unwrap();
+
+        let mv_key = e.mv_index.lock().unwrap().keys().next().cloned().unwrap();
+        let mv_tail = e
+            .mv_index
+            .lock()
+            .unwrap()
+            .get(&mv_key)
+            .unwrap()
+            .read()
+            .unwrap()
+            .tail_bytes;
+        assert_eq!(mv_tail, 0);
+        let sp_key = e
+            .sparse_index
+            .lock()
+            .unwrap()
+            .keys()
+            .next()
+            .cloned()
+            .unwrap();
+        let sp_tail = e
+            .sparse_index
+            .lock()
+            .unwrap()
+            .get(&sp_key)
+            .unwrap()
+            .read()
+            .unwrap()
+            .tail_bytes;
+        assert_eq!(sp_tail, 0);
+        let sec_key = e
+            .indexes
+            .lock()
+            .unwrap()
+            .keys()
+            .find(|k| k.ends_with(".c"))
+            .cloned()
+            .unwrap();
+        assert_eq!(
+            e.indexes.lock().unwrap().get(&sec_key).unwrap().key_count(),
+            0
+        );
+
+        // The sealed forms answer every path.
+        assert_eq!(
+            rows(&e, "SELECT id FROM q WHERE c = 7;"),
+            vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM q SEARCH MATCH SPARSE (s, [1:1.0], 'ip', 2);"
+            ),
+            vec![vec!["2".to_string()], vec!["1".to_string()]]
+        );
+        assert!(!rows(
+            &e,
+            "SELECT id FROM q SEARCH MATCH TENSOR (m, [1.0,0.0], 'float', 'maxsim', 'topn=2');"
+        )
+        .is_empty());
     }
 
     #[test]

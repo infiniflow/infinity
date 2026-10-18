@@ -45,6 +45,14 @@ impl SecondaryIndex {
         Self::default()
     }
 
+    /// Approximate heap bytes held by the map, for the unified memindex budget.
+    pub fn approx_bytes(&self) -> usize {
+        self.map
+            .iter()
+            .map(|(k, v)| k.len() + 16 + v.len() * 8)
+            .sum()
+    }
+
     /// Removes and returns every entry, leaving the index empty. Used when a
     /// memory tail is dumped into a sealed segment.
     pub fn take(&mut self) -> BTreeMap<Vec<u8>, Vec<RowID>> {
