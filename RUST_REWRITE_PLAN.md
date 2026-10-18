@@ -21,7 +21,7 @@
 2. **KV 存储**：RocksDB 在 Infinity 中只承担**元数据**（catalog / 计数器 / 对象清单 / rough filter / drop 墓碑），不承载行数据与索引。定义 `MetaStore` trait，默认纯 Rust `fjall`，并提供 `rust-rocksdb` 实现以兼容 C++ catalog（§4.2）。
 3. **验收**：以现有测试资产为准 —— **173 个 SQL Logic Test**、**Python PySDK 308 个有效 `def test_`**、**Go SDK 375 用例**，外加持久化 / 并发 / 性能关卡（§8）。测试经网络连接真实服务，因此 **Thrift 线协议必须保持兼容**（`TBinaryProtocol` + `client_version == 37`）。
 
-迁移策略：**洁净室重写 + 持续一致性测试**。新旧二进制并存，C++ 为 oracle，按垂直切片点亮测试子集（§4.1）。
+迁移策略：**以 C++ 类/public 方法映射为骨架的洁净室重写 + 持续一致性测试**（§4.1 D1）。新旧二进制并存，C++ 为 oracle，按垂直切片点亮测试；测试通过不等于移植完成，以 `CLASS_MAP.md` 的未闭合项为准。
 
 **当期结论**：
 
@@ -223,29 +223,34 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 - **全文**：`.dic`（TermMeta + FST）、`.pos`（逐 term 块）、`.len`（裸 `u32[]`）；FST 尾块 `u64 len_ + u64 root_addr + CRC-32/IEEE`（`Fst::Verify` 覆盖除末 4 字节的全部字节）。
 - **Catalog**：C++ 键空间（`catalog|db|…`、`tbl|col|…`、`idx|…`）+ `DataType::Serialize()` / `ColumnDef::ToJson()` / `IndexBase` 十个子类的逐字段 JSON；`file_name = "{table}_{index}"`、`flag = OPTION_FLAG_ALL = 63`。
 
-### 3.6 类与方法的 1:1 对应（防过度简化）
+### 3.6 类与方法的对应（防过度简化）
 
-除**已明确决定的设计变更**外，C++ 中**被其他类依赖的类**及其**被依赖的方法**，必须在 Rust 中有同职责的类与 public 方法一一对应。当前已批准的设计变更清单：①调度器（`TaskScheduler`/`FragmentContext`/`BlockingQueue` → Tokio 按边并发，§4.4 D4）；②倒排 FST 复用 `fst` crate 的数据路径，C++ 尾块校验和自行实现（§4.2）；③SIMD 距离核、压缩等底层原语允许用等价 crate（§3.4）。行式 `Value` 运行时**不在**已批准清单内，属于 §CLASS_MAP 中待替换的偏差。
+**原则上（大体上）**，C++ 中**被其他类依赖的类**及其**被依赖的方法**，在 Rust 中应有同职责的类与 public 方法一一对应。允许因语言惯用法、所有权模型做局部调整，但**不得为了通过测试而改变职责边界**。
 
-- 不得把多个 C++ 类合并成一个「上帝对象」或一组自由函数；
-- 不得为过测试而实现简化版：例如以全表扫描代替索引迭代器、以单个内存 map 代替「segment + memindex」两形态、以行式 `Value` 代替列式 `ColumnVector` 而不登记；
-- 允许的语言惯用法差异仅限 RAII、`Result`、`Arc/Mutex` 等；**职责边界与调用关系**必须可逐项回溯到 C++ `文件:行号`；
-- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；任何简化必须登记在「有意的设计变更」或「尚未一一对应」表，不能默默省略；
-- 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项，Gate A 全绿**不代表**移植完成。新增设计变更须先写入 §3.6 的批准清单，再改代码。
+- **已明确决定的设计变更**（清单随决策更新，当前包括但不限于）：①调度器（`TaskScheduler`/`FragmentContext`/`BlockingQueue` → Tokio 按边并发，§4.4 D4）；②倒排 FST 复用 `fst` crate 的数据路径，C++ 尾块校验和自行实现（§4.2）；③SIMD 距离核、压缩、`mmap` 等底层原语允许用等价 crate（§3.4）。这些变更不要求同名类/方法一一对应，但须在 `CLASS_MAP.md` 登记。
+- **除上述清单外**，若确需合并、拆分或替换某个 C++ 类/方法，应先登记为**新的设计变更**（动机、影响范围、与 C++ 的对应关系），再实现；不允许默默简化。
+- 不得把多个 C++ 类合并成一个「上帝对象」或一组自由函数；不得以全表扫描代替索引迭代器、以单个内存 map 代替「segment + memindex」两形态、以行式 `Value` 代替列式 `ColumnVector` 而不登记。
+- 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；「有意的设计变更」与「尚未一一对应」两张表必须与代码同步。
+- 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项；Gate A 全绿**不代表**移植完成。
 
 ---
 
 ## 4. 关键决策（Decision Matrix）
 
-### 4.1 D1 — 迁移策略：洁净室重写 + 持续一致性测试
+### 4.1 D1 — 迁移策略：类/方法映射骨架 + 洁净室重写 + 持续一致性测试
 
 | 方案 | 评价 |
 |---|---|
 | A. Big-bang | 风险最高，长期无可交付中间态 |
 | B. Strangler / FFI 渐进替换 | 与「整体重写」目标不符，FFI 边界多 |
-| **C. 洁净室重写 + conformance testing（采用）** | 新旧二进制并存，C++ 作 oracle，按垂直切片点亮测试；每次提交都有可运行产物 |
+| **C. 洁净室重写 + conformance testing（采用，2026-10-18 修订）** | 以 C++ 类结构与 public 方法为骨架（§3.6，**大体上一一对应**），新旧二进制并存、C++ 作 oracle，按垂直切片点亮测试；每次提交都有可运行产物 |
 
-**决策**：方案 C。线协议（Thrift/HTTP）保持兼容，现有 SDK 测试无需修改即可作为验收门槛。
+**决策**：采用方案 C，并附加两条约束：
+
+1. **先对齐骨架，再点亮测试**：每个垂直切片先按 §3.6 建立「C++ 类/方法 → Rust 类型/public 方法」映射并在 `CLASS_MAP.md` 登记，再实现行为。禁止为了通过某个 `.slt`/SDK 用例，把 C++ 的多个类压成一个简化实现，或用全表扫描替代索引迭代器。
+2. **一致性测试是验收，不是设计来源**：conformance testing 用于验证「映射后的实现」与 C++ 行为等价；测试通过但 `CLASS_MAP.md` 中「尚未一一对应」项未闭合，视为移植未完成。
+
+线协议（Thrift/HTTP）保持兼容，现有 SDK 测试无需修改即可作为验收门槛。
 
 ### 4.2 D2 — KV 存储
 
