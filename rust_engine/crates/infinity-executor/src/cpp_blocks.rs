@@ -1930,6 +1930,61 @@ impl Engine {
     }
 
     /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
+    /// the IVF chunks so a query can probe them (plan #89).
+    pub fn load_ivf_indexes(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Vec<infinity_index::ivf::IvfIndex> {
+        let Some(dir) = self.cpp_hnsw_dir(table, index_name) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (_, path) in hnsw_chunks(&dir) {
+            let Ok(bytes) = std::fs::read(&path) else {
+                continue;
+            };
+            // Plain storage only; SQ/PQ chunks are not mirrored yet.
+            let Ok((header, flat, parts)) = knn_format::decode_ivf_plain_chunk(&bytes, 4) else {
+                continue;
+            };
+            let dims = header.dimension as usize;
+            if dims == 0 {
+                continue;
+            }
+            let parts: Vec<Vec<(u32, Vec<f32>)>> = parts
+                .into_iter()
+                .map(|part| {
+                    part.segment_offsets
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, offset)| {
+                            let at = i * dims * 4;
+                            let vector = (0..dims)
+                                .map(|d| {
+                                    f32::from_le_bytes(
+                                        part.vectors[at + d * 4..at + d * 4 + 4]
+                                            .try_into()
+                                            .unwrap(),
+                                    )
+                                })
+                                .collect();
+                            (offset, vector)
+                        })
+                        .collect()
+                })
+                .collect();
+            out.push(infinity_index::ivf::IvfIndex::new(
+                dims,
+                header.centroid_count as usize,
+                flat,
+                parts,
+            ));
+        }
+        out
+    }
+
+    /// Reads back a mirror written by [`Self::write_cpp_ivf_index`], returning
     /// the centroids and `(row id, vector)` pairs.
     pub fn read_cpp_ivf_index(
         &self,

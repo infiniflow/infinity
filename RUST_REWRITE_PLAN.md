@@ -423,7 +423,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **多向量** | ✅ 每 `ROW_ID` 段 `.emvb` + `.mvec`；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `EMVBIndex::SaveIndexInner` 布局：粗聚类、`doc_lens`/offsets、质心分配、每质心 doc 列表、残差 PQ（8 子空间/8 bit）、OPQ 旋转 | ✅ 内存尾 | ✅ MaxSim + inner top-n + 中心点预过滤；查询用原始 token 精确重排 |
 | **次级** | ✅ 高基数 PGM / 低基数 Roaring 各一段；`CREATE INDEX` 物化，INSERT 进内存尾，`flush()` 封段 | ✅ `keys + offsets + PGMIndex<T,64,4>`；低基数 `RoaringBitmap::WriteAdv` | ✅ 内存尾（仅 DDL 后新行） | ✅ 近似位置 + 有界二分 + 全量兜底；布尔列自动走低基数；lookup 合并「封盘段 + 尾段」 |
 | **稀疏** | ✅ 每 `ROW_ID` 段一个 BMP 索引；`CREATE INDEX` 时物化，INSERT 进内存尾，`flush()` 封段 | ✅ `seg_*.bmp`，`bmp_cpp` 按 `BMPAlg::SaveToPtr` 的 `ivt+fwd+doc_ids`，地址对齐与 `GetSizeInBytesVecAligned` 一致 | ✅ 内存尾 | ✅ block-max 倒排、`kth(topk)` 阈值、上界降序、`alpha` 提前终止、`beta` 裁剪、tail；`SEARCH MATCH SPARSE` 已接入 |
-| **IVF** | 镜像 | ✅ plain/SQ/PQ 编解码 | — | ❌ 检索未移植（仅格式与镜像） |
+| **IVF** | ✅ 每 `chunk_<id>.idx` 一段 | ✅ plain/SQ/PQ 编解码 | — | ✅ **plain 检索已接入**：质心选择（l2/ip/cosine）+ `nprobe` 个 part 扫描 + 候选精确重排；SQ/PQ 仅格式编解码（镜像尚未写这两种编码） |
 
 **全文的段生命周期**：内存段达预算（默认 64 MiB，`INFINITY_TEXT_SEGMENT_BYTES` 覆盖）即写出 `ft_{rowid:016x}.{dic,pos,len}`；查询合并「封盘段 + 内存尾段」，语料统计与 postings 均按段合并；UPDATE 重写的行用 `overridden` 屏蔽旧副本。强制 4 KiB 预算跑完整 Gate A 仍 1752/129/1536。
 
@@ -450,8 +450,8 @@ query(sql) → parse → logical → optimize → physical → fragments
 #### 7.5.2 功能对齐缺口（P1）
 
 5. **多向量查询侧近似**：C++ 第二步用残差码字近似、第三步 PLAID 候选裁剪；当前是「质心预过滤 + 原始 token 精确重排」。残差码本与码字已持久化，补齐只需解码路径 + 候选剪枝。
-6. **全文非 OR 路径**：WAND 当前只覆盖「单字段 + 单 token + 纯 OR」（`lib.rs:5879-5891` 的条件），`boolean` / `rank_features` / `min_should_match` / `delta_term` / 短语 / 多字段 / filter 仍走整行扫描。
-7. **IVF 检索**：只有格式编解码与镜像，无 `SearchKnn`（nprobe/距离/合并）。
+6. **全文非 OR 路径**：WAND 已覆盖 filter、`similarity=boolean`、`minimum_should_match`、`delta_term`（`lib.rs` 的 `WandMode`）；短语、多字段加权、`rank_features` 仍走扫描路径（该路径本身已按索引裁剪候选行）。
+7. ~~IVF 检索~~：plain 已接入（#89）；SQ/PQ 编码的检索在镜像写出这两种编码前不可达。
 
 #### 7.5.3 验收缺口（P2）
 

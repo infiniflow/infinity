@@ -2210,6 +2210,8 @@ pub struct Engine {
     /// Vector indexes loaded from the C++ block mirror, keyed by
     /// `"<table>.<column>"` (plan #70: the persisted HNSW graph, on disk).
     vector_indexes: Mutex<HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>>,
+    /// IVF chunks loaded from the C++ mirror, keyed by `"<table>.<column>"`.
+    ivf_indexes: Mutex<HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>>,
     /// session/global configuration set via `SET CONFIG …`
     config: Mutex<HashMap<String, String>>,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
@@ -2326,6 +2328,15 @@ fn is_secondary_kind(index_type: &str) -> bool {
         || t.eq_ignore_ascii_case("SECONDARYFUNCTIONAL")
 }
 
+/// How `wand_scan` turns matched terms into a score. The reference scores
+/// `similarity=boolean` as one point per matched term (per field), while the
+/// default is BM25.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WandMode {
+    Bm25,
+    Boolean,
+}
+
 impl Engine {
     pub fn open(dir: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_capacity(dir, 4)
@@ -2382,6 +2393,7 @@ impl Engine {
             secondary_disk_backed: Mutex::new(Default::default()),
             indexes: Mutex::new(HashMap::new()),
             vector_indexes: Mutex::new(HashMap::new()),
+            ivf_indexes: Mutex::new(HashMap::new()),
             config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
             index_comments: Mutex::new(HashMap::new()),
@@ -2478,6 +2490,15 @@ impl Engine {
                 let segments = self.load_vector_indexes(&im.table, &im.name);
                 if !segments.is_empty() {
                     self.vector_indexes.lock().unwrap().insert(
+                        index_key(&im.table, &im.column),
+                        segments.into_iter().map(Arc::new).collect(),
+                    );
+                }
+            }
+            if im.index_type.eq_ignore_ascii_case("IVF") {
+                let segments = self.load_ivf_indexes(&im.table, &im.name);
+                if !segments.is_empty() {
+                    self.ivf_indexes.lock().unwrap().insert(
                         index_key(&im.table, &im.column),
                         segments.into_iter().map(Arc::new).collect(),
                     );
@@ -2612,6 +2633,33 @@ impl Engine {
             self.indexes.lock().unwrap().insert(key, idx);
         }
         Ok(())
+    }
+
+    /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
+    /// query in the same process sees what `flush()` just mirrored.
+    fn reload_vector_indexes(&self) {
+        let Ok(indexes) = self.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if im.index_type.eq_ignore_ascii_case("HNSW") {
+                let segments = self.load_vector_indexes(&im.table, &im.name);
+                if !segments.is_empty() {
+                    self.vector_indexes.lock().unwrap().insert(
+                        index_key(&im.table, &im.column),
+                        segments.into_iter().map(Arc::new).collect(),
+                    );
+                }
+            } else if im.index_type.eq_ignore_ascii_case("IVF") {
+                let segments = self.load_ivf_indexes(&im.table, &im.name);
+                if !segments.is_empty() {
+                    self.ivf_indexes.lock().unwrap().insert(
+                        index_key(&im.table, &im.column),
+                        segments.into_iter().map(Arc::new).collect(),
+                    );
+                }
+            }
+        }
     }
 
     /// Dumps the memory tail of every disk-backed secondary index into new
@@ -5004,12 +5052,19 @@ impl Engine {
     /// `dead` holds tombstoned rows: they still contribute to the corpus
     /// statistics (the reference's segments do until compaction) but never rank,
     /// exactly like the scan path's live check.
+    /// How `wand_scan` turns matched terms into a score. The reference scores
+    /// `similarity=boolean` as one point per matched term (per field), while
+    /// the default is BM25.
+    #[allow(clippy::too_many_arguments)]
     fn wand_scan(
         index: &MergedIndex,
         terms: &[String],
         weights: &[f64],
         k: usize,
         dead: &std::collections::HashSet<u64>,
+        delta: f64,
+        min_should: usize,
+        mode: WandMode,
     ) -> Vec<(u64, f64)> {
         if k == 0 {
             return Vec::new();
@@ -5028,8 +5083,12 @@ impl Engine {
             let df = list.len() as f64;
             let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
             let w = weights.get(ti).copied().unwrap_or(1.0);
-            // tf / (tf + k1 * (...)) <= 1, so idf * (k1 + 1) * w is a safe bound.
-            cursors.push((ti, idf * 2.2 * w, 0));
+            // tf / (tf + k1 * (...)) <= 1, so the bound is `idf * (k1 + 1 + δ)`.
+            let ub = match mode {
+                WandMode::Bm25 => idf * (2.2 + delta.max(0.0)) * w,
+                WandMode::Boolean => w,
+            };
+            cursors.push((ti, ub, 0));
         }
         if cursors.is_empty() {
             return Vec::new();
@@ -5107,17 +5166,31 @@ impl Engine {
                 }
             };
             if !at_d.is_empty() && worth {
-                let mut score = 0.0;
-                for &c in &at_d {
-                    let (ti, _, cur) = cursors[c];
-                    let post = &index.postings[&terms[ti]][cur];
-                    let tf = post.1 as f64;
-                    let dl = *index.doc_len.get(&post.0).unwrap_or(&1) as f64;
-                    let df = index.postings[&terms[ti]].len() as f64;
-                    let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-                    let w = weights.get(ti).copied().unwrap_or(1.0);
-                    score += idf * (2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * dl / avg))) * w;
-                }
+                let score = match mode {
+                    WandMode::Bm25 => {
+                        let mut score = 0.0;
+                        for &c in &at_d {
+                            let (ti, _, cur) = cursors[c];
+                            let post = &index.postings[&terms[ti]][cur];
+                            let tf = post.1 as f64;
+                            let dl = *index.doc_len.get(&post.0).unwrap_or(&1) as f64;
+                            let df = index.postings[&terms[ti]].len() as f64;
+                            let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+                            let w = weights.get(ti).copied().unwrap_or(1.0);
+                            score += idf
+                                * (2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * dl / avg)) + delta)
+                                * w;
+                        }
+                        score
+                    }
+                    // `similarity=boolean`: one point per matched term.
+                    WandMode::Boolean => at_d
+                        .iter()
+                        .map(|&c| weights.get(cursors[c].0).copied().unwrap_or(1.0))
+                        .sum(),
+                };
+                // `minimum_should_match` counts matched query terms.
+                let enough_terms = at_d.len() >= min_should.max(1);
                 // A deleted row keeps its statistics but is never returned.
                 let better = if best.len() < k {
                     true
@@ -5129,7 +5202,7 @@ impl Engine {
                         None => true,
                     }
                 };
-                if !dead.contains(&d) && better {
+                if enough_terms && !dead.contains(&d) && better {
                     best.push((d, score));
                     best.sort_by(|a, b| {
                         b.1.partial_cmp(&a.1)
@@ -5788,15 +5861,24 @@ impl Engine {
         idx: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
         let mut rows = Vec::new();
         for (k, v) in self.store.scan_prefix(&prefix)? {
             let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
                 .parse()
                 .unwrap_or(0);
             let text = String::from_utf8_lossy(&v);
-            let cell = text.split('\t').nth(idx).unwrap_or("");
+            // A stored row may omit trailing columns that carry a DEFAULT; the
+            // index builders must see the same value a scan would.
+            let cell = match text.split('\t').nth(idx) {
+                Some(c) => parse_value(c),
+                None => match defaults.get(idx).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                },
+            };
             let mut cells = vec![Value::Null; idx + 1];
-            cells[idx] = parse_value(cell);
+            cells[idx] = cell;
             rows.push((seq, cells));
         }
         Ok(rows)
@@ -6733,16 +6815,12 @@ impl Engine {
             }
             groups
         };
-        // Block-max WAND: a plain OR query over one field never needs a row's
-        // token vectors — the posting lists alone answer it. This is what keeps
-        // memory flat when a query matches a large share of a wide table.
-        if !boolean
-            && rank_features.is_empty()
-            && in_filter.is_none()
-            && opt_filter.is_none()
-            && pred.is_none()
-            && min_should == 1
-            && delta_term == 0.0
+        // Block-max WAND: an OR query over one field never needs a row's token
+        // vectors — the posting lists alone answer it. Filters become a dead
+        // set, and `minimum_should_match` / `delta_term` / boolean similarity
+        // are applied inside the scoring loop. This is what keeps memory flat
+        // when a query matches a large share of a wide table.
+        if rank_features.is_empty()
             && !matches!(&delims, Some(d) if d.is_empty())
             && field_specs.len() == 1
             && units
@@ -6755,19 +6833,55 @@ impl Engine {
                 let guard = index.read().unwrap();
                 // Tombstones still feed the corpus statistics (as the
                 // reference's segments do until compaction) but never rank.
-                let dp = del_prefix(table);
-                let mut dead: std::collections::HashSet<u64> = Default::default();
-                for (k, _) in self.store.scan_prefix(&dp)? {
-                    if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
-                        dead.insert(seq);
+                let mut dead = self.tombstone_set(table)?;
+                // A filter removes documents before ranking; evaluating it over
+                // the rows and feeding the failures as tombstones keeps the
+                // postings-only scoring exact.
+                if pred.is_some() || in_filter.is_some() || opt_filter.is_some() {
+                    for (seq, row) in self.fetch_rows_with_ids(table)? {
+                        let ok = pred
+                            .as_ref()
+                            .map(|p| p.eval_predicate(&row))
+                            .unwrap_or(true)
+                            && in_filter
+                                .as_ref()
+                                .map(|p| p.eval_predicate(&row))
+                                .unwrap_or(true)
+                            && opt_filter
+                                .as_ref()
+                                .map(|p| p.eval_predicate(&row))
+                                .unwrap_or(true);
+                        if !ok {
+                            dead.insert(seq as u64);
+                        }
                     }
                 }
                 let wterms: Vec<String> =
                     units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
-                let weights: Vec<f64> = units.iter().map(|(_, _, ub)| boost * ub).collect();
+                // Boolean similarity ignores per-term boosts (one point per
+                // matched term, weighted by the field boost).
+                let weights: Vec<f64> = if boolean {
+                    vec![*boost; wterms.len()]
+                } else {
+                    units.iter().map(|(_, _, ub)| boost * ub).collect()
+                };
                 let merged = guard.merge(&wterms);
                 drop(guard);
-                let hits = Self::wand_scan(&merged, &wterms, &weights, topn.max(1), &dead);
+                let mode = if boolean {
+                    WandMode::Boolean
+                } else {
+                    WandMode::Bm25
+                };
+                let hits = Self::wand_scan(
+                    &merged,
+                    &wterms,
+                    &weights,
+                    topn.max(1),
+                    &dead,
+                    delta_term,
+                    min_should,
+                    mode,
+                );
                 let scored: Vec<(usize, f64)> = hits
                     .into_iter()
                     .map(|(seq, score)| (seq as usize, score))
@@ -8498,26 +8612,79 @@ impl Engine {
         // yields the whole top-`k` — `k` is generous and capped by the row
         // count, which fully covers a small table.
         let vector_candidates: Option<std::collections::HashSet<usize>> = (|| {
-            if is_sparse || is_tensor || metric != "l2" {
+            if is_sparse || is_tensor {
                 return None;
             }
             let col_name = match_columns(&m.column).first()?.clone();
-            let segments = self
-                .vector_indexes
-                .lock()
-                .unwrap()
-                .get(&index_key(table, &col_name))
-                .cloned()?;
             let col_type = types.get(col_idx)?.to_ascii_uppercase();
             if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
-                return None; // the graph is a single-vector L2 index
+                return None; // a single-vector index
             }
             let qv: Vec<f32> = query_items
                 .iter()
                 .filter_map(|x| x.parse::<f64>().ok())
                 .map(|x| x as f32)
                 .collect();
-            if qv.is_empty() || segments.is_empty() {
+            if qv.is_empty() {
+                return None;
+            }
+            // IVF: probe `nprobe` centroids of every sealed chunk (C++
+            // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
+            // below, so ranking matches an exhaustive scan whenever the probe
+            // covers the true top-k.
+            if let Some(segments) = self
+                .ivf_indexes
+                .lock()
+                .unwrap()
+                .get(&index_key(table, &col_name))
+                .cloned()
+            {
+                if segments.is_empty() {
+                    return None;
+                }
+                let nprobe = with_opts
+                    .unwrap_or("")
+                    .split(';')
+                    .filter_map(|p| p.split_once('='))
+                    .find(|(k, _)| k.trim().eq_ignore_ascii_case("nprobe"))
+                    .and_then(|(_, v)| v.trim().parse::<usize>().ok())
+                    .unwrap_or(1);
+                let mut covered: std::collections::HashSet<usize> = Default::default();
+                let mut candidates: std::collections::HashSet<usize> = Default::default();
+                for seg in &segments {
+                    for part in &seg.parts {
+                        for (offset, _) in part {
+                            covered.insert(*offset as usize);
+                        }
+                    }
+                    for offset in seg.candidates(&qv, (topn * 4).max(64), nprobe, &metric) {
+                        candidates.insert(offset as usize);
+                    }
+                }
+                // Rows written after the mirror are not covered; fall back to
+                // the exact scan rather than returning an incomplete top-k.
+                let all_covered = if let Some(c) = &cache {
+                    c.read()
+                        .map(|g| g.live.iter().all(|s| covered.contains(s)))
+                        .unwrap_or(false)
+                } else {
+                    rows.iter().all(|(seq, _)| covered.contains(seq))
+                };
+                if !all_covered {
+                    return None;
+                }
+                return Some(candidates);
+            }
+            if metric != "l2" {
+                return None;
+            }
+            let segments = self
+                .vector_indexes
+                .lock()
+                .unwrap()
+                .get(&index_key(table, &col_name))
+                .cloned()?;
+            if segments.is_empty() {
                 return None;
             }
             // Every sealed segment is its own graph; the query searches each
@@ -9100,6 +9267,7 @@ impl Engine {
         self.seal_multivector_indexes();
         self.seal_sparse_indexes();
         self.seal_secondary_indexes();
+        self.reload_vector_indexes();
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
         if let Some(client) = self.object_store.lock().unwrap().clone() {
@@ -11253,6 +11421,111 @@ mod tests {
         drop(e);
         let e = Engine::open(dir.path()).unwrap();
         assert_eq!(rows(&e, "SELECT a FROM t;"), vec![vec!["1".to_string()]]);
+    }
+
+    /// WAND now covers filters, `minimum_should_match`, `delta_term` and
+    /// `similarity=boolean`; each must agree with the reference semantics.
+    #[test]
+    fn wand_covers_boolean_filters_min_should_and_delta() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ftw (id INT, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO ftw VALUES (1,'alpha beta'),(2,'alpha gamma'),\
+             (3,'beta gamma'),(4,'alpha beta gamma');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX ftw_i ON ftw(body) USING FULLTEXT;")
+            .unwrap();
+
+        // Boolean similarity: one point per matched term.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
+                 ('body','alpha beta','topn=10;similarity=boolean');"
+            ),
+            vec![
+                vec!["1".to_string(), "2.000000".to_string()],
+                vec!["4".to_string(), "2.000000".to_string()],
+                vec!["2".to_string(), "1.000000".to_string()],
+                vec!["3".to_string(), "1.000000".to_string()],
+            ]
+        );
+
+        // `minimum_should_match=2` keeps only documents with both terms.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM ftw SEARCH MATCH TEXT \
+                 ('body','alpha beta','topn=10;minimum_should_match=2');"
+            ),
+            vec![vec!["1".to_string()], vec!["4".to_string()]]
+        );
+
+        // A filter is applied before ranking; the surviving scores match the
+        // unfiltered query.
+        let all = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
+             ('body','alpha beta','topn=10');",
+        );
+        let filtered = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
+             ('body','alpha beta','topn=10;filter=id <= 2');",
+        );
+        assert_eq!(filtered.len(), 2);
+        for row in &filtered {
+            assert!(all.contains(row), "{row:?} not in {all:?}");
+        }
+
+        // `delta_term` adds a constant to the tf norm:
+        // df=3, N=4 → idf=ln(1+1.5/3.5), len=2, avg=2.25,
+        // norm=2.2/(1+1.2*(0.25+0.75*2/2.25))=1.047619…
+        let idf = (1.0f64 + 1.5 / 3.5).ln();
+        let norm = 2.2 / (1.0 + 1.2 * (0.25 + 0.75 * 2.0 / 2.25));
+        let expected = 2.0 * idf * (norm + 1.0);
+        let got = rows(
+            &e,
+            "SELECT ROUND(SCORE(),4) FROM ftw SEARCH MATCH TEXT \
+             ('body','alpha beta','topn=1;bm25_param_delta_term=1');",
+        );
+        assert_eq!(got.len(), 1);
+        let value: f64 = got[0][0].parse().unwrap();
+        assert!((value - expected).abs() < 1e-4, "{value} vs {expected}");
+    }
+
+    /// IVF chunks written by the mirror are loaded and probed for candidates.
+    #[test]
+    fn ivf_index_serves_vector_candidates() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT,2));")
+            .unwrap();
+        e.execute(
+            "INSERT INTO iv VALUES (1,[0.0,0.0]),(2,[1.0,0.0]),\
+             (3,[0.0,1.0]),(4,[2.0,2.0]);",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX ivx ON iv (v) USING IVF WITH (metric = l2);")
+            .unwrap();
+        e.flush().unwrap();
+        assert!(e
+            .ivf_indexes
+            .lock()
+            .unwrap()
+            .values()
+            .any(|segments| !segments.is_empty()));
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM iv SEARCH MATCH VECTOR \
+                 (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);"
+            ),
+            vec![vec!["2".to_string()], vec!["1".to_string()]]
+        );
     }
 
     #[test]
