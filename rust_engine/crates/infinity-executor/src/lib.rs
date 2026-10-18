@@ -11108,10 +11108,20 @@ async fn pipeline(
         match stage {
             Stage::Filter(expr) => data.retain(|r| expr.eval_predicate(r)),
             Stage::Projection(exprs, names) => {
-                data = data
-                    .iter()
-                    .map(|r| exprs.iter().map(|e| e.eval(r)).collect())
-                    .collect();
+                // `SELECT *` compiles to the identity projection; copying every
+                // row again doubles the cost of a full-table select.
+                let width = data.first().map(Vec::len).unwrap_or(0);
+                let identity = exprs.len() == width
+                    && exprs
+                        .iter()
+                        .enumerate()
+                        .all(|(i, e)| matches!(e, Expr::Column(j) if *j == i));
+                if !identity {
+                    data = data
+                        .iter()
+                        .map(|r| exprs.iter().map(|e| e.eval(r)).collect())
+                        .collect();
+                }
                 cols = names.clone();
             }
             Stage::Aggregate {
