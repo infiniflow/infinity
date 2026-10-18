@@ -36,6 +36,8 @@ mod explain;
 
 mod explain_search;
 
+mod wand;
+
 mod cpp_blocks;
 
 /// Result of executing one statement.
@@ -2371,15 +2373,6 @@ fn is_secondary_kind(index_type: &str) -> bool {
 /// row (Gate C memory).
 fn is_blob_type(t: &str) -> bool {
     is_embedding_type(t) || is_tensor_type(t) || is_sparse_type(t)
-}
-
-/// How `wand_scan` turns matched terms into a score. The reference scores
-/// `similarity=boolean` as one point per matched term (per field), while the
-/// default is BM25.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum WandMode {
-    Bm25,
-    Boolean,
 }
 
 impl Engine {
@@ -5333,191 +5326,15 @@ impl Engine {
     /// the default is BM25.
     #[allow(clippy::too_many_arguments)]
     fn wand_scan(
-        fields: &[(&MergedIndex, &[f64])],
+        fields: &[(MergedIndex, Vec<f64>)],
         terms: &[String],
         k: usize,
         dead: &std::collections::HashSet<u64>,
         delta: f64,
         min_should: usize,
-        mode: WandMode,
+        mode: wand::WandMode,
     ) -> Vec<(u64, f64)> {
-        if k == 0 || fields.is_empty() {
-            return Vec::new();
-        }
-        // (field, term, upper bound, cursor into the posting list). BM25 scores
-        // each field separately and sums, so cursors from every field coexist.
-        let mut cursors: Vec<(usize, usize, f64, usize)> = Vec::new();
-        for (fi, (index, weights)) in fields.iter().enumerate() {
-            let n = index.n_docs.max(1) as f64;
-            for (ti, term) in terms.iter().enumerate() {
-                let Some(list) = index.postings.get(term) else {
-                    continue;
-                };
-                if list.is_empty() {
-                    continue;
-                }
-                let df = list.len() as f64;
-                let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-                let w = weights.get(ti).copied().unwrap_or(1.0);
-                // tf / (tf + k1 * (...)) <= 1, so the bound is `idf * (k1 + 1 + δ)`.
-                let ub = match mode {
-                    WandMode::Bm25 => idf * (2.2 + delta.max(0.0)) * w,
-                    WandMode::Boolean => w,
-                };
-                cursors.push((fi, ti, ub, 0));
-            }
-        }
-        if cursors.is_empty() {
-            return Vec::new();
-        }
-        macro_rules! doc_at {
-            ($c:expr, $cur:expr) => {{
-                let (fi, ti, _, _) = cursors[$c];
-                fields[fi].0.postings[&terms[ti]][$cur].0
-            }};
-        }
-        // `best` is kept sorted by score (desc) then docid (asc), the same
-        // ordering the scan path produces, so ties resolve identically.
-        let mut best: Vec<(u64, f64)> = Vec::new();
-        let mut threshold = f64::NEG_INFINITY;
-        loop {
-            let mut alive: Vec<usize> = (0..cursors.len()).collect();
-            alive.retain(|&c| {
-                let (fi, ti, _, cur) = cursors[c];
-                cur < fields[fi].0.postings[&terms[ti]].len()
-            });
-            if alive.is_empty() {
-                break;
-            }
-            alive.sort_by_key(|&c| doc_at!(c, cursors[c].3));
-            let total_ub: f64 = alive.iter().map(|&c| cursors[c].2).sum();
-            // `<` (not `<=`): a document that ties the k-th score can still win
-            // on the smaller docid, so only a strictly smaller bound is final.
-            if total_ub < threshold {
-                break;
-            }
-            // pivot = first prefix whose upper bound reaches the threshold
-            let mut pivot = alive.len();
-            let mut prefix = 0.0;
-            for (pos, &c) in alive.iter().enumerate() {
-                prefix += cursors[c].2;
-                if prefix >= threshold {
-                    pivot = pos;
-                    break;
-                }
-            }
-            if pivot >= alive.len() {
-                break;
-            }
-            let d = doc_at!(alive[pivot], cursors[alive[pivot]].3);
-            while pivot + 1 < alive.len()
-                && doc_at!(alive[pivot + 1], cursors[alive[pivot + 1]].3) == d
-            {
-                pivot += 1;
-            }
-            for &c in alive.iter().take(pivot + 1) {
-                let (fi, ti, _, cur) = cursors[c];
-                let list = &fields[fi].0.postings[&terms[ti]];
-                let mut j = cur;
-                while j < list.len() && list[j].0 < d {
-                    j += 1;
-                }
-                cursors[c].3 = j;
-            }
-            let at_d: Vec<usize> = (0..=pivot)
-                .map(|pos| alive[pos])
-                .filter(|&c| {
-                    let (fi, ti, _, cur) = cursors[c];
-                    fields[fi].0.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d)
-                })
-                .collect();
-            // block-max bound on the prefix, then the exact BM25 sum at `d`
-            let bm: f64 = at_d.iter().map(|&c| cursors[c].2).sum();
-            // While the top-k is not full every candidate is scored.
-            let worth = if best.len() < k {
-                true
-            } else {
-                match best.last() {
-                    Some((worst, wscore)) => bm >= *wscore && !(bm == *wscore && d > *worst),
-                    None => true,
-                }
-            };
-            if !at_d.is_empty() && worth {
-                let score = match mode {
-                    WandMode::Bm25 => {
-                        let mut score = 0.0;
-                        for &c in &at_d {
-                            let (fi, ti, _, cur) = cursors[c];
-                            let (index, weights) = fields[fi];
-                            let n = index.n_docs.max(1) as f64;
-                            let avg = (index.total_len as f64 / n).max(1e-9);
-                            let post = &index.postings[&terms[ti]][cur];
-                            let tf = post.1 as f64;
-                            let dl = *index.doc_len.get(&post.0).unwrap_or(&1) as f64;
-                            let df = index.postings[&terms[ti]].len() as f64;
-                            let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-                            let w = weights.get(ti).copied().unwrap_or(1.0);
-                            score += idf
-                                * (2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * dl / avg)) + delta)
-                                * w;
-                        }
-                        score
-                    }
-                    // `similarity=boolean`: one point per matched term.
-                    WandMode::Boolean => at_d
-                        .iter()
-                        .map(|&c| {
-                            let (fi, ti, _, _) = cursors[c];
-                            fields[fi].1.get(ti).copied().unwrap_or(1.0)
-                        })
-                        .sum(),
-                };
-                // `minimum_should_match`: BM25 counts distinct query units across
-                // fields; boolean counts every (field, term) match, like the scan.
-                let matched = match mode {
-                    WandMode::Bm25 => {
-                        let mut seen = std::collections::HashSet::new();
-                        for &c in &at_d {
-                            seen.insert(cursors[c].1);
-                        }
-                        seen.len()
-                    }
-                    WandMode::Boolean => at_d.len(),
-                };
-                let enough_terms = matched >= min_should.max(1);
-                // A deleted row keeps its statistics but is never returned.
-                let better = if best.len() < k {
-                    true
-                } else {
-                    match best.last() {
-                        Some((worst, wscore)) => {
-                            score > *wscore || (score == *wscore && d < *worst)
-                        }
-                        None => true,
-                    }
-                };
-                if enough_terms && !dead.contains(&d) && better {
-                    best.push((d, score));
-                    best.sort_by(|a, b| {
-                        b.1.partial_cmp(&a.1)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                            .then(a.0.cmp(&b.0))
-                    });
-                    best.truncate(k);
-                    if best.len() == k {
-                        threshold = best[k - 1].1;
-                    }
-                }
-            }
-            for &c in alive.iter().take(pivot + 1) {
-                let (fi, ti, _, cur) = cursors[c];
-                // `cur` may already be at the end after the advance above.
-                if fields[fi].0.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d) {
-                    cursors[c].3 += 1;
-                }
-            }
-        }
-        best
+        wand::BlockMaxWandIterator::new(fields, terms, k, dead, delta, min_should, mode).run()
     }
 
     fn vector_cache_for(
@@ -7210,17 +7027,13 @@ impl Engine {
                     }
                 }
             }
-            let fields: Vec<(&MergedIndex, &[f64])> = merged_fields
-                .iter()
-                .map(|(index, weights)| (index, weights.as_slice()))
-                .collect();
             let mode = if boolean {
-                WandMode::Boolean
+                wand::WandMode::Boolean
             } else {
-                WandMode::Bm25
+                wand::WandMode::Bm25
             };
             let hits = Self::wand_scan(
-                &fields,
+                &merged_fields,
                 &wterms,
                 topn.max(1),
                 &dead,

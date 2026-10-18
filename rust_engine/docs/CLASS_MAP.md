@@ -21,6 +21,8 @@
 | `Fst` 尾块/校验和 | `inverted_format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | MurmurHash64A | ✅（g++ 值已 pin） |
 | `TxnManager`（`new_txn_manager`） | `infinity_txn::TxnManager` | `BeginTxn`→`begin`、`CommitTxn`→`commit` | ✅（冲突校验在引擎层，见下） |
+| `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
+| `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -73,7 +75,8 @@
 |---|---|---|
 | `buffer/buffer_handle_ut.cpp`、`buffer_obj_ut.cpp` | `BufferManager`（无 handle/obj 抽象） | 类边界未拆，测试无法一一对应 |
 | `invertedindex/column_inverter_ut.cpp`、`format/*` 其余部分 | `TextIndex` / `inverted_format` | 构建器/格式读写测试未逐个移植 |
-| `invertedindex/search/*`（WAND/BM25/短语） | `Engine::wand_scan`（自由函数） | 先拆 `BlockMaxWandIterator`/`Bm25Ranker`，再移植 |
+| （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
+| `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描 |
 | `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | 低基数/多类型/边界用例未逐个移植 |
 | `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | 层级/启发式/召回用例未逐个移植 |
 | `knn/sparse/*_ut.cpp` | `infinity_index::sparse` | alpha/beta/tail 边界用例未逐个移植 |
