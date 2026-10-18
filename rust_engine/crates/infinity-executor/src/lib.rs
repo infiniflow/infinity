@@ -36,6 +36,7 @@ mod explain;
 mod explain_search;
 
 mod hnsw_mem;
+mod knn_scan;
 mod wand;
 
 mod cpp_blocks;
@@ -5544,8 +5545,10 @@ impl Engine {
                         .sum::<usize>();
                 if bytes <= ROW_CACHE_BUDGET_BYTES {
                     let mut tables = self.tables.lock().unwrap();
-                    tables.entry(key).or_default().row_cache =
-                        Some(RowCache { rows: rows.clone(), bytes });
+                    tables.entry(key).or_default().row_cache = Some(RowCache {
+                        rows: rows.clone(),
+                        bytes,
+                    });
                 }
             }
         }
@@ -9084,9 +9087,10 @@ impl Engine {
                 return Err(Error::NotFound(format!("index '{want}'")));
             }
         }
-        let threshold = with_opts
-            .and_then(parse_threshold)
-            .or_else(|| parse_threshold(&params));
+        // C++ `KnnScanSharedData` / `KnnSearchOption`: one object for the
+        // `WITH` and legacy option strings.
+        let knn_opts = knn_scan::KnnScanOptions::parse(with_opts, &params);
+        let threshold = knn_opts.threshold;
         // `filter=…` narrows the candidates of this search (the SDK passes the
         // same expression it would put in WHERE).
         let search_filter = match option_value("filter") {
@@ -9343,13 +9347,7 @@ impl Engine {
                 if segments.is_empty() && mem.is_empty() {
                     return None;
                 }
-                let nprobe = with_opts
-                    .unwrap_or("")
-                    .split(';')
-                    .filter_map(|p| p.split_once('='))
-                    .find(|(k, _)| k.trim().eq_ignore_ascii_case("nprobe"))
-                    .and_then(|(_, v)| v.trim().parse::<usize>().ok())
-                    .unwrap_or(1);
+                let nprobe = knn_opts.nprobe.unwrap_or(1);
                 let mut covered: std::collections::HashSet<usize> = Default::default();
                 let mut candidates: std::collections::HashSet<usize> = Default::default();
                 // The memory segment: rows written since the last mirror dump.
@@ -9400,13 +9398,7 @@ impl Engine {
             let mut covered: std::collections::HashSet<usize> = Default::default();
             // `KnnSearchOption.ef_`: the candidate list size for the bottom
             // layer (`WITH (ef = ...)`).
-            let ef = with_opts
-                .unwrap_or("")
-                .split(';')
-                .filter_map(|p| p.split_once('='))
-                .find(|(k, _)| k.trim().eq_ignore_ascii_case("ef"))
-                .and_then(|(_, v)| v.trim().parse::<usize>().ok());
-            let search_option = infinity_index::hnsw_handler::KnnSearchOption { ef };
+            let search_option = infinity_index::hnsw_handler::KnnSearchOption { ef: knn_opts.ef };
             let k = (topn * 4).max(64);
             let mut merge = infinity_index::merge_knn::MergeKnn::new(
                 1,
@@ -10299,19 +10291,6 @@ fn arg_int(e: &ExprAst) -> Option<i64> {
         ExprAst::Literal(Literal::Float(f)) => Some(*f as i64),
         _ => None,
     }
-}
-
-/// Extracts a `threshold = <n>` value from a `WITH (…)` option string.
-fn parse_threshold(opts: &str) -> Option<f64> {
-    let idx = opts.to_ascii_lowercase().find("threshold")?;
-    let rest = &opts[idx..];
-    let eq = rest.find('=')?;
-    let tail: String = rest[eq + 1..]
-        .trim_start()
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == '+')
-        .collect();
-    tail.trim().parse().ok()
 }
 
 fn parse_vec_str(s: &str) -> Vec<f64> {
@@ -12847,7 +12826,8 @@ mod tests {
     fn scalar_tables_use_the_row_cache() {
         let dir = tempdir().unwrap();
         let e = Engine::open(dir.path()).unwrap();
-        e.execute("CREATE TABLE rc (id INT, name VARCHAR);").unwrap();
+        e.execute("CREATE TABLE rc (id INT, name VARCHAR);")
+            .unwrap();
         e.execute("INSERT INTO rc VALUES (1,'a'),(2,'b');").unwrap();
         assert_eq!(rows(&e, "SELECT * FROM rc;").len(), 2);
         let key = e.table_key("rc");
