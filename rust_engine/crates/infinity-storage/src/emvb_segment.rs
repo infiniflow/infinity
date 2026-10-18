@@ -256,13 +256,103 @@ pub fn encode_emvb(
     encode_emvb_refs(dims, start_segment_offset, &refs)
 }
 
-/// Like [`encode_emvb`] but borrowing the token rows, so sealing a segment does
-/// not duplicate every vector.
-pub fn encode_emvb_refs(
+/// The EMVB arrays of one segment, before serialization.
+pub struct EmvbData {
+    pub start_segment_offset: u32,
+    pub dims: usize,
+    pub subspace_num: usize,
+    pub subspace_bits: u32,
+    pub n_centroids: usize,
+    pub centroids: Vec<f32>,
+    /// `-0.5 * ||centroid||`, the reference's `centroid_norms_neg_half_`.
+    pub centroid_norms: Vec<f32>,
+    /// Residual-PQ codeword norms, `subspace_num * k`.
+    pub pq_norms: Vec<f32>,
+    pub doc_lens: Vec<u32>,
+    pub doc_segment_offsets: Vec<u32>,
+    pub doc_offsets: Vec<u32>,
+    pub assignments: Vec<u32>,
+    pub centroids_to_docid: Vec<Vec<u32>>,
+    pub codebook: Vec<f32>,
+    pub codes: Vec<u8>,
+}
+
+impl EmvbData {
+    /// A borrowed view for `EMVBIndex::GetQueryResult`.
+    pub fn view(&self) -> infinity_index::emvb::EmvbView<'_> {
+        infinity_index::emvb::EmvbView {
+            dims: self.dims,
+            subspace_num: self.subspace_num,
+            sub_dim: self.dims.div_ceil(self.subspace_num.max(1)),
+            k: 1usize << self.subspace_bits.min(8),
+            centroids: &self.centroids,
+            codebook: &self.codebook,
+            codes: &self.codes,
+            assignments: &self.assignments,
+            doc_lens: &self.doc_lens,
+            doc_segment_offsets: &self.doc_segment_offsets,
+            centroids_to_docid: &self.centroids_to_docid,
+        }
+    }
+
+    /// `EMVBIndex::SaveIndexInner` + `PQ::Save`.
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        push_u32(&mut out, EMVB_MAGIC);
+        push_u32(&mut out, EMVB_VERSION);
+        push_u32(&mut out, self.start_segment_offset);
+        push_u32(&mut out, self.dims as u32);
+        push_u32(&mut out, self.subspace_num as u32);
+        push_u32(&mut out, self.subspace_bits);
+        push_u32(&mut out, self.n_centroids as u32);
+        push_f32s(&mut out, &self.centroids);
+        push_f32s(&mut out, &self.centroid_norms);
+        push_u32(&mut out, self.doc_lens.len() as u32);
+        // One code per embedding per subspace.
+        push_u32(
+            &mut out,
+            (self.codes.len() / self.subspace_num.max(1)) as u32,
+        );
+        push_u32s(&mut out, &self.doc_lens);
+        push_u32s(&mut out, &self.doc_segment_offsets);
+        push_u32s(&mut out, &self.doc_offsets);
+        push_u32s(&mut out, &self.assignments);
+        for list in &self.centroids_to_docid {
+            push_u32s(&mut out, list);
+        }
+        // Residual PQ (`PQ::Save` / `OPQ::Save`): per-subspace centroids, their
+        // -0.5*norm table, the codes, and the OPQ rotation (identity here).
+        let sub_dim = self.dims.div_ceil(self.subspace_num.max(1));
+        let k = 1usize << self.subspace_bits.min(8);
+        for sub in 0..self.subspace_num {
+            let base = sub * k * sub_dim;
+            for v in &self.codebook[base..base + k * sub_dim] {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        for v in &self.pq_norms {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+        let n_embeddings = self.codes.len() / self.subspace_num.max(1);
+        push_u32(&mut out, n_embeddings as u32);
+        out.extend_from_slice(&self.codes);
+        push_u32(&mut out, n_embeddings as u32); // next_embedding_id
+        for i in 0..self.dims {
+            for j in 0..self.dims {
+                let v = if i == j { 1.0f32 } else { 0.0 };
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        out
+    }
+}
+
+/// Builds the EMVB arrays for one segment (`EMVBIndex::Train` + `AddOneDocEmbeddings`).
+pub fn build_emvb(
     dims: usize,
     start_segment_offset: u32,
     docs: &[(u32, &[Vec<f32>])],
-) -> Vec<u8> {
+) -> EmvbData {
     let tokens: Vec<&[f32]> = docs
         .iter()
         .flat_map(|(_, t)| t.iter().map(|v| v.as_slice()))
@@ -273,14 +363,14 @@ pub fn encode_emvb_refs(
         (raw / 8) * 8
     };
     let centroids = coarse_centroids(dims, &tokens, n_centroids);
-    let mut norms = Vec::with_capacity(n_centroids);
+    let mut centroid_norms = Vec::with_capacity(n_centroids);
     for c in 0..n_centroids {
         let base = c * dims;
         let norm: f32 = (0..dims)
             .map(|i| centroids[base + i].powi(2))
             .sum::<f32>()
             .sqrt();
-        norms.push(-0.5 * norm);
+        centroid_norms.push(-0.5 * norm);
     }
 
     let mut doc_lens = Vec::with_capacity(docs.len());
@@ -315,50 +405,41 @@ pub fn encode_emvb_refs(
     let subspace_num = if dims.is_multiple_of(8) { 8 } else { 1 };
     let pq = train_residual_pq(dims, subspace_num, 8, &residuals);
 
-    let mut out = Vec::new();
-    push_u32(&mut out, EMVB_MAGIC);
-    push_u32(&mut out, EMVB_VERSION);
-    push_u32(&mut out, start_segment_offset);
-    push_u32(&mut out, dims as u32);
-    push_u32(&mut out, pq.subspace_num as u32);
-    push_u32(&mut out, pq.bits);
-    push_u32(&mut out, n_centroids as u32);
-    push_f32s(&mut out, &centroids);
-    push_f32s(&mut out, &norms);
-    push_u32(&mut out, docs.len() as u32);
-    push_u32(&mut out, tokens.len() as u32);
-    push_u32s(&mut out, &doc_lens);
-    push_u32s(&mut out, &doc_segment_offsets);
-    push_u32s(&mut out, &doc_offsets);
-    push_u32s(&mut out, &assignments);
-    for list in &centroids_to_docid {
-        push_u32s(&mut out, list);
-    }
-    // Residual PQ (`PQ::Save` / `OPQ::Save`): per-subspace centroids, their
-    // -0.5*norm table, the codes, and the OPQ rotation (identity here).
+    // The codebook layout is `subspace_num * k * sub_dim`.
     let sub_dim = dims.div_ceil(pq.subspace_num);
+    let k = 1usize << pq.bits.min(8);
+    let mut codebook = Vec::with_capacity(pq.subspace_num * k * sub_dim);
     for sub in 0..pq.subspace_num {
-        let k = 1usize << pq.bits.min(8);
         let base = sub * k * sub_dim;
-        for v in &pq.centroids[base..base + k * sub_dim] {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
+        codebook.extend_from_slice(&pq.centroids[base..base + k * sub_dim]);
     }
-    for v in &pq.norms {
-        out.extend_from_slice(&v.to_le_bytes());
+
+    EmvbData {
+        start_segment_offset,
+        dims,
+        subspace_num: pq.subspace_num,
+        subspace_bits: pq.bits,
+        n_centroids,
+        centroids,
+        centroid_norms,
+        pq_norms: pq.norms.clone(),
+        doc_lens,
+        doc_segment_offsets,
+        doc_offsets,
+        assignments,
+        centroids_to_docid,
+        codebook,
+        codes: pq.codes.into_iter().flatten().collect(),
     }
-    push_u32(&mut out, pq.codes.len() as u32);
-    for code in &pq.codes {
-        out.extend_from_slice(code);
-    }
-    push_u32(&mut out, pq.codes.len() as u32); // next_embedding_id
-    for i in 0..dims {
-        for j in 0..dims {
-            let v = if i == j { 1.0f32 } else { 0.0 };
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-    }
-    out
+}
+
+/// Like [`encode_emvb`] but borrowing the token rows.
+pub fn encode_emvb_refs(
+    dims: usize,
+    start_segment_offset: u32,
+    docs: &[(u32, &[Vec<f32>])],
+) -> Vec<u8> {
+    build_emvb(dims, start_segment_offset, docs).encode()
 }
 
 /// Writes the segment to `path`.

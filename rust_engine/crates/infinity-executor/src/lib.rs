@@ -1990,6 +1990,32 @@ struct MultiVectorIndex {
     next_chunk: u64,
     /// Bytes held by `tail`, for the unified memindex budget.
     tail_bytes: usize,
+    /// Bumped on every tail mutation; the in-memory EMVB index is rebuilt when
+    /// it lags (the reference's `EMVBIndexInMem`).
+    tail_generation: u64,
+    tail_emvb: std::sync::Mutex<Option<MvTailEmvb>>,
+}
+
+/// The reference's `EMVBIndexInMem` over the multi-vector tail.
+struct MvTailEmvb {
+    generation: u64,
+    data: infinity_storage::emvb_segment::EmvbData,
+    seqs: Vec<u64>,
+}
+
+/// C++ `EMVBIndexInMem`: `build_index_threshold_ = 32 * (1 << bits)` with
+/// `residual_pq_subspace_bits = 8`.
+const EMVB_BUILD_THRESHOLD: usize = 32 * 256;
+
+/// The threshold, overridable for tests that need to exercise the build.
+fn emvb_build_threshold() -> usize {
+    static CAP: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CAP.get_or_init(|| {
+        std::env::var("INFINITY_EMVB_BUILD_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(EMVB_BUILD_THRESHOLD)
+    })
 }
 
 fn multivector_doc_bytes(doc: &[Vec<f32>]) -> usize {
@@ -2034,6 +2060,8 @@ impl MultiVectorIndex {
             sealed: Vec::new(),
             next_chunk,
             tail_bytes: 0,
+            tail_generation: 0,
+            tail_emvb: std::sync::Mutex::new(None),
         }
     }
 
@@ -2052,11 +2080,13 @@ impl MultiVectorIndex {
         }
         self.tail_bytes += multivector_doc_bytes(&doc);
         self.tail.insert(seq, doc);
+        self.tail_generation += 1;
     }
 
     fn remove(&mut self, seq: u64) {
         if let Some(old) = self.tail.remove(&seq) {
             self.tail_bytes = self.tail_bytes.saturating_sub(multivector_doc_bytes(&old));
+            self.tail_generation += 1;
         }
     }
 
@@ -2073,6 +2103,7 @@ impl MultiVectorIndex {
             by_segment.entry(seq >> 32).or_default().push((seq, doc));
         }
         self.tail_bytes = 0;
+        self.tail_generation += 1;
         for (segment, mut rows) in by_segment {
             rows.sort_by_key(|(seq, _)| *seq);
             let ids: Vec<u64> = rows.iter().map(|(seq, _)| *seq).collect();
@@ -2139,11 +2170,55 @@ impl MultiVectorIndex {
                 hits.push((*seq, reader.maxsim(query, doc)));
             }
         }
-        for (seq, doc) in &self.tail {
-            if dead.contains(seq) || doc.is_empty() {
-                continue;
+        // The memory segment: once the tail holds enough embeddings the
+        // reference builds an in-memory `EMVBIndex` and searches it; the
+        // survivors are re-scored exactly from the raw tokens.
+        let tail_embeddings: usize = self.tail.values().map(Vec::len).sum();
+        if tail_embeddings >= emvb_build_threshold() {
+            let mut guard = self.tail_emvb.lock().unwrap();
+            if guard
+                .as_ref()
+                .map(|t| t.generation != self.tail_generation)
+                .unwrap_or(true)
+            {
+                let mut docs: Vec<(u32, &[Vec<f32>])> = Vec::with_capacity(self.tail.len());
+                let mut seqs = Vec::with_capacity(self.tail.len());
+                for (i, (seq, doc)) in self.tail.iter().enumerate() {
+                    docs.push((i as u32, doc.as_slice()));
+                    seqs.push(*seq);
+                }
+                let data = infinity_storage::emvb_segment::build_emvb(self.dims, 0, &docs);
+                *guard = Some(MvTailEmvb {
+                    generation: self.tail_generation,
+                    data,
+                    seqs,
+                });
             }
-            hits.push((*seq, maxsim_tokens(query, doc)));
+            if let Some(tail) = guard.as_ref() {
+                for (doc, _) in tail.data.view().search(
+                    query,
+                    (k + dead.len()).max(1),
+                    infinity_index::emvb::EmvbSearchOptions::for_topk(k.max(1)),
+                ) {
+                    let Some(seq) = tail.seqs.get(doc as usize) else {
+                        continue;
+                    };
+                    if dead.contains(seq) {
+                        continue;
+                    }
+                    if let Some(tokens) = self.tail.get(seq) {
+                        hits.push((*seq, maxsim_tokens(query, tokens)));
+                    }
+                }
+            }
+            drop(guard);
+        } else {
+            for (seq, doc) in &self.tail {
+                if dead.contains(seq) || doc.is_empty() {
+                    continue;
+                }
+                hits.push((*seq, maxsim_tokens(query, doc)));
+            }
         }
         hits.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
@@ -8812,6 +8887,71 @@ impl Engine {
             }
         }
 
+        // Multi-vector: answer from the write-time EMVB index (sealed chunks
+        // plus the memory tail) when no predicate needs the other columns.
+        // C++: `PhysicalMatchTensorScan` over `EMVBIndexInMem`/segment readers.
+        if is_tensor
+            && types
+                .get(col_idx)
+                .map(|t| t.to_ascii_uppercase().starts_with("MULTIVECTOR"))
+                .unwrap_or(false)
+            && pred.is_none()
+            && in_filter.is_none()
+            && search_filter.is_none()
+        {
+            let dims = types.get(col_idx).and_then(|t| type_dim(t));
+            if let Some(dims) = dims.filter(|d| *d > 0) {
+                let q_flat: Vec<f32> = query_items
+                    .iter()
+                    .filter_map(|x| x.trim().parse::<f32>().ok())
+                    .collect();
+                if !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
+                    let query: Vec<Vec<f32>> =
+                        q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
+                    let column = match_columns(&m.column)
+                        .first()
+                        .cloned()
+                        .unwrap_or_default();
+                    let index = self
+                        .mv_index
+                        .lock()
+                        .unwrap()
+                        .get(&index_key(table, &column))
+                        .cloned();
+                    if let Some(index) = index {
+                        let dead = self.tombstone_set(table)?;
+                        let hits: Vec<(u64, f32)> = index
+                            .read()
+                            .unwrap()
+                            .search(&query, topn.max(1), &dead)
+                            .into_iter()
+                            .filter(|(_, score)| {
+                                threshold.map(|t| f64::from(*score) >= t).unwrap_or(true)
+                            })
+                            .collect();
+                        let wanted: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                        let mut by_id: HashMap<usize, Vec<Value>> = self
+                            .fetch_some_rows_with_ids(table, &wanted)?
+                            .into_iter()
+                            .collect();
+                        let mut out = Vec::new();
+                        for (seq, score) in hits {
+                            let Some(mut row) = by_id.remove(&(seq as usize)) else {
+                                continue;
+                            };
+                            let score = f64::from(score);
+                            row.push(Value::Int(seq as i64));
+                            row.push(Value::Float(score));
+                            row.push(Value::Float(-score));
+                            row.push(Value::Float(score));
+                            out.push(row);
+                        }
+                        return Ok((out, hidden));
+                    }
+                }
+            }
+        }
+
         let cache: Option<SharedVectorCache> = (|| {
             if is_sparse || is_tensor {
                 return None;
@@ -9107,113 +9247,17 @@ impl Engine {
                 return HashMap::new();
             }
             let query: Vec<Vec<f32>> = q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
-            #[allow(clippy::type_complexity)]
-            let mut segments: HashMap<u64, (Vec<Vec<Vec<f32>>>, Vec<usize>)> = HashMap::new();
+            // Exact MaxSim over the scanned rows. The persisted segments and
+            // residual codes are built at write/seal time (`MultiVectorIndex`);
+            // a scan never writes index files.
+            let mut best: HashMap<usize, f64> = HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
                     continue;
                 };
-                let flat: Vec<f32> = v
-                    .trim()
-                    .trim_start_matches('[')
-                    .trim_end_matches(']')
-                    .split([',', '[', ']'])
-                    .filter_map(|x| x.trim().parse::<f32>().ok())
-                    .collect();
-                if !flat.len().is_multiple_of(dims) || flat.is_empty() {
-                    continue;
+                if let Some(doc) = parse_multivector_doc(v, dims) {
+                    best.insert(*seq, f64::from(maxsim_tokens(&query, &doc)));
                 }
-                let doc: Vec<Vec<f32>> = flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
-                let segment = (*seq as u64) >> 32;
-                let entry = segments.entry(segment).or_default();
-                entry.0.push(doc);
-                entry.1.push(*seq);
-            }
-            let mut best: HashMap<usize, f64> = HashMap::new();
-            let mut per_segment: Vec<Vec<(usize, f32)>> = Vec::new();
-            let version = self
-                .write_batches
-                .lock()
-                .unwrap()
-                .get(table)
-                .copied()
-                .unwrap_or(0);
-            for (segment, (docs, ids)) in segments {
-                // Persist the segment once; later queries map the file.
-                let dir = self.dir.join("multivector").join(
-                    index_key(
-                        table,
-                        &match_columns(&m.column)
-                            .first()
-                            .cloned()
-                            .unwrap_or_default(),
-                    )
-                    .replace('/', "_"),
-                );
-                let path = dir.join(format!("seg_{segment}_{}_{version}.mvec", docs.len()));
-                if infinity_storage::multivector_segment::write_multivector_segment(
-                    &path, dims, &docs,
-                )
-                .is_err()
-                {
-                    continue;
-                }
-                // The reference's EMVB chunk (coarse centroids, document
-                // tables and inverted lists) is written beside the raw-token
-                // segment used for exact re-scoring.
-                // Written once per segment: it is an interop artifact, the
-                // query itself scores from `seg_*.mvec`.
-                let emvb_path = path.with_extension("emvb");
-                if !emvb_path.exists() {
-                    let emvb_docs: Vec<(u32, Vec<Vec<f32>>)> = docs
-                        .iter()
-                        .zip(ids.iter())
-                        .map(|(tokens, seq)| ((*seq as u64 & 0xffff_ffff) as u32, tokens.clone()))
-                        .collect();
-                    let _ = infinity_storage::emvb_segment::write_emvb_segment(
-                        &emvb_path,
-                        dims,
-                        (segment & 0xffff_ffff) as u32,
-                        &emvb_docs,
-                    );
-                }
-                let Ok(reader) =
-                    infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
-                else {
-                    continue;
-                };
-                // Large segments run the reference's two-stage search: a PQ
-                // prefilter (`PqCodebook`, EMVB's centroid stage) keeps a
-                // candidate set, then the winners are scored exactly.
-                let hits: Vec<(usize, f32)> = if docs.len() > 256 {
-                    let tokens: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
-                    let pq = infinity_index::multivector::PqCodebook::train(dims, 8, 8, &tokens);
-                    let mut scored: Vec<(usize, f32)> = pq
-                        .prefilter(&query, &docs, (topn * 4).max(64).min(docs.len()))
-                        .into_iter()
-                        .map(|d| (d, reader.maxsim(&query, d)))
-                        .collect();
-                    scored.sort_by(|a, b| {
-                        b.1.partial_cmp(&a.1)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                            .then(a.0.cmp(&b.0))
-                    });
-                    scored.truncate(topn.max(1));
-                    scored
-                        .into_iter()
-                        .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
-                        .collect()
-                } else {
-                    reader
-                        .search(&query, topn.max(1))
-                        .into_iter()
-                        .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
-                        .collect()
-                };
-                per_segment.push(hits);
-            }
-            for (row, score) in infinity_index::multivector::merge_topk(per_segment, topn.max(1)) {
-                best.insert(row, score as f64);
             }
             best
         })();
