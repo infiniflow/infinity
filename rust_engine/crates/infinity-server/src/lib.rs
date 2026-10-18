@@ -2800,7 +2800,11 @@ pub fn rows_to_column_fields_typed(
                 column_type: 21, // ColumnArray
                 column_name: name.clone(),
                 column_vectors: vec![chunk],
-                bitmasks: if masks.iter().all(|m| *m) { Vec::new() } else { masks },
+                bitmasks: if masks.iter().all(|m| *m) {
+                    Vec::new()
+                } else {
+                    masks
+                },
             });
             continue;
         }
@@ -2843,7 +2847,11 @@ pub fn rows_to_column_fields_typed(
                 column_type: 13, // ColumnSparse
                 column_name: name.clone(),
                 column_vectors: vec![chunk],
-                bitmasks: if masks.iter().all(|m| *m) { Vec::new() } else { masks },
+                bitmasks: if masks.iter().all(|m| *m) {
+                    Vec::new()
+                } else {
+                    masks
+                },
             });
             continue;
         }
@@ -2881,7 +2889,11 @@ pub fn rows_to_column_fields_typed(
                 column_type,
                 column_name: name.clone(),
                 column_vectors: vec![chunk],
-                bitmasks: if masks.iter().all(|m| *m) { Vec::new() } else { masks },
+                bitmasks: if masks.iter().all(|m| *m) {
+                    Vec::new()
+                } else {
+                    masks
+                },
             });
             continue;
         }
@@ -2931,7 +2943,11 @@ pub fn rows_to_column_fields_typed(
                 column_type: 10, // ColumnEmbedding
                 column_name: name.clone(),
                 column_vectors: vec![chunk],
-                bitmasks: if masks.iter().all(|m| *m) { Vec::new() } else { masks },
+                bitmasks: if masks.iter().all(|m| *m) {
+                    Vec::new()
+                } else {
+                    masks
+                },
             });
             continue;
         }
@@ -3017,7 +3033,11 @@ pub fn rows_to_column_fields_typed(
             column_type: code,
             column_name: name.clone(),
             column_vectors: vec![chunk],
-            bitmasks: if masks.iter().all(|m| *m) { Vec::new() } else { masks },
+            bitmasks: if masks.iter().all(|m| *m) {
+                Vec::new()
+            } else {
+                masks
+            },
         });
     }
     out

@@ -348,11 +348,7 @@ impl EmvbData {
 }
 
 /// Builds the EMVB arrays for one segment (`EMVBIndex::Train` + `AddOneDocEmbeddings`).
-pub fn build_emvb(
-    dims: usize,
-    start_segment_offset: u32,
-    docs: &[(u32, &[Vec<f32>])],
-) -> EmvbData {
+pub fn build_emvb(dims: usize, start_segment_offset: u32, docs: &[(u32, &[Vec<f32>])]) -> EmvbData {
     let tokens: Vec<&[f32]> = docs
         .iter()
         .flat_map(|(_, t)| t.iter().map(|v| v.as_slice()))
@@ -780,9 +776,8 @@ mod tests {
             let cluster = (row % 4) as usize;
             let toks = (0..3)
                 .map(|_| {
-                    let mut v: Vec<f32> = (0..dims)
-                        .map(|_| ((next() % 100) as f32) / 500.0)
-                        .collect();
+                    let mut v: Vec<f32> =
+                        (0..dims).map(|_| ((next() % 100) as f32) / 500.0).collect();
                     v[cluster] += 1.0;
                     v
                 })

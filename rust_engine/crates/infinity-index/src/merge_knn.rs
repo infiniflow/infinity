@@ -171,10 +171,7 @@ impl MergeKnn {
             return;
         }
         for (q, heap) in self.heaps.iter_mut().enumerate() {
-            self.results[q] = heap
-                .drain()
-                .map(|e| (e.dist, e.row_id))
-                .collect();
+            self.results[q] = heap.drain().map(|e| (e.dist, e.row_id)).collect();
         }
         self.result_size = Some(self.results[0].len().min(self.top_k));
         self.begun = false;
@@ -229,7 +226,10 @@ mod tests {
         let mut merge = MergeKnn::new(1, 3, Compare::Max, None);
         merge.begin();
         merge.search(0, &[(0.1, row(0, 10)), (0.5, row(0, 11))]);
-        merge.search(0, &[(0.05, row(1, 20)), (0.4, row(1, 21)), (0.9, row(1, 22))]);
+        merge.search(
+            0,
+            &[(0.05, row(1, 20)), (0.4, row(1, 21)), (0.9, row(1, 22))],
+        );
         merge.end();
         assert_eq!(
             merge.ids_by_idx(0),
@@ -298,7 +298,10 @@ mod tests {
         let mut merge = MergeKnn::new(1, 2, Compare::Min, None);
         merge.begin();
         // Cosine arrives as `cos - 1` (similarity - 1): larger is better.
-        merge.search(0, &[(-0.2, row(0, 1)), (-0.8, row(0, 2)), (-0.5, row(0, 3))]);
+        merge.search(
+            0,
+            &[(-0.2, row(0, 1)), (-0.8, row(0, 2)), (-0.5, row(0, 3))],
+        );
         merge.end();
         assert_eq!(merge.ids_by_idx(0), vec![row(0, 1), row(0, 3)]);
         assert_eq!(merge.distances_by_idx(0), vec![-0.2, -0.5]);

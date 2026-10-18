@@ -186,7 +186,12 @@ impl EmvbView<'_> {
         } else {
             let mut hits: Vec<(u32, u32)> = candidates
                 .iter()
-                .map(|&doc| (self.query_token_hits(doc as usize, &doc_offsets, &masks), doc))
+                .map(|&doc| {
+                    (
+                        self.query_token_hits(doc as usize, &doc_offsets, &masks),
+                        doc,
+                    )
+                })
                 .collect();
             hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
             hits.truncate(n_doc_to_score);
