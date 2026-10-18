@@ -387,8 +387,30 @@ impl HnswIndex {
         result
     }
 
+    /// Approximate heap bytes held by the graph, for the memindex budget.
+    /// C++: `HnswHandler::MemUsage`.
+    pub fn mem_usage(&self) -> usize {
+        let data: usize = self.data.iter().map(|v| v.capacity() * 4).sum();
+        let levels = self.levels.capacity() * std::mem::size_of::<usize>();
+        let links: usize = self
+            .links
+            .iter()
+            .map(|layer| {
+                layer.capacity() * std::mem::size_of::<Vec<usize>>()
+                    + layer.iter().map(|l| l.capacity() * 8).sum::<usize>()
+            })
+            .sum();
+        data + levels + links
+    }
+
     /// Returns `(row_id, distance)` for the `k` approximate nearest, ascending.
+    /// C++: `HnswHandler::SearchIndex` with the default `ef`.
     pub fn search(&self, q: &[f32], k: usize) -> Vec<(usize, f32)> {
+        self.search_with_ef(q, k, self.ef_search)
+    }
+
+    /// `KnnSearchOption.ef_`: the candidate list size for the bottom layer.
+    pub fn search_with_ef(&self, q: &[f32], k: usize, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
         };
@@ -398,7 +420,7 @@ impl HnswIndex {
             cur = self.search_layer_nearest(q, cur, l as usize);
             l -= 1;
         }
-        let ef = self.ef_search.max(k);
+        let ef = ef.max(k);
         let mut res = self.search_layer(q, cur, ef, 0);
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);

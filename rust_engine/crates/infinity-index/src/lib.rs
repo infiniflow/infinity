@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod fulltext;
+pub mod hnsw_handler;
 pub mod ivf;
 pub mod merge_knn;
 pub mod multivector;

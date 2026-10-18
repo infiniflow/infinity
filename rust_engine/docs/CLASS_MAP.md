@@ -24,7 +24,8 @@
 | `NewTxn::Delete/Commit` 冲突检查 | `Txn::delete` + `TxnManager::commit` | 删除键在提交时按 `begin_ts` 校验 | ✅ |
 | `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
-| `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search` | ✅ |
+| `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search`、`MemUsage` | ✅ |
+| `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::hnsw_handler::HnswHandler` | `Make`→`new`/`from_index`、`InsertVecs`→`insert_vecs`（按序，调度器设计变更）、`SearchIndex`→`search_index`（`KnnSearchOption.ef`→`ef`）、`MemUsage`→`mem_usage`、`GetDocNum`→`len` | ✅ |
 | `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `infinity_index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 | `BlockFwd` / `TailFwd`（`bmp_fwd.cppm`，own-mem） | `infinity_index::sparse::{BlockFwd, TailFwd, BlockTerm}` | `AddDoc`→`add_doc`、`ToBlockFwd`、`GetBlockTerms`、`GetScores`/`GetScoresTail`、`Prefetch` | ✅ |
 | `BMPIvt` / `BlockData` / `BlockPostings`（`bmp_ivt.cppm`，own-mem） | `infinity_index::sparse::{BMPIvt, Postings}` | `AddBlock`→`add_block`、`GetPostings`、`Optimize`→`build`、`kth`、`block_ids`/`max_scores` | ✅ |
@@ -44,8 +45,7 @@
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::vector::HnswIndex` + `hnsw_mem::HnswIndexInMem` | 图算法与内存段已对应；`InsertVecs`/`SearchIndex` 的批次与 `KnnSearchOption` 仍内联在执行器 |
-| `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
+| `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`、单段检索已走 `HnswHandler`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
 | `MemoryIndexer`（`memory_indexer.cppm`）/ `IndexSegmentReader`（`index_segment_reader.cppm`）/ `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `TextIndex` + `infinity_storage::fulltext_segment::SegmentIndexReader` + 查询期 `MergedIndex`（`lib.rs:1651`） | `SegmentIndexReader` 已对应 `IndexSegmentReader`；`MemoryIndexer`（未封段的内存倒排 + 预算）与 `ColumnIndexReader`（跨段合并/统计）仍内联在 `TextIndex` 与执行器 |
 | `EMVBIndex`（`emvb_index.cppm`）/ `EMVBIndexInMem`（`emvb_index_in_mem.cppm`） | `emvb_segment::{EmvbReader, EmvbPqIndex, PqCodebook}` + 执行器 `MultiVectorIndex` | 已移植：磁盘布局、残差 PQ 码本与候选预过滤（`prefilter`）。**未移植**：`Train` 的质心 k-means、三阶段 `GetQueryResult`（centroid→doc→refine）、`EMVBIndexInMem` 的建索引阈值；当前执行器对候选做精确 maxsim 重排 |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
@@ -76,6 +76,7 @@
 | `knn/sparse/test_bmp_fwd_ut.cpp`（块分组/迭代不变量） | `sparse::BlockFwd`/`TailFwd` | `block_fwd_groups_docs_into_blocks` |
 | `knn/sparse/test_bmp_ivt_ut.cpp`（block max / kth 不变量） | `sparse::BMPIvt`/`Postings` | `bmp_ivt_keeps_block_maxima_and_kth` |
 | `knn/sparse` 的 block-max 检索 | `sparse::BmpAlg::search_knn` | `matches_brute_force`、`beta_keeps_the_strongest_terms`、`tail_documents_are_scored_when_the_block_does_not_fill` |
+| `knn/hnsw` 的插入/检索入口 | `hnsw_handler::HnswHandler` | `insert_vecs_counts_only_matching_dimensions`、`search_index_honours_the_ef_option` |
 
 ### 未移植单测（Rust 类已存在）
 

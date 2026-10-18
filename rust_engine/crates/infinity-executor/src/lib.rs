@@ -2911,6 +2911,11 @@ impl Engine {
                 total += g.tail_bytes;
             }
         }
+        // The HNSW memory segment (`HnswIndexInMem`) owns a graph per column;
+        // the reference charges it against the same memindex budget.
+        for idx in self.hnsw_mem.lock().unwrap().values() {
+            total += idx.mem_usage();
+        }
         total
             + self
                 .indexes
@@ -8874,7 +8879,11 @@ impl Engine {
                 let seg_k = k.min(seg.labels.len().max(1));
                 let hits: Vec<(f32, u64)> = seg
                     .index
-                    .search(&qv, seg_k)
+                    .search_index(
+                        &qv,
+                        seg_k,
+                        infinity_index::hnsw_handler::KnnSearchOption::default(),
+                    )
                     .into_iter()
                     .map(|(node, dist)| (dist, seg.labels[node] as u64))
                     .collect();

@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use infinity_common::{Error, Result};
 use infinity_expression::Value;
+use infinity_index::hnsw_handler::HnswHandler;
 use infinity_index::vector::HnswIndex;
 use infinity_storage::cpp_format::{
     self, date_to_days, datetime_to_pair, element_width, embedding_size, pack_column_with_layout,
@@ -32,7 +33,7 @@ type VectorRows = Vec<(u32, Vec<f32>)>;
 /// An HNSW graph read back from the C++ mirror, so a query can walk the graph
 /// that is on disk (plan #70). `labels[i]` is the row id of node `i`.
 pub struct LoadedVectorIndex {
-    pub index: HnswIndex,
+    pub index: HnswHandler,
     pub labels: Vec<u32>,
 }
 
@@ -1910,7 +1911,10 @@ impl Engine {
             entry,
             header.max_layer.max(0) as usize,
         );
-        Ok(LoadedVectorIndex { index, labels })
+        Ok(LoadedVectorIndex {
+            index: HnswHandler::from_index(index),
+            labels,
+        })
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
