@@ -3099,6 +3099,9 @@ impl Engine {
             }
             Statement::DropTable { name, if_exists } => {
                 let existed = self.drop_table_all(name)?;
+                if existed {
+                    self.drop_text_index_storage(name, None);
+                }
                 if !existed && !*if_exists {
                     return Err(Error::Invalid(format!("table '{name}' does not exist")));
                 }
@@ -3108,7 +3111,23 @@ impl Engine {
                 })
             }
             Statement::DropIndex { name, if_exists } => {
+                let target = self
+                    .catalog
+                    .list_indexes()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|im| im.name == *name)
+                    .map(|im| (im.table, im.column, im.index_type));
+                let was_fulltext = target
+                    .as_ref()
+                    .map(|(_, _, t)| t.eq_ignore_ascii_case("FULLTEXT"))
+                    .unwrap_or(false);
                 let existed = self.catalog.drop_index(name)?;
+                if existed {
+                    if let Some((table, column, _)) = target.filter(|_| was_fulltext) {
+                        self.drop_text_index_storage(&table, Some(&column));
+                    }
+                }
                 if !existed && !*if_exists {
                     return Err(Error::Invalid(format!("index '{name}' does not exist")));
                 }
@@ -4436,6 +4455,40 @@ impl Engine {
             index_delete_row(&mut index, seq as u64);
             index_row(&mut index, seq as u64, text);
             index.maybe_seal();
+        }
+    }
+
+    /// Removes the cached inverted indexes of `table` (or of one column) and
+    /// their sealed segment files. Called when the table or its full-text index
+    /// is dropped, so segments never outlive the catalog entry.
+    fn drop_text_index_storage(&self, table: &str, column: Option<&str>) {
+        let prefix = match column {
+            Some(c) => index_key(table, c),
+            None => format!("{table}."),
+        };
+        let exact = column.is_some();
+        let mut removed: Vec<String> = Vec::new();
+        {
+            let mut indexes = self.text_index.lock().unwrap();
+            let keys: Vec<String> = indexes
+                .keys()
+                .filter(|k| {
+                    if exact {
+                        k.as_str() == prefix
+                    } else {
+                        k.starts_with(&prefix)
+                    }
+                })
+                .cloned()
+                .collect();
+            for key in keys {
+                indexes.remove(&key);
+                removed.push(key);
+            }
+        }
+        for key in removed {
+            let dir = self.dir.join("fulltext").join(key.replace('/', "_"));
+            let _ = std::fs::remove_dir_all(dir);
         }
     }
 
