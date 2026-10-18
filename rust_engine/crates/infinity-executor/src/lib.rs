@@ -1604,28 +1604,113 @@ fn dedupe_postings(list: &mut Vec<(u64, u32)>) {
     *list = out;
 }
 
-/// In-memory inverted index for one text column: `term -> [(doc, tf, positions)]`
-/// plus each document's length, mirroring the reference memory indexer
-/// (`src/storage/invertedindex/memory_indexer*`).
-struct TextIndex {
-    delims: Option<Vec<char>>,
-    /// Documents counted for the corpus statistics. Counted per scanned row, so
-    /// a table with duplicate sequence ids still matches the scan.
-    n_docs: usize,
-    total_len: u64,
-    /// Row sequence ids are 64-bit (`ROW_ID()` offsets each insert batch by
-    /// 2^32), so document ids must be too — truncating to `u32` merged batches.
+/// The reference's memory indexer: the **unsealed** segment of one text
+/// column, holding `term -> [(doc, tf, positions)]`, each document's length
+/// and the corpus statistics.
+///
+/// C++: `MemoryIndexer` (`src/storage/invertedindex/memory_indexer.cppm`).
+#[derive(Default)]
+struct MemoryIndexer {
+    /// `doc -> length`, used for BM25's document length.
     docs: HashMap<u64, u32>,
     postings: HashMap<String, Vec<(u64, u32, Vec<u32>)>>,
     live: std::collections::HashSet<u64>,
-    /// Approximate memory held by the postings of the **unsealed** segment.
-    /// When it reaches [`TEXT_SEGMENT_BYTES`] the segment is written out and
-    /// queried through `mmap`, so only the current segment is resident.
+    n_docs: usize,
+    total_len: u64,
+    /// Approximate bytes held by this segment, for the memindex budget.
     bytes: usize,
+}
+
+impl MemoryIndexer {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    /// C++: `MemoryIndexer::Insert` for one document. Returns `false` when the
+    /// document would push the segment past `budget`, leaving it unchanged.
+    fn insert(
+        &mut self,
+        seq: u64,
+        text: &str,
+        delims: &Option<Vec<char>>,
+        budget: usize,
+    ) -> bool {
+        let toks = tokenize_index_positions(text, delims);
+        // ~32 B per posting entry plus the positions and the term string.
+        let mut cost = 64usize;
+        for (term, _) in &toks {
+            cost += term.len() + 32;
+        }
+        if self.bytes + cost > budget {
+            return false;
+        }
+        self.bytes += cost;
+        // A re-indexed row (UPDATE rewrites in place) replaces its length
+        // rather than adding a second document to the corpus statistics.
+        match self.docs.insert(seq, toks.len() as u32) {
+            Some(old) => self.total_len = self.total_len.saturating_sub(old as u64),
+            None => self.n_docs += 1,
+        }
+        self.total_len += toks.len() as u64;
+        self.live.insert(seq);
+        let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
+        for (term, at) in &toks {
+            pos.entry(term.as_str()).or_default().push(*at);
+        }
+        for (term, positions) in pos {
+            self.postings.entry(term.to_string()).or_default().push((
+                seq,
+                positions.len() as u32,
+                positions,
+            ));
+        }
+        true
+    }
+
+    /// C++: deleting a document only drops its live marker; the postings and
+    /// length stay until the segment is compacted.
+    fn delete(&mut self, seq: u64) {
+        self.live.remove(&seq);
+    }
+
+    /// C++: `GetDocCount`.
+    fn doc_count(&self) -> usize {
+        self.n_docs
+    }
+
+    /// C++: `MemUsed`.
+    fn mem_used(&self) -> usize {
+        self.bytes
+    }
+
+    fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+    }
+
+    /// Drops the segment (the budget-exhausted path and `Reset`).
+    fn reset(&mut self) {
+        self.postings.clear();
+        self.postings.shrink_to_fit();
+        self.docs.clear();
+        self.live.clear();
+        self.bytes = 0;
+        self.n_docs = 0;
+        self.total_len = 0;
+    }
+}
+
+/// In-memory inverted index for one text column: a [`MemoryIndexer`] for the
+/// unsealed segment plus the sealed on-disk segments.
+/// C++: the `MemoryIndexer` + `IndexSegmentReader` pair held by a column.
+struct TextIndex {
+    delims: Option<Vec<char>>,
+    /// The unsealed segment.
+    mem: MemoryIndexer,
     disabled: bool,
-    /// Sealed segments, oldest first: each owns one on-disk index (`.dic`,
-    /// `.pos`, `.len`) exactly like the reference's per-segment indexes.
-    segments: Vec<SealedSegment>,
+    /// The sealed segments, oldest first: each owns one on-disk index
+    /// (`.dic`, `.pos`, `.len`) exactly like the reference's per-segment
+    /// indexes.
+    reader: ColumnIndexReader,
     /// Directory holding this column's sealed segment files.
     dir: String,
     /// Rows re-indexed after their segment was sealed; the sealed copy is stale
@@ -1646,6 +1731,53 @@ impl SealedSegment {
     }
 }
 
+/// The per-column reader over the sealed segments.
+///
+/// C++: `ColumnIndexReader` (`src/storage/invertedindex/column_index_reader.cppm`).
+/// It owns one `IndexSegmentReader` per sealed segment and answers term
+/// postings and document lengths across all of them.
+#[derive(Default)]
+struct ColumnIndexReader {
+    segments: Vec<SealedSegment>,
+}
+
+impl ColumnIndexReader {
+    /// C++: `GetDocCount` over the segment readers.
+    fn doc_count(&self) -> usize {
+        self.segments.iter().map(|s| s.docs as usize).sum()
+    }
+
+    /// Total token count across the segment readers.
+    fn total_len(&self) -> u64 {
+        self.segments.iter().map(|s| s.total_len).sum()
+    }
+
+    /// C++: `GetIndexReader(term)` — postings from every sealed segment.
+    fn postings(&self, term: &str) -> Vec<(u64, u32)> {
+        let mut list = Vec::new();
+        for seg in &self.segments {
+            if let Ok(mut hits) = seg.reader.postings(term) {
+                list.append(&mut hits);
+            }
+        }
+        list
+    }
+
+    /// C++: `GetColumnLength` — the length recorded by the newest segment
+    /// that contains `row`.
+    fn doc_len(&self, row: u64) -> Option<u32> {
+        self.segments
+            .iter()
+            .rev()
+            .find(|s| s.contains(row))
+            .and_then(|s| s.reader.doc_len_of_row(row))
+    }
+
+    fn contains(&self, row: u64) -> bool {
+        self.segments.iter().any(|s| s.contains(row))
+    }
+}
+
 /// The postings and corpus statistics a query sees: the sealed segments plus
 /// the unsealed tail, with stale (re-indexed) rows removed.
 struct MergedIndex {
@@ -1659,14 +1791,9 @@ impl TextIndex {
     fn new(dir: String, delims: Option<Vec<char>>) -> Self {
         Self {
             delims,
-            n_docs: 0,
-            total_len: 0,
-            docs: HashMap::new(),
-            postings: HashMap::new(),
-            live: Default::default(),
-            bytes: 0,
+            mem: MemoryIndexer::new(),
             disabled: false,
-            segments: Vec::new(),
+            reader: ColumnIndexReader::default(),
             dir,
             overridden: Default::default(),
         }
@@ -1674,25 +1801,25 @@ impl TextIndex {
 
     /// Documents in the column across the sealed segments and the memory tail.
     fn total_docs(&self) -> usize {
-        self.n_docs + self.segments.iter().map(|s| s.docs as usize).sum::<usize>()
+        self.mem.doc_count() + self.reader.doc_count()
     }
 
     /// Writes the current (unsealed) segment's index to disk and clears the
     /// in-memory postings. Returns `false` (leaving everything in memory) if the
     /// files cannot be written, so a failure never loses results.
     fn seal(&mut self) -> bool {
-        if self.docs.is_empty() {
+        if self.mem.is_empty() {
             return false;
         }
-        let base_row_id = match self.docs.keys().min() {
+        let base_row_id = match self.mem.docs.keys().min() {
             Some(&row) => row,
             None => return false,
         };
-        let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(d, l)| (*d, *l)).collect();
+        let mut docs: Vec<(u64, u32)> = self.mem.docs.iter().map(|(d, l)| (*d, *l)).collect();
         docs.sort_unstable_by_key(|(d, _)| *d);
         let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
             std::collections::BTreeMap::new();
-        for (term, list) in &self.postings {
+        for (term, list) in &self.mem.postings {
             let mut hits: Vec<(u64, u32)> = list.iter().map(|(d, tf, _)| (*d, *tf)).collect();
             dedupe_postings(&mut hits);
             postings.insert(term.clone(), hits);
@@ -1719,23 +1846,18 @@ impl TextIndex {
         ) else {
             return false;
         };
-        self.segments.push(SealedSegment {
+        self.reader.segments.push(SealedSegment {
             docs: docs.len() as u32,
-            total_len: self.total_len,
+            total_len: self.mem.total_len,
             reader,
         });
-        self.docs.clear();
-        self.postings.clear();
-        self.live.clear();
-        self.n_docs = 0;
-        self.total_len = 0;
-        self.bytes = 0;
+        self.mem.reset();
         true
     }
 
     /// Seals once the unsealed segment reaches its size budget.
     fn maybe_seal(&mut self) {
-        if self.bytes >= text_segment_bytes() {
+        if self.mem.mem_used() >= text_segment_bytes() {
             self.seal();
         }
     }
@@ -1743,39 +1865,26 @@ impl TextIndex {
     /// Postings and corpus statistics for `terms`, merging every sealed segment
     /// with the memory tail. Stale copies of re-indexed rows are dropped.
     fn merge(&self, terms: &[String]) -> MergedIndex {
-        let mut n_docs = self.n_docs;
-        let mut total_len = self.total_len;
-        for seg in &self.segments {
-            n_docs += seg.docs as usize;
-            total_len += seg.total_len;
-        }
+        let n_docs = self.mem.n_docs + self.reader.doc_count();
+        let total_len = self.mem.total_len + self.reader.total_len();
         let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
         let mut doc_len: HashMap<u64, u32> = HashMap::new();
         for term in terms {
             let mut list: Vec<(u64, u32)> = self
+                .mem
                 .postings
                 .get(term)
                 .map(|l| l.iter().map(|(d, tf, _)| (*d, *tf)).collect())
                 .unwrap_or_default();
-            for seg in &self.segments {
-                if let Ok(mut hits) = seg.reader.postings(term) {
-                    list.append(&mut hits);
-                }
-            }
+            list.append(&mut self.reader.postings(term));
             list.retain(|(d, _)| !self.overridden.contains(d));
             dedupe_postings(&mut list);
             for (d, _) in &list {
-                if let Some(l) = self.docs.get(d) {
+                if let Some(l) = self.mem.docs.get(d) {
                     doc_len.insert(*d, *l);
                     continue;
                 }
-                let dl = self
-                    .segments
-                    .iter()
-                    .rev()
-                    .find(|s| s.contains(*d))
-                    .and_then(|s| s.reader.doc_len_of_row(*d))
-                    .unwrap_or(1);
+                let dl = self.reader.doc_len(*d).unwrap_or(1);
                 doc_len.insert(*d, dl);
             }
             postings.insert(term.clone(), list);
@@ -2335,44 +2444,14 @@ fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
     if index.disabled {
         return;
     }
-    let toks = tokenize_index_positions(text, &index.delims);
-    // ~32 B per posting entry plus the positions and the term string.
-    let mut cost = 64usize;
-    for (term, _) in &toks {
-        cost += term.len() + 32;
-    }
-    if index.bytes + cost > TEXT_INDEX_BUDGET_BYTES {
-        // Only reachable if a caller never seals; keep the statistics in step
-        // with the (now empty) document map.
-        index.postings.clear();
-        index.postings.shrink_to_fit();
-        index.docs.clear();
-        index.live.clear();
-        index.bytes = 0;
-        index.n_docs = 0;
-        index.total_len = 0;
+    // `MemoryIndexer::Insert` fails when the segment would exceed the budget;
+    // the reference would spill, the port stops indexing this column.
+    if !index
+        .mem
+        .insert(seq, text, &index.delims, TEXT_INDEX_BUDGET_BYTES)
+    {
+        index.mem.reset();
         index.disabled = true;
-        return;
-    }
-    index.bytes += cost;
-    // A re-indexed row (UPDATE rewrites in place) replaces its length rather
-    // than adding a second document to the corpus statistics.
-    match index.docs.insert(seq, toks.len() as u32) {
-        Some(old) => index.total_len = index.total_len.saturating_sub(old as u64),
-        None => index.n_docs += 1,
-    }
-    index.total_len += toks.len() as u64;
-    index.live.insert(seq);
-    let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
-    for (term, at) in &toks {
-        pos.entry(term.as_str()).or_default().push(*at);
-    }
-    for (term, positions) in pos {
-        index.postings.entry(term.to_string()).or_default().push((
-            seq,
-            positions.len() as u32,
-            positions,
-        ));
     }
 }
 
@@ -2380,11 +2459,11 @@ fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
 /// segments keep deleted documents until compaction, so corpus statistics must
 /// still count them; the search paths filter them out by sequence id.
 fn index_delete_row(index: &mut TextIndex, seq: u64) {
-    index.live.remove(&seq);
+    index.mem.delete(seq);
     // A row whose text already went to a sealed segment keeps its old postings
     // there; the fresh text is added to the memory tail, so the sealed copy
     // must be ignored from now on.
-    if !index.docs.contains_key(&seq) && index.segments.iter().any(|s| s.contains(seq)) {
+    if !index.mem.docs.contains_key(&seq) && index.reader.contains(seq) {
         index.overridden.insert(seq);
     }
 }
@@ -2892,7 +2971,7 @@ impl Engine {
         let mut total = 0usize;
         for idx in self.text_index.lock().unwrap().values() {
             if let Ok(g) = idx.read() {
-                total += g.bytes;
+                total += g.mem.mem_used();
             }
         }
         total += self
@@ -12251,5 +12330,45 @@ mod tests {
         e.execute("INSERT INTO t (num) VALUES (1)").unwrap();
         let rows = rows(&e, "SELECT * FROM t");
         assert_eq!(rows, vec![vec!["1".to_string(), String::new()]]);
+    }
+
+    #[test]
+    fn memory_indexer_records_tf_positions_and_length() {
+        // C++ `column_inverter_ut.cpp`: tf, positions and the document length
+        // come out of one insertion.
+        let delims = Some(vec![' ']);
+        let mut mem = MemoryIndexer::new();
+        assert!(mem.insert(10, "alpha beta alpha", &delims, usize::MAX));
+        assert_eq!(mem.doc_count(), 1);
+        assert_eq!(mem.docs[&10], 3);
+        let alpha = &mem.postings["alpha"];
+        assert_eq!(alpha.len(), 1);
+        assert_eq!(alpha[0].0, 10);
+        assert_eq!(alpha[0].1, 2);
+        assert_eq!(alpha[0].2, vec![0, 2]);
+
+        // Re-indexing a row replaces its length, not the document count.
+        assert!(mem.insert(10, "gamma", &delims, usize::MAX));
+        assert_eq!(mem.doc_count(), 1);
+        assert_eq!(mem.docs[&10], 1);
+        assert_eq!(mem.total_len, 1);
+
+        // A full segment refuses the next document without changing itself.
+        let before = mem.mem_used();
+        assert!(!mem.insert(11, "delta", &delims, before));
+        assert_eq!(mem.doc_count(), 1);
+        assert_eq!(mem.mem_used(), before);
+    }
+
+    #[test]
+    fn memory_indexer_delete_keeps_the_postings() {
+        let delims = Some(vec![' ']);
+        let mut mem = MemoryIndexer::new();
+        assert!(mem.insert(7, "alpha", &delims, usize::MAX));
+        mem.delete(7);
+        assert!(!mem.live.contains(&7));
+        // The reference keeps deleted documents until compaction.
+        assert_eq!(mem.doc_count(), 1);
+        assert_eq!(mem.postings["alpha"].len(), 1);
     }
 }

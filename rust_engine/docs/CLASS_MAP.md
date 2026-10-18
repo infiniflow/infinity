@@ -26,6 +26,8 @@
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
 | `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search`、`MemUsage` | ✅ |
 | `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::hnsw_handler::HnswHandler` | `Make`→`new`/`from_index`、`InsertVecs`→`insert_vecs`（按序，调度器设计变更）、`SearchIndex`→`search_index`（`KnnSearchOption.ef`→`ef`）、`MemUsage`→`mem_usage`、`GetDocNum`→`len` | ✅ |
+| `MemoryIndexer`（`memory_indexer.cppm`） | 执行器 `MemoryIndexer` | `Insert`→`insert`（含预算检查）、`MemUsed`→`mem_used`、`GetDocCount`→`doc_count`、`Reset`；删除只去掉 live 标记（postings 保留到压实） | ✅ |
+| `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `ColumnIndexReader` | 每段 `IndexSegmentReader`→`fulltext_segment::SegmentIndexReader`；`GetIndexReader(term)`→`postings`、`GetColumnLength`→`doc_len`、跨段 `doc_count`/`total_len`/`contains` | ✅ |
 | `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `infinity_index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 | `BlockFwd` / `TailFwd`（`bmp_fwd.cppm`，own-mem） | `infinity_index::sparse::{BlockFwd, TailFwd, BlockTerm}` | `AddDoc`→`add_doc`、`ToBlockFwd`、`GetBlockTerms`、`GetScores`/`GetScoresTail`、`Prefetch` | ✅ |
 | `BMPIvt` / `BlockData` / `BlockPostings`（`bmp_ivt.cppm`，own-mem） | `infinity_index::sparse::{BMPIvt, Postings}` | `AddBlock`→`add_block`、`GetPostings`、`Optimize`→`build`、`kth`、`block_ids`/`max_scores` | ✅ |
@@ -46,7 +48,6 @@
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`、单段检索已走 `HnswHandler`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
-| `MemoryIndexer`（`memory_indexer.cppm`）/ `IndexSegmentReader`（`index_segment_reader.cppm`）/ `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `TextIndex` + `infinity_storage::fulltext_segment::SegmentIndexReader` + 查询期 `MergedIndex`（`lib.rs:1651`） | `SegmentIndexReader` 已对应 `IndexSegmentReader`；`MemoryIndexer`（未封段的内存倒排 + 预算）与 `ColumnIndexReader`（跨段合并/统计）仍内联在 `TextIndex` 与执行器 |
 | `EMVBIndex`（`emvb_index.cppm`）/ `EMVBIndexInMem`（`emvb_index_in_mem.cppm`） | `emvb_segment::{EmvbReader, EmvbPqIndex, PqCodebook}` + 执行器 `MultiVectorIndex` | 已移植：磁盘布局、残差 PQ 码本与候选预过滤（`prefilter`）。**未移植**：`Train` 的质心 k-means、三阶段 `GetQueryResult`（centroid→doc→refine）、`EMVBIndexInMem` 的建索引阈值；当前执行器对候选做精确 maxsim 重排 |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
@@ -77,13 +78,14 @@
 | `knn/sparse/test_bmp_ivt_ut.cpp`（block max / kth 不变量） | `sparse::BMPIvt`/`Postings` | `bmp_ivt_keeps_block_maxima_and_kth` |
 | `knn/sparse` 的 block-max 检索 | `sparse::BmpAlg::search_knn` | `matches_brute_force`、`beta_keeps_the_strongest_terms`、`tail_documents_are_scored_when_the_block_does_not_fill` |
 | `knn/hnsw` 的插入/检索入口 | `hnsw_handler::HnswHandler` | `insert_vecs_counts_only_matching_dimensions`、`search_index_honours_the_ef_option` |
+| `invertedindex/column_inverter_ut.cpp`（tf/positions/length） | `MemoryIndexer` | `memory_indexer_records_tf_positions_and_length`、`memory_indexer_delete_keeps_the_postings` |
 
 ### 未移植单测（Rust 类已存在）
 
 | C++ 用例 | 对应 Rust | 缺口 |
 |---|---|---|
 | `buffer/buffer_handle_ut.cpp`、`buffer_obj_ut.cpp` | `BufferManager`（无 handle/obj 抽象） | 类边界未拆，测试无法一一对应 |
-| `invertedindex/column_inverter_ut.cpp`、`format/*` 其余部分 | `TextIndex` / `inverted_format` | 构建器/格式读写测试未逐个移植 |
+| `invertedindex/format/*` 其余部分 | `inverted_format` | 构建器/格式读写测试未逐个移植（tf/positions 主路径已由 `MemoryIndexer` 用例覆盖） |
 | （无独立 WAND/BM25 单测） | `wand::BlockMaxWandIterator` | 已用 `ranker_matches_the_reference_formula`、`wand_matches_brute_force` 覆盖 |
 | `invertedindex/search/*`（短语/布尔组合） | `wand` 类 + 扫描路径 | WAND/BM25 已拆类；短语与布尔组合仍走扫描 |
 | `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | 低基数/多类型/边界用例未逐个移植 |
