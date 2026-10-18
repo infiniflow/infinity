@@ -12,6 +12,11 @@ pub enum Literal {
     /// A vector / array literal, e.g. `[0.1, 0.2]` or a sparse `[0:1.0,20:2.0]`.
     /// Elements are kept as their original text so rendering can round-trip.
     Array(Vec<String>),
+    /// A numeric vector/tensor as numbers, without formatting every element to
+    /// text first. The Thrift `Insert` path uses this for embedding columns:
+    /// a 5000-row batch of 2048-d vectors otherwise materialises ~800 MB of
+    /// per-element strings (Gate C).
+    Vector(Vec<f64>),
 }
 
 impl Literal {
@@ -23,6 +28,10 @@ impl Literal {
             Literal::Str(s) => s.clone(),
             Literal::Null => "null".to_string(),
             Literal::Array(items) => format!("[{}]", items.join(",")),
+            Literal::Vector(items) => {
+                let parts: Vec<String> = items.iter().map(|x| x.to_string()).collect();
+                format!("[{}]", parts.join(","))
+            }
         }
     }
 }

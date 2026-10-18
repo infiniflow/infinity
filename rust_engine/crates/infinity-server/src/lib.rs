@@ -821,6 +821,12 @@ fn handle_connection(
                                         | ValueLit::Float(_)
                                         | ValueLit::Str(_)
                                         | ValueLit::Null
+                                        | ValueLit::Bool(_)
+                                        | ValueLit::IntArray(_)
+                                        | ValueLit::FloatArray(_)
+                                        | ValueLit::IntTensor(_)
+                                        | ValueLit::FloatTensor(_)
+                                        | ValueLit::Sparse { .. }
                                 )
                             })
                     });
@@ -843,6 +849,49 @@ fn handle_connection(
                                                 infinity_parser::Literal::Str(t.clone())
                                             }
                                             ValueLit::Null => infinity_parser::Literal::Null,
+                                            ValueLit::Bool(b) => {
+                                                infinity_parser::Literal::Str(b.to_string())
+                                            }
+                                            ValueLit::IntArray(v) => {
+                                                infinity_parser::Literal::Vector(
+                                                    v.iter().map(|x| *x as f64).collect(),
+                                                )
+                                            }
+                                            ValueLit::FloatArray(v) => {
+                                                infinity_parser::Literal::Vector(v.clone())
+                                            }
+                                            ValueLit::IntTensor(rows) => {
+                                                infinity_parser::Literal::Vector(
+                                                    rows.iter()
+                                                        .flatten()
+                                                        .map(|x| *x as f64)
+                                                        .collect(),
+                                                )
+                                            }
+                                            ValueLit::FloatTensor(rows) => {
+                                                infinity_parser::Literal::Vector(
+                                                    rows.iter().flatten().copied().collect(),
+                                                )
+                                            }
+                                            ValueLit::Sparse {
+                                                indices,
+                                                ints,
+                                                floats,
+                                                is_float,
+                                            } => {
+                                                let items: Vec<String> = indices
+                                                    .iter()
+                                                    .enumerate()
+                                                    .map(|(k, i)| {
+                                                        if *is_float {
+                                                            format!("{i}:{}", floats[k])
+                                                        } else {
+                                                            format!("{i}:{}", ints[k])
+                                                        }
+                                                    })
+                                                    .collect();
+                                                infinity_parser::Literal::Array(items)
+                                            }
                                             _ => infinity_parser::Literal::Null,
                                         })
                                         .collect(),

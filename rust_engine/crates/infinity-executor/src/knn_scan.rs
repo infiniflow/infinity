@@ -40,23 +40,6 @@ impl KnnScanOptions {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_both_option_forms() {
-        let o = KnnScanOptions::parse(Some("nprobe = 16; ef=64"), "topn=3;threshold=0.85");
-        assert_eq!(o.nprobe, Some(16));
-        assert_eq!(o.ef, Some(64));
-        assert_eq!(o.threshold, Some(0.85));
-        // WITH wins over the legacy string.
-        let o = KnnScanOptions::parse(Some("threshold=1.5"), "threshold=0.5");
-        assert_eq!(o.threshold, Some(1.5));
-        assert_eq!(KnnScanOptions::parse(None, ""), KnnScanOptions::default());
-    }
-}
-
 use std::collections::HashSet;
 
 use infinity_expression::Value;
@@ -206,5 +189,22 @@ impl Engine {
             return None;
         }
         Some(candidates)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_both_option_forms() {
+        let o = KnnScanOptions::parse(Some("nprobe = 16; ef=64"), "topn=3;threshold=0.85");
+        assert_eq!(o.nprobe, Some(16));
+        assert_eq!(o.ef, Some(64));
+        assert_eq!(o.threshold, Some(0.85));
+        // WITH wins over the legacy string.
+        let o = KnnScanOptions::parse(Some("threshold=1.5"), "threshold=0.5");
+        assert_eq!(o.threshold, Some(1.5));
+        assert_eq!(KnnScanOptions::parse(None, ""), KnnScanOptions::default());
     }
 }

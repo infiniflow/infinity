@@ -30,6 +30,10 @@ impl Value {
             Literal::Null => Value::Null,
             // Vectors / arrays render as `[a,b,c]` with elements re-joined compactly.
             Literal::Array(items) => Value::Str(format!("[{}]", items.join(","))),
+            Literal::Vector(items) => {
+                let parts: Vec<String> = items.iter().map(|x| x.to_string()).collect();
+                Value::Str(format!("[{}]", parts.join(",")))
+            }
         }
     }
 
