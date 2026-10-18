@@ -3910,7 +3910,7 @@ impl Engine {
     /// BM25 upper bounds, advance the prefix cursors to it, prune with the
     /// block-max bound, and score exactly only when the bound beats the current
     /// k-th score. Terms must be single-unit (no phrase / require-all) OR terms.
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::needless_range_loop)]
     fn wand_scan(
         index: &TextIndex,
         terms: &[String],
