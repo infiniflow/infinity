@@ -7521,6 +7521,7 @@ impl Engine {
             // Per-segment BMP index written in the reference's byte layout
             // (`BMPAlg::SaveToPtr`) and queried through mmap.
             let width = sparse_idx_width(types.get(col_idx).map(String::as_str).unwrap_or(""));
+            #[allow(clippy::type_complexity)]
             let mut segments: HashMap<u64, Vec<(u64, Vec<(i32, f32)>)>> = HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
@@ -7544,8 +7545,7 @@ impl Engine {
                 .get(table)
                 .copied()
                 .unwrap_or(0);
-            let query_i32: Vec<(i32, f32)> =
-                qv.iter().map(|(t, v)| (*t as i32, *v as f32)).collect();
+            let query_i32: Vec<(i32, f32)> = qv.iter().map(|(t, v)| (*t as i32, *v)).collect();
             for (segment, mut docs) in segments {
                 docs.sort_by_key(|(row, _)| *row);
                 let term_num = docs
