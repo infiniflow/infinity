@@ -3487,27 +3487,31 @@ impl Engine {
                     }
                 }
                 if !to_del.is_empty() {
-                    // Rewrite the rows in place. Delete+append would double the
-                    // store's footprint for every update (each row carries its
-                    // vectors); keeping the sequence id also leaves secondary
-                    // indexes valid.
+                    // The reference deletes the old row and appends the
+                    // rewritten one, so an updated row moves to the end and
+                    // gets a fresh ROW_ID (`test_update` asserts that order).
+                    let base = self.reserve_rows(table, new_rows.len(), false)?;
                     let mut t = self.txn.begin();
-                    for (seq, nr) in to_del.iter().zip(new_rows.iter()) {
+                    for (k, nr) in new_rows.iter().enumerate() {
                         let encoded = nr
                             .iter()
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(table, *seq), encoded.into_bytes());
+                        t.put(row_key(table, base + k), encoded.into_bytes());
+                    }
+                    for seq in &to_del {
+                        t.put(del_key(table, *seq), b"1".to_vec());
                     }
                     self.txn.commit(t)?;
-                    // The secondary indexes must see the rewritten values.
-                    for (seq, nr) in to_del.iter().zip(new_rows.iter()) {
+                    for (k, nr) in new_rows.iter().enumerate() {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
-                        self.update_indexes_on_insert_text(table, *seq, &texts)?;
-                        self.update_text_indexes(table, *seq, &texts);
-                        self.update_vector_caches(table, *seq, &texts);
+                        self.update_indexes_on_insert_text(table, base + k, &texts)?;
+                        self.update_text_indexes(table, base + k, &texts);
+                        self.update_vector_caches(table, base + k, &texts);
                     }
+                    self.drop_text_index_rows(table, &to_del);
+                    self.drop_vector_cache_rows(table, &to_del);
                 }
                 Ok(QueryResult::Updated {
                     count: to_del.len(),

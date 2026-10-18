@@ -810,15 +810,16 @@ fn handle_connection(
                     // batch, more than the insert itself. Values that need the
                     // parser (arrays, tensors, sparse vectors) keep the SQL path.
                     let direct = req.rows.iter().all(|(_, vals)| {
-                        vals.iter().all(|v| {
-                            matches!(
-                                v,
-                                ValueLit::Int(_)
-                                    | ValueLit::Float(_)
-                                    | ValueLit::Str(_)
-                                    | ValueLit::Null
-                            )
-                        })
+                        !vals.is_empty()
+                            && vals.iter().all(|v| {
+                                matches!(
+                                    v,
+                                    ValueLit::Int(_)
+                                        | ValueLit::Float(_)
+                                        | ValueLit::Str(_)
+                                        | ValueLit::Null
+                                )
+                            })
                     });
                     if direct {
                         let mut i = 0usize;
