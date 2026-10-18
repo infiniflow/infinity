@@ -1443,6 +1443,19 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
     validate_tensor_dimension(type_text, lit)
 }
 
+/// Width of a sparse column's index element (`SPARSE(FLOAT, INT8)` etc.).
+fn sparse_idx_width(type_text: &str) -> infinity_storage::bmp_cpp::IdxWidth {
+    use infinity_storage::bmp_cpp::IdxWidth;
+    let t = type_text.to_ascii_uppercase();
+    if t.contains("INT8") || t.contains("TINYINT") {
+        IdxWidth::I8
+    } else if t.contains("INT16") || t.contains("SMALLINT") {
+        IdxWidth::I16
+    } else {
+        IdxWidth::I32
+    }
+}
+
 /// A sparse vector's indices must be `< bound`, non-negative and distinct.
 fn validate_sparse_literal(type_text: &str, lit: &str) -> Result<()> {
     let t = lit.trim();
@@ -7505,29 +7518,23 @@ impl Engine {
                 .into_iter()
                 .map(|(i, v)| (i as u32, v as f32))
                 .collect();
-            // One BMP index per segment (`ROW_ID` high bits) and merged
-            // results, matching the reference's per-segment sparse indexes.
-            let mut segments: HashMap<u64, (infinity_index::sparse::BmpIndex, Vec<usize>)> =
-                HashMap::new();
+            // Per-segment BMP index written in the reference's byte layout
+            // (`BMPAlg::SaveToPtr`) and queried through mmap.
+            let width = sparse_idx_width(types.get(col_idx).map(String::as_str).unwrap_or(""));
+            let mut segments: HashMap<u64, Vec<(u64, Vec<(i32, f32)>)>> = HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
                     continue;
                 };
-                let sv: Vec<(u32, f32)> = parse_sparse_str(v)
+                let entries: Vec<(i32, f32)> = parse_sparse_str(v)
                     .into_iter()
-                    .map(|(i, x)| (i as u32, x as f32))
+                    .map(|(i, x)| (i as i32, x as f32))
                     .collect();
                 let segment = (*seq as u64) >> 32;
-                let entry = segments.entry(segment).or_insert_with(|| {
-                    (
-                        infinity_index::sparse::BmpIndex::builder(
-                            infinity_index::sparse::BMP_BLOCK_SIZE,
-                        ),
-                        Vec::new(),
-                    )
-                });
-                entry.0.add(&sv);
-                entry.1.push(*seq);
+                segments
+                    .entry(segment)
+                    .or_default()
+                    .push((*seq as u64 & 0xffff_ffff, entries));
             }
             let mut best: HashMap<usize, f64> = HashMap::new();
             let version = self
@@ -7537,9 +7544,16 @@ impl Engine {
                 .get(table)
                 .copied()
                 .unwrap_or(0);
-            for (segment, (index, ids)) in segments {
-                // Persist the segment once and query it through mmap: the
-                // on-disk form of the sparse index (`bmp_index_file_worker`).
+            let query_i32: Vec<(i32, f32)> =
+                qv.iter().map(|(t, v)| (*t as i32, *v as f32)).collect();
+            for (segment, mut docs) in segments {
+                docs.sort_by_key(|(row, _)| *row);
+                let term_num = docs
+                    .iter()
+                    .flat_map(|(_, e)| e.iter().map(|(t, _)| *t + 1))
+                    .max()
+                    .unwrap_or(0)
+                    .max(1) as usize;
                 let dir = self.dir.join("sparse").join(
                     index_key(
                         table,
@@ -7550,40 +7564,31 @@ impl Engine {
                     )
                     .replace('/', "_"),
                 );
-                let path = dir.join(format!("seg_{segment}_{}_{version}.bmp", ids.len()));
-                let docs: Vec<Vec<(u32, f32)>> = (0..index.len())
-                    .map(|doc| {
-                        index
-                            .doc(doc)
-                            .iter()
-                            .map(|(t, s)| (*t, *s))
-                            .collect::<Vec<_>>()
-                    })
-                    .collect();
-                if infinity_storage::bmp_segment::write_bmp_segment(
+                let path = dir.join(format!("seg_{segment}_{}_{version}.bmp", docs.len()));
+                if infinity_storage::bmp_cpp::write_bmp_file(
                     &path,
                     infinity_index::sparse::BMP_BLOCK_SIZE,
+                    width,
                     &docs,
+                    term_num,
                 )
                 .is_err()
                 {
                     continue;
                 }
-                let Ok(reader) = infinity_storage::bmp_segment::BmpSegmentReader::open(&path)
-                else {
+                let Ok(reader) = infinity_storage::bmp_cpp::BmpCppReader::open(&path, width) else {
                     continue;
                 };
-                for (doc, score) in reader.search(&qv, topn.max(1)) {
-                    if let Some(seq) = ids.get(doc) {
-                        let score = score as f64;
-                        best.entry(*seq)
-                            .and_modify(|s| {
-                                if score > *s {
-                                    *s = score
-                                }
-                            })
-                            .or_insert(score);
-                    }
+                for (row, score) in reader.search(&query_i32, topn.max(1), 0.9) {
+                    let id = ((segment << 32) | row as u64) as usize;
+                    let score = score as f64;
+                    best.entry(id)
+                        .and_modify(|s| {
+                            if score > *s {
+                                *s = score
+                            }
+                        })
+                        .or_insert(score);
                 }
             }
             best
