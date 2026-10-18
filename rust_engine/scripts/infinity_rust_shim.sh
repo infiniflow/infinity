@@ -22,6 +22,11 @@ mkdir -p "$data_dir"
 # 23820 from affecting this run.
 export INFINITY_HTTP_BIND="${INFINITY_HTTP_BIND:-127.0.0.1:0}"
 if [[ "${1:-}" == --config=* ]]; then
+  cfg="${1#--config=}"
+  # The harness runs from `python/` but passes repo-relative config paths.
+  if [[ ! -f "$cfg" && -f "$here/../../$cfg" ]]; then
+    set -- "--config=$here/../../$cfg"
+  fi
   exec "$bin" "$@"
 fi
 exec "$bin" serve "$data_dir"
