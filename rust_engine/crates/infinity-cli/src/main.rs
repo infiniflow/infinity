@@ -118,10 +118,14 @@ fn serve_from_config(path: &str) -> infinity_common::Result<()> {
         engine.set_object_store(client);
     }
     // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
-    // chunk once it reaches this size.
-    engine.set_memindex_quota(parse_size_bytes(
-        &toml_value(&text, "memindex_memory_quota").unwrap_or_default(),
-    ));
+    // chunk once it reaches this size. The reference defaults to 4 GiB.
+    let quota = toml_value(&text, "memindex_memory_quota").unwrap_or_default();
+    let quota = if quota.trim().is_empty() {
+        4 * 1024 * 1024 * 1024
+    } else {
+        parse_size_bytes(&quota)
+    };
+    engine.set_memindex_quota(quota);
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
     let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());

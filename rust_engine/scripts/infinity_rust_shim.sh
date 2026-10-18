@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Adapts the C++ `infinity` CLI to the Rust `infinity-server` so the unmodified
-# harnesses under `python/restart_test` (Gate C) can drive the Rust engine.
+# Adapts the C++ `infinity` CLI to the Rust engine so the unmodified harnesses
+# under `python/restart_test` (Gate C) can drive it.
 #
 # The C++ harness starts the engine as `<binary> --config=<toml>` and expects it
 # to serve Thrift on 127.0.0.1:23817 with data under `/var/infinity`. The Rust
-# server takes the data dir as its only positional argument and binds
-# `INFINITY_BIND` (default `0.0.0.0:23817`); the `--config` value is accepted
-# and ignored here so nothing in the harness has to change.
+# CLI accepts the same `--config=` form: it reads `persistence_dir`,
+# `memindex_memory_quota`, `checkpoint_interval`, `optimize_interval` and the
+# MinIO settings, then serves Thrift. Without a config it serves `$INFINITY_DATA`.
 #
 #   ./scripts/infinity_rust_shim.sh --config=/any/path
 #
@@ -15,11 +15,13 @@
 # writable `/var/infinity`).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bin="${INFINITY_SERVER_BIN:-$here/../target/release/infinity-server}"
+bin="${INFINITY_SERVER_BIN:-$here/../target/release/infinity}"
 data_dir="${INFINITY_DATA:-/var/infinity}"
 mkdir -p "$data_dir"
-# The harness only speaks Thrift on 23817; give the HTTP listener an ephemeral
-# port so a foreign server already holding 23820 cannot make this one panic at
-# startup (which would leave the harness talking to the stale process).
+# The harness only speaks Thrift on 23817; keep a foreign server already holding
+# 23820 from affecting this run.
 export INFINITY_HTTP_BIND="${INFINITY_HTTP_BIND:-127.0.0.1:0}"
-exec "$bin" "$data_dir"
+if [[ "${1:-}" == --config=* ]]; then
+  exec "$bin" "$@"
+fi
+exec "$bin" serve "$data_dir"

@@ -5072,46 +5072,47 @@ impl Engine {
     /// the default is BM25.
     #[allow(clippy::too_many_arguments)]
     fn wand_scan(
-        index: &MergedIndex,
+        fields: &[(&MergedIndex, &[f64])],
         terms: &[String],
-        weights: &[f64],
         k: usize,
         dead: &std::collections::HashSet<u64>,
         delta: f64,
         min_should: usize,
         mode: WandMode,
     ) -> Vec<(u64, f64)> {
-        if k == 0 {
+        if k == 0 || fields.is_empty() {
             return Vec::new();
         }
-        let n = index.n_docs.max(1) as f64;
-        let avg = (index.total_len as f64 / n).max(1e-9);
-        // (term index, upper bound, cursor into the posting list)
-        let mut cursors: Vec<(usize, f64, usize)> = Vec::new();
-        for (ti, term) in terms.iter().enumerate() {
-            let Some(list) = index.postings.get(term) else {
-                continue;
-            };
-            if list.is_empty() {
-                continue;
+        // (field, term, upper bound, cursor into the posting list). BM25 scores
+        // each field separately and sums, so cursors from every field coexist.
+        let mut cursors: Vec<(usize, usize, f64, usize)> = Vec::new();
+        for (fi, (index, weights)) in fields.iter().enumerate() {
+            let n = index.n_docs.max(1) as f64;
+            for (ti, term) in terms.iter().enumerate() {
+                let Some(list) = index.postings.get(term) else {
+                    continue;
+                };
+                if list.is_empty() {
+                    continue;
+                }
+                let df = list.len() as f64;
+                let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+                let w = weights.get(ti).copied().unwrap_or(1.0);
+                // tf / (tf + k1 * (...)) <= 1, so the bound is `idf * (k1 + 1 + δ)`.
+                let ub = match mode {
+                    WandMode::Bm25 => idf * (2.2 + delta.max(0.0)) * w,
+                    WandMode::Boolean => w,
+                };
+                cursors.push((fi, ti, ub, 0));
             }
-            let df = list.len() as f64;
-            let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-            let w = weights.get(ti).copied().unwrap_or(1.0);
-            // tf / (tf + k1 * (...)) <= 1, so the bound is `idf * (k1 + 1 + δ)`.
-            let ub = match mode {
-                WandMode::Bm25 => idf * (2.2 + delta.max(0.0)) * w,
-                WandMode::Boolean => w,
-            };
-            cursors.push((ti, ub, 0));
         }
         if cursors.is_empty() {
             return Vec::new();
         }
         macro_rules! doc_at {
             ($c:expr, $cur:expr) => {{
-                let (ti, _, _) = cursors[$c];
-                index.postings[&terms[ti]][$cur].0
+                let (fi, ti, _, _) = cursors[$c];
+                fields[fi].0.postings[&terms[ti]][$cur].0
             }};
         }
         // `best` is kept sorted by score (desc) then docid (asc), the same
@@ -5121,14 +5122,14 @@ impl Engine {
         loop {
             let mut alive: Vec<usize> = (0..cursors.len()).collect();
             alive.retain(|&c| {
-                let (ti, _, cur) = cursors[c];
-                cur < index.postings[&terms[ti]].len()
+                let (fi, ti, _, cur) = cursors[c];
+                cur < fields[fi].0.postings[&terms[ti]].len()
             });
             if alive.is_empty() {
                 break;
             }
-            alive.sort_by_key(|&c| doc_at!(c, cursors[c].2));
-            let total_ub: f64 = alive.iter().map(|&c| cursors[c].1).sum();
+            alive.sort_by_key(|&c| doc_at!(c, cursors[c].3));
+            let total_ub: f64 = alive.iter().map(|&c| cursors[c].2).sum();
             // `<` (not `<=`): a document that ties the k-th score can still win
             // on the smaller docid, so only a strictly smaller bound is final.
             if total_ub < threshold {
@@ -5138,7 +5139,7 @@ impl Engine {
             let mut pivot = alive.len();
             let mut prefix = 0.0;
             for (pos, &c) in alive.iter().enumerate() {
-                prefix += cursors[c].1;
+                prefix += cursors[c].2;
                 if prefix >= threshold {
                     pivot = pos;
                     break;
@@ -5147,30 +5148,30 @@ impl Engine {
             if pivot >= alive.len() {
                 break;
             }
-            let d = doc_at!(alive[pivot], cursors[alive[pivot]].2);
+            let d = doc_at!(alive[pivot], cursors[alive[pivot]].3);
             while pivot + 1 < alive.len()
-                && doc_at!(alive[pivot + 1], cursors[alive[pivot + 1]].2) == d
+                && doc_at!(alive[pivot + 1], cursors[alive[pivot + 1]].3) == d
             {
                 pivot += 1;
             }
             for &c in alive.iter().take(pivot + 1) {
-                let (ti, _, cur) = cursors[c];
-                let list = &index.postings[&terms[ti]];
+                let (fi, ti, _, cur) = cursors[c];
+                let list = &fields[fi].0.postings[&terms[ti]];
                 let mut j = cur;
                 while j < list.len() && list[j].0 < d {
                     j += 1;
                 }
-                cursors[c].2 = j;
+                cursors[c].3 = j;
             }
             let at_d: Vec<usize> = (0..=pivot)
                 .map(|pos| alive[pos])
                 .filter(|&c| {
-                    let (ti, _, cur) = cursors[c];
-                    index.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d)
+                    let (fi, ti, _, cur) = cursors[c];
+                    fields[fi].0.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d)
                 })
                 .collect();
             // block-max bound on the prefix, then the exact BM25 sum at `d`
-            let bm: f64 = at_d.iter().map(|&c| cursors[c].1).sum();
+            let bm: f64 = at_d.iter().map(|&c| cursors[c].2).sum();
             // While the top-k is not full every candidate is scored.
             let worth = if best.len() < k {
                 true
@@ -5185,7 +5186,10 @@ impl Engine {
                     WandMode::Bm25 => {
                         let mut score = 0.0;
                         for &c in &at_d {
-                            let (ti, _, cur) = cursors[c];
+                            let (fi, ti, _, cur) = cursors[c];
+                            let (index, weights) = fields[fi];
+                            let n = index.n_docs.max(1) as f64;
+                            let avg = (index.total_len as f64 / n).max(1e-9);
                             let post = &index.postings[&terms[ti]][cur];
                             let tf = post.1 as f64;
                             let dl = *index.doc_len.get(&post.0).unwrap_or(&1) as f64;
@@ -5201,11 +5205,25 @@ impl Engine {
                     // `similarity=boolean`: one point per matched term.
                     WandMode::Boolean => at_d
                         .iter()
-                        .map(|&c| weights.get(cursors[c].0).copied().unwrap_or(1.0))
+                        .map(|&c| {
+                            let (fi, ti, _, _) = cursors[c];
+                            fields[fi].1.get(ti).copied().unwrap_or(1.0)
+                        })
                         .sum(),
                 };
-                // `minimum_should_match` counts matched query terms.
-                let enough_terms = at_d.len() >= min_should.max(1);
+                // `minimum_should_match`: BM25 counts distinct query units across
+                // fields; boolean counts every (field, term) match, like the scan.
+                let matched = match mode {
+                    WandMode::Bm25 => {
+                        let mut seen = std::collections::HashSet::new();
+                        for &c in &at_d {
+                            seen.insert(cursors[c].1);
+                        }
+                        seen.len()
+                    }
+                    WandMode::Boolean => at_d.len(),
+                };
+                let enough_terms = matched >= min_should.max(1);
                 // A deleted row keeps its statistics but is never returned.
                 let better = if best.len() < k {
                     true
@@ -5231,10 +5249,10 @@ impl Engine {
                 }
             }
             for &c in alive.iter().take(pivot + 1) {
-                let (ti, _, cur) = cursors[c];
+                let (fi, ti, _, cur) = cursors[c];
                 // `cur` may already be at the end after the advance above.
-                if index.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d) {
-                    cursors[c].2 += 1;
+                if fields[fi].0.postings[&terms[ti]].get(cur).map(|p| p.0) == Some(d) {
+                    cursors[c].3 += 1;
                 }
             }
         }
@@ -6830,49 +6848,27 @@ impl Engine {
             }
             groups
         };
-        // Block-max WAND: an OR query over one field never needs a row's token
-        // vectors — the posting lists alone answer it. Filters become a dead
-        // set, and `minimum_should_match` / `delta_term` / boolean similarity
-        // are applied inside the scoring loop. This is what keeps memory flat
-        // when a query matches a large share of a wide table.
+        // Block-max WAND: an OR query over one or more fields never needs a
+        // row's token vectors — the posting lists alone answer it. Filters
+        // become a dead set, and `minimum_should_match` / `delta_term` /
+        // boolean similarity are applied inside the scoring loop. BM25 scores
+        // each field separately and sums, like `BM25Ranker`.
         if rank_features.is_empty()
             && !matches!(&delims, Some(d) if d.is_empty())
-            && field_specs.len() == 1
+            && !field_specs.is_empty()
             && units
                 .iter()
                 .all(|(phrase, toks, _)| !*phrase && toks.len() == 1)
         {
-            if let Some((ci, boost, d)) = field_specs.first() {
+            let wterms: Vec<String> = units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
+            // One merged index per field, with that field's weights.
+            let mut merged_fields: Vec<(MergedIndex, Vec<f64>)> = Vec::new();
+            for (ci, boost, d) in &field_specs {
                 let name = schema[*ci].clone();
                 let index = self.text_index_for(table, &name, d.clone())?;
                 let guard = index.read().unwrap();
-                // Tombstones still feed the corpus statistics (as the
-                // reference's segments do until compaction) but never rank.
-                let mut dead = self.tombstone_set(table)?;
-                // A filter removes documents before ranking; evaluating it over
-                // the rows and feeding the failures as tombstones keeps the
-                // postings-only scoring exact.
-                if pred.is_some() || in_filter.is_some() || opt_filter.is_some() {
-                    for (seq, row) in self.fetch_rows_with_ids(table)? {
-                        let ok = pred
-                            .as_ref()
-                            .map(|p| p.eval_predicate(&row))
-                            .unwrap_or(true)
-                            && in_filter
-                                .as_ref()
-                                .map(|p| p.eval_predicate(&row))
-                                .unwrap_or(true)
-                            && opt_filter
-                                .as_ref()
-                                .map(|p| p.eval_predicate(&row))
-                                .unwrap_or(true);
-                        if !ok {
-                            dead.insert(seq as u64);
-                        }
-                    }
-                }
-                let wterms: Vec<String> =
-                    units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
+                let merged = guard.merge(&wterms);
+                drop(guard);
                 // Boolean similarity ignores per-term boosts (one point per
                 // matched term, weighted by the field boost).
                 let weights: Vec<f64> = if boolean {
@@ -6880,48 +6876,75 @@ impl Engine {
                 } else {
                     units.iter().map(|(_, _, ub)| boost * ub).collect()
                 };
-                let merged = guard.merge(&wterms);
-                drop(guard);
-                let mode = if boolean {
-                    WandMode::Boolean
-                } else {
-                    WandMode::Bm25
-                };
-                let hits = Self::wand_scan(
-                    &merged,
-                    &wterms,
-                    &weights,
-                    topn.max(1),
-                    &dead,
-                    delta_term,
-                    min_should,
-                    mode,
-                );
-                let scored: Vec<(usize, f64)> = hits
+                merged_fields.push((merged, weights));
+            }
+            // Tombstones still feed the corpus statistics (as the reference's
+            // segments do until compaction) but never rank.
+            let mut dead = self.tombstone_set(table)?;
+            // A filter removes documents before ranking; evaluating it over the
+            // rows and feeding the failures as tombstones keeps the
+            // postings-only scoring exact.
+            if pred.is_some() || in_filter.is_some() || opt_filter.is_some() {
+                for (seq, row) in self.fetch_rows_with_ids(table)? {
+                    let ok = pred
+                        .as_ref()
+                        .map(|p| p.eval_predicate(&row))
+                        .unwrap_or(true)
+                        && in_filter
+                            .as_ref()
+                            .map(|p| p.eval_predicate(&row))
+                            .unwrap_or(true)
+                        && opt_filter
+                            .as_ref()
+                            .map(|p| p.eval_predicate(&row))
+                            .unwrap_or(true);
+                    if !ok {
+                        dead.insert(seq as u64);
+                    }
+                }
+            }
+            let fields: Vec<(&MergedIndex, &[f64])> = merged_fields
+                .iter()
+                .map(|(index, weights)| (index, weights.as_slice()))
+                .collect();
+            let mode = if boolean {
+                WandMode::Boolean
+            } else {
+                WandMode::Bm25
+            };
+            let hits = Self::wand_scan(
+                &fields,
+                &wterms,
+                topn.max(1),
+                &dead,
+                delta_term,
+                min_should,
+                mode,
+            );
+            let scored: Vec<(usize, f64)> = hits
+                .into_iter()
+                .map(|(seq, score)| (seq as usize, score))
+                .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                .collect();
+            if !scored.is_empty() {
+                let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
+                let mut by_id: HashMap<usize, Vec<Value>> = self
+                    .fetch_some_rows_with_ids(table, &wanted)?
                     .into_iter()
-                    .map(|(seq, score)| (seq as usize, score))
-                    .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
                     .collect();
-                if !scored.is_empty() {
-                    let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
-                    let mut by_id: HashMap<usize, Vec<Value>> = self
-                        .fetch_some_rows_with_ids(table, &wanted)?
-                        .into_iter()
-                        .collect();
-                    let mut out = Vec::new();
-                    for (seq, score) in scored {
-                        let Some(mut row) = by_id.remove(&seq) else {
-                            continue;
-                        };
-                        row.push(Value::Int(seq as i64));
-                        row.push(Value::Float(score));
-                        row.push(Value::Float(0.0));
-                        row.push(Value::Float(score));
-                        out.push(row);
-                    }
-                    if !out.is_empty() {
-                        return Ok((out, hidden.to_vec()));
-                    }
+                let mut out = Vec::new();
+                for (seq, score) in scored {
+                    let Some(mut row) = by_id.remove(&seq) else {
+                        continue;
+                    };
+                    row.push(Value::Int(seq as i64));
+                    row.push(Value::Float(score));
+                    row.push(Value::Float(0.0));
+                    row.push(Value::Float(score));
+                    out.push(row);
+                }
+                if !out.is_empty() {
+                    return Ok((out, hidden.to_vec()));
                 }
             }
         }
@@ -11580,6 +11603,50 @@ mod tests {
                  (v, [299.0, 0.0], 'float', 'maxsim', 'topn=1');"
             ),
             vec![vec!["299".to_string()]]
+        );
+    }
+
+    /// Multi-field WAND: each field keeps its own BM25 statistics and the
+    /// scores sum, matching the reference's per-field `BM25Ranker`.
+    #[test]
+    fn wand_scores_multiple_fields_separately() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE ftm (id INT, title VARCHAR, body VARCHAR);")
+            .unwrap();
+        e.execute(
+            "INSERT INTO ftm VALUES (1,'alpha','beta'),(2,'alpha alpha',''),\
+             (3,'beta','alpha');",
+        )
+        .unwrap();
+        e.execute("CREATE INDEX ftm_t ON ftm(title) USING FULLTEXT;")
+            .unwrap();
+        e.execute("CREATE INDEX ftm_b ON ftm(body) USING FULLTEXT;")
+            .unwrap();
+        let got = rows(
+            &e,
+            "SELECT id, ROUND(SCORE(),6) FROM ftm SEARCH MATCH TEXT \
+             ('title^2,body','alpha beta','topn=10');",
+        );
+        let expected = [(3, 2.9990f64), (1, 1.8614), (2, 1.1332)];
+        assert_eq!(got.len(), expected.len(), "{got:?}");
+        for (row, (id, score)) in got.iter().zip(expected) {
+            assert_eq!(row[0], id.to_string());
+            let value: f64 = row[1].parse().unwrap();
+            assert!((value - score).abs() < 1e-3, "{row:?} vs {score}");
+        }
+        // Boolean similarity sums the per-field points.
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id, ROUND(SCORE(),4) FROM ftm SEARCH MATCH TEXT \
+                 ('title^2,body','alpha beta','topn=10;similarity=boolean');"
+            ),
+            vec![
+                vec!["1".to_string(), "3.000000".to_string()],
+                vec!["3".to_string(), "3.000000".to_string()],
+                vec!["2".to_string(), "2.000000".to_string()],
+            ]
         );
     }
 
