@@ -29,7 +29,7 @@
 |---|---|
 | SQL 功能（Gate A） | ✅ 1752 statement ok / 129 statement error / 1536 query 全部通过 |
 | SDK 协议（Gate B） | ✅ 未修改的 Python / Go SDK 与 HTTP 模式全绿 |
-| 持久化恢复（Gate C） | ⚠️ 常规用例全绿；重档内存已降至 **1.5 GB 峰值**（原 19.4 GB），5.toml 档在 batch 31 出现服务端断连，待定位（不再是 OOM） |
+| 持久化恢复（Gate C） | ⚠️ 常规用例全绿；重档引擎峰值 **1.5–2.1 GB**（原 19.4 GB）。本机 5.toml 档在 batch 31 被宿主 `earlyoom` 以 SIGTERM 终止（可用内存瞬时 1.96 GB < 其 2 GB 阈值），非引擎增长；CI 无该看门狗 |
 | 并发稳定（Gate D） | ✅ loom + miri + ASan + TSAN + `parallel_test` |
 | 性能（Gate E） | ✅ 对 C++ golden **+5.64%**（门限 `<7%`）：insert −4%、全量 select +249%、点查 +626% |
 | 工程质量（Gate F） | ✅ fmt / clippy / deny |
@@ -518,7 +518,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 ### 8.4 Gate C — 持久化与恢复
 
 - 常规用例全绿：`test_basic` 1、`test_drop` 1、`test_alter` 6、`test_cleanup` 10、`test_compact` 3、`test_snapshot` 7、`test_system_snapshot_restart` 3、`test_memidx` 10、`test_fulltext` 6（需 `enwiki-10w.csv`）、`test_insert` 11。
-- 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档重测（2026-10-19）：25 轮导入（250k 行）+ 31 个 5000 行批次期间**进程峰值 RSS 1.5 GB**（原 19.4 GB @ ~19 GB 被杀），随后服务端在 batch 31 断连；已排除内存增长，待定位断连原因。
+- 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档重测（2026-10-19）：25 轮导入（250k 行）+ 30 个 5000 行批次期间**引擎峰值 RSS 1.5–2.1 GB**（原 19.4 GB）。batch 31 服务端无 panic、无 SIGKILL，收到 **SIGTERM**；同机运行 `earlyoom -M 2000000,1000000`，采样到系统 `MemAvailable` 最低 **1.96 GB**（低于其 2 GB 阈值），因此是宿主看门狗杀掉了最大进程，而非引擎内存增长。CI 无 earlyoom；引擎侧目标（内存不随导入增长）已满足。
 - 内存修复：①HNSW 检查点不再重建全表图，而是序列化**内存段**（`HnswIndexInMem`），成本从 O(表) 降为 O(上次检查点后的行)；②`flush()` 每个检查点无条件 dump 所有 HNSW 内存段并清空，新增插入重新建立段；③索引尾部的 dump 先于块镜像执行，镜像失败不再阻塞内存回收。
 - 对象存储（MinIO HTTP/HTTPS）：删本地 `data/` 后重启可逐字节还原。
 
