@@ -1888,11 +1888,15 @@ fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
         cost += term.len() + 32;
     }
     if index.bytes + cost > TEXT_INDEX_BUDGET_BYTES {
+        // Only reachable if a caller never seals; keep the statistics in step
+        // with the (now empty) document map.
         index.postings.clear();
         index.postings.shrink_to_fit();
         index.docs.clear();
         index.live.clear();
         index.bytes = 0;
+        index.n_docs = 0;
+        index.total_len = 0;
         index.disabled = true;
         return;
     }
