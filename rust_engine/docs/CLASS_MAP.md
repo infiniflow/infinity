@@ -26,6 +26,8 @@
 | C++ | Rust | 原因 |
 |---|---|---|
 | `TaskScheduler` / `FragmentContext` / `BlockingQueue` | Tokio `mpsc` + `JoinSet` + 按边并发管线 | §4.4 D4（用户已批准） |
+| 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
+| SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
 | `ColumnVector` / `DataBlock`（typed 列式运行时） | `Value` / `Vec<Value>` 行式求值 | **已知偏差**：执行器仍是行式；列式运行时是 Gate E 的后续项 |
 
 ## 尚未一一对应（待补，按优先级）

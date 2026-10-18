@@ -225,13 +225,13 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 ### 3.6 类与方法的 1:1 对应（防过度简化）
 
-除**已明确决定的设计变更**（仅限调度器：`TaskScheduler`/`FragmentContext`/`BlockingQueue` → Tokio 按边并发，§4.4 D4）外，C++ 中**被其他类依赖的类**及其**被依赖的方法**，必须在 Rust 中有同职责的类与 public 方法一一对应：
+除**已明确决定的设计变更**外，C++ 中**被其他类依赖的类**及其**被依赖的方法**，必须在 Rust 中有同职责的类与 public 方法一一对应。当前已批准的设计变更清单：①调度器（`TaskScheduler`/`FragmentContext`/`BlockingQueue` → Tokio 按边并发，§4.4 D4）；②倒排 FST 复用 `fst` crate 的数据路径，C++ 尾块校验和自行实现（§4.2）；③SIMD 距离核、压缩等底层原语允许用等价 crate（§3.4）。行式 `Value` 运行时**不在**已批准清单内，属于 §CLASS_MAP 中待替换的偏差。
 
 - 不得把多个 C++ 类合并成一个「上帝对象」或一组自由函数；
 - 不得为过测试而实现简化版：例如以全表扫描代替索引迭代器、以单个内存 map 代替「segment + memindex」两形态、以行式 `Value` 代替列式 `ColumnVector` 而不登记；
 - 允许的语言惯用法差异仅限 RAII、`Result`、`Arc/Mutex` 等；**职责边界与调用关系**必须可逐项回溯到 C++ `文件:行号`；
 - 对照表维护在 `rust_engine/docs/CLASS_MAP.md`：每个 Rust `pub fn` 的文档注释写 `C++: path:line`；任何简化必须登记在「有意的设计变更」或「尚未一一对应」表，不能默默省略；
-- 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项，Gate A 全绿**不代表**移植完成。
+- 验收：`CLASS_MAP.md` 中「尚未一一对应」的条目即移植未完成项，Gate A 全绿**不代表**移植完成。新增设计变更须先写入 §3.6 的批准清单，再改代码。
 
 ---
 
