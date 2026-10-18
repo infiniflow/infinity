@@ -1599,6 +1599,7 @@ struct VectorCache {
     dims: usize,
     rows: Vec<(usize, Vec<f64>)>,
     live: std::collections::HashSet<usize>,
+    built_at: std::time::Instant,
 }
 type SharedVectorCache = Arc<std::sync::RwLock<VectorCache>>;
 
@@ -3917,10 +3918,20 @@ impl Engine {
             .store
             .count_prefix(&row_prefix(table))?
             .saturating_sub(self.store.count_prefix(&del_prefix(table))?);
-        if let Some(cache) = self.vector_cache.lock().unwrap().get(&key) {
-            // `!=` also catches a structural rewrite (DROP COLUMN re-keys rows),
-            // which leaves the cache holding seqs that are now tombstoned.
-            if cache.read().map(|g| g.live.len()).unwrap_or(0) == expected {
+        // Hold the map lock across a rebuild: concurrent readers noticing the
+        // same gap would each allocate a copy. A 250 ms floor keeps a
+        // write-heavy workload from rebuilding on every query.
+        let map = self.vector_cache.lock().unwrap();
+        if let Some(cache) = map.get(&key) {
+            let (live, built_at) = cache
+                .read()
+                .map(|g| (g.live.len(), g.built_at))
+                .unwrap_or((0, std::time::Instant::now()));
+            // Throttle only big caches: on a small table a stale snapshot would
+            // change results, and a rebuild is cheap.
+            let throttled =
+                live > 10_000 && built_at.elapsed() < std::time::Duration::from_millis(250);
+            if live == expected || throttled {
                 return Ok(cache.clone());
             }
         }
@@ -3933,6 +3944,7 @@ impl Engine {
             dims,
             rows: Vec::new(),
             live: Default::default(),
+            built_at: std::time::Instant::now(),
         };
         for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
             if let Some(Value::Str(text)) = cells.get(col) {
@@ -3943,6 +3955,7 @@ impl Engine {
                 }
             }
         }
+        drop(map);
         let shared = Arc::new(std::sync::RwLock::new(cache));
         self.vector_cache
             .lock()
