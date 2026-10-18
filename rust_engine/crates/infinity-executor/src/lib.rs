@@ -2418,6 +2418,22 @@ impl SparseIndex {
 }
 
 
+/// Per-table write bookkeeping and row-id allocation.
+///
+/// C++: the mutable half of `TableEntry` (`src/storage/meta/entry/table_entry.cppm`).
+/// The index maps still live on `Engine` until `SegmentEntry` is split out.
+#[derive(Default)]
+struct TableEntry {
+    /// Number of write batches (`COPY`/`INSERT`) seen by this process.
+    write_batches: usize,
+    /// Write generation at which the C++ block mirror was last flushed.
+    cpp_block_generation: Option<usize>,
+    /// Append-only sidecar holding this table's wide cells.
+    row_blob: Option<Arc<Mutex<std::fs::File>>>,
+    /// `(segment, offset, sealed)` of the row-id allocator.
+    row_counter: Option<(u32, u32, bool)>,
+}
+
 /// Engine-wide runtime state.
 ///
 /// C++: `InfinityContext` (`src/storage/infinity_context.cppm`) — the shared
@@ -2491,19 +2507,9 @@ pub struct Engine {
     result_cache: Mutex<HashMap<String, Vec<QueryResult>>>,
     /// the database new unqualified table names are resolved against
     current_db: Mutex<String>,
-    /// number of write batches (`COPY`/`INSERT`) per table; a table with more
-    /// than one batch is planned as several segments (a `MERGE` operator).
-    write_batches: Mutex<HashMap<String, usize>>,
-    /// Write generation at which the C++ block mirror of each table was last
-    /// flushed; a projection can read the mirror only when it matches.
-    cpp_block_generation: Mutex<HashMap<String, usize>>,
-    /// Append-only sidecar files holding wide vector-like cell values. Keeping
-    /// them out of the KV row turns ~40 KB/row of anonymous memory into
-    /// reclaimable file pages (Gate C).
-    row_blobs: Mutex<HashMap<String, Arc<Mutex<std::fs::File>>>>,
-    /// Next free row id per table; reserved in blocks so concurrent inserts do
-    /// not collide on the same base sequence.
-    row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
+    /// Per-table write bookkeeping (C++ `TableEntry`), keyed by the
+    /// fully-qualified lower-case table name.
+    tables: Mutex<HashMap<String, TableEntry>>,
     /// Estimated bytes buffered in each HNSW memory index since its last dump,
     /// keyed by `"<table>.<column>"`.
     index_pending_bytes: Mutex<HashMap<String, usize>>,
@@ -2648,10 +2654,7 @@ impl Engine {
             index_comments: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
-            write_batches: Mutex::new(HashMap::new()),
-            cpp_block_generation: Mutex::new(HashMap::new()),
-            row_blobs: Mutex::new(HashMap::new()),
-            row_counters: Mutex::new(HashMap::new()),
+            tables: Mutex::new(HashMap::new()),
             index_pending_bytes: Mutex::new(HashMap::new()),
             hnsw_mem: Mutex::new(HashMap::new()),
             hnsw_probed: Mutex::new(Default::default()),
@@ -3361,15 +3364,23 @@ impl Engine {
         s
     }
 
+    /// The key of a table's [`TableEntry`]: the fully-qualified lower-case
+    /// name (the C++ catalog's `db.table` key).
+    fn table_key(&self, table: &str) -> String {
+        if table.contains('.') {
+            table.to_ascii_lowercase()
+        } else {
+            format!("{}.{}", self.db(), table.to_ascii_lowercase())
+        }
+    }
+
     /// Drops a table and purges its stored rows, tombstones, secondary-index
     /// entries and index declarations, so a later CREATE TABLE with the same
     /// name starts empty.
     fn drop_table_all(&self, name: &str) -> Result<bool> {
         let table_id = self.catalog.get_table_by_name(name)?.map(|m| m.id);
-        self.row_counters
-            .lock()
-            .unwrap()
-            .remove(name.split('.').next_back().unwrap_or(name));
+        let key = self.table_key(name);
+        self.tables.lock().unwrap().remove(&key);
         let existed = self.catalog.drop_table(name)?;
         // The C++ block mirror of a dropped table is removed with it, so a
         // later restart cannot resurrect the data.
@@ -3425,10 +3436,11 @@ impl Engine {
 
     /// Reserves a contiguous block of `n` row ids for `table`.
     fn reserve_rows(&self, table: &str, n: usize, new_segment: bool) -> Result<usize> {
-        let mut counters = self.row_counters.lock().unwrap();
-        let key = table.split('.').next_back().unwrap_or(table).to_string();
-        let (mut seg, mut off, sealed) = match counters.get(&key) {
-            Some(v) => *v,
+        let key = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        let (mut seg, mut off, sealed) = match entry.row_counter {
+            Some(v) => v,
             None => {
                 let next = self.next_row_seq(table)?;
                 ((next >> 32) as u32, (next & 0xffff_ffff) as u32, false)
@@ -3445,52 +3457,55 @@ impl Engine {
         }
         let base = ((seg as usize) << 32) | off as usize;
         off = off.saturating_add(n as u32);
-        counters.insert(key, (seg, off, new_segment));
+        entry.row_counter = Some((seg, off, new_segment));
         Ok(base)
     }
 
     /// Forgets any cached row-id counter for `table` (used after an operation
     /// that re-keys rows outside `reserve_rows`).
     fn reset_row_counter(&self, table: &str) {
-        self.row_counters
-            .lock()
-            .unwrap()
-            .remove(table.split('.').next_back().unwrap_or(table));
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            entry.row_counter = None;
+        }
     }
 
     /// Upper bound on the rows ever reserved for `table`, from the in-memory
     /// counter (no scan). Used to decide whether the C++ block mirror is worth
     /// its duplicate copy of a large table.
     fn approx_row_count(&self, table: &str) -> usize {
-        let key = table.split('.').next_back().unwrap_or(table).to_string();
-        match self.row_counters.lock().unwrap().get(&key) {
-            Some((seg, off, _)) => ((*seg as u64) << 32 | *off as u64) as usize,
+        let key = self.table_key(table);
+        match self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.row_counter)
+        {
+            Some((seg, off, _)) => ((seg as u64) << 32 | off as u64) as usize,
             None => 0,
         }
     }
 
     /// Records a write batch (`COPY`/`INSERT`) against `table`.
     fn bump_writes(&self, table: &str) {
-        let key = table
-            .split('.')
-            .next_back()
-            .unwrap_or(table)
-            .to_ascii_lowercase();
-        *self.write_batches.lock().unwrap().entry(key).or_insert(0) += 1;
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .write_batches += 1;
     }
 
     /// True when `table` has been written in more than one batch.
     fn multi_segment(&self, table: &str) -> bool {
-        let key = table
-            .split('.')
-            .next_back()
-            .unwrap_or(table)
-            .to_ascii_lowercase();
-        self.write_batches
+        let key = self.table_key(table);
+        self.tables
             .lock()
             .unwrap()
             .get(&key)
-            .copied()
+            .map(|e| e.write_batches)
             .unwrap_or(0)
             >= 2
     }
@@ -5345,26 +5360,15 @@ impl Engine {
         if wanted.is_empty() {
             return Ok(None);
         }
-        let short = table
-            .split('.')
-            .next_back()
-            .unwrap_or(table)
-            .to_ascii_lowercase();
-        let current = self
-            .write_batches
+        let key = self.table_key(table);
+        let (current, generation) = self
+            .tables
             .lock()
             .unwrap()
-            .get(&short)
-            .copied()
-            .unwrap_or(0);
-        if self
-            .cpp_block_generation
-            .lock()
-            .unwrap()
-            .get(&short)
-            .copied()
-            != Some(current)
-        {
+            .get(&key)
+            .map(|e| (e.write_batches, e.cpp_block_generation))
+            .unwrap_or((0, None));
+        if generation != Some(current) {
             return Ok(None);
         }
         if self.cpp_block_row_count(table)? != self.row_count(table)? {
@@ -5379,9 +5383,15 @@ impl Engine {
     }
 
     fn blob_file(&self, table: &str) -> Result<Arc<Mutex<std::fs::File>>> {
-        let key = table.to_ascii_lowercase();
-        if let Some(f) = self.row_blobs.lock().unwrap().get(&key) {
-            return Ok(f.clone());
+        let key = self.table_key(table);
+        if let Some(f) = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.row_blob.clone())
+        {
+            return Ok(f);
         }
         let dir = self.dir.join("rowdata");
         std::fs::create_dir_all(&dir).map_err(|e| Error::Invalid(format!("row blob dir: {e}")))?;
@@ -5393,7 +5403,12 @@ impl Engine {
             .open(&path)
             .map_err(|e| Error::Invalid(format!("row blob {}: {e}", path.display())))?;
         let shared = Arc::new(Mutex::new(file));
-        self.row_blobs.lock().unwrap().insert(key, shared.clone());
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .row_blob = Some(shared.clone());
         Ok(shared)
     }
 
@@ -5425,8 +5440,13 @@ impl Engine {
     /// Flushes dirty sidecar pages so they become clean, reclaimable page
     /// cache instead of accumulating as unswappable dirty memory (Gate C).
     fn sync_row_blobs(&self) {
-        let files: Vec<Arc<Mutex<std::fs::File>>> =
-            self.row_blobs.lock().unwrap().values().cloned().collect();
+        let files: Vec<Arc<Mutex<std::fs::File>>> = self
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .filter_map(|e| e.row_blob.clone())
+            .collect();
         for file in files {
             if let Ok(file) = file.lock() {
                 let _ = file.sync_data();
@@ -6320,13 +6340,9 @@ impl Engine {
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
     pub fn segment_count(&self, table: &str) -> usize {
-        let key = &table
-            .split('.')
-            .next_back()
-            .unwrap_or(table)
-            .to_ascii_lowercase();
+        let key = self.table_key(table);
         let rows = self.row_count(table).unwrap_or(0);
-        let batches = match self.write_batches.lock().unwrap().get(key).copied() {
+        let batches = match self.tables.lock().unwrap().get(&key).map(|e| e.write_batches) {
             Some(b) => b.max(1),
             // Never written in this process: an empty table has no segment,
             // a table loaded from disk has at least one.
@@ -6590,16 +6606,13 @@ impl Engine {
         for (k, _) in self.store.scan_prefix(&del_prefix(table))? {
             self.store.delete(&k)?;
         }
-        let key = table
-            .split('.')
-            .next_back()
-            .unwrap_or(table)
-            .to_ascii_lowercase();
-        self.row_counters
-            .lock()
-            .unwrap()
-            .insert(key.clone(), (0, rows.len() as u32, true));
-        self.write_batches.lock().unwrap().insert(key, 1);
+        let key = self.table_key(table);
+        {
+            let mut tables = self.tables.lock().unwrap();
+            let entry = tables.entry(key).or_default();
+            entry.row_counter = Some((0, rows.len() as u32, true));
+            entry.write_batches = 1;
+        }
         // Block-level indexes and cached results refer to the old row ids.
         let prefix = format!("{table}.");
         self.indexes
@@ -9186,12 +9199,13 @@ impl Engine {
                     .push((*seq as u64 & 0xffff_ffff, entries));
             }
             let mut best: HashMap<usize, f64> = HashMap::new();
+            let key = self.table_key(table);
             let version = self
-                .write_batches
+                .tables
                 .lock()
                 .unwrap()
-                .get(table)
-                .copied()
+                .get(&key)
+                .map(|e| e.write_batches)
                 .unwrap_or(0);
             let query_i32: Vec<(i32, f32)> = qv.iter().map(|(t, v)| (*t as i32, *v)).collect();
             for (segment, mut docs) in segments {

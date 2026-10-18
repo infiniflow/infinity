@@ -37,6 +37,7 @@
 | `BMPAlg` / `BMPAlgBase::SearchKnn`（`bmp_alg.cppm`，own-mem） | `infinity_index::sparse::{BmpAlg, BmpSearchOptions}` | `AddDoc`→`add_doc`、`SearchKnn`→`search_knn`、`GetScores`/`Calculate2`、`alpha/beta/use_tail` | ✅ |
 | `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `infinity_storage::bmp_cpp::BmpCppReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
+| `TableEntry`（`table_entry.cppm`）的写入簿记 | 执行器 `TableEntry` | 写批次数、块镜像 generation、宽值 sidecar、行 id 分配器；以全限定小写表名为键 | ✅（部分：索引/段元数据仍在 `Engine`） |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -53,7 +54,7 @@
 |---|---|---|
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并走 `merge_knn::MergeKnn`、单段检索走 `HnswHandler`（`ef` 已透传）；仍缺算子对象（scan 状态/bitmask/多查询槽） |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
-| `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（剩余部分） | `InfinityContext` 已拆出；`Engine` 仍同时承担 storage/catalog/表段生命周期/索引映射，需按 C++ 的 `Storage`→`TableEntry`→`SegmentEntry` 逐层拆 |
+| `Storage` / `TableEntry`（索引/段元数据）/ `SegmentEntry` | `Engine`（剩余部分） | `InfinityContext` 与 `TableEntry` 的写入簿记已拆出；`Engine` 仍承担 catalog 之上的 storage 层、段生命周期与全部索引映射 |
 
 ## 维护规则
 

@@ -1101,23 +1101,11 @@ impl Engine {
                         rows.clear();
                     }
                 }
-                let short = meta
-                    .name
-                    .split('.')
-                    .next_back()
-                    .unwrap_or(&meta.name)
-                    .to_ascii_lowercase();
-                let generation = self
-                    .write_batches
-                    .lock()
-                    .unwrap()
-                    .get(&short)
-                    .copied()
-                    .unwrap_or(0);
-                self.cpp_block_generation
-                    .lock()
-                    .unwrap()
-                    .insert(short, generation);
+                let key = self.table_key(&meta.name);
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(key).or_default();
+                let generation = entry.write_batches;
+                entry.cpp_block_generation = Some(generation);
             }
             // A dropped index must not leave its `idx_{id}` mirror behind.
             let db_id = self.database_id_of(&meta.name);
