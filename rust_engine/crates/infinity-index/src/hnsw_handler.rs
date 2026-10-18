@@ -131,6 +131,6 @@ mod tests {
         // The exact three nearest are known for this dense layout.
         let ids: Vec<usize> = wide.iter().map(|(id, _)| *id).collect();
         assert_eq!(ids, vec![0, 1, 2]);
-        assert_eq!(handler.mem_usage() > 0, true);
+        assert!(handler.mem_usage() > 0);
     }
 }
