@@ -1508,11 +1508,12 @@ fn handle_connection(
                         read_table_args(&mut ip)?
                     };
                     let _ = (sid, &db);
-                    let n = engine
+                    let segs = engine
                         .as_ref()
-                        .map(|e| e.segment_count(&table))
-                        .unwrap_or(0);
-                    let rows: Vec<Vec<String>> = (0..n).map(|i| vec![i.to_string()]).collect();
+                        .map(|e| e.segments(&table))
+                        .unwrap_or_default();
+                    let rows: Vec<Vec<String>> =
+                        segs.iter().map(|(id, _)| vec![id.to_string()]).collect();
                     let resp = select_response_from_typed(&["segment_id".to_string()], &[], &rows);
                     write_result_response(&mut writer, seq, "ShowSegments", &resp)?;
                 }

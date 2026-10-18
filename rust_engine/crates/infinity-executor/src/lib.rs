@@ -2431,10 +2431,21 @@ struct TableEntry {
     row_blob: Option<Arc<Mutex<std::fs::File>>>,
     /// `(segment, offset, sealed)` of the row-id allocator.
     row_counter: Option<(u32, u32, bool)>,
+    /// Segments allocated by the row-id allocator, by id.
+    segments: std::collections::BTreeMap<u32, SegmentEntry>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
     row_cache: Option<RowCache>,
+}
+
+/// One segment of a table: its id and the highest row offset ever allocated.
+///
+/// C++: `SegmentEntry` (`src/storage/meta/entry/segment_entry.cppm`).
+struct SegmentEntry {
+    id: u32,
+    /// Number of rows in the segment (`SegmentEntry::row_count`).
+    rows: u32,
 }
 
 /// A table's decoded rows, bounded by [`ROW_CACHE_BUDGET_BYTES`].
@@ -3592,6 +3603,11 @@ impl Engine {
         let base = ((seg as usize) << 32) | off as usize;
         off = off.saturating_add(n as u32);
         entry.row_counter = Some((seg, off, new_segment));
+        entry
+            .segments
+            .entry(seg)
+            .and_modify(|s| s.rows = s.rows.max(off))
+            .or_insert(SegmentEntry { id: seg, rows: off });
         Ok(base)
     }
 
@@ -6567,6 +6583,27 @@ impl Engine {
 
     /// Number of segments `table` has: at least one per write batch, and more
     /// when a single import exceeds the segment capacity.
+    /// The table's segments with their row counts, for `SHOW SEGMENTS`. A table
+    /// restored from disk has no allocator history yet, so its rows report as
+    /// segment 0.
+    pub fn segments(&self, table: &str) -> Vec<(u32, u32)> {
+        let key = self.table_key(table);
+        let mut out: Vec<(u32, u32)> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|e| e.segments.values().map(|s| (s.id, s.rows)).collect())
+            .unwrap_or_default();
+        if out.is_empty() {
+            let rows = self.row_count(table).unwrap_or(0);
+            if rows > 0 {
+                out.push((0, rows as u32));
+            }
+        }
+        out
+    }
+
     pub fn segment_count(&self, table: &str) -> usize {
         let key = self.table_key(table);
         let rows = self.row_count(table).unwrap_or(0);
@@ -12838,5 +12875,21 @@ mod tests {
             .get(&key)
             .and_then(|t| t.row_cache.as_ref())
             .is_none());
+    }
+
+    /// Row-id allocation creates segments; `SHOW SEGMENTS` reports their ids
+    /// and row counts.
+    #[test]
+    fn segments_track_row_id_allocations() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE sg (id INT);").unwrap();
+        e.reserve_rows("sg", 2, true).unwrap();
+        e.reserve_rows("sg", 3, true).unwrap();
+        assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3)]);
+        // An INSERT after a sealed COPY opens a segment; the next one appends.
+        e.reserve_rows("sg", 4, false).unwrap();
+        e.reserve_rows("sg", 4, false).unwrap();
+        assert_eq!(e.segments("sg"), vec![(0, 2), (1, 3), (2, 8)]);
     }
 }
