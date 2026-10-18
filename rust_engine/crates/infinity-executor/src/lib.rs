@@ -1579,9 +1579,11 @@ struct TextIndex {
     /// a table with duplicate sequence ids still matches the scan.
     n_docs: usize,
     total_len: u64,
-    docs: HashMap<u32, u32>,
-    postings: HashMap<String, Vec<(u32, u32, Vec<u32>)>>,
-    live: std::collections::HashSet<u32>,
+    /// Row sequence ids are 64-bit (`ROW_ID()` offsets each insert batch by
+    /// 2^32), so document ids must be too — truncating to `u32` merged batches.
+    docs: HashMap<u64, u32>,
+    postings: HashMap<String, Vec<(u64, u32, Vec<u32>)>>,
+    live: std::collections::HashSet<u64>,
     /// Approximate memory held by the postings. The index is an optimisation:
     /// once it would exceed the budget it is dropped and queries fall back to
     /// the scan (which computes the same statistics), keeping memory bounded.
@@ -1692,7 +1694,7 @@ fn index_key(table: &str, column: &str) -> String {
 }
 
 /// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
-fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
+fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
     if index.disabled {
         return;
     }
@@ -1712,7 +1714,13 @@ fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
         return;
     }
     index.bytes += cost;
-    index.docs.insert(seq, toks.len() as u32);
+    // A re-indexed row (UPDATE rewrites in place) replaces its length rather
+    // than adding a second document to the corpus statistics.
+    match index.docs.insert(seq, toks.len() as u32) {
+        Some(old) => index.total_len = index.total_len.saturating_sub(old as u64),
+        None => index.n_docs += 1,
+    }
+    index.total_len += toks.len() as u64;
     index.live.insert(seq);
     let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
     for (term, at) in &toks {
@@ -1727,13 +1735,11 @@ fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
     }
 }
 
-/// Removes a document from the postings and the live set.
-fn index_delete_row(index: &mut TextIndex, seq: u32) {
+/// Marks a document deleted. Its postings and length stay: the reference's
+/// segments keep deleted documents until compaction, so corpus statistics must
+/// still count them; the search paths filter them out by sequence id.
+fn index_delete_row(index: &mut TextIndex, seq: u64) {
     index.live.remove(&seq);
-    index.docs.remove(&seq);
-    for list in index.postings.values_mut() {
-        list.retain(|(doc, _, _)| *doc != seq);
-    }
 }
 
 /// Only a plain secondary index materialises into the string-keyed
@@ -3910,13 +3916,17 @@ impl Engine {
     /// BM25 upper bounds, advance the prefix cursors to it, prune with the
     /// block-max bound, and score exactly only when the bound beats the current
     /// k-th score. Terms must be single-unit (no phrase / require-all) OR terms.
-    #[allow(dead_code, clippy::needless_range_loop)]
+    ///
+    /// `dead` holds tombstoned rows: they still contribute to the corpus
+    /// statistics (the reference's segments do until compaction) but never rank,
+    /// exactly like the scan path's live check.
     fn wand_scan(
         index: &TextIndex,
         terms: &[String],
         weights: &[f64],
         k: usize,
-    ) -> Vec<(u32, f64)> {
+        dead: &std::collections::HashSet<u64>,
+    ) -> Vec<(u64, f64)> {
         if k == 0 {
             return Vec::new();
         }
@@ -3946,8 +3956,10 @@ impl Engine {
                 index.postings[&terms[ti]][$cur].0
             }};
         }
+        // `best` is kept sorted by score (desc) then docid (asc), the same
+        // ordering the scan path produces, so ties resolve identically.
+        let mut best: Vec<(u64, f64)> = Vec::new();
         let mut threshold = f64::NEG_INFINITY;
-        let mut best: Vec<(u32, f64)> = Vec::new();
         loop {
             let mut alive: Vec<usize> = (0..cursors.len()).collect();
             alive.retain(|&c| {
@@ -3959,15 +3971,17 @@ impl Engine {
             }
             alive.sort_by_key(|&c| doc_at!(c, cursors[c].2));
             let total_ub: f64 = alive.iter().map(|&c| cursors[c].1).sum();
-            if total_ub <= threshold {
+            // `<` (not `<=`): a document that ties the k-th score can still win
+            // on the smaller docid, so only a strictly smaller bound is final.
+            if total_ub < threshold {
                 break;
             }
-            // pivot = first prefix whose upper bound exceeds the threshold
+            // pivot = first prefix whose upper bound reaches the threshold
             let mut pivot = alive.len();
             let mut prefix = 0.0;
             for (pos, &c) in alive.iter().enumerate() {
                 prefix += cursors[c].1;
-                if prefix > threshold {
+                if prefix >= threshold {
                     pivot = pos;
                     break;
                 }
@@ -4000,7 +4014,16 @@ impl Engine {
                 .collect();
             // block-max bound on the prefix, then the exact BM25 sum at `d`
             let bm: f64 = at_d.iter().map(|&c| cursors[c].1).sum();
-            if !at_d.is_empty() && bm > threshold {
+            // While the top-k is not full every candidate is scored.
+            let worth = if best.len() < k {
+                true
+            } else {
+                match best.last() {
+                    Some((worst, wscore)) => bm >= *wscore && !(bm == *wscore && d > *worst),
+                    None => true,
+                }
+            };
+            if !at_d.is_empty() && worth {
                 let mut score = 0.0;
                 for &c in &at_d {
                     let (ti, _, cur) = cursors[c];
@@ -4012,14 +4035,27 @@ impl Engine {
                     let w = weights.get(ti).copied().unwrap_or(1.0);
                     score += idf * (2.2 * tf / (tf + 1.2 * (0.25 + 0.75 * dl / avg))) * w;
                 }
-                if score > threshold {
-                    best.push((d, score));
-                    best.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-                    if best.len() > k {
-                        best.remove(0);
+                // A deleted row keeps its statistics but is never returned.
+                let better = if best.len() < k {
+                    true
+                } else {
+                    match best.last() {
+                        Some((worst, wscore)) => {
+                            score > *wscore || (score == *wscore && d < *worst)
+                        }
+                        None => true,
                     }
+                };
+                if !dead.contains(&d) && better {
+                    best.push((d, score));
+                    best.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    });
+                    best.truncate(k);
                     if best.len() == k {
-                        threshold = best[0].1;
+                        threshold = best[k - 1].1;
                     }
                 }
             }
@@ -4030,7 +4066,6 @@ impl Engine {
                 }
             }
         }
-        best.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         best
     }
 
@@ -4178,7 +4213,7 @@ impl Engine {
                 Some(other) => other.to_slt_string(),
                 None => String::new(),
             };
-            index_row(&mut index, seq as u32, &text);
+            index_row(&mut index, seq as u64, &text);
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
         self.text_index.lock().unwrap().insert(key, shared.clone());
@@ -4209,8 +4244,8 @@ impl Engine {
             };
             let Some(text) = cells.get(ci) else { continue };
             let mut index = shared.write().unwrap();
-            index_delete_row(&mut index, seq as u32);
-            index_row(&mut index, seq as u32, text);
+            index_delete_row(&mut index, seq as u64);
+            index_row(&mut index, seq as u64, text);
         }
     }
 
@@ -4221,7 +4256,7 @@ impl Engine {
             if key.starts_with(&prefix) {
                 let mut index = shared.write().unwrap();
                 for seq in seqs {
-                    index_delete_row(&mut index, *seq as u32);
+                    index_delete_row(&mut index, *seq as u64);
                 }
             }
         }
@@ -5218,6 +5253,68 @@ impl Engine {
             }
             groups
         };
+        // Block-max WAND: a plain OR query over one field never needs a row's
+        // token vectors — the posting lists alone answer it. This is what keeps
+        // memory flat when a query matches a large share of a wide table.
+        if !boolean
+            && rank_features.is_empty()
+            && in_filter.is_none()
+            && opt_filter.is_none()
+            && pred.is_none()
+            && min_should == 1
+            && delta_term == 0.0
+            && !matches!(&delims, Some(d) if d.is_empty())
+            && field_specs.len() == 1
+            && units
+                .iter()
+                .all(|(phrase, toks, _)| !*phrase && toks.len() == 1)
+        {
+            if let Some((ci, boost, d)) = field_specs.first() {
+                let name = schema[*ci].clone();
+                let index = self.text_index_for(table, &name, d.clone())?;
+                let guard = index.read().unwrap();
+                // Tombstones still feed the corpus statistics (as the
+                // reference's segments do until compaction) but never rank.
+                let dp = del_prefix(table);
+                let mut dead: std::collections::HashSet<u64> = Default::default();
+                for (k, _) in self.store.scan_prefix(&dp)? {
+                    if let Ok(seq) = String::from_utf8_lossy(&k[dp.len()..]).parse() {
+                        dead.insert(seq);
+                    }
+                }
+                let wterms: Vec<String> =
+                    units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
+                let weights: Vec<f64> = units.iter().map(|(_, _, ub)| boost * ub).collect();
+                let hits = Self::wand_scan(&guard, &wterms, &weights, topn.max(1), &dead);
+                drop(guard);
+                let scored: Vec<(usize, f64)> = hits
+                    .into_iter()
+                    .map(|(seq, score)| (seq as usize, score))
+                    .filter(|(_, score)| threshold.map(|t| *score >= t).unwrap_or(true))
+                    .collect();
+                if !scored.is_empty() {
+                    let wanted: Vec<u64> = scored.iter().map(|(seq, _)| *seq as u64).collect();
+                    let mut by_id: HashMap<usize, Vec<Value>> = self
+                        .fetch_some_rows_with_ids(table, &wanted)?
+                        .into_iter()
+                        .collect();
+                    let mut out = Vec::new();
+                    for (seq, score) in scored {
+                        let Some(mut row) = by_id.remove(&seq) else {
+                            continue;
+                        };
+                        row.push(Value::Int(seq as i64));
+                        row.push(Value::Float(score));
+                        row.push(Value::Float(0.0));
+                        row.push(Value::Float(score));
+                        out.push(row);
+                    }
+                    if !out.is_empty() {
+                        return Ok((out, hidden.to_vec()));
+                    }
+                }
+            }
+        }
         // BM25 (k1 = 1.2, b = 0.75) over the whole table; a document's length is
         // the number of indexed terms, and `similarity=boolean` scores one point
         // per matching term weighted by the field/term boosts.
