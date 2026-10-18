@@ -53,6 +53,11 @@ pub trait MetaStore: Send + Sync {
     fn atomic_write(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<()>;
     /// All `(key, value)` pairs whose key starts with `prefix`, in key order.
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
+    /// Number of keys with `prefix`. Counting (`SELECT count(*)`, `SHOW TABLE`)
+    /// must not read the row values, which can be tens of kilobytes each.
+    fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
+        Ok(self.scan_prefix(prefix)?.len())
+    }
     /// Flush to disk (durability barrier).
     fn flush(&self) -> Result<()>;
 }
@@ -94,6 +99,15 @@ impl MetaStore for FjallMetaStore {
             batch.insert(&self.ks, k.as_slice(), stored.as_slice());
         }
         batch.commit().map_err(fe)
+    }
+
+    fn count_prefix(&self, prefix: &[u8]) -> Result<usize> {
+        let mut n = 0usize;
+        for kv in self.ks.prefix(prefix) {
+            kv.into_inner().map_err(fe)?;
+            n += 1;
+        }
+        Ok(n)
     }
 
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {

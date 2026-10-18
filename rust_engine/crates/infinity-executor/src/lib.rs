@@ -6813,7 +6813,11 @@ impl Engine {
         } else {
             format!("{db}.{table}")
         };
-        Ok(self.fetch_rows(&name)?.len())
+        // Counting keys avoids materialising every row: `SHOW TABLE` and
+        // `count(*)` on a wide table otherwise decode gigabytes.
+        let total = self.store.count_prefix(&row_prefix(&name))?;
+        let deleted = self.store.count_prefix(&del_prefix(&name))?;
+        Ok(total.saturating_sub(deleted))
     }
 
     pub fn flush(&self) -> Result<()> {
