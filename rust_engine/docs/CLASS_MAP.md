@@ -37,6 +37,7 @@
 | `BMPAlg` / `BMPAlgBase::SearchKnn`（`bmp_alg.cppm`，own-mem） | `infinity_index::sparse::{BmpAlg, BmpSearchOptions}` | `AddDoc`→`add_doc`、`SearchKnn`→`search_knn`、`GetScores`/`Calculate2`、`alpha/beta/use_tail` | ✅ |
 | `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `infinity_storage::bmp_cpp::BmpCppReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
 | `KnnScanSharedData` / `KnnSearchOption`（`knn_scan_data.cppm`） | `knn_scan::KnnScanOptions` | `nprobe`/`ef`/`threshold` 从 `WITH (…)` 与 legacy 串解析（`WITH` 优先），供 IVF/HNSW/阈值共用 | ✅ |
+| `PhysicalKnnScan` 的候选阶段（`physical_knn_scan_impl.cpp`） | `knn_scan::KnnCandidateScan` + `Engine::knn_candidates` | 每段 IVF/HNSW 检索 → `MergeKnn` 合并 → 覆盖性检查（不完整则回退精确扫描） | ✅（候选阶段） |
 | `SegmentEntry`（`segment_entry.cppm`） | 执行器 `SegmentEntry`（`TableEntry.segments`） | 段 id 与行数由行 id 分配器维护；`SHOW SEGMENTS` 读取 | ✅（部分：block/index 元数据仍在 `Engine`） |
 | `Storage`（`storage.cppm`） | 执行器 `Engine::storage: Storage` | catalog 与 KV store 的所有权（`catalog`/`store` 由 `Storage` 持有，`Engine` 组合） | ✅（部分：文件/块管理仍在 `Engine`） |
 | `InfinityContext`（`infinity_context.cppm`） | 执行器 `Context` | `config`/`BufferManager`/`memindex_memory_quota`/`scan_gate`/`object_store`/exchange 容量；`Engine` 组合而非内联 | ✅（部分：C++ 的线程池由 Tokio 取代） |
@@ -57,7 +58,7 @@
 |---|---|---|
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并走 `merge_knn::MergeKnn`、单段检索走 `HnswHandler`（`ef` 已透传）；仍缺算子对象（scan 状态/bitmask/多查询槽） |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
-| `PhysicalKnnScan` 算子对象 | `Engine` 的 KNN 分支 | 选项（`KnnScanOptions`）、合并（`MergeKnn`）、单段检索（`HnswHandler`）已拆出；scan 状态/bitmask/多查询槽仍内联 |
+| `PhysicalKnnScan` 的评分/输出阶段 | `Engine` 的 KNN 分支 | 候选阶段已拆为 `KnnCandidateScan`；精确评分、bitmask 过滤、多查询槽与结果物化仍内联 |
 | `TableEntry` 的按列索引注册表 | `Engine` 的全局索引映射 | 索引映射仍按 `"table.column"` 键全局存放，未收进 `TableEntry` |
 
 ## 维护规则
