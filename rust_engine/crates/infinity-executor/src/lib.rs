@@ -3364,6 +3364,30 @@ impl Engine {
         s
     }
 
+    /// True when at least one index (secondary / fulltext / vector / sparse /
+    /// multi-vector) is maintained in memory. An insert into a table with none
+    /// skips the per-row index hook entirely.
+    fn any_in_memory_index(&self) -> bool {
+        !self.indexes.lock().unwrap().is_empty()
+            || !self.text_index.lock().unwrap().is_empty()
+            || !self.vector_cache.lock().unwrap().is_empty()
+            || !self.hnsw_mem.lock().unwrap().is_empty()
+            || !self.ivf_mem.lock().unwrap().is_empty()
+            || !self.mv_index.lock().unwrap().is_empty()
+            || !self.sparse_index.lock().unwrap().is_empty()
+    }
+
+    /// True when `table` has an index declaration. Consulted together with
+    /// [`Self::any_in_memory_index`] so the per-row hook runs whenever any
+    /// index state could need it.
+    fn has_index_declaration(&self, table: &str) -> bool {
+        let short = table.split('.').next_back().unwrap_or(table);
+        self.catalog
+            .list_indexes()
+            .map(|is| is.iter().any(|i| i.table == short || i.table == table))
+            .unwrap_or(true)
+    }
+
     /// The key of a table's [`TableEntry`]: the fully-qualified lower-case
     /// name (the C++ catalog's `db.table` key).
     fn table_key(&self, table: &str) -> String {
@@ -3653,11 +3677,16 @@ impl Engine {
             t.put(row_key(table, base + k), encoded.into_bytes());
         }
         self.txn.commit(t)?;
-        for (k, row) in rows.iter().enumerate() {
-            self.update_indexes_on_insert(table, base + k, row)?;
-            let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
-            self.update_text_indexes(table, base + k, &texts);
-            self.update_vector_caches(table, base + k, &texts);
+        // With no index of any kind in memory there is nothing to maintain;
+        // skipping the per-row hook avoids a catalog lookup + string render for
+        // every inserted row (the reference's insert path has the same guard).
+        if self.any_in_memory_index() || self.has_index_declaration(table) {
+            for (k, row) in rows.iter().enumerate() {
+                self.update_indexes_on_insert(table, base + k, row)?;
+                let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                self.update_text_indexes(table, base + k, &texts);
+                self.update_vector_caches(table, base + k, &texts);
+            }
         }
         self.bump_writes(table);
         // Give the allocator's per-batch scratch back to the OS.
