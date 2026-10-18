@@ -46,6 +46,7 @@
 |---|---|---|
 | `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::vector::HnswIndex` + `hnsw_mem::HnswIndexInMem` | 图算法与内存段已对应；`InsertVecs`/`SearchIndex` 的批次与 `KnnSearchOption` 仍内联在执行器 |
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
+| `MemoryIndexer`（`memory_indexer.cppm`）/ `IndexSegmentReader`（`index_segment_reader.cppm`）/ `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `TextIndex` + `infinity_storage::fulltext_segment::SegmentIndexReader` + 查询期 `MergedIndex`（`lib.rs:1651`） | `SegmentIndexReader` 已对应 `IndexSegmentReader`；`MemoryIndexer`（未封段的内存倒排 + 预算）与 `ColumnIndexReader`（跨段合并/统计）仍内联在 `TextIndex` 与执行器 |
 | `EMVBIndex`（`emvb_index.cppm`）/ `EMVBIndexInMem`（`emvb_index_in_mem.cppm`） | `emvb_segment::{EmvbReader, EmvbPqIndex, PqCodebook}` + 执行器 `MultiVectorIndex` | 已移植：磁盘布局、残差 PQ 码本与候选预过滤（`prefilter`）。**未移植**：`Train` 的质心 k-means、三阶段 `GetQueryResult`（centroid→doc→refine）、`EMVBIndexInMem` 的建索引阈值；当前执行器对候选做精确 maxsim 重排 |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
@@ -70,7 +71,6 @@
 | `buffer/buffer_manager_ut.cpp`（容量/淘汰） | `buffer::BufferManager` | `buffer::tests::evicts_least_recently_used`、`shrinking_the_budget_evicts` |
 | `invertedindex/format/*`（posting/position 编解码） | `inverted_format` | 该模块的往返/边界单测 |
 | `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |
-| `knn/sparse` 的 block-max 检索 | `infinity_index::sparse::BmpIndex` / `bmp_cpp` | `sparse` / `bmp_cpp` 单测 |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
 | （无独立 C++ 单测） | `merge_knn::MergeKnn` | 6 例：多段合并/并列取小 RowID/阈值方向/多查询/EndWithoutSort/余弦排序 |
 | `knn/sparse/test_bmp_fwd_ut.cpp`（块分组/迭代不变量） | `sparse::BlockFwd`/`TailFwd` | `block_fwd_groups_docs_into_blocks` |
