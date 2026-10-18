@@ -3809,6 +3809,33 @@ impl Engine {
         Ok(rows)
     }
 
+    /// Like `fetch_rows_with_ids`, but including tombstoned rows. Full-text
+    /// corpus statistics keep counting deleted documents, as the reference's
+    /// segments do until compaction, so the scan path must see them too.
+    fn fetch_rows_including_deleted(&self, table: &str) -> Result<Vec<(usize, Vec<Value>)>> {
+        let prefix = row_prefix(table);
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let mut rows = Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let mut cells: Vec<Value> = String::from_utf8_lossy(&v)
+                .split('\t')
+                .map(parse_value)
+                .collect();
+            while cells.len() < defaults.len() {
+                let i = cells.len();
+                cells.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
+            }
+            rows.push((seq, cells));
+        }
+        Ok(rows)
+    }
+
     fn fetch_some_rows_with_ids(
         &self,
         table: &str,
@@ -3837,8 +3864,14 @@ impl Engine {
         delims: Option<Vec<char>>,
     ) -> Result<SharedTextIndex> {
         let key = index_key(table, column);
+        // A bulk load that bypasses the DML hooks would leave the index short of
+        // rows; compare against the cheap reservation counter and rebuild.
+        let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
-            return Ok(idx.clone());
+            let complete = idx.read().map(|g| g.docs.len()).unwrap_or(0);
+            if complete >= reserved {
+                return Ok(idx.clone());
+            }
         }
         let schema = self.table_schema(table)?;
         let col = schema
@@ -4912,6 +4945,11 @@ impl Engine {
         // of the table is cheaper to scan than to gather.
         #[allow(clippy::type_complexity)]
         let index_view: Option<(Vec<usize>, Vec<(usize, f64, HashMap<String, usize>)>)> = (|| {
+            // The index path is still rolling out: its corpus statistics must
+            // match the scan byte-for-byte before it becomes the default.
+            if std::env::var("INFINITY_TEXT_INDEX").ok().as_deref() != Some("1") {
+                return None;
+            }
             if boolean
                 || !rank_features.is_empty()
                 || in_filter.is_some()
@@ -4967,7 +5005,7 @@ impl Engine {
             Vec::new();
         let scanned: Vec<(usize, Vec<Value>)> = match &index_view {
             Some((ids, _)) => self.fetch_rows_cols(table, ids, &cols)?,
-            None => self.fetch_rows_with_ids(table)?,
+            None => self.fetch_rows_including_deleted(table)?,
         };
         for (seq, mut row) in scanned {
             // Rows loaded before a column was added (or from a narrower COPY)
