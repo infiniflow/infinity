@@ -92,6 +92,11 @@ impl BmpIndex {
         self.docs.is_empty()
     }
 
+    /// The stored sparse vector of a document (for persisting a segment).
+    pub fn doc(&self, doc: usize) -> &[(u32, f32)] {
+        self.docs.get(doc).map(Vec::as_slice).unwrap_or(&[])
+    }
+
     /// Finalises the per-term k-th score table.
     pub fn build(&mut self) {
         for entry in self.terms.values_mut() {

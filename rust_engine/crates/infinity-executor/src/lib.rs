@@ -7401,9 +7401,55 @@ impl Engine {
                 entry.1.push(*seq);
             }
             let mut best: HashMap<usize, f64> = HashMap::new();
-            for (_, (mut index, ids)) in segments {
-                index.build();
-                for (doc, score) in index.search(&qv, topn.max(1), 0.9, 1.0, true) {
+            let version = self
+                .write_batches
+                .lock()
+                .unwrap()
+                .get(table)
+                .copied()
+                .unwrap_or(0);
+            for (segment, (index, ids)) in segments {
+                // Persist the segment once and query it through mmap: the
+                // on-disk form of the sparse index (`bmp_index_file_worker`).
+                let dir = self.dir.join("sparse").join(
+                    index_key(
+                        table,
+                        &match_columns(&m.column)
+                            .first()
+                            .cloned()
+                            .unwrap_or_default(),
+                    )
+                    .replace('/', "_"),
+                );
+                let path = dir.join(format!("seg_{segment}_{}_{version}.bmp", ids.len()));
+                let docs: Vec<Vec<(u32, f32)>> = if path.exists() {
+                    Vec::new()
+                } else {
+                    (0..index.len())
+                        .map(|doc| {
+                            index
+                                .doc(doc)
+                                .iter()
+                                .map(|(t, s)| (*t, *s))
+                                .collect::<Vec<_>>()
+                        })
+                        .collect()
+                };
+                if !path.exists()
+                    && infinity_storage::bmp_segment::write_bmp_segment(
+                        &path,
+                        infinity_index::sparse::BMP_BLOCK_SIZE,
+                        &docs,
+                    )
+                    .is_err()
+                {
+                    continue;
+                }
+                let Ok(reader) = infinity_storage::bmp_segment::BmpSegmentReader::open(&path)
+                else {
+                    continue;
+                };
+                for (doc, score) in reader.search(&qv, topn.max(1)) {
                     if let Some(seq) = ids.get(doc) {
                         let score = score as f64;
                         best.entry(*seq)

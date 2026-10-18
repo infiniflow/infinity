@@ -14,6 +14,7 @@
 // cannot change while mapped.
 #![deny(unsafe_code)]
 
+pub mod bmp_segment;
 pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
