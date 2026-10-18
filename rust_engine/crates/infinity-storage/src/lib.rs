@@ -29,6 +29,7 @@ pub mod metastore_rocks;
 pub mod multivector_segment;
 pub mod mvcc;
 pub mod s3;
+pub mod secondary_segment;
 pub mod wal;
 
 pub use cpp_format::{
