@@ -1570,6 +1570,18 @@ fn parse_value(cell: &str) -> Value {
     }
 }
 
+/// In-memory inverted index for one text column: `term -> [(doc, tf, positions)]`
+/// plus each document's length, mirroring the reference memory indexer
+/// (`src/storage/invertedindex/memory_indexer*`).
+struct TextIndex {
+    delims: Option<Vec<char>>,
+    docs: HashMap<u32, u32>,
+    postings: HashMap<String, Vec<(u32, u32, Vec<u32>)>>,
+    live: std::collections::HashSet<u32>,
+}
+
+type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
+
 /// Bounds how many full-table scans (full-text or vector) run at once. Each
 /// such scan materialises a large share of the table, so several concurrent
 /// readers can exhaust the process's memory even when a single query fits.
@@ -1649,10 +1661,39 @@ pub struct Engine {
     object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
     /// Concurrency limit for full-table text/vector scans.
     scan_gate: ScanGate,
+    /// Inverted indexes, keyed by `"<table>.<column>"`.
+    text_index: Mutex<HashMap<String, SharedTextIndex>>,
 }
 
 fn index_key(table: &str, column: &str) -> String {
     format!("{table}.{column}")
+}
+
+/// Indexes one document's tokens: length plus `(doc, tf, positions)` postings.
+fn index_row(index: &mut TextIndex, seq: u32, text: &str) {
+    let toks = tokenize_index_positions(text, &index.delims);
+    index.docs.insert(seq, toks.len() as u32);
+    index.live.insert(seq);
+    let mut pos: HashMap<&str, Vec<u32>> = HashMap::new();
+    for (term, at) in &toks {
+        pos.entry(term.as_str()).or_default().push(*at);
+    }
+    for (term, positions) in pos {
+        index
+            .postings
+            .entry(term.to_string())
+            .or_default()
+            .push((seq, positions.len() as u32, positions));
+    }
+}
+
+/// Removes a document from the postings and the live set.
+fn index_delete_row(index: &mut TextIndex, seq: u32) {
+    index.live.remove(&seq);
+    index.docs.remove(&seq);
+    for list in index.postings.values_mut() {
+        list.retain(|(doc, _, _)| *doc != seq);
+    }
 }
 
 /// Only a plain secondary index materialises into the string-keyed
@@ -1734,6 +1775,7 @@ impl Engine {
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(2),
             ),
+            text_index: Mutex::new(HashMap::new()),
         };
         engine.recover_cpp_blocks()?;
         engine.rebuild_indexes()?;
@@ -3036,6 +3078,8 @@ impl Engine {
                 self.txn.commit(t)?;
                 for (k, row) in rows.iter().enumerate() {
                     self.update_indexes_on_insert(table, base + k, row)?;
+                    let texts: Vec<String> = row.iter().map(|v| v.to_slt_string()).collect();
+                    self.update_text_indexes(table, base + k, &texts);
                 }
                 self.bump_writes(table);
                 Ok(QueryResult::Inserted { count: rows.len() })
@@ -3062,6 +3106,7 @@ impl Engine {
                         t.put(del_key(table, *seq), b"1".to_vec());
                     }
                     self.txn.commit(t)?;
+                    self.drop_text_index_rows(table, &to_del);
                 }
                 Ok(QueryResult::Deleted {
                     count: to_del.len(),
@@ -3176,6 +3221,7 @@ impl Engine {
                     for (seq, nr) in to_del.iter().zip(new_rows.iter()) {
                         let texts: Vec<String> = nr.iter().map(|v| v.to_slt_string()).collect();
                         self.update_indexes_on_insert_text(table, *seq, &texts)?;
+                        self.update_text_indexes(table, *seq, &texts);
                     }
                 }
                 Ok(QueryResult::Updated {
@@ -3754,6 +3800,83 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    /// Builds (once) the inverted index for a text column from its live rows.
+    fn text_index_for(
+        &self,
+        table: &str,
+        column: &str,
+        delims: Option<Vec<char>>,
+    ) -> Result<SharedTextIndex> {
+        let key = index_key(table, column);
+        if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
+            return Ok(idx.clone());
+        }
+        let schema = self.table_schema(table)?;
+        let col = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let mut index = TextIndex {
+            delims,
+            docs: HashMap::new(),
+            postings: HashMap::new(),
+            live: Default::default(),
+        };
+        for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
+            let text = match cells.get(col) {
+                Some(Value::Str(s)) => s.clone(),
+                Some(other) => other.to_slt_string(),
+                None => String::new(),
+            };
+            index_row(&mut index, seq as u32, &text);
+        }
+        let shared = Arc::new(std::sync::RwLock::new(index));
+        self.text_index.lock().unwrap().insert(key, shared.clone());
+        Ok(shared)
+    }
+
+    /// Keeps existing inverted indexes in step with an inserted/rewritten row.
+    fn update_text_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+        let prefix = format!("{table}.");
+        let indexes: Vec<(String, SharedTextIndex)> = self
+            .text_index
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if indexes.is_empty() {
+            return;
+        }
+        let Ok(schema) = self.table_schema(table) else {
+            return;
+        };
+        for (key, shared) in indexes {
+            let column = &key[prefix.len()..];
+            let Some(ci) = schema.iter().position(|c| c == column) else {
+                continue;
+            };
+            let Some(text) = cells.get(ci) else { continue };
+            let mut index = shared.write().unwrap();
+            index_delete_row(&mut index, seq as u32);
+            index_row(&mut index, seq as u32, text);
+        }
+    }
+
+    /// Drops deleted rows from every inverted index of `table`.
+    fn drop_text_index_rows(&self, table: &str, seqs: &[usize]) {
+        let prefix = format!("{table}.");
+        for (key, shared) in self.text_index.lock().unwrap().iter() {
+            if key.starts_with(&prefix) {
+                let mut index = shared.write().unwrap();
+                for seq in seqs {
+                    index_delete_row(&mut index, *seq as u32);
+                }
+            }
+        }
     }
 
     /// Live rows with only column `idx` parsed. A vector scan over a wide table
