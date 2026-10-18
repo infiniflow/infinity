@@ -406,6 +406,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 ### 7.2 存储与格式模块
 
 - `cpp_format`：数据文件框架、块 `version`、列体 `[data_region][null_bitmap]`、`ColumnLayout`/`pack_column`、整块目录、日期时间与 f16/bf16。
+- **列式投影读路径（#87）**：仅含列清单的 `SELECT` 在「C++ 块镜像的写入代次 == 当前 write generation」时，只解码所需列（`read_cpp_blocks_selected`），不读行存、不解析宽列；镜像过期或存在过滤/排序时自动回退。
 - `cpp_blocks`（执行器）：把真实表镜像成 C++ 块文件（每 8192 行一块），`flush()` 自动镜像并可脱离 KV 读回。覆盖定宽标量、`VARCHAR`/`JSON`、`EMBEDDING`/`VECTOR`、`TENSOR`/`MULTIVECTOR`、`SPARSE`、嵌套 `ARRAY`、`TENSORARRAY`、`EMBEDDING(BIT)`、`SPARSE(BIT)`；`TENSOR(BIT)`/`TENSORARRAY(BIT)` 按设计返回错误。
 - `catalog_format` / `value_format` / `cpp_layout`：全部 catalog 键、`DataType`/`ColumnDef`/`IndexBase`（十种）逐字段复刻；`Engine::flush` 写入 C++ 键空间，`Engine::open` 可从 C++ 键空间导入 schema。
 - `inverted_format`：LEB128、TermMeta、`.len`、`.pos` 框架、FST 尾块（CRC-32/IEEE）。
