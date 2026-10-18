@@ -415,8 +415,11 @@ fn handle_connection(
     next_session: Arc<AtomicI64>,
     engine: Option<Arc<Engine>>,
 ) -> Result<()> {
-    let mut reader = stream.try_clone().map_err(io)?;
-    let mut writer = stream;
+    // Thrift writes scalar fields one at a time (a `list<bool>` bitmask is one
+    // `writeBool` per row); on a raw `TcpStream` that is one syscall per value.
+    // The C++ server wraps the socket in a buffered transport, so do the same.
+    let mut reader = std::io::BufReader::new(stream.try_clone().map_err(io)?);
+    let mut writer = std::io::BufWriter::new(stream);
     // Set when a request could not be fully decoded: the stream is then
     // desynchronised, so reply and close instead of misreading the next call.
     let mut close_after_reply = false;
@@ -964,6 +967,7 @@ fn handle_connection(
                     if std::env::var_os("INF_DEBUG_SQL").is_some() {
                         eprintln!("[SELECT] {}", req.to_sql());
                     }
+                    let exec_started = std::time::Instant::now();
                     let resp = match &engine {
                         Some(eng) => match eng.execute(&req.to_sql()) {
                             Ok(rs) => {
@@ -1006,11 +1010,21 @@ fn handle_connection(
                                         columns[start + i] = n.clone();
                                     }
                                 }
+                                let exec_elapsed = exec_started.elapsed();
+                                let encode_started = std::time::Instant::now();
                                 let mut resp = select_response_from_typed(
                                     &columns,
                                     &declared_types(eng, &req.table_name, &columns),
                                     &rows,
                                 );
+                                if std::env::var_os("INF_DEBUG_SEL").is_some() {
+                                    eprintln!(
+                                        "[SEL] rows={} exec={:?} encode={:?}",
+                                        rows.len(),
+                                        exec_elapsed,
+                                        encode_started.elapsed()
+                                    );
+                                }
                                 if req.total_hits {
                                     // The count is the result set *before*
                                     // LIMIT/OFFSET.

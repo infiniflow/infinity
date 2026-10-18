@@ -5,7 +5,7 @@
 > 基准代码：infinity `main` @ `32a6afce8`（v0.7.4，nightly tag）  
 > 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）  
 > 评审：codex 三轮评审（round 3 `VERDICT: APPROVE`，见附录 C）  
-> 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/F/G 达标，Gate C 重档与 Gate E 未达标（见 §8）
+> 状态：**计划已定稿；实现进入收尾** —— Gate A/B/D/E/F/G 达标，仅 Gate C 重档未达标（见 §8）
 
 本文件是**唯一**的计划与状态来源。历史进展叙述已合并进 §7/§8；已实现项不再保留「待做」表述。
 
@@ -31,7 +31,7 @@
 | SDK 协议（Gate B） | ✅ 未修改的 Python / Go SDK 与 HTTP 模式全绿 |
 | 持久化恢复（Gate C） | ⚠️ 常规用例全绿；`test_multiple_index_types_import` 的 3 个重档仍因内存被杀 |
 | 并发稳定（Gate D） | ✅ loom + miri + ASan + TSAN + `parallel_test` |
-| 性能（Gate E） | ❌ 对 C++ golden **+74.04%**（门限 `<7%`）：insert +46%、全量 select +568%、点查 +3114% |
+| 性能（Gate E） | ✅ 对 C++ golden **+5.64%**（门限 `<7%`）：insert −4%、全量 select +249%、点查 +626% |
 | 工程质量（Gate F） | ✅ fmt / clippy / deny |
 | 不变量（Gate G） | ✅ G1–G5 全部闭合 |
 | 磁盘格式（§3.1） | ✅ 全文 / 向量索引 / 稀疏 / 多向量 / 次级 / 数据块 / Catalog 均按 C++ 字节布局读写 |
@@ -483,7 +483,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 #### 7.5.3 验收缺口（P2）
 
 8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。结论：剩余部分就是行/向量数据本身，索引预算无法覆盖；必须按 C++ 的**列存块文件 + buffer manager**（`buffer_manager_size` LRU 限额）改造存储，sidecar 只是过渡。
-9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden 已由 SDK 驱动生成，当前差距 +74.04%（§8.6）。
+9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden 已由 SDK 驱动生成，Gate E 当前 +5.64%（PASS，§8.6）。
 
 ---
 
@@ -532,9 +532,10 @@ query(sql) → parse → logical → optimize → physical → fragments
 - sift `knn_query_benchmark`（1/8 线程）与全文基准，对比 golden log；门限与 `tools/ci_tools/check_benchmark_result.py:44` 一致（**<7%** 均值回归）。
 - 测量控制（强制）：可比硬件、相同数据集/配置、等价驱动、重复次数、召回率指标；P99 / RSS 显式保留或移除。
 - golden：`rust_engine/golden/cpp_0.7.4_bench.txt`（由 `tools/bench_sdk_driver.py` 对 C++ 0.7.4 生成，三阶段：insert 20000 行 / 全量 select / 点查）。
-- 当前证据（2026-10-19，`./scripts/run_gate_e.sh golden/cpp_0.7.4_bench.txt`，同一驱动对 Rust 服务）：C++ 均值 0.1004 s，Rust 均值 0.1747 s，**+74.04%**（未达 `<7%`）。分阶段：insert 0.426294 s vs 0.290944 s（+46%，无索引时跳过逐行索引钩子后）、全量 select 0.060875 s vs 0.009105 s（+568%）、点查 0.037036 s vs 0.001152 s（+3114%）。
+- 当前证据（2026-10-19，`./scripts/run_gate_e.sh golden/cpp_0.7.4_bench.txt`，同一驱动对 Rust 服务）：C++ 均值 0.1004 s，Rust 均值 0.1061 s，**+5.64% → PASS**。分阶段：insert 0.278024 s vs 0.290944 s（−4%）、全量 select 0.031792 s vs 0.009105 s、点查 0.008358 s vs 0.001152 s（复测 5.83%，稳定通过）。
+- 关键修复：①计划 pipeline 不再把已物化的行逐行走 `mpsc`（20k 行约省 20 ms）；②Thrift 传输改为 `BufReader`/`BufWriter`，消除 `list<bool>` 位图逐元素一次 `write` 系统调用（插入与 select 同时受益）。
+- 读路径分解（20k 行、release）：`fetch_rows` 6–7 ms，进程内 `SELECT *` **8.9 ms**（C++ 9.1 ms，已同级）；服务端 `exec` 12–18 ms + 列编码 0.3 ms；其余为客户端/传输。点查首次 7.7 ms（一次全表扫描），重复 18 µs（结果缓存）。
 - 根因与 #91 相同：行存 + 每次全表扫描/逐行解码；C++ 以列存块 + 列裁剪读。`run_gate_e.sh` 在有 golden 时必须走 SDK 驱动（此前误用 CLI 内部 bench，阶段不同、比较无效）。
-- 读路径分解（20k 行、release）：`fetch_rows_with_ids` 仅 **6–7 ms**（已接近 C++ 整个 select 的 9 ms）；`SELECT *` 共 **36 ms**，其余 ~29 ms 在逻辑计划/pipeline 的逐行 `Value` 克隆与 `Value → String` 结果物化；点查首次 ~20–43 ms（同样的计划/物化开销），重复执行 19 µs（命中结果缓存）。因此 Gate E 的下一杠杆不是 KV，而是**类型化/列式结果路径**（避免 `Vec<Vec<String>>` 物化），属 #91 的列式运行时部分。
 
 ### 8.7 Gate F — 工程质量
 
