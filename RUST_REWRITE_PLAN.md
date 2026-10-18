@@ -160,6 +160,33 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 **结论**：当前的 Rust 引擎满足的是 **SQL 语义 / 协议 / 打分公式**级一致（Gate A 的 statement 面已达 100%，query 面 1394/1532），**但不满足磁盘格式兼容**。要达到本要求，需按上表逐项替换为「读 C++ 格式、写 C++ 格式」的实现（存储内核 M1 需重做列/段编码；M3 需落盘 HNSW/IVF/PGM/倒排；KV 需切到 RocksDB）。**该要求已登记为阻塞项（任务 #67），并覆盖 §3 D2 的旧表述。**
 
+### 2.6.2 索引架构与算法移植原则（2026-10-18，用户指令）
+
+**架构**：**每个 segment 拥有独立的索引**（全文、HNSW、IVF、多向量、稀疏等），查询按 segment 产生候选再合并（统计量、打分、去重都按段口径），**不得**把全表建成「一个大索引」。**每个索引都有 on-disk 与 in-memory 两个形态**：写入期新行进入内存索引（memindex）；段封存后索引写成该段自己的磁盘文件；查询时磁盘段通过 `mmap` 按需读取，进程内只保留尚未封存的段。这一条同时是 Gate C 的内存上界与 Gate E 读路径的设计前提。
+
+**算法**：关键检索算法**必须逐行移植 C++**，不得自创等价物、也不得以「能力等价」的通用库替换：
+
+| 子系统 | 必须移植的 C++ 实现 | 禁止的做法 |
+|---|---|---|
+| 全文检索 | `src/storage/invertedindex/search/blockmax_wand_iterator_impl.cpp`（pivot 选择、`NextShallow` 游标推进、block-max 上界剪枝、top-k 阈值）、`bm25_ranker_impl.cpp`（k1=1.2、b=0.75、`ln(1+(N-df+0.5)/(df+0.5))`）、`term_doc_iterator`/短语的 tf/df/长度口径 | 先取候选行再重新分词、自造打分循环、用第三方搜索引擎的检索控制流 |
+| HNSW | `src/storage/index/hnsw*`（层级采样、M/Mmax、ef_construction/ef_search、邻居选择启发式、构图顺序） | 用 `hnsw_rs`/`usearch` 等替代构图；只对齐文件格式不对齐构图 |
+| 多向量（EMVB/PLAID/MaxSim） | `src/storage/index/emvb*` 与 `match_tensor` 的量化/候选/聚合路径 | 逐行暴力 MaxSim 代替候选生成与剪枝 |
+| 稀疏 / BMP | block-max 倒排游标与上界 | 全表扫描后排序 |
+| 二级索引 | PGM-index 的查找/分段 | 内存 BTree 重建 |
+
+**允许复用的边界**：只有**底层原语**可以复用通用库——FST 打包、SIMD 位打包（FastPFor/NewPForDelta）、SIMD 距离核（SimSIMD 等）、`mmap`、压缩。前提是**字节或数值与 C++ 一致**（已有真值断言）；**检索控制流**（游标推进、pivot/剪枝、构图、候选集）必须是自己实现、并与上表 C++ 文件逐一对应。
+
+**当前落地状态**：
+
+| 索引 | 每段独立 | on-disk | in-memory | 算法移植 |
+|---|---|---|---|---|
+| 全文 | **是**（内存段 + 多个封盘段） | **是**（`.dic`=TermMeta+FST、`.pos`、`.len`，`mmap` 读取；另加 `.row` 记录段内序号→行号） | **是**（未封存段） | **WAND 已按 `blockmax_wand_iterator` 移植并默认用于单字段纯 OR 查询**；短语/布尔/filter 仍走扫描 |
+| HNSW | 否（按列一张图） | 是（`chunk_{id}.idx`） | 是 | **未移植**：构图仍是通用实现，需按 `hnsw*` 重写 |
+| 多向量 | 否 | 部分 | 是 | **未移植**：仍全表 MaxSim |
+| 稀疏 | 否 | 否 | 是 | **未移植**：全表打分 |
+
+**验收口径**：每个移植算法在 `rust_engine/docs/CPP_FORMAT_SPEC.md` 记录对应的 `C++ 文件:行号`；移植后 Gate A 必须保持逐位一致；性能以 Gate E（对 C++ golden `<7%`）为准。**任何「自研更快」但不移植的替代都不算完成。**
+
 **任务 #67/#68 进展（2026-10-17）**：已产出 `rust_engine/docs/CPP_FORMAT_SPEC.md`，冻结**已核对**的字节级事实：①数据文件/快照文件通用布局（`magic=0x00dd3344`(u64) + `buffer_size`(size_t) + 补零数据区 + `checksum`(u64)，`data_file_worker_impl.cpp:68-116/119-155`，读取侧断言 `:160-172`）；②Catalog KV = RocksDB + 自定义 MergeOperator（`kv_store*.cppm/impl`、`rocksdb_merge_operator*`）；③倒排索引的模块构成与 FST 校验和结论（PoC F）；④BM25 统计量来源（`term_doc_iterator_impl.cpp:57-70`）；⑤SEARCH 语义。**§6 清单的 #1–#5 已全部冻结**（见该文件 §8、§9）：目录/文件命名、段块元数据（**不存在** `SegmentEntry/BlockEntry` 文件；元数据在 RocksDB KV，行数由块 `version` 文件推导）、块内列式编码（`[data_region (capacity*slot)][null_bitmap ((capacity+7)/8, bit=1 非空)]`、Varchar 两字 slot）、HNSW/IVF `chunk_{id}.idx`（**无 magic/version/checksum**）、全文 `.dic`(TermMeta+FST)/`.pos`(逐 term 块)/`.len`(裸 `u32[]`)。#6 的**键空间**亦已冻结（值编码/MergeOperator 待）；#7（WAL）、#8（PGM）仍待。
 
 **已落地的实现**（`infinity-storage` 新模块 + `infinity-executor::cpp_blocks`，均带逐字节单测）：
@@ -386,7 +413,7 @@ QueryContext::query(sql)
 | **M0 立项 + 一致性基础设施先行** | Cargo workspace；CI（build/clippy/fmt/test）；Thrift codegen（`thrift` crate）；**conformance harness**：`sqllogictest` 驱动接入、pysdk/go/pytest 测试编排、**冻结测试 ID/marker/数据集/`.slt` manifest**、C++ oracle 差分框架；`MetaStore`/`Wal`/`BlockStore` trait 定稿；**跨底座宕机一致性契约**与**索引状态矩阵**；**确定性兼容规则**（精确 vs 容差）定稿；**四类原型**（存储内核 / 流式执行 / 单索引 / 协议互操作） | `Connect` 握手（`client_version==37`）成功；fake `SELECT 1` 通过；**harness 可对 C++ 引擎跑通全量测试并产出基线报告**；**确定性规则已定稿**；**原型完成并据此给出人月区间 + 应急余量**（作为**授权 M1 的前置门槛**） |
 | **M1 存储内核** | `MetaStore`（D2 全部 PoC 过关，含跨底座宕机注入）+ WAL（格式全量移植）+ BufferManager + BlockStore + MVCC（时间戳数组）+ catalog | 移植的存储层 Rust 单测通过；**重启/宕机恢复测试**（`restart_test` 子集）通过 |
 | **M2 查询内核** | lexer/parser（含全部文法）/expr/planner/optimizer/physical/executor（Tokio，流式父子并发） | `test/sql` 的 **ddl/dml/dql 无索引子集**全绿；`explain` 结构可产出；**差分语法测试**通过 |
-| **M3 索引** | 二级索引（PGM）→ HNSW → 全文倒排 → 稀疏/BMP → **IVF** → 多向量 →（**DiskANN**：按状态矩阵决定是否纳入，当前为未实现） | `test/sql/dql/**`、`test/sql/ddl/index`、`test/sql/snapshot` 全绿；索引状态矩阵中「已实现」项逐个打通 |
+| **M3 索引** | **按 §2.6.2 的「每段独立索引 + on-disk/in-memory 两形态 + 算法逐行移植」**：二级索引（PGM）→ HNSW → 全文倒排（block-max WAND）→ 稀疏/BMP → **IVF** → 多向量 →（**DiskANN**：按状态矩阵决定是否纳入，当前为未实现） | `test/sql/dql/**`、`test/sql/ddl/index`、`test/sql/snapshot` 全绿；索引状态矩阵中「已实现」项逐个打通 |
 | **M4 网络与 SDK 兼容** | Thrift `InfinityService` 全量 RPC（含二进制布局 spec）；HTTP 路由对齐 | **`python/test_pysdk` + `go/tests` 全绿（未修改 SDK）**；**HTTP `--http` 模式**全绿 |
 | **M5 并发/持久化/性能** | 并发压测、崩溃恢复、sanitizer/Loom、性能调优、**集群（需先定范围）** | `parallel_test` 通过；基准达标（Gate E）；集群项视范围决定 |
 | **M6 发布与数据迁移** | `infinity-import` 迁移工具（含校验/回滚）、打包、文档、灰度 | 发布候选；**迁移演练（含回滚）通过** |
