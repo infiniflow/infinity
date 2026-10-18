@@ -39,5 +39,6 @@ sha2 = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-native-certs = "0.8"
 crc32fast = "1"
+memmap2 = "0.9"
 thiserror = "1"
 tempfile = "3"

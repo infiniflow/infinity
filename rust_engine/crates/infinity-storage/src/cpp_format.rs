@@ -37,6 +37,8 @@ pub enum FormatError {
     BadMagic(u64),
     /// A stored checksum did not match the computed one.
     Checksum { expected: u32, got: u32 },
+    /// An index file could not be read or written.
+    Io(String),
 }
 
 impl std::fmt::Display for FormatError {
@@ -52,6 +54,7 @@ impl std::fmt::Display for FormatError {
                     "checksum mismatch: expected {expected:#010x}, got {got:#010x}"
                 )
             }
+            FormatError::Io(msg) => write!(f, "index file i/o: {msg}"),
         }
     }
 }

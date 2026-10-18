@@ -13,6 +13,7 @@ sha2.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 crc32fast.workspace = true
+memmap2.workspace = true
 # Optional RocksDB substrate for C++-compatible catalog KV (plan §2.6.1 item 4).
 # Off by default so the default build stays pure-Rust and fast; enable with
 # `--features rocksdb-store`.

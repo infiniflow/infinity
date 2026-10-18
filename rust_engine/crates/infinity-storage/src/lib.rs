@@ -8,11 +8,16 @@
 //! Invariants preserved from C++ (see plan 附录 A): the substrates are separate;
 //! MVCC is timestamp-array based (not KV snapshots); WAL writes are serialized.
 
-#![forbid(unsafe_code)]
+// Maps sealed on-disk indexes. `mmap` is the one operation that needs `unsafe`
+// (the mapping outlives the `File`); it is isolated in
+// [`fulltext_segment::SegmentIndexReader::open`], which documents why the region
+// cannot change while mapped.
+#![deny(unsafe_code)]
 
 pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
+pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod knn_format;
 pub mod metastore;
