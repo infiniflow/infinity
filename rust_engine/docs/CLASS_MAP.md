@@ -46,7 +46,8 @@
 |---|---|---|
 | `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::vector::HnswIndex` + `hnsw_mem::HnswIndexInMem` | 图算法与内存段已对应；`InsertVecs`/`SearchIndex` 的批次与 `KnnSearchOption` 仍内联在执行器 |
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
-| `EMVBIndex` / `PLAIDIndex` / `MultiVectorIndexHandler` | `MultiVectorIndex`（执行器）+ `EmvbPqIndex` | 构建、候选、merge 在一个结构里；需按 C++ 拆成 index + handler |
+| `EMVBIndex`（`emvb_index.cppm`）/ `EMVBIndexInMem`（`emvb_index_in_mem.cppm`） | `emvb_segment::{EmvbReader, EmvbPqIndex, PqCodebook}` + 执行器 `MultiVectorIndex` | 已移植：磁盘布局、残差 PQ 码本与候选预过滤（`prefilter`）。**未移植**：`Train` 的质心 k-means、三阶段 `GetQueryResult`（centroid→doc→refine）、`EMVBIndexInMem` 的建索引阈值；当前执行器对候选做精确 maxsim 重排 |
+| `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
 
 ## 维护规则
