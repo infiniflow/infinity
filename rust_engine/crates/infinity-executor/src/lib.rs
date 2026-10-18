@@ -3995,8 +3995,7 @@ impl Engine {
             {
                 pivot += 1;
             }
-            for pos in 0..=pivot {
-                let c = alive[pos];
+            for &c in alive.iter().take(pivot + 1) {
                 let (ti, _, cur) = cursors[c];
                 let list = &index.postings[&terms[ti]];
                 let mut j = cur;
@@ -4059,8 +4058,7 @@ impl Engine {
                     }
                 }
             }
-            for pos in 0..=pivot {
-                let c = alive[pos];
+            for &c in alive.iter().take(pivot + 1) {
                 if doc_at!(c, cursors[c].2) == d {
                     cursors[c].2 += 1;
                 }
