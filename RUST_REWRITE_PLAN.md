@@ -1,6 +1,6 @@
 # Infinity Rust 重写计划书
 
-> 版本：v1.0（整理稿，取代 v0.3 草案及其后续进展追加）  
+> 版本：v1.1（2026-10-18 迁移策略修订：D1 由「洁净室重写」改为「结构对齐的类级移植」）  
 > 日期：2026-10-18  
 > 基准代码：infinity `main` @ `32a6afce8`（v0.7.4，nightly tag）  
 > 实现代码：`rust_engine/`（Cargo workspace），C++ 引擎作为参考实现（oracle）  
@@ -21,7 +21,7 @@
 2. **KV 存储**：RocksDB 在 Infinity 中只承担**元数据**（catalog / 计数器 / 对象清单 / rough filter / drop 墓碑），不承载行数据与索引。定义 `MetaStore` trait，默认纯 Rust `fjall`，并提供 `rust-rocksdb` 实现以兼容 C++ catalog（§4.2）。
 3. **验收**：以现有测试资产为准 —— **173 个 SQL Logic Test**、**Python PySDK 308 个有效 `def test_`**、**Go SDK 375 用例**，外加持久化 / 并发 / 性能关卡（§8）。测试经网络连接真实服务，因此 **Thrift 线协议必须保持兼容**（`TBinaryProtocol` + `client_version == 37`）。
 
-迁移策略：**以 C++ 类/public 方法映射为骨架的洁净室重写 + 持续一致性测试**（§4.1 D1）。新旧二进制并存，C++ 为 oracle，按垂直切片点亮测试；测试通过不等于移植完成，以 `CLASS_MAP.md` 的未闭合项为准。
+迁移策略：**结构对齐的类级移植（structure-preserving port）**——以 C++ 类/public 方法为骨架逐类/逐方法移植（已批准的设计变更除外），C++ 单元测试随对应类一并移植，conformance testing 只作为验收而非设计来源（§4.1 D1）。新旧二进制并存，C++ 为 oracle；测试通过不等于移植完成，以 `CLASS_MAP.md` 的未闭合项为准。
 
 **当期结论**：
 
@@ -238,18 +238,25 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 
 ## 4. 关键决策（Decision Matrix）
 
-### 4.1 D1 — 迁移策略：类/方法映射骨架 + 洁净室重写 + 持续一致性测试
+### 4.1 D1 — 迁移策略：结构对齐的类级移植（structure-preserving port）
 
-| 方案 | 评价 |
-|---|---|
-| A. Big-bang | 风险最高，长期无可交付中间态 |
-| B. Strangler / FFI 渐进替换 | 与「整体重写」目标不符，FFI 边界多 |
-| **C. 洁净室重写 + conformance testing（采用，2026-10-18 修订）** | 以 C++ 类结构与 public 方法为骨架（§3.6，**大体上一一对应**），新旧二进制并存、C++ 作 oracle，按垂直切片点亮测试；每次提交都有可运行产物 |
+> **2026-10-18 修订**：本节取代 v0.3 的「洁净室重写 + conformance testing」。这不是措辞调整，而是**换了一套迁移方法**：旧策略只约束行为，允许从零设计内部结构；新策略把 **C++ 的类结构本身**作为移植骨架。
 
-**决策**：采用方案 C，并附加两条约束：
+| 方案 | 说明 | 评价 |
+|---|---|---|
+| A. Big-bang | 全部完成后切换 | 风险最高，长期无可交付中间态 |
+| B. Strangler / FFI | 保留 C++，逐模块 FFI 替换 | 与整体移植目标不符，FFI 边界多 |
+| C. 洁净室重写 + conformance testing | 以行为/测试为约束，内部结构自行设计 | **不再采用**：容易为了点亮测试而简化 C++ 类边界（全表扫描替代索引迭代器、单内存 map 替代 segment+memindex、行式 `Value` 替代 `ColumnVector`），结构、内存与性能语义随之外漂，且难以证明等价 |
+| **D. 结构对齐的类级移植（采用）** | 以 C++ 类/public 方法为骨架（§3.6，**大体上一一对应**；已批准的设计变更除外），逐类/逐方法移植；C++ 单测随类移植；conformance testing 只做验收 | 结构、算法、内存/性能语义可逐项回溯到 C++；每次提交仍有可运行产物；代价是移植量大，需先维护映射清单 |
 
-1. **先对齐骨架，再点亮测试**：每个垂直切片先按 §3.6 建立「C++ 类/方法 → Rust 类型/public 方法」映射并在 `CLASS_MAP.md` 登记，再实现行为。禁止为了通过某个 `.slt`/SDK 用例，把 C++ 的多个类压成一个简化实现，或用全表扫描替代索引迭代器。
-2. **一致性测试是验收，不是设计来源**：conformance testing 用于验证「映射后的实现」与 C++ 行为等价；测试通过但 `CLASS_MAP.md` 中「尚未一一对应」项未闭合，视为移植未完成。
+**决策**：采用方案 D。执行规则：
+
+1. **先映射、再实现**：每个切片先在 `CLASS_MAP.md` 登记「C++ 类/方法 → Rust 类型/public 方法」，每个 Rust `pub fn` 注释 `C++: path:line`。
+2. **逐类移植**：以一个 C++ 类及其被其他类依赖的方法为最小移植单元；不把多个类合并成简化实现。
+3. **单测随类**：已有对应 Rust 类的 C++ 单元测试必须移植（§3.6），不能移植的登记「未移植单测」。
+4. **设计变更白名单**：调度器、FST、SIMD/压缩/`mmap` 等（§3.6）；新增变更须显式批准并登记。
+5. **conformance 是验收，不是设计来源**：Gate A/B 通过不表示移植完成；`CLASS_MAP.md` 的「尚未一一对应」「未移植单测」未闭合即未完成。
+6. **新旧二进制并存**：C++ 作为 oracle 与差分基准；按垂直切片交付，但切片内部按类移植，不按「能过测试的最小实现」切。
 
 线协议（Thrift/HTTP）保持兼容，现有 SDK 测试无需修改即可作为验收门槛。
 
@@ -383,14 +390,14 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 ## 6. 里程碑
 
-> 每阶段交付「可运行二进制 + 点亮的测试子集」，退出准则即对应关卡通过率。
+> 每阶段交付「可运行二进制 + 点亮的测试子集 + `CLASS_MAP.md` 增量」，退出准则既包括关卡通过率，也包括该阶段类的「未一一对应 / 未移植单测」清零（§3.6、§4.1 D1）。
 
 | 里程碑 | 内容 | 退出准则 |
 |---|---|---|
-| **M0 一致性基础设施** | workspace；CI；Thrift codegen；conformance harness（冻结清单）；trait 定稿；跨底座宕机契约；索引状态矩阵；确定性规则；四类原型 | 握手成功；`SELECT 1`；harness 能对 C++ 跑全量并产出基线；规则定稿；原型给出人月区间 |
-| **M1 存储内核** | `MetaStore` + WAL + BufferManager + BlockStore + MVCC + catalog | 存储层单测；重启/宕机恢复测试 |
-| **M2 查询内核** | lexer/parser/expr/planner/optimizer/physical/executor | 无索引 ddl/dml/dql 子集全绿；`EXPLAIN` 可产出 |
-| **M3 索引** | 二级 → HNSW → 全文 → 稀疏 → IVF → 多向量（DiskANN 视状态矩阵） | `test/sql/dql/**`、`ddl/index`、`snapshot` 全绿；索引状态矩阵「已实现」项逐个打通 |
+| **M0 一致性基础设施** | workspace；CI；Thrift codegen；conformance harness（冻结清单）；**`CLASS_MAP.md` 初版 + C++ 单测清单**；trait 定稿；跨底座宕机契约；索引状态矩阵；确定性规则；四类原型 | 握手成功；`SELECT 1`；harness 能对 C++ 跑全量并产出基线；**计划移植的类、public 方法、单测都已在 CLASS_MAP 登记**；规则定稿；原型给出人月区间 |
+| **M1 存储内核** | `MetaStore` + WAL + BufferManager + BlockStore + MVCC + catalog（按 C++ 类逐个移植） | 存储层单测；**对应 C++ 单测已移植**；重启/宕机恢复测试 |
+| **M2 查询内核** | lexer/parser/expr/planner/optimizer/physical/executor | 无索引 ddl/dml/dql 子集全绿；`EXPLAIN` 可产出；**对应类的 C++ 单测已移植** |
+| **M3 索引** | 二级 → HNSW → 全文 → 稀疏 → IVF → 多向量（DiskANN 视状态矩阵）；每项按 C++ 类边界移植 | `test/sql/dql/**`、`ddl/index`、`snapshot` 全绿；**CLASS_MAP 中 M3 范围「尚未一一对应 / 未移植单测」清零** |
 | **M4 网络与 SDK** | Thrift 全量 RPC；HTTP 路由 | `python/test_pysdk` + `go/tests` 全绿（未修改 SDK）；HTTP 模式全绿 |
 | **M5 并发/持久化/性能** | 压测、崩溃恢复、loom/miri/sanitizer、性能调优 | `parallel_test`；Gate E 达标；集群视范围 |
 | **M6 发布与迁移** | `infinity-import`（校验/回滚）、打包、灰度 | 发布候选；迁移演练通过 |
