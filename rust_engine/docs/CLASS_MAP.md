@@ -28,6 +28,8 @@
 | `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::hnsw_handler::HnswHandler` | `Make`→`new`/`from_index`、`InsertVecs`→`insert_vecs`（按序，调度器设计变更）、`SearchIndex`→`search_index`（`KnnSearchOption.ef`→`ef`）、`MemUsage`→`mem_usage`、`GetDocNum`→`len` | ✅ |
 | `MemoryIndexer`（`memory_indexer.cppm`） | 执行器 `MemoryIndexer` | `Insert`→`insert`（含预算检查）、`MemUsed`→`mem_used`、`GetDocCount`→`doc_count`、`Reset`；删除只去掉 live 标记（postings 保留到压实） | ✅ |
 | `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `ColumnIndexReader` | 每段 `IndexSegmentReader`→`fulltext_segment::SegmentIndexReader`；`GetIndexReader(term)`→`postings`、`GetColumnLength`→`doc_len`、跨段 `doc_count`/`total_len`/`contains` | ✅ |
+| `EMVBIndex::GetQueryResult` / `EMVBSearch`（`emvb_search_impl.cpp`） | `infinity_index::emvb::{EmvbView, EmvbSearchOptions}` | 三阶段：`find_candidate_docs`→centroid 候选、`compute_hit_frequency`、`second_stage_filtering`、`compute_topk_documents_selected`（残差 PQ 精排）；`PLAID_*` 默认值 | ✅ |
+| `EMVBIndex::Train` / `EMVBProductQuantizer` | `emvb_segment::{coarse_centroids, train_residual_pq, encode_emvb_refs}` | 质心 k-means、残差 PQ 训练与编码（写入路径） | ✅（编码函数而非类） |
 | `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `infinity_index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 | `BlockFwd` / `TailFwd`（`bmp_fwd.cppm`，own-mem） | `infinity_index::sparse::{BlockFwd, TailFwd, BlockTerm}` | `AddDoc`→`add_doc`、`ToBlockFwd`、`GetBlockTerms`、`GetScores`/`GetScoresTail`、`Prefetch` | ✅ |
 | `BMPIvt` / `BlockData` / `BlockPostings`（`bmp_ivt.cppm`，own-mem） | `infinity_index::sparse::{BMPIvt, Postings}` | `AddBlock`→`add_block`、`GetPostings`、`Optimize`→`build`、`kth`、`block_ids`/`max_scores` | ✅ |
@@ -48,7 +50,7 @@
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
 | `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`、单段检索已走 `HnswHandler`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
-| `EMVBIndex`（`emvb_index.cppm`）/ `EMVBIndexInMem`（`emvb_index_in_mem.cppm`） | `emvb_segment::{EmvbReader, EmvbPqIndex, PqCodebook}` + 执行器 `MultiVectorIndex` | 已移植：磁盘布局、残差 PQ 码本与候选预过滤（`prefilter`）。**未移植**：`Train` 的质心 k-means、三阶段 `GetQueryResult`（centroid→doc→refine）、`EMVBIndexInMem` 的建索引阈值；当前执行器对候选做精确 maxsim 重排 |
+| `EMVBIndexInMem`（`emvb_index_in_mem.cppm`）的 `Insert`/`IsBuilt` | 执行器 `MultiVectorIndex` tail | **未移植**：内存段不建 EMVB（无 `build_index_threshold_`），tail 查询用精确 maxsim；封段后走 `EmvbView::search` |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
 
@@ -79,6 +81,7 @@
 | `knn/sparse` 的 block-max 检索 | `sparse::BmpAlg::search_knn` | `matches_brute_force`、`beta_keeps_the_strongest_terms`、`tail_documents_are_scored_when_the_block_does_not_fill` |
 | `knn/hnsw` 的插入/检索入口 | `hnsw_handler::HnswHandler` | `insert_vecs_counts_only_matching_dimensions`、`search_index_honours_the_ef_option` |
 | `invertedindex/column_inverter_ut.cpp`（tf/positions/length） | `MemoryIndexer` | `memory_indexer_records_tf_positions_and_length`、`memory_indexer_delete_keeps_the_postings` |
+| `knn/emvb`（候选/精排） | `emvb::EmvbView` / `EmvbPqIndex::prefilter` | `ranks_the_document_whose_centroid_matches_the_query`、`threshold_first_falls_back_to_the_closest_centroid`、`prefilter_keeps_the_exact_maxsim_winner` |
 
 ### 未移植单测（Rust 类已存在）
 
@@ -91,7 +94,7 @@
 | `secondary_index/*_ut.cpp` | `secondary_segment`/`secondary_lowcard` | 低基数/多类型/边界用例未逐个移植 |
 | `knn/hnsw/*_ut.cpp` | `infinity_index::vector::HnswIndex` | 层级/启发式/召回用例未逐个移植 |
 | `knn/sparse/*_ut.cpp` | `infinity_index::sparse` / `bmp_cpp` | 块/ivt 不变量与序列化往返已覆盖；`alpha` 剪枝边界用例未逐个移植 |
-| `knn/emvb/*_ut.cpp` | `MultiVectorIndex`/`EmvbPqIndex` | 量化/候选/OPQ 用例未移植 |
+| `knn/emvb/*_ut.cpp` | `emvb::EmvbView` / `MultiVectorIndex` | 候选/精排主路径已覆盖；OPQ 训练与 bitmask 过滤用例未移植 |
 | `bg_task/*_ut.cpp` | 执行器/CLI 的 dump/optimize/cleanup | 任务级场景未移植 |
 
 ### 未移植单测（Rust 类也未移植）

@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod emvb;
 pub mod fulltext;
 pub mod hnsw_handler;
 pub mod ivf;

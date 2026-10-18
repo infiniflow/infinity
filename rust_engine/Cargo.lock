@@ -464,6 +464,7 @@ dependencies = [
  "fjall",
  "hmac",
  "infinity-common",
+ "infinity-index",
  "lz4_flex",
  "memmap2",
  "rocksdb",

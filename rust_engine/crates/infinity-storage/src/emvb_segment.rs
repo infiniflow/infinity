@@ -404,79 +404,63 @@ pub struct EmvbPqIndex {
     pub assignments: Vec<u32>,
     pub doc_lens: Vec<u32>,
     pub doc_segment_offsets: Vec<u32>,
+    /// Documents per coarse centroid (the reference's `centroids_to_docid_`).
+    pub centroids_to_docid: Vec<Vec<u32>>,
 }
 
 impl EmvbPqIndex {
-    /// Approximate MaxSim ranking from the coarse centroid plus residual code
-    /// (`EMVB` stage 2). Returns **document indices** in descending score.
+    /// Approximate MaxSim ranking through the reference's three search stages
+    /// (`EMVBIndex::GetQueryResult`). Returns **document indices** best-first.
     pub fn prefilter(&self, query: &[Vec<f32>], k: usize) -> Vec<usize> {
-        let n_docs = self.doc_lens.len();
-        if n_docs == 0 || k == 0 || self.dims == 0 {
+        if self.doc_lens.is_empty() || k == 0 || self.dims == 0 {
             return Vec::new();
         }
-        let dims = self.dims;
-        let sn = self.subspace_num;
-        if self.centroids.len() < dims || self.codebook.len() < sn * self.k * self.sub_dim {
+        if self.centroids.len() < self.dims
+            || self.codebook.len() < self.subspace_num * self.k * self.sub_dim
+        {
             return Vec::new();
         }
-        let n_centroids = self.centroids.len() / dims;
-        let mut offset = 0usize;
-        let mut scored: Vec<(usize, f32)> = Vec::with_capacity(n_docs);
-        for doc in 0..n_docs {
-            let len = self.doc_lens[doc] as usize;
-            let mut total = 0.0f32;
-            for q in query {
-                if q.len() != dims {
-                    continue;
-                }
-                let mut best = f32::NEG_INFINITY;
-                for e in offset..offset + len {
-                    let Some(&centroid) = self.assignments.get(e) else {
-                        continue;
-                    };
-                    let cbase = centroid as usize * dims;
-                    if centroid as usize >= n_centroids {
-                        continue;
-                    }
-                    let mut score: f32 = q
-                        .iter()
-                        .zip(&self.centroids[cbase..cbase + dims])
-                        .map(|(a, b)| a * b)
-                        .sum();
-                    for sub in 0..sn {
-                        let Some(&code) = self.codes.get(e * sn + sub) else {
-                            continue;
-                        };
-                        let lo = sub * self.sub_dim;
-                        let hi = (lo + self.sub_dim).min(dims);
-                        if lo >= dims {
-                            break;
-                        }
-                        let cbase = (sub * self.k + code as usize) * self.sub_dim;
-                        score += q[lo..hi]
-                            .iter()
-                            .zip(&self.codebook[cbase..cbase + (hi - lo)])
-                            .map(|(a, b)| a * b)
-                            .sum::<f32>();
-                    }
-                    if score > best {
-                        best = score;
-                    }
-                }
-                if best != f32::NEG_INFINITY {
-                    total += best;
-                }
-            }
-            scored.push((doc, total));
-            offset += len;
-        }
-        scored.sort_by(|a, b| {
+        let view = infinity_index::emvb::EmvbView {
+            dims: self.dims,
+            subspace_num: self.subspace_num,
+            sub_dim: self.sub_dim,
+            k: self.k,
+            centroids: &self.centroids,
+            codebook: &self.codebook,
+            codes: &self.codes,
+            assignments: &self.assignments,
+            doc_lens: &self.doc_lens,
+            doc_segment_offsets: &self.doc_segment_offsets,
+            centroids_to_docid: &self.centroids_to_docid,
+        };
+        let mut hits = view.search(
+            query,
+            k,
+            infinity_index::emvb::EmvbSearchOptions::for_topk(k),
+        );
+        hits.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(a.0.cmp(&b.0))
         });
-        scored.truncate(k);
-        scored.into_iter().map(|(doc, _)| doc).collect()
+        // The view returns segment offsets; callers index by dense document id.
+        if self
+            .doc_segment_offsets
+            .iter()
+            .enumerate()
+            .all(|(i, &off)| off == i as u32)
+        {
+            return hits.into_iter().map(|(doc, _)| doc as usize).collect();
+        }
+        let dense: std::collections::HashMap<u32, usize> = self
+            .doc_segment_offsets
+            .iter()
+            .enumerate()
+            .map(|(i, &off)| (off, i))
+            .collect();
+        hits.into_iter()
+            .filter_map(|(offset, _)| dense.get(&offset).copied())
+            .collect()
     }
 }
 
@@ -613,6 +597,21 @@ impl EmvbReader {
         if m.len() < at + code_bytes {
             return None;
         }
+        let codes = m[at..at + code_bytes].to_vec();
+        // `centroids_to_docid_`: one document list per coarse centroid.
+        let n_centroids = self.header.n_centroids as usize;
+        let mut centroids_to_docid: Vec<Vec<u32>> = vec![Vec::new(); n_centroids];
+        let mut offset = 0u32;
+        for (doc, &len) in doc_lens.iter().enumerate() {
+            for e in offset..offset + len {
+                if let Some(&c) = assignments.get(e as usize) {
+                    if let Some(list) = centroids_to_docid.get_mut(c as usize) {
+                        list.push(doc as u32);
+                    }
+                }
+            }
+            offset += len;
+        }
         Some(EmvbPqIndex {
             dims,
             subspace_num: sn,
@@ -620,10 +619,11 @@ impl EmvbReader {
             k,
             centroids,
             codebook,
-            codes: m[at..at + code_bytes].to_vec(),
+            codes,
             assignments,
             doc_lens,
             doc_segment_offsets,
+            centroids_to_docid,
         })
     }
 
@@ -679,5 +679,66 @@ mod tests {
         let ranked = pq.prefilter(&[vec![0.0f32; 8]], 5);
         assert_eq!(ranked.len(), 5);
         assert!(ranked.iter().all(|d| *d < 40));
+    }
+
+    /// The three-stage search must keep the exact MaxSim winner inside its
+    /// candidate set (the executor re-scores exactly afterwards).
+    #[test]
+    fn prefilter_keeps_the_exact_maxsim_winner() {
+        // 300 docs in four well-separated clusters, three tokens each.
+        let dims = 8usize;
+        let mut docs: Vec<(u32, Vec<Vec<f32>>)> = Vec::new();
+        let mut state = 7u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for row in 0..300u32 {
+            let cluster = (row % 4) as usize;
+            let toks = (0..3)
+                .map(|_| {
+                    let mut v: Vec<f32> = (0..dims)
+                        .map(|_| ((next() % 100) as f32) / 500.0)
+                        .collect();
+                    v[cluster] += 1.0;
+                    v
+                })
+                .collect();
+            docs.push((row, toks));
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("seg_0.emvb");
+        write_emvb_segment(&path, dims, 0, &docs).unwrap();
+        let reader = EmvbReader::open(&path).unwrap();
+        let pq = reader.pq_index().expect("residual PQ tables");
+
+        let mut query = vec![0.0f32; dims];
+        query[1] = 1.0; // cluster 1
+        let exact = docs
+            .iter()
+            .map(|(row, toks)| {
+                let score: f32 = toks
+                    .iter()
+                    .map(|t| t.iter().zip(&query).map(|(a, b)| a * b).sum::<f32>())
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap()
+                    .max(0.0);
+                (*row as usize, score)
+            })
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap()
+            .0;
+
+        let candidates = pq.prefilter(&[query], 64);
+        // The candidate set is the documents of the probed centroids, so it can
+        // be smaller than `k`; what matters is that it contains the winner.
+        assert!(!candidates.is_empty());
+        assert!(
+            candidates.contains(&exact),
+            "exact winner {exact} missing from {:?}",
+            &candidates[..candidates.len().min(8)]
+        );
     }
 }
