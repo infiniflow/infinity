@@ -19,6 +19,7 @@ pub mod bmp_segment;
 pub mod catalog_format;
 pub mod cpp_format;
 pub mod crc;
+pub mod emvb_segment;
 pub mod fulltext_segment;
 pub mod inverted_format;
 pub mod knn_format;
