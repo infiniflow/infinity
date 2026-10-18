@@ -7464,6 +7464,76 @@ impl Engine {
             }
             best
         })();
+        // Multi-vector: one `MultiVectorIndex` per segment, MaxSim + inner
+        // top-n, merged across segments (the reference's handler shape).
+        let mv_scores: HashMap<usize, f64> = (|| {
+            if !is_tensor || bit_sparse {
+                return HashMap::new();
+            }
+            let Some(decl) = types.get(col_idx).map(|t| t.to_ascii_uppercase()) else {
+                return HashMap::new();
+            };
+            if !decl.starts_with("MULTIVECTOR") {
+                return HashMap::new();
+            }
+            let Some(dims) = type_dim(&decl) else {
+                return HashMap::new();
+            };
+            if dims == 0 {
+                return HashMap::new();
+            }
+            let q_flat: Vec<f32> = query_items
+                .iter()
+                .filter_map(|x| x.trim().parse::<f32>().ok())
+                .collect();
+            if q_flat.is_empty() || !q_flat.len().is_multiple_of(dims) {
+                return HashMap::new();
+            }
+            let query: Vec<Vec<f32>> = q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
+            let mut segments: HashMap<
+                u64,
+                (infinity_index::multivector::MultiVectorIndex, Vec<usize>),
+            > = HashMap::new();
+            for (seq, row) in &rows {
+                let Some(Value::Str(v)) = row.get(col_idx) else {
+                    continue;
+                };
+                let flat: Vec<f32> = v
+                    .trim()
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .split([',', '[', ']'])
+                    .filter_map(|x| x.trim().parse::<f32>().ok())
+                    .collect();
+                if !flat.len().is_multiple_of(dims) || flat.is_empty() {
+                    continue;
+                }
+                let doc: Vec<Vec<f32>> = flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
+                let segment = (*seq as u64) >> 32;
+                let entry = segments.entry(segment).or_insert_with(|| {
+                    (
+                        infinity_index::multivector::MultiVectorIndex::new(dims),
+                        Vec::new(),
+                    )
+                });
+                entry.0.add(doc);
+                entry.1.push(*seq);
+            }
+            let mut best: HashMap<usize, f64> = HashMap::new();
+            let mut per_segment: Vec<Vec<(usize, f32)>> = Vec::new();
+            for (_, (index, ids)) in segments {
+                let hits: Vec<(usize, f32)> = index
+                    .search(&query, topn.max(1), 0)
+                    .into_iter()
+                    .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
+                    .collect();
+                per_segment.push(hits);
+            }
+            for (row, score) in infinity_index::multivector::merge_topk(per_segment, topn.max(1)) {
+                best.insert(row, score as f64);
+            }
+            best
+        })();
         let mut scored: Vec<(usize, f64, f64)> = Vec::new();
         for (seq, row) in &rows {
             // The WHERE predicate filters candidates *before* top-N ranking.
@@ -7500,6 +7570,10 @@ impl Engine {
             }
             if let Some(Value::Str(v)) = row.get(col_idx) {
                 if is_tensor {
+                    if let Some(score) = mv_scores.get(seq) {
+                        scored.push((*seq, *score, -*score));
+                        continue;
+                    }
                     let qtext = format!("[{}]", query_items.join(","));
                     let qtext = match type_dim(&types[col_idx]) {
                         Some(d) => reshape_tensor(&qtext, d),
