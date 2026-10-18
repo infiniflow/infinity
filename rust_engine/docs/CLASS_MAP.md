@@ -50,7 +50,7 @@
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`、单段检索已走 `HnswHandler`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
+| `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并走 `merge_knn::MergeKnn`、单段检索走 `HnswHandler`（`ef` 已透传）；仍缺算子对象（scan 状态/bitmask/多查询槽） |
 | `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
 

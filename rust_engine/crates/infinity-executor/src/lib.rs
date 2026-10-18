@@ -9082,6 +9082,15 @@ impl Engine {
             // (`src/storage/knn_index/merge_knn.cppm`). The union of their
             // labels must cover the live rows, else the exact scan runs.
             let mut covered: std::collections::HashSet<usize> = Default::default();
+            // `KnnSearchOption.ef_`: the candidate list size for the bottom
+            // layer (`WITH (ef = ...)`).
+            let ef = with_opts
+                .unwrap_or("")
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case("ef"))
+                .and_then(|(_, v)| v.trim().parse::<usize>().ok());
+            let search_option = infinity_index::hnsw_handler::KnnSearchOption { ef };
             let k = (topn * 4).max(64);
             let mut merge = infinity_index::merge_knn::MergeKnn::new(
                 1,
@@ -9098,11 +9107,7 @@ impl Engine {
                 let seg_k = k.min(seg.labels.len().max(1));
                 let hits: Vec<(f32, u64)> = seg
                     .index
-                    .search_index(
-                        &qv,
-                        seg_k,
-                        infinity_index::hnsw_handler::KnnSearchOption::default(),
-                    )
+                    .search_index(&qv, seg_k, search_option)
                     .into_iter()
                     .map(|(node, dist)| (dist, seg.labels[node] as u64))
                     .collect();
