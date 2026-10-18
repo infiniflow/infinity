@@ -7670,11 +7670,34 @@ impl Engine {
                 else {
                     continue;
                 };
-                let hits: Vec<(usize, f32)> = reader
-                    .search(&query, topn.max(1))
-                    .into_iter()
-                    .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
-                    .collect();
+                // Large segments run the reference's two-stage search: a PQ
+                // prefilter (`PqCodebook`, EMVB's centroid stage) keeps a
+                // candidate set, then the winners are scored exactly.
+                let hits: Vec<(usize, f32)> = if docs.len() > 256 {
+                    let tokens: Vec<&[f32]> = docs.iter().flatten().map(|t| t.as_slice()).collect();
+                    let pq = infinity_index::multivector::PqCodebook::train(dims, 8, 8, &tokens);
+                    let mut scored: Vec<(usize, f32)> = pq
+                        .prefilter(&query, &docs, (topn * 4).max(64).min(docs.len()))
+                        .into_iter()
+                        .map(|d| (d, reader.maxsim(&query, d)))
+                        .collect();
+                    scored.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then(a.0.cmp(&b.0))
+                    });
+                    scored.truncate(topn.max(1));
+                    scored
+                        .into_iter()
+                        .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
+                        .collect()
+                } else {
+                    reader
+                        .search(&query, topn.max(1))
+                        .into_iter()
+                        .filter_map(|(doc, score)| ids.get(doc).map(|seq| (*seq, score)))
+                        .collect()
+                };
                 per_segment.push(hits);
             }
             for (row, score) in infinity_index::multivector::merge_topk(per_segment, topn.max(1)) {
