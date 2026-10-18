@@ -20,7 +20,8 @@
 | `IVF_Index_Storage::SearchIndex` | `infinity_index::ivf::IvfIndex::candidates` | 质心选择 + part 扫描 | ✅ |
 | `Fst` 尾块/校验和 | `inverted_format` 的 FST 写入/`fst_len_from_trailer` | 保存/校验 | ✅ |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | MurmurHash64A | ✅（g++ 值已 pin） |
-| `TxnManager`（`new_txn_manager`） | `infinity_txn::TxnManager` | `BeginTxn`→`begin`、`CommitTxn`→`commit` | ✅（冲突校验在引擎层，见下） |
+| `TxnManager`（`new_txn_manager`） | `infinity_txn::TxnManager` | `BeginTxn`→`begin`、`CommitTxn`→`commit`（含删除冲突校验） | ✅ |
+| `NewTxn::Delete/Commit` 冲突检查 | `Txn::delete` + `TxnManager::commit` | 删除键在提交时按 `begin_ts` 校验 | ✅ |
 | `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
 
@@ -44,7 +45,6 @@
 | `EMVBIndex` / `PLAIDIndex` / `MultiVectorIndexHandler` | `MultiVectorIndex`（执行器）+ `EmvbPqIndex` | 构建、候选、merge 在一个结构里；需按 C++ 拆成 index + handler |
 | `BMPIvt` / `BMPFwd` / `BMPSearch` | `infinity_index::sparse::BmpIndex` + `bmp_cpp` | 内存形态与磁盘形态分离，但缺少 C++ 的 `BMPIvt`/`BMPFwd` 类边界 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
-| `NewTxn::Delete/Commit` 冲突检查 | `Engine::commit_with_deletes` | 语义已移植，但职责在 `Engine` 而非 `Txn`/`TxnManager`；后续移入 `TxnManager` |
 
 ## 维护规则
 
@@ -62,7 +62,7 @@
 
 | C++ 用例 | Rust 类/方法 | Rust 测试 |
 |---|---|---|
-| `txn/conflict_check_ut.cpp::conflict_check_delete` | `Engine::commit_with_deletes` | `tests::delete_conflicts_follow_the_reference` |
+| `txn/conflict_check_ut.cpp::conflict_check_delete` | `TxnManager::commit` + `Txn::delete` | `infinity_txn::tests::concurrent_deletes_conflict`、`tests::delete_conflicts_follow_the_reference` |
 | `buffer/buffer_manager_ut.cpp`（容量/淘汰） | `buffer::BufferManager` | `buffer::tests::evicts_least_recently_used`、`shrinking_the_budget_evicts` |
 | `invertedindex/format/*`（posting/position 编解码） | `inverted_format` | 该模块的往返/边界单测 |
 | `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |

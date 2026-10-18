@@ -2256,11 +2256,6 @@ pub struct Engine {
     /// them out of the KV row turns ~40 KB/row of anonymous memory into
     /// reclaimable file pages (Gate C).
     row_blobs: Mutex<HashMap<String, Arc<Mutex<std::fs::File>>>>,
-    /// `(table, seq) -> commit ts` of the delete that removed the row, for the
-    /// reference's `kTxnConflict` check (`conflict_check_ut.cpp`).
-    delete_ts: Mutex<HashMap<(String, usize), u64>>,
-    /// Serialises delete validation + commit so the first committer wins.
-    delete_lock: Mutex<()>,
     /// Bounded LRU cache of decoded column blocks (the reference's
     /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
     buffer: Mutex<
@@ -2441,8 +2436,6 @@ impl Engine {
             write_batches: Mutex::new(HashMap::new()),
             cpp_block_generation: Mutex::new(HashMap::new()),
             row_blobs: Mutex::new(HashMap::new()),
-            delete_ts: Mutex::new(HashMap::new()),
-            delete_lock: Mutex::new(()),
             buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
                 8 * 1024 * 1024 * 1024,
             )),
@@ -3451,27 +3444,11 @@ impl Engine {
     /// commits and records the tombstones' commit ts. Mirrors the reference's
     /// `ConflictCheckTest.conflict_check_delete`: the first committer wins and
     /// concurrent deleters get `kTxnConflict`.
-    fn commit_with_deletes(&self, table: &str, deletes: &[usize], txn: Txn) -> Result<u64> {
-        let _guard = self.delete_lock.lock().unwrap();
-        let begin = txn.begin_ts;
-        {
-            let seen = self.delete_ts.lock().unwrap();
-            for seq in deletes {
-                if let Some(&ts) = seen.get(&(table.to_string(), *seq)) {
-                    if ts >= begin {
-                        return Err(Error::TxnConflict(format!(
-                            "row {seq} of '{table}' was changed by a newer transaction"
-                        )));
-                    }
-                }
-            }
-        }
-        let commit_ts = self.txn.commit(txn)?;
-        let mut seen = self.delete_ts.lock().unwrap();
+    fn commit_with_deletes(&self, table: &str, deletes: &[usize], mut txn: Txn) -> Result<u64> {
         for seq in deletes {
-            seen.insert((table.to_string(), *seq), commit_ts);
+            txn.delete(del_key(table, *seq));
         }
-        Ok(commit_ts)
+        self.txn.commit(txn)
     }
 
     fn execute_stmt(&self, stmt: &Statement) -> Result<QueryResult> {
@@ -4374,10 +4351,7 @@ impl Engine {
                     }
                 }
                 if !to_del.is_empty() {
-                    let mut t = self.txn.begin();
-                    for seq in &to_del {
-                        t.put(del_key(table, *seq), b"1".to_vec());
-                    }
+                    let t = self.txn.begin();
                     self.commit_with_deletes(table, &to_del, t)?;
                     self.drop_text_index_rows(table, &to_del);
                     self.drop_vector_cache_rows(table, &to_del);
@@ -4489,9 +4463,6 @@ impl Engine {
                             .collect::<Vec<_>>()
                             .join("\t");
                         t.put(row_key(table, base + k), encoded.into_bytes());
-                    }
-                    for seq in &to_del {
-                        t.put(del_key(table, *seq), b"1".to_vec());
                     }
                     self.commit_with_deletes(table, &to_del, t)?;
                     for (k, nr) in new_rows.iter().enumerate() {
@@ -11944,7 +11915,7 @@ mod tests {
     fn delete_conflicts_follow_the_reference() {
         fn stale_delete(e: &Engine, table: &str, seq: usize) -> Txn {
             let mut txn = e.txn.begin();
-            txn.put(del_key(table, seq), b"1".to_vec());
+            txn.delete(del_key(table, seq));
             txn
         }
         let dir = tempdir().unwrap();
@@ -11982,7 +11953,7 @@ mod tests {
         // Overlapping delete sets: the later committer conflicts on the shared
         // row even though it has its own disjoint write.
         let mut a = stale_delete(&e, table, seqs[2]);
-        a.put(del_key(table, seqs[3]), b"1".to_vec());
+        a.delete(del_key(table, seqs[3]));
         let b = stale_delete(&e, table, seqs[2]);
         e.commit_with_deletes(table, &[seqs[2], seqs[3]], a)
             .unwrap();

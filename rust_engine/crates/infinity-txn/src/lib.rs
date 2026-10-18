@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -55,17 +56,26 @@ pub struct Txn {
     pub id: u64,
     pub begin_ts: TxnTimeStamp,
     writes: Vec<(Vec<u8>, Vec<u8>)>,
+    /// Tombstones this transaction writes. They are validated against newer
+    /// commits at commit time (`NewTxn::CommitTxn` conflict check).
+    deletes: Vec<Vec<u8>>,
 }
 
 impl Txn {
     pub fn put(&mut self, key: impl Into<Vec<u8>>, value: impl Into<Vec<u8>>) {
         self.writes.push((key.into(), value.into()));
     }
+    /// Records a tombstone write. The key is validated at commit: if another
+    /// transaction deleted it after this one began, the commit gets
+    /// `kTxnConflict`.
+    pub fn delete(&mut self, key: impl Into<Vec<u8>>) {
+        self.deletes.push(key.into());
+    }
     pub fn len(&self) -> usize {
-        self.writes.len()
+        self.writes.len() + self.deletes.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.writes.is_empty()
+        self.writes.is_empty() && self.deletes.is_empty()
     }
 }
 
@@ -85,6 +95,12 @@ pub struct TxnManager {
     /// Highest commit timestamp whose batch has been fsynced to the KV store;
     /// only records up to this point may be dropped from the log.
     synced: AtomicU64,
+    /// Last commit timestamp that touched each tombstone key. Conflict checks
+    /// compare it with a transaction's `begin_ts` (in-memory, like `NewTxn`'s
+    /// conflict sets).
+    delete_ts: Mutex<HashMap<Vec<u8>, TxnTimeStamp>>,
+    /// Serialises delete validation + commit so the first committer wins.
+    delete_lock: Mutex<()>,
 }
 
 impl TxnManager {
@@ -113,6 +129,8 @@ impl TxnManager {
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
+            delete_ts: Mutex::new(HashMap::new()),
+            delete_lock: Mutex::new(()),
         })
     }
 
@@ -123,6 +141,7 @@ impl TxnManager {
             id,
             begin_ts,
             writes: Vec::new(),
+            deletes: Vec::new(),
         }
     }
 
@@ -132,19 +151,46 @@ impl TxnManager {
         if txn.is_empty() {
             return Err(Error::Txn("empty transaction".into()));
         }
+        let _delete_guard = if txn.deletes.is_empty() {
+            None
+        } else {
+            Some(self.delete_lock.lock().unwrap())
+        };
+        if !txn.deletes.is_empty() {
+            let seen = self.delete_ts.lock().unwrap();
+            for key in &txn.deletes {
+                if let Some(&ts) = seen.get(key) {
+                    if ts >= txn.begin_ts {
+                        return Err(Error::TxnConflict(format!(
+                            "row changed by a newer transaction (begin_ts={})",
+                            txn.begin_ts
+                        )));
+                    }
+                }
+            }
+        }
         let commit_ts = self.next_ts.fetch_add(1, Ordering::SeqCst);
-        let payload = encode_writes(&txn.writes);
+        let mut writes = txn.writes.clone();
+        for key in &txn.deletes {
+            writes.push((key.clone(), b"1".to_vec()));
+        }
+        let payload = encode_writes(&writes);
         {
             let mut wal = self.wal.lock().unwrap();
             wal.append(&WalRecord::new(txn.id, commit_ts, payload))?;
         }
         // The applied-timestamp marker rides along with the batch, so a replay
         // after a reopen never re-applies records that are already in the KV.
-        let mut writes = txn.writes.clone();
         let applied = self.max_applied.fetch_max(commit_ts, Ordering::SeqCst);
         let applied = applied.max(commit_ts);
         writes.push((APPLIED_TS_KEY.to_vec(), applied.to_le_bytes().to_vec()));
         self.store.atomic_write(&writes)?;
+        if !txn.deletes.is_empty() {
+            let mut seen = self.delete_ts.lock().unwrap();
+            for key in &txn.deletes {
+                seen.insert(key.clone(), commit_ts);
+            }
+        }
         Ok(commit_ts)
     }
 
@@ -437,5 +483,30 @@ mod loom_model {
             all.sort_unstable();
             assert_eq!(all, vec![0, 1, 2, 3], "commit timestamps must be unique");
         });
+    }
+
+    #[test]
+    fn concurrent_deletes_conflict() {
+        let dir = tempdir().unwrap();
+        let m = manager(dir.path());
+        let mut t1 = m.begin();
+        t1.delete(b"row:1".to_vec());
+        let mut t2 = m.begin();
+        t2.delete(b"row:1".to_vec());
+        m.commit(t1).unwrap();
+        assert!(matches!(m.commit(t2), Err(Error::TxnConflict(_))));
+
+        // A transaction that starts after the winner is not stale.
+        let mut t3 = m.begin();
+        t3.delete(b"row:1".to_vec());
+        m.commit(t3).unwrap();
+
+        // Disjoint keys never conflict.
+        let mut t4 = m.begin();
+        t4.delete(b"row:2".to_vec());
+        let mut t5 = m.begin();
+        t5.delete(b"row:3".to_vec());
+        m.commit(t5).unwrap();
+        m.commit(t4).unwrap();
     }
 }
