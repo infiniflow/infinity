@@ -362,6 +362,95 @@ pub fn write_emvb_segment(
     std::fs::write(path, bytes).map_err(|e| FormatError::Io(format!("{}: {e}", path.display())))
 }
 
+/// The persisted residual product quantizer of one EMVB segment (plan #82).
+/// C++ reference: `EMVBIndex::SaveIndexInner` + `PQ::Save`.
+pub struct EmvbPqIndex {
+    pub dims: usize,
+    pub subspace_num: usize,
+    pub sub_dim: usize,
+    pub k: usize,
+    pub centroids: Vec<f32>,
+    pub codebook: Vec<f32>,
+    pub codes: Vec<u8>,
+    pub assignments: Vec<u32>,
+    pub doc_lens: Vec<u32>,
+    pub doc_segment_offsets: Vec<u32>,
+}
+
+impl EmvbPqIndex {
+    /// Approximate MaxSim ranking from the coarse centroid plus residual code
+    /// (`EMVB` stage 2). Returns **document indices** in descending score.
+    pub fn prefilter(&self, query: &[Vec<f32>], k: usize) -> Vec<usize> {
+        let n_docs = self.doc_lens.len();
+        if n_docs == 0 || k == 0 || self.dims == 0 {
+            return Vec::new();
+        }
+        let dims = self.dims;
+        let sn = self.subspace_num;
+        if self.centroids.len() < dims || self.codebook.len() < sn * self.k * self.sub_dim {
+            return Vec::new();
+        }
+        let n_centroids = self.centroids.len() / dims;
+        let mut offset = 0usize;
+        let mut scored: Vec<(usize, f32)> = Vec::with_capacity(n_docs);
+        for doc in 0..n_docs {
+            let len = self.doc_lens[doc] as usize;
+            let mut total = 0.0f32;
+            for q in query {
+                if q.len() != dims {
+                    continue;
+                }
+                let mut best = f32::NEG_INFINITY;
+                for e in offset..offset + len {
+                    let Some(&centroid) = self.assignments.get(e) else {
+                        continue;
+                    };
+                    let cbase = centroid as usize * dims;
+                    if centroid as usize >= n_centroids {
+                        continue;
+                    }
+                    let mut score: f32 = q
+                        .iter()
+                        .zip(&self.centroids[cbase..cbase + dims])
+                        .map(|(a, b)| a * b)
+                        .sum();
+                    for sub in 0..sn {
+                        let Some(&code) = self.codes.get(e * sn + sub) else {
+                            continue;
+                        };
+                        let lo = sub * self.sub_dim;
+                        let hi = (lo + self.sub_dim).min(dims);
+                        if lo >= dims {
+                            break;
+                        }
+                        let cbase = (sub * self.k + code as usize) * self.sub_dim;
+                        score += q[lo..hi]
+                            .iter()
+                            .zip(&self.codebook[cbase..cbase + (hi - lo)])
+                            .map(|(a, b)| a * b)
+                            .sum::<f32>();
+                    }
+                    if score > best {
+                        best = score;
+                    }
+                }
+                if best != f32::NEG_INFINITY {
+                    total += best;
+                }
+            }
+            scored.push((doc, total));
+            offset += len;
+        }
+        scored.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
+        scored.truncate(k);
+        scored.into_iter().map(|(doc, _)| doc).collect()
+    }
+}
+
 /// Header of an EMVB segment, enough to validate the layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EmvbHeader {
@@ -426,6 +515,89 @@ impl EmvbReader {
         self.header
     }
 
+    /// Parses the residual PQ tables (`PQ::Save`) that follow the document and
+    /// centroid tables. `None` when the file is truncated or carries no codes.
+    pub fn pq_index(&self) -> Option<EmvbPqIndex> {
+        let m = &self.map;
+        let u32_at = |o: usize| -> Option<u32> {
+            m.get(o..o + 4)
+                .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+        };
+        let mut at = 28usize;
+        // Coarse centroids (floats) and their -0.5*norm table.
+        let clen = u32_at(at)? as usize;
+        at += 4;
+        if m.len() < at + clen * 4 {
+            return None;
+        }
+        let centroids: Vec<f32> = (0..clen)
+            .map(|i| f32::from_le_bytes(m[at + i * 4..at + i * 4 + 4].try_into().unwrap()))
+            .collect();
+        at += clen * 4;
+        let nlen = u32_at(at)? as usize;
+        at += 4 + nlen * 4;
+        // n_docs / n_embeddings.
+        at += 8;
+        let read_u32s = |o: usize| -> Option<(Vec<u32>, usize)> {
+            let n = u32_at(o)? as usize;
+            if m.len() < o + 4 + n * 4 {
+                return None;
+            }
+            let values = (0..n)
+                .map(|i| u32::from_le_bytes(m[o + 4 + i * 4..o + 8 + i * 4].try_into().unwrap()))
+                .collect();
+            Some((values, o + 4 + n * 4))
+        };
+        let (doc_lens, next) = read_u32s(at)?;
+        at = next;
+        let (doc_segment_offsets, next) = read_u32s(at)?;
+        at = next;
+        let (_doc_offsets, next) = read_u32s(at)?;
+        at = next;
+        let (assignments, next) = read_u32s(at)?;
+        at = next;
+        for _ in 0..self.header.n_centroids {
+            let (_, next) = read_u32s(at)?;
+            at = next;
+        }
+        let sn = self.header.subspace_num as usize;
+        let dims = self.header.dims as usize;
+        if sn == 0 || dims == 0 {
+            return None;
+        }
+        let k = 1usize << self.header.subspace_bits.min(8);
+        let sub_dim = dims.div_ceil(sn);
+        let cb_len = sn * k * sub_dim;
+        if m.len() < at + cb_len * 4 {
+            return None;
+        }
+        let codebook: Vec<f32> = (0..cb_len)
+            .map(|i| f32::from_le_bytes(m[at + i * 4..at + i * 4 + 4].try_into().unwrap()))
+            .collect();
+        at += cb_len * 4;
+        // Residual-code norms: one per code word.
+        at += sn * k * 4;
+        // The prefix counts embeddings; each code is `subspace_num` bytes.
+        let code_len = u32_at(at)? as usize;
+        at += 4;
+        let code_bytes = code_len * sn;
+        if m.len() < at + code_bytes {
+            return None;
+        }
+        Some(EmvbPqIndex {
+            dims,
+            subspace_num: sn,
+            sub_dim,
+            k,
+            centroids,
+            codebook,
+            codes: m[at..at + code_bytes].to_vec(),
+            assignments,
+            doc_lens,
+            doc_segment_offsets,
+        })
+    }
+
     pub fn len(&self) -> usize {
         self.map.len()
     }
@@ -469,5 +641,14 @@ mod tests {
         assert_eq!(h.subspace_bits, 8);
         assert_eq!(h.n_centroids % 8, 0);
         assert!(reader.len() > 16);
+        // The residual PQ tables parse and rank the owning documents.
+        let pq = reader.pq_index().expect("residual PQ tables");
+        assert_eq!(pq.dims, 8);
+        assert_eq!(pq.subspace_num, 8);
+        assert_eq!(pq.doc_lens.len(), 40);
+        assert_eq!(pq.codes.len(), 120 * 8);
+        let ranked = pq.prefilter(&[vec![0.0f32; 8]], 5);
+        assert_eq!(ranked.len(), 5);
+        assert!(ranked.iter().all(|d| *d < 40));
     }
 }

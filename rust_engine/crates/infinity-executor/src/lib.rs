@@ -1871,11 +1871,13 @@ struct MultiVectorIndex {
     dir: PathBuf,
     /// `ROW_ID -> token rows` for documents not yet dumped.
     tail: std::collections::BTreeMap<u64, Vec<Vec<f32>>>,
-    /// One mmap reader per dumped chunk plus the row id of every document.
+    /// One mmap reader per dumped chunk plus the row id of every document and
+    /// the persisted residual PQ (the reference's stage-2 candidate filter).
     #[allow(clippy::type_complexity)]
     sealed: Vec<(
         Arc<infinity_storage::multivector_segment::MultiVectorSegmentReader>,
         Arc<Vec<u64>>,
+        Option<Arc<infinity_storage::emvb_segment::EmvbPqIndex>>,
     )>,
     /// Chunk ordinal used in file names.
     next_chunk: u64,
@@ -1933,7 +1935,7 @@ impl MultiVectorIndex {
             + self
                 .sealed
                 .iter()
-                .map(|(r, _)| r.doc_count())
+                .map(|(r, _, _)| r.doc_count())
                 .sum::<usize>()
     }
 
@@ -1994,7 +1996,12 @@ impl MultiVectorIndex {
             if let Ok(reader) =
                 infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
             {
-                self.sealed.push((Arc::new(reader), Arc::new(ids)));
+                let pq =
+                    infinity_storage::emvb_segment::EmvbReader::open(&path.with_extension("emvb"))
+                        .ok()
+                        .and_then(|r| r.pq_index())
+                        .map(Arc::new);
+                self.sealed.push((Arc::new(reader), Arc::new(ids), pq));
             }
         }
     }
@@ -2007,13 +2014,21 @@ impl MultiVectorIndex {
         dead: &std::collections::HashSet<u64>,
     ) -> Vec<(u64, f32)> {
         let mut hits: Vec<(u64, f32)> = Vec::new();
-        for (reader, ids) in &self.sealed {
-            for (doc, score) in reader.search(query, reader.doc_count()) {
-                if let Some(seq) = ids.get(doc) {
-                    if !dead.contains(seq) {
-                        hits.push((*seq, score));
-                    }
+        for (reader, ids, pq) in &self.sealed {
+            // The persisted residual codes rank the documents (EMVB stage 2);
+            // the survivors are re-scored exactly from the raw tokens.
+            let docs: Vec<usize> = match pq {
+                Some(pq) if reader.doc_count() > 256 => {
+                    pq.prefilter(query, (k * 4).max(64).min(reader.doc_count()))
                 }
+                _ => (0..reader.doc_count()).collect(),
+            };
+            for doc in docs {
+                let Some(seq) = ids.get(doc) else { continue };
+                if dead.contains(seq) {
+                    continue;
+                }
+                hits.push((*seq, reader.maxsim(query, doc)));
             }
         }
         for (seq, doc) in &self.tail {
@@ -11525,6 +11540,46 @@ mod tests {
                  (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);"
             ),
             vec![vec!["2".to_string()], vec!["1".to_string()]]
+        );
+    }
+
+    /// A sealed multi-vector chunk ranks with its persisted residual codes
+    /// (EMVB stage 2) before the exact MaxSim re-score.
+    #[test]
+    fn multivector_prefilter_uses_the_persisted_residual_codes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE mvp (id INT, v MULTIVECTOR(FLOAT,2));")
+            .unwrap();
+        e.execute("CREATE INDEX mvp_i ON mvp (v) USING EMVB;")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO mvp VALUES ");
+        for i in 0..300 {
+            sql.push_str(&format!("({i}, [[{i}.0, 0.0]])"));
+            if i < 299 {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.flush().unwrap();
+        let key = e.mv_index.lock().unwrap().keys().next().cloned().unwrap();
+        let has_codes = {
+            let guard = e.mv_index.lock().unwrap();
+            let idx = guard.get(&key).unwrap().read().unwrap();
+            idx.sealed
+                .first()
+                .map(|(_, _, pq)| pq.is_some())
+                .unwrap_or(false)
+        };
+        assert!(has_codes, "the sealed chunk carries residual codes");
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT id FROM mvp SEARCH MATCH TENSOR \
+                 (v, [299.0, 0.0], 'float', 'maxsim', 'topn=1');"
+            ),
+            vec![vec!["299".to_string()]]
         );
     }
 
