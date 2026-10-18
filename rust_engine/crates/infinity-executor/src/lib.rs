@@ -7490,6 +7490,7 @@ impl Engine {
                 return HashMap::new();
             }
             let query: Vec<Vec<f32>> = q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
+            #[allow(clippy::type_complexity)]
             let mut segments: HashMap<u64, (Vec<Vec<Vec<f32>>>, Vec<usize>)> = HashMap::new();
             for (seq, row) in &rows {
                 let Some(Value::Str(v)) = row.get(col_idx) else {
