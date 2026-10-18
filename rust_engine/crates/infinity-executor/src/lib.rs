@@ -2458,7 +2458,7 @@ impl Engine {
         let schema = meta.columns.clone();
         // An explicit column list must name existing columns; the C++
         // engine reports this as a syntax error.
-        if let Some(cols) = columns.as_deref() {
+        if let Some(cols) = columns {
             for c in cols {
                 if !schema.iter().any(|s| s == c) {
                     return Err(Error::Invalid(format!(
