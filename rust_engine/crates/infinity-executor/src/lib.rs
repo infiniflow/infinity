@@ -1584,16 +1584,199 @@ struct TextIndex {
     docs: HashMap<u64, u32>,
     postings: HashMap<String, Vec<(u64, u32, Vec<u32>)>>,
     live: std::collections::HashSet<u64>,
-    /// Approximate memory held by the postings. The index is an optimisation:
-    /// once it would exceed the budget it is dropped and queries fall back to
-    /// the scan (which computes the same statistics), keeping memory bounded.
+    /// Approximate memory held by the postings of the **unsealed** segment.
+    /// When it reaches [`TEXT_SEGMENT_BYTES`] the segment is written out and
+    /// queried through `mmap`, so only the current segment is resident.
     bytes: usize,
     disabled: bool,
+    /// Sealed segments, oldest first: each owns one on-disk index (`.dic`,
+    /// `.pos`, `.len`) exactly like the reference's per-segment indexes.
+    segments: Vec<SealedSegment>,
+    /// Directory holding this column's sealed segment files.
+    dir: String,
+    /// Rows re-indexed after their segment was sealed; the sealed copy is stale
+    /// and must not be scored (the memory index holds the new text).
+    overridden: std::collections::HashSet<u64>,
+}
+
+/// One sealed segment's index: the mmap'd reader plus the corpus counts.
+struct SealedSegment {
+    base_row_id: u64,
+    docs: u32,
+    total_len: u64,
+    reader: infinity_storage::fulltext_segment::SegmentIndexReader,
+}
+
+impl SealedSegment {
+    fn contains(&self, row: u64) -> bool {
+        row >= self.base_row_id && row - self.base_row_id < u64::from(self.docs)
+    }
+}
+
+/// The postings and corpus statistics a query sees: the sealed segments plus
+/// the unsealed tail, with stale (re-indexed) rows removed.
+struct MergedIndex {
+    n_docs: usize,
+    total_len: u64,
+    postings: HashMap<String, Vec<(u64, u32)>>,
+    doc_len: HashMap<u64, u32>,
+}
+
+impl TextIndex {
+    fn new(dir: String, delims: Option<Vec<char>>) -> Self {
+        Self {
+            delims,
+            n_docs: 0,
+            total_len: 0,
+            docs: HashMap::new(),
+            postings: HashMap::new(),
+            live: Default::default(),
+            bytes: 0,
+            disabled: false,
+            segments: Vec::new(),
+            dir,
+            overridden: Default::default(),
+        }
+    }
+
+    /// Documents in the column across the sealed segments and the memory tail.
+    fn total_docs(&self) -> usize {
+        self.n_docs + self.segments.iter().map(|s| s.docs as usize).sum::<usize>()
+    }
+
+    /// Writes the current (unsealed) segment's index to disk and clears the
+    /// in-memory postings. Returns `false` (leaving everything in memory) if the
+    /// files cannot be written, so a failure never loses results.
+    fn seal(&mut self) -> bool {
+        if self.docs.is_empty() {
+            return false;
+        }
+        let base_row_id = match self.docs.keys().min() {
+            Some(&row) => row,
+            None => return false,
+        };
+        let mut docs: Vec<(u64, u32)> = self.docs.iter().map(|(d, l)| (*d, *l)).collect();
+        docs.sort_unstable_by_key(|(d, _)| *d);
+        let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
+            std::collections::BTreeMap::new();
+        for (term, list) in &self.postings {
+            postings.insert(
+                term.clone(),
+                list.iter().map(|(d, tf, _)| (*d, *tf)).collect(),
+            );
+        }
+        let base_name = format!("ft_{base_row_id:016x}");
+        let flags = infinity_storage::inverted_format::TermMetaFlags::default();
+        if infinity_storage::fulltext_segment::write_segment_index(
+            &self.dir,
+            &base_name,
+            base_row_id,
+            &docs,
+            &postings,
+            flags,
+        )
+        .is_err()
+        {
+            return false;
+        }
+        let Ok(reader) = infinity_storage::fulltext_segment::SegmentIndexReader::open(
+            &self.dir,
+            &base_name,
+            base_row_id,
+            flags,
+        ) else {
+            return false;
+        };
+        self.segments.push(SealedSegment {
+            base_row_id,
+            docs: docs.len() as u32,
+            total_len: self.total_len,
+            reader,
+        });
+        self.docs.clear();
+        self.postings.clear();
+        self.live.clear();
+        self.n_docs = 0;
+        self.total_len = 0;
+        self.bytes = 0;
+        true
+    }
+
+    /// Seals once the unsealed segment reaches its size budget.
+    fn maybe_seal(&mut self) {
+        if self.bytes >= text_segment_bytes() {
+            self.seal();
+        }
+    }
+
+    /// Postings and corpus statistics for `terms`, merging every sealed segment
+    /// with the memory tail. Stale copies of re-indexed rows are dropped.
+    fn merge(&self, terms: &[String]) -> MergedIndex {
+        let mut n_docs = self.n_docs;
+        let mut total_len = self.total_len;
+        for seg in &self.segments {
+            n_docs += seg.docs as usize;
+            total_len += seg.total_len;
+        }
+        let mut postings: HashMap<String, Vec<(u64, u32)>> = HashMap::new();
+        let mut doc_len: HashMap<u64, u32> = HashMap::new();
+        for term in terms {
+            let mut list: Vec<(u64, u32)> = self
+                .postings
+                .get(term)
+                .map(|l| l.iter().map(|(d, tf, _)| (*d, *tf)).collect())
+                .unwrap_or_default();
+            for seg in &self.segments {
+                if let Ok(mut hits) = seg.reader.postings(term) {
+                    list.append(&mut hits);
+                }
+            }
+            list.retain(|(d, _)| !self.overridden.contains(d));
+            list.sort_unstable_by_key(|(d, _)| *d);
+            for (d, _) in &list {
+                if let Some(l) = self.docs.get(d) {
+                    doc_len.insert(*d, *l);
+                    continue;
+                }
+                let dl = self
+                    .segments
+                    .iter()
+                    .rev()
+                    .find(|s| s.contains(*d))
+                    .and_then(|s| s.reader.doc_len((*d - s.base_row_id) as u32))
+                    .unwrap_or(1);
+                doc_len.insert(*d, dl);
+            }
+            postings.insert(term.clone(), list);
+        }
+        MergedIndex {
+            n_docs,
+            total_len,
+            postings,
+            doc_len,
+        }
+    }
 }
 
 /// Cap for one in-memory inverted index. The heavy import tests build several
 /// indexes over 250k wide rows; without a cap the postings alone reached ~20 GB.
 const TEXT_INDEX_BUDGET_BYTES: usize = 512 * 1024 * 1024;
+
+/// Size at which the current segment is sealed to disk. Only this much posting
+/// data stays resident per column; sealed segments are read through `mmap`,
+/// like the reference's on-disk segments.
+const TEXT_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
+
+/// The segment budget, overridable for tests that need to exercise sealing.
+fn text_segment_bytes() -> usize {
+    static CAP: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CAP.get_or_init(|| {
+        std::env::var("INFINITY_TEXT_SEGMENT_BYTES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(TEXT_SEGMENT_BYTES)
+    })
+}
 
 type SharedTextIndex = Arc<std::sync::RwLock<TextIndex>>;
 
@@ -1740,6 +1923,12 @@ fn index_row(index: &mut TextIndex, seq: u64, text: &str) {
 /// still count them; the search paths filter them out by sequence id.
 fn index_delete_row(index: &mut TextIndex, seq: u64) {
     index.live.remove(&seq);
+    // A row whose text already went to a sealed segment keeps its old postings
+    // there; the fresh text is added to the memory tail, so the sealed copy
+    // must be ignored from now on.
+    if !index.docs.contains_key(&seq) && index.segments.iter().any(|s| s.contains(seq)) {
+        index.overridden.insert(seq);
+    }
 }
 
 /// Only a plain secondary index materialises into the string-keyed
@@ -3921,7 +4110,7 @@ impl Engine {
     /// statistics (the reference's segments do until compaction) but never rank,
     /// exactly like the scan path's live check.
     fn wand_scan(
-        index: &TextIndex,
+        index: &MergedIndex,
         terms: &[String],
         weights: &[f64],
         k: usize,
@@ -4028,7 +4217,7 @@ impl Engine {
                     let (ti, _, cur) = cursors[c];
                     let post = &index.postings[&terms[ti]][cur];
                     let tf = post.1 as f64;
-                    let dl = *index.docs.get(&post.0).unwrap_or(&1) as f64;
+                    let dl = *index.doc_len.get(&post.0).unwrap_or(&1) as f64;
                     let df = index.postings[&terms[ti]].len() as f64;
                     let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
                     let w = weights.get(ti).copied().unwrap_or(1.0);
@@ -4185,7 +4374,7 @@ impl Engine {
         // rows; compare against the cheap reservation counter and rebuild.
         let reserved = self.store.scan_prefix(&row_prefix(table))?.len();
         if let Some(idx) = self.text_index.lock().unwrap().get(&key) {
-            let complete = idx.read().map(|g| g.n_docs).unwrap_or(0);
+            let complete = idx.read().map(|g| g.total_docs()).unwrap_or(0);
             if complete >= reserved {
                 return Ok(idx.clone());
             }
@@ -4195,16 +4384,13 @@ impl Engine {
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
-        let mut index = TextIndex {
-            delims,
-            n_docs: 0,
-            total_len: 0,
-            docs: HashMap::new(),
-            postings: HashMap::new(),
-            bytes: 0,
-            disabled: false,
-            live: Default::default(),
-        };
+        let dir = self
+            .dir
+            .join("fulltext")
+            .join(key.replace('/', "_"))
+            .to_string_lossy()
+            .into_owned();
+        let mut index = TextIndex::new(dir, delims);
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, col)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
@@ -4212,6 +4398,7 @@ impl Engine {
                 None => String::new(),
             };
             index_row(&mut index, seq as u64, &text);
+            index.maybe_seal();
         }
         let shared = Arc::new(std::sync::RwLock::new(index));
         self.text_index.lock().unwrap().insert(key, shared.clone());
@@ -4244,6 +4431,7 @@ impl Engine {
             let mut index = shared.write().unwrap();
             index_delete_row(&mut index, seq as u64);
             index_row(&mut index, seq as u64, text);
+            index.maybe_seal();
         }
     }
 
@@ -5283,8 +5471,9 @@ impl Engine {
                 let wterms: Vec<String> =
                     units.iter().map(|(_, toks, _)| toks[0].clone()).collect();
                 let weights: Vec<f64> = units.iter().map(|(_, _, ub)| boost * ub).collect();
-                let hits = Self::wand_scan(&guard, &wterms, &weights, topn.max(1), &dead);
+                let merged = guard.merge(&wterms);
                 drop(guard);
+                let hits = Self::wand_scan(&merged, &wterms, &weights, topn.max(1), &dead);
                 let scored: Vec<(usize, f64)> = hits
                     .into_iter()
                     .map(|(seq, score)| (seq as usize, score))
@@ -5340,8 +5529,9 @@ impl Engine {
                 let name = schema.get(*ci)?.clone();
                 let index = self.text_index_for(table, &name, d.clone()).ok()?;
                 let guard = index.read().ok()?;
-                let n = guard.n_docs;
-                let sum = guard.total_len as usize;
+                let merged = guard.merge(&terms);
+                let n = merged.n_docs;
+                let sum = merged.total_len as usize;
                 let avg = if n == 0 {
                     1.0
                 } else {
@@ -5354,9 +5544,9 @@ impl Engine {
                 };
                 let mut df: HashMap<String, usize> = HashMap::new();
                 for t in &terms {
-                    if let Some(list) = guard.postings.get(t) {
+                    if let Some(list) = merged.postings.get(t) {
                         df.insert(t.clone(), list.len());
-                        for (doc, _, _) in list {
+                        for (doc, _) in list {
                             set.insert(*doc as usize);
                         }
                     }
