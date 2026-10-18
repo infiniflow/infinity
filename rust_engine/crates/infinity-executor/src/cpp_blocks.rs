@@ -1792,7 +1792,7 @@ impl Engine {
             }
         }
         if vectors.is_empty() {
-            return Err(Error::Invalid(format!("HNSW mirror has no vectors")));
+            return Err(Error::Invalid("HNSW mirror has no vectors".to_string()));
         }
         let entry = Some((header.enterpoint.max(0) as usize).min(vectors.len() - 1));
         let index = HnswIndex::from_parts(
