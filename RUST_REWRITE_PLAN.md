@@ -181,7 +181,7 @@ Infinity 是面向 LLM 应用的 AI-native 数据库，提供稠密向量、稀�
 | 索引 | 每段独立 | on-disk | in-memory | 算法移植 |
 |---|---|---|---|---|
 | 全文 | **是**（内存段 + 多个封盘段） | **是**（`.dic`=TermMeta+FST、`.pos`、`.len`，`mmap` 读取；另加 `.row` 记录段内序号→行号） | **是**（未封存段） | **WAND 已按 `blockmax_wand_iterator` 移植并默认用于单字段纯 OR 查询**；短语/布尔/filter 仍走扫描 |
-| HNSW | 否（按列一张图） | 是（`chunk_{id}.idx`） | 是 | **未移植**：构图仍是通用实现，需按 `hnsw*` 重写 |
+| HNSW | 内存段按列一张图 + 落盘图（待拆多封盘段） | 是（`chunk_{id}.idx`） | **是**（`HnswIndexInMem`：插入即建图，查询与落盘图并集） | **已按 `hnsw_alg.cppm` 移植**：`TryUpdateEnterPoint` 先于构图、`SearchLayerNearest` 逆序扫描、`SelectNeighborsHeuristic` 返回「远→近」且 `Build` 从 `neighbors[0]` 继续、`ConnectNeighbors` 双向剪枝到 `2M/M`、`SearchLayer` 的 `<=` 与 top-k 语义；`M=16`、`ef_construction=200` 取自 `default_values.cppm` |
 | 多向量 | 否 | 部分 | 是 | **未移植**：仍全表 MaxSim |
 | 稀疏 | 否 | 否 | 是 | **未移植**：全表打分 |
 
