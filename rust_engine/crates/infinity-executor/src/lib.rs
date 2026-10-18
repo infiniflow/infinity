@@ -1813,7 +1813,7 @@ impl Engine {
                 std::env::var("INFINITY_SCAN_CONCURRENCY")
                     .ok()
                     .and_then(|v| v.parse().ok())
-                    .unwrap_or(1),
+                    .unwrap_or(2),
             ),
             text_index: Mutex::new(HashMap::new()),
             vector_cache: Mutex::new(HashMap::new()),
