@@ -2417,13 +2417,38 @@ impl SparseIndex {
     }
 }
 
+
+/// Engine-wide runtime state.
+///
+/// C++: `InfinityContext` (`src/storage/infinity_context.cppm`) — the shared
+/// configuration, buffer manager and service handles. `Engine` composes it
+/// instead of owning these fields directly.
+struct Context {
+    /// Tokio exchange capacity per pipeline edge.
+    exchange_capacity: usize,
+    /// Bounded LRU cache of decoded column blocks (the reference's
+    /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
+    buffer: Mutex<
+        infinity_storage::buffer::BufferManager<Vec<infinity_storage::cpp_format::RawBlockColumn>>,
+    >,
+    /// session/global configuration set via `SET CONFIG …`
+    config: Mutex<HashMap<String, String>>,
+    /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
+    /// trigger (the reference only dumps when a quota is configured).
+    memindex_quota: std::sync::atomic::AtomicU64,
+    /// Object store backing the C++-format data files (`storage_type =
+    /// "minio"`). `None` keeps everything on the local disk.
+    object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
+    /// Concurrency limit for full-table text/vector scans.
+    scan_gate: ScanGate,
+}
+
 /// The engine: catalog + transaction manager + KV store + a Tokio runtime.
 pub struct Engine {
     catalog: Catalog,
     txn: TxnManager,
     store: Arc<dyn MetaStore>,
     rt: tokio::runtime::Runtime,
-    exchange_capacity: usize,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
     /// On-disk secondary-index segments (the reference's PGM chunks): one
@@ -2456,8 +2481,8 @@ pub struct Engine {
     /// the sealed chunks at query time (the reference's in-memory index).
     #[allow(clippy::type_complexity)]
     ivf_mem: Mutex<HashMap<String, Vec<(u64, Vec<f32>)>>>,
-    /// session/global configuration set via `SET CONFIG …`
-    config: Mutex<HashMap<String, String>>,
+    /// Engine-wide runtime state (the reference's `InfinityContext`).
+    context: Context,
     /// fulltext analyzer per `"<table>.<column>"`, from `CREATE INDEX … WITH (analyzer=…)`
     index_analyzers: Mutex<HashMap<String, String>>,
     /// `CREATE INDEX … COMMENT '…'`, keyed by `"<table>#<index>"`.
@@ -2476,25 +2501,12 @@ pub struct Engine {
     /// them out of the KV row turns ~40 KB/row of anonymous memory into
     /// reclaimable file pages (Gate C).
     row_blobs: Mutex<HashMap<String, Arc<Mutex<std::fs::File>>>>,
-    /// Bounded LRU cache of decoded column blocks (the reference's
-    /// `BufferManager`), sized by `[buffer] buffer_manager_size`.
-    buffer: Mutex<
-        infinity_storage::buffer::BufferManager<Vec<infinity_storage::cpp_format::RawBlockColumn>>,
-    >,
     /// Next free row id per table; reserved in blocks so concurrent inserts do
     /// not collide on the same base sequence.
     row_counters: Mutex<HashMap<String, (u32, u32, bool)>>,
-    /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
-    /// trigger (the reference only dumps when a quota is configured).
-    memindex_quota: std::sync::atomic::AtomicU64,
     /// Estimated bytes buffered in each HNSW memory index since its last dump,
     /// keyed by `"<table>.<column>"`.
     index_pending_bytes: Mutex<HashMap<String, usize>>,
-    /// Object store backing the C++-format data files (`storage_type =
-    /// "minio"`). `None` keeps everything on the local disk.
-    object_store: Mutex<Option<Arc<infinity_storage::s3::S3Client>>>,
-    /// Concurrency limit for full-table text/vector scans.
-    scan_gate: ScanGate,
     /// In-memory HNSW segment per vector column, keyed by
     /// `"<table>.<column>"`; the on-disk graph lives in `vector_indexes`.
     hnsw_mem: Mutex<HashMap<String, hnsw_mem::HnswIndexInMem>>,
@@ -2609,7 +2621,21 @@ impl Engine {
             txn,
             store,
             rt,
-            exchange_capacity: exchange_capacity.max(1),
+            context: Context {
+                exchange_capacity: exchange_capacity.max(1),
+                buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
+                    8 * 1024 * 1024 * 1024,
+                )),
+                config: Mutex::new(HashMap::new()),
+                memindex_quota: std::sync::atomic::AtomicU64::new(0),
+                object_store: Mutex::new(None),
+                scan_gate: ScanGate::new(
+                    std::env::var("INFINITY_SCAN_CONCURRENCY")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(2),
+                ),
+            },
             dir,
             secondary_low: Mutex::new(HashMap::new()),
             secondary_disk: Mutex::new(HashMap::new()),
@@ -2618,7 +2644,6 @@ impl Engine {
             vector_indexes: Mutex::new(HashMap::new()),
             ivf_indexes: Mutex::new(HashMap::new()),
             ivf_mem: Mutex::new(HashMap::new()),
-            config: Mutex::new(HashMap::new()),
             index_analyzers: Mutex::new(HashMap::new()),
             index_comments: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
@@ -2626,19 +2651,8 @@ impl Engine {
             write_batches: Mutex::new(HashMap::new()),
             cpp_block_generation: Mutex::new(HashMap::new()),
             row_blobs: Mutex::new(HashMap::new()),
-            buffer: Mutex::new(infinity_storage::buffer::BufferManager::new(
-                8 * 1024 * 1024 * 1024,
-            )),
             row_counters: Mutex::new(HashMap::new()),
-            memindex_quota: std::sync::atomic::AtomicU64::new(0),
             index_pending_bytes: Mutex::new(HashMap::new()),
-            object_store: Mutex::new(None),
-            scan_gate: ScanGate::new(
-                std::env::var("INFINITY_SCAN_CONCURRENCY")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(2),
-            ),
             hnsw_mem: Mutex::new(HashMap::new()),
             hnsw_probed: Mutex::new(Default::default()),
             text_index: Mutex::new(HashMap::new()),
@@ -3084,6 +3098,7 @@ impl Engine {
     /// the reference's memindex dump. `memindex_memory_quota = 0` disables it.
     fn enforce_memindex_quota(&self) {
         let quota = self
+            .context
             .memindex_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
         if quota == 0 || self.memindex_bytes() <= quota {
@@ -4425,7 +4440,7 @@ impl Engine {
                         "config '{key}' is unavailable while result_cache is off"
                     )));
                 }
-                self.config
+                self.context.config
                     .lock()
                     .unwrap()
                     .insert(key.to_ascii_lowercase(), value.clone());
@@ -4448,7 +4463,7 @@ impl Engine {
                 let v = if cache_var == "cache_result_num" {
                     self.result_cache.lock().unwrap().len().to_string()
                 } else {
-                    self.config
+                    self.context.config
                         .lock()
                         .unwrap()
                         .get(&key.to_ascii_lowercase())
@@ -5180,7 +5195,7 @@ impl Engine {
             }
         };
         self.rt
-            .block_on(pipeline(columns, rows, stages, self.exchange_capacity))
+            .block_on(pipeline(columns, rows, stages, self.context.exchange_capacity))
     }
 
     /// Maintains declared indexes on insert.
@@ -6616,7 +6631,7 @@ impl Engine {
     /// engine defaults the reference reports before any `SET CONFIG`.
     pub fn config_get(&self, key: &str) -> Option<String> {
         let key = key.to_ascii_lowercase();
-        if let Some(v) = self.config.lock().unwrap().get(&key) {
+        if let Some(v) = self.context.config.lock().unwrap().get(&key) {
             return Some(v.clone());
         }
         let default = match key.as_str() {
@@ -6632,7 +6647,7 @@ impl Engine {
 
     /// Every configuration knob's current value.
     pub fn config_all(&self) -> Vec<(String, String)> {
-        self.config
+        self.context.config
             .lock()
             .unwrap()
             .iter()
@@ -6641,7 +6656,7 @@ impl Engine {
     }
 
     fn result_cache_enabled(&self) -> bool {
-        match self.config.lock().unwrap().get("result_cache") {
+        match self.context.config.lock().unwrap().get("result_cache") {
             Some(v) => !v.eq_ignore_ascii_case("off"),
             None => true,
         }
@@ -6649,7 +6664,7 @@ impl Engine {
 
     /// Whether new results are being cached (`off`/`suspend` disable it).
     fn result_cache_active(&self) -> bool {
-        match self.config.lock().unwrap().get("result_cache") {
+        match self.context.config.lock().unwrap().get("result_cache") {
             Some(v) => !(v.eq_ignore_ascii_case("off") || v.eq_ignore_ascii_case("suspend")),
             None => true,
         }
@@ -6657,7 +6672,7 @@ impl Engine {
 
     /// Maximum cached entries (`cache_result_capacity`); unbounded by default.
     fn result_cache_capacity(&self) -> usize {
-        self.config
+        self.context.config
             .lock()
             .unwrap()
             .get("cache_result_capacity")
@@ -6906,7 +6921,7 @@ impl Engine {
     ) -> Result<(Vec<Vec<Value>>, Vec<String>)> {
         // A full-text scan holds the whole table's token data; bound how many
         // run at once so a handful of concurrent readers cannot exhaust memory.
-        let _scan = self.scan_gate.enter();
+        let _scan = self.context.scan_gate.enter();
         let schema = self.table_schema(table)?;
         // A full-text search runs through an index; without one the C++ engine
         // refuses the statement.
@@ -8517,7 +8532,7 @@ impl Engine {
         // A vector/sparse/tensor scan also reads most of the table; share the
         // same bound as full-text scans (acquired after the TEXT early return,
         // which takes the slot itself).
-        let _scan = self.scan_gate.enter();
+        let _scan = self.context.scan_gate.enter();
         // A trailing index name in `MATCH VECTOR (col, vec, 'float', 'l2', k,
         // 'idx')` must reference an existing index.
         if !is_tensor && !is_sparse {
@@ -9597,7 +9612,7 @@ impl Engine {
         }
         // With `storage_type = "minio"` the C++-format data files are mirrored
         // into the bucket; the row/meta KV stays local.
-        if let Some(client) = self.object_store.lock().unwrap().clone() {
+        if let Some(client) = self.context.object_store.lock().unwrap().clone() {
             let root = self.dir.join("data");
             let _ = infinity_storage::s3::sync_tree(&client, &root, "data");
         }
@@ -9615,7 +9630,7 @@ impl Engine {
 
     /// Binds an object store for the C++-format data files.
     pub fn set_object_store(&self, client: Arc<infinity_storage::s3::S3Client>) {
-        *self.object_store.lock().unwrap() = Some(client);
+        *self.context.object_store.lock().unwrap() = Some(client);
     }
 
     /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
@@ -9624,11 +9639,11 @@ impl Engine {
     /// Sets the column-block cache budget (the reference's
     /// `[buffer] buffer_manager_size`).
     pub fn set_buffer_manager_size(&self, bytes: usize) {
-        self.buffer.lock().unwrap().set_budget(bytes);
+        self.context.buffer.lock().unwrap().set_budget(bytes);
     }
 
     pub fn set_memindex_quota(&self, bytes: u64) {
-        self.memindex_quota
+        self.context.memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
@@ -9638,6 +9653,7 @@ impl Engine {
     /// reproduces (one `chunk_{n}.idx` per dump).
     fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
+            .context
             .memindex_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
         if quota == 0 || count == 0 {

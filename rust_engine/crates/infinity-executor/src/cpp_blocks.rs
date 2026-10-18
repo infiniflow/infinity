@@ -1067,7 +1067,7 @@ impl Engine {
                 segment_id: 0,
                 block_id: block_index as u16,
             };
-            self.buffer.lock().unwrap().invalidate(&id);
+            self.context.buffer.lock().unwrap().invalidate(&id);
             cpp_format::write_block(&root, id, &block_columns, &version).map_err(|e| {
                 Error::Io {
                     path: root.join(cpp_format::block_dir(db_id, meta.id, 0, id.block_id)),
@@ -1220,7 +1220,7 @@ impl Engine {
         root: &Path,
         id: BlockId,
     ) -> std::io::Result<(BlockVersionFile, Arc<Vec<RawBlockColumn>>)> {
-        if let Some(columns) = self.buffer.lock().unwrap().get(&id) {
+        if let Some(columns) = self.context.buffer.lock().unwrap().get(&id) {
             let dir = root.join(cpp_format::block_dir(
                 id.db_id,
                 id.table_id,
@@ -1235,7 +1235,7 @@ impl Engine {
         let (version, columns) = cpp_format::read_block(root, id)?;
         let bytes = infinity_storage::buffer::block_bytes(&columns);
         let columns = Arc::new(columns);
-        self.buffer.lock().unwrap().put(id, columns.clone(), bytes);
+        self.context.buffer.lock().unwrap().put(id, columns.clone(), bytes);
         Ok((version, columns))
     }
 
