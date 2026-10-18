@@ -3824,7 +3824,7 @@ impl Engine {
             postings: HashMap::new(),
             live: Default::default(),
         };
-        for (seq, cells) in self.fetch_rows_with_ids_projected(table, col)? {
+        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, col)? {
             let text = match cells.get(col) {
                 Some(Value::Str(s)) => s.clone(),
                 Some(other) => other.to_slt_string(),
@@ -3914,6 +3914,56 @@ impl Engine {
             rows.push((seq, cells));
         }
         Ok(rows)
+    }
+
+    /// Like `fetch_rows_with_ids_projected`, but including tombstoned rows.
+    /// Corpus statistics keep counting deleted documents (as the reference's
+    /// segments do until compaction), so the index must see them too.
+    fn fetch_rows_with_ids_projected_all(
+        &self,
+        table: &str,
+        idx: usize,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let prefix = row_prefix(table);
+        let mut rows = Vec::new();
+        for (k, v) in self.store.scan_prefix(&prefix)? {
+            let seq: usize = String::from_utf8_lossy(&k[prefix.len()..])
+                .parse()
+                .unwrap_or(0);
+            let text = String::from_utf8_lossy(&v);
+            let cell = text.split('\t').nth(idx).unwrap_or("");
+            let mut cells = vec![Value::Null; idx + 1];
+            cells[idx] = parse_value(cell);
+            rows.push((seq, cells));
+        }
+        Ok(rows)
+    }
+
+    /// Rows for `ids`, parsing only the `cols` columns (others are `Null`).
+    fn fetch_rows_cols(
+        &self,
+        table: &str,
+        ids: &[usize],
+        cols: &[usize],
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
+        let mut out = Vec::with_capacity(ids.len());
+        for &seq in ids {
+            if self.store.get(&del_key(table, seq))?.is_some() {
+                continue;
+            }
+            let Some(v) = self.store.get(&row_key(table, seq))? else {
+                continue;
+            };
+            let text = String::from_utf8_lossy(&v);
+            let mut cells = vec![Value::Null; text.split('\t').count()];
+            for &c in cols {
+                if let Some(cell) = text.split('\t').nth(c) {
+                    cells[c] = parse_value(cell);
+                }
+            }
+            out.push((seq, cells));
+        }
+        Ok(out)
     }
 
     /// Rows matched by an equality on an indexed column, or the whole table
