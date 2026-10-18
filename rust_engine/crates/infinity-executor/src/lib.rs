@@ -8812,22 +8812,31 @@ impl Engine {
                 return None;
             }
             // Every sealed segment is its own graph; the query searches each
-            // and merges (`HnswIndexHandler` over segment indexes). The union of
-            // their labels must cover the live rows, else the exact scan runs.
+            // and merges the results through the reference's `MergeKnn`
+            // (`src/storage/knn_index/merge_knn.cppm`). The union of their
+            // labels must cover the live rows, else the exact scan runs.
             let mut covered: std::collections::HashSet<usize> = Default::default();
-            let mut candidates: std::collections::HashSet<usize> = Default::default();
+            let k = (topn * 4).max(64);
+            let mut merge = infinity_index::merge_knn::MergeKnn::new(
+                1,
+                k,
+                infinity_index::merge_knn::Compare::Max,
+                None,
+            );
+            merge.begin();
             for seg in &segments {
                 if seg.index.dims() != qv.len() {
                     return None;
                 }
                 covered.extend(seg.labels.iter().map(|s| *s as usize));
-                let k = (topn * 4).max(64).min(seg.labels.len().max(1));
-                candidates.extend(
-                    seg.index
-                        .search(&qv, k)
-                        .into_iter()
-                        .map(|(node, _)| seg.labels[node] as usize),
-                );
+                let seg_k = k.min(seg.labels.len().max(1));
+                let hits: Vec<(f32, u64)> = seg
+                    .index
+                    .search(&qv, seg_k)
+                    .into_iter()
+                    .map(|(node, dist)| (dist, seg.labels[node] as u64))
+                    .collect();
+                merge.search(0, &hits);
             }
             // The in-memory segment: rows written after the last dump. The
             // reference searches every segment and merges the results.
@@ -8837,11 +8846,14 @@ impl Engine {
                 .unwrap()
                 .get(&index_key(table, &col_name))
             {
-                for (row, _) in mem.search(&qv, (topn * 4).max(64)) {
-                    candidates.insert(row as usize);
+                for (row, dist) in mem.search(&qv, k) {
+                    merge.add_result(0, dist, row);
                     covered.insert(row as usize);
                 }
             }
+            merge.end();
+            let candidates: std::collections::HashSet<usize> =
+                merge.ids_by_idx(0).into_iter().map(|r| r as usize).collect();
             let uncovered = if let Some(c) = &cache {
                 c.read()
                     .map(|g| g.live.iter().any(|s| !covered.contains(s)))

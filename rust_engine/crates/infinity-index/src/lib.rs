@@ -9,6 +9,7 @@
 
 pub mod fulltext;
 pub mod ivf;
+pub mod merge_knn;
 pub mod multivector;
 pub mod sparse;
 pub mod vector;

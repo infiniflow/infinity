@@ -25,6 +25,7 @@
 | `BM25Ranker`（`bm25_ranker_impl.cpp`） | `wand::Bm25Ranker` | `idf`/`score`/`upper_bound` | ✅ |
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
 | `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search` | ✅ |
+| `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `infinity_index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 
 ## 有意的设计变更（§3.6 豁免）
 
@@ -39,10 +40,8 @@
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| `BlockMaxWandIterator`（pivot/NextShallow/block-max） | `Engine::wand_scan` 自由函数 | 控制流已移植，但**没有类**（无 `Next()`/游标对象）；需拆成 `BlockMaxWandIterator` 结构 |
-| `BM25Ranker` | `wand_scan` 内联公式 | 需独立 `Bm25Ranker`，供扫描路径与 WAND 共用 |
-| `MemoryIndexer` / `Indexer` / `IndexReader` | `TextIndex` + `SegmentIndexReader` + 查询期 `MergedIndex` | 构建/落盘/读取职责混在 `TextIndex` 与执行器；需拆出 `MemoryIndexer`、`Indexer`、`IndexReader` |
-| `HnswIndexHandler`（多 segment 合并） | `Engine::vector_candidates` | 内存段已拆为 `HnswIndexInMem`；handler/segment 合并仍在执行器 |
+| `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::vector::HnswIndex` + `hnsw_mem::HnswIndexInMem` | 图算法与内存段已对应；`InsertVecs`/`SearchIndex` 的批次与 `KnnSearchOption` 仍内联在执行器 |
+| `PhysicalKnnScan`（`physical_knn_scan_impl.cpp`） | `Engine` 的 KNN 分支 | 合并已走 `merge_knn::MergeKnn`；算子边界（scan 状态/bitmask/多查询）仍在执行器 |
 | `EMVBIndex` / `PLAIDIndex` / `MultiVectorIndexHandler` | `MultiVectorIndex`（执行器）+ `EmvbPqIndex` | 构建、候选、merge 在一个结构里；需按 C++ 拆成 index + handler |
 | `BMPIvt` / `BMPFwd` / `BMPSearch` | `infinity_index::sparse::BmpIndex` + `bmp_cpp` | 内存形态与磁盘形态分离，但缺少 C++ 的 `BMPIvt`/`BMPFwd` 类边界 |
 | `InfinityContext` / `Storage` / `TableEntry` / `SegmentEntry` | `Engine`（单一大结构） | **最大的偏差**：`Engine` 同时承担 context/storage/catalog/txn/索引；需按 C++ 边界拆分 |
@@ -69,6 +68,7 @@
 | `secondary_index` 的 PGM 查找 | `SecondarySegmentReader::lookup` | `secondary_segment::tests::pgm_lookup_matches_binary_search` |
 | `knn/sparse` 的 block-max 检索 | `infinity_index::sparse::BmpIndex` / `bmp_cpp` | `sparse` / `bmp_cpp` 单测 |
 | `std::hash<string_view>`（VARCHAR 次级键） | `secondary_segment::hash_varchar` | `varchar_hash_matches_libstdcxx` |
+| （无独立 C++ 单测） | `merge_knn::MergeKnn` | 6 例：多段合并/并列取小 RowID/阈值方向/多查询/EndWithoutSort/余弦排序 |
 
 ### 未移植单测（Rust 类已存在）
 
