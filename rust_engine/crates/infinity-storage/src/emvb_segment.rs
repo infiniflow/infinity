@@ -115,6 +115,133 @@ fn push_f32s(out: &mut Vec<u8>, vs: &[f32]) {
     }
 }
 
+/// Residual product quantizer (`PQ::Save` / `OPQ::Save`): per-subspace
+/// centroids over `token - coarse centroid`, their `-0.5 * norm` table and one
+/// code per embedding.
+struct ResidualPq {
+    subspace_num: usize,
+    bits: u32,
+    centroids: Vec<f32>,
+    norms: Vec<f32>,
+    codes: Vec<Vec<u8>>,
+}
+
+fn train_residual_pq(
+    dims: usize,
+    subspace_num: usize,
+    bits: u32,
+    residuals: &[Vec<f32>],
+) -> ResidualPq {
+    let subspace_num = subspace_num.max(1);
+    let width = dims.div_ceil(subspace_num);
+    let k = 1usize << bits.min(8);
+    let mut centroids = Vec::with_capacity(subspace_num * k * width);
+    let mut norms = Vec::with_capacity(subspace_num * k);
+    // Sample so training stays bounded on large segments.
+    let sample: Vec<&Vec<f32>> = residuals
+        .iter()
+        .step_by((residuals.len() / 4096).max(1))
+        .collect();
+    for sub in 0..subspace_num {
+        let lo = sub * width;
+        let hi = (lo + width).min(dims);
+        let sub_dim = hi - lo;
+        let mut cs = vec![0.0f32; k * sub_dim];
+        for c in 0..k {
+            let t = sample.get((c * sample.len()) / k.max(1)).copied();
+            if let Some(t) = t {
+                let n = sub_dim.min(t.len().saturating_sub(lo));
+                cs[c * sub_dim..c * sub_dim + n].copy_from_slice(&t[lo..lo + n]);
+            }
+        }
+        for _ in 0..4 {
+            let mut sums = vec![0.0f32; k * sub_dim];
+            let mut counts = vec![0usize; k];
+            for t in &sample {
+                if lo >= t.len() {
+                    continue;
+                }
+                let v = &t[lo..hi.min(t.len())];
+                let mut best = 0usize;
+                let mut best_d = f32::INFINITY;
+                for c in 0..k {
+                    let d: f32 = cs[c * sub_dim..c * sub_dim + v.len()]
+                        .iter()
+                        .zip(v)
+                        .map(|(a, b)| (a - b) * (a - b))
+                        .sum();
+                    if d < best_d {
+                        best_d = d;
+                        best = c;
+                    }
+                }
+                counts[best] += 1;
+                for (acc, x) in sums[best * sub_dim..best * sub_dim + v.len()]
+                    .iter_mut()
+                    .zip(v)
+                {
+                    *acc += x;
+                }
+            }
+            for (c, &count) in counts.iter().enumerate() {
+                if count == 0 {
+                    continue;
+                }
+                for i in 0..sub_dim {
+                    cs[c * sub_dim + i] = sums[c * sub_dim + i] / count as f32;
+                }
+            }
+        }
+        for c in 0..k {
+            let norm: f32 = cs[c * sub_dim..(c + 1) * sub_dim]
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
+            norms.push(-0.5 * norm);
+        }
+        centroids.extend_from_slice(&cs);
+    }
+    // Encode every embedding.
+    let mut codes = Vec::with_capacity(residuals.len());
+    for r in residuals {
+        let mut code = Vec::with_capacity(subspace_num);
+        for sub in 0..subspace_num {
+            let lo = sub * width;
+            let hi = (lo + width).min(dims);
+            let sub_dim = hi - lo;
+            let v = if lo < r.len() {
+                &r[lo..hi.min(r.len())]
+            } else {
+                &[][..]
+            };
+            let mut best = 0u8;
+            let mut best_d = f32::INFINITY;
+            for c in 0..k {
+                let base = (sub * k + c) * sub_dim;
+                let d: f32 = centroids[base..base + sub_dim]
+                    .iter()
+                    .zip(v)
+                    .map(|(a, b)| (a - b) * (a - b))
+                    .sum();
+                if d < best_d {
+                    best_d = d;
+                    best = c as u8;
+                }
+            }
+            code.push(best);
+        }
+        codes.push(code);
+    }
+    ResidualPq {
+        subspace_num,
+        bits,
+        centroids,
+        norms,
+        codes,
+    }
+}
+
 /// Encodes one multi-vector segment. `docs` are `(row offset, tokens)` in row
 /// order.
 pub fn encode_emvb(
@@ -160,13 +287,27 @@ pub fn encode_emvb(
         }
     }
 
+    // Residuals feed the product quantizer: one vector per embedding.
+    let mut residuals: Vec<Vec<f32>> = Vec::with_capacity(tokens.len());
+    for (i, t) in tokens.iter().enumerate() {
+        let c = assignments[i] as usize;
+        let base = c * dims;
+        residuals.push(
+            (0..dims)
+                .map(|j| t.get(j).copied().unwrap_or(0.0) - centroids[base + j])
+                .collect(),
+        );
+    }
+    let subspace_num = if dims % 8 == 0 { 8 } else { 1 };
+    let pq = train_residual_pq(dims, subspace_num, 8, &residuals);
+
     let mut out = Vec::new();
     push_u32(&mut out, EMVB_MAGIC);
     push_u32(&mut out, EMVB_VERSION);
     push_u32(&mut out, start_segment_offset);
     push_u32(&mut out, dims as u32);
-    push_u32(&mut out, 0); // residual_pq_subspace_num
-    push_u32(&mut out, 0); // residual_pq_subspace_bits
+    push_u32(&mut out, pq.subspace_num as u32);
+    push_u32(&mut out, pq.bits);
     push_u32(&mut out, n_centroids as u32);
     push_f32s(&mut out, &centroids);
     push_f32s(&mut out, &norms);
@@ -179,9 +320,24 @@ pub fn encode_emvb(
     for list in &centroids_to_docid {
         push_u32s(&mut out, list);
     }
-    // Empty residual PQ + identity rotation.
-    push_u32(&mut out, 0);
-    push_u32(&mut out, 0);
+    // Residual PQ (`PQ::Save` / `OPQ::Save`): per-subspace centroids, their
+    // -0.5*norm table, the codes, and the OPQ rotation (identity here).
+    let sub_dim = dims.div_ceil(pq.subspace_num);
+    for sub in 0..pq.subspace_num {
+        let k = 1usize << pq.bits.min(8);
+        let base = sub * k * sub_dim;
+        for v in &pq.centroids[base..base + k * sub_dim] {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    for v in &pq.norms {
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    push_u32(&mut out, pq.codes.len() as u32);
+    for code in &pq.codes {
+        out.extend_from_slice(code);
+    }
+    push_u32(&mut out, pq.codes.len() as u32); // next_embedding_id
     for i in 0..dims {
         for j in 0..dims {
             let v = if i == j { 1.0f32 } else { 0.0 };
@@ -309,7 +465,8 @@ mod tests {
         assert_eq!(h.dims, 8);
         assert_eq!(h.n_docs, 40);
         assert_eq!(h.n_embeddings, 120);
-        assert_eq!(h.subspace_num, 0);
+        assert_eq!(h.subspace_num, 8);
+        assert_eq!(h.subspace_bits, 8);
         assert_eq!(h.n_centroids % 8, 0);
         assert!(reader.len() > 16);
     }

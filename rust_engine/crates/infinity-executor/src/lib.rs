@@ -7776,18 +7776,22 @@ impl Engine {
                 // The reference's EMVB chunk (coarse centroids, document
                 // tables and inverted lists) is written beside the raw-token
                 // segment used for exact re-scoring.
+                // Written once per segment: it is an interop artifact, the
+                // query itself scores from `seg_*.mvec`.
                 let emvb_path = path.with_extension("emvb");
-                let emvb_docs: Vec<(u32, Vec<Vec<f32>>)> = docs
-                    .iter()
-                    .zip(ids.iter())
-                    .map(|(tokens, seq)| ((*seq as u64 & 0xffff_ffff) as u32, tokens.clone()))
-                    .collect();
-                let _ = infinity_storage::emvb_segment::write_emvb_segment(
-                    &emvb_path,
-                    dims,
-                    (segment & 0xffff_ffff) as u32,
-                    &emvb_docs,
-                );
+                if !emvb_path.exists() {
+                    let emvb_docs: Vec<(u32, Vec<Vec<f32>>)> = docs
+                        .iter()
+                        .zip(ids.iter())
+                        .map(|(tokens, seq)| ((*seq as u64 & 0xffff_ffff) as u32, tokens.clone()))
+                        .collect();
+                    let _ = infinity_storage::emvb_segment::write_emvb_segment(
+                        &emvb_path,
+                        dims,
+                        (segment & 0xffff_ffff) as u32,
+                        &emvb_docs,
+                    );
+                }
                 let Ok(reader) =
                     infinity_storage::multivector_segment::MultiVectorSegmentReader::open(&path)
                 else {
