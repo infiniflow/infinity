@@ -1570,6 +1570,22 @@ fn parse_value(cell: &str) -> Value {
     }
 }
 
+/// Sorts a posting list by row id and keeps the last frequency for repeated
+/// rows. An UPDATE appends the rewritten row's terms without removing the old
+/// entry (the old one must keep counting toward `df` until compaction), so the
+/// query path has to collapse the duplicate.
+fn dedupe_postings(list: &mut Vec<(u64, u32)>) {
+    list.sort_unstable_by_key(|(row, _)| *row);
+    let mut out: Vec<(u64, u32)> = Vec::with_capacity(list.len());
+    for (row, tf) in list.drain(..) {
+        match out.last_mut() {
+            Some((last, last_tf)) if *last == row => *last_tf = tf,
+            _ => out.push((row, tf)),
+        }
+    }
+    *list = out;
+}
+
 /// In-memory inverted index for one text column: `term -> [(doc, tf, positions)]`
 /// plus each document's length, mirroring the reference memory indexer
 /// (`src/storage/invertedindex/memory_indexer*`).
@@ -1659,10 +1675,9 @@ impl TextIndex {
         let mut postings: std::collections::BTreeMap<String, Vec<(u64, u32)>> =
             std::collections::BTreeMap::new();
         for (term, list) in &self.postings {
-            postings.insert(
-                term.clone(),
-                list.iter().map(|(d, tf, _)| (*d, *tf)).collect(),
-            );
+            let mut hits: Vec<(u64, u32)> = list.iter().map(|(d, tf, _)| (*d, *tf)).collect();
+            dedupe_postings(&mut hits);
+            postings.insert(term.clone(), hits);
         }
         let base_name = format!("ft_{base_row_id:016x}");
         let flags = infinity_storage::inverted_format::TermMetaFlags::default();
@@ -1730,7 +1745,7 @@ impl TextIndex {
                 }
             }
             list.retain(|(d, _)| !self.overridden.contains(d));
-            list.sort_unstable_by_key(|(d, _)| *d);
+            dedupe_postings(&mut list);
             for (d, _) in &list {
                 if let Some(l) = self.docs.get(d) {
                     doc_len.insert(*d, *l);
