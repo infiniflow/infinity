@@ -73,27 +73,20 @@ impl BpReordering {
         let data_n = self.fwd.len();
         let mut permutation: Vec<u32> = (0..data_n as u32).collect();
         let mut ctx = BpReorderContext::new(self.query_n.max(0) as usize, data_n);
-        self.work(0, data_n, 0, &mut permutation, &mut ctx);
+        self.work(0, data_n, &mut permutation, &mut ctx);
         permutation
     }
 
     /// C++: `Work`.
-    fn work(
-        &self,
-        start: usize,
-        end: usize,
-        depth: usize,
-        permutation: &mut [u32],
-        ctx: &mut BpReorderContext,
-    ) {
+    fn work(&self, start: usize, end: usize, permutation: &mut [u32], ctx: &mut BpReorderContext) {
         permutation[start..end].sort_unstable();
         if end - start <= self.terminate_length.max(0) as usize {
             return;
         }
         let mid = (start + end) / 2;
         self.bisection(start, mid, end, ctx, permutation);
-        self.work(start, mid, depth + 1, permutation, ctx);
-        self.work(mid, end, depth + 1, permutation, ctx);
+        self.work(start, mid, permutation, ctx);
+        self.work(mid, end, permutation, ctx);
     }
 
     /// C++: `Bisection`.
@@ -110,8 +103,8 @@ impl BpReordering {
         ctx.term_gains_to_right_valid.fill(false);
         ctx.term_gains_to_left_valid.fill(false);
 
-        for i in start..end {
-            let doc = permutation[i] as usize;
+        for (i, &doc) in permutation.iter().enumerate().take(end).skip(start) {
+            let doc = doc as usize;
             for &term in &self.fwd[doc] {
                 if i < mid {
                     ctx.ldegs[term as usize] += 1;
@@ -172,13 +165,11 @@ impl BpReordering {
     ) {
         let left_log_n = (mid - start).ilog2() as f32;
         let right_log_n = (end - mid).ilog2() as f32;
-        for i in start..end {
+        for (i, &doc) in permutation.iter().enumerate().take(end).skip(start) {
             if i < mid {
-                ctx.gains[i] =
-                    self.compute_gain(permutation[i], left_log_n, right_log_n, true, ctx);
+                ctx.gains[i] = self.compute_gain(doc, left_log_n, right_log_n, true, ctx);
             } else {
-                ctx.gains[i] =
-                    self.compute_gain(permutation[i], right_log_n, left_log_n, false, ctx);
+                ctx.gains[i] = self.compute_gain(doc, right_log_n, left_log_n, false, ctx);
             }
         }
     }
