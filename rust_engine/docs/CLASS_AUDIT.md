@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1029, `mapped` 85, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1022, `mapped` 92, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -336,12 +336,12 @@
 | 327 | `IntegerOption` | `src/main/options.cppm` | grouped | parser/CLI 结构 |
 | 328 | `LogLevelOption` | `src/main/options.cppm` | grouped | parser/CLI 结构 |
 | 329 | `StringOption` | `src/main/options.cppm` | grouped | parser/CLI 结构 |
-| 330 | `BaseProfiler` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
-| 331 | `OptimizerProfiler` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
-| 332 | `ProfileHistory` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
-| 333 | `QueryProfiler` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
-| 334 | `TaskBinding` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
-| 335 | `TaskProfiler` | `src/main/profiler.cppm` | grouped | parser/CLI 结构 |
+| 330 | `BaseProfiler` | `src/main/profiler.cppm` | mapped | `infinity_executor::profiler::BaseProfiler`（Begin/End/Elapsed/ElapsedToString/BeginTime/EndTime） |
+| 331 | `OptimizerProfiler` | `src/main/profiler.cppm` | mapped | `profiler::OptimizerProfiler`（StartRule/StopRule/ToString） |
+| 332 | `ProfileHistory` | `src/main/profiler.cppm` | mapped | `profiler::ProfileHistory`（Resize/Enqueue/GetElement/GetElements） |
+| 333 | `QueryProfiler` | `src/main/profiler.cppm` | mapped | `profiler::QueryProfiler`（StartPhase/StopPhase/Stop/Flush/ToString/QueryPhaseToString/GetTaskProfile） |
+| 334 | `TaskBinding` | `src/main/profiler.cppm` | mapped | `profiler::TaskBinding` |
+| 335 | `TaskProfiler` | `src/main/profiler.cppm` | mapped | `profiler::TaskProfiler`（Begin/End/StartOperator/StopOperator） |
 | 336 | `QueryContext` | `src/main/query_context.cppm` | grouped | parser/CLI 结构 |
 | 337 | `AlterIndexOptions` | `src/main/query_options.cppm` | grouped | parser/CLI 结构 |
 | 338 | `CreateDatabaseOptions` | `src/main/query_options.cppm` | grouped | parser/CLI 结构 |
@@ -360,7 +360,7 @@
 | 351 | `RemoteSession` | `src/main/session.cppm` | grouped | parser/CLI 结构 |
 | 352 | `QueryInfo` | `src/main/session_manager.cppm` | grouped | parser/CLI 结构 |
 | 353 | `SessionManager` | `src/main/session_manager.cppm` | grouped | parser/CLI 结构 |
-| 354 | `VarUtil` | `src/main/variables.cppm` | grouped | parser/CLI 结构 |
+| 354 | `VarUtil` | `src/main/variables.cppm` | mapped | `infinity_executor::variables::{GlobalVariable, SessionVariable}::from_name` |
 | 355 | `SystemInfo` | `src/metrics/system_info.cppm` | grouped | 服务端计数 |
 | 356 | `BufferReader` | `src/network/buffer_reader.cppm` | grouped | 生成的 Thrift 类型 / `infinity-server` |
 | 357 | `BufferWriter` | `src/network/buffer_writer.cppm` | grouped | 生成的 Thrift 类型 / `infinity-server` |

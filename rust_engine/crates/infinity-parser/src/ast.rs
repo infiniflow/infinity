@@ -285,9 +285,18 @@ pub struct SearchClause {
 pub enum ExplainKind {
     #[default]
     Physical,
+    /// `EXPLAIN AST`: the parsed statement tree.
+    Ast,
+    /// `EXPLAIN` / `EXPLAIN UNOPTIMIZED`: the unoptimized logical plan.
+    UnOpt,
+    /// `EXPLAIN OPTIMIZED`: the optimized logical plan.
+    Opt,
+    /// `EXPLAIN LOGICAL`: either logical plan (the port keeps one form).
     Logical,
     /// `EXPLAIN FRAGMENT`: the multi-fragment physical plan.
     Fragment,
+    /// `EXPLAIN PIPELINE`: the execution pipeline.
+    Pipeline,
 }
 
 #[allow(clippy::large_enum_variant)]

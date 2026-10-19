@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 12, `gap` 219, `gate-a` 216, `integration` 294, `partial` 231, `ported` 39.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布：`excluded` 1, `exempt` 13, `gap` 212, `gate-a` 216, `integration` 294, `partial` 231, `ported` 45.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -200,13 +200,13 @@
 | 186 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestConfInvalidValues` | ported | `infinity-cli` `config::tests::invalid_values` |
 | 187 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestOutofRangeValues` | ported | `infinity-cli` `config::tests::out_of_range_values` |
 | 188 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestValidValues` | ported | `infinity-cli` `config::tests::valid_values` |
-| 189 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test1` | gap |
-| 190 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test2` | gap |
-| 191 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test1` | gap |
-| 192 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test2` | gap |
-| 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | gap |
-| 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | gap |
-| 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | gap |
+| 189 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test1` | ported | `infinity-executor` `tests::catalog_lifecycle_matches_the_reference_test` |
+| 190 | `src/unit_test/main/infinity_ut.cpp` | `InfinityTest` | `test2` | ported | `infinity-executor` `tests::show_variable_covers_the_reference_names` + `variables::tests` |
+| 191 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test1` | ported | `infinity-executor` `profiler::tests::query_phase_names_match_the_reference` |
+| 192 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test2` | ported | `profiler::tests::disabled_profiler_ignores_phase_transitions` + `enabled_profiler_enforces_phase_order` |
+| 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
+| 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | exempt | 用例主体在 `#ifdef INFINITY_STATS` 内，构建系统从未定义该宏 → C++ 侧编译为空 |
+| 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `tests::explain_covers_every_plan_kind`（6 种 EXPLAIN） |
 | 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | gap |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | gate-a |
 | 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | gate-a |

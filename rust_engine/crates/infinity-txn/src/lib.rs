@@ -95,6 +95,9 @@ pub struct TxnManager {
     /// Highest commit timestamp whose batch has been fsynced to the KV store;
     /// only records up to this point may be dropped from the log.
     synced: AtomicU64,
+    /// `total_commit_count`: successful commits since open (the reference's
+    /// `NewTxnManager::total_committed_txn_count`).
+    total_committed: AtomicU64,
     /// Last commit timestamp that touched each tombstone key. Conflict checks
     /// compare it with a transaction's `begin_ts` (in-memory, like `NewTxn`'s
     /// conflict sets).
@@ -129,6 +132,7 @@ impl TxnManager {
             max_applied: AtomicU64::new(applied_ts),
             last_appended: AtomicU64::new(max_ts),
             synced: AtomicU64::new(applied_ts),
+            total_committed: AtomicU64::new(0),
             delete_ts: Mutex::new(HashMap::new()),
             delete_lock: Mutex::new(()),
         })
@@ -191,7 +195,24 @@ impl TxnManager {
                 seen.insert(key.clone(), commit_ts);
             }
         }
+        self.total_committed.fetch_add(1, Ordering::Relaxed);
         Ok(commit_ts)
+    }
+
+    /// C++: `NewTxnManager::total_committed_txn_count`.
+    pub fn total_committed_txn_count(&self) -> u64 {
+        self.total_committed.load(Ordering::Relaxed)
+    }
+
+    /// C++: `NewTxnManager::current_transaction_id` — the id the next `begin`
+    /// hands out.
+    pub fn current_transaction_id(&self) -> u64 {
+        self.next_txn_id.load(Ordering::Relaxed)
+    }
+
+    /// C++: `NewTxnManager::CurrentTS` — the timestamp of the last commit.
+    pub fn current_ts(&self) -> TxnTimeStamp {
+        self.next_ts.load(Ordering::Relaxed).saturating_sub(1)
     }
 
     /// Replays the WAL into the KV store for all records after `checkpoint_ts`.
