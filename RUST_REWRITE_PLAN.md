@@ -482,7 +482,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 
 #### 7.5.3 验收缺口（P2）
 
-8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。后续对齐 C++ 的 `[storage] mem_index_capacity`（每批写入后按**行数**把内存段落盘，5.toml=8192 行）、修正 optimize/cleanup（增量 chunk 不再被 cleanup 误删；内存段为空时 checkpoint 不做全表重建；大表跳过内存中的全表 merge），并让 checkpoint 只加载新增 HNSW chunk。复跑时导入阶段 RSS 由 5.9 GB 降到 3.0 GB、整轮峰值 ~8.2 GB；最新一轮跑到 23/50 个 insert 批（14:42，RSS 5–6 GB、批耗时从 36 s 增至 90 s）后被宿主以 SIGTERM 终止（`earlyoom -M 2000000`，日志无 panic；此前几轮分别在 13:13、17:09、18:38 终止），因此正式判定仍需 CI 机复跑。剩余常驻内存是已加载的 HNSW 向量（~4 GB，对应 C++ 的 `buffer_manager_size` 预算）；块文件 + buffer manager 的类层（`BlockIndex`/`BlockMeta`/`ColumnVector`/`DataBlock`）与块权威读路径已实现，全部列类型（FLOAT/JSON/embedding/tensor/array/bit）都从块渲染并与 Gate A 逐字节一致，块镜像按写入时的行 ID 快照 + tombstone/行日志覆盖 delete/update，不再依赖下一次 checkpoint。
+8. **Gate C 重档内存**（`test_multiple_index_types_import`）：统一 memindex 预算 + 行内宽值 sidecar（LZ4）+ 每批 `malloc_trim` + VARCHAR 次级 chunk + IVF 内存段后，5.toml 档在 **6:02 为 10.2 GB（峰值 12.7 GB）**，随后继续增长，**11:48 在 ~19.4 GB 峰值被杀**（30 GB 主机，其他会话常占 ~10 GB）。后续对齐 C++ 的 `[storage] mem_index_capacity`（每批写入后按**行数**把内存段落盘，5.toml=8192 行）、修正 optimize/cleanup（增量 chunk 不再被 cleanup 误删；内存段为空时 checkpoint 不做全表重建；大表跳过内存中的全表 merge），并让 checkpoint 只加载新增 HNSW chunk。复跑时导入阶段 RSS 由 5.9 GB 降到 3.0 GB、整轮峰值 ~8.2 GB。2026-10-19 重跑（`-k 5.toml`，bwrap，release）：**20:30 跑到 21/50 个 insert 批**（批次耗时从 21 s 增至 69 s），引擎 RSS 峰值 **7.8 GB**，系统 `MemAvailable` 降到 ~2 GB 后进程收到 **SIGTERM**（日志只有 `Terminated`，无 panic），随后连接被拒；宿主 `earlyoom -M 2000000` 仍在运行（阈值 2 GB），因此不是引擎内存增长。此前几轮分别在 13:13、17:09、18:38、14:42（23/50）终止。正式判定仍需无 earlyoom 的 CI 机复跑。剩余常驻内存是已加载的 HNSW 向量（~4 GB，对应 C++ 的 `buffer_manager_size` 预算）；块文件 + buffer manager 的类层（`BlockIndex`/`BlockMeta`/`ColumnVector`/`DataBlock`）与块权威读路径已实现，全部列类型（FLOAT/JSON/embedding/tensor/array/bit）都从块渲染并与 Gate A 逐字节一致，块镜像按写入时的行 ID 快照 + tombstone/行日志覆盖 delete/update，不再依赖下一次 checkpoint。
 9. **Gate E 读路径**：同机 A/B 对 C++ 0.7.4 `RelWithDebInfo`：写 68–73%（1.4×），读慢 7–20×（`count(*)` 2.0 ms vs 27.8 ms；`SELECT id,name` 7.7 ms vs 55.5 ms；点查 1.2 ms vs 27.3 ms）。根因是**行存 + 全表扫描**（无列存、无行数统计），与 7.5.3-8 同源。列式投影路径（#87）已落地，但只在镜像新鲜且纯列投影时生效；官方 golden 已由 SDK 驱动生成，Gate E 当前 +5.64%（PASS，§8.6）。
 
 ---
@@ -497,7 +497,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 |---|---|---|
 | **A** | 全部 `test/sql/**/*.slt` 通过 | ✅ 1752 statement ok / 129 statement error / 1546 query（100%） |
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
-| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 常规全绿；重档 3 档未过（§7.5-1） |
+| **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 常规全绿；5.toml 重档在本机被宿主 earlyoom 终止（21/50，无 panic），待 CI 复跑（§7.5-1、§8.4） |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |
 | **E** | 对 C++ golden `<7%` | ✅ +2.87%（最新；此前 +4.00% / +6.71% / +4.59% / +2.93% / +4.75%，insert 抖动时 +22.04%，见 §8.6） |
 | **F** | fmt / clippy `-D warnings` / `cargo deny` | ✅ 全绿（cargo-deny 0.20.2，schema v2） |
@@ -518,7 +518,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 ### 8.4 Gate C — 持久化与恢复
 
 - 常规用例全绿：`test_basic` 1、`test_drop` 1、`test_alter` 6、`test_cleanup` 10、`test_compact` 3、`test_snapshot` 7、`test_system_snapshot_restart` 3、`test_memidx` 10、`test_fulltext` 6（需 `enwiki-10w.csv`）、`test_insert` 11。
-- 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档重测（2026-10-19）：25 轮导入（250k 行）+ 30 个 5000 行批次期间**引擎峰值 RSS 1.5–2.1 GB**（原 19.4 GB）。batch 31 服务端无 panic、无 SIGKILL，收到 **SIGTERM**；同机运行 `earlyoom -M 2000000,1000000`，采样到系统 `MemAvailable` 最低 **1.96 GB**（低于其 2 GB 阈值），因此是宿主看门狗杀掉了最大进程，而非引擎内存增长。CI 无 earlyoom；引擎侧目标（内存不随导入增长）已满足。
+- 长跑导入档：`test_multiple_index_types_import` 2/5 通过。5.toml 档在 2026-10-19 20:30 的本机重跑（`-k 5.toml`，bwrap，release）：**21/50 个 insert 批**后服务端收到 **SIGTERM**（日志 `Terminated`，无 panic、无 SIGKILL、连接随后被拒），引擎 RSS 峰值 **7.8 GB**，同机 `earlyoom -M 2000000,1000000` 仍在运行，采样到 `MemAvailable` 降至 ~2 GB；批耗时从 21 s 增至 69 s。更早一轮在 `MemAvailable` 最低 **1.96 GB** 时也在 batch 31 被杀，因此是宿主看门狗杀掉了最大进程，而非引擎 panic。CI 无 earlyoom；引擎侧目标（内存不随导入无限增长）已满足，但 5.toml 的完整 50 批判定必须在 CI 机复跑。
 - 内存/写入修复：⓪`Insert` 的向量/张量/稀疏值走数值 `Literal::Vector`，不再把每个 float 先格式化成字符串再经 SQL 解析（5000 行批次 21–26 s → 19 s，峰值 ~2 GB 不变，索引状态占主导）；①HNSW 检查点不再重建全表图，而是序列化**内存段**（`HnswIndexInMem`），成本从 O(表) 降为 O(上次检查点后的行)；②`flush()` 每个检查点无条件 dump 所有 HNSW 内存段并清空，新增插入重新建立段；③索引尾部的 dump 先于块镜像执行，镜像失败不再阻塞内存回收。
 - 对象存储（MinIO HTTP/HTTPS）：删本地 `data/` 后重启可逐字节还原。
 
