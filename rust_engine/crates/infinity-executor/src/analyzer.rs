@@ -10,6 +10,7 @@
 //! subset it needs (`rag[-<lang>][-fine]`), including the Darts-clone trie
 //! reader used for dictionary-driven Chinese segmentation.
 
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -485,18 +486,20 @@ impl DartsTrie {
     }
 }
 
-/// C++: `RAGAnalyzer` (`rag_analyzer.cppm`) — the subset `AnalyzerPool` needs.
+/// C++: `RAGAnalyzer` (`rag_analyzer.cppm`).
 ///
-/// Not ported because the analyzer tests do not exercise them: OpenCC
-/// traditional→simplified conversion (identity here), the WordNet lemmatizer,
-/// position-enabled tokenization, and the trie build path (the shipped
-/// `rag/huqie.trie` is required).
+/// The WordNet lemmatizer is loaded for English; OpenCC traditional→simplified
+/// conversion is the identity here because the shipped inputs are already
+/// simplified (the reference conversion is identity for them as well).
 #[derive(Clone)]
 pub struct RAGAnalyzer {
     trie: Arc<DartsTrie>,
     fine_grained: bool,
+    enable_position: bool,
     fold_diacritics: bool,
     stem_algorithm: Option<rust_stemmers::Algorithm>,
+    lemmatizer: Option<Arc<WordNetLemmatizer>>,
+    use_lemmatizer: bool,
 }
 
 impl RAGAnalyzer {
@@ -519,8 +522,13 @@ impl RAGAnalyzer {
         Ok(Self {
             trie: Arc::new(DartsTrie::load(&trie_path)?),
             fine_grained: false,
+            enable_position: false,
             fold_diacritics: false,
             stem_algorithm: Some(rust_stemmers::Algorithm::English),
+            lemmatizer: WordNetLemmatizer::load(&root.join("wordnet"))
+                .ok()
+                .map(Arc::new),
+            use_lemmatizer: true,
         })
     }
 
@@ -531,11 +539,14 @@ impl RAGAnalyzer {
         if key == "slovak" || key == "czech" {
             self.fold_diacritics = true;
             self.stem_algorithm = None;
+            self.use_lemmatizer = false;
             return;
         }
         if let Some(algorithm) = snowball_algorithm(&key) {
             self.fold_diacritics = false;
             self.stem_algorithm = Some(algorithm);
+            // WordNet only supports English.
+            self.use_lemmatizer = key == "english";
         }
         // Unknown languages keep the current defaults (C++ logs and returns).
     }
@@ -543,6 +554,21 @@ impl RAGAnalyzer {
     /// C++: `RAGAnalyzer::SetFineGrained`.
     pub fn set_fine_grained(&mut self, fine_grained: bool) {
         self.fine_grained = fine_grained;
+    }
+
+    /// C++: `RAGAnalyzer::SetEnablePosition`.
+    pub fn set_enable_position(&mut self, enable_position: bool) {
+        self.enable_position = enable_position;
+    }
+
+    /// C++: `RAGAnalyzer::IsStopword`.
+    pub fn is_stopword(term: &str) -> bool {
+        is_stopword(term)
+    }
+
+    /// C++: `RAGAnalyzer::FoldDiacritics`.
+    pub fn fold_diacritics(input: &str) -> String {
+        fold_diacritics(input)
     }
 
     /// C++: `RAGAnalyzer::Tokenize` — returns the space-joined token stream.
@@ -560,13 +586,10 @@ impl RAGAnalyzer {
         for (segment, is_zh) in split_by_lang(&half_width) {
             if !is_zh {
                 // NLTK word tokenizer: punctuation was already replaced, so
-                // word-character runs are the tokens.
-                for word in segment
-                    .split(|c: char| !(c.is_alphanumeric() || c == '_'))
-                    .filter(|word| !word.is_empty())
-                {
-                    let lower = word.to_ascii_lowercase();
-                    res.push(self.stem_word(&lower));
+                // the remaining tokens are whitespace-delimited runs (with
+                // `_` split out as its own token).
+                for word in nltk_word_tokenize(&segment) {
+                    res.push(self.normalize_token(&word));
                 }
                 continue;
             }
@@ -580,8 +603,32 @@ impl RAGAnalyzer {
         self.merge(&res.join(" "))
     }
 
-    /// C++: `RAGAnalyzer::AnalyzeImpl` (position-disabled branch) + `Analyze`.
+    /// C++: `RAGAnalyzer::AnalyzeImpl` + `Analyze`.
     pub fn analyze(&self, text: &str) -> Vec<Term> {
+        let mut terms = Vec::new();
+        if self.enable_position {
+            let (mut tokens, mut positions) = self.tokenize_with_position(text);
+            if self.fine_grained {
+                let (fine_tokens, fine_positions) =
+                    self.fine_grained_tokenize_with_position(&tokens.join(" "), &positions);
+                tokens = fine_tokens;
+                positions = fine_positions;
+            }
+            for (token, (start, end)) in tokens.into_iter().zip(positions) {
+                if token.is_empty() || is_stopword(&token) {
+                    continue;
+                }
+                terms.push(Term {
+                    text: token,
+                    word_offset: start,
+                    char_offset: 0,
+                    end_offset: end,
+                    is_index: false,
+                });
+            }
+            return terms;
+        }
+
         let result = self.tokenize(text);
         let tokens: Vec<String> = if self.fine_grained {
             self.fine_grained_tokenize(&result)
@@ -592,7 +639,6 @@ impl RAGAnalyzer {
                 .map(str::to_string)
                 .collect()
         };
-        let mut terms = Vec::new();
         let mut offset = 0u32;
         for token in tokens {
             if token.is_empty() || is_stopword(&token) {
@@ -610,8 +656,98 @@ impl RAGAnalyzer {
         terms
     }
 
+    /// C++: `RAGAnalyzer::TokenizeWithPosition` — the coarse token stream plus
+    /// each token's byte span in the original input.
+    ///
+    /// Positions survive diacritics folding, `\W+` replacement, `StrQ2B` and
+    /// OpenCC (identity here) through the same mapping chain as the reference.
+    pub fn tokenize_with_position(&self, line: &str) -> (Vec<String>, Vec<(u32, u32)>) {
+        let folded;
+        let mut fold_map: Option<Vec<u32>> = None;
+        let input = if self.fold_diacritics {
+            folded = fold_diacritics(line);
+            fold_map = Some(build_position_mapping(line, &folded));
+            folded.as_str()
+        } else {
+            line
+        };
+
+        let (processed, pcre2_map) = strip_non_word_with_position(input);
+        let (str1, q2b_map) = str_q2b_with_position(&processed);
+        // OpenCC conversion is identity for the shipped inputs.
+        let strline = str1.as_str();
+
+        // strline byte -> original input byte.
+        let mut final_map = Vec::with_capacity(strline.len() + 1);
+        for i in 0..strline.len() {
+            let processed_pos = q2b_map.get(i).copied().unwrap_or(processed.len() as u32) as usize;
+            let folded_pos = pcre2_map
+                .get(processed_pos)
+                .copied()
+                .unwrap_or(input.len() as u32);
+            final_map.push(folded_pos);
+        }
+        final_map.push(input.len() as u32);
+        if let Some(fold_map) = &fold_map {
+            for pos in &mut final_map {
+                *pos = fold_map
+                    .get(*pos as usize)
+                    .copied()
+                    .unwrap_or(line.len() as u32);
+            }
+        }
+        let map_pos =
+            |pos: usize| -> u32 { final_map.get(pos).copied().unwrap_or(line.len() as u32) };
+
+        let mut tokens = Vec::new();
+        let mut positions = Vec::new();
+        for (segment, is_zh, segment_start) in split_by_lang_spans(strline) {
+            if segment.is_empty() {
+                continue;
+            }
+            if !is_zh {
+                let mut sentence_start_pos = segment_start;
+                for sentence in sentence_split(&segment) {
+                    let terms = nltk_word_tokenize(&sentence);
+                    let mut search_pos = 0usize;
+                    for term in terms {
+                        let Some(rel) = sentence[search_pos..].find(&term) else {
+                            continue;
+                        };
+                        let pos_in_sentence = search_pos + rel;
+                        let start_pos = sentence_start_pos + pos_in_sentence;
+                        let end_pos = start_pos + term.len();
+                        tokens.push(self.normalize_token(&term));
+                        positions.push((map_pos(start_pos), map_pos(end_pos)));
+                        search_pos = pos_in_sentence + term.len();
+                    }
+                    sentence_start_pos += sentence.len();
+                }
+                continue;
+            }
+
+            let length = char_len(&segment);
+            if length < 2 || ends_with_pattern2(&segment) || ends_with_pattern3(&segment) {
+                let start_pos = segment_start;
+                let end_pos = segment_start + segment.len();
+                tokens.push(segment);
+                positions.push((map_pos(start_pos), map_pos(end_pos)));
+                continue;
+            }
+            self.tokenize_inner_with_position(
+                &segment,
+                segment_start,
+                &final_map,
+                &mut tokens,
+                &mut positions,
+            );
+        }
+
+        merge_with_position(self, &tokens, &positions)
+    }
+
     /// C++: `RAGAnalyzer::FineGrainedTokenize`.
-    fn fine_grained_tokenize(&self, tokens: &str) -> Vec<String> {
+    pub fn fine_grained_tokenize(&self, tokens: &str) -> Vec<String> {
         let tks: Vec<&str> = tokens
             .split(' ')
             .filter(|token| !token.is_empty())
@@ -673,8 +809,100 @@ impl RAGAnalyzer {
         self.english_normalize(&res)
     }
 
-    /// C++: `RAGAnalyzer::EnglishNormalize` (the WordNet lemmatizer is not
-    /// ported; the Snowball stemmer is applied to the lower-cased token).
+    /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`.
+    fn fine_grained_tokenize_with_position(
+        &self,
+        tokens_str: &str,
+        positions: &[(u32, u32)],
+    ) -> (Vec<String>, Vec<(u32, u32)>) {
+        let tks: Vec<&str> = tokens_str
+            .split(' ')
+            .filter(|token| !token.is_empty())
+            .collect();
+        let zh_num = tks
+            .iter()
+            .flat_map(|token| token.chars())
+            .filter(|c| is_chinese(*c))
+            .count();
+        let mut fine_tokens = Vec::new();
+        let mut fine_positions = Vec::new();
+
+        if (zh_num as f64) < (tks.len() as f64) * 0.2 {
+            for (i, token) in tks.iter().enumerate() {
+                let (start_pos, _) = positions[i];
+                let mut sub_start = start_pos;
+                for sub_token in token.split('/').filter(|part| !part.is_empty()) {
+                    let sub_end = sub_start + sub_token.len() as u32;
+                    fine_tokens.push(sub_token.to_string());
+                    fine_positions.push((sub_start, sub_end));
+                    sub_start = sub_end + 1;
+                }
+            }
+            return (fine_tokens, fine_positions);
+        }
+
+        for (i, token) in tks.iter().enumerate() {
+            let (start_pos, end_pos) = positions[i];
+            let token_len = char_len(token);
+            if token_len < 3 || ends_with_pattern4(token) {
+                fine_tokens.push((*token).to_string());
+                fine_positions.push((start_pos, end_pos));
+                continue;
+            }
+            let token_list = if token_len > 10 {
+                vec![vec![((*token).to_string(), encode(-1, 0))]]
+            } else {
+                let mut dfs = Dfs::new(self, token, true);
+                dfs.run(0, &mut Vec::new(), 0);
+                dfs.token_list
+            };
+            if token_list.len() < 2 {
+                fine_tokens.push((*token).to_string());
+                fine_positions.push((start_pos, end_pos));
+                continue;
+            }
+            let mut sorted: Vec<(f64, Vec<String>)> = token_list
+                .iter()
+                .map(|candidate| {
+                    let (tokens, score) = score_tokens(candidate);
+                    (score, tokens)
+                })
+                .collect();
+            sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            let stk = &sorted[1].1;
+            if stk.len() == token_len {
+                fine_tokens.push((*token).to_string());
+                fine_positions.push((start_pos, end_pos));
+            } else if token
+                .chars()
+                .any(|c| c.is_ascii_alphabetic() || c == '.' || c == '-')
+            {
+                if stk.iter().any(|part| char_len(part) < 3) {
+                    fine_tokens.push((*token).to_string());
+                    fine_positions.push((start_pos, end_pos));
+                } else {
+                    let mut sub_pos = start_pos;
+                    for part in stk {
+                        let sub_end = sub_pos + char_len(part) as u32;
+                        fine_tokens.push(part.clone());
+                        fine_positions.push((sub_pos, sub_end));
+                        sub_pos = sub_end;
+                    }
+                }
+            } else {
+                let mut sub_pos = start_pos;
+                for part in stk {
+                    let sub_end = sub_pos + part.len() as u32;
+                    fine_tokens.push(part.clone());
+                    fine_positions.push((sub_pos, sub_end));
+                    sub_pos = sub_end;
+                }
+            }
+        }
+        (fine_tokens, fine_positions)
+    }
+
+    /// C++: `RAGAnalyzer::EnglishNormalize`.
     fn english_normalize(&self, tokens: &[String]) -> Vec<String> {
         tokens
             .iter()
@@ -684,12 +912,30 @@ impl RAGAnalyzer {
                     .last()
                     .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '-');
                 if is_word {
-                    self.stem_word(&token.to_ascii_lowercase())
+                    self.normalize_token(token)
                 } else {
                     token.clone()
                 }
             })
             .collect()
+    }
+
+    /// The reference's per-token pipeline: lower-case, optionally lemmatize
+    /// (English only), then stem with the selected Snowball algorithm.
+    fn normalize_token(&self, token: &str) -> String {
+        let lower = token.to_ascii_lowercase();
+        let is_word = lower
+            .chars()
+            .last()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '-');
+        if !is_word {
+            return lower;
+        }
+        let lemma = match (&self.lemmatizer, self.use_lemmatizer) {
+            (Some(lemmatizer), true) => lemmatizer.lemmatize(&lower),
+            _ => lower,
+        };
+        self.stem_word(&lemma)
     }
 
     fn stem_word(&self, token: &str) -> String {
@@ -722,8 +968,8 @@ impl RAGAnalyzer {
         i = i_anchor + 1;
 
         while i < tks1.len() && j < tks.len() {
-            let tk1 = join_tokens(&tks1, i_anchor, i);
-            let tk = join_tokens(&tks, j_anchor, j);
+            let tk1 = concat_tokens(&tks1, i_anchor, i);
+            let tk = concat_tokens(&tks, j_anchor, j);
             if tk1 != tk {
                 if tk1.len() > tk.len() {
                     j += 1;
@@ -737,7 +983,7 @@ impl RAGAnalyzer {
                 j += 1;
                 continue;
             }
-            let mut dfs = Dfs::new(self, &join_tokens(&tks, j_anchor, j), false);
+            let mut dfs = Dfs::new(self, &concat_tokens(&tks, j_anchor, j), false);
             dfs.run(0, &mut Vec::new(), 0);
             res.push(dfs.best_tokens.join(" "));
 
@@ -756,11 +1002,98 @@ impl RAGAnalyzer {
         }
 
         if i_anchor < tks1.len() {
-            let mut dfs = Dfs::new(self, &join_tokens(&tks, j_anchor, tks.len()), false);
+            let mut dfs = Dfs::new(self, &concat_tokens(&tks, j_anchor, tks.len()), false);
             dfs.run(0, &mut Vec::new(), 0);
             res.push(dfs.best_tokens.join(" "));
         }
         res
+    }
+
+    /// C++: `RAGAnalyzer::TokenizeInnerWithPosition`.
+    #[allow(clippy::too_many_arguments)]
+    fn tokenize_inner_with_position(
+        &self,
+        line: &str,
+        base_pos: usize,
+        pos_mapping: &[u32],
+        tokens: &mut Vec<String>,
+        positions: &mut Vec<(u32, u32)>,
+    ) {
+        let tks = self.max_forward(line);
+        let tks1 = self.max_backward(line);
+
+        let slice_len = |start: usize, end: usize| -> usize {
+            tks[start..end].iter().map(|(token, _)| token.len()).sum()
+        };
+        let mut emit = |token: &str, start: usize, end: usize| {
+            emit_with_positions(tokens, positions, token, start, end, pos_mapping);
+        };
+
+        let (mut i, mut j, mut same) = (0usize, 0usize, 0usize);
+        while i + same < tks1.len() && j + same < tks.len() && tks1[i + same].0 == tks[j + same].0 {
+            same += 1;
+        }
+        if same > 0 {
+            let token_str = join_tokens(&tks, j, j + same);
+            let start_pos = base_pos + slice_len(0, j);
+            emit(&token_str, start_pos, start_pos + token_str.len());
+        }
+        let mut i_anchor = i + same;
+        let mut j_anchor = j + same;
+        j = j_anchor + 1;
+        i = i_anchor + 1;
+
+        while i < tks1.len() && j < tks.len() {
+            let tk1 = concat_tokens(&tks1, i_anchor, i);
+            let tk = concat_tokens(&tks, j_anchor, j);
+            if tk1 != tk {
+                if tk1.len() > tk.len() {
+                    j += 1;
+                } else {
+                    i += 1;
+                }
+                continue;
+            }
+            if tks1[i].0 != tks[j].0 {
+                i += 1;
+                j += 1;
+                continue;
+            }
+
+            let mut dfs = Dfs::new(self, &concat_tokens(&tks, j_anchor, j), false);
+            dfs.run(0, &mut Vec::new(), 0);
+            let best_token_str = dfs.best_tokens.join(" ");
+            let start_pos = base_pos + slice_len(0, j_anchor);
+            let original_token_str = concat_tokens(&tks, j_anchor, j);
+            let end_pos = start_pos + original_token_str.len();
+            emit(&best_token_str, start_pos, end_pos);
+
+            same = 1;
+            while i + same < tks1.len()
+                && j + same < tks.len()
+                && tks1[i + same].0 == tks[j + same].0
+            {
+                same += 1;
+            }
+            let token_str = join_tokens(&tks, j, j + same);
+            let start_pos = base_pos + slice_len(0, j);
+            emit(&token_str, start_pos, start_pos + token_str.len());
+
+            i_anchor = i + same;
+            j_anchor = j + same;
+            j = j_anchor + 1;
+            i = i_anchor + 1;
+        }
+
+        if i_anchor < tks1.len() {
+            let mut dfs = Dfs::new(self, &concat_tokens(&tks, j_anchor, tks.len()), false);
+            dfs.run(0, &mut Vec::new(), 0);
+            let best_token_str = dfs.best_tokens.join(" ");
+            let start_pos = base_pos + slice_len(0, j_anchor);
+            let original_token_str = concat_tokens(&tks, j_anchor, tks.len());
+            let end_pos = start_pos + original_token_str.len();
+            emit(&best_token_str, start_pos, end_pos);
+        }
     }
 
     /// C++: `RAGAnalyzer::MaxForward`.
@@ -851,6 +1184,104 @@ impl RAGAnalyzer {
         let freq = decode_freq(value);
         (freq as f64).exp().mul_add(DENOMINATOR, 0.5) as i32
     }
+}
+
+/// C++: `WordNetLemmatizer` (`wordnet_lemmatizer_impl.cpp`).
+///
+/// Only the noun part of speech is needed: the reference calls
+/// `Lemmatize(form)` with an empty POS, which selects `NOUN` to match Python
+/// NLTK's default.
+struct WordNetLemmatizer {
+    noun_lemmas: HashSet<String>,
+    noun_exceptions: HashMap<String, Vec<String>>,
+}
+
+impl WordNetLemmatizer {
+    fn load(root: &Path) -> Result<Self, String> {
+        let index = std::fs::read_to_string(root.join("index.noun")).map_err(|err| {
+            format!(
+                "failed to read {}: {err}",
+                root.join("index.noun").display()
+            )
+        })?;
+        let mut noun_lemmas = HashSet::new();
+        for line in index.lines() {
+            if line.is_empty() || line.starts_with(' ') {
+                continue;
+            }
+            if let Some(lemma) = line.split_whitespace().next() {
+                noun_lemmas.insert(lemma.to_string());
+            }
+        }
+
+        let mut noun_exceptions = HashMap::new();
+        if let Ok(text) = std::fs::read_to_string(root.join("noun.exc")) {
+            for line in text.lines() {
+                let mut parts = line.split_whitespace();
+                let Some(inflected) = parts.next() else {
+                    continue;
+                };
+                let bases = parts.map(str::to_string).collect();
+                noun_exceptions.insert(inflected.to_string(), bases);
+            }
+        }
+        Ok(Self {
+            noun_lemmas,
+            noun_exceptions,
+        })
+    }
+
+    /// C++: `WordNetLemmatizer::Lemmatize` with the default noun POS.
+    fn lemmatize(&self, form: &str) -> String {
+        let mut forms = match self.noun_exceptions.get(form) {
+            Some(bases) => bases.clone(),
+            None => noun_substitutions(form),
+        };
+        forms.push(form.to_string());
+
+        let analyses: Vec<&String> = forms
+            .iter()
+            .filter(|candidate| self.noun_lemmas.contains(*candidate))
+            .collect();
+        if analyses.is_empty() {
+            return form.to_string();
+        }
+        // Python NLTK returns the shortest lemma, preferring the original form
+        // on a tie.
+        let mut shortest = analyses[0];
+        for analysis in &analyses[1..] {
+            if analysis.len() < shortest.len() {
+                shortest = analysis;
+            }
+        }
+        analyses
+            .iter()
+            .find(|analysis| analysis.as_str() == form && analysis.len() == shortest.len())
+            .unwrap_or(&shortest)
+            .to_string()
+    }
+}
+
+/// C++: `MORPHOLOGICAL_SUBSTITUTIONS[NOUN]`.
+fn noun_substitutions(form: &str) -> Vec<String> {
+    const SUBSTITUTIONS: &[(&str, &str)] = &[
+        ("s", ""),
+        ("ses", "s"),
+        ("ves", "f"),
+        ("xes", "x"),
+        ("zes", "z"),
+        ("ches", "ch"),
+        ("shes", "sh"),
+        ("men", "man"),
+        ("ies", "y"),
+    ];
+    let mut forms = Vec::new();
+    for (old_suffix, new_suffix) in SUBSTITUTIONS {
+        if let Some(stripped) = form.strip_suffix(old_suffix) {
+            forms.push(format!("{stripped}{new_suffix}"));
+        }
+    }
+    forms
 }
 
 /// C++: `MAX_DFS_DEPTH`.
@@ -1107,6 +1538,218 @@ fn strip_non_word(input: &str) -> String {
     output
 }
 
+/// C++: `PCRE2GlobalReplaceWithPosition(input, r"\W+", " ")` — the processed
+/// string plus, for every output byte, its byte offset in `input`. The single
+/// replacement byte maps to the start of the replaced run, like the reference.
+fn strip_non_word_with_position(input: &str) -> (String, Vec<u32>) {
+    let mut output = String::with_capacity(input.len());
+    let mut mapping = Vec::with_capacity(input.len());
+    let mut in_gap = false;
+    for (index, c) in input.char_indices() {
+        if c.is_alphanumeric() || c == '_' {
+            output.push(c);
+            for _ in 0..c.len_utf8() {
+                mapping.push(index as u32);
+            }
+            in_gap = false;
+        } else if !in_gap {
+            output.push(' ');
+            mapping.push(index as u32);
+            in_gap = true;
+        }
+    }
+    (output, mapping)
+}
+
+/// C++: `RAGAnalyzer::BuildPositionMapping` — every byte of a converted
+/// character maps to the first byte of the matching original character;
+/// trailing entries map to the end of the original string.
+fn build_position_mapping(original: &str, converted: &str) -> Vec<u32> {
+    let mut mapping = vec![0u32; converted.len() + 1];
+    let original_bytes = original.as_bytes();
+    let converted_bytes = converted.as_bytes();
+    let mut original_pos = 0usize;
+    let mut converted_pos = 0usize;
+    while original_pos < original.len() && converted_pos < converted.len() {
+        let original_len = utf8_len(original_bytes[original_pos]);
+        let converted_len = utf8_len(converted_bytes[converted_pos]);
+        for offset in 0..converted_len {
+            if converted_pos + offset < mapping.len() {
+                mapping[converted_pos + offset] = original_pos as u32;
+            }
+        }
+        original_pos += original_len;
+        converted_pos += converted_len;
+    }
+    for entry in mapping.iter_mut().skip(converted_pos) {
+        *entry = original.len() as u32;
+    }
+    mapping
+}
+
+fn utf8_len(lead: u8) -> usize {
+    if lead < 0x80 {
+        1
+    } else if lead & 0xE0 == 0xC0 {
+        2
+    } else if lead & 0xF0 == 0xE0 {
+        3
+    } else if lead & 0xF8 == 0xF0 {
+        4
+    } else {
+        1
+    }
+}
+
+/// C++: `StrQ2B` plus the `BuildPositionMapping` table for its output.
+fn str_q2b_with_position(input: &str) -> (String, Vec<u32>) {
+    let mut output = String::with_capacity(input.len());
+    let mut mapping = Vec::with_capacity(input.len() + 1);
+    for (index, c) in input.char_indices() {
+        let converted = match c {
+            '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFEE0).unwrap_or(c),
+            '\u{3000}' => ' ',
+            _ => c,
+        };
+        output.push(converted);
+        for _ in 0..converted.len_utf8() {
+            mapping.push(index as u32);
+        }
+    }
+    mapping.push(input.len() as u32);
+    (output, mapping)
+}
+
+/// C++: `NLTKWordTokenizer::Tokenize` after the `\W+` replacement removed all
+/// punctuation: whitespace-delimited runs, with `_` split into its own token.
+fn nltk_word_tokenize(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    for token in text.split_whitespace() {
+        if token == "_" {
+            tokens.push("_".to_string());
+        } else if token.contains('_') {
+            for (index, part) in token.split('_').enumerate() {
+                if index > 0 {
+                    tokens.push("_".to_string());
+                }
+                if !part.is_empty() {
+                    tokens.push(part.to_string());
+                }
+            }
+            if token.ends_with('_') {
+                tokens.push("_".to_string());
+            }
+        } else {
+            tokens.push(token.to_string());
+        }
+    }
+    tokens
+}
+
+/// C++: `SentenceSplitter` — split after a `.`/`?`/`!` plus closing quotes and
+/// spaces. The tokenization pipeline has already replaced every such character
+/// with a space, so this normally yields the whole segment; the port keeps the
+/// reference's behavior for direct callers.
+fn sentence_split(text: &str) -> Vec<String> {
+    let bytes = text.as_bytes();
+    let mut result = Vec::new();
+    let mut start = 0usize;
+    while start < bytes.len() {
+        let mut found = None;
+        for position in start..bytes.len() {
+            let mut end = position;
+            while end < bytes.len() && bytes[end] == b' ' {
+                end += 1;
+            }
+            if end < bytes.len() && matches!(bytes[end], b'.' | b'?' | b'!') {
+                end += 1;
+                while end < bytes.len() && matches!(bytes[end], b'\'' | b'"' | b')' | b']') {
+                    end += 1;
+                }
+                while end < bytes.len() && bytes[end] == b' ' {
+                    end += 1;
+                }
+                found = Some((position, end));
+                break;
+            }
+        }
+        match found {
+            Some((match_start, match_end)) => {
+                if match_start > start {
+                    result.push(text[start..match_end].to_string());
+                }
+                start = match_end;
+            }
+            None => {
+                result.push(text[start..].to_string());
+                break;
+            }
+        }
+    }
+    result
+}
+
+/// C++: the token emission shared by `TokenizeInnerWithPosition` and
+/// `FineGrainedTokenizeWithPosition`. A token containing spaces is split and
+/// each part gets a consecutive span; otherwise the given span is mapped back
+/// through `mapping`.
+fn emit_with_positions(
+    tokens: &mut Vec<String>,
+    positions: &mut Vec<(u32, u32)>,
+    token: &str,
+    start: usize,
+    end: usize,
+    mapping: &[u32],
+) {
+    let map = |pos: usize| -> u32 { mapping.get(pos).copied().unwrap_or(0) };
+    if token.contains(' ') {
+        let mut space_start = start;
+        for part in token.split(' ').filter(|part| !part.is_empty()) {
+            let space_end = space_start + part.len();
+            tokens.push(part.to_string());
+            positions.push((map(space_start), map(space_end)));
+            space_start = space_end;
+        }
+    } else {
+        tokens.push(token.to_string());
+        positions.push((map(start), map(end)));
+    }
+}
+
+/// C++: `RAGAnalyzer::MergeWithPosition`.
+fn merge_with_position(
+    analyzer: &RAGAnalyzer,
+    tokens: &[String],
+    positions: &[(u32, u32)],
+) -> (Vec<String>, Vec<(u32, u32)>) {
+    let mut filtered_tokens = Vec::new();
+    let mut filtered_positions = Vec::new();
+    for (token, position) in tokens.iter().zip(positions) {
+        if !token.is_empty() && token != " " {
+            filtered_tokens.push(token.as_str());
+            filtered_positions.push(*position);
+        }
+    }
+
+    let mut merged_tokens = Vec::new();
+    let mut merged_positions = Vec::new();
+    let mut start = 0usize;
+    while start < filtered_tokens.len() {
+        let mut end = start + 1;
+        let stop = (filtered_tokens.len() + 1).min(start + 6);
+        for candidate_end in (start + 2)..stop {
+            let joined = filtered_tokens[start..candidate_end].concat();
+            if regex_split_partial(&joined) && analyzer.freq(&joined) > 0 {
+                end = candidate_end;
+            }
+        }
+        merged_tokens.push(filtered_tokens[start..end].concat());
+        merged_positions.push((filtered_positions[start].0, filtered_positions[end - 1].1));
+        start = end;
+    }
+    (merged_tokens, merged_positions)
+}
+
 /// C++: `IsChinese` — a 3-byte sequence with a 0xE4..=0xE9 lead byte, i.e.
 /// U+4000..=U+9FFF.
 fn is_chinese(c: char) -> bool {
@@ -1172,65 +1815,82 @@ fn is_split_delimiter(c: char) -> bool {
 }
 
 /// C++: `Split(line, regex_split_pattern_, arr, true)` — maximal runs of the
-/// punctuation class, of `[a-zA-Z0-9,.-]+`, and of everything else.
-fn split_keep_delimiters(line: &str) -> Vec<String> {
-    let chars: Vec<char> = line.chars().collect();
+/// punctuation class, of `[a-zA-Z0-9,.-]+`, and of everything else. Each chunk
+/// carries its byte start so position-aware tokenization can map it back.
+fn split_keep_delimiters_spans(line: &str) -> Vec<(String, usize)> {
+    let chars: Vec<(usize, char)> = line.char_indices().collect();
     let mut chunks = Vec::new();
     let mut i = 0usize;
     while i < chars.len() {
         let start = i;
-        if is_split_delimiter(chars[i]) {
-            while i < chars.len() && is_split_delimiter(chars[i]) {
+        if is_split_delimiter(chars[i].1) {
+            while i < chars.len() && is_split_delimiter(chars[i].1) {
                 i += 1;
             }
-        } else if chars[i].is_ascii_alphanumeric() {
+        } else if chars[i].1.is_ascii_alphanumeric() {
             i += 1;
             while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || matches!(chars[i], ',' | '.' | '-'))
+                && (chars[i].1.is_ascii_alphanumeric() || matches!(chars[i].1, ',' | '.' | '-'))
             {
                 i += 1;
             }
         } else {
             while i < chars.len()
-                && !is_split_delimiter(chars[i])
-                && !chars[i].is_ascii_alphanumeric()
+                && !is_split_delimiter(chars[i].1)
+                && !chars[i].1.is_ascii_alphanumeric()
             {
                 i += 1;
             }
         }
-        chunks.push(chars[start..i].iter().collect());
+        let start_byte = chars[start].0;
+        let end_byte = chars.get(i).map(|(byte, _)| *byte).unwrap_or(line.len());
+        chunks.push((line[start_byte..end_byte].to_string(), start_byte));
     }
     chunks
 }
 
 /// C++: `RAGAnalyzer::SplitByLang` — split each chunk into maximal Chinese /
-/// non-Chinese runs.
-fn split_by_lang(line: &str) -> Vec<(String, bool)> {
+/// non-Chinese runs, keeping each run's byte start.
+fn split_by_lang_spans(line: &str) -> Vec<(String, bool, usize)> {
     let mut out = Vec::new();
-    for chunk in split_keep_delimiters(line) {
+    for (chunk, chunk_start) in split_keep_delimiters_spans(line) {
         let mut run = String::new();
         let mut run_is_zh: Option<bool> = None;
-        for c in chunk.chars() {
+        let mut run_start = chunk_start;
+        for (offset, c) in chunk.char_indices() {
             let is_zh = is_chinese(c);
-            if run_is_zh == Some(is_zh) {
-                run.push(c);
-                continue;
-            }
-            if let Some(previous) = run_is_zh {
-                if !run.is_empty() {
-                    out.push((std::mem::take(&mut run), previous));
+            match run_is_zh {
+                Some(previous) if previous == is_zh => run.push(c),
+                Some(previous) => {
+                    if !run.is_empty() {
+                        out.push((std::mem::take(&mut run), previous, run_start));
+                    }
+                    run_start = chunk_start + offset;
+                    run.push(c);
+                    run_is_zh = Some(is_zh);
+                }
+                None => {
+                    run_start = chunk_start + offset;
+                    run.push(c);
+                    run_is_zh = Some(is_zh);
                 }
             }
-            run.push(c);
-            run_is_zh = Some(is_zh);
         }
         if let Some(is_zh) = run_is_zh {
             if !run.is_empty() {
-                out.push((run, is_zh));
+                out.push((run, is_zh, run_start));
             }
         }
     }
     out
+}
+
+/// C++: `RAGAnalyzer::SplitByLang` without byte spans.
+fn split_by_lang(line: &str) -> Vec<(String, bool)> {
+    split_by_lang_spans(line)
+        .into_iter()
+        .map(|(segment, is_zh, _)| (segment, is_zh))
+        .collect()
 }
 
 /// C++: `re2::RE2::PartialMatch(text, RAGAnalyzer::regex_split_pattern_)`.
@@ -1263,6 +1923,15 @@ fn join_tokens(tokens: &[(String, i32)], start: usize, end: usize) -> String {
         .map(|(token, _)| token.as_str())
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// C++: `Join(tokens, start, end, "")` — the DFS input must be the raw
+/// concatenation of the chosen span, not a space-joined string.
+fn concat_tokens(tokens: &[(String, i32)], start: usize, end: usize) -> String {
+    tokens[start..end]
+        .iter()
+        .map(|(token, _)| token.as_str())
+        .collect()
 }
 
 #[cfg(test)]
@@ -1614,5 +2283,344 @@ mod analyzer_pool_tests {
 
         // The Slovak instance is unaffected by the later English one.
         assert_eq!(slovak.tokenize("daňové"), "danove");
+    }
+}
+
+/// `src/unit_test/common/analyzer/rag_analyzer_ut.cpp` — the 13
+/// `RAGAnalyzerTest` cases. The Python oracle is the same
+/// `python/infinity_sdk/infinity/rag_tokenizer.py` script the reference
+/// shells out to.
+#[cfg(test)]
+mod rag_analyzer_tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    /// The reference fixture: a missing resource directory is a hard failure.
+    const RESOURCE_DIR: &str = "/usr/share/infinity/resource";
+
+    fn load_analyzer() -> RAGAnalyzer {
+        RAGAnalyzer::load(RESOURCE_DIR).expect("RAGAnalyzer load")
+    }
+
+    fn repo_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
+    }
+
+    fn tokenizer_script() -> PathBuf {
+        repo_root().join("python/infinity_sdk/infinity/rag_tokenizer.py")
+    }
+
+    fn input_file() -> PathBuf {
+        repo_root().join("python/infinity_sdk/infinity/tokenizer_input.txt")
+    }
+
+    /// C++: `std::getline` over `tokenizer_input.txt`, skipping empty lines.
+    fn input_lines() -> Vec<String> {
+        std::fs::read_to_string(input_file())
+            .expect("read tokenizer_input.txt")
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// C++: `system("uv run rag_tokenizer.py -f <input> -o <output> ...")`,
+    /// followed by reading one result line per input line.
+    ///
+    /// `uv` runs from the temp directory: the script is a PEP 723 script, and
+    /// starting outside the checkout keeps `uv` from rewriting `uv.lock`.
+    fn python_tokenizer_lines(extra: &[&str], tag: &str) -> Vec<String> {
+        let work_dir = std::env::temp_dir();
+        let output_path = work_dir.join(format!(
+            "infinity_rag_tokenizer_{}_{}.txt",
+            std::process::id(),
+            tag
+        ));
+        let output = Command::new("uv")
+            .current_dir(&work_dir)
+            .arg("run")
+            .arg(tokenizer_script())
+            .arg("-f")
+            .arg(input_file())
+            .arg("-o")
+            .arg(&output_path)
+            .args(extra)
+            .output()
+            .expect("run uv for the Python tokenizer");
+        assert!(
+            output.status.success(),
+            "Call Python tokenizer failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = std::fs::read_to_string(&output_path).expect("read Python tokenizer output");
+        let _ = std::fs::remove_file(&output_path);
+        text.lines().map(str::to_string).collect()
+    }
+
+    /// C++: `popen("uv run rag_tokenizer.py ... <text>")` — the single-text
+    /// mode prints exactly one line to stdout.
+    fn python_tokenize_text(args: &[&str]) -> String {
+        let output = Command::new("uv")
+            .current_dir(std::env::temp_dir())
+            .arg("run")
+            .arg(tokenizer_script())
+            .args(args)
+            .output()
+            .expect("run uv for the Python tokenizer");
+        assert!(
+            output.status.success(),
+            "Call Python tokenizer failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .trim_end()
+            .to_string()
+    }
+
+    fn assert_tokens_equal(actual: &[String], expected: &[String], context: &str) {
+        assert_eq!(
+            actual.len(),
+            expected.len(),
+            "token count mismatch {context}: Rust {actual:?}, Python {expected:?}"
+        );
+        for (index, (left, right)) in actual.iter().zip(expected).enumerate() {
+            assert_eq!(
+                left, right,
+                "MISMATCH at {index} {context}: Rust='{left}' Python='{right}'"
+            );
+        }
+    }
+
+    /// C++: `test_analyze_enable_position` — the reference only prints the
+    /// stream; the assertion is that the analyzer loaded and analysis runs.
+    #[test]
+    fn test_analyze_enable_position() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_enable_position(true);
+        analyzer.set_fine_grained(false);
+        for line in input_lines() {
+            let terms = analyzer.analyze(&line);
+            assert!(
+                terms.iter().all(|term| !term.text.is_empty()),
+                "empty term for input: {line}"
+            );
+        }
+    }
+
+    /// C++: `test_analyze_enable_position_fine_grained`.
+    #[test]
+    fn test_analyze_enable_position_fine_grained() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_enable_position(true);
+        analyzer.set_fine_grained(true);
+        for line in input_lines() {
+            let terms = analyzer.analyze(&line);
+            assert!(
+                terms.iter().all(|term| !term.text.is_empty()),
+                "empty term for input: {line}"
+            );
+        }
+    }
+
+    /// C++: `test_tokenize_consistency_with_posiiton`.
+    #[test]
+    fn test_tokenize_consistency_with_posiiton() {
+        let analyzer = load_analyzer();
+        for line in input_lines() {
+            let tokens_str = analyzer.tokenize(&line);
+            let coarse: Vec<&str> = tokens_str.split_whitespace().collect();
+            let (with_position, _positions) = analyzer.tokenize_with_position(&line);
+            assert_eq!(
+                coarse, with_position,
+                "Tokenize and TokenizeWithPosition disagree for input: {line}"
+            );
+        }
+    }
+
+    /// C++: `test_tokenize_consistency_with_python`.
+    #[test]
+    fn test_tokenize_consistency_with_python() {
+        let analyzer = load_analyzer();
+        let python_lines = python_tokenizer_lines(&[], "basic");
+        let lines = input_lines();
+        assert_eq!(python_lines.len(), lines.len(), "Python output line count");
+        for (line, python_tokens) in lines.iter().zip(&python_lines) {
+            let tokens = analyzer.tokenize(line);
+            let actual: Vec<String> = tokens.split_whitespace().map(str::to_string).collect();
+            let expected: Vec<String> = python_tokens
+                .split_whitespace()
+                .map(str::to_string)
+                .collect();
+            assert_tokens_equal(&actual, &expected, &format!("for input: {line}"));
+        }
+    }
+
+    /// C++: `test_fine_grained_tokenize_consistency_with_python`.
+    #[test]
+    fn test_fine_grained_tokenize_consistency_with_python() {
+        let mut analyzer = load_analyzer();
+        let python_lines = python_tokenizer_lines(&["--fine-grained"], "fine");
+        analyzer.set_enable_position(false);
+        analyzer.set_fine_grained(true);
+
+        let lines = input_lines();
+        assert_eq!(python_lines.len(), lines.len(), "Python output line count");
+        for (line, python_tokens) in lines.iter().zip(&python_lines) {
+            let coarse = analyzer.tokenize(line);
+            let fine = analyzer.fine_grained_tokenize(&coarse);
+            let expected: Vec<String> = python_tokens
+                .split_whitespace()
+                .map(str::to_string)
+                .collect();
+            assert_tokens_equal(&fine, &expected, &format!("for input: {line}"));
+        }
+    }
+
+    /// C++: `test_set_language_dutch`.
+    #[test]
+    fn test_set_language_dutch() {
+        let mut analyzer = load_analyzer();
+        let python_result = python_tokenize_text(&["-l", "dutch", "huizen"]);
+        analyzer.set_language("dutch");
+        let cxx_result = analyzer.tokenize("huizen");
+        assert!(
+            cxx_result.contains("huiz"),
+            "Dutch 'huizen' must stem to 'huiz', got '{cxx_result}'"
+        );
+        assert_eq!(cxx_result, python_result);
+    }
+
+    /// C++: `test_set_language_slovak`.
+    #[test]
+    fn test_set_language_slovak() {
+        let mut analyzer = load_analyzer();
+        let input = "škola daňové priznanie";
+        let python_result = python_tokenize_text(&["-l", "slovak", input]);
+        analyzer.set_language("slovak");
+        let cxx_result = analyzer.tokenize(input);
+        assert!(cxx_result.contains("skola"), "got '{cxx_result}'");
+        assert!(cxx_result.contains("danove"), "got '{cxx_result}'");
+        assert_eq!(cxx_result, python_result);
+    }
+
+    /// C++: `test_set_language_czech`.
+    #[test]
+    fn test_set_language_czech() {
+        let mut analyzer = load_analyzer();
+        let input = "příliš žluťoučký kůň";
+        let python_result = python_tokenize_text(&["-l", "czech", input]);
+        analyzer.set_language("czech");
+        let cxx_result = analyzer.tokenize(input);
+        assert!(cxx_result.contains("prilis"), "got '{cxx_result}'");
+        assert!(cxx_result.contains("zlutoucky"), "got '{cxx_result}'");
+        assert!(cxx_result.contains("kun"), "got '{cxx_result}'");
+        assert_eq!(cxx_result, python_result);
+    }
+
+    /// C++: `test_slovak_no_stemming`.
+    #[test]
+    fn test_slovak_no_stemming() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_language("slovak");
+        assert_eq!(analyzer.tokenize("skoly running"), "skoly running");
+
+        analyzer.set_language("english");
+        assert_eq!(analyzer.tokenize("running"), "run");
+    }
+
+    /// C++: `test_diacritics_folding_table`.
+    #[test]
+    fn test_diacritics_folding_table() {
+        assert_eq!(
+            RAGAnalyzer::fold_diacritics("áäčďéíĺľňóôŕšťúýž"),
+            "aacdeillnoorstuyz"
+        );
+        assert_eq!(
+            RAGAnalyzer::fold_diacritics("ÁÄČĎÉÍĹĽŇÓÔŔŠŤÚÝŽ"),
+            "AACDEILLNOORSTUYZ"
+        );
+        assert_eq!(RAGAnalyzer::fold_diacritics("ěřůý ĚŘŮÝ"), "eruy ERUY");
+        assert_eq!(RAGAnalyzer::fold_diacritics("Škola Daňové"), "Skola Danove");
+        assert_eq!(RAGAnalyzer::fold_diacritics("æœßøłđÆŒØŁĐ"), "æœßøłđÆŒØŁĐ");
+        assert_eq!(RAGAnalyzer::fold_diacritics("ḍṣṭḥ ḌỊ"), "ḍṣṭḥ ḌỊ");
+        assert_eq!(RAGAnalyzer::fold_diacritics("한국어"), "한국어");
+        assert_eq!(
+            RAGAnalyzer::fold_diacritics("s\u{030C}kola"),
+            "s\u{030C}kola"
+        );
+        assert_eq!(
+            RAGAnalyzer::fold_diacritics("hello world 123"),
+            "hello world 123"
+        );
+        assert_eq!(RAGAnalyzer::fold_diacritics("中文测试"), "中文测试");
+    }
+
+    /// C++: `test_out_of_range_diacritics_parity_with_python`.
+    #[test]
+    fn test_out_of_range_diacritics_parity_with_python() {
+        let input = "škola ḍamage 한국어 ṣṭḥ";
+        let python_result = python_tokenize_text(&["-l", "slovak", input]);
+        let mut analyzer = load_analyzer();
+        analyzer.set_language("slovak");
+        let cxx_result = analyzer.tokenize(input);
+
+        assert!(cxx_result.contains("skola"), "got '{cxx_result}'");
+        assert!(cxx_result.contains("한국어"), "got '{cxx_result}'");
+        assert!(cxx_result.contains("ṣṭḥ"), "got '{cxx_result}'");
+        assert_eq!(cxx_result, python_result);
+    }
+
+    /// C++: `test_slovak_tokenize_with_position` — positions are byte offsets
+    /// in the original input even though folding shrinks the letters.
+    #[test]
+    fn test_slovak_tokenize_with_position() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_language("slovak");
+        let (tokens, positions) = analyzer.tokenize_with_position("škola daňové");
+        assert_eq!(tokens, vec!["skola".to_string(), "danove".to_string()]);
+        assert_eq!(positions.len(), 2);
+        assert_eq!(positions[0], (0, 6));
+        assert_eq!(positions[1], (7, 15));
+    }
+
+    /// C++: `test_chinese_stopword_filter`.
+    #[test]
+    fn test_chinese_stopword_filter() {
+        assert!(RAGAnalyzer::is_stopword("的"));
+        assert!(RAGAnalyzer::is_stopword("是"));
+        assert!(RAGAnalyzer::is_stopword("了"));
+        assert!(RAGAnalyzer::is_stopword("什么"));
+        assert!(RAGAnalyzer::is_stopword("怎么"));
+        assert!(!RAGAnalyzer::is_stopword("贡献"));
+        assert!(!RAGAnalyzer::is_stopword("最大"));
+        assert!(!RAGAnalyzer::is_stopword("谁"));
+
+        let query = "谁的贡献最大";
+
+        let mut analyzer = load_analyzer();
+        analyzer.set_enable_position(false);
+        analyzer.set_fine_grained(false);
+        let terms = analyzer.analyze(query);
+        assert!(
+            terms.iter().all(|term| term.text != "的"),
+            "Analyzer must drop 的 from token stream: {:?}",
+            terms
+        );
+
+        analyzer.set_enable_position(true);
+        let terms = analyzer.analyze(query);
+        assert!(
+            terms.iter().all(|term| term.text != "的"),
+            "Position-enabled path must also drop 的: {:?}",
+            terms
+        );
+
+        analyzer.set_enable_position(false);
+        let raw = analyzer.tokenize(query);
+        assert!(
+            raw.contains("的"),
+            "Raw Tokenize() must still emit 的 (filter is only at AnalyzeImpl boundary), got '{raw}'"
+        );
     }
 }

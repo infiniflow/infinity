@@ -45,6 +45,7 @@ pub mod analyzer;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;
+pub mod query_builder;
 mod regex_literal;
 mod variables;
 mod wand;
@@ -4147,15 +4148,6 @@ impl Engine {
         Ok(base)
     }
 
-    /// Forgets any cached row-id counter for `table` (used after an operation
-    /// that re-keys rows outside `reserve_rows`).
-    fn reset_row_counter(&self, table: &str) {
-        let key = self.table_key(table);
-        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
-            entry.row_counter = None;
-        }
-    }
-
     /// Upper bound on the rows ever reserved for `table`, from the in-memory
     /// counter (no scan). Used to decide whether the C++ block mirror is worth
     /// its duplicate copy of a large table.
@@ -4693,12 +4685,15 @@ impl Engine {
                 // rewrite rows without the dropped column (an empty table has
                 // nothing to rewrite, and committing an empty txn is an error)
                 if !rows.is_empty() {
+                    // Allocate the new ids through the row counter: a concurrent
+                    // append must not pick the same block, or one of the two
+                    // batches silently overwrites the other.
+                    let base = self.reserve_rows(table, rows.len(), false)?;
                     let mut t = self.txn.begin();
                     for (seq, _) in &rows {
                         t.put(del_key(table, *seq), b"1".to_vec());
                     }
-                    let mut next = self.next_row_seq(table)?;
-                    for (_, row) in &rows {
+                    for (i, (_, row)) in rows.iter().enumerate() {
                         let mut nr = row.clone();
                         if idx < nr.len() {
                             nr.remove(idx);
@@ -4708,12 +4703,10 @@ impl Engine {
                             .map(|v| v.to_slt_string())
                             .collect::<Vec<_>>()
                             .join("\t");
-                        t.put(row_key(table, next), encoded.into_bytes());
-                        next += 1;
+                        t.put(row_key(table, base + i), encoded.into_bytes());
                     }
                     self.txn.commit(t)?;
                 }
-                self.reset_row_counter(table);
                 // The rewrite moved every row to a new sequence id.
                 self.invalidate_row_cache(table);
                 self.invalidate_block_mirror(table);
@@ -7804,6 +7797,16 @@ impl Engine {
 
     /// Rows held by `segment` of `table` (used by `ShowBlocks`).
     pub fn segment_rows(&self, table: &str, segment: usize) -> usize {
+        // Prefer the allocator's per-segment counts: several write batches can
+        // still land in one segment, and dividing the live rows by the batch
+        // count would then under-report it.
+        if let Some((_, rows)) = self
+            .segments(table)
+            .into_iter()
+            .find(|(id, _)| *id as usize == segment)
+        {
+            return rows as usize;
+        }
         let rows = self.row_count(table).unwrap_or(0);
         let by_size = rows.div_ceil(Self::SEGMENT_ROW_CAPACITY).max(1);
         if by_size == self.segment_count(table) {
