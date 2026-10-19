@@ -2421,10 +2421,31 @@ pub struct Storage {
     flush_lock: Mutex<()>,
 }
 
+/// Sealed high-cardinality chunk readers with their base row id.
+type SecondaryDiskChunks =
+    Vec<(u64, Arc<infinity_storage::secondary_segment::SecondarySegmentReader>)>;
+/// Sealed low-cardinality (boolean) chunk readers with their base row id.
+type SecondaryLowChunks =
+    Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>;
+
+/// Secondary-index registry of one table (C++ `TableEntry::indexes_` plus the
+/// sealed chunk readers), keyed by column.
+#[derive(Default)]
+struct SecondaryIndexes {
+    /// Memory tails: rows written since the last chunk dump.
+    indexes: HashMap<String, SecondaryIndex>,
+    /// Low-cardinality (boolean) chunk readers with their base row id.
+    low: HashMap<String, SecondaryLowChunks>,
+    /// High-cardinality (integer/varchar) PGM chunk readers.
+    disk: HashMap<String, SecondaryDiskChunks>,
+    /// Columns whose memory map is a tail backed by on-disk chunks.
+    disk_backed: std::collections::HashSet<String>,
+}
+
 /// Per-table write bookkeeping and row-id allocation.
 ///
-/// C++: the mutable half of `TableEntry` (`src/storage/meta/entry/table_entry.cppm`).
-/// The index maps still live on `Engine` until `SegmentEntry` is split out.
+/// C++: the mutable half of `TableEntry` (`src/storage/meta/entry/table_entry.cppm`):
+/// index registries, row-id allocator and the in-memory row blocks.
 #[derive(Default)]
 struct TableEntry {
     /// Number of write batches (`COPY`/`INSERT`) seen by this process.
@@ -2455,6 +2476,16 @@ struct TableEntry {
     mv: HashMap<String, Arc<std::sync::RwLock<MultiVectorIndex>>>,
     /// Full-text inverted indexes per column.
     text: HashMap<String, SharedTextIndex>,
+    /// Secondary indexes per column with their sealed chunk readers.
+    secondary: SecondaryIndexes,
+    /// HNSW chunks loaded from the C++ block mirror, per column (the
+    /// reference's `TableEntry::vector_indexes_`, on-disk form).
+    vector: HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>,
+    /// IVF chunks loaded from the C++ mirror, per column.
+    ivf: HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>,
+    /// IVF memory segment: rows written since the last mirror dump, merged
+    /// with the sealed chunks at query time.
+    ivf_mem: HashMap<String, Vec<(u64, Vec<f32>)>>,
     /// Decoded rows of a **scalar-only** table (the reference's in-memory
     /// `DataBlock`s). Served by `fetch_rows_with_ids` while it covers every
     /// live row; any mutation that rewrites rows drops it.
@@ -2545,36 +2576,6 @@ pub struct Engine {
     rt: tokio::runtime::Runtime,
     /// the engine's data directory (root of the C++-format block mirror)
     dir: PathBuf,
-    /// On-disk secondary-index segments (the reference's PGM chunks): one
-    /// mmap reader per `ROW_ID` segment, with its base row id. The memory map
-    /// only holds the tail written since the last dump.
-    #[allow(clippy::type_complexity)]
-    secondary_low:
-        Mutex<HashMap<String, Vec<(u64, Arc<infinity_storage::secondary_lowcard::LowCardReader>)>>>,
-    #[allow(clippy::type_complexity)]
-    secondary_disk: Mutex<
-        HashMap<
-            String,
-            Vec<(
-                u64,
-                Arc<infinity_storage::secondary_segment::SecondarySegmentReader>,
-            )>,
-        >,
-    >,
-    /// Keys whose memory map is a tail backed by on-disk chunks (integer and
-    /// boolean columns). String-keyed indexes keep the whole map in memory.
-    secondary_disk_backed: Mutex<std::collections::HashSet<String>>,
-    /// secondary indexes keyed by `"<table>.<column>"`
-    indexes: Mutex<HashMap<String, SecondaryIndex>>,
-    /// Vector indexes loaded from the C++ block mirror, keyed by
-    /// `"<table>.<column>"` (plan #70: the persisted HNSW graph, on disk).
-    vector_indexes: Mutex<HashMap<String, Vec<Arc<crate::cpp_blocks::LoadedVectorIndex>>>>,
-    /// IVF chunks loaded from the C++ mirror, keyed by `"<table>.<column>"`.
-    ivf_indexes: Mutex<HashMap<String, Vec<Arc<infinity_index::ivf::IvfIndex>>>>,
-    /// IVF memory segment: rows written since the last mirror dump, merged with
-    /// the sealed chunks at query time (the reference's in-memory index).
-    #[allow(clippy::type_complexity)]
-    ivf_mem: Mutex<HashMap<String, Vec<(u64, Vec<f32>)>>>,
     /// Engine-wide runtime state (the reference's `InfinityContext`).
     context: Context,
     /// cached `SELECT` results keyed by the statement text
@@ -2707,13 +2708,6 @@ impl Engine {
                 ),
             },
             dir,
-            secondary_low: Mutex::new(HashMap::new()),
-            secondary_disk: Mutex::new(HashMap::new()),
-            secondary_disk_backed: Mutex::new(Default::default()),
-            indexes: Mutex::new(HashMap::new()),
-            vector_indexes: Mutex::new(HashMap::new()),
-            ivf_indexes: Mutex::new(HashMap::new()),
-            ivf_mem: Mutex::new(HashMap::new()),
             result_cache: Mutex::new(HashMap::new()),
             current_db: Mutex::new("default_db".to_string()),
             tables: Mutex::new(HashMap::new()),
@@ -2779,8 +2773,11 @@ impl Engine {
         // A new index may have appeared since the last write.
         for e in self.tables.lock().unwrap().values_mut() {
             e.hnsw_probed = false;
+            // Sealed chunk readers are reloaded from the mirror below.
+            e.vector.clear();
+            e.ivf.clear();
+            e.ivf_mem.clear();
         }
-        self.vector_indexes.lock().unwrap().clear();
         for im in self.storage.catalog.list_indexes()? {
             // skip functional-index targets (not plain columns)
             if is_secondary_kind(&im.index_type)
@@ -2797,21 +2794,26 @@ impl Engine {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let segments = self.load_vector_indexes(&im.table, &im.name);
                 if !segments.is_empty() {
-                    self.vector_indexes.lock().unwrap().insert(
-                        index_key(&im.table, &im.column),
-                        segments.into_iter().map(Arc::new).collect(),
-                    );
+                    let tkey = self.table_key(&im.table);
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .vector
+                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
                 }
             }
             if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
-                let key = index_key(&im.table, &im.column);
-                self.ivf_mem.lock().unwrap().entry(key.clone()).or_default();
+                let tkey = self.table_key(&im.table);
+                let mut tables = self.tables.lock().unwrap();
+                let entry = tables.entry(tkey).or_default();
+                entry.ivf_mem.entry(im.column.clone()).or_default();
                 if !segments.is_empty() {
-                    self.ivf_indexes
-                        .lock()
-                        .unwrap()
-                        .insert(key, segments.into_iter().map(Arc::new).collect());
+                    entry
+                        .ivf
+                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
                 }
             }
         }
@@ -2820,8 +2822,16 @@ impl Engine {
 
     /// Writes one `keys + offsets + PGM` chunk per `ROW_ID` segment and installs
     /// the readers (the reference's high-cardinality `SaveIndexInner`).
-    fn write_secondary_pgm_chunks(&self, key: &str, by_segment: HashMap<u64, Vec<(u64, u32)>>) {
-        let dir = self.dir.join("secondary").join(key.replace('/', "_"));
+    fn write_secondary_pgm_chunks(
+        &self,
+        table: &str,
+        column: &str,
+        by_segment: HashMap<u64, Vec<(u64, u32)>>,
+    ) {
+        let dir = self
+            .dir
+            .join("secondary")
+            .join(index_key(table, column).replace('/', "_"));
         let mut readers = Vec::new();
         for (segment, mut entries) in by_segment {
             entries.sort_unstable_by_key(|(k, _)| *k);
@@ -2839,10 +2849,15 @@ impl Engine {
                 readers.push((segment << 32, Arc::new(reader)));
             }
         }
-        self.secondary_disk
+        let tkey = self.table_key(table);
+        self.tables
             .lock()
             .unwrap()
-            .insert(key.to_string(), readers);
+            .entry(tkey)
+            .or_default()
+            .secondary
+            .disk
+            .insert(column.to_string(), readers);
     }
 
     fn build_index(&self, table: &str, column: &str) -> Result<()> {
@@ -2855,7 +2870,15 @@ impl Engine {
         // indexed column (not the wide vectors in the same row): `index_lookup`
         // merges the chunks with the in-memory tail.
         let key = index_key(table, column);
-        self.secondary_disk.lock().unwrap().remove(&key);
+        let tkey = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(tkey.clone())
+            .or_default()
+            .secondary
+            .disk
+            .remove(column);
         let type_upper = self
             .column_types(table)
             .ok()
@@ -2877,7 +2900,7 @@ impl Engine {
                     .or_default()
                     .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.write_secondary_pgm_chunks(&key, by_segment);
+            self.write_secondary_pgm_chunks(table, column, by_segment);
         } else if !is_bool {
             // VARCHAR (and JSON) keys are hashed to u64, exactly like the
             // reference's `std::hash<std::string_view>` (`ConvertToOrderedKeyValue`).
@@ -2892,10 +2915,17 @@ impl Engine {
                     .or_default()
                     .push((ordered, (seq as u64 & 0xffff_ffff) as u32));
             }
-            self.write_secondary_pgm_chunks(&key, by_segment);
+            self.write_secondary_pgm_chunks(table, column, by_segment);
         }
         // Boolean columns use the low-cardinality variant.
-        self.secondary_low.lock().unwrap().remove(&key);
+        self.tables
+            .lock()
+            .unwrap()
+            .entry(tkey.clone())
+            .or_default()
+            .secondary
+            .low
+            .remove(column);
         {
             if is_bool {
                 let mut by_segment: HashMap<u64, [Vec<u32>; 2]> = HashMap::new();
@@ -2927,21 +2957,24 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                self.secondary_low
+                self.tables
                     .lock()
                     .unwrap()
-                    .insert(key.clone(), readers);
+                    .entry(tkey.clone())
+                    .or_default()
+                    .secondary
+                    .low
+                    .insert(column.to_string(), readers);
             }
         }
         // The memory map is only the tail written since the last dump.
-        self.secondary_disk_backed
-            .lock()
-            .unwrap()
-            .insert(key.clone());
-        self.indexes
-            .lock()
-            .unwrap()
-            .insert(key, SecondaryIndex::new());
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        entry.secondary.disk_backed.insert(column.to_string());
+        entry
+            .secondary
+            .indexes
+            .insert(column.to_string(), SecondaryIndex::new());
         Ok(())
     }
 
@@ -2955,18 +2988,26 @@ impl Engine {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 let segments = self.load_vector_indexes(&im.table, &im.name);
                 if !segments.is_empty() {
-                    self.vector_indexes.lock().unwrap().insert(
-                        index_key(&im.table, &im.column),
-                        segments.into_iter().map(Arc::new).collect(),
-                    );
+                    let tkey = self.table_key(&im.table);
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .vector
+                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
                 }
             } else if im.index_type.eq_ignore_ascii_case("IVF") {
                 let segments = self.load_ivf_indexes(&im.table, &im.name);
                 if !segments.is_empty() {
-                    self.ivf_indexes.lock().unwrap().insert(
-                        index_key(&im.table, &im.column),
-                        segments.into_iter().map(Arc::new).collect(),
-                    );
+                    let tkey = self.table_key(&im.table);
+                    self.tables
+                        .lock()
+                        .unwrap()
+                        .entry(tkey)
+                        .or_default()
+                        .ivf
+                        .insert(im.column.clone(), segments.into_iter().map(Arc::new).collect());
                 }
             }
         }
@@ -2975,23 +3016,28 @@ impl Engine {
     /// Dumps the memory tail of every disk-backed secondary index into new
     /// chunks, so memory stays bounded by the rows written since the last dump.
     fn seal_secondary_indexes(&self) {
-        let backed: Vec<String> = self
-            .secondary_disk_backed
-            .lock()
-            .unwrap()
-            .iter()
-            .cloned()
-            .collect();
+        let backed: Vec<(String, String)> = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .iter()
+                .flat_map(|(t, e)| {
+                    e.secondary
+                        .disk_backed
+                        .iter()
+                        .map(move |c| (t.clone(), c.clone()))
+                })
+                .collect()
+        };
         if backed.is_empty() {
             return;
         }
         let Ok(catalog_indexes) = self.storage.catalog.list_indexes() else {
             return;
         };
-        for key in backed {
+        for (tkey, column) in backed {
             let Some(im) = catalog_indexes
                 .iter()
-                .find(|im| index_key(&im.table, &im.column) == key)
+                .find(|im| self.table_key(&im.table) == tkey && im.column == column)
             else {
                 continue;
             };
@@ -3010,7 +3056,14 @@ impl Engine {
                 .unwrap_or_default();
             let is_bool = ty.starts_with("BOOL");
             let is_int = ty.starts_with("INT") || ty.starts_with("UINT");
-            let tail = match self.indexes.lock().unwrap().get_mut(&key) {
+            let key = index_key(&im.table, &column);
+            let tail = match self
+                .tables
+                .lock()
+                .unwrap()
+                .get_mut(&tkey)
+                .and_then(|e| e.secondary.indexes.get_mut(&column))
+            {
                 Some(idx) => idx.take(),
                 None => continue,
             };
@@ -3063,10 +3116,14 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                self.secondary_disk
+                self.tables
                     .lock()
                     .unwrap()
-                    .entry(key)
+                    .entry(tkey.clone())
+                    .or_default()
+                    .secondary
+                    .disk
+                    .entry(column.clone())
                     .or_default()
                     .extend(readers);
             } else {
@@ -3109,10 +3166,14 @@ impl Engine {
                         readers.push((segment << 32, Arc::new(reader)));
                     }
                 }
-                self.secondary_low
+                self.tables
                     .lock()
                     .unwrap()
-                    .entry(key)
+                    .entry(tkey)
+                    .or_default()
+                    .secondary
+                    .low
+                    .entry(column)
                     .or_default()
                     .extend(readers);
             }
@@ -3156,10 +3217,11 @@ impl Engine {
         }
         total
             + self
-                .indexes
+                .tables
                 .lock()
                 .unwrap()
                 .values()
+                .flat_map(|e| e.secondary.indexes.values())
                 .map(SecondaryIndex::approx_bytes)
                 .sum::<usize>()
     }
@@ -3182,14 +3244,34 @@ impl Engine {
     }
 
     fn index_lookup(&self, table: &str, column: &str, value: &Literal) -> Option<Vec<u64>> {
-        let key = index_key(table, column);
-        let known = self.indexes.lock().unwrap().contains_key(&key)
-            || self.secondary_disk.lock().unwrap().contains_key(&key)
-            || self.secondary_low.lock().unwrap().contains_key(&key);
-        if !known {
-            return None;
-        }
+        let tkey = self.table_key(table);
         let want = value.to_slt_string();
+        // Snapshot the readers (cheap Arc clones) and the memory-tail hits so
+        // the table lock is not held across the row lookup.
+        let (disk, low, tail): (
+            Option<SecondaryDiskChunks>,
+            Option<SecondaryLowChunks>,
+            Vec<u64>,
+        ) = {
+            let tables = self.tables.lock().unwrap();
+            let reg = tables.get(&tkey).map(|e| &e.secondary)?;
+            let known = reg.indexes.contains_key(column)
+                || reg.disk.contains_key(column)
+                || reg.low.contains_key(column);
+            if !known {
+                return None;
+            }
+            let tail = reg
+                .indexes
+                .get(column)
+                .map(|idx| idx.lookup(want.as_bytes()).to_vec())
+                .unwrap_or_default();
+            (
+                reg.disk.get(column).cloned(),
+                reg.low.get(column).cloned(),
+                tail,
+            )
+        };
         let schema = self.table_schema(table).unwrap_or_default();
         let col = schema.iter().position(|c| c == column);
         let mut out: Vec<u64> = Vec::new();
@@ -3198,8 +3280,7 @@ impl Engine {
         // map only holds the tail written since the last dump.
         if let Literal::Int(v) = value {
             let ordered = (*v as u64) ^ (1u64 << 63);
-            let disks = self.secondary_disk.lock().unwrap();
-            if let Some(segments) = disks.get(&key) {
+            if let Some(segments) = &disk {
                 for (base, reader) in segments {
                     for off in reader.lookup(ordered) {
                         let id = base | u64::from(off);
@@ -3219,8 +3300,7 @@ impl Engine {
                 None
             };
             if let Some(bit) = bit {
-                let lows = self.secondary_low.lock().unwrap();
-                if let Some(segments) = lows.get(&key) {
+                if let Some(segments) = &low {
                     for (base, reader) in segments {
                         for off in reader.lookup(bit) {
                             let id = base | u64::from(off);
@@ -3233,8 +3313,7 @@ impl Engine {
             } else {
                 // VARCHAR/JSON chunks store the reference's u64 key hash.
                 let ordered = infinity_storage::secondary_segment::hash_varchar(&want);
-                let disks = self.secondary_disk.lock().unwrap();
-                if let Some(segments) = disks.get(&key) {
+                if let Some(segments) = &disk {
                     for (base, reader) in segments {
                         for off in reader.lookup(ordered) {
                             let id = base | u64::from(off);
@@ -3247,11 +3326,9 @@ impl Engine {
             }
         }
         // The tail: rows inserted after the last dump.
-        if let Some(idx) = self.indexes.lock().unwrap().get(&key) {
-            for id in idx.lookup(want.as_bytes()) {
-                if self.live_row_matches(table, *id, col, &want) && seen.insert(*id) {
-                    out.push(*id);
-                }
+        for id in tail {
+            if self.live_row_matches(table, id, col, &want) && seen.insert(id) {
+                out.push(id);
             }
         }
         out.sort_unstable();
@@ -3420,33 +3497,17 @@ impl Engine {
     /// multi-vector) is maintained in memory. An insert into a table with none
     /// skips the per-row index hook entirely.
     fn any_in_memory_index(&self) -> bool {
-        !self.indexes.lock().unwrap().is_empty()
-            || self
-                .tables
-                .lock()
-                .unwrap()
-                .values()
-                .any(|e| !e.text.is_empty())
-            || !self.vector_cache.lock().unwrap().is_empty()
-            || self
-                .tables
-                .lock()
-                .unwrap()
-                .values()
-                .any(|e| !e.hnsw_mem.is_empty())
-            || !self.ivf_mem.lock().unwrap().is_empty()
-            || self
-                .tables
-                .lock()
-                .unwrap()
-                .values()
-                .any(|e| !e.mv.is_empty())
-            || self
-                .tables
-                .lock()
-                .unwrap()
-                .values()
-                .any(|e| !e.sparse.is_empty())
+        if !self.vector_cache.lock().unwrap().is_empty() {
+            return true;
+        }
+        self.tables.lock().unwrap().values().any(|e| {
+            !e.text.is_empty()
+                || !e.hnsw_mem.is_empty()
+                || !e.secondary.indexes.is_empty()
+                || !e.ivf_mem.is_empty()
+                || !e.mv.is_empty()
+                || !e.sparse.is_empty()
+        })
     }
 
     /// True when `table` has an index declaration. Consulted together with
@@ -3546,23 +3607,7 @@ impl Engine {
         for (k, _) in self.storage.store.scan_prefix(&del_prefix(name))? {
             self.storage.store.delete(&k)?;
         }
-        let key_prefix = format!("{name}.");
-        self.indexes
-            .lock()
-            .unwrap()
-            .retain(|k, _| !k.starts_with(&key_prefix));
-        self.secondary_disk
-            .lock()
-            .unwrap()
-            .retain(|k, _| !k.starts_with(&key_prefix));
-        self.secondary_low
-            .lock()
-            .unwrap()
-            .retain(|k, _| !k.starts_with(&key_prefix));
-        self.secondary_disk_backed
-            .lock()
-            .unwrap()
-            .retain(|k| !k.starts_with(&key_prefix));
+        // The table entry (index registries included) was removed above.
         for im in self.storage.catalog.list_indexes()? {
             if im.table == name {
                 let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
@@ -4057,37 +4102,17 @@ impl Engine {
                 for (k, _) in self.storage.store.scan_prefix(&del_prefix(table))? {
                     self.storage.store.delete(&k)?;
                 }
-                // move the secondary-index entries and declarations
-                let old_prefix = format!("{table}.");
-                let pairs: Vec<(String, String)> = self
-                    .indexes
+                // move the secondary-index declarations; the old table entry
+                // (whose registries refer to the old row ids) is dropped and
+                // rebuilt from the renamed rows below.
+                let old_tkey = self.table_key(table);
+                let pairs: Vec<String> = self
+                    .tables
                     .lock()
                     .unwrap()
-                    .keys()
-                    .filter(|k| k.starts_with(&old_prefix))
-                    .map(|k| (k.clone(), k[old_prefix.len()..].to_string()))
-                    .collect();
-                let mut guard = self.indexes.lock().unwrap();
-                for (old_key, column) in &pairs {
-                    if let Some(v) = guard.remove(old_key) {
-                        guard.insert(index_key(new_name, column), v);
-                    }
-                }
-                drop(guard);
-                // Chunk readers and the disk-backed marker are keyed by the old
-                // name; rebuild the new key from the renamed rows.
-                self.secondary_disk
-                    .lock()
-                    .unwrap()
-                    .retain(|k, _| !k.starts_with(&old_prefix));
-                self.secondary_low
-                    .lock()
-                    .unwrap()
-                    .retain(|k, _| !k.starts_with(&old_prefix));
-                self.secondary_disk_backed
-                    .lock()
-                    .unwrap()
-                    .retain(|k| !k.starts_with(&old_prefix));
+                    .remove(&old_tkey)
+                    .map(|e| e.secondary.indexes.keys().cloned().collect())
+                    .unwrap_or_default();
                 for im in self.storage.catalog.list_indexes()? {
                     if im.table == *table {
                         let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
@@ -4100,7 +4125,7 @@ impl Engine {
                         )?;
                     }
                 }
-                for (_, column) in &pairs {
+                for column in &pairs {
                     let _ = self.build_index(new_name, column);
                 }
                 self.storage.catalog.rename_table(table, new_name)?;
@@ -4174,10 +4199,15 @@ impl Engine {
                 {
                     let _ = self.storage.catalog.drop_index_on(&im.table, &im.name);
                 }
-                self.indexes
+                let tkey = self.table_key(table);
+                self.tables
                     .lock()
                     .unwrap()
-                    .remove(&index_key(table, column));
+                    .entry(tkey)
+                    .or_default()
+                    .secondary
+                    .indexes
+                    .remove(column);
                 // remaining indexes now hold stale row ids: rebuild them
                 let remaining: Vec<String> = self
                     .storage
@@ -4593,10 +4623,14 @@ impl Engine {
                 // An IVF index keeps a memory segment for rows written before
                 // the next mirror dump.
                 if index_type.eq_ignore_ascii_case("IVF") {
-                    self.ivf_mem
+                    let tkey = self.table_key(table);
+                    self.tables
                         .lock()
                         .unwrap()
-                        .entry(index_key(table, column))
+                        .entry(tkey)
+                        .or_default()
+                        .ivf_mem
+                        .entry(column.clone())
                         .or_default();
                 }
                 Ok(QueryResult::CreatedIndex {
@@ -5444,13 +5478,13 @@ impl Engine {
         values: &[String],
     ) -> Result<()> {
         let schema = self.table_schema(table)?;
-        let mut idxs = self.indexes.lock().unwrap();
-        for (k, idx) in idxs.iter_mut() {
-            if let Some(col) = k.strip_prefix(&format!("{table}.")) {
-                if let Some(ci) = schema.iter().position(|c| c == col) {
-                    if let Some(v) = values.get(ci) {
-                        idx.insert(v.as_bytes(), seq as u64);
-                    }
+        let tkey = self.table_key(table);
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(tkey).or_default();
+        for (col, idx) in entry.secondary.indexes.iter_mut() {
+            if let Some(ci) = schema.iter().position(|c| c == col) {
+                if let Some(v) = values.get(ci) {
+                    idx.insert(v.as_bytes(), seq as u64);
                 }
             }
         }
@@ -5956,13 +5990,13 @@ impl Engine {
     /// Feeds a row into the IVF memory segment (rows written since the last
     /// mirror dump), the reference's in-memory IVF form.
     fn note_ivf_insert(&self, table: &str, seq: u64, cells: &[String]) {
-        let prefix = format!("{table}.");
-        if !self
-            .ivf_mem
+        let tkey = self.table_key(table);
+        if self
+            .tables
             .lock()
             .unwrap()
-            .keys()
-            .any(|k| k.starts_with(&prefix))
+            .get(&tkey)
+            .is_none_or(|e| e.ivf_mem.is_empty())
         {
             return;
         }
@@ -5972,12 +6006,11 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        let mut map = self.ivf_mem.lock().unwrap();
-        for (key, rows) in map.iter_mut() {
-            if !key.starts_with(&prefix) {
-                continue;
-            }
-            let column = &key[prefix.len()..];
+        let mut tables = self.tables.lock().unwrap();
+        let Some(entry) = tables.get_mut(&tkey) else {
+            return;
+        };
+        for (column, rows) in entry.ivf_mem.iter_mut() {
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
             };
@@ -6920,17 +6953,10 @@ impl Engine {
             entry.write_batches = 1;
             // Compaction renumbered every row.
             entry.row_cache = None;
+            // Block-level indexes refer to the old row ids.
+            entry.secondary.indexes.clear();
+            entry.vector.clear();
         }
-        // Block-level indexes and cached results refer to the old row ids.
-        let prefix = format!("{table}.");
-        self.indexes
-            .lock()
-            .unwrap()
-            .retain(|k, _| !k.starts_with(&prefix));
-        self.vector_indexes
-            .lock()
-            .unwrap()
-            .retain(|k, _| !k.starts_with(&prefix));
         self.result_cache.lock().unwrap().clear();
         Ok(())
     }
@@ -11865,19 +11891,23 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        let key = e
-            .indexes
-            .lock()
-            .unwrap()
-            .keys()
-            .find(|k| k.ends_with(".v"))
-            .cloned()
+        let tables = e.tables.lock().unwrap();
+        let idx = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
             .unwrap();
-        assert!(e.indexes.lock().unwrap().get(&key).unwrap().key_count() > 0);
+        assert!(idx.key_count() > 0);
+        drop(tables);
 
         // The dump drains the tail; the answer comes from the chunk + new tail.
         e.flush().unwrap();
-        assert_eq!(e.indexes.lock().unwrap().get(&key).unwrap().key_count(), 0);
+        let tables = e.tables.lock().unwrap();
+        let idx = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
+            .unwrap();
+        assert_eq!(idx.key_count(), 0);
+        drop(tables);
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
@@ -11956,18 +11986,13 @@ mod tests {
         let sp_tail = sp.read().unwrap()
             .tail_bytes;
         assert_eq!(sp_tail, 0);
-        let sec_key = e
-            .indexes
-            .lock()
-            .unwrap()
-            .keys()
-            .find(|k| k.ends_with(".c"))
-            .cloned()
+        let tables = e.tables.lock().unwrap();
+        let sec = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
             .unwrap();
-        assert_eq!(
-            e.indexes.lock().unwrap().get(&sec_key).unwrap().key_count(),
-            0
-        );
+        assert_eq!(sec.key_count(), 0);
+        drop(tables);
 
         // The sealed forms answer every path.
         assert_eq!(
@@ -12105,15 +12130,10 @@ mod tests {
         // Rows written before the dump live in the IVF memory segment and are
         // merged with the sealed chunks.
         e.execute("INSERT INTO iv VALUES (5,[0.9,0.1]);").unwrap();
-        let key = e
-            .ivf_mem
-            .lock()
-            .unwrap()
-            .keys()
-            .next()
-            .cloned()
-            .unwrap_or_else(|| panic!("ivf_mem is empty"));
-        assert!(!e.ivf_mem.lock().unwrap().get(&key).unwrap().is_empty());
+        let tables = e.tables.lock().unwrap();
+        let entry = tables.get("default_db.iv").unwrap();
+        assert!(!entry.ivf_mem.get("v").unwrap().is_empty());
+        drop(tables);
         let q = "SELECT id FROM iv SEARCH MATCH VECTOR \
                  (v, [0.9,0.1], 'float', 'l2', 2) WITH (nprobe = 16);";
         assert_eq!(
@@ -12121,13 +12141,11 @@ mod tests {
             vec![vec!["5".to_string()], vec!["2".to_string()]]
         );
         e.flush().unwrap();
-        assert!(e.ivf_mem.lock().unwrap().get(&key).unwrap().is_empty());
-        assert!(e
-            .ivf_indexes
-            .lock()
-            .unwrap()
-            .values()
-            .any(|segments| !segments.is_empty()));
+        let tables = e.tables.lock().unwrap();
+        let entry = tables.get("default_db.iv").unwrap();
+        assert!(entry.ivf_mem.get("v").unwrap().is_empty());
+        assert!(entry.ivf.values().any(|segments| !segments.is_empty()));
+        drop(tables);
         assert_eq!(
             rows(&e, q),
             vec![vec!["5".to_string()], vec!["2".to_string()]]
@@ -12325,17 +12343,21 @@ mod tests {
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]
         );
-        let key = e
-            .indexes
-            .lock()
-            .unwrap()
-            .keys()
-            .find(|k| k.ends_with(".name"))
-            .cloned()
+        let tables = e.tables.lock().unwrap();
+        let idx = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
             .unwrap();
-        assert!(e.indexes.lock().unwrap().get(&key).unwrap().key_count() > 0);
+        assert!(idx.key_count() > 0);
+        drop(tables);
         e.flush().unwrap();
-        assert_eq!(e.indexes.lock().unwrap().get(&key).unwrap().key_count(), 0);
+        let tables = e.tables.lock().unwrap();
+        let idx = tables
+            .values()
+            .find_map(|t| t.secondary.indexes.values().next())
+            .unwrap();
+        assert_eq!(idx.key_count(), 0);
+        drop(tables);
         assert_eq!(
             rows(&e, q),
             vec![vec!["2".to_string()], vec!["3".to_string()]]

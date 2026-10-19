@@ -64,24 +64,23 @@ pub(crate) struct KnnCandidateScan<'a> {
 
 impl Engine {
     pub(crate) fn knn_candidates(&self, q: &KnnCandidateScan<'_>) -> Option<HashSet<usize>> {
+        let tkey = self.table_key(q.table);
         // IVF: probe `nprobe` centroids of every sealed chunk (C++
         // `IVF_Index_Storage::SearchIndex`). Candidates are scored exactly
         // below, so ranking matches an exhaustive scan whenever the probe
         // covers the true top-k.
-        if let Some(segments) = self
-            .ivf_indexes
-            .lock()
-            .unwrap()
-            .get(&super::index_key(q.table, q.column))
-            .cloned()
-        {
-            let mem: Vec<(u64, Vec<f32>)> = self
-                .ivf_mem
-                .lock()
-                .unwrap()
-                .get(&super::index_key(q.table, q.column))
-                .cloned()
-                .unwrap_or_default();
+        let ivf = {
+            let tables = self.tables.lock().unwrap();
+            tables.get(&tkey).and_then(|e| {
+                (e.ivf.contains_key(q.column) || e.ivf_mem.contains_key(q.column)).then(|| {
+                    (
+                        e.ivf.get(q.column).cloned().unwrap_or_default(),
+                        e.ivf_mem.get(q.column).cloned().unwrap_or_default(),
+                    )
+                })
+            })
+        };
+        if let Some((segments, mem)) = ivf {
             if segments.is_empty() && mem.is_empty() {
                 return None;
             }
@@ -120,12 +119,12 @@ impl Engine {
         if q.metric != "l2" {
             return None;
         }
-        let segments = self
-            .vector_indexes
-            .lock()
-            .unwrap()
-            .get(&super::index_key(q.table, q.column))
-            .cloned()?;
+        let segments = {
+            let tables = self.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|e| e.vector.get(q.column).cloned())?
+        };
         if segments.is_empty() {
             return None;
         }
@@ -161,7 +160,6 @@ impl Engine {
         }
         // The in-memory segment: rows written after the last dump. The
         // reference searches every segment and merges the results.
-        let tkey = self.table_key(q.table);
         let mem = self
             .tables
             .lock()

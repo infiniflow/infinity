@@ -1096,15 +1096,12 @@ impl Engine {
                 self.write_cpp_blocks(&meta.name)?;
                 // The mirror now covers every row; the IVF memory segment is
                 // redundant and would double-count candidates.
-                let prefix = format!("{}.", meta.name);
-                for (k, rows) in self.ivf_mem.lock().unwrap().iter_mut() {
-                    if k.starts_with(&prefix) {
-                        rows.clear();
-                    }
-                }
                 let key = self.table_key(&meta.name);
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(key).or_default();
+                for rows in entry.ivf_mem.values_mut() {
+                    rows.clear();
+                }
                 let generation = entry.write_batches;
                 entry.cpp_block_generation = Some(generation);
             }
@@ -2755,10 +2752,11 @@ mod tests {
         // disk rather than scanning every row (plan #70).
         let e = Engine::open(dir.path()).unwrap();
         assert!(
-            e.vector_indexes
+            e.tables
                 .lock()
                 .unwrap()
-                .contains_key(&crate::index_key("default_db.hv", "v")),
+                .get("default_db.hv")
+                .is_some_and(|t| t.vector.contains_key("v")),
             "the HNSW graph was not loaded from the mirror"
         );
         let rows = row_strings(
