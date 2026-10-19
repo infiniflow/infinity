@@ -1298,6 +1298,7 @@ mod reference_suite {
     /// scalar value renderings (the JSON case has no `Column` variant; JSON is
     /// stored as text and rendered verbatim).
     #[test]
+    #[allow(clippy::approx_constant)]
     fn value_to_string_matches_the_reference() {
         let cases: Vec<(Column, &str)> = vec![
             (Column::Bool(cv(vec![true])), "true"),
@@ -1331,6 +1332,7 @@ mod reference_suite {
     /// into the declared scalar type (the JSON case is covered by the scalar
     /// JSON functions).
     #[test]
+    #[allow(clippy::approx_constant)]
     fn string_to_value_roundtrips_the_scalar_types() {
         let mut b = ColumnVector::<bool>::new();
         b.push(Some(true));

@@ -495,7 +495,7 @@ mod tests {
         let pool = BufferPool::new(64 * 1024);
         let b = pool.allocate(4096, BufferType::Persistent);
         {
-            let mut h = b.load().unwrap();
+            let h = b.load().unwrap();
             h.data_mut().as_mut().unwrap()[0] = 9;
         }
         let mut handles = Vec::new();
