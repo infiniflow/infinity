@@ -14,6 +14,7 @@
 | `BlockVersionFile`（`storage/buffer/block_version.cppm`） | `cpp_format::BlockVersionFile` | `Decode/Encode` | ✅ |
 | `ColumnDef::ToString` / `ConstrainTypeToString` / `LogicalType2Str`（`parser/definition/column_def.cpp:213`、`parser/type/logical_type.cpp:28`） | `ColumnDefValue` 的 `Display` | 约束按 `std::set<ConstraintType>` 顺序、缺省默认打印 `Null`、`DataType` 的 C++ 拼写（`TinyInt`/`Varchar`/`Decimal(p,s)`…） | ✅ |
 | `KeyEncode`（`storage/common/kv_code.cppm`） | `infinity_storage::catalog_format` 的 `catalog|…` 与名称键两族函数 | `CatalogDbKey`/`CatalogDbPrefix`/`CatalogDbTagPrefix`/`CatalogTableKey`/`TableColumnKey`/`CatalogTableSegmentKey` 与 `DatabaseKey`/`TableKey`/`TableSegmentKey`/`TableSegmentBlockKey`/`TableSegmentBlockColumnKey`/`TableIndexKey`/`TableIndexSegmentKey`/`TableIndexChunkKey` 及各自 `*Prefix` | ✅ |
+| `Selection`（`column_vector/selection.cppm`）/ `VarBuffer`（`buffer/buffer_obj.cppm`） | `infinity_storage::selection::Selection` / `infinity_storage::var_buffer::VarBuffer` | `Initialize/Set/Append/Get/Capacity/Size/Reset`；`Append/Get/Write/TotalSize/GetSize`（分块存储 + 前缀和，零长度行返回空） | ✅ |
 | `BlockVersion` / `CreateField`（`catalog/meta/block_version.cppm`） | `infinity_storage::mvcc::{BlockVersion, CreateField}` | `Append`→`append`（累计行数）、`CommitAppend`→`commit_append`、`Delete`→`delete`（重复删除报 `TxnWWConflict`）、`RollbackDelete`、`CheckDelete`、`GetCreateTS`/`GetDeleteTS`、`SpillToFile`/`LoadFromFile`（复用 `BlockVersionFile` 字节布局） | ✅ |
 | `TableDef` / `ColumnDef` / `IndexBase` 系列（`table_def.cppm`、`column_def.cppm`、`index_def*.cppm`） | `infinity_catalog::{TableMeta, IndexMeta, ColumnDefValue, IndexDefValue}` + `cpp_layout` | catalog 键空间按 C++ 布局编解码；`IndexFullText/Secondary/HNSW/IVF/BMP/EMVB` 的参数存于 `IndexMeta.options` | ✅ |
 | `SecondaryIndexDataBase::SaveIndexInner` | `secondary_segment::write_secondary_segment` / `SecondarySegmentReader` | 保存/查找 | ✅ |
@@ -99,7 +100,7 @@
 
 ## 类级覆盖审计（基线 `5d27942c0`）
 
-`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **95** 个。其余 1041 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 95 / grouped 1019 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
+`src/**/*.cppm` 中 `export class/struct` 共 **1136** 个；本表显式命名 **97** 个。其余 1039 个按 §3.6 允许的「结构合并」处理（模板特化 / POD 状态 / 迭代器机件 / 生成的 Thrift 类型），不是静默省略。**逐名清单（1136 行，mapped 97 / grouped 1017 / excluded 15 / test 7）见 [`CLASS_AUDIT.md`](CLASS_AUDIT.md)**；下表是按区域汇总（计数以加入 PLAID/SMVE 映射前的快照统计）：
 
 | 区域 | 未逐类命名 | Rust 承担方式 |
 |---|---:|---|
@@ -113,7 +114,7 @@
 
 > 判定口径：C++ 中承载**行为**且被其他类调用的类（HNSW/IVF/EMVB/PLAID/SMVE、全文段、事务、Buffer、BlockIndex、PDataBlock 等）在本表中逐类对应；纯数据载体、模板特化、迭代器和生成类型按上表合并，理由与归属均已登记。新增 C++ 行为类时仍须先登记再移植。
 
-**聚合对应（精确计数，覆盖其余 1019 个类；逐名见 `CLASS_AUDIT.md`）**
+**聚合对应（精确计数，覆盖其余 1017 个类；逐名见 `CLASS_AUDIT.md`）**
 
 | 聚合到（Rust） | 类数 |
 |---|---:|
@@ -137,7 +138,7 @@
 | 表函数（执行器直接求值） | 17 |
 | `infinity_storage::buffer` | 16 |
 | `std::fs` + `infinity_storage::s3` | 16 |
-| `data_block::{ColumnVector, DataBlock}` | 15 |
+| `data_block::{ColumnVector, DataBlock}` | 14 |
 | `infinity-expression` 求值函数 | 13 |
 | `infinity_catalog::value_format` | 12 |
 | `sparse::{BmpAlg, BMPIvt, BlockFwd, TailFwd}` + `SparseIndex` | 12 |
@@ -147,7 +148,7 @@
 | `ivf::IvfIndex` + `ivf`/`ivf_mem` | 7 |
 | `merge_knn::MergeKnn` + 结果堆 | 3 |
 | 其余 8 个聚合组（每组 ≤2 个类） | 12 |
-| **合计** | **1019** |
+| **合计** | **1017** |
 
 ## 维护规则
 
@@ -213,6 +214,7 @@
 | `storage/definition/index_base_ut.cpp`（3 例） | `value_format::IndexDefValue` | `ivf_index_base_roundtrips_through_its_bytes`、`hnsw_index_base_roundtrips_through_its_bytes`、`full_text_index_base_roundtrips_through_its_bytes` |
 | `storage/common/kv_code_ut.cpp`（2 例） | `catalog_format` | `catalog_keys_match_the_reference`、`name_keyed_catalog_keys_match_the_reference` |
 | `common/utility/{trim,utility,exception}_ut.cpp`（3 例） | `infinity_common::{utility, Error}` | `trim_path_keeps_the_repository_relative_part`、`extract_u64_reads_the_key_suffix`、`non_alphanumeric_suffix_reports_failure`、`exception_messages_match_the_reference` |
+| `storage/column_vector/{selection,var_buffer}_ut.cpp`（2 例） | `selection::Selection` / `var_buffer::VarBuffer` | `selection_matches_the_reference`、`var_buffer_appends_and_roundtrips` |
 | `storage/meta/entry/block_version_ut.cpp`（5 例） | `mvcc::BlockVersion` | `save_and_load_roundtrip`、`reopen_preserves_the_slot_array`、`delete_twice_is_rejected`、`check_delete_compares_timestamps`、`get_delete_ts_returns_the_slot_range` |
 | `main/table_ut.cpp::InfinityTableTest::test1` | `Engine` + `ExplainKind` | `explain_covers_every_plan_kind`（AST/LOGICAL/OPTIMIZED/PHYSICAL/FRAGMENT/PIPELINE） |
 

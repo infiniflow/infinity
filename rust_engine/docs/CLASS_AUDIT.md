@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1019, `mapped` 95, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1017, `mapped` 97, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -546,7 +546,7 @@
 | 537 | `BufferObj` | `src/storage/buffer/buffer_handle.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 538 | `BufferManager` | `src/storage/buffer/buffer_manager.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 539 | `BufferObjectInfo` | `src/storage/buffer/buffer_obj.cppm` | grouped | `infinity_storage::buffer`（`BufferObj`/`BufferManager`） |
-| 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | grouped | `infinity_storage::buffer`（`BufferObj`/`BufferManager`） |
+| 540 | `VarBuffer` | `src/storage/buffer/buffer_obj.cppm` | mapped | `infinity_storage::var_buffer::VarBuffer`（Append/Get/Write/TotalSize/GetSize） |
 | 541 | `BMPIndexFileWorker` | `src/storage/buffer/file_worker/bmp_index_file_worker.cppm` | grouped | `infinity_storage::buffer`（`BufferObj`/`BufferManager`） |
 | 542 | `DataFileWorker` | `src/storage/buffer/file_worker/data_file_worker.cppm` | mapped | CLASS_MAP 已显式命名 |
 | 543 | `EMVBIndexFileWorker` | `src/storage/buffer/file_worker/emvb_index_file_worker.cppm` | grouped | `infinity_storage::buffer`（`BufferObj`/`BufferManager`） |
@@ -651,7 +651,7 @@
 | 642 | `NullaryOperator` | `src/storage/column_vector/operator/nullary_operation.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
 | 643 | `TernaryOperator` | `src/storage/column_vector/operator/ternary_operator.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
 | 644 | `UnaryOperator` | `src/storage/column_vector/operator/unary_operator.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
-| 645 | `Selection` | `src/storage/column_vector/selection.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
+| 645 | `Selection` | `src/storage/column_vector/selection.cppm` | mapped | `infinity_storage::selection::{Selection, SelectionData}`（Initialize/Set/Append/Get/operator[]/Capacity/Size/Reset） |
 | 646 | `ArrayValueInfo` | `src/storage/column_vector/value.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
 | 647 | `EmbeddingValueInfo` | `src/storage/column_vector/value.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |
 | 648 | `JsonValueInfo` | `src/storage/column_vector/value.cppm` | grouped | `infinity_storage::data_block::{ColumnVector, DataBlock}` |

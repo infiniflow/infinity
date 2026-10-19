@@ -439,7 +439,7 @@
 | 425 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_not_inline_varchar` | partial |
 | 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | partial |
 | 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | partial |
-| 428 | `src/unit_test/storage/column_vector/selection_ut.cpp` | `SelectionTest` | `test1` | partial |
+| 428 | `src/unit_test/storage/column_vector/selection_ut.cpp` | `SelectionTest` | `test1` | ported | `infinity-storage` `selection::tests::selection_matches_the_reference` |
 | 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | partial |
 | 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | partial |
 | 431 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor` | partial |
@@ -447,7 +447,7 @@
 | 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | partial |
 | 434 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_tostring` | partial |
 | 435 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_stringtovalue` | partial |
-| 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | partial |
+| 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | ported | `infinity-storage` `var_buffer::tests::var_buffer_appends_and_roundtrips` |
 | 437 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code1` | ported | `infinity-storage` `catalog_format::tests::catalog_keys_match_the_reference` |
 | 438 | `src/unit_test/storage/common/kv_code_ut.cpp` | `KVCodeTest` | `kv_code2` | ported | `catalog_format::tests::name_keyed_catalog_keys_match_the_reference` |
 | 439 | `src/unit_test/storage/common/loser_tree_ut.cpp` | `LoserTreeTest` | `BasicMerge1` | ported | `infinity-common` `loser_tree::tests::basic_merge_1` |
