@@ -204,19 +204,165 @@ impl MixedValueType {
     }
 }
 
-/// C++: `MixedT` (`src/parser/type/mixed_type.h`): the heterogeneous value's
-/// rendered form (the executor keeps typed values in `Value`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct MixedT(pub String);
+/// The payload of a [`MixedT`] value.
+///
+/// C++: the `MixedType` union (`src/parser/type/mixed_type.h`). The reference's
+/// short/long string split mirrors its inline header (14 bytes); the payload is
+/// otherwise an owned value, so Rust's move semantics replace the reference's
+/// moved-from `kInvalid` state.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum MixedValue {
+    #[default]
+    Invalid,
+    Integer(i64),
+    Float(f64),
+    ShortStr(String),
+    LongStr(String),
+    Tuple(Vec<MixedT>),
+    Array(Vec<MixedT>),
+    Null,
+    Missing,
+    Dummy,
+}
+
+/// C++: `MixedT` (`src/parser/type/mixed_type.h`) — a heterogeneous value.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MixedT {
+    pub value: MixedValue,
+}
+
+/// C++ `ShortStrMixedType`'s inline capacity.
+pub const MIXED_SHORT_STR_MAX: usize = 14;
 
 impl MixedT {
+    /// The textual constructor used by the column/block mirror.
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self::make_string(&value.into())
+    }
+
+    pub fn make_integer(value: i64) -> Self {
+        Self {
+            value: MixedValue::Integer(value),
+        }
+    }
+
+    pub fn make_float(value: f64) -> Self {
+        Self {
+            value: MixedValue::Float(value),
+        }
+    }
+
+    /// C++ `MixedType::MakeString`: up to 14 bytes stay inline (`kShortStr`).
+    pub fn make_string(value: &str) -> Self {
+        let value = value.to_string();
+        Self {
+            value: if value.len() <= MIXED_SHORT_STR_MAX {
+                MixedValue::ShortStr(value)
+            } else {
+                MixedValue::LongStr(value)
+            },
+        }
+    }
+
+    pub fn make_tuple(values: Vec<MixedT>) -> Self {
+        Self {
+            value: MixedValue::Tuple(values),
+        }
+    }
+
+    pub fn make_array(values: Vec<MixedT>) -> Self {
+        Self {
+            value: MixedValue::Array(values),
+        }
+    }
+
+    /// C++ `MixedType::MakeNull`.
+    pub fn make_null() -> Self {
+        Self {
+            value: MixedValue::Null,
+        }
+    }
+
+    /// C++ `MixedType::MakeMiss`.
+    pub fn make_missing() -> Self {
+        Self {
+            value: MixedValue::Missing,
+        }
     }
 
     /// C++ `NullValue<MixedT>()`: the value's type tag is `kNull`.
     pub fn null() -> Self {
-        Self("null".to_string())
+        Self::make_null()
+    }
+
+    /// C++ `MixedType::Reset`: back to `kInvalid`.
+    pub fn reset(&mut self) {
+        self.value = MixedValue::Invalid;
+    }
+
+    /// C++ `MixedType::type`.
+    pub fn value_type(&self) -> MixedValueType {
+        match self.value {
+            MixedValue::Invalid => MixedValueType::Invalid,
+            MixedValue::Integer(_) => MixedValueType::Integer,
+            MixedValue::Float(_) => MixedValueType::Float,
+            MixedValue::ShortStr(_) => MixedValueType::ShortStr,
+            MixedValue::LongStr(_) => MixedValueType::LongStr,
+            MixedValue::Tuple(_) => MixedValueType::Tuple,
+            MixedValue::Array(_) => MixedValueType::Array,
+            MixedValue::Null => MixedValueType::Null,
+            MixedValue::Missing => MixedValueType::Missing,
+            MixedValue::Dummy => MixedValueType::Dummy,
+        }
+    }
+
+    pub fn as_integer(&self) -> Option<i64> {
+        match self.value {
+            MixedValue::Integer(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self.value {
+            MixedValue::Float(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_text(&self) -> Option<&str> {
+        match &self.value {
+            MixedValue::ShortStr(s) | MixedValue::LongStr(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// The rendered form used by the block mirror.
+    pub fn text(&self) -> String {
+        match &self.value {
+            MixedValue::Invalid => String::new(),
+            MixedValue::Integer(v) => v.to_string(),
+            MixedValue::Float(v) => v.to_string(),
+            MixedValue::ShortStr(s) | MixedValue::LongStr(s) => s.clone(),
+            MixedValue::Null => "null".to_string(),
+            MixedValue::Missing => "missing".to_string(),
+            MixedValue::Dummy => "dummy".to_string(),
+            MixedValue::Tuple(items) | MixedValue::Array(items) => {
+                let inner: Vec<String> = items.iter().map(MixedT::text).collect();
+                format!("[{}]", inner.join(","))
+            }
+        }
+    }
+
+    /// Approximate heap bytes (used by the column-vector accounting).
+    pub fn heap_len(&self) -> usize {
+        match &self.value {
+            MixedValue::ShortStr(s) | MixedValue::LongStr(s) => s.len(),
+            MixedValue::Tuple(items) | MixedValue::Array(items) => {
+                items.iter().map(MixedT::heap_len).sum::<usize>() + items.len() * 24
+            }
+            _ => 0,
+        }
     }
 }
 
@@ -744,7 +890,7 @@ mod tests {
         let interval = IntervalT::null_value();
         assert_eq!(interval.unit, TimeUnit::Invalid);
         assert_eq!(interval.value, i32::MIN);
-        assert_eq!(MixedT::null_value().0, "null");
+        assert_eq!(MixedT::null_value().value_type(), MixedValueType::Null);
     }
 
     // C++: src/unit_test/parser/type/complex/uuid_type_ut.cpp:Uuid
@@ -819,5 +965,68 @@ mod tests {
         ] {
             assert_eq!(ty.type_name(), name);
         }
+    }
+    /// `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp::mixed_integer`.
+    #[test]
+    fn mixed_integer_value_and_clone() {
+        let mut a = MixedT::make_integer(10);
+        assert_eq!(a.value_type(), MixedValueType::Integer);
+        assert_eq!(a.as_integer(), Some(10));
+        let b = a.clone();
+        a.value = MixedValue::Integer(11);
+        assert_eq!(a.as_integer(), Some(11));
+        assert_eq!(b.as_integer(), Some(10));
+    }
+
+    /// `mixed_type_ut.cpp::mixed_float`.
+    #[test]
+    fn mixed_float_value() {
+        let v = MixedT::make_float(3.25);
+        assert_eq!(v.value_type(), MixedValueType::Float);
+        assert_eq!(v.as_float(), Some(3.25));
+    }
+
+    /// `mixed_type_ut.cpp::mixed_short_str`: the 14-byte inline boundary and
+    /// `Reset`.
+    #[test]
+    fn mixed_short_string_boundary() {
+        let v = MixedT::make_string("Hello");
+        assert_eq!(v.value_type(), MixedValueType::ShortStr);
+        assert_eq!(v.as_text(), Some("Hello"));
+
+        let v = MixedT::make_string("Hello a World!");
+        assert_eq!(v.as_text().unwrap().len(), 14);
+        assert_eq!(v.value_type(), MixedValueType::ShortStr);
+
+        let mut v = v;
+        v.reset();
+        assert_eq!(v.value_type(), MixedValueType::Invalid);
+    }
+
+    /// `mixed_type_ut.cpp::mixed_long_str`.
+    #[test]
+    fn mixed_long_string() {
+        let v = MixedT::make_string("Hello the world");
+        assert_eq!(v.value_type(), MixedValueType::LongStr);
+        assert_eq!(v.as_text(), Some("Hello the world"));
+    }
+
+    /// `mixed_type_ut.cpp::mixed_null` / `mixed_miss`.
+    #[test]
+    fn mixed_null_and_missing_tags() {
+        assert_eq!(MixedT::make_null().value_type(), MixedValueType::Null);
+        assert_eq!(MixedT::make_missing().value_type(), MixedValueType::Missing);
+    }
+
+    /// `mixed_type_ut.cpp::mixed_tuple1` / `mixed_array1`: nesting and rendering.
+    #[test]
+    fn mixed_tuple_and_array_nest() {
+        let tuple = MixedT::make_tuple(vec![MixedT::make_integer(1), MixedT::make_string("abc")]);
+        assert_eq!(tuple.value_type(), MixedValueType::Tuple);
+        assert_eq!(tuple.text(), "[1,abc]");
+
+        let array = MixedT::make_array(vec![tuple.clone(), MixedT::make_float(0.5)]);
+        assert_eq!(array.value_type(), MixedValueType::Array);
+        assert_eq!(array.text(), "[[1,abc],0.5]");
     }
 }

@@ -1023,7 +1023,7 @@ fn put_block_value<S: Sink>(sink: &mut S, value: &BlockValue) {
         }
         BlockValue::Mixed(v) => {
             put_u8(sink, 19);
-            put_str(sink, &v.0);
+            put_str(sink, &v.text());
         }
     }
 }

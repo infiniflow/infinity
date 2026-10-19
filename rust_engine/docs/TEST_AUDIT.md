@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 73, `integration` 250, `partial` 42, `ported` 397.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 65, `integration` 250, `partial` 44, `ported` 403.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -256,16 +256,16 @@
 | 242 | `src/unit_test/parser/type/geo/point_type_ut.cpp` | `PointTypeTest` | `point1` | gate-a |
 | 243 | `src/unit_test/parser/type/geo/polygon_type_ut_nimpl.cpp` | `PolygonTypeTest` | `polygon1` | gate-a |
 | 244 | `src/unit_test/parser/type/heterogeneous/base_mixed_type_ut.cpp` | `BaseMixedTypeTest` | `GetTypeName` | ported | `infinity-common` `types::tests::mixed_value_type_names_match_the_reference` |
-| 245 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_integer` | gate-a |
-| 246 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_float` | gate-a |
-| 247 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_short_str` | gate-a |
-| 248 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_long_str` | gate-a |
-| 249 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_null` | gate-a |
-| 250 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_miss` | gate-a |
-| 251 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple1` | gate-a |
+| 245 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_integer` | ported | `infinity-common` `types::tests::mixed_integer_value_and_clone` |
+| 246 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_float` | ported | `infinity-common` `types::tests::mixed_float_value` |
+| 247 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_short_str` | ported | `infinity-common` `types::tests::mixed_short_string_boundary` |
+| 248 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_long_str` | ported | `infinity-common` `types::tests::mixed_long_string` |
+| 249 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_null` | ported | `infinity-common` `types::tests::mixed_null_and_missing_tags` |
+| 250 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_miss` | ported | `infinity-common` `types::tests::mixed_null_and_missing_tags` |
+| 251 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple1` | partial | `infinity-common` `types::tests::mixed_tuple_and_array_nest` 覆盖基础嵌套；C++ 的多层访问器断言未移植 |
 | 252 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple2` | gate-a |
 | 253 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_tuple3` | gate-a |
-| 254 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array1` | gate-a |
+| 254 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array1` | partial | `infinity-common` `types::tests::mixed_tuple_and_array_nest` 覆盖基础嵌套；C++ 的多层访问器断言未移植 |
 | 255 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array2` | gate-a |
 | 256 | `src/unit_test/parser/type/heterogeneous/mixed_type_ut.cpp` | `MixedTypeTest` | `mixed_array3` | gate-a |
 | 257 | `src/unit_test/parser/type/info/decimal_info_ut.cpp` | `DecimalInfoTest` | `decimal_info_A` | ported | `infinity-common` `decimal_info_a` |

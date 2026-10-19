@@ -507,7 +507,7 @@ impl Column {
                         .join(",")
                 )
             }),
-            Column::Mixed(c) => c.get(row).map(|v| v.0.clone()),
+            Column::Mixed(c) => c.get(row).map(|v| v.text()),
         }
     }
 
@@ -542,7 +542,7 @@ impl Column {
                 v.values().iter().map(|x| x.len() * 8 + 24).sum::<usize>() + v.validity().len()
             }
             Column::Mixed(v) => {
-                v.values().iter().map(|x| x.0.len() + 24).sum::<usize>() + v.validity().len()
+                v.values().iter().map(|x| x.heap_len() + 24).sum::<usize>() + v.validity().len()
             }
         }
     }
