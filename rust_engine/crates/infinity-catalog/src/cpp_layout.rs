@@ -15,7 +15,7 @@ use crate::value_format::{
     self, array_type_info, data_type_json, embedding_type_info, logical, ColumnDefValue,
     IndexDefValue,
 };
-use crate::{Catalog, IndexMeta, TableMeta};
+use crate::{split_sparse_store_suffix, Catalog, IndexMeta, SparseStore, TableMeta};
 
 /// One table as read back from a C++-layout catalog.
 #[derive(Debug, Clone, PartialEq)]
@@ -31,8 +31,16 @@ pub struct CppTable {
 
 /// Maps a declared type text to the C++ `DataType::Serialize()` object.
 ///
+/// A trailing `WITH (SORTED)` on a `SPARSE` type text selects the C++
+/// `SparseStoreType::kSorted`; without it the column keeps `kSort`.
 /// Returns `None` for shapes this mapping does not cover yet.
 pub fn data_type_of_text(type_text: &str) -> Option<Json> {
+    let (type_text, store) = split_sparse_store_suffix(type_text);
+    data_type_of_text_with_store(type_text, store)
+}
+
+/// [`data_type_of_text`] with an explicit sparse storage hint.
+pub fn data_type_of_text_with_store(type_text: &str, store: Option<SparseStore>) -> Option<Json> {
     let up = type_text.trim().to_ascii_uppercase();
     let base = up.split('(').next().unwrap_or("").trim();
     let plain = |lt: i64| Some(data_type_json(lt, None));
@@ -105,7 +113,7 @@ pub fn data_type_of_text(type_text: &str) -> Option<Json> {
                     element_code(&elem)?,
                     value_format::sparse_index_type(dim),
                     dim,
-                    value_format::sparse_store::SORT,
+                    store.unwrap_or(SparseStore::Sort).as_i64(),
                 )),
             ))
         }
@@ -228,7 +236,17 @@ pub fn type_text_of(column_type: &infinity_expression::json::Json) -> Option<Str
             };
             let elem = value_format::type_info_int(column_type, elem_key)?;
             let dim = value_format::type_info_int(column_type, "dimension")?;
-            Some(format!("{base}({},{})", element_name(elem)?, dim))
+            let text = format!("{base}({},{})", element_name(elem)?, dim);
+            // Keep the sparse storage hint in the text: the C++ record carries
+            // it as `"sort": 1`, and `create_table_typed_with_sparse_stores`
+            // splits it back out.
+            if code == value_format::logical::SPARSE
+                && value_format::type_info_int(column_type, "sort")
+                    == Some(SparseStore::Sorted.as_i64())
+            {
+                return Some(format!("{text} WITH (SORTED)"));
+            }
+            Some(text)
         }
         _ => None,
     }
@@ -573,7 +591,8 @@ impl Catalog {
             let mut columns = Vec::new();
             for (i, col) in t.columns.iter().enumerate() {
                 let type_text = t.types.get(i).cloned().unwrap_or_default();
-                let Some(data_type) = data_type_of_text(&type_text) else {
+                let sparse_store = t.sparse_stores.get(i).copied().flatten();
+                let Some(data_type) = data_type_of_text_with_store(&type_text, sparse_store) else {
                     return Err(Error::Catalog(format!(
                         "column '{col}' of '{}' has a type the C++ catalog encoding \
                          does not cover yet: '{type_text}'",
@@ -912,6 +931,17 @@ pub fn index_meta_of(def: &IndexDefValue, cpp_tables: &[CppTable]) -> Option<Ind
 pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> {
     let mut out = Vec::new();
     for t in read_cpp_layout(store)? {
+        // `type_text_of` carries `WITH (SORTED)` for a kSorted sparse column;
+        // split it back into the bare type text plus the hint field.
+        let declared: Vec<(String, Option<SparseStore>)> = t
+            .columns
+            .iter()
+            .map(|c| {
+                let text = type_text_of(&c.column_type).unwrap_or_default();
+                let (bare, store) = split_sparse_store_suffix(&text);
+                (bare.to_string(), store)
+            })
+            .collect();
         out.push(TableMeta {
             id: t.table_id,
             name: format!("{}.{}", t.db_name, t.table_name),
@@ -924,17 +954,14 @@ pub fn read_cpp_tables_as_meta(store: &dyn MetaStore) -> Result<Vec<TableMeta>> 
                 .map(|c| c.default.as_ref().and_then(default_text_of))
                 .collect(),
             not_nulls: t.columns.iter().map(is_not_null).collect(),
-            types: t
-                .columns
-                .iter()
-                .map(|c| type_text_of(&c.column_type).unwrap_or_default())
-                .collect(),
+            types: declared.iter().map(|(text, _)| text.clone()).collect(),
             comments: t.columns.iter().map(|c| c.column_comment.clone()).collect(),
             ids: t
                 .columns
                 .iter()
                 .map(|c| c.column_id.max(0) as u64)
                 .collect(),
+            sparse_stores: declared.into_iter().map(|(_, store)| store).collect(),
         });
     }
     Ok(out)
@@ -972,6 +999,67 @@ mod tests {
             data_type_of_text("SPARSE(FLOAT,100)").unwrap().compact(),
             r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
         );
+        // `WITH (SORTED)` selects the C++ `kSorted` flag; `WITH (sort)` keeps
+        // the default.
+        assert_eq!(
+            data_type_of_text("SPARSE(FLOAT,100) WITH (SORTED)")
+                .unwrap()
+                .compact(),
+            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":1}}"#
+        );
+        assert_eq!(
+            data_type_of_text("SPARSE(FLOAT,100) WITH (sort)")
+                .unwrap()
+                .compact(),
+            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":100,"index_type":2,"sort":0}}"#
+        );
+    }
+
+    #[test]
+    fn sparse_sorted_hint_round_trips_through_the_cpp_layout() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cat = Catalog::open(tmp.path()).unwrap();
+        cat.create_table_typed_with_sparse_stores(
+            "default_db.sp",
+            &["id".to_string(), "v".to_string()],
+            &[None, None],
+            &[false, false],
+            &["INTEGER".to_string(), "SPARSE(FLOAT,30000)".to_string()],
+            &[None, None],
+            &[None, Some(SparseStore::Sorted)],
+        )
+        .unwrap();
+
+        let out = tempfile::tempdir().unwrap();
+        let store: Arc<dyn MetaStore> = Arc::new(FjallMetaStore::open(out.path(), "cpp").unwrap());
+        cat.write_cpp_layout(store.as_ref()).unwrap();
+
+        let tables = read_cpp_layout(store.as_ref()).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(
+            tables[0].columns[1].column_type.compact(),
+            r#"{"data_type":15,"type_info":{"data_type":6,"dimension":30000,"index_type":3,"sort":1}}"#
+        );
+        assert_eq!(
+            type_text_of(&tables[0].columns[1].column_type).unwrap(),
+            "SPARSE(float,30000) WITH (SORTED)"
+        );
+
+        // The read direction restores the bare type text plus the hint field.
+        let metas = read_cpp_tables_as_meta(store.as_ref()).unwrap();
+        assert_eq!(metas[0].types[1], "SPARSE(float,30000)");
+        assert_eq!(metas[0].sparse_stores[1], Some(crate::SparseStore::Sorted));
+
+        // Importing the layout into a fresh native catalog keeps the hint.
+        let dst = tempfile::tempdir().unwrap();
+        let imported = Catalog::open(dst.path()).unwrap();
+        imported.import_cpp_layout(store.as_ref()).unwrap();
+        let meta = imported
+            .get_table_by_name("default_db.sp")
+            .unwrap()
+            .unwrap();
+        assert_eq!(meta.types[1], "SPARSE(float,30000)");
+        assert_eq!(meta.sparse_stores[1], Some(crate::SparseStore::Sorted));
     }
 
     #[test]

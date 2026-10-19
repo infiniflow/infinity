@@ -168,6 +168,12 @@ impl PlaidIndex {
     pub fn is_colbertsar_mode(&self) -> bool {
         self.colbertsar_mode
     }
+    /// C++ `PlaidIndex::IsMmap`. The reference may keep `centroid_ids` in an
+    /// mmap after `LoadFromPtr`; this port always owns the data (the deviation
+    /// is documented at the module level), so no index is ever mmapped.
+    pub fn is_mmap(&self) -> bool {
+        false
+    }
     pub fn centroids_data(&self) -> &[f32] {
         match &self.global_centroids {
             Some(g) => g.centroids_data(),
@@ -1832,5 +1838,184 @@ mod tests {
         let a = index.exact_score(probe, 1, 6);
         let b = merged.exact_score(probe, 1, 6);
         assert!((a - b).abs() < 1e-6, "{a} vs {b}");
+    }
+
+    // ── ColBERTSaR mode (`PlaidIndexColBERTSaRTest`) ──
+    //
+    // `GenerateData(data, count, seed)` in the reference is a fixed-seed
+    // normal sample; `Normal::new(seed).data(count * dim)` is the same shape.
+
+    const COLBERTSAR_DIM: u32 = 16;
+    const COLBERTSAR_K: u32 = 8;
+    const COLBERTSAR_TRAIN: usize = 512;
+    const COLBERTSAR_PER_DOC: u32 = 6;
+
+    fn colbertsar_data(count: usize, seed: u64) -> Vec<f32> {
+        Normal::new(seed).data(count * COLBERTSAR_DIM as usize)
+    }
+
+    /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_construction`
+    /// (`test_plaid_ut.cpp:334`): an untrained ColBERTSaR index reports its
+    /// mode and dimension, with no centroids, documents or embeddings, and is
+    /// not mmapped.
+    #[test]
+    fn colbertsar_construction() {
+        let index = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        assert!(index.is_colbertsar_mode());
+        assert_eq!(index.embedding_dimension(), COLBERTSAR_DIM);
+        assert_eq!(index.n_centroids(), 0);
+        assert_eq!(index.doc_num(), 0);
+        assert_eq!(index.total_embedding_num(), 0);
+        assert!(!index.is_mmap());
+    }
+
+    /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_move_semantics`
+    /// (`test_plaid_ut.cpp:484`): a move construction and a move assignment
+    /// both preserve the ColBERTSaR flag, the centroids and the document.
+    #[test]
+    fn colbertsar_move_semantics() {
+        let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
+        let mut index1 = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        assert!(index1.is_colbertsar_mode());
+        index1
+            .train(COLBERTSAR_K, &train, COLBERTSAR_TRAIN, 4)
+            .unwrap();
+        index1
+            .add_multiple_docs_embeddings(&train, &[8u32])
+            .unwrap();
+
+        // Move construct.
+        let index2 = index1;
+        assert!(index2.is_colbertsar_mode());
+        assert_eq!(index2.n_centroids(), COLBERTSAR_K);
+        assert_eq!(index2.doc_num(), 1);
+
+        // Move assign.
+        let mut index3 = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        assert_eq!(index3.doc_num(), 0, "the assigned-to index starts empty");
+        index3 = index2;
+        assert!(index3.is_colbertsar_mode());
+        assert_eq!(index3.n_centroids(), COLBERTSAR_K);
+        assert_eq!(index3.doc_num(), 1);
+    }
+
+    /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_mem_usage`
+    /// (`test_plaid_ut.cpp:509`): `MemUsage` is positive and equals the
+    /// serialized size.
+    #[test]
+    fn colbertsar_mem_usage() {
+        let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
+        let mut index = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        index
+            .train(COLBERTSAR_K, &train, COLBERTSAR_TRAIN, 4)
+            .unwrap();
+        index.add_multiple_docs_embeddings(&train, &[8u32]).unwrap();
+
+        let mem_usage = index.mem_usage();
+        assert!(mem_usage > 0);
+        assert_eq!(mem_usage, index.calc_size());
+    }
+
+    /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_merge`
+    /// (`test_plaid_ut.cpp:526`): two 5-document chunks sharing the primary's
+    /// centroids merge into one 10-document index without residuals.
+    #[test]
+    fn colbertsar_merge() {
+        let train = colbertsar_data(COLBERTSAR_TRAIN, 42);
+        let mut primary = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        primary
+            .train(COLBERTSAR_K, &train, COLBERTSAR_TRAIN, 4)
+            .unwrap();
+
+        let make_chunk = |seed_start: u64| {
+            let mut chunk = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+            chunk
+                .copy_centroids_from(
+                    primary.centroids_data(),
+                    primary.centroid_norms_neg_half(),
+                    COLBERTSAR_K,
+                    None,
+                    false,
+                )
+                .unwrap();
+            let mut lens = Vec::new();
+            let mut embeddings = Vec::new();
+            for doc in 0..5u64 {
+                embeddings.extend_from_slice(&colbertsar_data(
+                    COLBERTSAR_PER_DOC as usize,
+                    seed_start + doc,
+                ));
+                lens.push(COLBERTSAR_PER_DOC);
+            }
+            chunk
+                .add_multiple_docs_embeddings(&embeddings, &lens)
+                .unwrap();
+            assert_eq!(chunk.doc_num(), 5);
+            chunk
+        };
+        let chunk1 = make_chunk(200);
+        let chunk2 = make_chunk(300);
+
+        let mut merged = PlaidIndex::new(0, COLBERTSAR_DIM, 4, COLBERTSAR_K, true).unwrap();
+        merged
+            .copy_centroids_from(
+                primary.centroids_data(),
+                primary.centroid_norms_neg_half(),
+                COLBERTSAR_K,
+                None,
+                false,
+            )
+            .unwrap();
+        merged.merge_chunks(&[(0, &chunk1), (0, &chunk2)]).unwrap();
+        assert_eq!(merged.doc_num(), 10);
+        assert_eq!(merged.total_embedding_num(), 10 * COLBERTSAR_PER_DOC);
+        assert!(merged.packed_residuals().is_empty());
+    }
+
+    /// C++: `PlaidIndexColBERTSaRTest.test_colbertsar_size_smaller_than_plaid`
+    /// (`test_plaid_ut.cpp:571`): ColBERTSaR stores no packed residuals, so
+    /// its serialized size is smaller by at least `n_total_emb * packed_dim`
+    /// bytes.
+    #[test]
+    fn colbertsar_size_smaller_than_plaid() {
+        const DIM: u32 = 32;
+        const K: u32 = 8;
+        const TRAIN: usize = 512;
+        const DOCS: usize = 10;
+        const PER_DOC: usize = 8;
+        let mut rng = Normal::new(42);
+        let train = rng.data(TRAIN * DIM as usize);
+        let mut doc_lens = Vec::new();
+        let mut embeddings = Vec::new();
+        for _ in 0..DOCS {
+            embeddings.extend_from_slice(&rng.data(PER_DOC * DIM as usize));
+            doc_lens.push(PER_DOC as u32);
+        }
+
+        let mut colbertsar = PlaidIndex::new(0, DIM, 4, K, true).unwrap();
+        colbertsar.train(K, &train, TRAIN, 4).unwrap();
+        colbertsar
+            .add_multiple_docs_embeddings(&embeddings, &doc_lens)
+            .unwrap();
+        let colbertsar_size = colbertsar.calc_size();
+
+        let mut plaid = PlaidIndex::new(0, DIM, 4, K, false).unwrap();
+        plaid.train(K, &train, TRAIN, 4).unwrap();
+        plaid
+            .add_multiple_docs_embeddings(&embeddings, &doc_lens)
+            .unwrap();
+        let plaid_size = plaid.calc_size();
+
+        assert!(
+            plaid_size > colbertsar_size,
+            "PLAID {plaid_size} should exceed ColBERTSaR {colbertsar_size}"
+        );
+        let packed_dim = (DIM as usize * 4).div_ceil(8);
+        assert!(
+            plaid_size - colbertsar_size >= DOCS * PER_DOC * packed_dim,
+            "difference {} should cover the packed residuals {}",
+            plaid_size - colbertsar_size,
+            DOCS * PER_DOC * packed_dim
+        );
     }
 }

@@ -833,6 +833,66 @@ impl Column {
         Ok(())
     }
 
+    /// C++ `ColumnVector::SetValueByIndex`: overwrites an already-appended
+    /// slot. The row must be inside the written region.
+    pub fn set_value(&mut self, row: usize, value: BlockValue) -> Result<(), String> {
+        macro_rules! set {
+            ($vector:expr, $slot:expr) => {
+                $vector.set_value(row, $slot)
+            };
+        }
+        if value == BlockValue::Null {
+            return match self {
+                Column::Bool(c) => set!(c, None),
+                Column::TinyInt(c) => set!(c, None),
+                Column::SmallInt(c) => set!(c, None),
+                Column::Int(c) => set!(c, None),
+                Column::Int32(c) => set!(c, None),
+                Column::HugeInt(c) => set!(c, None),
+                Column::Float32(c) => set!(c, None),
+                Column::Float(c) => set!(c, None),
+                Column::Decimal(c) => set!(c, None),
+                Column::Str(c) => set!(c, None),
+                Column::Date(c) => set!(c, None),
+                Column::Time(c) => set!(c, None),
+                Column::DateTime(c) => set!(c, None),
+                Column::Timestamp(c) => set!(c, None),
+                Column::Interval(c) => set!(c, None),
+                Column::Uuid(c) => set!(c, None),
+                Column::Embedding(c) => set!(c, None),
+                Column::Array(c) => set!(c, None),
+                Column::Mixed(c) => set!(c, None),
+                Column::Json(c) => set!(c, None),
+                Column::Bytes(c) => set!(c, None),
+                Column::RowId(c) => set!(c, None),
+            };
+        }
+        match (self, value) {
+            (Column::Bool(c), BlockValue::Bool(v)) => set!(c, Some(v)),
+            (Column::TinyInt(c), BlockValue::TinyInt(v)) => set!(c, Some(v)),
+            (Column::SmallInt(c), BlockValue::SmallInt(v)) => set!(c, Some(v)),
+            (Column::Int(c), BlockValue::Int(v)) => set!(c, Some(v)),
+            (Column::Int32(c), BlockValue::Int32(v)) => set!(c, Some(v)),
+            (Column::HugeInt(c), BlockValue::HugeInt(v)) => set!(c, Some(v)),
+            (Column::Float32(c), BlockValue::Float(v)) => set!(c, Some(v)),
+            (Column::Float(c), BlockValue::Double(v)) => set!(c, Some(v)),
+            (Column::Decimal(c), BlockValue::Decimal(v)) => set!(c, Some(v)),
+            (Column::Str(c), BlockValue::Str(v)) => set!(c, Some(v)),
+            (Column::Date(c), BlockValue::Date(v)) => set!(c, Some(v)),
+            (Column::Time(c), BlockValue::Time(v)) => set!(c, Some(v)),
+            (Column::DateTime(c), BlockValue::DateTime(v)) => set!(c, Some(v)),
+            (Column::Timestamp(c), BlockValue::Timestamp(v)) => set!(c, Some(v)),
+            (Column::Interval(c), BlockValue::Interval(v)) => set!(c, Some(v)),
+            (Column::Uuid(c), BlockValue::Uuid(v)) => set!(c, Some(v)),
+            (Column::Embedding(c), BlockValue::Embedding(v)) => set!(c, Some(v)),
+            (Column::Array(c), BlockValue::Array(v)) => set!(c, Some(v)),
+            (Column::Mixed(c), BlockValue::Mixed(v)) => set!(c, Some(v)),
+            (Column::Json(c), BlockValue::Json(v)) => set!(c, Some(v)),
+            (Column::RowId(c), BlockValue::RowId(v)) => set!(c, Some(v)),
+            _ => Err("value type does not match column".to_string()),
+        }
+    }
+
     /// C++ `ColumnVector::GetValueByIndex`: the typed slot (`None` for NULL).
     pub fn get_value_by_index(&self, row: usize) -> Option<BlockValue> {
         match self {
@@ -999,6 +1059,7 @@ impl Column {
     /// C++ `ColumnVector::WriteAdv`: appends the frame to `out`.
     pub fn write_adv(&self, out: &mut Vec<u8>) -> Result<(), String> {
         self.check_serializable()?;
+        let start = out.len();
         let rows = self.size();
         let constant = self.vector_type() == ColumnVectorType::Constant;
         let value_rows = if constant { 1 } else { rows };
@@ -1095,7 +1156,7 @@ impl Column {
                 unreachable!("rejected by check_serializable")
             }
         }
-        debug_assert_eq!(out.len(), self.get_size_in_bytes()?);
+        debug_assert_eq!(out.len() - start, self.get_size_in_bytes()?);
         Ok(())
     }
 
@@ -1457,16 +1518,26 @@ pub struct DataBlock {
     columns: Vec<Column>,
     row_count: usize,
     capacity: usize,
+    /// C++ `finalized`: set by `Finalize`, cleared by any append/reset.
+    finalized: bool,
 }
 
 impl DataBlock {
     /// C++ `DataBlock::Make(column_defs, capacity)`. The column vectors start
-    /// empty; rows are appended with [`DataBlock::push_row`].
-    pub fn new(columns: Vec<Column>, capacity: usize) -> Self {
+    /// empty; rows are appended with [`DataBlock::push_row`]. As in
+    /// `DataBlock::Init`, uninitialized column vectors are made flat with the
+    /// block capacity.
+    pub fn new(mut columns: Vec<Column>, capacity: usize) -> Self {
+        for column in &mut columns {
+            if column.vector_type() == ColumnVectorType::Invalid {
+                column.initialize(ColumnVectorType::Flat, capacity);
+            }
+        }
         Self {
             columns,
             row_count: 0,
             capacity,
+            finalized: false,
         }
     }
 
@@ -1513,6 +1584,11 @@ impl DataBlock {
         self.row_count >= self.capacity
     }
 
+    /// C++ `DataBlock::Finalized()`.
+    pub fn is_finalized(&self) -> bool {
+        self.finalized
+    }
+
     /// C++ `DataBlock::AppendValue`/`AppendRow` for one slot. Every column must
     /// receive a value (or NULL) per row, as in the reference.
     pub fn push_slot(&mut self, column: usize, text: Option<&str>) {
@@ -1520,11 +1596,16 @@ impl DataBlock {
             return;
         };
         col.push_text(text);
+        self.finalized = false;
     }
 
     /// C++ `DataBlock::Finalize`: all columns have the same length.
     pub fn finalize(&mut self) {
         self.row_count = self.columns.iter().map(Column::len).max().unwrap_or(0);
+        if self.capacity == 0 {
+            self.capacity = self.row_count;
+        }
+        self.finalized = true;
     }
 
     /// C++ `DataBlock::GetValue(column, row)`, rendered as text.
@@ -1538,16 +1619,48 @@ impl DataBlock {
             column.clear();
         }
         self.row_count = 0;
+        self.finalized = false;
     }
 
-    /// C++ `DataBlock::AppendValue(column, value)`.
+    /// C++ `DataBlock::AppendValue(column, value)`: the column index must be
+    /// valid and the column vector must still have capacity (the reference
+    /// raises `UnrecoverableError` for both).
     pub fn append_value(&mut self, column: usize, value: BlockValue) -> Result<(), String> {
-        let col = self
-            .columns
-            .get_mut(column)
-            .ok_or_else(|| format!("column {column} out of range"))?;
-        col.push_block_value(value)
-            .map_err(|_| format!("value type does not match column {column}"))
+        if column >= self.columns.len() {
+            return Err(format!(
+                "Attempt to access invalid column index: {column} in column count: {}",
+                self.columns.len()
+            ));
+        }
+        let len = self.columns[column].len();
+        if len >= self.capacity {
+            return Err(format!(
+                "Exceed the column vector capacity.({len}/{})",
+                self.capacity
+            ));
+        }
+        self.columns[column]
+            .push_block_value(value)
+            .map_err(|_| format!("value type does not match column {column}"))?;
+        self.finalized = false;
+        Ok(())
+    }
+
+    /// C++ `DataBlock::SetValue(column, row, value)`: an invalid column or a
+    /// row outside the already-appended region is an error.
+    pub fn set_value(
+        &mut self,
+        column: usize,
+        row: usize,
+        value: BlockValue,
+    ) -> Result<(), String> {
+        if column >= self.columns.len() {
+            return Err(format!(
+                "Attempt to access invalid column index: {column} in column count: {}",
+                self.columns.len()
+            ));
+        }
+        self.columns[column].set_value(row, value)
     }
 
     /// C++ `DataBlock::GetValue(column, row)`.
@@ -1568,6 +1681,45 @@ impl DataBlock {
         for offset in 0..self.row_count as u32 {
             row_ids.push(RowIdT::new(u32::MAX, start + offset));
         }
+    }
+
+    /// C++ `DataBlock::GetSizeInBytes`: the `i32` column count followed by each
+    /// column vector's frame.
+    pub fn get_size_in_bytes(&self) -> Result<usize, String> {
+        let mut size = std::mem::size_of::<i32>();
+        for column in &self.columns {
+            size += column.get_size_in_bytes()?;
+        }
+        Ok(size)
+    }
+
+    /// C++ `DataBlock::WriteAdv`: appends the `i32` column count and every
+    /// column's frame to `out`.
+    pub fn write_adv(&self, out: &mut Vec<u8>) -> Result<(), String> {
+        out.extend_from_slice(&(self.columns.len() as i32).to_le_bytes());
+        for column in &self.columns {
+            column.write_adv(out)?;
+        }
+        Ok(())
+    }
+
+    /// C++ `DataBlock::ReadAdv`: reads a block written by [`Self::write_adv`]
+    /// and returns it with the number of bytes consumed.
+    pub fn read_adv(input: &[u8]) -> Option<(DataBlock, usize)> {
+        if input.len() < std::mem::size_of::<i32>() {
+            return None;
+        }
+        let column_count = i32::from_le_bytes(input[..4].try_into().ok()?) as usize;
+        let mut offset = 4;
+        let mut columns = Vec::with_capacity(column_count);
+        for _ in 0..column_count {
+            let (column, consumed) = Column::read_adv(&input[offset..])?;
+            offset += consumed;
+            columns.push(column);
+        }
+        let mut block = DataBlock::new(columns, 0);
+        block.finalize();
+        Some((block, offset))
     }
 }
 
@@ -1662,6 +1814,99 @@ mod data_block_reference_suite {
             block.append_value(2, BlockValue::Str("bad".into())),
             Err("value type does not match column 2".to_string())
         );
+    }
+
+    /// C++ `DataBlockTest.test2` (`storage/definition/data_block_ut.cpp:150`):
+    /// an out-of-range column and a full block both reject `AppendValue`;
+    /// `Finalize` fixes the row count and `FillRowIDVector(block_id = 1)`
+    /// yields `block_id * DEFAULT_BLOCK_CAPACITY + offset` offsets with an
+    /// invalid segment id.
+    #[test]
+    fn append_rejects_bad_column_and_overflow_then_fills_row_ids() {
+        let mut block =
+            DataBlock::new(vec![Column::Bool(ColumnVector::new())], DEFAULT_VECTOR_SIZE);
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            block.append_value(0, BlockValue::Bool(i % 2 == 0)).unwrap();
+        }
+        assert!(block.append_value(1, BlockValue::Bool(true)).is_err());
+        assert!(block.append_value(0, BlockValue::Bool(true)).is_err());
+
+        assert!(!block.is_finalized());
+        block.finalize();
+        assert!(block.is_finalized());
+        assert_eq!(block.row_count(), DEFAULT_VECTOR_SIZE);
+
+        let mut row_ids = Vec::with_capacity(DEFAULT_VECTOR_SIZE);
+        block.fill_row_id_vector(&mut row_ids, 1);
+        assert_eq!(row_ids.len(), DEFAULT_VECTOR_SIZE);
+        for (row_id, id) in row_ids.iter().enumerate() {
+            assert_eq!(
+                id.segment_offset as usize,
+                row_id + crate::cpp_format::DEFAULT_BLOCK_CAPACITY
+            );
+            assert_eq!(id.segment_id, u32::MAX);
+        }
+    }
+
+    /// C++ `DataBlockTest.test3` (`storage/definition/data_block_ut.cpp:183`):
+    /// `SetValue` on an invalid column, and on a valid column but an
+    /// unwritten row, is an error; appended TinyInt cells read back.
+    #[test]
+    fn set_value_rejects_bad_column_and_row() {
+        let mut block = DataBlock::new(
+            vec![Column::TinyInt(ColumnVector::new())],
+            DEFAULT_VECTOR_SIZE,
+        );
+        assert!(block.set_value(1, 0, BlockValue::TinyInt(1)).is_err());
+        assert!(block.set_value(0, 1, BlockValue::TinyInt(1)).is_err());
+
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            block.append_value(0, BlockValue::TinyInt(i as i8)).unwrap();
+        }
+        block.finalize();
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            assert_eq!(
+                block.get_value(0, i),
+                Some(BlockValue::TinyInt(i as i8)),
+                "row {i}"
+            );
+        }
+        // An in-range row can be overwritten.
+        block.set_value(0, 3, BlockValue::TinyInt(42)).unwrap();
+        assert_eq!(block.get_value(0, 3), Some(BlockValue::TinyInt(42)));
+    }
+
+    /// C++ `DataBlockTest.ReadWrite` (`storage/definition/data_block_ut.cpp:226`):
+    /// a two-column block round-trips through `DataBlock::WriteAdv` /
+    /// `ReadAdv`, consuming exactly `GetSizeInBytes()` bytes and comparing
+    /// equal.
+    #[test]
+    fn data_block_write_adv_read_adv_roundtrip() {
+        let mut block = DataBlock::new(
+            vec![
+                Column::Bool(ColumnVector::new()),
+                Column::TinyInt(ColumnVector::new()),
+            ],
+            DEFAULT_VECTOR_SIZE,
+        );
+        for i in 0..DEFAULT_VECTOR_SIZE {
+            block.append_value(0, BlockValue::Bool(i % 2 == 0)).unwrap();
+            block.append_value(1, BlockValue::TinyInt(i as i8)).unwrap();
+        }
+        block.finalize();
+
+        let exp_size = block.get_size_in_bytes().unwrap();
+        let mut buf = Vec::with_capacity(exp_size);
+        block.write_adv(&mut buf).unwrap();
+        assert_eq!(buf.len(), exp_size);
+
+        let (copy, consumed) = DataBlock::read_adv(&buf).expect("read back");
+        assert_eq!(consumed, exp_size);
+        assert_eq!(copy.row_count(), block.row_count());
+        assert_eq!(copy.column_count(), block.column_count());
+        for (i, (left, right)) in copy.columns().iter().zip(block.columns()).enumerate() {
+            assert_eq!(left, right, "column {i}");
+        }
     }
 }
 

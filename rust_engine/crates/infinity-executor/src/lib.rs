@@ -17,15 +17,15 @@ use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use infinity_catalog::Catalog;
+use infinity_catalog::{Catalog, SparseStore as CatalogSparseStore};
 use infinity_common::{Error, Result};
 use infinity_expression::{aggregate, Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
 use infinity_parser::lexer::{tokenize, Token};
 use infinity_parser::parser::render_tokens_as_sql;
 use infinity_parser::{
-    parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, MatchClause, Predicate, SearchClause,
-    SelectItem, Statement,
+    parse, AggFunc, CmpOp, ColumnDef, ExprAst, JoinClause, Literal, MatchClause, Predicate,
+    SearchClause, SelectItem, SparseStore as ParserSparseStore, Statement,
 };
 use infinity_planner::{plan_select, LogicalPlan};
 #[cfg(not(feature = "rocksdb-store"))]
@@ -1613,6 +1613,19 @@ fn validate_insert_value(type_text: &str, lit: &str) -> Result<()> {
     validate_tensor_dimension(type_text, lit)
 }
 
+/// The catalog-side `SPARSE` storage hints for a parsed column list.
+fn sparse_store_hints(columns: &[ColumnDef]) -> Vec<Option<CatalogSparseStore>> {
+    columns
+        .iter()
+        .map(|c| {
+            c.sparse_store.map(|s| match s {
+                ParserSparseStore::Sort => CatalogSparseStore::Sort,
+                ParserSparseStore::Sorted => CatalogSparseStore::Sorted,
+            })
+        })
+        .collect()
+}
+
 /// Width of a sparse column's index element (`SPARSE(FLOAT, INT8)` etc.).
 fn sparse_idx_width(type_text: &str) -> infinity_storage::bmp_cpp::IdxWidth {
     use infinity_storage::bmp_cpp::IdxWidth;
@@ -1851,7 +1864,12 @@ fn is_plain_identifier(s: &str) -> bool {
 /// session selects from the view under another `USE`. This walks the token
 /// stream and prefixes names in `FROM`/`JOIN` position (including
 /// comma-separated FROM lists); subqueries are handled by the same walk.
-fn qualify_sql_tables(sql: &str, db: &str) -> Result<String> {
+/// Qualifies every unqualified table reference using `resolve(name)`, which
+/// returns the database the table actually lives in. Views created from a
+/// non-default database may reference tables in another database, so the
+/// caller resolves each name against the catalog instead of blindly using the
+/// current session database.
+fn qualify_sql_tables_with(sql: &str, resolve: &dyn Fn(&str) -> String) -> Result<String> {
     let mut toks = tokenize(sql)?;
     let mut depth = 0i32;
     let mut in_from = false;
@@ -1871,7 +1889,9 @@ fn qualify_sql_tables(sql: &str, db: &str) -> Result<String> {
                     let already_qualified =
                         matches!(toks.get(i + 1), Some(Token::Op(op)) if op == ".");
                     if !already_qualified && !k.contains('.') {
-                        toks[i] = Token::Ident(format!("{db}.{}", k.to_ascii_lowercase()));
+                        let lower = k.to_ascii_lowercase();
+                        let target = resolve(&lower);
+                        toks[i] = Token::Ident(format!("{target}.{lower}"));
                     }
                     continue;
                 }
@@ -2594,11 +2614,13 @@ impl MultiVectorIndex {
     /// `max(256, n_centroids * 32)` embeddings the reference leaves the index
     /// unbuilt and the caller falls back to an exhaustive scan of the range.
     fn build_plaid(&mut self) {
-        eprintln!(
-            "DEBUG build_plaid cfg={:?} tail={}",
-            self.plaid_config,
-            self.tail.len()
-        );
+        if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
+            eprintln!(
+                "DEBUG build_plaid cfg={:?} tail={}",
+                self.plaid_config,
+                self.tail.len()
+            );
+        }
         let Some(cfg) = self.plaid_config else {
             return;
         };
@@ -2650,11 +2672,13 @@ impl MultiVectorIndex {
 
     /// C++: `SMVEIndexInMem::BuildFromColumn` over the buffered documents.
     fn build_smve(&mut self) {
-        eprintln!(
-            "DEBUG build_smve cfg={:?} tail={}",
-            self.smve_config,
-            self.tail.len()
-        );
+        if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
+            eprintln!(
+                "DEBUG build_smve cfg={:?} tail={}",
+                self.smve_config,
+                self.tail.len()
+            );
+        }
         let Some(cfg) = self.smve_config else {
             return;
         };
@@ -2893,8 +2917,15 @@ impl MultiVectorIndex {
 
 /// One sparse (BMP) index in the reference's two forms: sealed `seg_*.bmp`
 /// chunks written with `BMPAlg::SaveToPtr`'s layout, and the memory tail.
+///
+/// The `SPARSE … WITH (SORTED)` hint is recorded here, but this engine's BMP
+/// writer has a single build path: the hint does not change the chunk bytes.
+/// It survives a restart because it is re-read from the catalog
+/// (`TableMeta::sparse_stores`) when the index is rebuilt.
 struct SparseIndex {
     width: infinity_storage::bmp_cpp::IdxWidth,
+    /// The catalog's `SparseStoreType` for this column.
+    store: CatalogSparseStore,
     dir: PathBuf,
     /// `ROW_ID -> (term, weight)` for documents not yet dumped.
     tail: std::collections::BTreeMap<u64, Vec<(i32, f32)>>,
@@ -2921,7 +2952,11 @@ fn sparse_doc_bytes(doc: &[(i32, f32)]) -> usize {
 }
 
 impl SparseIndex {
-    fn new(dir: PathBuf, width: infinity_storage::bmp_cpp::IdxWidth) -> Self {
+    fn new(
+        dir: PathBuf,
+        width: infinity_storage::bmp_cpp::IdxWidth,
+        store: CatalogSparseStore,
+    ) -> Self {
         let next_chunk = std::fs::read_dir(&dir)
             .map(|d| {
                 d.filter_map(|e| e.ok())
@@ -2931,6 +2966,7 @@ impl SparseIndex {
             .unwrap_or(0);
         Self {
             width,
+            store,
             dir,
             tail: Default::default(),
             sealed: Vec::new(),
@@ -5348,7 +5384,7 @@ impl Engine {
     ) -> Result<QueryResult> {
         let query = self.expand_views(query.clone())?;
         let (source_columns, rows) = self.run_select(&query)?;
-        let (names, types, defaults, not_nulls, comments) = if columns.is_empty() {
+        let (names, types, defaults, not_nulls, comments, sparse_stores) = if columns.is_empty() {
             let names: Vec<String> = source_columns
                 .iter()
                 .enumerate()
@@ -5372,6 +5408,7 @@ impl Engine {
                 vec![None; source_columns.len()],
                 vec![false; source_columns.len()],
                 vec![None; source_columns.len()],
+                vec![None; source_columns.len()],
             )
         } else {
             if columns.len() != source_columns.len() {
@@ -5394,12 +5431,18 @@ impl Engine {
                     .collect(),
                 columns.iter().map(|c| c.not_null).collect(),
                 columns.iter().map(|c| c.comment.clone()).collect(),
+                sparse_store_hints(columns),
             )
         };
-        let created = self
-            .storage
-            .catalog
-            .create_table_typed(name, &names, &defaults, &not_nulls, &types, &comments)?;
+        let created = self.storage.catalog.create_table_typed_with_sparse_stores(
+            name,
+            &names,
+            &defaults,
+            &not_nulls,
+            &types,
+            &comments,
+            &sparse_stores,
+        )?;
         let literals: Vec<Vec<Literal>> = rows
             .iter()
             .map(|row| {
@@ -5462,13 +5505,7 @@ impl Engine {
     /// `CREATE VIEW v [(cols)] AS SELECT …`: validates the query, resolves the
     /// output column names (applying an explicit alias list) and registers the
     /// view's fully-qualified SQL in the catalog.
-    fn create_view(
-        &self,
-        name: &str,
-        aliases: &[String],
-        query: &Statement,
-        query_sql: &str,
-    ) -> Result<QueryResult> {
+    fn create_view(&self, name: &str, aliases: &[String], query_sql: &str) -> Result<QueryResult> {
         let db = self.db();
         // `CREATE VIEW v AS (SELECT …)` parses to the same SELECT statement;
         // store the query without the redundant outer parentheses so the
@@ -5477,8 +5514,43 @@ impl Engine {
         if raw.starts_with('(') && raw.ends_with(')') {
             raw = raw[1..raw.len() - 1].trim();
         }
-        let mut sql = qualify_sql_tables(raw, &db)?;
-        let qualified = self.expand_views(query.clone())?;
+        // Resolve each unqualified table to the database it really lives in:
+        // a view created in `db1` may legitimately select from a table in
+        // `default_db`. The current database wins; otherwise a unique match
+        // across the catalog decides, and an unknown name keeps the current
+        // database so the normal "table not found" error is produced.
+        let databases = self.storage.catalog.list_databases()?;
+        let resolve = |table: &str| -> String {
+            let in_db = |d: &str| {
+                self.storage
+                    .catalog
+                    .get_table_by_name(&format!("{d}.{table}"))
+                    .ok()
+                    .flatten()
+                    .is_some()
+            };
+            if in_db(&db) {
+                return db.clone();
+            }
+            let mut found: Option<&String> = None;
+            for d in &databases {
+                if in_db(d) {
+                    if found.is_some() {
+                        return db.clone();
+                    }
+                    found = Some(d);
+                }
+            }
+            found.cloned().unwrap_or_else(|| db.clone())
+        };
+        let mut sql = qualify_sql_tables_with(raw, &resolve)?;
+        // Validate against the qualified text: `query` still carries the
+        // unqualified names, which would resolve against the session database.
+        let parsed = infinity_parser::parse(&sql)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error::Invalid("empty view query".to_string()))?;
+        let qualified = self.expand_views(parsed)?;
         let (source_columns, _) = self.run_select(&qualified)?;
         let view_columns = if aliases.is_empty() {
             source_columns
@@ -5854,10 +5926,16 @@ impl Engine {
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
                 let comments: Vec<Option<String>> =
                     columns.iter().map(|c| c.comment.clone()).collect();
-                let t = self
-                    .storage
-                    .catalog
-                    .create_table_typed(name, &names, &defaults, &not_nulls, &types, &comments)?;
+                let sparse_stores = sparse_store_hints(columns);
+                let t = self.storage.catalog.create_table_typed_with_sparse_stores(
+                    name,
+                    &names,
+                    &defaults,
+                    &not_nulls,
+                    &types,
+                    &comments,
+                    &sparse_stores,
+                )?;
                 Ok(QueryResult::CreatedTable {
                     id: t.id,
                     name: t.name,
@@ -6056,13 +6134,15 @@ impl Engine {
                     .collect();
                 let not_nulls: Vec<bool> = columns.iter().map(|c| c.not_null).collect();
                 let types: Vec<String> = columns.iter().map(|c| c.type_text.clone()).collect();
-                self.storage.catalog.add_columns_typed(
+                let sparse_stores = sparse_store_hints(columns);
+                self.storage.catalog.add_columns_typed_with_sparse_stores(
                     table,
                     &names,
                     &defaults,
                     &not_nulls,
                     &types,
                     &vec![None; names.len()],
+                    &sparse_stores,
                 )?;
                 Ok(QueryResult::CreatedTable {
                     id: 0,
@@ -6558,9 +6638,9 @@ impl Engine {
             Statement::CreateView {
                 name,
                 columns,
-                query,
                 query_sql,
-            } => self.create_view(name, columns, query, query_sql),
+                ..
+            } => self.create_view(name, columns, query_sql),
             Statement::DropView { name, if_exists } => self.drop_view(name, *if_exists),
             Statement::Describe { table } => self.describe_table(table),
             Statement::Utility { .. } => Ok(QueryResult::Rows {
@@ -8202,11 +8282,13 @@ impl Engine {
                 }
             }
         }
-        eprintln!(
-            "DEBUG mv_for build table={table} col={column} plaid={:?} smve={:?}",
-            self.mv_plaid_config(table, column),
-            self.mv_smve_config(table, column)
-        );
+        if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
+            eprintln!(
+                "DEBUG mv_for build table={table} col={column} plaid={:?} smve={:?}",
+                self.mv_plaid_config(table, column),
+                self.mv_smve_config(table, column)
+            );
+        }
         let mut index = MultiVectorIndex::new(
             dir,
             dims,
@@ -8449,20 +8531,31 @@ impl Engine {
         let key = index_key(table, column);
         let tkey = self.table_key(table);
         let reserved = self.storage.store.scan_prefix(&row_prefix(table))?.len();
-        {
-            let tables = self.tables.lock().unwrap();
-            if let Some(idx) = tables.get(&tkey).and_then(|e| e.sparse.get(column)) {
-                let complete = idx.read().map(|g| g.doc_count()).unwrap_or(0);
-                if complete >= reserved {
-                    return Ok(idx.clone());
-                }
-            }
-        }
         let schema = self.table_schema(table)?;
         let ci = schema
             .iter()
             .position(|c| c == column)
             .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let store = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .and_then(|m| m.sparse_stores.get(ci).copied().flatten())
+            .unwrap_or(CatalogSparseStore::Sort);
+        {
+            let tables = self.tables.lock().unwrap();
+            if let Some(idx) = tables.get(&tkey).and_then(|e| e.sparse.get(column)) {
+                // A changed catalog hint invalidates the cached index even
+                // though the BMP bytes are identical.
+                let reusable = idx
+                    .read()
+                    .map(|g| g.doc_count() >= reserved && g.store == store)
+                    .unwrap_or(false);
+                if reusable {
+                    return Ok(idx.clone());
+                }
+            }
+        }
         let dir = self.dir.join("sparse").join(key.replace('/', "_"));
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
@@ -8472,7 +8565,7 @@ impl Engine {
                 }
             }
         }
-        let mut index = SparseIndex::new(dir, width);
+        let mut index = SparseIndex::new(dir, width, store);
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             // A NULL sparse cell has no postings; only stored values are indexed.
             let Some(Value::Str(text)) = cells.get(ci) else {
@@ -9099,7 +9192,20 @@ impl Engine {
             .collect();
         out.push_str(&nns.join(&SNAP_FLD.to_string()));
         out.push(SNAP_REC);
-        out.push_str(&meta.types.join(&SNAP_FLD.to_string()));
+        // A sparse storage hint travels as a `WITH (SORTED)` suffix on the type
+        // text, so old snapshots (which have no suffix) still decode.
+        let types: Vec<String> = meta
+            .types
+            .iter()
+            .enumerate()
+            .map(
+                |(i, t)| match meta.sparse_stores.get(i).copied().flatten() {
+                    Some(CatalogSparseStore::Sorted) => format!("{t} WITH (SORTED)"),
+                    _ => t.clone(),
+                },
+            )
+            .collect();
+        out.push_str(&types.join(&SNAP_FLD.to_string()));
         out.push(SNAP_REC);
         // The snapshot carries the table's indexes: name, column, type and the
         // `WITH (…)` options, so a restore recreates the same index kinds.
@@ -14854,6 +14960,80 @@ mod tests {
         );
     }
 
+    /// `SPARSE … WITH (SORTED)` is carried through the catalog, survives a
+    /// restart, and the BMP index records it. The BMP chunk layout is the same
+    /// for both hints, so top-k is unchanged.
+    #[test]
+    fn sparse_sorted_hint_is_persisted_and_ranks() {
+        let dir = tempdir().unwrap();
+        let q = "SELECT id FROM ss SEARCH MATCH SPARSE (v, [0:1.0,20:2.0], 'ip', 3);";
+        let first;
+        {
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE ss (id INT, v SPARSE(FLOAT,30000) WITH (SORTED));")
+                .unwrap();
+            e.execute("CREATE TABLE so (id INT, v SPARSE(FLOAT,30000) WITH (sort));")
+                .unwrap();
+
+            let meta = e
+                .storage
+                .catalog
+                .get_table_by_name("default_db.ss")
+                .unwrap()
+                .unwrap();
+            assert_eq!(meta.types[1], "SPARSE(FLOAT,30000)");
+            assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sorted));
+            let meta = e
+                .storage
+                .catalog
+                .get_table_by_name("default_db.so")
+                .unwrap()
+                .unwrap();
+            assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sort));
+
+            e.execute("CREATE INDEX ss_i ON ss (v) USING BMP;").unwrap();
+            e.execute("INSERT INTO ss VALUES (1, [0:1.0,10:1.0]), (2, [0:2.0,20:2.0]);")
+                .unwrap();
+            first = rows(&e, q);
+            assert_eq!(first, vec![vec!["2".to_string()], vec!["1".to_string()]]);
+            let recorded = e
+                .tables
+                .lock()
+                .unwrap()
+                .values()
+                .find_map(|t| t.sparse.get("v").cloned())
+                .unwrap();
+            assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
+
+            // Sealing the tail rewrites the same-format chunks; the ranking
+            // and the recorded hint both hold.
+            e.flush().unwrap();
+            assert_eq!(rows(&e, q), first);
+            assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
+        }
+
+        // Reopen: the hint comes back from the catalog and the rebuilt index
+        // records it again.
+        let e = Engine::open(dir.path()).unwrap();
+        let meta = e
+            .storage
+            .catalog
+            .get_table_by_name("default_db.ss")
+            .unwrap()
+            .unwrap();
+        assert_eq!(meta.types[1], "SPARSE(FLOAT,30000)");
+        assert_eq!(meta.sparse_stores[1], Some(CatalogSparseStore::Sorted));
+        assert_eq!(rows(&e, q), first);
+        let recorded = e
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .find_map(|t| t.sparse.get("v").cloned())
+            .unwrap();
+        assert_eq!(recorded.read().unwrap().store, CatalogSparseStore::Sorted);
+    }
+
     /// A secondary index keeps only post-dump rows in memory; `flush()` seals
     /// the tail into a chunk and lookups merge chunks with the tail.
     #[test]
@@ -16702,9 +16882,11 @@ mod tests {
             .is_err());
     }
 
-    /// `src/unit_test/main/table_ut.cpp::InfinityTableTest/test1`: a table with
-    /// an `EMBEDDING(FLOAT, 128)` and a `BIGINT` column explains in every plan
-    /// mode without executing the inner statement.
+    /// `src/unit_test/main/table_ut.cpp::InfinityTableTest/test1`: the facade
+    /// scenario — create the database, create a table with an
+    /// `EMBEDDING(FLOAT, 128)` and a `BIGINT` column, fetch it back, insert
+    /// rows, query them, and explain in every plan mode without executing the
+    /// inner statement.
     #[test]
     fn explain_covers_every_plan_kind() {
         let dir = tempdir().unwrap();
@@ -16718,6 +16900,40 @@ mod tests {
             .any(|d| d == "db1"));
         e.execute("CREATE TABLE db1.knn_table (col1 EMBEDDING(FLOAT, 128), col2 BIGINT);")
             .unwrap();
+
+        // `Infinity::GetDatabase` / `GetTable`: the created table is
+        // retrievable with both declared columns.
+        let table = e
+            .catalog()
+            .get_table_by_name("db1.knn_table")
+            .unwrap()
+            .expect("created table is retrievable");
+        assert_eq!(table.columns, vec!["col1".to_string(), "col2".to_string()]);
+        assert_eq!(table.types.len(), 2);
+        assert!(
+            table.types[0].to_lowercase().contains("embedding"),
+            "col1 type: {}",
+            table.types[0]
+        );
+        assert!(
+            table.types[1].to_lowercase().contains("bigint"),
+            "col2 type: {}",
+            table.types[1]
+        );
+
+        // Insert and read back through the same facade.
+        let embedding = vec!["0.5"; 128].join(",");
+        for col2 in [42, 7] {
+            e.execute(&format!(
+                "INSERT INTO db1.knn_table (col1, col2) VALUES ([{embedding}], {col2});"
+            ))
+            .unwrap();
+        }
+        assert_eq!(
+            rows(&e, "SELECT col2 FROM db1.knn_table ORDER BY col2;"),
+            vec![vec!["7".to_string()], vec!["42".to_string()]]
+        );
+
         // The reference asks for AST, unoptimized/optimized logical, physical,
         // fragment and pipeline plans; each must succeed.
         for sql in [

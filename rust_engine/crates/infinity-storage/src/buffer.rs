@@ -14,6 +14,11 @@
 //! blocks directly in [`BufferManager`], so it does not allocate these objects
 //! on the scan path; they exist for the index/file workers that need owned
 //! buffers with the reference's lifecycle.
+//!
+//! A [`FileWorker`] gives such a buffer its data and spill paths
+//! (`DataFileWorker` / `VarFileWorker`). The pool reproduces the manager's
+//! spill accounting: `temp_set_`, `PickForCleanup`/`RemoveClean` and the
+//! `RequestSpace` budget — the surface `buffer_manager_ut.cpp` drives.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -33,6 +38,8 @@ pub enum BufferStatus {
     /// until the next GC pass frees it (the reference's GC queue).
     Unloaded,
     Freed,
+    /// Picked for cleanup (`PickForCleanup`); `RemoveClean` deletes the file.
+    Clean,
 }
 
 /// C++ `BufferType`: whether a payload outlives its last handle.
@@ -46,6 +53,83 @@ pub enum BufferType {
     Temp,
 }
 
+/// C++ `FileWorker`: the payload file of a [`BufferObj`].
+///
+/// The reference has one worker subclass per payload kind; the port keeps the
+/// two shapes the unit tests exercise: `DataFileWorker` (a fixed-size byte
+/// buffer) and `VarFileWorker` (a `VarBuffer` that grows on append). A worker
+/// owns the *data* path (`data_dir/file_dir/file_name`) and the *spill* path
+/// (`temp_dir/file_dir/file_name`); `Save`/`MoveFile` move the spill copy to
+/// the data path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileWorker {
+    data_dir: PathBuf,
+    temp_dir: PathBuf,
+    file_dir: PathBuf,
+    file_name: String,
+    buffer_size: usize,
+    variable: bool,
+}
+
+impl FileWorker {
+    /// C++ `DataFileWorker(data_dir, temp_dir, file_dir, file_name, size)`.
+    pub fn data(
+        data_dir: impl Into<PathBuf>,
+        temp_dir: impl Into<PathBuf>,
+        file_dir: impl Into<PathBuf>,
+        file_name: impl Into<String>,
+        buffer_size: usize,
+    ) -> Self {
+        Self {
+            data_dir: data_dir.into(),
+            temp_dir: temp_dir.into(),
+            file_dir: file_dir.into(),
+            file_name: file_name.into(),
+            buffer_size,
+            variable: false,
+        }
+    }
+
+    /// C++ `VarFileWorker`: the payload starts empty and grows through
+    /// [`BufferHandle::var_append`].
+    pub fn var(
+        data_dir: impl Into<PathBuf>,
+        temp_dir: impl Into<PathBuf>,
+        file_dir: impl Into<PathBuf>,
+        file_name: impl Into<String>,
+        buffer_size: usize,
+    ) -> Self {
+        Self {
+            data_dir: data_dir.into(),
+            temp_dir: temp_dir.into(),
+            file_dir: file_dir.into(),
+            file_name: file_name.into(),
+            buffer_size,
+            variable: true,
+        }
+    }
+
+    /// C++ `FileWorker::GetFilePath`: the data path, also the key of
+    /// `BufferManager::buffer_map_`.
+    pub fn file_path(&self) -> PathBuf {
+        self.data_dir.join(&self.file_dir).join(&self.file_name)
+    }
+
+    /// C++ `FileWorker::ChooseFileDir(true)`: the spill path.
+    pub fn spill_path(&self) -> PathBuf {
+        self.temp_dir.join(&self.file_dir).join(&self.file_name)
+    }
+
+    /// C++ `VarFileWorker::GetBufferSize` / `DataFileWorker::GetMemoryCost`.
+    pub fn buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+
+    pub fn is_variable(&self) -> bool {
+        self.variable
+    }
+}
+
 /// The shared budget of a [`BufferPool`].
 struct PoolState {
     budget: usize,
@@ -53,6 +137,15 @@ struct PoolState {
     /// C++ `LRUCache::gc_list_`: buffers whose last handle was dropped, in
     /// unload order. Weak so the pool does not keep them alive.
     gc_queue: VecDeque<Weak<BufferObj>>,
+    /// C++ `BufferManager::temp_set_`: payloads spilled to the temp dir and
+    /// not yet moved to their data path.
+    temps: Vec<Weak<BufferObj>>,
+    /// C++ `BufferManager::clean_temp_set_`: spill files scheduled for
+    /// deletion by [`BufferPool::remove_clean`].
+    clean_temps: Vec<Weak<BufferObj>>,
+    /// C++ `BufferManager::clean_list_`: buffers picked for cleanup whose data
+    /// file `RemoveClean` deletes.
+    clean: Vec<Weak<BufferObj>>,
 }
 
 static NEXT_BUFFER_ID: AtomicU64 = AtomicU64::new(0);
@@ -65,17 +158,25 @@ static NEXT_BUFFER_ID: AtomicU64 = AtomicU64::new(0);
 /// queues it for GC (the reference's `gc_list_`); the payload is released by
 /// [`BufferObj::free`], which the pool runs under memory pressure.
 pub struct BufferObj {
+    /// Object id (C++ `BufferObj::id`), for diagnostics.
+    id: u64,
     state: Arc<Mutex<PoolState>>,
     data: Mutex<Option<Vec<u8>>>,
     status: AtomicU8,
     kind: AtomicU8,
     rc: AtomicUsize,
-    /// Spill/persist target. Ephemeral buffers get a temporary file so their
-    /// contents survive the last handle (the reference spills to its temp dir).
+    /// C++ `obj_rc_`: owner references (`AddObjRc`/`PickForCleanup`).
+    obj_rc: AtomicUsize,
+    /// Spill/persist target of an anonymous buffer. File workers carry their
+    /// own data/spill paths.
     path: Option<PathBuf>,
+    worker: Option<FileWorker>,
     /// Whether `path` is an auto-created temp file this object must delete.
     owns_path: bool,
-    bytes: usize,
+    /// Charged bytes: the payload size (`GetMemoryCost`).
+    bytes: AtomicUsize,
+    /// C++ `DataFileWorker::data_size_`: bytes `Save` writes.
+    data_size: AtomicUsize,
     /// Assigned by the pool so the GC queue can hold a weak reference.
     self_ref: OnceLock<Weak<BufferObj>>,
 }
@@ -90,33 +191,43 @@ impl BufferObj {
         bytes: usize,
         kind: BufferType,
         path: Option<PathBuf>,
+        worker: Option<FileWorker>,
+        status: BufferStatus,
     ) -> Self {
-        let (path, owns_path) = match (path, kind) {
-            (Some(path), _) => (Some(path), false),
-            (None, BufferType::Ephemeral | BufferType::Temp) => {
-                let id = NEXT_BUFFER_ID.fetch_add(1, Ordering::Relaxed);
-                (
-                    Some(std::env::temp_dir().join(format!("infinity_buffer_{id}.bin"))),
-                    true,
-                )
-            }
-            (None, BufferType::Persistent) => (None, false),
+        let id = NEXT_BUFFER_ID.fetch_add(1, Ordering::Relaxed);
+        let (path, owns_path) = match (path, &worker, kind) {
+            (Some(path), _, _) => (Some(path), false),
+            (None, Some(_), _) => (None, false),
+            (None, None, BufferType::Ephemeral | BufferType::Temp) => (
+                Some(std::env::temp_dir().join(format!("infinity_buffer_{id}.bin"))),
+                true,
+            ),
+            (None, None, BufferType::Persistent) => (None, false),
         };
         Self {
+            id,
             state,
             data: Mutex::new(None),
-            status: AtomicU8::new(BufferStatus::New as u8),
+            status: AtomicU8::new(status as u8),
             kind: AtomicU8::new(match kind {
                 BufferType::Ephemeral => KIND_EPHEMERAL,
                 BufferType::Persistent => KIND_PERSISTENT,
                 BufferType::Temp => KIND_TEMP,
             }),
             rc: AtomicUsize::new(0),
+            obj_rc: AtomicUsize::new(0),
             path,
+            worker,
             owns_path,
-            bytes,
+            bytes: AtomicUsize::new(bytes),
+            data_size: AtomicUsize::new(bytes),
             self_ref: OnceLock::new(),
         }
+    }
+
+    /// C++ `BufferObj::id`.
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     pub fn status(&self) -> BufferStatus {
@@ -124,7 +235,8 @@ impl BufferObj {
             0 => BufferStatus::New,
             1 => BufferStatus::Loaded,
             2 => BufferStatus::Unloaded,
-            _ => BufferStatus::Freed,
+            3 => BufferStatus::Freed,
+            _ => BufferStatus::Clean,
         }
     }
 
@@ -141,12 +253,27 @@ impl BufferObj {
         self.rc.load(Ordering::Acquire)
     }
 
+    /// C++ `BufferObj::GetBufferSize` / `GetMemoryCost`.
     pub fn size(&self) -> usize {
-        self.bytes
+        self.bytes.load(Ordering::Acquire)
     }
 
     pub fn path(&self) -> Option<PathBuf> {
-        self.path.clone()
+        self.data_path()
+    }
+
+    fn data_path(&self) -> Option<PathBuf> {
+        self.worker
+            .as_ref()
+            .map(FileWorker::file_path)
+            .or_else(|| self.path.clone())
+    }
+
+    fn spill_path(&self) -> Option<PathBuf> {
+        self.worker
+            .as_ref()
+            .map(FileWorker::spill_path)
+            .or_else(|| self.path.clone())
     }
 
     /// C++ `BufferObj::Load`: allocates (or reads back) the payload and pins
@@ -163,11 +290,24 @@ impl BufferObj {
             if self.status() == BufferStatus::Freed && self.kind() == BufferType::Ephemeral {
                 return Err(Error::Storage("Invalid status".into()));
             }
-            self.reserve(self.bytes)?;
-            let payload = match &self.path {
-                Some(p) if p.exists() => std::fs::read(p).map_err(|e| Error::io(p, e))?,
-                _ => vec![0u8; self.bytes],
+            let need = self.size();
+            if !self.request_space(need) {
+                // C++ leaves the failed request charged; the Rust pool keeps
+                // `used` equal to the resident bytes, so roll it back.
+                let mut state = self.state.lock().unwrap();
+                state.used = state.used.saturating_sub(need);
+                return Err(Error::Storage("Out of memory.".into()));
+            }
+            let payload = match (self.status(), self.kind()) {
+                (BufferStatus::Freed, BufferType::Temp) => {
+                    self.read_from(self.spill_path(), need)?
+                }
+                (BufferStatus::Freed, BufferType::Persistent) => {
+                    self.read_from(self.data_path(), need)?
+                }
+                _ => vec![0u8; need],
             };
+            self.bytes.store(payload.len().max(need), Ordering::Release);
             *data = Some(payload);
         }
         self.status
@@ -177,51 +317,81 @@ impl BufferObj {
         Ok(BufferHandle { obj: self })
     }
 
-    /// C++ `BufferObj::Save`: writes an ephemeral payload back and moves the
-    /// buffer to the persistent state. A `Temp` buffer is moved in place.
-    pub fn save(&self) -> Result<()> {
-        let mut became_unloaded = false;
-        {
-            let mut data = self.data.lock().unwrap();
-            match self.kind() {
-                BufferType::Persistent => {
-                    // A file-backed persistent payload is written in place.
-                    if let Some(payload) = data.as_ref() {
-                        self.write_payload(payload)?;
-                    }
-                    return Ok(());
+    /// C++ `BufferObj::Save`: writes an ephemeral payload to its data path and
+    /// turns it persistent, or moves a spilled `Temp` payload. Returns the
+    /// reference's `write` flag (`false` when only a file move happened).
+    pub fn save(&self) -> Result<bool> {
+        let mut write = false;
+        let mut data = self.data.lock().unwrap();
+        match self.kind() {
+            BufferType::Persistent => {
+                // A file-backed persistent payload is written in place.
+                if let Some(payload) = data.as_ref() {
+                    self.write_to(self.data_path(), payload)?;
                 }
-                BufferType::Temp => {
-                    self.kind.store(KIND_PERSISTENT, Ordering::Release);
-                    return Ok(());
-                }
-                BufferType::Ephemeral => {
-                    if data.is_none() {
-                        self.reserve(self.bytes)?;
-                        *data = Some(vec![0u8; self.bytes]);
-                        became_unloaded = self.status() == BufferStatus::New;
-                    }
-                    if let Some(payload) = data.as_ref() {
-                        self.write_payload(payload)?;
-                    }
-                    self.kind.store(KIND_PERSISTENT, Ordering::Release);
-                }
+                return Ok(false);
             }
+            BufferType::Temp => {
+                drop(data);
+                self.pool_move_temp();
+                self.move_file()?;
+                self.kind.store(KIND_PERSISTENT, Ordering::Release);
+                return Ok(false);
+            }
+            BufferType::Ephemeral => match self.status() {
+                BufferStatus::New => {
+                    let need = self.size();
+                    if !self.request_space(need) {
+                        return Err(Error::Storage("Out of memory.".into()));
+                    }
+                    *data = Some(vec![0u8; need]);
+                    self.push_gc_queue();
+                    self.status
+                        .store(BufferStatus::Unloaded as u8, Ordering::Release);
+                    if let Some(payload) = data.as_ref() {
+                        self.write_to(self.data_path(), payload)?;
+                    }
+                    self.kind.store(KIND_PERSISTENT, Ordering::Release);
+                    write = true;
+                }
+                BufferStatus::Loaded | BufferStatus::Unloaded => {
+                    if let Some(payload) = data.as_ref() {
+                        self.write_to(self.data_path(), payload)?;
+                    }
+                    self.kind.store(KIND_PERSISTENT, Ordering::Release);
+                    write = true;
+                }
+                BufferStatus::Freed => {
+                    drop(data);
+                    self.move_file()?;
+                }
+                BufferStatus::Clean => {
+                    return Err(Error::Storage("Invalid buffer status: Clean".into()));
+                }
+            },
         }
-        if became_unloaded {
-            self.status
-                .store(BufferStatus::Unloaded as u8, Ordering::Release);
-            self.push_gc_queue();
-        }
-        Ok(())
+        Ok(write)
     }
 
     /// C++ `BufferObj::Free`: drops the payload and returns its budget. Only
     /// an `Unloaded` buffer is freeable; an ephemeral payload is spilled to
-    /// its temp file and the buffer becomes `Temp` first.
+    /// its temp file (and becomes `Temp`) first.
     pub fn free(&self) -> Result<()> {
         self.remove_from_gc_queue();
-        let mut data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap();
+        self.free_locked(data)
+    }
+
+    /// C++ `BufferObj::Free` with its `try_lock`: a buffer another thread is
+    /// loading or cleaning cannot be freed now (`false`); the GC skips it.
+    fn try_free(&self) -> bool {
+        match self.data.try_lock() {
+            Ok(data) => self.free_locked(data).is_ok(),
+            Err(_) => false,
+        }
+    }
+
+    fn free_locked(&self, mut data: MutexGuard<'_, Option<Vec<u8>>>) -> Result<()> {
         if self.status() == BufferStatus::Freed {
             return Ok(());
         }
@@ -235,23 +405,24 @@ impl BufferObj {
             BufferType::Persistent | BufferType::Temp => {}
             BufferType::Ephemeral => {
                 if let Some(payload) = data.as_ref() {
-                    self.write_payload(payload)?;
+                    self.write_to(self.spill_path(), payload)?;
                 }
                 self.kind.store(KIND_TEMP, Ordering::Release);
+                self.pool_add_temp();
             }
         }
         let freed = data.take().is_some();
         drop(data);
         if freed {
             let mut state = self.state.lock().unwrap();
-            state.used = state.used.saturating_sub(self.bytes);
+            state.used = state.used.saturating_sub(self.size());
         }
         self.status
             .store(BufferStatus::Freed as u8, Ordering::Release);
         Ok(())
     }
 
-    /// C++ `BufferObj::CheckState`: the status/reference-count invariants.
+    /// C++ `CheckState`: the status/reference-count invariants.
     pub fn check_state(&self) -> Result<()> {
         let invalid = |status: BufferStatus| {
             Err(Error::Storage(format!(
@@ -265,7 +436,7 @@ impl BufferObj {
                     return invalid(BufferStatus::Loaded);
                 }
             }
-            BufferStatus::Unloaded | BufferStatus::Freed => {
+            BufferStatus::Unloaded | BufferStatus::Freed | BufferStatus::Clean => {
                 if self.rc() > 0 {
                     return invalid(self.status());
                 }
@@ -279,34 +450,185 @@ impl BufferObj {
         Ok(())
     }
 
-    fn write_payload(&self, payload: &[u8]) -> Result<()> {
-        if let Some(path) = self.path.as_ref() {
-            std::fs::write(path, payload).map_err(|e| Error::io(path, e))?;
+    /// C++ `BufferObj::AddObjRc`.
+    pub fn add_obj_rc(&self) {
+        self.obj_rc.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// C++ `BufferObj::SubObjRc`.
+    pub fn sub_obj_rc(&self) -> Result<()> {
+        let prev = self.obj_rc.fetch_sub(1, Ordering::AcqRel);
+        if prev == 0 {
+            self.obj_rc.fetch_add(1, Ordering::AcqRel);
+            return Err(Error::Storage("SubObjRc: obj_rc_ is 0".into()));
+        }
+        if prev > 1 {
+            return Ok(());
+        }
+        self.status
+            .store(BufferStatus::Clean as u8, Ordering::Release);
+        self.pool_add_clean();
+        Ok(())
+    }
+
+    /// C++ `BufferObj::PickForCleanup`: the last owner releases the buffer,
+    /// freeing its memory and scheduling the data file for deletion.
+    pub fn pick_for_cleanup(&self) -> Result<()> {
+        let prev = self.obj_rc.fetch_sub(1, Ordering::AcqRel);
+        if prev == 0 {
+            self.obj_rc.fetch_add(1, Ordering::AcqRel);
+            return Err(Error::Storage("PickForCleanup: obj_rc_ is 0".into()));
+        }
+        if prev > 1 {
+            return Ok(());
+        }
+        match self.status() {
+            BufferStatus::Clean => return Ok(()),
+            BufferStatus::New | BufferStatus::Freed => {}
+            BufferStatus::Unloaded => {
+                let mut data = self.data.lock().unwrap();
+                let freed = data.take().is_some();
+                drop(data);
+                if freed {
+                    let mut state = self.state.lock().unwrap();
+                    state.used = state.used.saturating_sub(self.size());
+                }
+            }
+            BufferStatus::Loaded => {
+                return Err(Error::Storage(
+                    "PickForCleanup: buffer is still loaded".into(),
+                ));
+            }
+        }
+        self.status
+            .store(BufferStatus::Clean as u8, Ordering::Release);
+        self.pool_add_clean();
+        if self.kind() == BufferType::Temp {
+            self.pool_remove_temp();
         }
         Ok(())
     }
 
-    /// C++ `BufferManager::RequestSpace` + `LRUCache::RequestSpace`: charge
-    /// `needed` bytes, freeing GC-queued buffers until the budget holds.
-    fn reserve(&self, needed: usize) -> Result<()> {
-        loop {
-            let victim = {
-                let mut state = self.state.lock().unwrap();
-                if state.used + needed <= state.budget {
-                    state.used += needed;
-                    return Ok(());
-                }
-                state.gc_queue.pop_front()
-            };
-            let Some(victim) = victim else {
-                return Err(Error::Storage("buffer manager out of memory".into()));
-            };
-            if let Some(victim) = victim.upgrade() {
-                // A concurrent reload makes `free` refuse; the reference
-                // skips such a buffer as well.
-                let _ = victim.free();
+    /// C++ `BufferObj::CleanupFile`: `RemoveClean` deletes the data file.
+    fn cleanup_file(&self) -> Result<()> {
+        if self.status() != BufferStatus::Clean {
+            return Err(Error::Storage("Invalid status".into()));
+        }
+        if let Some(path) = self.data_path() {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(Error::io(&path, e)),
             }
         }
+        Ok(())
+    }
+
+    /// C++ `BufferObj::CleanupTempFile`: delete the spill file unless the
+    /// payload is still waiting to be moved (`kTemp`).
+    fn cleanup_temp_file(&self) {
+        if self.kind() == BufferType::Temp {
+            return;
+        }
+        if let Some(path) = self.spill_path() {
+            if path.exists() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+
+    /// C++ `DataFileWorker::SetDataSize`.
+    pub fn set_data_size(&self, size: usize) {
+        self.data_size.store(size, Ordering::Release);
+    }
+
+    fn read_from(&self, path: Option<PathBuf>, expected: usize) -> Result<Vec<u8>> {
+        let Some(path) = path else {
+            return Ok(vec![0u8; expected]);
+        };
+        let mut payload = std::fs::read(&path).map_err(|e| Error::io(&path, e))?;
+        if payload.len() < expected {
+            payload.resize(expected, 0);
+        }
+        Ok(payload)
+    }
+
+    fn write_to(&self, path: Option<PathBuf>, payload: &[u8]) -> Result<()> {
+        let Some(path) = path else {
+            return Ok(());
+        };
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        let len = if self
+            .worker
+            .as_ref()
+            .is_some_and(|worker| !worker.is_variable())
+        {
+            self.data_size.load(Ordering::Acquire).min(payload.len())
+        } else {
+            payload.len()
+        };
+        std::fs::write(&path, &payload[..len]).map_err(|e| Error::io(&path, e))
+    }
+
+    fn move_file(&self) -> Result<()> {
+        let (Some(src), Some(dst)) = (self.spill_path(), self.data_path()) else {
+            return Ok(());
+        };
+        if src == dst {
+            return Ok(());
+        }
+        if !src.exists() {
+            return Err(Error::Storage(format!("File not found: {}", src.display())));
+        }
+        if let Some(parent) = dst.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        std::fs::rename(&src, &dst).map_err(|e| Error::io(&dst, e))
+    }
+
+    /// C++ `BufferManager::RequestSpace` + `LRUCache::RequestSpace`: charge
+    /// `needed` bytes, freeing GC-queued buffers until the budget holds.
+    ///
+    /// Mirrors the reference's arithmetic, including charging the request even
+    /// when it fails (the `varfile_test` accounting assertion relies on it).
+    fn request_space(&self, needed: usize) -> bool {
+        let free_space = {
+            let mut state = self.state.lock().unwrap();
+            let free_space = state.budget.wrapping_sub(state.used);
+            if free_space >= needed {
+                state.used += needed;
+                return true;
+            }
+            free_space
+        };
+        let mut freed = 0;
+        // One pass over the buffers queued when the request started; a buffer
+        // another thread is loading/cleaning is skipped (the reference's
+        // `Free` returns false) and stays queued for a later pass.
+        let mut remaining = self.state.lock().unwrap().gc_queue.len();
+        while freed + free_space < needed && remaining > 0 {
+            let victim = {
+                let mut state = self.state.lock().unwrap();
+                state.gc_queue.pop_front()
+            };
+            let Some(victim) = victim else { break };
+            remaining -= 1;
+            let Some(obj) = victim.upgrade() else {
+                continue;
+            };
+            let size = obj.size();
+            if obj.try_free() {
+                freed += size;
+            } else {
+                let mut state = self.state.lock().unwrap();
+                state.gc_queue.push_back(victim);
+            }
+        }
+        let mut state = self.state.lock().unwrap();
+        state.used = state.used.wrapping_add(needed);
+        freed + free_space >= needed
     }
 
     fn push_gc_queue(&self) {
@@ -323,6 +645,51 @@ impl BufferObj {
         };
         let mut state = self.state.lock().unwrap();
         state.gc_queue.retain(|weak| !Weak::ptr_eq(weak, me));
+    }
+
+    /// C++ `BufferManager::AddTemp`.
+    fn pool_add_temp(&self) {
+        let Some(me) = self.self_ref.get() else {
+            return;
+        };
+        let mut state = self.state.lock().unwrap();
+        if !state.temps.iter().any(|weak| Weak::ptr_eq(weak, me)) {
+            state.temps.push(me.clone());
+        }
+        state.clean_temps.retain(|weak| !Weak::ptr_eq(weak, me));
+    }
+
+    /// C++ `BufferManager::RemoveTemp`: the spill file is relinquished; its
+    /// deletion is deferred to `RemoveClean`.
+    fn pool_remove_temp(&self) {
+        let Some(me) = self.self_ref.get() else {
+            return;
+        };
+        let mut state = self.state.lock().unwrap();
+        state.temps.retain(|weak| !Weak::ptr_eq(weak, me));
+        if !state.clean_temps.iter().any(|weak| Weak::ptr_eq(weak, me)) {
+            state.clean_temps.push(me.clone());
+        }
+    }
+
+    /// C++ `BufferManager::MoveTemp`: `Save` consumes the spill file.
+    fn pool_move_temp(&self) {
+        let Some(me) = self.self_ref.get() else {
+            return;
+        };
+        let mut state = self.state.lock().unwrap();
+        state.temps.retain(|weak| !Weak::ptr_eq(weak, me));
+    }
+
+    /// C++ `BufferManager::AddToCleanList`.
+    fn pool_add_clean(&self) {
+        let Some(me) = self.self_ref.get() else {
+            return;
+        };
+        let mut state = self.state.lock().unwrap();
+        if !state.clean.iter().any(|weak| Weak::ptr_eq(weak, me)) {
+            state.clean.push(me.clone());
+        }
     }
 
     /// C++ `BufferObj::UnloadInner`: the last handle leaves the payload
@@ -363,10 +730,52 @@ impl<'a> BufferHandle<'a> {
 
     /// C++ `GetDataMut()`. Taking a mutable pointer makes the buffer
     /// ephemeral again (the reference's `GetMutPointer`), so unflushed writes
-    /// are spilled by the GC rather than silently kept persistent.
+    /// are spilled by the GC rather than silently kept persistent. A spilled
+    /// payload is relinquished from the temp set; `RemoveClean` deletes the
+    /// spill file once the buffer is saved again.
     pub fn data_mut(&self) -> MutexGuard<'_, Option<Vec<u8>>> {
+        if self.obj.kind() == BufferType::Temp {
+            self.obj.pool_remove_temp();
+        }
         self.obj.kind.store(KIND_EPHEMERAL, Ordering::Release);
         self.obj.data.lock().unwrap()
+    }
+
+    /// C++ `VarBuffer::Append` for a `VarFileWorker` payload: appends `bytes`
+    /// and charges the growth to the pool. Returns the reference's
+    /// `free_success` — the data is appended even when the request fails.
+    pub fn var_append(&self, bytes: &[u8]) -> bool {
+        let mut data = self.obj.data.lock().unwrap();
+        let payload = data
+            .as_mut()
+            .expect("var_append requires a loaded buffer payload");
+        let success = self.obj.request_space(bytes.len());
+        payload.extend_from_slice(bytes);
+        self.obj.bytes.store(payload.len(), Ordering::Release);
+        self.obj.kind.store(KIND_EPHEMERAL, Ordering::Release);
+        success
+    }
+
+    /// C++ `VarBuffer::TotalSize`.
+    pub fn var_total_size(&self) -> usize {
+        let data = self.obj.data.lock().unwrap();
+        data.as_ref().map_or(0, Vec::len)
+    }
+
+    /// C++ `VarBuffer::Get(offset, size)`.
+    pub fn var_get(&self, offset: usize, size: usize) -> Result<Option<Vec<u8>>> {
+        if size == 0 {
+            return Ok(None);
+        }
+        let data = self.obj.data.lock().unwrap();
+        let payload = data.as_ref().expect("var_get requires a loaded payload");
+        if offset + size > payload.len() {
+            return Err(Error::Invalid(format!(
+                "offset {offset} and size {size} is out of range [0, {})",
+                payload.len()
+            )));
+        }
+        Ok(Some(payload[offset..offset + size].to_vec()))
     }
 
     pub fn obj(&self) -> &'a BufferObj {
@@ -385,6 +794,10 @@ impl Drop for BufferHandle<'_> {
 /// C++: the allocation/accounting half of `BufferManager`.
 pub struct BufferPool {
     state: Arc<Mutex<PoolState>>,
+    /// C++ `BufferManager::buffer_map_`: file-backed buffers keyed by their
+    /// data path, so a second `GetBufferObject` for the same file returns the
+    /// existing object instead of allocating a new one.
+    objects: Mutex<HashMap<PathBuf, Arc<BufferObj>>>,
 }
 
 impl BufferPool {
@@ -394,7 +807,11 @@ impl BufferPool {
                 budget,
                 used: 0,
                 gc_queue: VecDeque::new(),
+                temps: Vec::new(),
+                clean_temps: Vec::new(),
+                clean: Vec::new(),
             })),
+            objects: Mutex::new(HashMap::new()),
         }
     }
 
@@ -402,13 +819,31 @@ impl BufferPool {
         self.state.lock().unwrap().budget
     }
 
+    /// C++ `BufferManager::memory_usage`.
     pub fn used_bytes(&self) -> usize {
         self.state.lock().unwrap().used
     }
 
+    /// C++ `BufferManager::TempSetSize`.
+    pub fn temp_set_size(&self) -> usize {
+        self.state.lock().unwrap().temps.len()
+    }
+
+    /// C++ `BufferManager::BufferedObjectCount`.
+    pub fn buffered_object_count(&self) -> usize {
+        self.objects.lock().unwrap().len()
+    }
+
     /// C++ `BufferManager::AllocateBufferObject` for an anonymous buffer.
     pub fn allocate(&self, bytes: usize, kind: BufferType) -> Arc<BufferObj> {
-        self.register(BufferObj::new(self.state.clone(), bytes, kind, None))
+        self.register(BufferObj::new(
+            self.state.clone(),
+            bytes,
+            kind,
+            None,
+            None,
+            BufferStatus::New,
+        ))
     }
 
     /// C++ `BufferManager::AllocateBufferObject` for a file-backed buffer.
@@ -423,7 +858,85 @@ impl BufferPool {
             bytes,
             kind,
             Some(path.into()),
+            None,
+            BufferStatus::New,
         ))
+    }
+
+    /// C++ `BufferManager::AllocateBufferObject(FileWorker)`: an ephemeral
+    /// buffer registered under its data path.
+    pub fn allocate_file(&self, worker: FileWorker) -> Result<Arc<BufferObj>> {
+        let key = worker.file_path();
+        let mut objects = self.objects.lock().unwrap();
+        if objects.contains_key(&key) {
+            return Err(Error::Storage(format!(
+                "BufferManager::Allocate: file {} already exists.",
+                key.display()
+            )));
+        }
+        let bytes = worker.buffer_size();
+        let obj = self.register(BufferObj::new(
+            self.state.clone(),
+            bytes,
+            BufferType::Ephemeral,
+            None,
+            Some(worker),
+            BufferStatus::New,
+        ));
+        objects.insert(key, obj.clone());
+        Ok(obj)
+    }
+
+    /// C++ `BufferManager::GetBufferObject(FileWorker)`: the buffer already
+    /// tracking this file path, or a persistent one for an existing file.
+    pub fn get_file_object(&self, worker: FileWorker) -> Arc<BufferObj> {
+        let key = worker.file_path();
+        let mut objects = self.objects.lock().unwrap();
+        if let Some(obj) = objects.get(&key) {
+            return obj.clone();
+        }
+        let bytes = worker.buffer_size();
+        let obj = self.register(BufferObj::new(
+            self.state.clone(),
+            bytes,
+            BufferType::Persistent,
+            None,
+            Some(worker),
+            BufferStatus::Freed,
+        ));
+        objects.insert(key, obj.clone());
+        obj
+    }
+
+    /// C++ `BufferManager::RemoveClean`: delete every picked buffer's data
+    /// file, then every relinquished spill file, and drop them from the map.
+    pub fn remove_clean(&self) -> Result<()> {
+        let (clean, temps) = {
+            let mut state = self.state.lock().unwrap();
+            (
+                std::mem::take(&mut state.clean),
+                std::mem::take(&mut state.clean_temps),
+            )
+        };
+        for weak in &clean {
+            if let Some(obj) = weak.upgrade() {
+                obj.cleanup_file()?;
+            }
+        }
+        for weak in &temps {
+            if let Some(obj) = weak.upgrade() {
+                obj.cleanup_temp_file();
+            }
+        }
+        let mut objects = self.objects.lock().unwrap();
+        for weak in clean {
+            if let Some(obj) = weak.upgrade() {
+                if let Some(path) = obj.data_path() {
+                    objects.remove(&path);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn register(&self, obj: BufferObj) -> Arc<BufferObj> {
@@ -986,5 +1499,522 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
+    }
+
+    /// Number of files below `dir` (C++ `ListAllFile`).
+    fn count_files(dir: &std::path::Path) -> usize {
+        fn walk(dir: &std::path::Path, count: &mut usize) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, count);
+                } else {
+                    *count += 1;
+                }
+            }
+        }
+        let mut count = 0;
+        walk(dir, &mut count);
+        count
+    }
+
+    /// C++: `BufferManagerTest.cleanup_test`
+    /// (`storage/buffer/buffer_manager_ut.cpp:99`). 100 ephemeral 100-byte
+    /// files under a 2-block budget: loading spills all but the last two to
+    /// the temp dir, `Save` moves them to the data dir, and the two cleanup
+    /// rounds (`RemoveClean`, then `PickForCleanup` + `RemoveClean`) delete
+    /// every spill and data file.
+    #[test]
+    fn cleanup_test() {
+        const K: usize = 2;
+        const FILE_SIZE: usize = 100;
+        const BUFFER_SIZE: usize = K * FILE_SIZE;
+        const FILE_NUM: usize = 100;
+        const FILE_NUM1: usize = FILE_NUM / 2;
+        const {
+            assert!(FILE_NUM > K + FILE_NUM1);
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let check = |data: usize, temp: usize| {
+            assert_eq!(count_files(&data_dir), data, "data files");
+            assert_eq!(count_files(&temp_dir), temp, "temp files");
+        };
+
+        let pool = BufferPool::new(BUFFER_SIZE);
+        let mut buffers = Vec::new();
+        for i in 0..FILE_NUM {
+            let worker = FileWorker::data(&data_dir, &temp_dir, "", format!("file_{i}"), FILE_SIZE);
+            let obj = pool.allocate_file(worker).unwrap();
+            obj.add_obj_rc();
+            buffers.push(obj);
+            {
+                let handle = buffers[i].load().unwrap();
+                let mut guard = handle.data_mut();
+                let payload = guard.as_mut().unwrap();
+                for (j, byte) in payload.iter_mut().take(FILE_SIZE).enumerate() {
+                    *byte = b'a' + ((i + j) % 26) as u8;
+                }
+            }
+            buffers[i].set_data_size(FILE_SIZE);
+        }
+        // The budget holds two payloads; the other 98 were spilled.
+        check(0, FILE_NUM - K);
+        let mut write_n = 0;
+        for obj in &buffers {
+            if obj.save().unwrap() {
+                write_n += 1;
+            }
+        }
+        assert_eq!(write_n, K);
+        check(FILE_NUM, 0);
+        for (i, obj) in buffers.iter().enumerate() {
+            let handle = obj.load().unwrap();
+            let guard = handle.data();
+            let payload = guard.as_ref().unwrap();
+            for (j, byte) in payload.iter().take(FILE_SIZE).enumerate() {
+                assert_eq!(*byte, b'a' + ((i + j) % 26) as u8, "file {i}");
+            }
+        }
+        check(FILE_NUM, 0);
+        for (i, obj) in buffers.iter().enumerate() {
+            let handle = obj.load().unwrap();
+            let mut guard = handle.data_mut();
+            let payload = guard.as_mut().unwrap();
+            for (j, byte) in payload.iter_mut().take(FILE_SIZE).enumerate() {
+                *byte = b'a' + ((i + j) % 26) as u8;
+            }
+        }
+        {
+            let mut write_n = 0;
+            for obj in &buffers[..FILE_NUM1] {
+                if obj.save().unwrap() {
+                    write_n += 1;
+                }
+            }
+            assert!(write_n <= K);
+            pool.remove_clean().unwrap();
+            check(FILE_NUM, FILE_NUM - K - FILE_NUM1);
+        }
+        for (i, obj) in buffers.iter().enumerate().skip(FILE_NUM1) {
+            {
+                let handle = obj.load().unwrap();
+                let mut guard = handle.data_mut();
+                let payload = guard.as_mut().unwrap();
+                for (j, byte) in payload.iter_mut().take(FILE_SIZE).enumerate() {
+                    *byte = b'A' + ((i + j) % 26) as u8;
+                }
+            }
+            obj.save().unwrap();
+        }
+        check(FILE_NUM, FILE_NUM - FILE_NUM1);
+        pool.remove_clean().unwrap();
+        check(FILE_NUM, 0);
+
+        for obj in &buffers {
+            obj.pick_for_cleanup().unwrap();
+        }
+        pool.remove_clean().unwrap();
+        check(0, 0);
+        assert_eq!(pool.buffered_object_count(), 0);
+    }
+
+    /// C++: `BufferManagerTest.varfile_test`
+    /// (`storage/buffer/buffer_manager_ut.cpp:204`): three `VarFileWorker`
+    /// payloads append under a 100-byte budget; the fourth append cannot get
+    /// space (all handles are live) yet the reference still charges it, and
+    /// the two appended buffers read back both 25-byte chunks.
+    #[test]
+    fn varfile_test() {
+        const BUFFER_SIZE: usize = 100;
+        const FILE_NUM: usize = 10;
+        const DATA_SIZE: usize = 25;
+
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let pool = BufferPool::new(BUFFER_SIZE);
+        let mut buffers = Vec::new();
+        for i in 0..FILE_NUM {
+            let worker = FileWorker::var(&data_dir, &temp_dir, "", format!("file_{i}"), 0);
+            buffers.push(pool.allocate_file(worker).unwrap());
+        }
+        let data: Vec<u8> = (0..DATA_SIZE).map(|i| b'a' + (i % 26) as u8).collect();
+        {
+            let h1 = buffers[0].load().unwrap();
+            h1.var_append(&data);
+            let h2 = buffers[1].load().unwrap();
+            h2.var_append(&data);
+            let h3 = buffers[2].load().unwrap();
+            assert!(h3.var_append(&data));
+            assert_eq!(pool.used_bytes(), 3 * DATA_SIZE);
+        }
+        {
+            let h1 = buffers[0].load().unwrap();
+            assert!(h1.var_append(&data));
+            let _h2 = buffers[1].load().unwrap();
+            let h3 = buffers[2].load().unwrap();
+            // Every handle is live, so the GC has no victim: the append is
+            // still performed but the request fails and is charged anyway.
+            assert!(!h3.var_append(&data));
+            assert_eq!(pool.used_bytes(), 5 * DATA_SIZE);
+        }
+        {
+            let h2 = buffers[1].load().unwrap();
+            assert!(h2.var_append(&data));
+        }
+        for (i, buf) in buffers.iter().take(2).enumerate() {
+            let handle = buf.load().unwrap();
+            assert_eq!(
+                handle.var_get(0, DATA_SIZE).unwrap().as_deref(),
+                Some(data.as_slice()),
+                "buffer {i} first chunk"
+            );
+            assert_eq!(
+                handle.var_get(DATA_SIZE, DATA_SIZE).unwrap().as_deref(),
+                Some(data.as_slice()),
+                "buffer {i} second chunk"
+            );
+        }
+    }
+
+    /// A small thread-safe xorshift RNG; the reference uses `rand()`.
+    struct Rng(AtomicU64);
+
+    impl Rng {
+        fn new(seed: u64) -> Self {
+            Self(AtomicU64::new(seed.max(1)))
+        }
+
+        fn next_u32(&self) -> u32 {
+            let mut current = self.0.load(Ordering::Relaxed);
+            loop {
+                let mut next = current;
+                next ^= next << 13;
+                next ^= next >> 7;
+                next ^= next << 17;
+                match self.0.compare_exchange_weak(
+                    current,
+                    next,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => return (next >> 16) as u32,
+                    Err(observed) => current = observed,
+                }
+            }
+        }
+    }
+
+    const THREAD_N: usize = 2;
+    const FILE_N: usize = 100;
+    const AVG_FILE_SIZE: usize = 100;
+    const MAX_FILE_SIZE: usize = AVG_FILE_SIZE + AVG_FILE_SIZE / 2;
+    /// `*2` because `BufferManager::RequestSpace` may scan a buffer that is
+    /// loading/cleaning.
+    const PARALLEL_BUFFER_SIZE: usize = MAX_FILE_SIZE * THREAD_N * 2;
+    const LOOP_N: usize = 10;
+    const TEST_N: usize = 2;
+    const VAR_FILE_STEP: usize = MAX_FILE_SIZE / LOOP_N / TEST_N;
+
+    /// C++ `FileInfo` (`buffer_manager_ut.cpp:277`).
+    struct FileInfo {
+        file_id: usize,
+        buffer_obj: Option<Arc<BufferObj>>,
+        file_size: usize,
+        visit_cnt: usize,
+    }
+
+    impl FileInfo {
+        fn new(file_id: usize) -> Self {
+            Self {
+                file_id,
+                buffer_obj: None,
+                file_size: 0,
+                visit_cnt: 0,
+            }
+        }
+    }
+
+    /// C++ `TestObj`.
+    trait TestObj: Sync {
+        fn init(
+            &self,
+            alloc_new: bool,
+            file_id: usize,
+            file_size: &mut usize,
+            slot: &mut Option<Arc<BufferObj>>,
+        );
+        fn write(&self, visit_cnt: usize, file_size: &mut usize, obj: &Arc<BufferObj>);
+        fn check(&self, visit_cnt: usize, file_size: usize, obj: &Arc<BufferObj>);
+    }
+
+    /// C++ `BufferManagerParallelTest::TestRoutine`.
+    fn test_routine(
+        files: &[Mutex<FileInfo>],
+        test_i: usize,
+        test_obj: &dyn TestObj,
+        finished_n: &AtomicUsize,
+        rng: &Rng,
+    ) {
+        let alloc_new = test_i == 0;
+        let clean = test_i + 1 == TEST_N;
+        while finished_n.load(Ordering::Acquire) < FILE_N {
+            let mut op = (rng.next_u32() % 5) as usize;
+            if op > 2 {
+                op = 2; // read
+            }
+            let file_id = (rng.next_u32() as usize) % FILE_N;
+            let mut file_info = files[file_id].lock().unwrap();
+            let mut file_size = file_info.file_size;
+            let mut buffer_obj = file_info.buffer_obj.take();
+            if op < 2 {
+                // write
+                if file_info.visit_cnt == test_i * LOOP_N {
+                    assert!(buffer_obj.is_none());
+                    test_obj.init(
+                        alloc_new,
+                        file_info.file_id,
+                        &mut file_size,
+                        &mut buffer_obj,
+                    );
+                } else if file_info.visit_cnt == (test_i + 1) * LOOP_N {
+                    if clean {
+                        assert!(buffer_obj.is_none());
+                    }
+                    file_info.file_size = file_size;
+                    file_info.buffer_obj = buffer_obj;
+                    continue;
+                }
+                test_obj.write(
+                    file_info.visit_cnt,
+                    &mut file_size,
+                    buffer_obj.as_ref().unwrap(),
+                );
+                if op == 1 {
+                    buffer_obj.as_ref().unwrap().save().expect("save");
+                }
+                file_info.visit_cnt += 1;
+                if file_info.visit_cnt == (test_i + 1) * LOOP_N {
+                    if clean {
+                        buffer_obj
+                            .as_ref()
+                            .unwrap()
+                            .pick_for_cleanup()
+                            .expect("pick for cleanup");
+                        buffer_obj = None;
+                    }
+                    finished_n.fetch_add(1, Ordering::AcqRel);
+                }
+            } else {
+                // read
+                let visit_cnt = file_info.visit_cnt;
+                if visit_cnt == test_i * LOOP_N || visit_cnt == (test_i + 1) * LOOP_N {
+                    file_info.file_size = file_size;
+                    file_info.buffer_obj = buffer_obj;
+                    continue;
+                }
+                test_obj.check(visit_cnt, file_size, buffer_obj.as_ref().unwrap());
+            }
+            file_info.file_size = file_size;
+            file_info.buffer_obj = buffer_obj;
+        }
+    }
+
+    /// C++ `Test1Obj`: fixed-size `DataFileWorker` payloads.
+    struct Test1Obj<'a> {
+        pool: &'a BufferPool,
+        data_dir: PathBuf,
+        temp_dir: PathBuf,
+        rng: &'a Rng,
+    }
+
+    impl TestObj for Test1Obj<'_> {
+        fn init(
+            &self,
+            alloc_new: bool,
+            file_id: usize,
+            file_size: &mut usize,
+            slot: &mut Option<Arc<BufferObj>>,
+        ) {
+            if alloc_new {
+                *file_size = (self.rng.next_u32() as usize) % AVG_FILE_SIZE + AVG_FILE_SIZE / 2;
+            }
+            let worker = FileWorker::data(
+                &self.data_dir,
+                &self.temp_dir,
+                "",
+                format!("file_{file_id}"),
+                *file_size,
+            );
+            if alloc_new {
+                let obj = self.pool.allocate_file(worker).expect("allocate");
+                obj.add_obj_rc();
+                *slot = Some(obj);
+            } else {
+                *slot = Some(self.pool.get_file_object(worker));
+            }
+        }
+
+        fn write(&self, visit_cnt: usize, file_size: &mut usize, obj: &Arc<BufferObj>) {
+            let handle = obj.load().expect("load");
+            {
+                let mut guard = handle.data_mut();
+                let payload = guard.as_mut().expect("payload");
+                payload[..*file_size].fill(b'a' + (visit_cnt % 26) as u8);
+            }
+            obj.set_data_size(*file_size);
+        }
+
+        fn check(&self, visit_cnt: usize, file_size: usize, obj: &Arc<BufferObj>) {
+            let handle = obj.load().expect("load");
+            let guard = handle.data();
+            let payload = guard.as_ref().expect("payload");
+            for (i, byte) in payload.iter().take(file_size).enumerate() {
+                assert_eq!(
+                    *byte,
+                    b'a' + ((visit_cnt - 1) % 26) as u8,
+                    "byte {i} of a {file_size}-byte buffer"
+                );
+            }
+        }
+    }
+
+    /// C++ `Test2Obj`: growing `VarFileWorker` payloads.
+    struct Test2Obj<'a> {
+        pool: &'a BufferPool,
+        data_dir: PathBuf,
+        temp_dir: PathBuf,
+    }
+
+    impl TestObj for Test2Obj<'_> {
+        fn init(
+            &self,
+            alloc_new: bool,
+            file_id: usize,
+            file_size: &mut usize,
+            slot: &mut Option<Arc<BufferObj>>,
+        ) {
+            let worker = FileWorker::var(
+                &self.data_dir,
+                &self.temp_dir,
+                "",
+                format!("file_{file_id}"),
+                *file_size,
+            );
+            if alloc_new {
+                let obj = self.pool.allocate_file(worker).expect("allocate");
+                obj.add_obj_rc();
+                *slot = Some(obj);
+            } else {
+                *slot = Some(self.pool.get_file_object(worker));
+            }
+        }
+
+        fn write(&self, _visit_cnt: usize, file_size: &mut usize, obj: &Arc<BufferObj>) {
+            let handle = obj.load().expect("load");
+            let step = VAR_FILE_STEP;
+            let mut data = vec![0u8; step];
+            for (i, byte) in data.iter_mut().enumerate() {
+                *byte = b'a' + ((i + *file_size) % 26) as u8;
+            }
+            // The reference passes no `free_success` pointer: the append is
+            // unconditional.
+            handle.var_append(&data);
+            *file_size += step;
+            assert_eq!(obj.size(), *file_size, "GetBufferSize");
+        }
+
+        fn check(&self, _visit_cnt: usize, file_size: usize, obj: &Arc<BufferObj>) {
+            let handle = obj.load().expect("load");
+            let step = VAR_FILE_STEP;
+            let mut offset = 0;
+            while offset < file_size {
+                let chunk = handle
+                    .var_get(offset, step)
+                    .expect("get")
+                    .expect("non-empty chunk");
+                for (j, byte) in chunk.iter().enumerate() {
+                    assert_eq!(
+                        *byte,
+                        b'a' + ((offset + j) % 26) as u8,
+                        "offset {offset} byte {j}"
+                    );
+                }
+                offset += step;
+            }
+        }
+    }
+
+    fn parallel_dirs() -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let temp_dir = dir.path().join("temp");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        (dir, data_dir, temp_dir)
+    }
+
+    fn run_parallel(test_obj: &dyn TestObj, pool: &BufferPool) {
+        let files: Vec<Mutex<FileInfo>> =
+            (0..FILE_N).map(|i| Mutex::new(FileInfo::new(i))).collect();
+        let rng = Rng::new(1);
+        for test_i in 0..TEST_N {
+            let finished_n = AtomicUsize::new(0);
+            for file in &files {
+                file.lock().unwrap().buffer_obj = None;
+            }
+            std::thread::scope(|scope| {
+                for _ in 0..THREAD_N {
+                    scope.spawn(|| test_routine(&files, test_i, test_obj, &finished_n, &rng));
+                }
+            });
+        }
+        assert_eq!(pool.used_bytes(), 0, "memory usage after the run");
+        pool.remove_clean().unwrap();
+    }
+
+    /// C++: `BufferManagerParallelTest.parallel_test1`
+    /// (`storage/buffer/buffer_manager_ut.cpp:420`): two threads alternate
+    /// reads/writes/saves over 100 fixed-size buffers for two passes; the
+    /// second pass reloads the buffers created by the first.
+    #[test]
+    fn parallel_test1() {
+        let (_dir, data_dir, temp_dir) = parallel_dirs();
+        let pool = BufferPool::new(PARALLEL_BUFFER_SIZE);
+        let rng = Rng::new(1);
+        let test_obj = Test1Obj {
+            pool: &pool,
+            data_dir,
+            temp_dir,
+            rng: &rng,
+        };
+        run_parallel(&test_obj, &pool);
+    }
+
+    /// C++: `BufferManagerParallelTest.parallel_test2`
+    /// (`storage/buffer/buffer_manager_ut.cpp:507`): the same scenario over
+    /// growing `VarFileWorker` buffers; every append's size is charged and
+    /// `GetBufferSize` tracks the accumulated bytes.
+    #[test]
+    fn parallel_test2() {
+        let (_dir, data_dir, temp_dir) = parallel_dirs();
+        let pool = BufferPool::new(PARALLEL_BUFFER_SIZE);
+        let test_obj = Test2Obj {
+            pool: &pool,
+            data_dir,
+            temp_dir,
+        };
+        run_parallel(&test_obj, &pool);
     }
 }

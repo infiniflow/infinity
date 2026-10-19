@@ -338,6 +338,26 @@ fn views_keep_their_creation_database_scope() {
 }
 
 #[test]
+fn view_created_in_another_database_resolves_tables_globally() {
+    let (_d, e) = engine();
+    seed_source(&e);
+    e.execute("CREATE DATABASE db1;").unwrap();
+    e.execute("USE db1;").unwrap();
+    // `src` only exists in `default_db`; the view is created while `db1` is
+    // current, so the table reference must be resolved against the catalog
+    // rather than blindly qualified with the session database.
+    result(&e, "CREATE VIEW v AS SELECT a, b FROM src;");
+    assert_eq!(
+        row_strings(&e, "SELECT * FROM v ORDER BY a;"),
+        vec![
+            vec!["1".to_string(), "x".to_string()],
+            vec!["2".to_string(), "y".to_string()],
+            vec!["3".to_string(), "z".to_string()],
+        ]
+    );
+}
+
+#[test]
 fn view_ddl_reports_name_and_arity_errors() {
     let (_d, e) = engine();
     seed_source(&e);

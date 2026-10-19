@@ -249,10 +249,9 @@ pub struct ColumnDef {
     pub not_null: bool,
     /// `COMMENT '…'`
     pub comment: Option<String>,
-    /// `SPARSE(...) WITH (sort|sorted)`. Accepted for compatibility with the
-    /// reference's `with_index_param_list`; the Rust catalog always encodes
-    /// `SparseStoreType::kSort` (`cpp_layout::data_type_of_text`), so the hint
-    /// is recorded here but has no semantic effect yet.
+    /// `SPARSE(...) WITH (sort|sorted)`. Carried into
+    /// `infinity_catalog::TableMeta::sparse_stores` and written to the C++
+    /// catalog as `SparseStoreType::{kSort,kSorted}`.
     pub sparse_store: Option<SparseStore>,
 }
 

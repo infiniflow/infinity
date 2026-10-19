@@ -564,6 +564,40 @@ mod tests {
         }
     }
 
+    /// C++ `RabitqTest.test_compress` (`test_rabitq_ut.cpp:229`): every
+    /// compressed vector's code has `dim` bits, and the number of set bits
+    /// (read MSB-first, the reference's `align_size` layout) equals the
+    /// record's stored `sum_`; the quantized query's u8 codes sum to
+    /// `query_sum_`.
+    #[test]
+    fn test_compress() {
+        const DIM: usize = 128;
+        const VEC_N: usize = 8192;
+        let mut rng = Rng(29);
+        let vectors: Vec<Vec<f32>> = (0..VEC_N).map(|_| rng.vector(DIM, 100.0, 200.0)).collect();
+        let query = rng.vector(DIM, 100.0, 200.0);
+
+        let mut store = RabitqStore::new(DIM, Metric::L2, 31);
+        store.build(&vectors);
+        assert_eq!(store.len(), VEC_N);
+        assert_eq!(store.dim(), 128);
+        for (i, record) in store.data().iter().enumerate() {
+            assert_eq!(record.code.len(), store.dim() / 8);
+            let mut sum = 0usize;
+            for d in 0..store.dim() {
+                let bit = (record.code[d / 8] >> (7 - d % 8)) & 1;
+                sum += bit as usize;
+            }
+            assert_eq!(sum, record.sum as usize, "vector {i} bit sum");
+        }
+
+        let query_code = store.make_query(&query);
+        assert_eq!(query_code.code.len(), store.dim());
+        let sum: f32 = query_code.code.iter().map(|&c| f32::from(c)).sum();
+        assert_eq!(sum, query_code.sum, "query code sum");
+        assert!(query_code.delta > 0.0);
+    }
+
     #[test]
     fn save_and_load_roundtrip() {
         let dim = 24;

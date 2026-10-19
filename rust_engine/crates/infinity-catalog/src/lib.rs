@@ -17,6 +17,63 @@ use infinity_storage::{FjallMetaStore, MetaStore};
 
 const COUNTER_KEY: &[u8] = b"__counter:table";
 
+/// The storage hint of a `SPARSE` column: `WITH (SORT)` / `WITH (SORTED)`.
+///
+/// C++: `SparseStoreType` (`parser/type/info/sparse_info.h:29-33`). Only
+/// `SPARSE` columns carry one; every other column stores `None`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SparseStore {
+    /// `WITH (SORT)` / the default: values sorted row-wise on write.
+    Sort,
+    /// `WITH (SORTED)`: the column is declared pre-sorted.
+    Sorted,
+}
+
+impl SparseStore {
+    /// The C++ `SparseStoreType` ordinal (`sparse_info.h:29-33`).
+    pub fn as_i64(self) -> i64 {
+        match self {
+            Self::Sort => 0,
+            Self::Sorted => 1,
+        }
+    }
+
+    fn encode(self) -> &'static str {
+        match self {
+            Self::Sort => "0",
+            Self::Sorted => "1",
+        }
+    }
+
+    fn decode(s: &str) -> Option<Self> {
+        match s {
+            "" => None,
+            "0" | "SORT" => Some(Self::Sort),
+            "1" | "SORTED" => Some(Self::Sorted),
+            _ => None,
+        }
+    }
+}
+
+/// Splits a trailing `WITH (SORT|SORTED)` hint off a declared type text, so a
+/// type stream can carry the sparse storage hint without a side channel.
+///
+/// `SPARSE(FLOAT,30000) WITH (SORTED)` -> (`SPARSE(FLOAT,30000)`, `Sorted`).
+/// Anything else is returned unchanged with `None`.
+pub fn split_sparse_store_suffix(type_text: &str) -> (&str, Option<SparseStore>) {
+    let trimmed = type_text.trim_end();
+    let up = trimmed.to_ascii_uppercase();
+    let Some(pos) = up.rfind("WITH") else {
+        return (trimmed, None);
+    };
+    let tail = up[pos..].replace(char::is_whitespace, "");
+    match tail.as_str() {
+        "WITH(SORT)" => (trimmed[..pos].trim_end(), Some(SparseStore::Sort)),
+        "WITH(SORTED)" => (trimmed[..pos].trim_end(), Some(SparseStore::Sorted)),
+        _ => (trimmed, None),
+    }
+}
+
 /// Metadata of a table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableMeta {
@@ -35,6 +92,9 @@ pub struct TableMeta {
     /// never reuses it, so `DROP COLUMN` leaves a hole (the block files are
     /// named `<id>.col`).
     pub ids: Vec<u64>,
+    /// Per-column sparse storage hint (`None` for non-sparse columns and for
+    /// old catalogs written before the hint was persisted).
+    pub sparse_stores: Vec<Option<SparseStore>>,
 }
 
 /// Field/record separators for the encoded table metadata.
@@ -66,7 +126,16 @@ impl TableMeta {
                 let ty = self.types.get(i).cloned().unwrap_or_default();
                 let cm = self.comments.get(i).cloned().flatten().unwrap_or_default();
                 let cid = self.ids.get(i).copied().unwrap_or(i as u64);
-                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}{FSEP}{cm}{FSEP}{cid}")
+                // Appended field: old records simply lack it, which decodes as
+                // "no sparse hint".
+                let ss = self
+                    .sparse_stores
+                    .get(i)
+                    .copied()
+                    .flatten()
+                    .map(SparseStore::encode)
+                    .unwrap_or_default();
+                format!("{c}{FSEP}{d}{FSEP}{n}{FSEP}{ty}{FSEP}{cm}{FSEP}{cid}{FSEP}{ss}")
             })
             .collect();
         format!("{}{RSEP}{}", self.name, cols.join(&RSEP.to_string())).into_bytes()
@@ -83,6 +152,7 @@ impl TableMeta {
         let mut types = Vec::new();
         let mut comments = Vec::new();
         let mut ids = Vec::new();
+        let mut sparse_stores = Vec::new();
         for part in cols.split(RSEP).filter(|c| !c.is_empty()) {
             let mut f = part.split(FSEP);
             let n = f.next().unwrap_or(part);
@@ -91,6 +161,7 @@ impl TableMeta {
             let ty = f.next().unwrap_or("");
             let cm = f.next().unwrap_or("");
             let cid = f.next().and_then(|v| v.parse::<u64>().ok());
+            let ss = f.next().map(SparseStore::decode).unwrap_or(None);
             columns.push(n.to_string());
             defaults.push(match d.strip_prefix('\u{1}') {
                 Some(rest) => Some(rest.to_string()),
@@ -105,6 +176,7 @@ impl TableMeta {
                 Some(cm.to_string())
             });
             ids.push(cid.unwrap_or(ids.len() as u64));
+            sparse_stores.push(ss);
         }
         Ok(Self {
             id,
@@ -115,8 +187,27 @@ impl TableMeta {
             types,
             comments,
             ids,
+            sparse_stores,
         })
     }
+}
+
+/// Strips any `WITH (SORT|SORTED)` suffix from each declared type and returns
+/// the bare type texts plus the per-column hint. An explicit hint wins over
+/// the one encoded in the text.
+fn normalize_types(
+    types: &[String],
+    sparse_stores: &[Option<SparseStore>],
+    len: usize,
+) -> (Vec<String>, Vec<Option<SparseStore>>) {
+    (0..len)
+        .map(|i| {
+            let raw = types.get(i).map(String::as_str).unwrap_or("");
+            let (bare, from_text) = split_sparse_store_suffix(raw);
+            let hint = sparse_stores.get(i).copied().flatten().or(from_text);
+            (bare.to_string(), hint)
+        })
+        .unzip()
 }
 
 fn table_key(id: u64) -> Vec<u8> {
@@ -487,6 +578,36 @@ impl Catalog {
         types: &[String],
         comments: &[Option<String>],
     ) -> Result<TableMeta> {
+        self.create_table_typed_with_sparse_stores(
+            name,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            &[],
+        )
+    }
+
+    /// Creates a table with full column metadata, including the `SPARSE`
+    /// storage hint per column.
+    ///
+    /// A hint may also arrive as a trailing `WITH (SORT|SORTED)` on the type
+    /// text; it is split off here so [`TableMeta::types`] always holds the
+    /// bare declaration (which is what `DESCRIBE` prints, matching the C++
+    /// `DataType::ToString()`).
+    // Mirrors `create_table_typed`, plus the per-column sparse hint.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_table_typed_with_sparse_stores(
+        &self,
+        name: &str,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
         if self.get_table_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
         }
@@ -494,15 +615,17 @@ impl Catalog {
             return Err(Error::Catalog(format!("view '{name}' already exists")));
         }
         let id = self.alloc_id()?;
+        let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         let meta = TableMeta {
             id,
             name: name.to_string(),
             columns: columns.to_vec(),
             defaults: defaults.to_vec(),
             not_nulls: not_nulls.to_vec(),
-            types: types.to_vec(),
+            types,
             comments: comments.to_vec(),
             ids: (0..columns.len() as u64).collect(),
+            sparse_stores,
         };
         if self.cpp_only {
             let mut tables = self.cpp_tables()?;
@@ -546,9 +669,34 @@ impl Catalog {
         types: &[String],
         comments: &[Option<String>],
     ) -> Result<TableMeta> {
+        self.add_columns_typed_with_sparse_stores(
+            name,
+            columns,
+            defaults,
+            not_nulls,
+            types,
+            comments,
+            &[],
+        )
+    }
+
+    /// Appends columns with type text and their `SPARSE` storage hints.
+    // Mirrors `add_columns_typed`, plus the per-column sparse hint.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_columns_typed_with_sparse_stores(
+        &self,
+        name: &str,
+        columns: &[String],
+        defaults: &[Option<String>],
+        not_nulls: &[bool],
+        types: &[String],
+        comments: &[Option<String>],
+        sparse_stores: &[Option<SparseStore>],
+    ) -> Result<TableMeta> {
         let mut meta = self
             .get_table_by_name(name)?
             .ok_or_else(|| Error::Catalog(format!("table '{name}' does not exist")))?;
+        let (types, sparse_stores) = normalize_types(types, sparse_stores, columns.len());
         for (i, c) in columns.iter().enumerate() {
             if meta.columns.iter().any(|x| x == c) {
                 return Err(Error::Catalog(format!("column '{c}' already exists")));
@@ -559,6 +707,8 @@ impl Catalog {
                 .push(not_nulls.get(i).copied().unwrap_or(false));
             meta.types.push(types.get(i).cloned().unwrap_or_default());
             meta.comments.push(comments.get(i).cloned().flatten());
+            meta.sparse_stores
+                .push(sparse_stores.get(i).copied().flatten());
             let next_id = meta.ids.iter().copied().max().map_or(0, |v| v + 1);
             meta.ids.push(next_id);
         }
@@ -596,6 +746,9 @@ impl Catalog {
         }
         if idx < meta.comments.len() {
             meta.comments.remove(idx);
+        }
+        if idx < meta.sparse_stores.len() {
+            meta.sparse_stores.remove(idx);
         }
         // The id is retired with the column; later columns keep theirs.
         if idx < meta.ids.len() {
@@ -1051,6 +1204,72 @@ mod tests {
         assert_eq!(t.columns, cols(&["id", "name"]));
         let t2 = c.create_table("another", &cols(&["z"])).unwrap();
         assert_eq!(t2.id, 1);
+    }
+
+    #[test]
+    fn sparse_store_hint_survives_reopen() {
+        let dir = tempdir().unwrap();
+        {
+            let c = Catalog::open(dir.path()).unwrap();
+            let t = c
+                .create_table_typed_with_sparse_stores(
+                    "sp",
+                    &cols(&["id", "v"]),
+                    &[None, None],
+                    &[false, false],
+                    &["INTEGER".to_string(), "SPARSE(FLOAT,30000)".to_string()],
+                    &[None, None],
+                    &[None, Some(SparseStore::Sorted)],
+                )
+                .unwrap();
+            // The bare declaration is what `DESCRIBE` prints; the hint lives
+            // beside it.
+            assert_eq!(t.types[1], "SPARSE(FLOAT,30000)");
+            assert_eq!(t.sparse_stores[1], Some(SparseStore::Sorted));
+            c.flush().unwrap();
+        }
+        let c = Catalog::open(dir.path()).unwrap();
+        let t = c.get_table_by_name("sp").unwrap().unwrap();
+        assert_eq!(t.sparse_stores, vec![None, Some(SparseStore::Sorted)]);
+        assert_eq!(t.types[1], "SPARSE(FLOAT,30000)");
+    }
+
+    #[test]
+    fn sparse_store_suffix_in_type_text_is_split_out() {
+        let dir = tempdir().unwrap();
+        let c = Catalog::open(dir.path()).unwrap();
+        let t = c
+            .create_table_typed(
+                "sp",
+                &cols(&["v", "w"]),
+                &[None, None],
+                &[false, false],
+                &[
+                    "SPARSE(FLOAT,100) WITH (SORTED)".to_string(),
+                    "SPARSE(FLOAT,100) WITH (sort)".to_string(),
+                ],
+                &[None, None],
+            )
+            .unwrap();
+        assert_eq!(t.types, vec!["SPARSE(FLOAT,100)", "SPARSE(FLOAT,100)"]);
+        assert_eq!(
+            t.sparse_stores,
+            vec![Some(SparseStore::Sorted), Some(SparseStore::Sort)]
+        );
+    }
+
+    #[test]
+    fn legacy_table_record_decodes_without_a_sparse_hint() {
+        let dir = tempdir().unwrap();
+        let store: Arc<dyn MetaStore> =
+            Arc::new(FjallMetaStore::open(dir.path(), "catalog").unwrap());
+        // A record written before the hint field existed: six columns, no
+        // trailing sparse hint.
+        let legacy = "t\u{1e}id\u{1f}\u{1f}0\u{1f}INTEGER\u{1f}\u{1f}0";
+        store.put(&table_key(7), legacy.as_bytes()).unwrap();
+        let meta = TableMeta::decode(7, legacy.as_bytes()).unwrap();
+        assert_eq!(meta.types, vec!["INTEGER"]);
+        assert_eq!(meta.sparse_stores, vec![None]);
     }
 
     #[test]

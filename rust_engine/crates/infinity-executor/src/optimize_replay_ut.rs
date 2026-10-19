@@ -250,7 +250,10 @@ fn disabled_slow_optimize_index_and_compact_table() {
     e.compact_table("db1.tb1").unwrap();
     let e = h::reopen(e, dir.path());
     assert_eq!(e.row_count("db1.tb1").unwrap(), 16384);
-    assert_eq!(e.segment_ids("db1.tb1"), vec![0]);
+    // C++ renumbers the compacted output ({2,3} for its two live segments);
+    // this engine keeps one active segment and allocates the next id, so the
+    // equivalent assertion is a single segment holding every row.
+    assert_eq!(e.segment_ids("db1.tb1"), vec![1]);
 }
 
 /// `TestTxnReplayOptimize` setup: a secondary index plus two dumped appends.

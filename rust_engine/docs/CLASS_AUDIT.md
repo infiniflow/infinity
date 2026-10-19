@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 12, `mapped` 1102, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1094, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -99,14 +99,14 @@
 | 90 | `PhysicalCreateIndexPrepare` | `src/executor/operator/physical_create_index_prepare.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 91 | `PhysicalCreateSchema` | `src/executor/operator/physical_create_schema.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 92 | `PhysicalCreateTable` | `src/executor/operator/physical_create_table.cppm` | mapped | infinity_executor 的物理算子/管线 
-| 93 | `PhysicalCreateView` | `src/executor/operator/physical_create_view.cppm` | mapped | infinity_executor 的物理算子/管线 
+| 93 | `PhysicalCreateView` | `src/executor/operator/physical_create_view.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 94 | `PhysicalCrossProduct` | `src/executor/operator/physical_cross_product.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 95 | `PhysicalDelete` | `src/executor/operator/physical_delete.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 96 | `PhysicalDropCollection` | `src/executor/operator/physical_drop_collection.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 97 | `PhysicalDropIndex` | `src/executor/operator/physical_drop_index.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 98 | `PhysicalDropSchema` | `src/executor/operator/physical_drop_schema.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 99 | `PhysicalDropTable` | `src/executor/operator/physical_drop_table.cppm` | mapped | infinity_executor 的物理算子/管线 
-| 100 | `PhysicalDropView` | `src/executor/operator/physical_drop_view.cppm` | mapped | infinity_executor 的物理算子/管线 
+| 100 | `PhysicalDropView` | `src/executor/operator/physical_drop_view.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 101 | `PhysicalDummyOperator` | `src/executor/operator/physical_dummy_operator.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 102 | `PhysicalDummyScan` | `src/executor/operator/physical_dummy_scan.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 103 | `PhysicalExcept` | `src/executor/operator/physical_except.cppm` | mapped | infinity_executor 的物理算子/管线 
@@ -176,14 +176,14 @@
 | 167 | `CreateDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 168 | `CreateIndexPrepareOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 169 | `CreateTableOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
-| 170 | `CreateViewOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
+| 170 | `CreateViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 171 | `CrossProductOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 172 | `DeleteOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 173 | `DropCollectionOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 174 | `DropDatabaseOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 175 | `DropIndexOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 176 | `DropTableOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
-| 177 | `DropViewOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
+| 177 | `DropViewOperatorState` | `src/executor/operator_state.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 178 | `EmptySourceState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 179 | `ExplainOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
 | 180 | `ExportOperatorState` | `src/executor/operator_state.cppm` | mapped | infinity_executor 的物理算子/管线 
@@ -439,14 +439,14 @@
 | 430 | `LogicalCreateIndex` | `src/planner/node/logical_create_index.cppm` | mapped | infinity_planner 
 | 431 | `LogicalCreateSchema` | `src/planner/node/logical_create_schema.cppm` | mapped | infinity_planner 
 | 432 | `LogicalCreateTable` | `src/planner/node/logical_create_table.cppm` | mapped | infinity_planner 
-| 433 | `LogicalCreateView` | `src/planner/node/logical_create_view.cppm` | mapped | infinity_planner 
+| 433 | `LogicalCreateView` | `src/planner/node/logical_create_view.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 434 | `LogicalCrossProduct` | `src/planner/node/logical_cross_product.cppm` | mapped | infinity_planner 
 | 435 | `LogicalDelete` | `src/planner/node/logical_delete.cppm` | mapped | infinity_planner 
 | 436 | `LogicalDropCollection` | `src/planner/node/logical_drop_collection.cppm` | mapped | infinity_planner 
 | 437 | `LogicalDropIndex` | `src/planner/node/logical_drop_index.cppm` | mapped | infinity_planner 
 | 438 | `LogicalDropSchema` | `src/planner/node/logical_drop_schema.cppm` | mapped | infinity_planner 
 | 439 | `LogicalDropTable` | `src/planner/node/logical_drop_table.cppm` | mapped | infinity_planner 
-| 440 | `LogicalDropView` | `src/planner/node/logical_drop_view.cppm` | mapped | infinity_planner 
+| 440 | `LogicalDropView` | `src/planner/node/logical_drop_view.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 441 | `LogicalDummyScan` | `src/planner/node/logical_dummy_scan.cppm` | mapped | infinity_planner 
 | 442 | `LogicalExplain` | `src/planner/node/logical_explain.cppm` | mapped | infinity_planner 
 | 443 | `LogicalExport` | `src/planner/node/logical_export.cppm` | mapped | infinity_planner 
@@ -477,7 +477,7 @@
 | 468 | `LogicalUnnest` | `src/planner/node/logical_unnest.cppm` | mapped | infinity_planner 
 | 469 | `LogicalUnnestAggregate` | `src/planner/node/logical_unnest_aggregate.cppm` | mapped | infinity_planner 
 | 470 | `LogicalUpdate` | `src/planner/node/logical_update.cppm` | mapped | infinity_planner 
-| 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | mapped | infinity_planner 
+| 471 | `LogicalViewScan` | `src/planner/node/logical_view_scan.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 472 | `Optimizer` | `src/planner/optimizer.cppm` | mapped | infinity_planner 
 | 473 | `ApplyFastRoughFilter` | `src/planner/optimizer/apply_fast_rough_filter.cppm` | mapped | infinity_planner 
 | 474 | `ColumnPruner` | `src/planner/optimizer/column_pruner.cppm` | mapped | infinity_planner 
@@ -1095,7 +1095,7 @@
 | 1086 | `MemIndexDetail` | `src/storage/tracer/memindex_tracer.cppm` | mapped | infinity_storage::memindex_tracer 
 | 1087 | `MemIndexTracer` | `src/storage/tracer/memindex_tracer.cppm` | mapped | `infinity_storage::memindex_tracer::MemIndexTracer` 
 | 1088 | `MemIndexTracerInfo` | `src/storage/tracer/memindex_tracer.cppm` | mapped | infinity_storage::memindex_tracer 
-| 1089 | `View` | `src/storage/view.cppm` | mapped | infinity_catalog + infinity_executor 的视图路径 
+| 1089 | `View` | `src/storage/view.cppm` | exempt | C++ `BuildCreateView` 返回 `NotSupport`（实现位于 `#if 0`）；Rust 视图 DDL 为行为扩展，不计入逐类移植 
 | 1090 | `BottomExecutor` | `src/storage/wal/bottom_executor.cppm` | mapped | infinity_storage::wal_entry 
 | 1091 | `TempWalFileInfo` | `src/storage/wal/log_file.cppm` | mapped | infinity_storage::wal_entry 
 | 1092 | `WalFile` | `src/storage/wal/log_file.cppm` | mapped | infinity_storage::wal_entry 
