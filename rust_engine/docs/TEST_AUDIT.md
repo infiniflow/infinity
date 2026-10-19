@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 148, `gap` 98, `gate-a` 42, `integration` 224, `partial` 28, `ported` 425.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 112, `gap` 100, `gate-a` 42, `integration` 250, `partial` 36, `ported` 425.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -193,7 +193,7 @@
 | 179 | `src/unit_test/function/scalar/week_of_year_functions_ut.cpp` | `WeekOfYearFunctionsTest` | `week_of_year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 180 | `src/unit_test/function/scalar/weekday_functions_ut.cpp` | `WeekdayFunctionsTest` | `weekday_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 181 | `src/unit_test/function/scalar/year_functions_ut.cpp` | `YearFunctionsTest` | `year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
-| 182 | `src/unit_test/infinity_cloud/upload_meta_to_s3_ut.cpp` | `UploadMetaToS3` | `DISABLED_MINIO_test1` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 182 | `src/unit_test/infinity_cloud/upload_meta_to_s3_ut.cpp` | `UploadMetaToS3` | `DISABLED_MINIO_test1` | gap |
 | 183 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test1` | ported | `infinity-cli` `config::tests::defaults` |
 | 184 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `test2` | ported | `infinity-cli` `config::tests::full_config_file` |
 | 185 | `src/unit_test/main/config_ut.cpp` | `ConfigTest` | `TestWrongParamNames` | ported | `infinity-cli` `config::tests::wrong_parameter_names` |
@@ -207,7 +207,7 @@
 | 193 | `src/unit_test/main/query_profiler_ut.cpp` | `QueryProfilerTest` | `test3` | ported | `profiler::tests::all_phases_and_optimizer_rules_record_time` |
 | 194 | `src/unit_test/main/stats/global_resource_usage_ut.cpp` | `GlobalResourceUsageTest` | `usage_test` | exempt | 用例主体在 `#ifdef INFINITY_STATS` 内，构建系统从未定义该宏 → C++ 侧编译为空 |
 | 195 | `src/unit_test/main/table_ut.cpp` | `InfinityTableTest` | `test1` | ported | `infinity-executor` `tests::explain_covers_every_plan_kind`（6 种 EXPLAIN） |
-| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 196 | `src/unit_test/parallel/chaos_ut.cpp` | `ParallelTest` | `DISABLED_SLOW_ChaosTest` | gap |
 | 197 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_precision` | ported | `infinity-parser` `float_serialize_test_precision` |
 | 198 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json` | ported | `infinity-expression` `float_serialize_test_json` |
 | 199 | `src/unit_test/parser/float_serialize_ut.cpp` | `FloatSerializeTest` | `test_json_hex_float` | ported | `infinity-expression` `float_serialize_test_json_hex_float` |
@@ -299,8 +299,8 @@
 | 285 | `src/unit_test/storage/bg_task/background_process_ut.cpp` | `BGProcessTest` | `test1` | integration |
 | 286 | `src/unit_test/storage/bg_task/cleanup_task_ut.cpp` | `CleanupTaskTest` | `test_delete_db_simple` | integration |
 | 287 | `src/unit_test/storage/bg_task/compact_segments_task_ut.cpp` | `CompactTaskTest` | `bg_compact` | integration |
-| 288 | `src/unit_test/storage/bg_task/dump_index_task_2_ut.cpp` | `DumpMemIndexTaskTest2` | `DISABLED_SLOW_row_cnt_exceed_memory_quota` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 288 | `src/unit_test/storage/bg_task/dump_index_task_2_ut.cpp` | `DumpMemIndexTaskTest2` | `DISABLED_SLOW_row_cnt_exceed_memory_quota` | integration |
+| 289 | `src/unit_test/storage/bg_task/dump_index_task_ut.cpp` | `DumpMemIndexTaskTest` | `DISABLED_SLOW_row_cnt_exceed_memindex_capacity` | integration |
 | 290 | `src/unit_test/storage/binary_fuse_filter/binary_fuse_filter_test_ut.cpp` | `BinaryFuseFilterTest` | `test_2000` | gap |
 | 291 | `src/unit_test/storage/buffer/buffer_handle_ut.cpp` | `BufferHandleTest` | `test1` | ported |
 | 292 | `src/unit_test/storage/buffer/buffer_manager_ut.cpp` | `BufferManagerTest` | `cleanup_test` | ported |
@@ -310,7 +310,7 @@
 | 296 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test1` | partial |
 | 297 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_hnsw_index_buffer_obj_shutdown` | partial |
 | 298 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `test_big_with_gc_and_cleanup` | partial |
-| 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 299 | `src/unit_test/storage/buffer/buffer_obj_ut.cpp` | `BufferObjTest` | `DISABLED_SLOW_test_multiple_threads_read` | partial |
 | 300 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `flat_boolean` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
 | 301 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `contant_bool` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
 | 302 | `src/unit_test/storage/column_vector/column_vector_bool_ut.cpp` | `ColumnVectorBoolTest` | `bool_column_vector_select` | ported | `infinity-storage` `data_block::reference_suite::bool_flat_constant_select_slice` |
@@ -655,13 +655,13 @@
 | 641 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test_avg` | ported |
 | 642 | `src/unit_test/storage/knnindex/knn_hnsw/test_lsg_build_ut.cpp` | `LSGBuildTest` | `test1` | ported |
 | 643 | `src/unit_test/storage/knnindex/knn_hnsw/test_lvq_ut.cpp` | `HnswLVQTest` | `test1` | ported |
-| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 644 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_lvq` | partial |
+| 645 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_flat_rabitq` | partial |
+| 646 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lvq` | partial |
+| 647 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_rabitq` | partial |
+| 648 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_hnsw_lsg_rabitq` | partial |
+| 649 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_hnsw_to_rabitq` | partial |
+| 650 | `src/unit_test/storage/knnindex/knn_hnsw/test_quantizer_performance_ut.cpp` | `QuantizerPerformanceTest` | `DISABLED_SLOW_compress_lsg_to_rabitq` | partial |
 | 651 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_simple` | ported |
 | 652 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_compress` | ported |
 | 653 | `src/unit_test/storage/knnindex/knn_hnsw/test_rabitq_ut.cpp` | `RabitqTest` | `test_distance` | ported |
@@ -710,7 +710,7 @@
 | 696 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_drop_column` | ported | `infinity-executor` `append_add_column_fills_old_rows_with_null` |
 | 697 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_rename` | ported | `infinity-executor` `append_uses_the_renamed_table` |
 | 698 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_append` | integration |
-| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 699 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `DISABLED_SLOW_test_append_append_concurrent` | integration |
 | 700 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_create_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
 | 701 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_drop_index` | ported | `infinity-executor` `append_around_secondary_index_lifecycle` |
 | 702 | `src/unit_test/storage/new_catalog/append_ut.cpp` | `TestTxnAppend` | `test_append_and_compact` | ported | `infinity-executor` `append_then_compact_preserves_rows` |
@@ -719,10 +719,10 @@
 | 705 | `src/unit_test/storage/new_catalog/checkpoint1_ut.cpp` | `TestTxnCheckpointTest` | `checkpoint_and_create_table` | integration |
 | 706 | `src/unit_test/storage/new_catalog/checkpoint_add_column_ut.cpp` | `TestTxnCheckpointAddColumnTest` | `addcol_checkpoint_insert` | integration |
 | 707 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint0` | integration |
-| 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 708 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint1` | integration |
 | 709 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint2` | integration |
-| 710 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint3` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 711 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint4` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 710 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint3` | integration |
+| 711 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `DISABLED_SLOW_test_checkpoint4` | integration |
 | 712 | `src/unit_test/storage/new_catalog/checkpoint_internal_ut.cpp` | `TestTxnCheckpointInternalTest` | `test_checkpoint5` | integration |
 | 713 | `src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp` | `TestTxnCleanupInternal` | `test_cleanup_db` | integration |
 | 714 | `src/unit_test/storage/new_catalog/cleanup_internal_ut.cpp` | `TestTxnCleanupInternal` | `test_cleanup_table` | integration |
@@ -796,8 +796,8 @@
 | 782 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_import` | integration |
 | 783 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_append` | integration |
 | 784 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `dump_and_delete` | integration |
-| 785 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_dump_and_dump` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 785 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_dump_and_dump` | integration |
+| 786 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `DISABLED_SLOW_test_dump_index_and_optimize_index` | integration |
 | 787 | `src/unit_test/storage/new_catalog/dump_mem_index_ut.cpp` | `TestTxnDumpMemIndex` | `test_dump_index_and_compact` | integration |
 | 788 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import1` | integration |
 | 789 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_with_index` | integration |
@@ -813,12 +813,12 @@
 | 799 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_rename` | integration |
 | 800 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_create_index` | integration |
 | 801 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_drop_index` | integration |
-| 802 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `DISABLED_SLOW_test_import_and_compact` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 802 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `DISABLED_SLOW_test_import_and_compact` | integration |
 | 803 | `src/unit_test/storage/new_catalog/import_ut.cpp` | `TestTxnImport` | `test_import_and_optimize_index` | integration |
 | 804 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index0` | integration |
 | 805 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_index` | integration |
 | 806 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_populate_index0` | integration |
-| 807 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `DISABLED_SLOW_test_populate_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 807 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `DISABLED_SLOW_test_populate_index` | integration |
 | 808 | `src/unit_test/storage/new_catalog/index_internal_ut.cpp` | `TestTxnIndexInternal` | `test_json_index` | integration |
 | 809 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test1` | integration |
 | 810 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `index_test2` | integration |
@@ -826,7 +826,7 @@
 | 812 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `dropindex_wrong_conflicttype` | integration |
 | 813 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_db` | integration |
 | 814 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_and_drop_table` | integration |
-| 815 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `DISABLED_SLOW_create_index_create_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 815 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `DISABLED_SLOW_create_index_create_index` | integration |
 | 816 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_add_column` | integration |
 | 817 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_drop_column` | integration |
 | 818 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `create_index_rename_table` | integration |
@@ -838,7 +838,7 @@
 | 824 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_drop_column` | integration |
 | 825 | `src/unit_test/storage/new_catalog/index_ut.cpp` | `TestTxnIndex` | `drop_index_and_rename_table` | integration |
 | 826 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store0` | integration |
-| 827 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `DISABLED_SLOW_kv_store1` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 827 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `DISABLED_SLOW_kv_store1` | integration |
 | 828 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store2` | integration |
 | 829 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store3` | integration |
 | 830 | `src/unit_test/storage/new_catalog/kv_store_ut.cpp` | `TestTxnKVStoreTest` | `kv_store4` | integration |
@@ -854,9 +854,9 @@
 | 840 | `src/unit_test/storage/new_catalog/meta_cache_ut.cpp` | `MetaCacheTest` | `test_erase` | integration |
 | 841 | `src/unit_test/storage/new_catalog/new_catalog_ut.cpp` | `TestTxnNewCatalog` | `test_block_lock` | integration |
 | 842 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_ts` | integration |
-| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 843 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_ts` | integration |
 | 844 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `test_check_txns` | integration |
-| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 845 | `src/unit_test/storage/new_catalog/new_txn_mgr_ut.cpp` | `TestTxnManagerTest` | `DISABLED_SLOW_test_parallel_insert_table` | integration |
 | 846 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db` | integration |
 | 847 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_db2` | integration |
 | 848 | `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp` | `TestTxnReplayTest` | `test_replay_create_table` | integration |
@@ -879,12 +879,12 @@
 | 865 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_db` | integration |
 | 866 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_table` | integration |
 | 867 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_index` | integration |
-| 868 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_optimize_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 869 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_dump_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 868 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_optimize_index` | integration |
+| 869 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_dump_index` | integration |
 | 870 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_add_column` | integration |
 | 871 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_drop_column` | integration |
 | 872 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `optimize_index_and_rename_table` | integration |
-| 873 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_compact_table` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 873 | `src/unit_test/storage/new_catalog/optimize_index_ut.cpp` | `TestTxnOptimizeIndex` | `DISABLED_SLOW_optimize_index_and_compact_table` | integration |
 | 874 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_add_column` | integration |
 | 875 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_drop_column` | integration |
 | 876 | `src/unit_test/storage/new_catalog/replay_alter_ut.cpp` | `TestTxnReplayAlter` | `test_rename` | integration |
@@ -895,20 +895,20 @@
 | 881 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_rollback` | integration |
 | 882 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_replay_compact_flush_gap` | integration |
 | 883 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact_interrupt` | integration |
-| 884 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `DISABLED_SLOW_test_compact_with_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 884 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `DISABLED_SLOW_test_compact_with_index` | integration |
 | 885 | `src/unit_test/storage/new_catalog/replay_compact_ut.cpp` | `TestTxnReplayCompact` | `test_compact1_rollback` | integration |
 | 886 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import0` | integration |
 | 887 | `src/unit_test/storage/new_catalog/replay_import_ut.cpp` | `TestTxnReplayImport` | `test_import_with_index` | integration |
-| 888 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_replay_append_with_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 889 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_populate_index` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 888 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_replay_append_with_index` | integration |
+| 889 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `DISABLED_SLOW_test_populate_index` | integration |
 | 890 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `drop_index` | integration |
 | 891 | `src/unit_test/storage/new_catalog/replay_index_ut.cpp` | `TestTxnReplayIndex` | `test_json_index_replay` | integration |
-| 892 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_commit` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 893 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_rollback` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 894 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_interrupt` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 895 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 896 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
-| 897 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | exempt | C++ 侧 `DISABLED_SLOW_` 用例（gtest 从不执行；且属性能测试，按用户要求不执行） |
+| 892 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_commit` | integration |
+| 893 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_rollback` | integration |
+| 894 | `src/unit_test/storage/new_catalog/replay_optimize_ut.cpp` | `TestTxnReplayOptimize` | `DISABLED_SLOW_test_optimize_interrupt` | integration |
+| 895 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_table_snapshot` | integration |
+| 896 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_database_snapshot` | integration |
+| 897 | `src/unit_test/storage/new_catalog/replay_restore_ut.cpp` | `TestTxnReplayRestore` | `DISABLED_SLOW_test_repaly_restore_system_snapshot` | integration |
 | 898 | `src/unit_test/storage/new_catalog/table_cache_ut.cpp` | `TestTableCache` | `test_table_cache` | integration |
 | 899 | `src/unit_test/storage/new_catalog/table_meta_ut.cpp` | `TestTxnTableMeta` | `table_meta` | integration |
 | 900 | `src/unit_test/storage/new_catalog/table_ut.cpp` | `TestTxnTable` | `table_test1` | ported | `infinity-executor` `create_and_drop_table_conflicts` |
