@@ -11,6 +11,7 @@ pub mod emvb;
 pub mod fulltext;
 pub mod hnsw_handler;
 pub mod ivf;
+pub mod linscan;
 pub mod lsg;
 pub mod lvq;
 pub mod merge_knn;

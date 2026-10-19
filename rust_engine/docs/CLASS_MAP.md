@@ -40,6 +40,7 @@
 | `MergeKnn` + `HeapResultHandler`（`merge_knn.cppm`、`result_handler.cppm`） | `infinity_index::merge_knn::MergeKnn` | `Search/AddResult`→`search/add_result`、`Begin/End/EndWithoutSort`、`GetSize/GetIDsByIdx/GetDistancesByIdx/GetUniqueIDs`；`CompareMax/CompareMin`→`Compare::{Max,Min}` | ✅ |
 | `BlockFwd` / `TailFwd`（`bmp_fwd.cppm`，own-mem） | `infinity_index::sparse::{BlockFwd, TailFwd, BlockTerm}` | `AddDoc`→`add_doc`、`ToBlockFwd`、`GetBlockTerms`、`GetScores`/`GetScoresTail`、`Prefetch` | ✅ |
 | `BMPIvt` / `BlockData` / `BlockPostings`（`bmp_ivt.cppm`，own-mem） | `infinity_index::sparse::{BMPIvt, Postings}` | `AddBlock`→`add_block`、`GetPostings`、`Optimize`→`build`、`kth`、`block_ids`/`max_scores` | ✅ |
+| `LinScan<DataType, IdxType>`（`linscan_alg.cppm`） | `infinity_index::linscan::LinScan` | `Insert`→`insert`、`SearchBF`→`search_bf`、`SearchKnn`→`search_knn`（按 |value| 排序读 postings 至 budget，保留 top-k 候选）、`Save/Load`→`to_bytes`/`from_bytes`（含重复 doc_id/term 校验） | ✅ |
 | `BMPAlg` / `BMPAlgBase::SearchKnn`（`bmp_alg.cppm`，own-mem） | `infinity_index::sparse::{BmpAlg, BmpSearchOptions}` | `AddDoc`→`add_doc`、`SearchKnn`→`search_knn`、`GetScores`/`Calculate2`、`alpha/beta/use_tail` | ✅ |
 | `BMPIvt`/`BlockFwd` 的 `BMPOwnMem::kFalse`（mmap） | `infinity_storage::bmp_cpp::BmpCppReader` | 读取同一份 `SaveToPtr` 字节布局并查询 | ✅（设计变更：读路径共用磁盘格式） |
 | `KnnScanSharedData` / `KnnSearchOption`（`knn_scan_data.cppm`） | `knn_scan::KnnScanOptions` | `nprobe`/`ef`/`threshold` 从 `WITH (…)` 与 legacy 串解析（`WITH` 优先），供 IVF/HNSW/阈值共用 | ✅ |
@@ -172,6 +173,7 @@
 | `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
 | `column_vector/column_vector_integer_ut.cpp`（20 例） | `data_block::ColumnVector<T>` | `tinyint/smallint/int/bigint/hugeint_flat_constant_select_slice`（flat/constant/selection/slice 四类场景） |
 | `column_vector/column_vector_date_time_ut.cpp`（20 例） | `data_block::ColumnVector<T>` + `DateT`/`TimeT`/`DateTimeT`/`TimestampT`/`IntervalT` | `date/time/datetime/timestamp/interval_flat_constant_select_slice`、`interval_constant_set_value_before_finalize` |
+| `knn/sparse/test_linscan_ut.cpp`（2 例） | `infinity_index::linscan::LinScan` | `accurate_scan`（1000×10000、1% 稀疏、50 查询，与暴力 top-10 逐位/1e-6 一致）、`approximate_scan`（budget = 1000，候选精确重排后 hit ≥ 90%）、`save_and_load_roundtrip` |
 | `storage/common/loser_tree_ut.cpp::LoserTreeTest` | `infinity_common::loser_tree::LoserTree` | `basic_merge_1`…`basic_merge_4`（10/3、10/12、1000/200、1000/2000 路归并）、`round_up_matches_the_reference` |
 | `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
 | `knn/plaid/test_plaid_ut.cpp::PlaidQuantizerTest` | `plaid::PlaidQuantizer` | `train_quantize_dequantize`、`two_bit_quantization`、`ip_table_and_position_lut_agree`、`save_and_load_roundtrip` |
