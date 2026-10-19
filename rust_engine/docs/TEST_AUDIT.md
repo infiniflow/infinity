@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 104, `gap` 103, `gate-a` 46, `integration` 250, `partial` 44, `ported` 418.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 107, `gap` 100, `gate-a` 46, `integration` 250, `partial` 44, `ported` 418.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -514,9 +514,9 @@
 | 500 | `src/unit_test/storage/invertedindex/column_inverter_ut.cpp` | `ColumnInverterTest` | `Invert` | ported |
 | 501 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test1` | gap |
 | 502 | `src/unit_test/storage/invertedindex/common/external_sort_ut.cpp` | `ExternalSortTest` | `test2` | gap |
-| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | gap |
-| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | gap |
-| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | gap |
+| 503 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test1` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
+| 504 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test2` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
+| 505 | `src/unit_test/storage/invertedindex/common/skiplist_ut_nimpl.cpp` | `SkiplistTest` | `test3` | exempt | Skiplist 容器已登记为设计变更（读路径按 postings 列表解码），不单独移植 |
 | 506 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test1` | exempt |
 | 507 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test2` | exempt |
 | 508 | `src/unit_test/storage/invertedindex/format/inmem_doc_list_decoder_ut.cpp` | `InMemDocListDecoderTest` | `test3` | exempt |
