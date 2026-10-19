@@ -6,8 +6,8 @@
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
 - `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
 - `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。
-- `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point/Line/Box/Path/Polygon/Circle`）相关用例——用户决定不移植这些类型。
-- `exempt`：SIMD/第三方夹具，以及已登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV（Merge/TransactionDB/backup/disable-WAL）、无 WAL 的 checkpoint 模式、后台任务线程池与后台 DumpMemIndexTask。
+- `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point/Line/Box/Path/Polygon/Circle`）相关用例——用户确认不移植这些类型。
+- `exempt`：SIMD/第三方夹具、整段位于 `#if 0` 的用例（C++ 构建中不存在），以及已登记为设计变更的组件——`PostingByteSlice`/`Skiplist`/`PForDelta` 压缩原语、RocksDB 事务型 KV、无 WAL 的 checkpoint 模式、后台任务线程池等（后三项已补齐实现，见 ported）。
 - `gap`：尚未移植。
 - 带 `#[ignore]` 的 `ported` 行：C++ 的 `DISABLED_*` 用例，Rust 用 `#[ignore]` 表达，需 `cargo test -- --ignored` 显式运行。
 
@@ -69,7 +69,7 @@
 | 54 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `add_bigint_constant_1` | ported | `infinity-expression` `expression_evaluator_add_bigint_constant_1` |
 | 55 | `src/unit_test/executor/expression/new_expression_evaluator_ut.cpp` | `ExpressionEvaluatorTest` | `subtract_constant_8192_bigint` | ported | `infinity-expression` `expression_evaluator_subtract_constant_8192_bigint` |
 | 56 | `src/unit_test/executor/fragment/plan_fragment_ut.cpp` | `PlanFragmentTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::plan_fragment_test1` |
-| 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 57 | `src/unit_test/executor/operator/physical_sort_ut_nimpl.cpp` | `PhysicalSortTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 58 | `src/unit_test/executor/pipeline/explain_ut.cpp` | `ExplainTest` | `test1` | ported | `gate-a` unit assertions ported |
 | 59 | `src/unit_test/executor/pipeline/fragment_ut.cpp` | `FragmentTest` | `test_build_fragment` | ported | `infinity-executor` `gate_b_executor_ut::fragment_test_build_fragment` |
 | 60 | `src/unit_test/function/aggregate/avg_functions_ut.cpp` | `AvgFunctionTest` | `avg_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
@@ -78,8 +78,8 @@
 | 63 | `src/unit_test/function/aggregate/max_functions_ut.cpp` | `MaxFunctionTest` | `max_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 64 | `src/unit_test/function/aggregate/min_functions_ut.cpp` | `MinFunctionTest` | `min_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
 | 65 | `src/unit_test/function/aggregate/sum_functions_ut.cpp` | `SumFunctionTest` | `sum_func` | ported | `infinity-executor` `tests::aggregate_functions_match_the_reference` |
-| 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 66 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast0` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 67 | `src/unit_test/function/cast/bitmap_cast_ut_nimpl.cpp` | `BitmapCastTest` | `bitmap_cast1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 68 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast0` | ported | `infinity-common` `bool_cast0` |
 | 69 | `src/unit_test/function/cast/bool_cast_ut.cpp` | `BoolCastTest` | `bool_cast1` | ported | `infinity-common` `bool_cast1` |
 | 70 | `src/unit_test/function/cast/cast_table_ut.cpp` | `CastTableTest` | `casttable_boolean` | ported | `infinity-common` `casttable_boolean` |
@@ -124,8 +124,8 @@
 | 109 | `src/unit_test/function/cast/integer_cast/small_integer_cast_ut.cpp` | `SmallIntegerCastTest` | `small_integer_cast1` | ported | `infinity-common` `small_integer_cast1` |
 | 110 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast0` | ported | `infinity-common` `tiny_integer_cast0` |
 | 111 | `src/unit_test/function/cast/integer_cast/tiny_integer_cast_ut.cpp` | `TinyIntegerCastTest` | `tiny_integer_cast1` | ported | `infinity-common` `tiny_integer_cast1` |
-| 112 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast0` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 112 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast0` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 113 | `src/unit_test/function/cast/uuid_cast_ut_nimpl.cpp` | `UuidCastTest` | `uuid_cast1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 114 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast0` | ported | `infinity-common` `varchar_cast0` |
 | 115 | `src/unit_test/function/cast/varchar_cast_ut.cpp` | `VarcharCastTest` | `varchar_cast1` | ported | `infinity-common` `varchar_cast1` |
 | 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `infinity-executor` `tests::abs_function_covers_every_numeric_type` |
@@ -233,11 +233,11 @@
 | 218 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `bad_search_test` | ported | `infinity-parser` `parser::tests::search_with_order_or_limit_is_rejected` |
 | 219 | `src/unit_test/parser/sql_select_statement_ut.cpp` | `SelectStatementParsingTest` | `good_search_test` | ported | `infinity-parser` `select_statement_parsing_good_search_test` |
 | 220 | `src/unit_test/parser/sql_statement_ut.cpp` | `StatementParsingTest` | `good_test1` | ported | `infinity-parser` `statement_parsing_good_test1` |
-| 221 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap1` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 222 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap2` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 223 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap33` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 221 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 222 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap2` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 223 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap33` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 224 | `src/unit_test/parser/type/complex/bitmap_type_ut_nimpl.cpp` | `BitmapTypeTest` | `bitmap34` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 225 | `src/unit_test/parser/type/complex/blob_type_ut_nimpl.cpp` | `BlobTypeTest` | `blob1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 226 | `src/unit_test/parser/type/complex/uuid_type_ut.cpp` | `UuidTypeTest` | `Uuid` | ported | `infinity-common` `uuid` |
 | 227 | `src/unit_test/parser/type/complex/varchar_ut.cpp` | `VarcharTest` | `structure_check` | ported | `infinity-parser` `varchar::tests::varchar_structure_check` |
 | 228 | `src/unit_test/parser/type/data_type_ut.cpp` | `DataTypeTest` | `GetTypeName` | ported | `infinity-common` `data_type_get_type_name` |
@@ -274,8 +274,8 @@
 | 259 | `src/unit_test/parser/type/null_value_ut.cpp` | `NullValueTest` | `null_value_test1` | ported | `infinity-common` `null_value_test1` |
 | 260 | `src/unit_test/planner/column_binding_ut.cpp` | `ColumnBindingTest` | `test1` | ported | `infinity-planner` `column_binding::tests::column_binding_test1` |
 | 261 | `src/unit_test/planner/explain_basic_ut.cpp` | `ExplainBasicTest` | `test1` | ported | `infinity-executor` `gate_b_executor_ut::explain_basic_test1` |
-| 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
-| 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | excluded | component absent or file under `#if 0` (see gate-a report) |
+| 262 | `src/unit_test/planner/logical_plan_tpch_ut.cpp` | `LogicalPlannerTpchTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
+| 263 | `src/unit_test/planner/logical_planner_ut_nimpl.cpp` | `LogicalPlannerTest` | `test1` | exempt | C++ 整段位于 `#if 0`，无编译后可执行行为 |
 | 264 | `src/unit_test/planner/node/logical_aggregate_ut.cpp` | `LogicalAggregateTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 265 | `src/unit_test/planner/node/logical_check_ut.cpp` | `LogicalCheckTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
 | 266 | `src/unit_test/planner/node/logical_command_ut.cpp` | `LogicalCommandTest` | `test1` | ported | `infinity-executor` `tests::logical_planner_statements_succeed` |
