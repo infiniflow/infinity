@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 132, `gate-a` 136, `integration` 264, `partial` 60, `ported` 278.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 99, `gap` 125, `gate-a` 136, `integration` 264, `partial` 60, `ported` 285.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -41,13 +41,13 @@
 | 27 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `invalid_utf8_is_checked_before_any_replacement` | gap |
 | 28 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `non_character_offsets_remain_checked` | gap |
 | 29 | `src/unit_test/common/analyzer/rag_regex_ut.cpp` | `RAGRegexTest` | `large_html_replacement` | gap |
-| 30 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test1` | gap |
-| 31 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test2` | gap |
-| 32 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test3` | gap |
-| 33 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test4` | gap |
-| 34 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test5` | gap |
-| 35 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test6` | gap |
-| 36 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test7` | gap |
+| 30 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test1` | ported | `infinity-executor` `analyzer::tests::*` |
+| 31 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test2` | ported | `infinity-executor` `analyzer::tests::*` |
+| 32 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test3` | ported | `infinity-executor` `analyzer::tests::*` |
+| 33 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test4` | ported | `infinity-executor` `analyzer::tests::*` |
+| 34 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test5` | ported | `infinity-executor` `analyzer::tests::*` |
+| 35 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test6` | ported | `infinity-executor` `analyzer::tests::*` |
+| 36 | `src/unit_test/common/analyzer/standard_analyzer_ut.cpp` | `StandardAnalyzerTest` | `test7` | ported | `infinity-executor` `analyzer::tests::*` |
 | 37 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test1` | exempt |
 | 38 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test2` | exempt |
 | 39 | `src/unit_test/common/analyzer/user_defined_analyzer_ut_nimpl.cpp` | `UserDefinedAnalyzerTest` | `test3` | exempt |

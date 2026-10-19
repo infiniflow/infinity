@@ -38,6 +38,7 @@ mod catalog_ut;
 
 mod explain_search;
 
+mod analyzer;
 mod hnsw_mem;
 mod knn_scan;
 mod profiler;
@@ -11405,54 +11406,11 @@ fn split_words(s: &str, delims: &Option<Vec<char>>) -> Vec<String> {
 /// the engine: `2012/02/14` -> `20120214`, `x/y` -> `xy`,
 /// `www.example.com/path` -> `www`+`example`+`compath`.
 fn standard_tokenize(s: &str) -> Vec<String> {
-    const ALLOW: u8 = 0;
-    const DELIM: u8 = 1;
-    const SPACE: u8 = 2;
-    const UNITE: u8 = 3;
-    fn kind(b: u8) -> u8 {
-        if b > 127 || b.is_ascii_alphanumeric() {
-            ALLOW
-        } else if b.is_ascii_whitespace() {
-            SPACE
-        } else if b == b'/' {
-            UNITE
-        } else {
-            DELIM
-        }
-    }
-    let bytes = s.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        while i < bytes.len() && kind(bytes[i]) == SPACE {
-            i += 1;
-        }
-        if i == bytes.len() {
-            break;
-        }
-        if kind(bytes[i]) == DELIM {
-            // A lone delimiter is its own token, which `DoNext` then skips.
-            i += 1;
-            continue;
-        }
-        let mut tok = vec![bytes[i]];
-        i += 1;
-        while i < bytes.len() {
-            match kind(bytes[i]) {
-                SPACE | DELIM => break,
-                ALLOW => {
-                    tok.push(bytes[i]);
-                    i += 1;
-                }
-                _ => i += 1, // UNITE: dropped, token continues
-            }
-        }
-        let text = String::from_utf8_lossy(&tok).to_ascii_lowercase();
-        if !text.is_empty() {
-            out.push(text);
-        }
-    }
-    out
+    analyzer::tokenize(s, &analyzer::TokenizeConfig::default())
+        .into_iter()
+        .map(|(token, _, _)| token.to_ascii_lowercase())
+        .filter(|token| !token.is_empty())
+        .collect()
 }
 
 /// Query-side tokens: the standard analyzer's stem replaces the word.

@@ -3,7 +3,7 @@
 基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `grouped` 1012, `mapped` 102, `test` 7
+- 状态分布：`excluded` 15, `grouped` 1006, `mapped` 108, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -11,7 +11,7 @@
 | 2 | `Analyzer` | `src/common/analyzer/analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 3 | `AnalyzerPool` | `src/common/analyzer/analyzer_pool.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 4 | `ChineseAnalyzer` | `src/common/analyzer/chinese_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 5 | `CommonLanguageAnalyzer` | `src/common/analyzer/common_analyzer.cppm` | mapped | `infinity_executor::analyzer::StandardAnalyzer` 的选项（case/stem/stem_only） |
 | 6 | `DartsTrie` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 7 | `DartsTuple` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 8 | `POSTable` | `src/common/analyzer/darts_trie.cppm` | grouped | `tokenize_*` analyzer 函数 |
@@ -35,13 +35,13 @@
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 28 | `SparsegramAnalyzer` | `src/common/analyzer/sparsegram_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 29 | `StandardAnalyzer` | `src/common/analyzer/standard_analyzer.cppm` | mapped | `analyzer::StandardAnalyzer`（Analyze 的 word/stem/case 组合） |
 | 30 | `Stemmer` | `src/common/analyzer/stemmer/stemmer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 31 | `Term` | `src/common/analyzer/term.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 32 | `TermList` | `src/common/analyzer/term.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 31 | `Term` | `src/common/analyzer/term.cppm` | mapped | `analyzer::Term` |
+| 32 | `TermList` | `src/common/analyzer/term.cppm` | mapped | `Vec<analyzer::Term>` |
 | 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | grouped | `tokenize_*` analyzer 函数 |
-| 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | grouped | `tokenize_*` analyzer 函数 |
+| 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
+| 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
 | 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | grouped | `tokenize_*` analyzer 函数 |
 | 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | grouped | `tokenize_*` analyzer 函数 |
