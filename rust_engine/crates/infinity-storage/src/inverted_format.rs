@@ -2841,9 +2841,9 @@ mod tests {
         // in the header, so the writer uses the "*_ALONE" frames, whose value is
         // the word after the header (`new_pfordelta_compressor.h:488-540`).
         let cases: &[(u32, Vec<u16>)] = &[
-            (254, vec![2560]),                              // same, alone
-            (252, vec![3000, 3001, 3002, 3003]),            // increase, alone
-            (250, vec![3003, 3002, 3001, 3000]),            // decrease, alone
+            (254, vec![2560]),                   // same, alone
+            (252, vec![3000, 3001, 3002, 3003]), // increase, alone
+            (250, vec![3003, 3002, 3001, 3000]), // decrease, alone
         ];
         for (marker, values) in cases {
             let bytes = encode_u16_block(values);

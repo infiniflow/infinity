@@ -96,11 +96,11 @@ pub mod rcu_map;
 pub mod result_cache;
 pub mod s3;
 pub mod secondary_index_data;
-/// Transactional KV substrate (`KVStore` / `KVInstance`, plan §2.6.1).
-pub mod txn_kv;
 pub mod secondary_lowcard;
 pub mod secondary_segment;
 pub mod selection;
+/// Transactional KV substrate (`KVStore` / `KVInstance`, plan §2.6.1).
+pub mod txn_kv;
 pub mod var_buffer;
 pub mod virtual_store;
 pub mod wal;

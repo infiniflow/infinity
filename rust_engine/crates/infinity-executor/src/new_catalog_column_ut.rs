@@ -252,7 +252,85 @@ fn drop_column_and_add_column() {
     e.execute("DROP DATABASE db1;").unwrap();
 }
 
-/// C++ `column_ut.cpp:1672` (`drop_column_and_drop_column`): dropping two
+/// Reproduction of `test/sql/ddl/alter/drop_column_with_index.slt`: the
+/// drop-column rewrite must leave every index pointing at the same row ids as
+/// the row store. Two identical rows are inserted around the drop, so each
+/// `topn=1` match has to break the score tie the same way (lowest row id);
+/// otherwise the RRF fusion sees two distinct rows and returns both.
+#[test]
+fn drop_column_keeps_index_row_ids_in_sync() {
+    let dir = tempdir().unwrap();
+    let e = Engine::open(dir.path()).unwrap();
+    setup(
+        &e,
+        "db1",
+        "tb1",
+        "a INT, b VARCHAR, c EMBEDDING(float, 4), d SPARSE(float, 30000), e INT",
+    );
+    e.execute("CREATE INDEX idx_b ON db1.tb1 (b) USING FULLTEXT;")
+        .unwrap();
+    e.execute("CREATE INDEX idx_c ON db1.tb1 (c) USING Hnsw WITH (metric = l2);")
+        .unwrap();
+    e.execute("CREATE INDEX idx_d ON db1.tb1 (d) USING BMP WITH (block_size = 16);")
+        .unwrap();
+    e.execute(
+        "INSERT INTO db1.tb1 VALUES \
+         (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0], 1);",
+    )
+    .unwrap();
+    e.execute("ALTER TABLE db1.tb1 DROP COLUMN (e);").unwrap();
+    e.execute(
+        "INSERT INTO db1.tb1 VALUES \
+         (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0]);",
+    )
+    .unwrap();
+
+    // The rewrite preserves the first row's id; the second insert appends 1.
+    assert_eq!(
+        rows(&e, "SELECT _row_id, a FROM db1.tb1;"),
+        vec![
+            vec!["0".to_string(), "1".to_string()],
+            vec!["1".to_string(), "1".to_string()],
+        ]
+    );
+    // Every index reports the same row for the tie: both rows match equally,
+    // so the lowest id wins in each of them.
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT _row_id FROM db1.tb1 SEARCH MATCH TEXT('b', 'text', 'topn=1');"
+        ),
+        vec![vec!["0".to_string()]]
+    );
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT _row_id FROM db1.tb1 SEARCH MATCH VECTOR \
+             (c, [0.1, 0.2, 0.3, 0.4], 'float', 'l2', 1);"
+        ),
+        vec![vec!["0".to_string()]]
+    );
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT _row_id FROM db1.tb1 SEARCH MATCH SPARSE(d, [10000:1.0], 'ip', 1);"
+        ),
+        vec![vec!["0".to_string()]]
+    );
+    // Fused: the three lists all name row 0, so exactly one result row.
+    assert_eq!(
+        rows(
+            &e,
+            "SELECT a FROM db1.tb1 SEARCH \
+             MATCH TEXT('b', 'text', 'topn=1'), \
+             MATCH VECTOR(c, [0.1, 0.2, 0.3, 0.4], 'float', 'l2', 1), \
+             MATCH SPARSE(d, [10000:1.0], 'ip', 1), FUSION('rrf');"
+        ),
+        vec![vec!["1".to_string()]]
+    );
+
+    e.execute("DROP DATABASE db1;").unwrap();
+}
 /// different columns leaves the third; dropping an already-dropped column
 /// fails and leaves the remaining schema untouched.
 #[test]

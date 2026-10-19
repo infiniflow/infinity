@@ -78,10 +78,7 @@ impl DeferredCatalogStore {
                 .append(true)
                 .open(&self.path)
                 .map_err(|e| Error::io(&self.path, e))?;
-            let len = file
-                .metadata()
-                .map_err(|e| Error::io(&self.path, e))?
-                .len();
+            let len = file.metadata().map_err(|e| Error::io(&self.path, e))?.len();
             if len == 0 {
                 file.write_all(MAGIC)
                     .map_err(|e| Error::io(&self.path, e))?;

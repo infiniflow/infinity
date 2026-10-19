@@ -21,6 +21,8 @@ use infinity_catalog::Catalog;
 use infinity_common::{Error, Result};
 use infinity_expression::{aggregate, Expr, Value};
 use infinity_index::{Index, SecondaryIndex};
+use infinity_parser::lexer::{tokenize, Token};
+use infinity_parser::parser::render_tokens_as_sql;
 use infinity_parser::{
     parse, AggFunc, CmpOp, ExprAst, JoinClause, Literal, MatchClause, Predicate, SearchClause,
     SelectItem, Statement,
@@ -123,6 +125,9 @@ mod txn_ut;
 
 #[cfg(test)]
 mod query_match_ut;
+
+#[cfg(test)]
+mod select_ddl_ut;
 
 #[cfg(test)]
 mod query_parser_and_optimizer_ut;
@@ -1248,9 +1253,13 @@ fn invalidates_result_cache(stmt: &Statement) -> bool {
     matches!(
         stmt,
         Statement::Insert { .. }
+            | Statement::InsertSelect { .. }
             | Statement::Delete { .. }
             | Statement::Update { .. }
             | Statement::CreateTable { .. }
+            | Statement::CreateTableAs { .. }
+            | Statement::CreateView { .. }
+            | Statement::DropView { .. }
             | Statement::DropTable { .. }
             | Statement::AlterTableAdd { .. }
             | Statement::AlterTableDropColumn { .. }
@@ -1726,6 +1735,169 @@ fn align_insert_rows(
             }
         })
         .collect()
+}
+
+fn is_int_type_text(type_text: &str) -> bool {
+    let base = type_text
+        .trim()
+        .to_ascii_uppercase()
+        .split('(')
+        .next()
+        .unwrap_or("")
+        .to_string();
+    matches!(
+        base.as_str(),
+        "INT" | "INTEGER" | "TINYINT" | "SMALLINT" | "BIGINT" | "HUGEINT"
+    )
+}
+
+fn is_bool_type_text(type_text: &str) -> bool {
+    matches!(
+        type_text.trim().to_ascii_uppercase().as_str(),
+        "BOOL" | "BOOLEAN"
+    )
+}
+
+/// Converts a projected value to the [`Literal`] the insert path expects for
+/// `type_text`. This is the implicit cast `INSERT … SELECT` performs: numeric
+/// text becomes a number for a numeric target, while everything stored as a
+/// string keeps its text form.
+fn literal_from_value(value: &Value, type_text: &str) -> Literal {
+    if is_int_type_text(type_text) {
+        return match value {
+            Value::Int(i) => Literal::Int(*i),
+            Value::Float(f) => Literal::Float(*f),
+            Value::Bool(b) => Literal::Int(i64::from(*b)),
+            Value::Str(s) => match s.trim().parse::<i64>() {
+                Ok(i) => Literal::Int(i),
+                Err(_) => Literal::Str(s.clone()),
+            },
+            Value::Null => Literal::Null,
+        };
+    }
+    if is_float_type(type_text) {
+        return match value {
+            Value::Int(i) => Literal::Int(*i),
+            Value::Float(f) => Literal::Float(*f),
+            Value::Bool(b) => Literal::Float(if *b { 1.0 } else { 0.0 }),
+            Value::Str(s) => match s.trim().parse::<f64>() {
+                Ok(f) => Literal::Float(f),
+                Err(_) => Literal::Str(s.clone()),
+            },
+            Value::Null => Literal::Null,
+        };
+    }
+    if is_bool_type_text(type_text) {
+        return match value {
+            Value::Bool(b) => Literal::Str(b.to_string()),
+            Value::Int(i) => Literal::Str((*i != 0).to_string()),
+            Value::Str(s) => Literal::Str(s.clone()),
+            Value::Float(f) => Literal::Str((*f != 0.0).to_string()),
+            Value::Null => Literal::Null,
+        };
+    }
+    match value {
+        Value::Int(i) => Literal::Str(i.to_string()),
+        Value::Float(f) => Literal::Str(f.to_string()),
+        Value::Bool(b) => Literal::Str(b.to_string()),
+        Value::Str(s) => Literal::Str(s.clone()),
+        Value::Null => Literal::Null,
+    }
+}
+
+/// The column type `CREATE TABLE … AS SELECT` assigns to an inferred column:
+/// integers become `BIGINT`, mixed integers/floats `DOUBLE`, booleans
+/// `BOOLEAN`, and anything textual (or an all-NULL column) `VARCHAR`.
+fn infer_column_type(values: impl Iterator<Item = Value>) -> String {
+    let mut saw_int = false;
+    let mut saw_float = false;
+    let mut saw_bool = false;
+    let mut saw_other = false;
+    for v in values {
+        match v {
+            Value::Int(_) => saw_int = true,
+            Value::Float(_) => saw_float = true,
+            Value::Bool(_) => saw_bool = true,
+            Value::Str(_) => saw_other = true,
+            Value::Null => {}
+        }
+    }
+    if saw_other || (saw_bool && (saw_int || saw_float)) {
+        "VARCHAR".to_string()
+    } else if saw_float {
+        "DOUBLE".to_string()
+    } else if saw_int {
+        "BIGINT".to_string()
+    } else if saw_bool {
+        "BOOLEAN".to_string()
+    } else {
+        "VARCHAR".to_string()
+    }
+}
+
+fn is_plain_identifier(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Qualifies the table references of a stored view query with `db`.
+///
+/// A view is stored as SQL text, but an unqualified `FROM t` must keep
+/// referring to the database in which the view was created even when a later
+/// session selects from the view under another `USE`. This walks the token
+/// stream and prefixes names in `FROM`/`JOIN` position (including
+/// comma-separated FROM lists); subqueries are handled by the same walk.
+fn qualify_sql_tables(sql: &str, db: &str) -> Result<String> {
+    let mut toks = tokenize(sql)?;
+    let mut depth = 0i32;
+    let mut in_from = false;
+    let mut expect_table = false;
+    for i in 0..toks.len() {
+        match toks[i].clone() {
+            Token::LParen => {
+                depth += 1;
+                expect_table = false;
+            }
+            Token::RParen => depth -= 1,
+            Token::Comma if in_from && depth == 0 => expect_table = true,
+            Token::Ident(k) => {
+                let up = k.to_ascii_uppercase();
+                if expect_table {
+                    expect_table = false;
+                    let already_qualified =
+                        matches!(toks.get(i + 1), Some(Token::Op(op)) if op == ".");
+                    if !already_qualified && !k.contains('.') {
+                        toks[i] = Token::Ident(format!("{db}.{}", k.to_ascii_lowercase()));
+                    }
+                    continue;
+                }
+                if up == "FROM" || up == "JOIN" {
+                    in_from = true;
+                    expect_table = true;
+                } else if depth == 0
+                    && matches!(
+                        up.as_str(),
+                        "WHERE"
+                            | "GROUP"
+                            | "HAVING"
+                            | "ORDER"
+                            | "LIMIT"
+                            | "OFFSET"
+                            | "SEARCH"
+                            | "UNION"
+                    )
+                {
+                    in_from = false;
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(render_tokens_as_sql(&toks))
 }
 
 fn parse_value(cell: &str) -> Value {
@@ -4033,9 +4205,7 @@ impl Engine {
         Ok(DumpVersion {
             table: table_meta,
             index: index_meta,
-            optimize_epoch: self
-                .index_epoch
-                .load(std::sync::atomic::Ordering::SeqCst),
+            optimize_epoch: self.index_epoch.load(std::sync::atomic::Ordering::SeqCst),
         })
     }
 
@@ -4499,7 +4669,7 @@ impl Engine {
                 });
                 continue;
             }
-            let qualified = self.qualify_tables(&s);
+            let qualified = self.expand_views(self.qualify_tables(&s))?;
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
             if matches!(qualified, Statement::Select { .. }) && self.result_cache_active() {
@@ -4567,8 +4737,17 @@ impl Engine {
         match &mut s {
             Statement::CreateTable { name, .. }
             | Statement::DropTable { name, .. }
+            | Statement::DropView { name, .. }
             | Statement::CreateCollection { name, .. }
             | Statement::DropCollection { name, .. } => *name = q(name),
+            Statement::CreateTableAs { name, query, .. } => {
+                *name = q(name);
+                **query = self.qualify_tables(query);
+            }
+            Statement::CreateView { name, query, .. } => {
+                *name = q(name);
+                **query = self.qualify_tables(query);
+            }
             Statement::Insert { table, .. }
             | Statement::Delete { table, .. }
             | Statement::Update { table, .. }
@@ -4577,9 +4756,14 @@ impl Engine {
             | Statement::ShowTableColumns { table }
             | Statement::ShowTable { table }
             | Statement::ShowTableIndex { table, .. }
+            | Statement::Describe { table }
             | Statement::Copy { table, .. }
             | Statement::CreateIndex { table, .. }
             | Statement::CreateSnapshot { table, .. } => *table = q(table),
+            Statement::InsertSelect { table, query, .. } => {
+                *table = q(table);
+                **query = self.qualify_tables(query);
+            }
             Statement::RenameTable { table, new_name } => {
                 *table = q(table);
                 *new_name = q(new_name);
@@ -4604,6 +4788,30 @@ impl Engine {
             _ => {}
         }
         s
+    }
+
+    /// Replaces `FROM <view>` with the view's stored query. The derived-table
+    /// path then executes that query. Views are expanded once per statement;
+    /// nested views are expanded when the derived query itself is executed.
+    fn expand_views(&self, mut stmt: Statement) -> Result<Statement> {
+        if let Statement::Select { from, join, .. } = &mut stmt {
+            if let Some(t) = from.as_mut() {
+                if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
+                    if let Some(v) = self.storage.catalog.get_view_by_name(t)? {
+                        *t = v.query;
+                    }
+                }
+            }
+            if let Some(j) = join.as_mut() {
+                if self.storage.catalog.get_view_by_name(&j.table)?.is_some() {
+                    return Err(Error::Invalid(format!(
+                        "view '{}' is not supported in a JOIN",
+                        j.table
+                    )));
+                }
+            }
+        }
+        Ok(stmt)
     }
 
     /// True when at least one index (secondary / fulltext / vector / sparse /
@@ -4995,6 +5203,334 @@ impl Engine {
             deletes: Vec::new(),
             dumps: Vec::new(),
         }
+    }
+
+    /// `INSERT INTO t [(cols)] SELECT …`: evaluates the query through the
+    /// normal SELECT path, maps its columns onto the target schema (by the
+    /// explicit list when present, otherwise by position), casts each value to
+    /// the target column's type, and appends the rows.
+    fn insert_from_select(
+        &self,
+        table: &str,
+        columns: Option<&[String]>,
+        query: &Statement,
+    ) -> Result<QueryResult> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let query = self.expand_views(query.clone())?;
+        let (source_columns, rows) = self.run_select(&query)?;
+        let target_indices: Vec<usize> = match columns {
+            Some(cols) => {
+                let mut indices = Vec::with_capacity(cols.len());
+                for c in cols {
+                    let idx = meta.columns.iter().position(|s| s == c).ok_or_else(|| {
+                        Error::Invalid(format!(
+                            "syntax: column '{c}' does not exist in table '{table}'"
+                        ))
+                    })?;
+                    indices.push(idx);
+                }
+                indices
+            }
+            None => (0..meta.columns.len()).collect(),
+        };
+        if source_columns.len() != target_indices.len() {
+            return Err(Error::Invalid(format!(
+                "INSERT has {} target column(s) but SELECT returns {} column(s)",
+                target_indices.len(),
+                source_columns.len()
+            )));
+        }
+        let mut literals = Vec::with_capacity(rows.len());
+        for row in rows {
+            let mut out: Vec<Literal> = (0..meta.columns.len())
+                .map(|i| {
+                    meta.defaults
+                        .get(i)
+                        .and_then(|d| d.as_deref())
+                        .map(default_literal)
+                        .unwrap_or(Literal::Null)
+                })
+                .collect();
+            for (src, value) in row.iter().enumerate() {
+                let target = target_indices[src];
+                let ty = meta.types.get(target).map(String::as_str).unwrap_or("");
+                out[target] = literal_from_value(value, ty);
+            }
+            literals.push(out);
+        }
+        self.insert_literals(table, None, literals)
+    }
+
+    /// The output types of a SELECT, used by `CREATE TABLE … AS SELECT`.
+    ///
+    /// A direct column (or `*`) keeps its declared type, so an empty result and
+    /// structured columns (vector/array/sparse/…) survive the copy. Expressions
+    /// and aggregates have no static type in this planner, so their type is
+    /// inferred from the produced values.
+    fn select_output_types(&self, stmt: &Statement, rows: &[Vec<Value>]) -> Vec<String> {
+        let Statement::Select {
+            items, from, join, ..
+        } = stmt
+        else {
+            return Vec::new();
+        };
+        let mut base: Option<(Vec<String>, Vec<String>)> = None;
+        if let Some(t) = from {
+            if !t.trim_start().to_ascii_uppercase().starts_with("SELECT ") {
+                if let (Ok(schema), Ok(mut types)) = (self.table_schema(t), self.column_types(t)) {
+                    let mut schema = schema;
+                    if let Some(j) = join {
+                        if let (Ok(js), Ok(jt)) =
+                            (self.table_schema(&j.table), self.column_types(&j.table))
+                        {
+                            schema.extend(js);
+                            types.extend(jt);
+                        }
+                    }
+                    base = Some((schema, types));
+                }
+            }
+        }
+        let inferred = |i: usize| infer_column_type(rows.iter().filter_map(|r| r.get(i).cloned()));
+        let width = rows.first().map(Vec::len).unwrap_or_else(|| {
+            items
+                .iter()
+                .map(|it| match it {
+                    SelectItem::Star => base.as_ref().map_or(0, |(schema, _)| schema.len()),
+                    _ => 1,
+                })
+                .sum()
+        });
+        let mut out = Vec::with_capacity(width);
+        for (i, item) in items.iter().enumerate() {
+            match item {
+                SelectItem::Star => {
+                    if let Some((_, types)) = &base {
+                        out.extend(types.iter().cloned());
+                    }
+                }
+                SelectItem::Column(c) => {
+                    let declared = base.as_ref().and_then(|(schema, types)| {
+                        schema
+                            .iter()
+                            .position(|s| s == c)
+                            .and_then(|p| types.get(p).cloned())
+                    });
+                    out.push(declared.unwrap_or_else(|| inferred(i)));
+                }
+                SelectItem::Literal(l) => out.push(match l {
+                    Literal::Int(_) => "BIGINT".to_string(),
+                    Literal::Float(_) => "DOUBLE".to_string(),
+                    _ => "VARCHAR".to_string(),
+                }),
+                _ => out.push(inferred(i)),
+            }
+        }
+        if out.len() == width {
+            out
+        } else {
+            (0..width).map(inferred).collect()
+        }
+    }
+
+    /// `CREATE TABLE t [(cols)] AS SELECT …`: derives the schema (explicit
+    /// definitions win; otherwise names and types are inferred from the
+    /// result), creates the table and appends the rows.
+    fn create_table_from_select(
+        &self,
+        name: &str,
+        columns: &[infinity_parser::ColumnDef],
+        query: &Statement,
+    ) -> Result<QueryResult> {
+        let query = self.expand_views(query.clone())?;
+        let (source_columns, rows) = self.run_select(&query)?;
+        let (names, types, defaults, not_nulls, comments) = if columns.is_empty() {
+            let names: Vec<String> = source_columns
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
+                    if c.trim().is_empty() {
+                        format!("column_{}", i + 1)
+                    } else {
+                        c.clone()
+                    }
+                })
+                .collect();
+            let mut types = self.select_output_types(&query, &rows);
+            if types.len() != names.len() {
+                types = (0..names.len())
+                    .map(|i| infer_column_type(rows.iter().filter_map(|r| r.get(i).cloned())))
+                    .collect();
+            }
+            (
+                names,
+                types,
+                vec![None; source_columns.len()],
+                vec![false; source_columns.len()],
+                vec![None; source_columns.len()],
+            )
+        } else {
+            if columns.len() != source_columns.len() {
+                return Err(Error::Invalid(format!(
+                    "CREATE TABLE AS has {} column definition(s) but SELECT returns {} column(s)",
+                    columns.len(),
+                    source_columns.len()
+                )));
+            }
+            (
+                columns.iter().map(|c| c.name.clone()).collect(),
+                columns.iter().map(|c| c.type_text.clone()).collect(),
+                columns
+                    .iter()
+                    .map(|c| {
+                        c.default
+                            .as_ref()
+                            .map(|l| normalize_default(&c.type_text, &l.to_slt_string()))
+                    })
+                    .collect(),
+                columns.iter().map(|c| c.not_null).collect(),
+                columns.iter().map(|c| c.comment.clone()).collect(),
+            )
+        };
+        let created = self
+            .storage
+            .catalog
+            .create_table_typed(name, &names, &defaults, &not_nulls, &types, &comments)?;
+        let literals: Vec<Vec<Literal>> = rows
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .map(|(i, value)| {
+                        literal_from_value(value, types.get(i).map(String::as_str).unwrap_or(""))
+                    })
+                    .collect()
+            })
+            .collect();
+        match self.insert_literals(name, None, literals) {
+            Ok(_) => Ok(QueryResult::CreatedTable {
+                id: created.id,
+                name: created.name,
+            }),
+            Err(e) => {
+                // A failed insert must not leave a half-created table behind.
+                let _ = self.drop_table_all(name);
+                Err(e)
+            }
+        }
+    }
+
+    /// `DESCRIBE <table>`: the same four columns as the reference's
+    /// `SHOW TABLE … COLUMNS` (`name`, `type`, `default`, `comment`), in
+    /// definition order.
+    fn describe_table(&self, table: &str) -> Result<QueryResult> {
+        let meta = self
+            .storage
+            .catalog
+            .get_table_by_name(table)?
+            .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
+        let rows: Vec<Vec<String>> = (0..meta.columns.len())
+            .map(|i| {
+                let ty = meta.types.get(i).cloned().unwrap_or_default();
+                vec![
+                    meta.columns[i].clone(),
+                    describe_type(&ty),
+                    render_column_default(meta.defaults.get(i).and_then(|d| d.as_ref()), &ty),
+                    meta.comments
+                        .get(i)
+                        .cloned()
+                        .flatten()
+                        .unwrap_or_else(|| "(empty)".to_string()),
+                ]
+            })
+            .collect();
+        Ok(QueryResult::Rows {
+            columns: vec![
+                "name".to_string(),
+                "type".to_string(),
+                "default".to_string(),
+                "comment".to_string(),
+            ],
+            rows,
+        })
+    }
+
+    /// `CREATE VIEW v [(cols)] AS SELECT …`: validates the query, resolves the
+    /// output column names (applying an explicit alias list) and registers the
+    /// view's fully-qualified SQL in the catalog.
+    fn create_view(
+        &self,
+        name: &str,
+        aliases: &[String],
+        query: &Statement,
+        query_sql: &str,
+    ) -> Result<QueryResult> {
+        let db = self.db();
+        // `CREATE VIEW v AS (SELECT …)` parses to the same SELECT statement;
+        // store the query without the redundant outer parentheses so the
+        // derived-table path recognises it by its `SELECT` prefix.
+        let mut raw = query_sql.trim();
+        if raw.starts_with('(') && raw.ends_with(')') {
+            raw = raw[1..raw.len() - 1].trim();
+        }
+        let mut sql = qualify_sql_tables(raw, &db)?;
+        let qualified = self.expand_views(query.clone())?;
+        let (source_columns, _) = self.run_select(&qualified)?;
+        let view_columns = if aliases.is_empty() {
+            source_columns
+        } else {
+            if aliases.len() != source_columns.len() {
+                return Err(Error::Invalid(format!(
+                    "CREATE VIEW has {} column name(s) but SELECT returns {} column(s)",
+                    aliases.len(),
+                    source_columns.len()
+                )));
+            }
+            let mut seen = std::collections::HashSet::new();
+            for alias in aliases {
+                if !seen.insert(alias.to_ascii_lowercase()) {
+                    return Err(Error::Invalid(format!(
+                        "duplicate view column name '{alias}'"
+                    )));
+                }
+            }
+            for (src, alias) in source_columns.iter().zip(aliases) {
+                if !is_plain_identifier(src) || !is_plain_identifier(alias) {
+                    return Err(Error::Invalid(format!(
+                        "cannot rename view column '{src}' to '{alias}'"
+                    )));
+                }
+            }
+            let projection: Vec<String> = source_columns
+                .iter()
+                .zip(aliases)
+                .map(|(src, alias)| format!("{src} AS {alias}"))
+                .collect();
+            sql = format!("SELECT {} FROM ({sql})", projection.join(", "));
+            aliases.to_vec()
+        };
+        self.storage
+            .catalog
+            .create_view(name, &view_columns, &sql)?;
+        Ok(QueryResult::Rows {
+            columns: vec![],
+            rows: vec![],
+        })
+    }
+
+    fn drop_view(&self, name: &str, if_exists: bool) -> Result<QueryResult> {
+        let existed = self.storage.catalog.drop_view(name)?;
+        if !existed && !if_exists {
+            return Err(Error::Invalid(format!("view '{name}' does not exist")));
+        }
+        Ok(QueryResult::Rows {
+            columns: vec![],
+            rows: vec![],
+        })
     }
 
     /// Inserts literal rows into `table`. The Thrift `Insert` RPC calls this
@@ -6009,15 +6545,24 @@ impl Engine {
                     existed,
                 })
             }
-            // Parse-only forms: the parser accepts them (so corpus files can be
-            // read) but the Rust executor has no implementation yet.
-            Statement::InsertSelect { .. }
-            | Statement::CreateTableAs { .. }
-            | Statement::CreateView { .. }
-            | Statement::DropView { .. }
-            | Statement::Describe { .. } => Err(Error::Invalid(
-                "statement is not supported by the Rust executor".to_string(),
-            )),
+            Statement::InsertSelect {
+                table,
+                columns,
+                query,
+            } => self.insert_from_select(table, columns.as_deref(), query),
+            Statement::CreateTableAs {
+                name,
+                columns,
+                query,
+            } => self.create_table_from_select(name, columns, query),
+            Statement::CreateView {
+                name,
+                columns,
+                query,
+                query_sql,
+            } => self.create_view(name, columns, query, query_sql),
+            Statement::DropView { name, if_exists } => self.drop_view(name, *if_exists),
+            Statement::Describe { table } => self.describe_table(table),
             Statement::Utility { .. } => Ok(QueryResult::Rows {
                 columns: vec![],
                 rows: vec![],
@@ -6120,10 +6665,7 @@ impl Engine {
                         vec!["table_name".to_string(), name.to_string()],
                         vec!["table_comment".to_string(), String::new()],
                         vec!["storage_directory".to_string(), String::new()],
-                        vec![
-                            "column_count".to_string(),
-                            meta.columns.len().to_string(),
-                        ],
+                        vec!["column_count".to_string(), meta.columns.len().to_string()],
                         vec!["segment_count".to_string(), "0".to_string()],
                     ],
                 })
@@ -6330,404 +6872,417 @@ impl Engine {
                     count: to_del.len(),
                 })
             }
-            Statement::Select {
-                items,
-                from,
-                join,
-                where_pred,
-                group_by,
-                aliases,
-                having,
-                order_by,
-                limit,
-                offset,
-                search,
-                distinct,
-                highlight: _,
-                ..
-            } => {
-                // `SELECT count(*)` with no other clause is answered from the key
-                // counts alone; the generic path materialises every row.
-                if join.is_none()
-                    && where_pred.is_none()
-                    && group_by.is_empty()
-                    && having.is_none()
-                    && order_by.is_empty()
-                    && limit.is_none()
-                    && offset.is_none()
-                    && search.is_none()
-                    && !*distinct
-                    && items.len() == 1
-                    && aliases.len() <= 1
-                {
-                    if let infinity_parser::SelectItem::Aggregate(a) = &items[0] {
-                        // `AggFunc` is not re-exported; the debug name is stable.
-                        if format!("{:?}", a.func) == "Count" && a.args.is_empty() && !a.distinct {
-                            if let Some(t) = from.as_ref() {
-                                let n = self.row_count(t)?;
-                                let name = aliases
-                                    .first()
-                                    .cloned()
-                                    .flatten()
-                                    .unwrap_or_else(|| "count(star)".to_string());
-                                return Ok(QueryResult::Rows {
-                                    columns: vec![name],
-                                    rows: vec![vec![n.to_string()]],
-                                });
-                            }
-                        }
-                    }
-                }
-                // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
-                // row per element, then let the normal planner handle WHERE,
-                // GROUP BY and aggregates over the expanded relation.
-                let mut where_pred = where_pred.clone();
-                let mut group_by = group_by.to_vec();
-                let mut having = having.clone();
-                let mut items_owned: Vec<SelectItem> = items.to_vec();
-                let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
-                let unnest_idx = items_owned.iter().position(|it| {
-                    matches!(it, SelectItem::Func { name, .. }
-                        if name.eq_ignore_ascii_case("UNNEST"))
-                });
-                if let (Some(t), Some(ui)) = (from.as_ref(), unnest_idx) {
-                    let (arg_col, alias) = match &items_owned[ui] {
-                        SelectItem::Func { args, .. } => (
-                            match args.first() {
-                                Some(ExprAst::Column(c)) => Some(c.clone()),
-                                _ => None,
-                            },
-                            aliases.get(ui).cloned().flatten(),
-                        ),
-                        _ => (None, None),
-                    };
-                    if let Some(col) = arg_col {
-                        let schema = self.table_schema(t)?;
-                        if let Some(ci) = schema.iter().position(|c| c == &col) {
-                            let col_ty = self.column_types(t)?.get(ci).cloned().unwrap_or_default();
-                            let float_elems = array_elem_is_float(&col_ty);
-                            let is_json_col = is_json_type(&col_ty);
-                            let new_name = alias.unwrap_or_else(|| format!("__unnest_{col}"));
-                            let mut out: Vec<Vec<Value>> = Vec::new();
-                            for (_seq, row) in self.fetch_rows_with_ids(t)? {
-                                let mut elements: Vec<Value> = Vec::new();
-                                // a JSON column's stored text may have been read as
-                                // a number, so re-render it before parsing
-                                let cell: Option<String> = match row.get(ci) {
-                                    Some(Value::Str(c)) => Some(c.clone()),
-                                    Some(other) if is_json_col => Some(other.to_slt_string()),
-                                    _ => None,
-                                };
-                                if let Some(cell) = cell {
-                                    if !is_json_col {
-                                        if let Some(elems) = brace_array_elems(&cell) {
-                                            for e in elems {
-                                                let text =
-                                                    if float_elems { fmt_float6(&e) } else { e };
-                                                elements.push(parse_value(&text));
-                                            }
-                                        }
-                                    } else {
-                                        // JSON elements keep their textual form
-                                        match infinity_expression::json::parse(&cell) {
-                                            Some(infinity_expression::json::Json::Arr(items)) => {
-                                                for v in items {
-                                                    elements.push(Value::Str(v.compact()));
-                                                }
-                                            }
-                                            Some(other) => {
-                                                elements.push(Value::Str(other.compact()))
-                                            }
-                                            None => {}
-                                        }
-                                    }
-                                }
-                                for v in elements {
-                                    let mut r = row.clone();
-                                    r.push(v);
-                                    out.push(r);
-                                }
-                            }
-                            // Filters written against the output expression
-                            // (`uc2 > 1` is sent as `unnest(c2) > 1`) must see
-                            // the expanded column.
-                            if let Some(p) = where_pred.as_ref() {
-                                where_pred = Some(rewrite_unnest_pred(p, &col, &new_name));
-                            }
-                            if let Some(p) = having.as_ref() {
-                                having = Some(Box::new(rewrite_unnest_pred(p, &col, &new_name)));
-                            }
-                            group_by = group_by
-                                .iter()
-                                .map(|g| rewrite_unnest_expr(g, &col, &new_name))
-                                .collect();
-                            items_owned[ui] = SelectItem::Column(new_name.clone());
-                            unnest_expansion = Some((new_name, out));
-                        }
-                    }
-                }
-                let items: &[SelectItem] = &items_owned;
-                // `FROM (SELECT …)`: run the subquery first and scan its result.
-                // Its columns become a synthetic table so names resolve.
-                let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
-                    Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
-                        Some(self.derived_table(f.trim())?)
-                    }
-                    _ => None,
-                };
-                let from_derived: Option<String> = if derived.is_some() {
-                    Some("__derived".to_string())
-                } else {
-                    from.clone()
-                };
-                let from = &from_derived;
-                // A WHERE clause must be a predicate: `WHERE c1` on a
-                // non-boolean column is rejected by the reference.
-                if let (Some(t), Some(p), None) =
-                    (from.as_ref(), where_pred.as_ref(), derived.as_ref())
-                {
-                    self.validate_where_predicate(t, p)?;
-                }
-                // SUM/AVG require a numeric argument.
-                if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
-                    self.validate_aggregate_args(t, items)?;
-                }
-                // `AND`/`OR`/`NOT` take boolean operands: a projected
-                // arithmetic expression such as `c1 + 0.1 and c2 - 1.0` is
-                // invalid (the reference rejects it).
-                for it in items {
-                    match it {
-                        SelectItem::Expr(e) => validate_boolean_expr(e)?,
-                        SelectItem::Func { args, .. } => {
-                            for a in args {
-                                validate_boolean_expr(a)?;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
-                    validate_search_pseudo_columns(s, items)?;
-                    // an outer WHERE cannot be combined with an in-subsearch filter
-                    if where_pred.is_some() && s.matches.iter().any(|m| m.filter.is_some()) {
-                        return Err(Error::Invalid(
-                            "cannot have both a where clause and a subsearch filter".into(),
-                        ));
-                    }
-                }
-                let mut tables: Vec<(String, Vec<String>)> = Vec::new();
-                if let Some(t) = from {
-                    let cols = match &derived {
-                        Some((cols, _)) => cols.clone(),
-                        None => self.table_schema(t)?,
-                    };
-                    tables.push((t.clone(), cols));
-                }
-                let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
-                if let Some((name, rows)) = unnest_expansion {
-                    if let Some(entry) = tables.first_mut() {
-                        entry.1.push(name);
-                    }
-                    unnest_rows = Some(rows);
-                }
-                if let Some(JoinClause { table, .. }) = join {
-                    tables.push((table.clone(), self.table_schema(table)?));
-                }
-                // SEARCH MATCH: run the search first, then expose its result rows
-                // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
-                // A derived table's rows are the scan source from the start.
-                let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
-                if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
-                    let pred = match where_pred.as_ref() {
-                        Some(p) => Some(infinity_planner::predicate_expr(p, &tables[0].1)?),
-                        None => None,
-                    };
-                    let (rows, hidden) = self.run_search(t, s, pred.as_ref())?;
-                    if !hidden.is_empty() {
-                        if let Some(entry) = tables.first_mut() {
-                            entry.1.extend(hidden);
-                        }
-                    }
-                    override_rows = Some(rows);
-                }
-                // Projection-only scan: read just the selected columns from the
-                // C++ block mirror when that mirror is as fresh as the row
-                // store (plan #87). `SELECT id, name` then avoids decoding the
-                // wide columns (embeddings, text) altogether.
-                if override_rows.is_none()
-                    && join.is_none()
-                    && search.is_none()
-                    && where_pred.is_none()
-                    && group_by.is_empty()
-                    && having.is_none()
-                    && order_by.is_empty()
-                    && limit.is_none()
-                    && offset.is_none()
-                    && !*distinct
-                {
-                    if let Some(t) = from.as_ref() {
-                        override_rows = self.try_cpp_projection(t, items)?;
-                    }
-                }
-                // `ROW_ID()` outside a SEARCH exposes the row's sequence number
-                // as a hidden scan column.
-                let mut rowid_col = false;
-                if search.is_none() {
-                    if let Some(t) = from.as_ref() {
-                        if unnest_rows.is_none() && uses_row_id(items) {
-                            if let Some(entry) = tables.first_mut() {
-                                entry.1.push("#_row_id".into());
-                            }
-                            let rows: Vec<Vec<Value>> = self
-                                .fetch_rows_with_ids(t)?
-                                .into_iter()
-                                .map(|(seq, mut r)| {
-                                    r.push(Value::Int(seq as i64));
-                                    r
-                                })
-                                .collect();
-                            override_rows = Some(rows);
-                            rowid_col = true;
-                        }
-                    }
-                }
-                let _ = rowid_col;
-                // An ORDER BY key that names a select alias is rewritten to the
-                // corresponding output label.
-                let order_keys: Vec<infinity_parser::OrderKey> = order_by
-                    .iter()
-                    .map(|ok| {
-                        let mut ok = ok.clone();
-                        if let Some(i) = aliases
-                            .iter()
-                            .position(|a| a.as_deref() == Some(ok.column.as_str()))
-                        {
-                            if let Some(item) = items.get(i) {
-                                ok.column = infinity_planner::item_label(item);
-                            }
-                        }
-                        ok
-                    })
-                    .collect();
-                if unnest_rows.is_some() {
-                    override_rows = unnest_rows;
-                }
-                let mut plan = plan_select(
-                    items,
-                    &tables,
-                    join.as_ref(),
-                    where_pred.as_ref(),
-                    &group_by,
-                    having.as_deref(),
-                    &order_keys,
-                    *limit,
-                    *offset,
-                )?;
-                // `SELECT sum(c1) AS s` names the output column `s`.
-                apply_select_aliases(&mut plan, aliases);
-                // A full-text `threshold=` filter is answered by the index: the
-                // score needs corpus statistics a row-local predicate cannot see,
-                // so resolve the qualifying rows once and feed them down.
-                if override_rows.is_none() && join.is_none() {
-                    if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
-                        if let Some((col, query, packed)) = fulltext_index_call(p) {
-                            let (opts, hint) = packed.split_once('\u{1}').unwrap_or((&packed, ""));
-                            // Only a `threshold=` filter (needs corpus stats) or a
-                            // query targeted at a gram index (needs substring
-                            // semantics) departs from the row-local term match.
-                            let sparsegram = !hint.is_empty()
-                                && self
-                                    .analyzer_of_index(t, hint)
-                                    .map(|a| a.to_ascii_lowercase().starts_with("sparsegram"))
-                                    .unwrap_or(false);
-                            let has_threshold = opts
-                                .split(';')
-                                .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="));
-                            if !sparsegram && !has_threshold {
-                                override_rows = None;
-                            } else if sparsegram {
-                                let schema = self.table_schema(t)?;
-                                let needle = query.trim().trim_matches('"').to_lowercase();
-                                let keep: Vec<u64> = match schema.iter().position(|c| c == &col) {
-                                    None => Vec::new(),
-                                    Some(ci) => self
-                                        .fetch_rows_with_ids(t)?
-                                        .into_iter()
-                                        .filter(|(_, r)| match r.get(ci) {
-                                            Some(Value::Str(s)) => {
-                                                s.to_lowercase().contains(&needle)
-                                            }
-                                            Some(v) => {
-                                                v.to_slt_string().to_lowercase().contains(&needle)
-                                            }
-                                            None => false,
-                                        })
-                                        .map(|(id, _)| id as u64)
-                                        .collect(),
-                                };
-                                let mut out = self.fetch_rows_by_ids(t, &keep)?;
-                                if rowid_col {
-                                    for (r, id) in out.iter_mut().zip(keep.iter()) {
-                                        r.push(Value::Int(*id as i64));
-                                    }
-                                }
-                                override_rows = Some(out);
-                            } else {
-                                let m = MatchClause {
-                                    kind: "TEXT".into(),
-                                    column: col,
-                                    args: vec![
-                                        ExprAst::Literal(Literal::Str(query)),
-                                        ExprAst::Literal(Literal::Str(opts.to_string())),
-                                    ],
-                                    filter: None,
-                                };
-                                let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
-                                let mut ids: Vec<u64> = rows
-                                    .iter()
-                                    .filter_map(|r| match r.iter().rev().nth(3) {
-                                        Some(Value::Int(i)) => Some(*i as u64),
-                                        _ => None,
-                                    })
-                                    .collect();
-                                // Table order, not score order: this is a WHERE filter.
-                                ids.sort_unstable();
-                                let mut out = self.fetch_rows_by_ids(t, &ids)?;
-                                if rowid_col {
-                                    for (r, id) in out.iter_mut().zip(ids.iter()) {
-                                        r.push(Value::Int(*id as i64));
-                                    }
-                                }
-                                override_rows = Some(out);
-                            }
-                        }
-                    }
-                }
-                // index scan: an equality predicate on an indexed single-table
-                // column fetches only the matching rows.
-                if override_rows.is_none() && join.is_none() {
-                    if let (Some(t), Some(pred)) = (from.as_ref(), where_pred.as_ref()) {
-                        if let Some((col, CmpOp::Eq, val)) = pred.as_column_literal() {
-                            if let Some(ids) = self.index_lookup(t, col, val) {
-                                let mut rows = self.fetch_rows_by_ids(t, &ids)?;
-                                if rowid_col {
-                                    for (r, id) in rows.iter_mut().zip(ids.iter()) {
-                                        r.push(Value::Int(*id as i64));
-                                    }
-                                }
-                                override_rows = Some(rows);
-                            }
-                        }
-                    }
-                }
-                let (columns, mut rows) = self.run_plan(plan, override_rows)?;
-                if *distinct {
-                    let mut seen = std::collections::HashSet::new();
-                    rows.retain(|r| seen.insert(r.clone()));
-                }
-                Ok(QueryResult::Rows { columns, rows })
+            Statement::Select { .. } => {
+                let (columns, rows) = self.run_select(stmt)?;
+                Ok(QueryResult::Rows {
+                    columns,
+                    rows: rows
+                        .into_iter()
+                        .map(|r| r.into_iter().map(|v| v.to_slt_string()).collect())
+                        .collect(),
+                })
             }
         }
+    }
+
+    /// Executes a `SELECT` and returns its typed rows. The public
+    /// [`QueryResult`] renders cells as text, but `INSERT … SELECT` and
+    /// `CREATE TABLE … AS SELECT` must preserve values (and NULLs) before
+    /// casting them to the target schema.
+    fn run_select(&self, stmt: &Statement) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
+        let Statement::Select {
+            items,
+            from,
+            join,
+            where_pred,
+            group_by,
+            aliases,
+            having,
+            order_by,
+            limit,
+            offset,
+            search,
+            distinct,
+            ..
+        } = stmt
+        else {
+            return Err(Error::Invalid("run_select requires a SELECT".into()));
+        };
+        // `SELECT count(*)` with no other clause is answered from the key
+        // counts alone; the generic path materialises every row.
+        if join.is_none()
+            && where_pred.is_none()
+            && group_by.is_empty()
+            && having.is_none()
+            && order_by.is_empty()
+            && limit.is_none()
+            && offset.is_none()
+            && search.is_none()
+            && !*distinct
+            && items.len() == 1
+            && aliases.len() <= 1
+        {
+            if let infinity_parser::SelectItem::Aggregate(a) = &items[0] {
+                // `AggFunc` is not re-exported; the debug name is stable.
+                if format!("{:?}", a.func) == "Count" && a.args.is_empty() && !a.distinct {
+                    if let Some(t) = from.as_ref() {
+                        let n = self.row_count(t)?;
+                        let name = aliases
+                            .first()
+                            .cloned()
+                            .flatten()
+                            .unwrap_or_else(|| "count(star)".to_string());
+                        return Ok((vec![name], vec![vec![Value::Int(n as i64)]]));
+                    }
+                }
+            }
+        }
+        // `SELECT … UNNEST(col) …`: expand an array/JSON column into one
+        // row per element, then let the normal planner handle WHERE,
+        // GROUP BY and aggregates over the expanded relation.
+        let mut where_pred = where_pred.clone();
+        let mut group_by = group_by.to_vec();
+        let mut having = having.clone();
+        let mut items_owned: Vec<SelectItem> = items.to_vec();
+        let mut unnest_expansion: Option<(String, Vec<Vec<Value>>)> = None;
+        let unnest_idx = items_owned.iter().position(|it| {
+            matches!(it, SelectItem::Func { name, .. }
+                if name.eq_ignore_ascii_case("UNNEST"))
+        });
+        if let (Some(t), Some(ui)) = (from.as_ref(), unnest_idx) {
+            let (arg_col, alias) = match &items_owned[ui] {
+                SelectItem::Func { args, .. } => (
+                    match args.first() {
+                        Some(ExprAst::Column(c)) => Some(c.clone()),
+                        _ => None,
+                    },
+                    aliases.get(ui).cloned().flatten(),
+                ),
+                _ => (None, None),
+            };
+            if let Some(col) = arg_col {
+                let schema = self.table_schema(t)?;
+                if let Some(ci) = schema.iter().position(|c| c == &col) {
+                    let col_ty = self.column_types(t)?.get(ci).cloned().unwrap_or_default();
+                    let float_elems = array_elem_is_float(&col_ty);
+                    let is_json_col = is_json_type(&col_ty);
+                    let new_name = alias.unwrap_or_else(|| format!("__unnest_{col}"));
+                    let mut out: Vec<Vec<Value>> = Vec::new();
+                    for (_seq, row) in self.fetch_rows_with_ids(t)? {
+                        let mut elements: Vec<Value> = Vec::new();
+                        // a JSON column's stored text may have been read as
+                        // a number, so re-render it before parsing
+                        let cell: Option<String> = match row.get(ci) {
+                            Some(Value::Str(c)) => Some(c.clone()),
+                            Some(other) if is_json_col => Some(other.to_slt_string()),
+                            _ => None,
+                        };
+                        if let Some(cell) = cell {
+                            if !is_json_col {
+                                if let Some(elems) = brace_array_elems(&cell) {
+                                    for e in elems {
+                                        let text = if float_elems { fmt_float6(&e) } else { e };
+                                        elements.push(parse_value(&text));
+                                    }
+                                }
+                            } else {
+                                // JSON elements keep their textual form
+                                match infinity_expression::json::parse(&cell) {
+                                    Some(infinity_expression::json::Json::Arr(items)) => {
+                                        for v in items {
+                                            elements.push(Value::Str(v.compact()));
+                                        }
+                                    }
+                                    Some(other) => elements.push(Value::Str(other.compact())),
+                                    None => {}
+                                }
+                            }
+                        }
+                        for v in elements {
+                            let mut r = row.clone();
+                            r.push(v);
+                            out.push(r);
+                        }
+                    }
+                    // Filters written against the output expression
+                    // (`uc2 > 1` is sent as `unnest(c2) > 1`) must see
+                    // the expanded column.
+                    if let Some(p) = where_pred.as_ref() {
+                        where_pred = Some(rewrite_unnest_pred(p, &col, &new_name));
+                    }
+                    if let Some(p) = having.as_ref() {
+                        having = Some(Box::new(rewrite_unnest_pred(p, &col, &new_name)));
+                    }
+                    group_by = group_by
+                        .iter()
+                        .map(|g| rewrite_unnest_expr(g, &col, &new_name))
+                        .collect();
+                    items_owned[ui] = SelectItem::Column(new_name.clone());
+                    unnest_expansion = Some((new_name, out));
+                }
+            }
+        }
+        let items: &[SelectItem] = &items_owned;
+        // `FROM (SELECT …)`: run the subquery first and scan its result.
+        // Its columns become a synthetic table so names resolve.
+        let derived: Option<(Vec<String>, Vec<Vec<Value>>)> = match from.as_ref() {
+            Some(f) if f.trim_start().to_ascii_uppercase().starts_with("SELECT ") => {
+                Some(self.derived_table(f.trim())?)
+            }
+            _ => None,
+        };
+        let from_derived: Option<String> = if derived.is_some() {
+            Some("__derived".to_string())
+        } else {
+            from.clone()
+        };
+        let from = &from_derived;
+        // A WHERE clause must be a predicate: `WHERE c1` on a
+        // non-boolean column is rejected by the reference.
+        if let (Some(t), Some(p), None) = (from.as_ref(), where_pred.as_ref(), derived.as_ref()) {
+            self.validate_where_predicate(t, p)?;
+        }
+        // SUM/AVG require a numeric argument.
+        if let (Some(t), None) = (from.as_ref(), derived.as_ref()) {
+            self.validate_aggregate_args(t, items)?;
+        }
+        // `AND`/`OR`/`NOT` take boolean operands: a projected
+        // arithmetic expression such as `c1 + 0.1 and c2 - 1.0` is
+        // invalid (the reference rejects it).
+        for it in items {
+            match it {
+                SelectItem::Expr(e) => validate_boolean_expr(e)?,
+                SelectItem::Func { args, .. } => {
+                    for a in args {
+                        validate_boolean_expr(a)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let (Some(_), Some(s)) = (from.as_ref(), search.as_deref()) {
+            validate_search_pseudo_columns(s, items)?;
+            // an outer WHERE cannot be combined with an in-subsearch filter
+            if where_pred.is_some() && s.matches.iter().any(|m| m.filter.is_some()) {
+                return Err(Error::Invalid(
+                    "cannot have both a where clause and a subsearch filter".into(),
+                ));
+            }
+        }
+        let mut tables: Vec<(String, Vec<String>)> = Vec::new();
+        if let Some(t) = from {
+            let cols = match &derived {
+                Some((cols, _)) => cols.clone(),
+                None => self.table_schema(t)?,
+            };
+            tables.push((t.clone(), cols));
+        }
+        let mut unnest_rows: Option<Vec<Vec<Value>>> = None;
+        if let Some((name, rows)) = unnest_expansion {
+            if let Some(entry) = tables.first_mut() {
+                entry.1.push(name);
+            }
+            unnest_rows = Some(rows);
+        }
+        if let Some(JoinClause { table, .. }) = join {
+            tables.push((table.clone(), self.table_schema(table)?));
+        }
+        // SEARCH MATCH: run the search first, then expose its result rows
+        // (plus hidden ROW_ID/SIMILARITY/DISTANCE/SCORE columns) as the scan.
+        // A derived table's rows are the scan source from the start.
+        let mut override_rows: Option<Vec<Vec<Value>>> = derived.map(|(_, rows)| rows);
+        if let (Some(t), Some(s)) = (from.as_ref(), search.as_deref()) {
+            let pred = match where_pred.as_ref() {
+                Some(p) => Some(infinity_planner::predicate_expr(p, &tables[0].1)?),
+                None => None,
+            };
+            let (rows, hidden) = self.run_search(t, s, pred.as_ref())?;
+            if !hidden.is_empty() {
+                if let Some(entry) = tables.first_mut() {
+                    entry.1.extend(hidden);
+                }
+            }
+            override_rows = Some(rows);
+        }
+        // Projection-only scan: read just the selected columns from the
+        // C++ block mirror when that mirror is as fresh as the row
+        // store (plan #87). `SELECT id, name` then avoids decoding the
+        // wide columns (embeddings, text) altogether.
+        if override_rows.is_none()
+            && join.is_none()
+            && search.is_none()
+            && where_pred.is_none()
+            && group_by.is_empty()
+            && having.is_none()
+            && order_by.is_empty()
+            && limit.is_none()
+            && offset.is_none()
+            && !*distinct
+        {
+            if let Some(t) = from.as_ref() {
+                override_rows = self.try_cpp_projection(t, items)?;
+            }
+        }
+        // `ROW_ID()` outside a SEARCH exposes the row's sequence number
+        // as a hidden scan column.
+        let mut rowid_col = false;
+        if search.is_none() {
+            if let Some(t) = from.as_ref() {
+                if unnest_rows.is_none() && uses_row_id(items) {
+                    if let Some(entry) = tables.first_mut() {
+                        entry.1.push("#_row_id".into());
+                    }
+                    let rows: Vec<Vec<Value>> = self
+                        .fetch_rows_with_ids(t)?
+                        .into_iter()
+                        .map(|(seq, mut r)| {
+                            r.push(Value::Int(seq as i64));
+                            r
+                        })
+                        .collect();
+                    override_rows = Some(rows);
+                    rowid_col = true;
+                }
+            }
+        }
+        let _ = rowid_col;
+        // An ORDER BY key that names a select alias is rewritten to the
+        // corresponding output label.
+        let order_keys: Vec<infinity_parser::OrderKey> = order_by
+            .iter()
+            .map(|ok| {
+                let mut ok = ok.clone();
+                if let Some(i) = aliases
+                    .iter()
+                    .position(|a| a.as_deref() == Some(ok.column.as_str()))
+                {
+                    if let Some(item) = items.get(i) {
+                        ok.column = infinity_planner::item_label(item);
+                    }
+                }
+                ok
+            })
+            .collect();
+        if unnest_rows.is_some() {
+            override_rows = unnest_rows;
+        }
+        let mut plan = plan_select(
+            items,
+            &tables,
+            join.as_ref(),
+            where_pred.as_ref(),
+            &group_by,
+            having.as_deref(),
+            &order_keys,
+            *limit,
+            *offset,
+        )?;
+        // `SELECT sum(c1) AS s` names the output column `s`.
+        apply_select_aliases(&mut plan, aliases);
+        // A full-text `threshold=` filter is answered by the index: the
+        // score needs corpus statistics a row-local predicate cannot see,
+        // so resolve the qualifying rows once and feed them down.
+        if override_rows.is_none() && join.is_none() {
+            if let (Some(t), Some(p)) = (from.as_ref(), where_pred.as_ref()) {
+                if let Some((col, query, packed)) = fulltext_index_call(p) {
+                    let (opts, hint) = packed.split_once('\u{1}').unwrap_or((&packed, ""));
+                    // Only a `threshold=` filter (needs corpus stats) or a
+                    // query targeted at a gram index (needs substring
+                    // semantics) departs from the row-local term match.
+                    let sparsegram = !hint.is_empty()
+                        && self
+                            .analyzer_of_index(t, hint)
+                            .map(|a| a.to_ascii_lowercase().starts_with("sparsegram"))
+                            .unwrap_or(false);
+                    let has_threshold = opts
+                        .split(';')
+                        .any(|o| o.trim().to_ascii_lowercase().starts_with("threshold="));
+                    if !sparsegram && !has_threshold {
+                        override_rows = None;
+                    } else if sparsegram {
+                        let schema = self.table_schema(t)?;
+                        let needle = query.trim().trim_matches('"').to_lowercase();
+                        let keep: Vec<u64> = match schema.iter().position(|c| c == &col) {
+                            None => Vec::new(),
+                            Some(ci) => self
+                                .fetch_rows_with_ids(t)?
+                                .into_iter()
+                                .filter(|(_, r)| match r.get(ci) {
+                                    Some(Value::Str(s)) => s.to_lowercase().contains(&needle),
+                                    Some(v) => v.to_slt_string().to_lowercase().contains(&needle),
+                                    None => false,
+                                })
+                                .map(|(id, _)| id as u64)
+                                .collect(),
+                        };
+                        let mut out = self.fetch_rows_by_ids(t, &keep)?;
+                        if rowid_col {
+                            for (r, id) in out.iter_mut().zip(keep.iter()) {
+                                r.push(Value::Int(*id as i64));
+                            }
+                        }
+                        override_rows = Some(out);
+                    } else {
+                        let m = MatchClause {
+                            kind: "TEXT".into(),
+                            column: col,
+                            args: vec![
+                                ExprAst::Literal(Literal::Str(query)),
+                                ExprAst::Literal(Literal::Str(opts.to_string())),
+                            ],
+                            filter: None,
+                        };
+                        let (rows, _) = self.search_text_terms(t, &m, None, &[])?;
+                        let mut ids: Vec<u64> = rows
+                            .iter()
+                            .filter_map(|r| match r.iter().rev().nth(3) {
+                                Some(Value::Int(i)) => Some(*i as u64),
+                                _ => None,
+                            })
+                            .collect();
+                        // Table order, not score order: this is a WHERE filter.
+                        ids.sort_unstable();
+                        let mut out = self.fetch_rows_by_ids(t, &ids)?;
+                        if rowid_col {
+                            for (r, id) in out.iter_mut().zip(ids.iter()) {
+                                r.push(Value::Int(*id as i64));
+                            }
+                        }
+                        override_rows = Some(out);
+                    }
+                }
+            }
+        }
+        // index scan: an equality predicate on an indexed single-table
+        // column fetches only the matching rows.
+        if override_rows.is_none() && join.is_none() {
+            if let (Some(t), Some(pred)) = (from.as_ref(), where_pred.as_ref()) {
+                if let Some((col, CmpOp::Eq, val)) = pred.as_column_literal() {
+                    if let Some(ids) = self.index_lookup(t, col, val) {
+                        let mut rows = self.fetch_rows_by_ids(t, &ids)?;
+                        if rowid_col {
+                            for (r, id) in rows.iter_mut().zip(ids.iter()) {
+                                r.push(Value::Int(*id as i64));
+                            }
+                        }
+                        override_rows = Some(rows);
+                    }
+                }
+            }
+        }
+        let (columns, mut rows) = self.run_plan(plan, override_rows)?;
+        if *distinct {
+            let mut seen = std::collections::HashSet::new();
+            rows.retain(|r| {
+                seen.insert(
+                    r.iter()
+                        .map(|v| v.to_slt_string())
+                        .collect::<Vec<_>>()
+                        .join("\u{1f}"),
+                )
+            });
+        }
+        Ok((columns, rows))
     }
 
     /// Decomposes a plan into its source relation and ordered operator stages.
@@ -6813,7 +7368,7 @@ impl Engine {
         &self,
         plan: LogicalPlan,
         override_rows: Option<Vec<Vec<Value>>>,
-    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    ) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
         let (source, stages) = Self::decompose(infinity_planner::optimize::optimize(plan));
         let (columns, rows) = match source {
             Source::Values { columns, rows } => (columns, rows),
@@ -13157,7 +13712,7 @@ async fn pipeline(
     rows: Vec<Vec<Value>>,
     stages: Vec<Stage>,
     _cap: usize,
-) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+) -> Result<(Vec<String>, Vec<Vec<Value>>)> {
     // The source is already materialized, and every stage is a synchronous
     // transform. The previous per-row `mpsc` hop cost ~1 µs/row (20k rows:
     // ~20 ms) without overlapping any work; the reference's pipeline stages
@@ -13203,11 +13758,7 @@ async fn pipeline(
         }
     }
 
-    let out = data
-        .iter()
-        .map(|r| r.iter().map(|v| v.to_slt_string()).collect())
-        .collect();
-    Ok((cols, out))
+    Ok((cols, data))
 }
 
 fn apply_aggregate(
@@ -13328,8 +13879,7 @@ impl BgTask for DumpMemIndexTask {
             let _batch = engine.batch_lock.lock().unwrap();
             engine.dump_all_memory_indexes();
         }
-        self.pending
-            .store(0, std::sync::atomic::Ordering::Relaxed);
+        self.pending.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -16184,4 +16734,3 @@ mod tests {
         }
     }
 }
-

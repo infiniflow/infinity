@@ -72,7 +72,10 @@ mod tests {
         for file in &files {
             let sql = read(file);
             parse(&sql).unwrap_or_else(|e| {
-                panic!("{} must parse: {e}", file.file_name().unwrap().to_string_lossy())
+                panic!(
+                    "{} must parse: {e}",
+                    file.file_name().unwrap().to_string_lossy()
+                )
             });
         }
     }
@@ -113,10 +116,7 @@ mod tests {
                 continue;
             }
             let result = parse(&sql);
-            assert!(
-                result.is_err(),
-                "bad.sql:{line_no} must be rejected: {sql}"
-            );
+            assert!(result.is_err(), "bad.sql:{line_no} must be rejected: {sql}");
             rejected += 1;
         }
         assert_eq!(rejected, 43, "bad.sql rejection count changed");

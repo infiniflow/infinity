@@ -293,11 +293,7 @@ impl InMemPositionListDecoder {
             .unwrap()
             .skip_to(current_ttf as u32 + 1);
         let offset = if let Some(result) = result {
-            self.pre_record_ttf = self
-                .skiplist_reader
-                .as_ref()
-                .unwrap()
-                .get_prev_key();
+            self.pre_record_ttf = self.skiplist_reader.as_ref().unwrap().get_prev_key();
             self.decoded_pos_count = result.doc_id;
             result.offset
         } else {
@@ -388,7 +384,8 @@ mod tests {
         let mut encoder = PositionListEncoder::new(flag);
         for &pos in pos_list.iter().take(tf as usize) {
             encoder.add_position(pos);
-        }        encoder.end_document();
+        }
+        encoder.end_document();
         if need_flush {
             encoder.flush();
         }
@@ -467,7 +464,10 @@ mod tests {
                 assert!(!decoder.locate_record(&state, &mut temp_tf));
                 assert_eq!(record_offset, state.get_record_offset());
             }
-            assert_eq!((i % MAX_POS_PER_RECORD as u32) as i32, state.get_offset_in_record());
+            assert_eq!(
+                (i % MAX_POS_PER_RECORD as u32) as i32,
+                state.get_offset_in_record()
+            );
         }
     }
 

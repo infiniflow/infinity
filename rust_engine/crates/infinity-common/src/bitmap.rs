@@ -84,7 +84,11 @@ impl Bitmap {
     /// C++: `operator^`.
     pub fn xor(&self, other: &Bitmap) -> Bitmap {
         Bitmap {
-            values: self.values.symmetric_difference(&other.values).copied().collect(),
+            values: self
+                .values
+                .symmetric_difference(&other.values)
+                .copied()
+                .collect(),
         }
     }
 

@@ -4,7 +4,8 @@ use infinity_common::{Error, LogicalType, Result};
 
 use crate::ast::{
     AggFunc, BinOp, BoolOp, CmpOp, ColumnDef, Cte, ExplainKind, ExprAst, JoinClause, JoinKind,
-    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, Statement,
+    Literal, MatchClause, OrderKey, Predicate, SearchClause, SelectAgg, SelectItem, SparseStore,
+    Statement,
 };
 use crate::lexer::{tokenize, Token};
 
@@ -119,7 +120,7 @@ impl Parser {
                         toks.push(Token::RParen);
                     }
                 }
-                Token::                Eof => return self.err("unterminated subquery"),
+                Token::Eof => return self.err("unterminated subquery"),
                 t => toks.push(t),
             }
         }
@@ -357,11 +358,15 @@ impl Parser {
                         self.expect(Token::RParen)?;
                     }
                     self.expect_kw("AS")?;
+                    let sql_start = self.pos;
                     let query = self.statement()?;
+                    let sql_end = self.pos;
+                    let query_sql = render_tokens_as_sql(&self.toks[sql_start..sql_end]);
                     return Ok(Statement::CreateView {
                         name,
                         columns,
                         query: Box::new(query),
+                        query_sql,
                     });
                 }
                 if self.eat_kw("DATABASE") {
@@ -463,12 +468,23 @@ impl Parser {
                         let query = self.statement()?;
                         return Ok(Statement::CreateTableAs {
                             name,
+                            columns: Vec::new(),
                             query: Box::new(query),
                         });
                     }
                     self.expect(Token::LParen)?;
                     let columns = self.column_defs()?;
                     self.expect(Token::RParen)?;
+                    // `CREATE TABLE t (a INT) AS SELECT …`: the definitions
+                    // name/type the output columns instead of being inferred.
+                    if self.eat_kw("AS") {
+                        let query = self.statement()?;
+                        return Ok(Statement::CreateTableAs {
+                            name,
+                            columns,
+                            query: Box::new(query),
+                        });
+                    }
                     // tolerate a trailing `PROPERTIES (…)` / `WITH (…)` clause
                     while !matches!(self.peek(), Token::Semicolon | Token::Eof) {
                         if self.peek() == &Token::LParen {
@@ -920,14 +936,10 @@ impl Parser {
                 {
                     return self.err("OFFSET requires LIMIT");
                 }
-                if search.is_some()
-                    && (!order_by.is_empty()
-                        || limit.is_some()
-                        || limit_expr.is_some()
-                        || offset.is_some()
-                        || offset_expr.is_some())
-                {
-                    return self.err("SEARCH cannot be combined with ORDER BY/OFFSET/LIMIT");
+                // `parser.y:1546`: only ORDER BY conflicts with SEARCH;
+                // `SEARCH … LIMIT n [OFFSET m]` is valid.
+                if search.is_some() && !order_by.is_empty() {
+                    return self.err("SEARCH cannot be combined with ORDER BY");
                 }
                 Ok(Statement::Select {
                     items,
@@ -1268,8 +1280,7 @@ impl Parser {
             let high = self.expr()?;
             let ge = Predicate::Cmp(left.clone(), CmpOp::Ge, low);
             let le = Predicate::Cmp(left, CmpOp::Le, high);
-            let between =
-                Predicate::Bool(Box::new(ge), BoolOp::And, Box::new(le));
+            let between = Predicate::Bool(Box::new(ge), BoolOp::And, Box::new(le));
             return Ok(if between_neg {
                 Predicate::Not(Box::new(between))
             } else {
@@ -1375,7 +1386,10 @@ impl Parser {
         if let Token::Ident(s) = self.peek() {
             let upper = s.to_ascii_uppercase();
             let base = upper.strip_suffix('S').unwrap_or(&upper);
-            if matches!(base, "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND") {
+            if matches!(
+                base,
+                "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND"
+            ) {
                 self.advance();
                 return Some(base.to_string());
             }
@@ -1880,6 +1894,44 @@ impl Parser {
         Ok(parts.join(" "))
     }
 
+    /// Parses the `(name [= value], …)` list following a column type
+    /// (`with_index_param_list`, `parser.y:4302`) and maps the sparse storage
+    /// hints `sort` / `sorted` to [`SparseStore`] (`sparse_info.cpp:29-42`).
+    ///
+    /// Any other option is accepted and ignored: the reference only consults
+    /// this list for `SPARSE` columns and rejects other keys there, but the
+    /// Rust parser stays permissive for the non-sparse case, where the list is
+    /// inert.
+    fn column_option_list(&mut self) -> Result<Option<SparseStore>> {
+        self.expect(Token::LParen)?;
+        let mut store = None;
+        loop {
+            if self.peek() == &Token::RParen {
+                self.advance();
+                break;
+            }
+            let name = self.expect_ident()?.to_ascii_lowercase();
+            match name.as_str() {
+                "sort" => store = Some(SparseStore::Sort),
+                "sorted" => store = Some(SparseStore::Sorted),
+                _ => {}
+            }
+            if self.peek() == &Token::Op("=".into()) {
+                self.advance();
+                if !matches!(self.peek(), Token::RParen | Token::Comma) {
+                    self.advance();
+                }
+            }
+            if self.peek() == &Token::Comma {
+                self.advance();
+            } else {
+                self.expect(Token::RParen)?;
+                break;
+            }
+        }
+        Ok(store)
+    }
+
     fn column_defs(&mut self) -> Result<Vec<ColumnDef>> {
         let mut cols = Vec::new();
         loop {
@@ -1890,10 +1942,17 @@ impl Parser {
             let mut explicit_null = false;
             let mut primary_key = false;
             let mut comment = None;
+            let mut sparse_store = None;
             // Column constraints. The reference rejects a stray identifier
             // between columns (e.g. a missing comma), so only known constraint
             // forms are accepted here.
             loop {
+                // `with_index_param_list` after the type (`parser.y:820`):
+                // e.g. `SPARSE(FLOAT, 30000) WITH (SORTED)`.
+                if self.eat_kw("WITH") {
+                    sparse_store = self.column_option_list()?;
+                    continue;
+                }
                 if self.eat_kw("NOT") {
                     let _ = self.eat_kw("NULL");
                     not_null = true;
@@ -1964,6 +2023,7 @@ impl Parser {
                 default,
                 not_null,
                 comment,
+                sparse_store,
             });
             if self.peek() == &Token::Comma {
                 self.advance();
@@ -2449,7 +2509,7 @@ fn validate_fulltext_options(opts: &str) -> Result<()> {
 /// column. Aggregates, multi-column and function-of-expression forms fail.
 /// Renders tokens back into SQL text (string literals re-quoted) so a captured
 /// subquery can be re-parsed by the executor.
-fn render_tokens_as_sql(toks: &[Token]) -> String {
+pub fn render_tokens_as_sql(toks: &[Token]) -> String {
     let mut out = String::new();
     for (i, t) in toks.iter().enumerate() {
         if i > 0 && !matches!(t, Token::Comma | Token::RParen | Token::Semicolon) {
@@ -2615,7 +2675,10 @@ fn typed_literal_value(kind: &str, raw: &str) -> Result<String> {
                 .map_err(|_| Error::Invalid(format!("invalid interval amount '{n}'")))?;
             let unit = unit.to_ascii_uppercase();
             let base = unit.strip_suffix('S').unwrap_or(&unit);
-            if !matches!(base, "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND") {
+            if !matches!(
+                base,
+                "YEAR" | "MONTH" | "DAY" | "HOUR" | "MINUTE" | "SECOND"
+            ) {
                 return Err(Error::Invalid(format!("invalid interval unit '{unit}'")));
             }
             Ok(normalize_datetime(kind, raw))
@@ -2630,7 +2693,11 @@ fn validate_date(raw: &str) -> Result<()> {
     let [y, m, d] = parts.as_slice() else {
         return Err(Error::Invalid(format!("invalid date literal '{raw}'")));
     };
-    if y.len() > 4 || [y, m, d].iter().any(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit())) {
+    if y.len() > 4
+        || [y, m, d]
+            .iter()
+            .any(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit()))
+    {
         return Err(Error::Invalid(format!("invalid date literal '{raw}'")));
     }
     let (y, m, d): (i64, i64, i64) = (
@@ -2813,6 +2880,7 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                     ColumnDef {
                         name: "name".into(),
@@ -2821,6 +2889,7 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                     ColumnDef {
                         name: "v".into(),
@@ -2829,6 +2898,7 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                 ],
             }
@@ -3564,6 +3634,7 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                     ColumnDef {
                         name: "b".into(),
@@ -3572,6 +3643,7 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                     ColumnDef {
                         name: "c".into(),
@@ -3580,11 +3652,44 @@ mod tests {
                         default: None,
                         not_null: false,
                         comment: None,
+                        sparse_store: None,
                     },
                 ],
             }
         );
     }
+
+    /// `SPARSE(<elem>, <bound>) WITH (<hint>)` on a column definition:
+    /// `SparseInfo::ParseStoreType` (`sparse_info.cpp:29-42`) maps `sort` to
+    /// `kSort` and `sorted` to `kSorted`; the hint stays out of `type_text`.
+    /// `sort=SORTED` is accepted too (the reference keys off the name only).
+    #[test]
+    fn sparse_column_storage_hint() {
+        for (sql, ty_text, want) in [
+            (
+                "CREATE TABLE t (c1 INT, c2 SPARSE(FLOAT, 30000) WITH (SORTED))",
+                "SPARSE(FLOAT,30000)",
+                SparseStore::Sorted,
+            ),
+            (
+                "CREATE TABLE t (c1 INT, c2 SPARSE(DOUBLE, 30000) WITH (sort))",
+                "SPARSE(DOUBLE,30000)",
+                SparseStore::Sort,
+            ),
+            (
+                "CREATE TABLE t (c1 INT, c2 SPARSE(DOUBLE, 30000) WITH (sort=SORTED))",
+                "SPARSE(DOUBLE,30000)",
+                SparseStore::Sort,
+            ),
+        ] {
+            let Statement::CreateTable { columns, .. } = one(sql) else {
+                panic!("expected CREATE TABLE: {sql}");
+            };
+            assert_eq!(columns[1].type_text, ty_text, "{sql}");
+            assert_eq!(columns[1].sparse_store, Some(want), "{sql}");
+        }
+    }
+
     /// `src/unit_test/parser/sql_select_statement_ut.cpp::good_test3`: multiple
     /// SELECTs and every JOIN spelling parse.
     #[test]
@@ -3720,9 +3825,7 @@ mod tests {
             limit_expr,
             offset_expr,
             ..
-        } = one(
-            "SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2);",
-        )
+        } = one("SELECT * FROM t1 limit (SELECT MIN(x) FROM t2) offset (SELECT MAX(y) FROM t2);")
         else {
             panic!("expected SELECT");
         };
@@ -3744,8 +3847,7 @@ mod tests {
         assert!(sql.to_ascii_uppercase().contains("MAX"));
 
         // EXTRACT(field FROM ...) is named extract_<field>.
-        let Statement::Select { items, .. } =
-            one("SELECT extract('year' from date '2025-03-04');")
+        let Statement::Select { items, .. } = one("SELECT extract('year' from date '2025-03-04');")
         else {
             panic!("expected SELECT");
         };
@@ -3834,9 +3936,9 @@ mod tests {
         assert_eq!(args[1], ExprAst::Literal(Literal::Str("DAY".into())));
 
         // CAST date minus INTERVAL.
-        let Statement::Select { where_pred, .. } = one(
-            "SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;",
-        ) else {
+        let Statement::Select { where_pred, .. } =
+            one("SELECT * FROM t where a = cast ('2023-01-01' as date) - INTERVAL 15 days;")
+        else {
             panic!("expected SELECT");
         };
         let Some(Predicate::Cmp(
@@ -3887,16 +3989,33 @@ mod tests {
     }
 
     /// `SelectStatementParsingTest.bad_search_test`: `SEARCH` cannot be
-    /// combined with `ORDER BY`/`LIMIT`/`OFFSET`.
+    /// combined with `ORDER BY` (`parser.y:1546`).
     #[test]
-    fn search_with_order_or_limit_is_rejected() {
-        for sql in [
-            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'l2', 3) WHERE a > 0 ORDER BY c2;",
-            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'hamming', 3) WHERE a > 0 LIMIT 5;",
-            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;",
-        ] {
-            assert!(parse(sql).is_err(), "{sql}");
-        }
+    fn search_with_order_by_is_rejected() {
+        let sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'l2', 3) WHERE a > 0 ORDER BY c2;";
+        assert!(parse(sql).is_err(), "{sql}");
+    }
+
+    /// `SEARCH … LIMIT n [OFFSET m]` is valid: the reference only forbids
+    /// `ORDER BY` alongside `SEARCH` (cf. `cached_limit.slt`).
+    #[test]
+    fn search_with_limit_and_offset_parses() {
+        let s = one(
+            "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1.0, 2.0], 'double', 'l2', 3) \
+             WHERE a > 0 LIMIT 2 OFFSET 1;",
+        );
+        let Statement::Select {
+            search,
+            limit,
+            offset,
+            ..
+        } = s
+        else {
+            panic!("expected SELECT");
+        };
+        assert!(search.is_some());
+        assert_eq!(limit, Some(2));
+        assert_eq!(offset, Some(1));
     }
 
     /// `SQLParserTest.bad_test1` (`sql_parser_ut.cpp`): malformed `CREATE

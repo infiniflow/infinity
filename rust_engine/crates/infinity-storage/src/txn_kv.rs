@@ -155,7 +155,13 @@ impl KVStore {
     /// in the memtable and an `Uninit` without `Flush` loses it.
     pub fn put_with_options(&self, key: &str, value: &str, disable_wal: bool) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
-        write_direct(&self.path, &mut inner, key.as_bytes(), Some(value.as_bytes()), disable_wal)
+        write_direct(
+            &self.path,
+            &mut inner,
+            key.as_bytes(),
+            Some(value.as_bytes()),
+            disable_wal,
+        )
     }
 
     /// `KVStore::Delete` with `disable_wal = true`.
@@ -363,7 +369,9 @@ fn load_snapshot(path: &Path, inner: &mut Inner) -> Result<()> {
     for _ in 0..count {
         let key = cursor.bytes(&snapshot)?;
         let value = cursor.bytes(&snapshot)?;
-        inner.history.insert(key.clone(), vec![(inner.version, Some(value.clone()))]);
+        inner
+            .history
+            .insert(key.clone(), vec![(inner.version, Some(value.clone()))]);
         inner.data.insert(key, value);
     }
     Ok(())
@@ -866,7 +874,9 @@ mod tests {
             txn1.commit().unwrap();
 
             let mut txn2 = store.get_instance();
-            let mut iter = txn2.iterator_with_bounds(Some("key1"), Some("key4")).unwrap();
+            let mut iter = txn2
+                .iterator_with_bounds(Some("key1"), Some("key4"))
+                .unwrap();
             iter.seek("key");
             let mut seen = Vec::new();
             while iter.valid() && iter.key().starts_with(b"key") {

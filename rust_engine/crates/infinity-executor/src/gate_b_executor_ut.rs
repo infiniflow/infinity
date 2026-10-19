@@ -23,7 +23,8 @@ fn explain_basic_test1() {
     let (_dir, engine) = open();
     engine.execute("create database db1").unwrap();
     engine.execute("create collection collection1").unwrap();
-    engine.execute("create table tb(col1 int, col2 varchar)")
+    engine
+        .execute("create table tb(col1 int, col2 varchar)")
         .unwrap();
     for i in 0..200 {
         engine
@@ -79,7 +80,11 @@ fn explain_basic_test1() {
         "select * from tb where col1 > 100 and 1 = 1 order by col1 limit 100",
         true,
     );
-    explain(&engine, "select * from tb where col1 in (100, 150, 200)", true);
+    explain(
+        &engine,
+        "select * from tb where col1 in (100, 150, 200)",
+        true,
+    );
     explain(
         &engine,
         "select * from tb where col1 between 100 and 200",
@@ -92,8 +97,16 @@ fn explain_basic_test1() {
     );
 
     // Create.
-    explain(&engine, "create index idx on tb(col1) using secondary", false);
-    explain(&engine, "create index idx on tb(col2) using fulltext", false);
+    explain(
+        &engine,
+        "create index idx on tb(col1) using secondary",
+        false,
+    );
+    explain(
+        &engine,
+        "create index idx on tb(col2) using fulltext",
+        false,
+    );
     explain(&engine, "create table tb1(c1 int, c2 varchar)", false);
     explain(&engine, "create database db1", false);
     explain(&engine, "create collection c1", false);
@@ -148,7 +161,8 @@ fn explain_basic_test1() {
 #[test]
 fn logical_create_collection_test1() {
     let (_dir, engine) = open();
-    engine.execute("create table tb(col1 int, col2 varchar)")
+    engine
+        .execute("create table tb(col1 int, col2 varchar)")
         .unwrap();
     engine.execute("create index idx on tb(col1)").unwrap();
     for i in 0..200 {
@@ -182,7 +196,8 @@ fn logical_drop_collection_test1() {
 #[test]
 fn plan_fragment_test1() {
     let (_dir, engine) = open();
-    engine.execute("create table tb(col1 int, col2 varchar)")
+    engine
+        .execute("create table tb(col1 int, col2 varchar)")
         .unwrap();
     for i in 0..200 {
         engine
@@ -246,7 +261,10 @@ fn fragment_test_build_fragment() {
     };
     assert_eq!(columns.len(), 2);
     assert_eq!(rows.len(), 6);
-    assert_eq!(rows[0], vec!["database_name".to_string(), "default_db".to_string()]);
+    assert_eq!(
+        rows[0],
+        vec!["database_name".to_string(), "default_db".to_string()]
+    );
     assert_eq!(rows[1], vec!["table_name".to_string(), "t2".to_string()]);
     assert_eq!(rows[4], vec!["column_count".to_string(), "1".to_string()]);
 

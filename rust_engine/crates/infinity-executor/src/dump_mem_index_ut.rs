@@ -440,10 +440,7 @@ fn dump_and_drop_table() {
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
         e.execute("DROP TABLE db1.tb1;").unwrap();
-        assert!(
-            txn.commit().is_err(),
-            "dump committed after the table drop"
-        );
+        assert!(txn.commit().is_err(), "dump committed after the table drop");
         assert!(!e.table_exists("db1.tb1"));
         assert!(!has_index(&e, "db1.tb1", "index1"));
     }
@@ -480,8 +477,7 @@ fn dump_and_rename_table() {
         txn.commit().unwrap();
         assert_dumped(&e);
 
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-            .unwrap();
+        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
         assert!(!e.table_exists("db1.tb1"));
         assert!(e.table_exists("db1.tb2"));
         assert!(has_index(&e, "db1.tb2", "index1"));
@@ -498,8 +494,7 @@ fn dump_and_rename_table() {
 
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-            .unwrap();
+        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
         assert!(txn.commit().is_err(), "dump committed after the rename");
         assert!(!e.table_exists("db1.tb1"));
         assert!(e.table_exists("db1.tb2"));
@@ -512,8 +507,7 @@ fn dump_and_rename_table() {
         let e = Engine::open(dir.path()).unwrap();
         fixture(&e);
         append_block(&e);
-        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;")
-            .unwrap();
+        e.execute("ALTER TABLE db1.tb1 RENAME TO db1.tb2;").unwrap();
 
         let mut txn = e.begin_txn();
         assert!(txn.dump_index("db1.tb1", "index1").is_err());
@@ -557,10 +551,7 @@ fn dump_and_drop_index() {
         let mut txn = e.begin_txn();
         txn.dump_index("db1.tb1", "index1").unwrap();
         e.execute("DROP INDEX index1 ON db1.tb1;").unwrap();
-        assert!(
-            txn.commit().is_err(),
-            "dump committed after the index drop"
-        );
+        assert!(txn.commit().is_err(), "dump committed after the index drop");
         assert!(!has_index(&e, "db1.tb1", "index1"));
         assert_eq!(e.row_count("db1.tb1").unwrap(), 8192);
     }
@@ -670,8 +661,7 @@ fn dump_index_and_optimize_index() {
         e.execute("CREATE DATABASE db1;").unwrap();
         e.execute("CREATE TABLE db1.tb1 (col1 INT, col2 VARCHAR);")
             .unwrap();
-        e.execute("CREATE INDEX index1 ON db1.tb1 (col1);")
-            .unwrap();
+        e.execute("CREATE INDEX index1 ON db1.tb1 (col1);").unwrap();
         for _ in 0..2 {
             let batch: Vec<Vec<Literal>> = (0..8192)
                 .map(|_| {
@@ -715,10 +705,7 @@ fn dump_index_and_optimize_index() {
         let mut dump = e.begin_txn();
         dump.dump_index("db1.tb1", "index1").unwrap();
         e.optimize_indexes().unwrap();
-        assert!(
-            dump.commit().is_err(),
-            "dump committed after the optimize"
-        );
+        assert!(dump.commit().is_err(), "dump committed after the optimize");
         e.execute("DROP DATABASE db1;").unwrap();
     }
 }

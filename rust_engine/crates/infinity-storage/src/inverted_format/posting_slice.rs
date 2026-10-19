@@ -336,12 +336,20 @@ impl PostingBuffer {
                 })?;
                 match &mut row.slots {
                     RowData::U32(v) => {
-                        for (slot, chunk) in v.iter_mut().take(usize::from(self.size)).zip(bytes.chunks_exact(4)) {
+                        for (slot, chunk) in v
+                            .iter_mut()
+                            .take(usize::from(self.size))
+                            .zip(bytes.chunks_exact(4))
+                        {
                             *slot = u32::from_le_bytes(chunk.try_into().unwrap());
                         }
                     }
                     RowData::U16(v) => {
-                        for (slot, chunk) in v.iter_mut().take(usize::from(self.size)).zip(bytes.chunks_exact(2)) {
+                        for (slot, chunk) in v
+                            .iter_mut()
+                            .take(usize::from(self.size))
+                            .zip(bytes.chunks_exact(2))
+                        {
                             *slot = u16::from_le_bytes(chunk.try_into().unwrap());
                         }
                     }
@@ -467,10 +475,7 @@ impl PostingByteSlice {
         let flushed = appended.len();
         Arc::make_mut(&mut self.bytes).extend_from_slice(&appended);
         self.flush_info.flush_count = self.flush_info.flush_count.saturating_add(size as u32);
-        self.flush_info.flush_length = self
-            .flush_info
-            .flush_length
-            .saturating_add(flushed as u32);
+        self.flush_info.flush_length = self.flush_info.flush_length.saturating_add(flushed as u32);
         self.flush_info.valid_posting_buffer = false;
         self.buffer.clear();
         flushed
@@ -768,7 +773,11 @@ impl SkipListWriter {
             "AddItem failed, key: {key}, last_key: {}",
             self.last_key
         );
-        let last_key = if self.last_key == u32::MAX { 0 } else { self.last_key };
+        let last_key = if self.last_key == u32::MAX {
+            0
+        } else {
+            self.last_key
+        };
         self.slice.push_back_u32(0, key - last_key);
         self.slice.push_back_u32(1, value1);
         self.last_key = key;
@@ -787,7 +796,11 @@ impl SkipListWriter {
             "AddItem failed, value1: {value1}, last_value1: {}",
             self.last_value1
         );
-        let last_key = if self.last_key == u32::MAX { 0 } else { self.last_key };
+        let last_key = if self.last_key == u32::MAX {
+            0
+        } else {
+            self.last_key
+        };
         let last_value1 = if self.last_value1 == u32::MAX {
             0
         } else {
@@ -821,7 +834,11 @@ impl SkipListWriter {
             "AddItem failed, total_tf: {total_tf}, last_value1: {}",
             self.last_value1
         );
-        let last_key = if self.last_key == u32::MAX { 0 } else { self.last_key };
+        let last_key = if self.last_key == u32::MAX {
+            0
+        } else {
+            self.last_key
+        };
         let last_value1 = if self.last_value1 == u32::MAX {
             0
         } else {
@@ -948,7 +965,10 @@ impl SkipListReader {
 
     /// `SkipListReaderByteSlice::Load`.
     pub fn load_byte_slice(&mut self, bytes: &[u8], start: usize, end: usize) {
-        assert!(start <= bytes.len(), "start > byte_slice_list->GetTotalSize().");
+        assert!(
+            start <= bytes.len(),
+            "start > byte_slice_list->GetTotalSize()."
+        );
         assert!(end <= bytes.len(), "end > byte_slice_list->GetTotalSize().");
         self.source = Source::Bytes {
             data: bytes.to_vec(),
@@ -997,9 +1017,7 @@ impl SkipListReader {
                     let Some(bm) = read_u32_field(data, pos) else {
                         return false;
                     };
-                    let Some(pct) =
-                        read_u16_field(data, pos, SKIP_LIST_BUFFER_SIZE)
-                    else {
+                    let Some(pct) = read_u16_field(data, pos, SKIP_LIST_BUFFER_SIZE) else {
                         return false;
                     };
                     out.block_max_tf = bm;
@@ -1052,7 +1070,10 @@ impl SkipListReader {
             }
         };
         let doc_num = loaded.docs.len();
-        assert!(doc_num <= SKIP_LIST_BUFFER_SIZE, "skip list buffer overflow");
+        assert!(
+            doc_num <= SKIP_LIST_BUFFER_SIZE,
+            "skip list buffer overflow"
+        );
         assert!(
             loaded.ttf.is_empty() || loaded.ttf.len() == doc_num,
             "SKipList decode error, doc_num = {doc_num} ttf_num = {}",
@@ -1422,8 +1443,14 @@ mod tests {
 
         let mut reader = ReaderState::default();
         reader.open();
-        assert_eq!(reader.decode_u32(&slice, MAX_DOC_PER_RECORD), Some(vec![1, 2]));
-        assert_eq!(reader.decode_u16(&slice, MAX_DOC_PER_RECORD), Some(vec![2, 3]));
+        assert_eq!(
+            reader.decode_u32(&slice, MAX_DOC_PER_RECORD),
+            Some(vec![1, 2])
+        );
+        assert_eq!(
+            reader.decode_u16(&slice, MAX_DOC_PER_RECORD),
+            Some(vec![2, 3])
+        );
     }
 
     #[test]
@@ -1624,7 +1651,9 @@ mod tests {
 
         let mut reader = ReaderState::default();
         reader.open();
-        let first = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
+        let first = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
         let mut buffer = first;
         buffer.extend(reader.decode_u32(writer.slice(), 2).unwrap());
         assert_eq!(buffer, expected);
@@ -1658,15 +1687,24 @@ mod tests {
 
         let mut reader = ReaderState::default();
         reader.open();
-        let keys1 = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
-        let values1 = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
+        let keys1 = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
+        let values1 = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
         let keys2 = reader.decode_u32(writer.slice(), 3).unwrap();
         let values2 = reader.decode_u32(writer.slice(), 3).unwrap();
         let mut read_key = 0u32;
         let mut read_values = Vec::new();
         read_values.extend(values1);
         read_values.extend(values2);
-        for (i, (delta_key, value)) in keys1.iter().chain(keys2.iter()).zip(&read_values).enumerate() {
+        for (i, (delta_key, value)) in keys1
+            .iter()
+            .chain(keys2.iter())
+            .zip(&read_values)
+            .enumerate()
+        {
             read_key += delta_key;
             assert_eq!(read_key, expected_keys[i]);
             assert_eq!(*value, expected_values[i]);
@@ -1706,9 +1744,15 @@ mod tests {
 
         let mut reader = ReaderState::default();
         reader.open();
-        let keys1 = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
-        let vals1_1 = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
-        let vals2_1 = reader.decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE).unwrap();
+        let keys1 = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
+        let vals1_1 = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
+        let vals2_1 = reader
+            .decode_u32(writer.slice(), SKIP_LIST_BUFFER_SIZE)
+            .unwrap();
         let keys2 = reader.decode_u32(writer.slice(), 3).unwrap();
         let vals1_2 = reader.decode_u32(writer.slice(), 3).unwrap();
         let vals2_2 = reader.decode_u32(writer.slice(), 3).unwrap();
@@ -1716,11 +1760,12 @@ mod tests {
         let mut read_key = 0u32;
         let mut read_value1 = 0u32;
         let mut i = 0usize;
-        for (delta_key, (dv1, value2)) in keys1
-            .iter()
-            .chain(keys2.iter())
-            .zip(vals1_1.iter().chain(vals1_2.iter()).zip(vals2_1.iter().chain(vals2_2.iter())))
-        {
+        for (delta_key, (dv1, value2)) in keys1.iter().chain(keys2.iter()).zip(
+            vals1_1
+                .iter()
+                .chain(vals1_2.iter())
+                .zip(vals2_1.iter().chain(vals2_2.iter())),
+        ) {
             read_key += delta_key;
             read_value1 += dv1;
             assert_eq!(read_key, expected_keys[i]);
@@ -1774,7 +1819,13 @@ mod tests {
         (writer, doc_ids, tfs, deltas, offsets)
     }
 
-    fn check_skips(reader: &mut SkipListReader, queries: &[u32], doc_ids: &[u32], deltas: &[u32], offsets: &[u32]) {
+    fn check_skips(
+        reader: &mut SkipListReader,
+        queries: &[u32],
+        doc_ids: &[u32],
+        deltas: &[u32],
+        offsets: &[u32],
+    ) {
         for &query in queries {
             let result = reader.skip_to(query).expect("skip_to");
             assert_eq!(result.doc_id, doc_ids[query as usize]);

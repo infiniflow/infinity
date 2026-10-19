@@ -211,6 +211,47 @@ fn index_key(table: &str, name: &str) -> Vec<u8> {
     format!("idx:{table}\x1f{name}").into_bytes()
 }
 
+const VIEW_PREFIX: &[u8] = b"view:";
+
+fn view_key(name: &str) -> Vec<u8> {
+    format!("view:{name}").into_bytes()
+}
+
+/// Metadata of a view. The query is stored as fully qualified SQL text (the
+/// executor resolves unqualified table names against the database that owned
+/// the session at `CREATE VIEW` time), so it can be re-parsed and expanded
+/// from any later session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewMeta {
+    pub name: String,
+    /// Output column names, in select-list order.
+    pub columns: Vec<String>,
+    pub query: String,
+}
+
+impl ViewMeta {
+    fn encode(&self) -> Vec<u8> {
+        format!("{}\u{1e}{}", self.columns.join("\u{1f}"), self.query).into_bytes()
+    }
+
+    fn decode(name: &str, bytes: &[u8]) -> Result<Self> {
+        let s = String::from_utf8_lossy(bytes);
+        let (cols, query) = s
+            .split_once(RSEP)
+            .ok_or_else(|| Error::Catalog(format!("bad view meta for '{name}'")))?;
+        let columns = if cols.is_empty() {
+            Vec::new()
+        } else {
+            cols.split(FSEP).map(str::to_string).collect()
+        };
+        Ok(Self {
+            name: name.to_string(),
+            columns,
+            query: query.to_string(),
+        })
+    }
+}
+
 /// Catalog façade over a `MetaStore`.
 pub struct Catalog {
     store: Arc<dyn MetaStore>,
@@ -448,6 +489,9 @@ impl Catalog {
     ) -> Result<TableMeta> {
         if self.get_table_by_name(name)?.is_some() {
             return Err(Error::Catalog(format!("table '{name}' already exists")));
+        }
+        if self.get_view_by_name(name)?.is_some() {
+            return Err(Error::Catalog(format!("view '{name}' already exists")));
         }
         let id = self.alloc_id()?;
         let meta = TableMeta {
@@ -854,6 +898,51 @@ impl Catalog {
             }
         }
         Ok(false)
+    }
+
+    /// Registers a view. A view may not shadow an existing table (or another
+    /// view); the caller stores an already-qualified query.
+    pub fn create_view(&self, name: &str, columns: &[String], query: &str) -> Result<ViewMeta> {
+        if self.get_table_by_name(name)?.is_some() {
+            return Err(Error::Catalog(format!("table '{name}' already exists")));
+        }
+        if self.get_view_by_name(name)?.is_some() {
+            return Err(Error::Catalog(format!("view '{name}' already exists")));
+        }
+        let meta = ViewMeta {
+            name: name.to_string(),
+            columns: columns.to_vec(),
+            query: query.to_string(),
+        };
+        self.store.put(&view_key(name), &meta.encode())?;
+        Ok(meta)
+    }
+
+    pub fn get_view_by_name(&self, name: &str) -> Result<Option<ViewMeta>> {
+        match self.store.get(&view_key(name))? {
+            Some(b) => Ok(Some(ViewMeta::decode(name, &b)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn list_views(&self) -> Result<Vec<ViewMeta>> {
+        self.store
+            .scan_prefix(VIEW_PREFIX)?
+            .into_iter()
+            .map(|(k, v)| {
+                let name = String::from_utf8_lossy(&k[VIEW_PREFIX.len()..]).to_string();
+                ViewMeta::decode(&name, &v)
+            })
+            .collect()
+    }
+
+    /// Drops a view by name. Returns `true` if it existed.
+    pub fn drop_view(&self, name: &str) -> Result<bool> {
+        if self.store.get(&view_key(name))?.is_none() {
+            return Ok(false);
+        }
+        self.store.delete(&view_key(name))?;
+        Ok(true)
     }
 
     pub fn flush(&self) -> Result<()> {

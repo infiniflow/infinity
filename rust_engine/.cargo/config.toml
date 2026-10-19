@@ -1,9 +1,3 @@
-# The sandbox has no direct egress; crates.io is reachable only through the
-# local HTTP proxy. Project-scoped config file (not an inline env var).
-[http]
-proxy = "http://127.0.0.1:7890"
-timeout = 60
-
 # The bundled RocksDB in `librocksdb-sys` is old enough that the local GCC 16
 # cannot compile it, so build it with clang (23), which can.
 # (`ROCKSDB_LIB_DIR`/`ROCKSDB_INCLUDE_DIR` would link the system RocksDB 10.2

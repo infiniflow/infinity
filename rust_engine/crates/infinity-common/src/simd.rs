@@ -307,10 +307,7 @@ mod tests {
         let mut j = 0u32;
         while j < 64 {
             let mask = movemask_gt_f32x8(values, 0.5);
-            let packed = compress_u32x8(
-                ids.map(|id| id + j),
-                mask,
-            );
+            let packed = compress_u32x8(ids.map(|id| id + j), mask);
             store_u32x8(&mut out[out_ptr..], packed);
             out_ptr += mask.count_ones() as usize;
             j += 8;

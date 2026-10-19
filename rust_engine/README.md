@@ -15,11 +15,10 @@ remains the reference oracle.
 | `infinity-parser` | hand-written lexer + recursive-descent SQL (`CREATE/DROP/INSERT` (**multi-row**)/`SELECT` w/ `WHERE`/`JOIN…ON`/`GROUP BY`/`ORDER BY`/`LIMIT`, projection, aggregates) | ✅ M2 |
 | `infinity-expression` | scalar `Expr`/`Value` + eval + aggregates | ✅ M2 |
 | `infinity-planner` | logical plan (`Scan`/`Join`/`Filter`/`Projection`/`Aggregate`/`Sort`/`Limit`/`Values`) + optimizer (limit/predicate push-down, const folding) | ✅ M2 |
-| `infinity-index` | secondary index (byte-keyed multimap) + vector index (`FlatIndex` exact, `HnswIndex` approx w/ recall test) + full-text inverted index (BM25); wired into `CREATE INDEX` + equality index scan | ✅ M3 |
+| `infinity-index` | secondary/low-cardinality index, vector (`Flat/HNSW/LVQ/RaBitQ/LSG/IVF/PLAID/SMVE/BMP`), full-text inverted index (BM25/phrase/BMW) and EMVB; wired into `CREATE INDEX` and the scan/fusion paths | ✅ M3 |
 | `infinity-executor` | `Engine` + **Tokio per-edge-concurrent bounded pipeline** (join/aggregate/sort blocking) + `DELETE`/`UPDATE` (tombstones; update = delete+append) | ✅ minimal |
 | `infinity-cli` | `infinity` binary (smoke/query/bench/import-csv/**conformance**/driver) | ✅ |
 | `infinity-server` | Thrift `TBinaryProtocol` front-end (dispatcher, `Connect`/`Disconnect`/`ListDatabase`/`ShowTable`, columnar `SelectResponse`, `CreateTable`/`Insert`/`Delete`/`Update`/`Select` w/ projection+`WHERE`+`ORDER BY`+`LIMIT`); stateful TCP server; HTTP seed (`POST /query`); **PG wire** (startup + simple query); cross-verified by the authoritative Python codec | ✅ M4 |
-| `infinity-function`, `infinity-index`, `infinity-server`, optimizer | query engine + protocol | ⬜ planned |
 
 ## What is implemented (M0/M1)
 

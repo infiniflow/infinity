@@ -503,7 +503,10 @@ fn push_topk(
     }
 }
 
-/// `(score, doc)` ordered by score then doc id, for the heap.
+/// `(score, doc)` ordered so that the *smallest* value is the worst result the
+/// heap may still evict: a lower score loses and, on a tie, the higher doc id
+/// loses. This mirrors `CompareMin::Compare(a, b, i, j)` in the reference
+/// (`result_handler.cppm:33`): `a < b || (a == b && i > j)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct OrdF32(f32, usize);
 impl Eq for OrdF32 {}
@@ -517,7 +520,7 @@ impl Ord for OrdF32 {
         self.0
             .partial_cmp(&other.0)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then(self.1.cmp(&other.1))
+            .then(other.1.cmp(&self.1))
     }
 }
 
@@ -622,6 +625,33 @@ mod tests {
         let scores: Vec<f32> = hits.iter().map(|(_, score)| *score).collect();
         assert_eq!(ids, vec![0, 2, 3, 4, 5]);
         assert_eq!(scores, vec![3.0, 2.0, 2.0, 2.0, 2.0]);
+    }
+
+    /// `CompareMin` breaks a score tie by keeping the *lower* document id
+    /// (`result_handler.cppm:33`: `a == b && i > j`). With two identical
+    /// documents and `topk=1` the first one wins, so a sparse index and the
+    /// full-text/vector indexes all point at the same row.
+    #[test]
+    fn bmp_topk_ties_keep_the_lower_doc_id() {
+        let mut index = BmpAlg::new(BMP_BLOCK_SIZE);
+        index.add_doc(&[(10000, 1.0)]);
+        index.add_doc(&[(10000, 1.0)]);
+        index.build();
+        let hits = index.search_knn(&[(10000, 1.0)], 1, BmpSearchOptions::default());
+        assert_eq!(hits, vec![(0, 1.0)]);
+
+        // The tie-break also applies inside a single block, not just in the
+        // tail/block split above.
+        let mut index = BmpAlg::new(2);
+        index.add_doc(&[(0, 1.0)]);
+        index.add_doc(&[(0, 1.0)]);
+        index.add_doc(&[(0, 1.0)]);
+        index.build();
+        let hits = index.search_knn(&[(0, 1.0)], 2, BmpSearchOptions::default());
+        assert_eq!(
+            hits.iter().map(|(doc, _)| *doc).collect::<Vec<_>>(),
+            vec![0, 1]
+        );
     }
 
     #[test]

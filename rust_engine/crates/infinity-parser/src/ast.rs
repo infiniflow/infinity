@@ -227,6 +227,17 @@ pub struct JoinClause {
     pub kind: JoinKind,
 }
 
+/// The storage hint on a `SPARSE` column (`WITH (sort)` / `WITH (sorted)`).
+///
+/// C++: `SparseInfo::ParseStoreType` (`parser/type/info/sparse_info.cpp:29`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SparseStore {
+    /// `WITH (sort)`: the engine default (values sorted row-wise on write).
+    Sort,
+    /// `WITH (sorted)`: the column is declared pre-sorted.
+    Sorted,
+}
+
 /// A column definition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDef {
@@ -238,6 +249,11 @@ pub struct ColumnDef {
     pub not_null: bool,
     /// `COMMENT '…'`
     pub comment: Option<String>,
+    /// `SPARSE(...) WITH (sort|sorted)`. Accepted for compatibility with the
+    /// reference's `with_index_param_list`; the Rust catalog always encodes
+    /// `SparseStoreType::kSort` (`cpp_layout::data_type_of_text`), so the hint
+    /// is recorded here but has no semantic effect yet.
+    pub sparse_store: Option<SparseStore>,
 }
 
 /// One `WITH <alias> AS (<query>)` binding.
@@ -449,9 +465,13 @@ pub enum Statement {
         columns: Option<Vec<String>>,
         query: Box<Statement>,
     },
-    /// `CREATE TABLE <name> AS <SELECT …>`
+    /// `CREATE TABLE <name> [(<column defs>)] AS <SELECT …>`
     CreateTableAs {
         name: String,
+        /// Optional explicit column definitions. When present they name and
+        /// type the output columns; otherwise the schema is inferred from the
+        /// SELECT result.
+        columns: Vec<ColumnDef>,
         query: Box<Statement>,
     },
     /// `CREATE VIEW <name> [(col, …)] AS <SELECT …>`
@@ -459,6 +479,9 @@ pub enum Statement {
         name: String,
         columns: Vec<String>,
         query: Box<Statement>,
+        /// The query's original SQL text. Views persist this (rather than an
+        /// AST) so a later session can re-parse and expand the view.
+        query_sql: String,
     },
     /// `DROP VIEW [IF EXISTS] <name>`
     DropView {

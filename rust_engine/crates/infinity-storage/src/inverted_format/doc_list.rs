@@ -148,7 +148,8 @@ impl DocListEncoder {
     }
 
     fn add_document(&mut self, doc_id: u32, doc_payload: u16, tf: u32, doc_len: u32) {
-        self.buffer.push_back_u32(0, doc_id.wrapping_sub(self.last_doc_id));
+        self.buffer
+            .push_back_u32(0, doc_id.wrapping_sub(self.last_doc_id));
         let mut n = 1;
         if self.option.has_tf_list {
             self.buffer.push_back_u32(n, tf);
@@ -162,9 +163,7 @@ impl DocListEncoder {
         self.last_doc_payload = doc_payload;
         self.block_max_tf = self.block_max_tf.max(tf);
         assert!(tf > 0 && tf <= doc_len);
-        self.block_max_percentage = self
-            .block_max_percentage
-            .max(tf as f32 / doc_len as f32);
+        self.block_max_percentage = self.block_max_percentage.max(tf as f32 / doc_len as f32);
         if self.buffer.need_flush(MAX_DOC_PER_RECORD) {
             self.flush_doc_list_buffer();
         }
@@ -316,12 +315,8 @@ impl InMemDocListDecoder {
         let Some(buffer) = &self.doc_list_buffer else {
             return (false, self.last_doc_id);
         };
-        self.doc_list_reader
-            .seek(buffer, offset as usize);
-        let Some(values) = self
-            .doc_list_reader
-            .decode_u32(buffer, MAX_DOC_PER_RECORD)
-        else {
+        self.doc_list_reader.seek(buffer, offset as usize);
+        let Some(values) = self.doc_list_reader.decode_u32(buffer, MAX_DOC_PER_RECORD) else {
             return (false, self.last_doc_id);
         };
         self.decode_count = values.len();
@@ -417,12 +412,8 @@ impl InMemDocListDecoder {
         let Some(buffer) = &self.doc_list_buffer else {
             return false;
         };
-        self.doc_list_reader
-            .seek(buffer, self.offset as usize);
-        match self
-            .doc_list_reader
-            .decode_u32(buffer, MAX_DOC_PER_RECORD)
-        {
+        self.doc_list_reader.seek(buffer, self.offset as usize);
+        match self.doc_list_reader.decode_u32(buffer, MAX_DOC_PER_RECORD) {
             Some(values) => {
                 doc_buffer.clear();
                 doc_buffer.extend_from_slice(&values);
@@ -437,10 +428,7 @@ impl InMemDocListDecoder {
         let Some(buffer) = &self.doc_list_buffer else {
             return false;
         };
-        match self
-            .doc_list_reader
-            .decode_u32(buffer, MAX_DOC_PER_RECORD)
-        {
+        match self.doc_list_reader.decode_u32(buffer, MAX_DOC_PER_RECORD) {
             Some(values) => {
                 tf_buffer.clear();
                 tf_buffer.extend_from_slice(&values);
@@ -455,10 +443,7 @@ impl InMemDocListDecoder {
         let Some(buffer) = &self.doc_list_buffer else {
             return false;
         };
-        match self
-            .doc_list_reader
-            .decode_u16(buffer, MAX_DOC_PER_RECORD)
-        {
+        match self.doc_list_reader.decode_u16(buffer, MAX_DOC_PER_RECORD) {
             Some(values) => {
                 payload.clear();
                 payload.extend_from_slice(&values);
@@ -592,10 +577,7 @@ mod tests {
             doc_buffer[base..base + docs.len()].copy_from_slice(&docs);
             let first_doc_id = prev_last_doc_id.wrapping_add(doc_buffer[base]);
             assert_eq!(i * MAX_DOC_PER_RECORD as u32, first_doc_id);
-            assert_eq!(
-                (i + 1) * MAX_DOC_PER_RECORD as u32 - 1,
-                last_doc_id
-            );
+            assert_eq!((i + 1) * MAX_DOC_PER_RECORD as u32 - 1, last_doc_id);
             assert_eq!(
                 i * MAX_DOC_PER_RECORD as u32,
                 decoder.get_seeked_doc_count()
@@ -626,7 +608,10 @@ mod tests {
             assert!(decoder.decode_current_doc_id_buffer(&mut docs));
             doc_buffer[base..base + docs.len()].copy_from_slice(&docs);
             let first_doc_id = prev_last_doc_id.wrapping_add(doc_buffer[base]);
-            assert_eq!(i * MAX_DOC_PER_RECORD as u32, decoder.get_seeked_doc_count());
+            assert_eq!(
+                i * MAX_DOC_PER_RECORD as u32,
+                decoder.get_seeked_doc_count()
+            );
             assert_eq!(i * MAX_DOC_PER_RECORD as u32, first_doc_id);
             assert_eq!(doc_count - 1, last_doc_id);
             let expect_ttf = if need_tf {
@@ -662,7 +647,11 @@ mod tests {
                 assert_eq!(2, tf_buffer[i as usize]);
             }
         }
-        assert!(!decoder.decode_skip_list(last_doc_id.wrapping_add(1)).success);
+        assert!(
+            !decoder
+                .decode_skip_list(last_doc_id.wrapping_add(1))
+                .success
+        );
     }
 
     #[test]

@@ -42,11 +42,16 @@ impl Varchar {
 
     /// The 24-bit `length_` bitfield.
     pub fn length(&self) -> u32 {
-        u32::from(self.length[0]) | (u32::from(self.length[1]) << 8) | (u32::from(self.length[2]) << 16)
+        u32::from(self.length[0])
+            | (u32::from(self.length[1]) << 8)
+            | (u32::from(self.length[2]) << 16)
     }
 
     pub fn set_length(&mut self, length: u32) {
-        assert!(length <= Self::LENGTH_LIMIT, "varchar length exceeds 24 bits");
+        assert!(
+            length <= Self::LENGTH_LIMIT,
+            "varchar length exceeds 24 bits"
+        );
         self.length = [
             (length & 0xff) as u8,
             ((length >> 8) & 0xff) as u8,

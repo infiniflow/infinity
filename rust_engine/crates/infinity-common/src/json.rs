@@ -236,9 +236,9 @@ fn element_width(dtype: EmbeddingDataType) -> crate::Result<usize> {
             "bit is not a valid sparse element type".to_string(),
         )),
         EmbeddingDataType::UInt8 | EmbeddingDataType::Int8 => Ok(1),
-        EmbeddingDataType::Int16
-        | EmbeddingDataType::Float16
-        | EmbeddingDataType::BFloat16 => Ok(2),
+        EmbeddingDataType::Int16 | EmbeddingDataType::Float16 | EmbeddingDataType::BFloat16 => {
+            Ok(2)
+        }
         EmbeddingDataType::Int32 | EmbeddingDataType::Float => Ok(4),
         EmbeddingDataType::Int64 | EmbeddingDataType::Double => Ok(8),
     }
@@ -302,12 +302,8 @@ fn scalar_to_json(data: &[u8], offset: usize, dtype: EmbeddingDataType) -> crate
         EmbeddingDataType::Int64 => Json::Int(read_u64(data, offset) as i64),
         EmbeddingDataType::Float => Json::Float(f32::from_bits(read_u32(data, offset)) as f64),
         EmbeddingDataType::Double => Json::Float(f64::from_bits(read_u64(data, offset))),
-        EmbeddingDataType::Float16 => {
-            Json::Float(f16_bits_to_f32(read_u16(data, offset)) as f64)
-        }
-        EmbeddingDataType::BFloat16 => {
-            Json::Float(bf16_bits_to_f32(read_u16(data, offset)) as f64)
-        }
+        EmbeddingDataType::Float16 => Json::Float(f16_bits_to_f32(read_u16(data, offset)) as f64),
+        EmbeddingDataType::BFloat16 => Json::Float(bf16_bits_to_f32(read_u16(data, offset)) as f64),
         EmbeddingDataType::Bit => {
             return Err(crate::Error::Invalid(
                 "bit is not a scalar sparse element type".to_string(),
@@ -410,12 +406,8 @@ pub fn sparse_to_json(
         let index = match index_type {
             EmbeddingDataType::UInt8 => indices[i * index_width] as i64,
             EmbeddingDataType::Int8 => indices[i * index_width] as i8 as i64,
-            EmbeddingDataType::Int16 => {
-                read_u16(indices, i * index_width) as i16 as i64
-            }
-            EmbeddingDataType::Int32 => {
-                read_u32(indices, i * index_width) as i32 as i64
-            }
+            EmbeddingDataType::Int16 => read_u16(indices, i * index_width) as i16 as i64,
+            EmbeddingDataType::Int32 => read_u32(indices, i * index_width) as i32 as i64,
             EmbeddingDataType::Int64 => read_u64(indices, i * index_width) as i64,
             other => {
                 return Err(crate::Error::Invalid(format!(
@@ -522,9 +514,7 @@ mod tests {
             let value = 0.1_f64 * j as f64;
             double_data[j * 8..(j + 1) * 8].copy_from_slice(&value.to_le_bytes());
         }
-        let expected: Vec<Json> = (0..DIM)
-            .map(|j| Json::Float(0.1_f64 * j as f64))
-            .collect();
+        let expected: Vec<Json> = (0..DIM).map(|j| Json::Float(0.1_f64 * j as f64)).collect();
         assert_eq!(
             embedding_to_json(&double_data, EmbeddingDataType::Double, DIM).unwrap(),
             Json::Arr(expected)
@@ -597,10 +587,7 @@ mod tests {
         let values: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
         let value_bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         let cases: [(EmbeddingDataType, Vec<u8>); 4] = [
-            (
-                EmbeddingDataType::Int8,
-                vec![1_u8, 2, 3, 4],
-            ),
+            (EmbeddingDataType::Int8, vec![1_u8, 2, 3, 4]),
             (
                 EmbeddingDataType::Int16,
                 [1_i16, 2, 3, 4]
@@ -685,7 +672,9 @@ mod tests {
         ];
         const DIM: usize = 16;
         for dtype in types {
-            let row_bytes = crate::types::EmbeddingInfo::make(dtype, DIM).unwrap().size();
+            let row_bytes = crate::types::EmbeddingInfo::make(dtype, DIM)
+                .unwrap()
+                .size();
             let expected_rows = 256 / row_bytes;
             let data = vec![0_u8; 256];
             let json = tensor_array_to_json(&[&data], dtype, DIM).unwrap();
@@ -780,8 +769,11 @@ mod tests {
     #[allow(clippy::approx_constant)]
     fn simdjson_test_walks_documents_by_type() {
         let doc = twitter_document();
-        let count = get(get(&doc, "search_metadata").expect("search_metadata"), "count")
-            .expect("count");
+        let count = get(
+            get(&doc, "search_metadata").expect("search_metadata"),
+            "count",
+        )
+        .expect("count");
         assert!(matches!(count, Json::Int(100)));
 
         let text = "{\"hello\":\"world\",\"t\":true,\"f\":false,\"n\":null,\"i\":123,\"pi\":3.1416,"

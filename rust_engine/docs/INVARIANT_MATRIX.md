@@ -57,7 +57,7 @@
 | G2 | ~~**索引文件族契约**（A3）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/index_file_family.rs`（4 用例）把 C++ 的索引路径/文件族契约固定下来——①路径形状 `db_{db}/tbl_{tbl}/idx_{index}/seg_{seg}`、向量族的 `chunk_{n}.idx`、块数据的 `db_{db}/tbl_{tbl}/seg_{seg}/blk_{blk}` 与 `{col}.col`/`col_{id}_out`/`version`；②全文族的后缀集 `.dic`/`.pos`/`.spill`（瞬时）/`.len` 与 `{index_dir}/{base_name}{suffix}` 拼法；③两类索引的**文件集合差异**（向量=单 `chunk_{n}.idx`；全文=`.dic`+`.pos`+`.len`）；④用真实编解码器把全文族的 `.dic`+`.pos`+`.len` 组成一个可回读的倒排索引（term→offset→TermMeta→postings）。此前该缺口的原因是磁盘格式未落地，现随 #68/#70/#71 完成而闭合。 |
 | G3 | ~~**跨底座宕机一致性**（KV+WAL+块文件同时崩溃）~~ | **已闭合（2026-10-17）**：`infinity-storage/tests/crash_consistency.rs` 把 PoC C 的边界场景落成回归测试 —— ①块写后崩溃→事务不可见；②WAL 落盘后崩溃→回放可见；③完整提交→无需回放即可见；④块文件丢失→由 WAL 载荷重建；⑤WAL 撕裂尾→回放在有效前缀处停止。 |
 | G4 | **`miri` / sanitizer** 覆盖 | **已闭合（2026-10-17，受工具链限制的范围内）**：`run_gate_d.sh` 现在跑三件事——①**miri**（`nightly-2025-04-04`）对纯 Rust 核心（`infinity-parser`/`infinity-expression`/`infinity-planner`，38 用例）；②**AddressSanitizer** 与 ③**ThreadSanitizer**（同 nightly，`RUSTFLAGS=-Zsanitizer=address|thread` + `-Zbuild-std`）对同三个 crate（各 38 用例，实测 `sanitizer=address: core crates clean` / `sanitizer=thread: core crates clean`）。**限制**：`infinity-storage`/`infinity-catalog`/`infinity-executor` 的依赖 MSRV 高于该 pinned nightly（1.88.0-nightly），故带 FFI/SIMD 的 crate 未纳入——如需覆盖需升级 pinned toolchain 到满足 MSRV 的 nightly。 |
-| G5 | ~~全文**打分**不变量~~ | **已闭合（2026-10-17）**：`infinity-executor/tests/fulltext_score.rs`（①更高 tf 不打低于低 tf；②等 tf 下更短文档不打低于更长文档；③不含查询词的行不出现）**加上新的一组精确口径单测**：`lib.rs::tests::analyzer_emits_word_and_stem_only_on_the_index_side`（索引侧发原词+词干、查询侧只发词干）、`standard_tokenizer_matches_the_cpp_byte_table`（`/` unite、`_`/`.`/`,` 切分）、`highlight_keeps_hit_sentences_and_marks_terms`。分值本身已与 C++ 逐位对齐（Gate A 1536/1536）。 |
+| G5 | ~~全文**打分**不变量~~ | **已闭合（2026-10-17）**：`infinity-executor/tests/fulltext_score.rs`（①更高 tf 不打低于低 tf；②等 tf 下更短文档不打低于更长文档；③不含查询词的行不出现）**加上新的一组精确口径单测**：`lib.rs::tests::analyzer_emits_word_and_stem_only_on_the_index_side`（索引侧发原词+词干、查询侧只发词干）、`standard_tokenizer_matches_the_cpp_byte_table`（`/` unite、`_`/`.`/`,` 切分）、`highlight_keeps_hit_sentences_and_marks_terms`。分值本身已与 C++ 逐位对齐；2026-10-19 修复后实测 Gate A 为 statement ok 1752/1752、statement error 129/129、query 1546/1546（174 个文件，100%）。 |
 
 ## 5. 使用方式
 
@@ -71,3 +71,4 @@ RUSTFLAGS="--cfg loom" cargo test -p infinity-txn --lib loom
 > 结论：Gate G 的**清单已产出且 G1–G5 全部闭合**——配置值域校验（G1）、索引文件族契约（G2）、
 > 跨底座崩溃回归（G3）、miri/ASan/TSan（G4，受 pinned nightly MSRV 限制的范围）、全文打分单调性（G5）
 > 均带回归测试。§5.1 的**精确分值与 C++/iresearch 对齐**仍是独立任务（Gate A 打分项）。
+> **2026-10-19**：G1–G5 只覆盖上表列出的窄范围；Gate A 的全量 SQL 一致性已单独重测为 1752/1752、129/129、1546/1546（174 文件，100%）。
