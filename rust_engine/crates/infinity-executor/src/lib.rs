@@ -13792,6 +13792,40 @@ mod tests {
         assert_eq!(mem.mem_used(), before);
     }
 
+    /// C++: `function/scalar/{century,day,day_of_month,day_of_week,day_of_year,era,extract}_*_ut.cpp`:
+    /// the date-component family over a DATE column.
+    #[test]
+    fn date_component_functions_match_the_reference() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE dtf (d DATE);").unwrap();
+        e.execute("INSERT INTO dtf VALUES ('2023-12-25');").unwrap();
+        assert_eq!(
+            rows(
+                &e,
+                "SELECT century(d), day(d), dayofmonth(d), dayofweek(d), dayofyear(d), era(d), quarter(d) FROM dtf;"
+            ),
+            vec![vec![
+                "21".to_string(),
+                "25".to_string(),
+                "25".to_string(),
+                "1".to_string(),
+                "359".to_string(),
+                "1".to_string(),
+                "4".to_string(),
+            ]]
+        );
+        // `EXTRACT(field FROM source)` and `DATE_PART(field, source)`.
+        assert_eq!(
+            rows(&e, "SELECT EXTRACT(day FROM d) FROM dtf;"),
+            vec![vec!["25".to_string()]]
+        );
+        assert_eq!(
+            rows(&e, "SELECT date_part('day', d) FROM dtf;"),
+            vec![vec!["25".to_string()]]
+        );
+    }
+
     /// C++: `function/aggregate/{sum,avg,count,min,max,first}_functions_ut.cpp`:
     /// the six aggregates over one column, including NULL handling.
     #[test]

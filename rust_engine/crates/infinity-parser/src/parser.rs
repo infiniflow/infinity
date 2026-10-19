@@ -1137,7 +1137,27 @@ impl Parser {
                         ],
                     });
                 }
-                // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.
+                // `EXTRACT(field FROM source)`.
+                if s.eq_ignore_ascii_case("EXTRACT") {
+                    self.advance();
+                    self.expect(Token::LParen)?;
+                    let field = match self.advance() {
+                        Token::Ident(f) => f,
+                        Token::Str(f) => f,
+                        _ => return self.err("expected a field name in EXTRACT"),
+                    };
+                    self.expect_kw("FROM")?;
+                    let src = self.expr()?;
+                    self.expect(Token::RParen)?;
+                    return Ok(ExprAst::Func {
+                        name: "EXTRACT".to_string(),
+                        args: vec![
+                            ExprAst::Literal(Literal::Str(field.to_ascii_uppercase())),
+                            src,
+                        ],
+                    });
+                }
+                // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.                // `INTERVAL <n> <UNIT>` (unquoted form), e.g. `INTERVAL -100 YEAR`.
                 if s.eq_ignore_ascii_case("INTERVAL")
                     && !matches!(self.toks.get(self.pos + 1), Some(Token::Str(_)))
                 {

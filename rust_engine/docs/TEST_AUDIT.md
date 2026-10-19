@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 121, `integration` 250, `partial` 42, `ported` 349.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 43, `exempt` 104, `gap` 103, `gate-a` 113, `integration` 250, `partial` 42, `ported` 357.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -130,20 +130,20 @@
 | 116 | `src/unit_test/function/scalar/abs_functions_ut.cpp` | `AbsFunctionsTest` | `abs_func` | ported | `infinity-executor` `tests::abs_function_covers_every_numeric_type` |
 | 117 | `src/unit_test/function/scalar/add_functions_ut.cpp` | `AddFunctionsTest` | `add_func` | partial | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` 覆盖常规值；C++ 的按列宽 checked 溢出→NULL 未建模（i64 求值） |
 | 118 | `src/unit_test/function/scalar/and_functions_ut.cpp` | `AndFunctionsTest` | `and_func` | gate-a |
-| 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | gate-a |
+| 119 | `src/unit_test/function/scalar/century_functions_ut.cpp` | `CenturyFunctionsTest` | `century_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 120 | `src/unit_test/function/scalar/current_date_functions_ut.cpp` | `CurrentDateFunctionsTest` | `current_date_func` | gate-a |
 | 121 | `src/unit_test/function/scalar/current_time_functions_ut.cpp` | `CurrentTimeFunctionsTest` | `current_time_func` | gate-a |
 | 122 | `src/unit_test/function/scalar/current_timestamp_functions_ut.cpp` | `CurrentTimestampFunctionsTest` | `current_timestamp_func` | gate-a |
-| 123 | `src/unit_test/function/scalar/date_part_functions_ut.cpp` | `DatePartFunctionsTest` | `datepart_func` | gate-a |
-| 124 | `src/unit_test/function/scalar/day_functions_ut.cpp` | `DayFunctionsTest` | `day_func` | gate-a |
-| 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | gate-a |
-| 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | gate-a |
-| 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | gate-a |
+| 123 | `src/unit_test/function/scalar/date_part_functions_ut.cpp` | `DatePartFunctionsTest` | `datepart_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 124 | `src/unit_test/function/scalar/day_functions_ut.cpp` | `DayFunctionsTest` | `day_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 125 | `src/unit_test/function/scalar/day_of_month_functions_ut.cpp` | `DayOfMonthFunctionsTest` | `day_of_month_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 126 | `src/unit_test/function/scalar/day_of_week_ut.cpp` | `DayOfWeekFunctionsTest` | `day_of_week_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 127 | `src/unit_test/function/scalar/day_of_year_functions_ut.cpp` | `DayOfYearFunctionsTest` | `day_of_year_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 128 | `src/unit_test/function/scalar/div_functions_ut.cpp` | `DivFunctionsTest` | `div_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
 | 129 | `src/unit_test/function/scalar/epoch_functions_ut.cpp` | `EpochFunctionsTest` | `epoch_func` | gate-a |
 | 130 | `src/unit_test/function/scalar/equals_functions_ut.cpp` | `EqualsFunctionsTest` | `equals_func` | ported | `infinity-executor` `tests::arithmetic_and_equality_follow_the_reference` |
-| 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | gate-a |
-| 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | gate-a |
+| 131 | `src/unit_test/function/scalar/era_functions_ut.cpp` | `EraFunctionsTest` | `era_func` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
+| 132 | `src/unit_test/function/scalar/extract_function_ut.cpp` | `ExtractFunctionTest` | `extract_year_test` | ported | `infinity-executor` `tests::date_component_functions_match_the_reference` |
 | 133 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `config_test` | ported |
 | 134 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `tensor_test` | ported |
 | 135 | `src/unit_test/function/scalar/fixed_dimensional_encoding_ut.cpp` | `FixedDimensionalEncodingTest` | `random_generator_test` | ported |
