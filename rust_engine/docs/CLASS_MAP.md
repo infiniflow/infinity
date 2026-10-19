@@ -78,6 +78,7 @@
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
 | `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `infinity-executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `infinity_catalog` + `BlockIndex` 按 C++ 布局承担 |
 | `PlaidIndex` 的 mmap 读取（`LoadFromPtr` / `centroid_ids` 指针模式） | `infinity_index::plaid::PlaidIndex` 的 owned `Vec<u32>` | mmap 属于已批准的原语豁免；执行器的 chunk 加载器总是解码为 owned 缓冲，语义（同一份 `SaveIndexInner` 字节布局）不变 |
+| geo 类型（`PointType`/`LineType`/`LineSegmentType`/`BoxType`/`CircleType`/`PathType`/`PolygonType`）及其 `column_vector_geo_ut`、`function/cast/geography/*` 用例 | 无 | 用户明确决定不需要 Box/Point/Circle 等 geo 类型，测试与产品代码均不移植 | 
 | DiskANN / Vamana（`knn_diskann/*`：`VamanaAlg`、`PQFlashIndex`、`FixedChunkPQTable`、`DiskAnnMemGraphStore`、`NeighborPriorityQueue` 等） | 无 | 计划 §2.6/R14 明确不纳入：C++ 的 populate 分支只 `LOG_WARN("Not implemented yet")` 后返回成功，索引不可用；Rust 不移植不可达的骨架 |
 
 ## 尚未一一对应（待补，按优先级）
@@ -208,6 +209,6 @@
 
 `src/unit_test` 共 **1012** 个 `TEST/TEST_F/TEST_P`，逐条状态见 [`TEST_AUDIT.md`](TEST_AUDIT.md)：`ported` 33、`partial` 231、`integration` 294、`gate-a` 216、`gap` 225、`exempt` 12、`excluded` 1。
 
-- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer 与 date/time 套件（40 例）已移植，geo 套件待补。
+- `column_vector/*` 的 `ColumnVector`/`DataBlock` 类已移植；integer 套件（flat/constant/select/slice × tinyint/smallint/int/bigint/hugeint，20 例）已逐条移植。`VectorBuffer`/`Bitmask` 为设计变更（Rust `Vec` + `validity`）；integer 与 date/time 套件（40 例）已移植；geo 类型与用例按用户决定不移植（见设计变更）。
 - `LoserTree` 已移植（`infinity_common::loser_tree`，4 例通过）；`common/test_rcu_multimap_ut.cpp` 的 RCU 容器尚未移植，列为 `gap`。
 - `gap`/`partial` 的 456 个用例是下一阶段的移植队列，按 `TEST_AUDIT.md` 的文件分组推进。

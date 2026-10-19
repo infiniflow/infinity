@@ -6,7 +6,7 @@
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
 - `gate-a`：parser/planner/executor/function，当前由 Gate A 的 SQL 用例覆盖，单元断言待移植。
 - `integration`：catalog/txn/wal/io/bg_task，当前由 Gate C 的 restart/快照集成用例覆盖，单元断言待移植。
-- `excluded`：DiskANN（计划 §2.6/R14 排除）。
+- `excluded`：DiskANN（计划 §2.6/R14 排除）以及 geo 类型（`Point/Line/Box/Path/Polygon/Circle`）相关用例——用户决定不移植这些类型。
 - `exempt`：SIMD/第三方夹具，以及 `PostingByteSlice`/`Skiplist`/PForDelta 等已登记为设计变更的压缩/字节切片原语。
 - `gap`：尚未移植。
 
@@ -99,20 +99,20 @@
 | 85 | `src/unit_test/function/cast/float/double_cast_ut.cpp` | `DoubleCastTest` | `double_cast1` | gate-a |
 | 86 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast0` | gate-a |
 | 87 | `src/unit_test/function/cast/float/float_cast_ut.cpp` | `FloatCastTest` | `float_cast1` | gate-a |
-| 88 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast0` | gate-a |
-| 89 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast1` | gate-a |
-| 90 | `src/unit_test/function/cast/geography/circle_cast_ut.cpp` | `CircleCastTest` | `circle_cast0` | gate-a |
-| 91 | `src/unit_test/function/cast/geography/circle_cast_ut.cpp` | `CircleCastTest` | `circle_cast1` | gate-a |
-| 92 | `src/unit_test/function/cast/geography/line_cast_ut.cpp` | `LineCastTest` | `line_cast0` | gate-a |
-| 93 | `src/unit_test/function/cast/geography/line_cast_ut.cpp` | `LineCastTest` | `line_cast1` | gate-a |
-| 94 | `src/unit_test/function/cast/geography/line_segment_cast_ut.cpp` | `LineSegCastTest` | `line_seg_cast0` | gate-a |
-| 95 | `src/unit_test/function/cast/geography/line_segment_cast_ut.cpp` | `LineSegCastTest` | `line_seg_cast1` | gate-a |
-| 96 | `src/unit_test/function/cast/geography/path_cast_ut_nimpl.cpp` | `PathCastTest` | `path_cast0` | gate-a |
-| 97 | `src/unit_test/function/cast/geography/path_cast_ut_nimpl.cpp` | `PathCastTest` | `path_cast1` | gate-a |
-| 98 | `src/unit_test/function/cast/geography/point_cast_ut.cpp` | `PointCastTest` | `point_cast0` | gate-a |
-| 99 | `src/unit_test/function/cast/geography/point_cast_ut.cpp` | `PointCastTest` | `point_cast1` | gate-a |
-| 100 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast0` | gate-a |
-| 101 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast1` | gate-a |
+| 88 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast0` | excluded |
+| 89 | `src/unit_test/function/cast/geography/box_cast_ut.cpp` | `BoxCastTest` | `line_seg_cast1` | excluded |
+| 90 | `src/unit_test/function/cast/geography/circle_cast_ut.cpp` | `CircleCastTest` | `circle_cast0` | excluded |
+| 91 | `src/unit_test/function/cast/geography/circle_cast_ut.cpp` | `CircleCastTest` | `circle_cast1` | excluded |
+| 92 | `src/unit_test/function/cast/geography/line_cast_ut.cpp` | `LineCastTest` | `line_cast0` | excluded |
+| 93 | `src/unit_test/function/cast/geography/line_cast_ut.cpp` | `LineCastTest` | `line_cast1` | excluded |
+| 94 | `src/unit_test/function/cast/geography/line_segment_cast_ut.cpp` | `LineSegCastTest` | `line_seg_cast0` | excluded |
+| 95 | `src/unit_test/function/cast/geography/line_segment_cast_ut.cpp` | `LineSegCastTest` | `line_seg_cast1` | excluded |
+| 96 | `src/unit_test/function/cast/geography/path_cast_ut_nimpl.cpp` | `PathCastTest` | `path_cast0` | excluded |
+| 97 | `src/unit_test/function/cast/geography/path_cast_ut_nimpl.cpp` | `PathCastTest` | `path_cast1` | excluded |
+| 98 | `src/unit_test/function/cast/geography/point_cast_ut.cpp` | `PointCastTest` | `point_cast0` | excluded |
+| 99 | `src/unit_test/function/cast/geography/point_cast_ut.cpp` | `PointCastTest` | `point_cast1` | excluded |
+| 100 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast0` | excluded |
+| 101 | `src/unit_test/function/cast/geography/polygon_cast_ut_nimpl.cpp` | `PolygonCastTest` | `polygon_cast1` | excluded |
 | 102 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast0` | gate-a |
 | 103 | `src/unit_test/function/cast/integer_cast/bigint_cast_ut.cpp` | `BigIntCastTest` | `bigint_cast1` | gate-a |
 | 104 | `src/unit_test/function/cast/integer_cast/hugeint_cast_ut.cpp` | `HugeIntCastTest` | `hugeint_cast0` | gate-a |
@@ -351,34 +351,34 @@
 | 337 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `contant_double` | partial |
 | 338 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_vector_select` | partial |
 | 339 | `src/unit_test/storage/column_vector/column_vector_float_ut.cpp` | `ColumnVectorFloatTest` | `double_column_slice_init` | partial |
-| 340 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_point` | partial |
-| 341 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_point` | partial |
-| 342 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `point_column_vector_select` | partial |
-| 343 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `point_column_slice_init` | partial |
-| 344 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_line` | partial |
-| 345 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_line` | partial |
-| 346 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_column_vector_select` | partial |
-| 347 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_column_slice_init` | partial |
-| 348 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_line_seg` | partial |
-| 349 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_line_seg` | partial |
-| 350 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_seg_column_vector_select` | partial |
-| 351 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_seg_column_slice_init` | partial |
-| 352 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_box` | partial |
-| 353 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_box` | partial |
-| 354 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `box_column_vector_select` | partial |
-| 355 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `box_column_slice_init` | partial |
-| 356 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_path` | partial |
-| 357 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_path` | partial |
-| 358 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `path_column_vector_select` | partial |
-| 359 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `path_column_slice_init` | partial |
-| 360 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_polygon` | partial |
-| 361 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_polygon` | partial |
-| 362 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `polygon_column_vector_select` | partial |
-| 363 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `polygon_column_slice_init` | partial |
-| 364 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_circle` | partial |
-| 365 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_circle` | partial |
-| 366 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `circle_column_vector_select` | partial |
-| 367 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `circle_column_slice_init` | partial |
+| 340 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_point` | excluded |
+| 341 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_point` | excluded |
+| 342 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `point_column_vector_select` | excluded |
+| 343 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `point_column_slice_init` | excluded |
+| 344 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_line` | excluded |
+| 345 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_line` | excluded |
+| 346 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_column_vector_select` | excluded |
+| 347 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_column_slice_init` | excluded |
+| 348 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_line_seg` | excluded |
+| 349 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_line_seg` | excluded |
+| 350 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_seg_column_vector_select` | excluded |
+| 351 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `line_seg_column_slice_init` | excluded |
+| 352 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_box` | excluded |
+| 353 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_box` | excluded |
+| 354 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `box_column_vector_select` | excluded |
+| 355 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `box_column_slice_init` | excluded |
+| 356 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_path` | excluded |
+| 357 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_path` | excluded |
+| 358 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `path_column_vector_select` | excluded |
+| 359 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `path_column_slice_init` | excluded |
+| 360 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_polygon` | excluded |
+| 361 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_polygon` | excluded |
+| 362 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `polygon_column_vector_select` | excluded |
+| 363 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `polygon_column_slice_init` | excluded |
+| 364 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `flat_circle` | excluded |
+| 365 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `contant_circle` | excluded |
+| 366 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `circle_column_vector_select` | excluded |
+| 367 | `src/unit_test/storage/column_vector/column_vector_geo_ut.cpp` | `ColumnVectorGeoTest` | `circle_column_slice_init` | excluded |
 | 368 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `flat_tinyint` | ported |
 | 369 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `contant_tinyint` | ported |
 | 370 | `src/unit_test/storage/column_vector/column_vector_integer_ut.cpp` | `ColumnVectorIntegerTest` | `tinyint_column_vector_select` | ported |
