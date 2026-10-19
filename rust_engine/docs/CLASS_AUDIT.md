@@ -1,9 +1,9 @@
 # C++ 类级覆盖审计（逐名）
 
-基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。
+基线 `5d27942c0` 的 `src/**/*.cppm` 中每个 `export class/struct` 一行。geo 类型类未逐类列入本表（`GeographyTryCastToVarlen` 例外，承担于 cast）；geo 用例的排除见 `TEST_AUDIT.md`，DiskANN 15 类在本表 `excluded`。
 
 - 总数：**1136**
-- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1058, `partial` 36, `test` 7
+- 状态分布：`excluded` 15, `exempt` 20, `mapped` 1056, `partial` 38, `test` 7
 
 | # | C++ 类/结构 | 定义位置 | 状态 | Rust 承担方式 |
 |---:|---|---|---|---|
@@ -29,8 +29,8 @@
 | 20 | `LexemePath` | `src/common/analyzer/ik/lexeme_path.cppm` | mapped | infinity_executor::analyzer 
 | 21 | `QuickSortSet` | `src/common/analyzer/ik/quick_sort_set.cppm` | mapped | infinity_executor::analyzer 
 | 22 | `Segmenter` | `src/common/analyzer/ik/segmenter.cppm` | mapped | infinity_executor::analyzer 
-| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | mapped | infinity_executor::analyzer 
-| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | mapped | infinity_executor::analyzer 
+| 23 | `JapaneseAnalyzer` | `src/common/analyzer/japanese_analyzer.cppm` | partial | 需 MeCab ipadic（Japanese），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
+| 24 | `KoreanAnalyzer` | `src/common/analyzer/korean_analyzer.cppm` | partial | 需 MeCab ko-dic（Korean），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
 | 25 | `NGramAnalyzer` | `src/common/analyzer/ngram_analyzer.cppm` | mapped | `analyzer::NGramAnalyzer`（n-gram 窗口按 UTF-8 code point 滑动） |
 | 26 | `RAGAnalyzer` | `src/common/analyzer/rag_analyzer.cppm` | mapped | `infinity_executor::analyzer::RAGAnalyzer` 
 | 27 | `RankFeaturesAnalyzer` | `src/common/analyzer/rank_features_analyzer.cppm` | mapped | infinity_executor::analyzer 
@@ -42,7 +42,7 @@
 | 33 | `CharTypeTable` | `src/common/analyzer/tokenizer.cppm` | mapped | infinity_executor::analyzer 
 | 34 | `TokenizeConfig` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::TokenizeConfig`（AddAllows/AddDivides/AddUnites） |
 | 35 | `Tokenizer` | `src/common/analyzer/tokenizer.cppm` | mapped | `analyzer::tokenize` |
-| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | mapped | infinity_executor::analyzer 
+| 36 | `TraditionalChineseAnalyzer` | `src/common/analyzer/traditional_chinese_analyzer.cppm` | partial | 需 OpenCC 简繁转换（Traditional Chinese），Rust 未移植且 AnalyzerPool 明确拒绝，不得标 mapped 
 | 37 | `UserDefinedAnalyzer` | `src/common/analyzer/user_defined_analyzer.cppm` | mapped | infinity_executor::analyzer 
 | 38 | `UserDefinedTermWeight` | `src/common/analyzer/user_defined_term_weight.cppm` | mapped | infinity_executor::analyzer 
 | 39 | `WhitespaceAnalyzer` | `src/common/analyzer/whitespace_analyzer.cppm` | mapped | infinity_executor::analyzer 

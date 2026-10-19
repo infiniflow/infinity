@@ -1209,6 +1209,15 @@ impl HnswIndex {
         self.search_query(self.store.make_query(q), k, ef)
     }
 
+    /// C++ `KnnSearchSorted` with a non-zero `ef_`: the bottom layer returns
+    /// up to `ef` candidates and the reference does **not** truncate them to
+    /// `k` (`hnsw_alg.cppm:448-456`, which returns every `result_n`). The
+    /// reference's `TestLoad` cases rely on this: they query with `k = 1` and
+    /// `ef = 10` and scan all returned candidates.
+    pub fn search_candidates(&self, q: &[f32], ef: usize) -> Vec<(usize, f32)> {
+        self.search_query_candidates(self.store.make_query(q), ef)
+    }
+
     /// The sparse counterpart of [`HnswIndex::search_with_ef`]
     /// (C++ `KnnHnsw<SparseIPVecStoreType>::KnnSearchSorted`).
     pub fn search_sparse(&self, q: &[(u32, f32)], k: usize, ef: usize) -> Vec<(usize, f32)> {
@@ -1216,6 +1225,12 @@ impl HnswIndex {
     }
 
     fn search_query(&self, query: HnswQuery, k: usize, ef: usize) -> Vec<(usize, f32)> {
+        let mut res = self.search_query_candidates(query, ef.max(k));
+        res.truncate(k);
+        res
+    }
+
+    fn search_query_candidates(&self, query: HnswQuery, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
         };
@@ -1225,10 +1240,8 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let ef = ef.max(k);
-        let mut res = self.search_layer(&query, cur, ef, 0, None);
+        let mut res = self.search_layer(&query, cur, ef.max(1), 0, None);
         res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
     }
 
@@ -1521,11 +1534,11 @@ mod reference_suite {
     fn candidate_recall(index: &HnswIndex, data: &[Vec<f32>]) -> f32 {
         let mut correct = 0usize;
         for (i, q) in data.iter().enumerate() {
-            if index
-                .search_with_ef(q, EF_SEARCH, EF_SEARCH)
-                .iter()
-                .any(|(id, _)| *id == i)
-            {
+            // The reference's `KnnSearchSorted(q, 1, {.ef_ = 10})` returns up
+            // to `ef` candidates, so the test scans that whole list.
+            let candidates = index.search_candidates(q, EF_SEARCH);
+            assert!(candidates.len() <= EF_SEARCH);
+            if candidates.iter().any(|(id, _)| *id == i) {
                 correct += 1;
             }
         }
@@ -1550,6 +1563,20 @@ mod reference_suite {
             }
         }
         correct as f32 / data.len() as f32
+    }
+
+    /// C++ `KnnSearchSorted(q, 1, {.ef_ = 10})` returns up to `ef` candidates
+    /// and does not truncate to `k` (`hnsw_alg.cppm:448-456`).
+    #[test]
+    fn search_candidates_keeps_the_reference_ef_semantics() {
+        let data = data();
+        let index = build(Metric::L2, HnswEncoding::Plain, &data);
+        let candidates = index.search_candidates(&data[0], EF_SEARCH);
+        assert!(candidates.len() <= EF_SEARCH);
+        assert!(candidates.len() > 1, "{candidates:?}");
+        assert_eq!(candidates[0].0, 0);
+        // The k-limited API still truncates.
+        assert_eq!(index.search_with_ef(&data[0], 1, EF_SEARCH).len(), 1);
     }
 
     /// C++: `HnswAlgTest.test_plain_1`.

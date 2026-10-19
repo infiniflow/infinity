@@ -44,7 +44,18 @@
 | G19 | `SHOW CURRENT NODE` 启动身份硬编码 | medium | 已改由 `NodeInfo` 驱动；新增 `show_current_node_reflects_the_peer_manager` |
 | G20 | `RingBufferIterator` 溢出处理差异 | medium | 可接受偏差，已在代码注释说明 |
 
-## Round 3（进行中）
+## Round 3（HEAD d0e61a8f7，稳定区）
 
-范围限定为无 worker 编辑的稳定区：HNSW 生产持久化与指标、analyzer 家族缺口、
-字段组 boost 解析、审计一致性、`TestLoad` 语义。结果追加到本表。
+| # | 发现 | 级别 | 处置 |
+|---|---|---|---|
+| H1 | index 测试用 test-only `chunk_file`，未走生产 `knn_format` | medium | 生产 codec 在 `knn_format` 有 encode/decode/截断测试，Engine 层有 flush→reopen→search；index 内的 `chunk_file` 是图结构单元测试。已在 CROSS_REVIEW 记录差异，未合并两套测试 |
+| H2 | `search_with_ef` 截断到 k，C++ `KnnSearchSorted` 不截断 | medium | **已修**：新增 `search_candidates(q, ef)`（不截断），`search_with_ef` 复用它再截断；`candidate_recall` 改用候选 API；新增 `search_candidates_keeps_the_reference_ef_semantics` |
+| H3 | RaBitQ 用 `candidate_recall` 但调用形状与 C++ 不同 | medium | **已修**：候选 API 后，测试按 `ef` 取候选并断言 `<= ef`；top-ef 口径的 C++ 依据保留在注释 |
+| H4 | 字段组 BM25 走 `parse_single` 而非 `parse_single_with_fields` | low | 待 `planner-10` 接线完成后处理；当前字段组由 `parse_field_query` + SearchDriver 双层解析 |
+| H5 | 手写字段组解析不识别 `title:alpha^3` 的 term boost | low | 同上；已作为已知差异记录 |
+| H6 | japanese/korean/traditional 被拒绝但类审计标 mapped | low | **已修**：`CLASS_AUDIT` 三行改 `partial` 并注明缺少 MeCab/OpenCC |
+| H7 | 审计行数与表头不一致 | low | **已修**：重算为 mapped 1056 / partial 38 / exempt 20 / excluded 15 / test 7 |
+| H8 | geo 与 DiskANN 在两张审计中的口径 | low | **已说明**：geo 类型类不逐类列入，`GeographyTryCastToVarlen` 例外；geo 用例排除见 TEST_AUDIT，DiskANN 15 类在 CLASS_AUDIT excluded |
+
+结论：稳定区无 critical/high；H2/H3/H6/H7 已修，H1 以现有生产层测试覆盖，
+H4/H5 待 planner 接线后复核。
