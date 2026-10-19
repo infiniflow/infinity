@@ -1,6 +1,6 @@
 # C++ 单元测试覆盖审计
 
-`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 107, `gap` 100, `gate-a` 46, `integration` 250, `partial` 43, `ported` 419.
+`src/unit_test/**/*.cpp` 中 `TEST/TEST_F/TEST_P` 共 **1012** 个，状态分布（逐行重算）：`excluded` 47, `exempt` 112, `gap` 100, `gate-a` 46, `integration` 250, `partial` 38, `ported` 419.
 
 - `ported`：Rust 已逐条移植同等场景。
 - `partial`：Rust 类已存在、部分场景已覆盖，剩余用例待补（如 `column_vector/*` 的完整 `ColumnVector` API、HNSW 内部类）。
@@ -440,11 +440,11 @@
 | 426 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `constant_not_inline_varchar` | partial |
 | 427 | `src/unit_test/storage/column_vector/column_vector_varchar_ut.cpp` | `ColumnVectorVarcharTest` | `flat_mixed_inline_varchar` | partial |
 | 428 | `src/unit_test/storage/column_vector/selection_ut.cpp` | `SelectionTest` | `test1` | ported | `infinity-storage` `selection::tests::selection_matches_the_reference` |
-| 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | partial |
-| 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | partial |
-| 431 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor` | partial |
-| 432 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor_array` | partial |
-| 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | partial |
+| 429 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_embedding` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
+| 430 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_sparse` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
+| 431 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
+| 432 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_tensor_array` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
+| 433 | `src/unit_test/storage/column_vector/value_json_ut.cpp` | `Value2JsonTest` | `test_basic_type` | exempt | C++ 用例仅调用 `AppendToJson` 构造 JSON，无对 JSON 的断言（`test_basic_type` 的 ASSERT_NEAR 读的是 Value 本身） |
 | 434 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_tostring` | ported | `infinity-storage` `data_block::reference_suite::value_to_string_matches_the_reference`（JSON 以文本形式原样呈现） |
 | 435 | `src/unit_test/storage/column_vector/value_ut.cpp` | `ValueStringTest` | `test_stringtovalue` | partial | `data_block::reference_suite::string_to_value_roundtrips_the_scalar_types` 覆盖标量；日期/时间与 JSON 的文本解析未逐项移植 |
 | 436 | `src/unit_test/storage/column_vector/var_buffer_ut.cpp` | `VarBufferTest` | `test1` | ported | `infinity-storage` `var_buffer::tests::var_buffer_appends_and_roundtrips` |
