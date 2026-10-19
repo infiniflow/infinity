@@ -143,6 +143,129 @@ pub fn decode_labels(buf: &[u8]) -> Result<Vec<u32>, FormatError> {
         .collect())
 }
 
+/// A decoded chunk with an opaque vec-store meta blob (LVQ / RaBitQ).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HnswChunkExt {
+    pub m: u64,
+    pub ef_construction: u64,
+    pub cur_vec_num: u64,
+    pub mmax0: u64,
+    pub mmax: u64,
+    pub max_layer: i32,
+    pub enterpoint: i32,
+    pub store_meta: Vec<u8>,
+    pub vectors: Vec<u8>,
+    pub graph: Vec<u8>,
+    pub labels: Vec<u32>,
+}
+
+/// Encodes a chunk whose vec-store meta is an opaque blob: the plain `dim u64`
+/// for plain stores, the LVQ mean/cache or the RaBitQ rotation/centroid for the
+/// quantized stores.
+#[allow(clippy::too_many_arguments)]
+pub fn encode_hnsw_chunk_ext(
+    m: u64,
+    ef_construction: u64,
+    cur_vec_num: u64,
+    mmax0: u64,
+    mmax: u64,
+    max_layer: i32,
+    enterpoint: i32,
+    store_meta: &[u8],
+    vector_region: &[u8],
+    graph_region: &[u8],
+    labels: &[u32],
+) -> Vec<u8> {
+    let mut out = Vec::with_capacity(
+        24 + store_meta.len() + 24 + vector_region.len() + graph_region.len() + labels.len() * 4,
+    );
+    out.extend_from_slice(&m.to_le_bytes());
+    out.extend_from_slice(&ef_construction.to_le_bytes());
+    out.extend_from_slice(&cur_vec_num.to_le_bytes());
+    out.extend_from_slice(store_meta);
+    out.extend_from_slice(&mmax0.to_le_bytes());
+    out.extend_from_slice(&mmax.to_le_bytes());
+    out.extend_from_slice(&max_layer.to_le_bytes());
+    out.extend_from_slice(&enterpoint.to_le_bytes());
+    out.extend_from_slice(vector_region);
+    out.extend_from_slice(graph_region);
+    out.extend_from_slice(&encode_labels(labels));
+    out
+}
+
+/// Decodes a chunk written by [`encode_hnsw_chunk_ext`]. `store_meta_len` and
+/// `record_size` come from the index metadata (encoding, dimension, metric).
+pub fn decode_hnsw_chunk_ext(
+    buf: &[u8],
+    store_meta_len: usize,
+    record_size: usize,
+    vertex_l0_size: usize,
+    vertex_lx_size: usize,
+) -> Result<HnswChunkExt, FormatError> {
+    if buf.len() < 24 + store_meta_len + 24 {
+        return Err(FormatError::Truncated {
+            need: 24 + store_meta_len + 24,
+            got: buf.len(),
+        });
+    }
+    let u64_at = |at: usize| u64::from_le_bytes(buf[at..at + 8].try_into().unwrap());
+    let i32_at = |at: usize| i32::from_le_bytes(buf[at..at + 4].try_into().unwrap());
+    let m = u64_at(0);
+    let ef_construction = u64_at(8);
+    let cur_vec_num = u64_at(16);
+    let store_meta = buf[24..24 + store_meta_len].to_vec();
+    let mut at = 24 + store_meta_len;
+    let mmax0 = u64_at(at);
+    let mmax = u64_at(at + 8);
+    let max_layer = i32_at(at + 16);
+    let enterpoint = i32_at(at + 20);
+    at += 24;
+    let vec_len =
+        (cur_vec_num as usize)
+            .checked_mul(record_size)
+            .ok_or(FormatError::Truncated {
+                need: usize::MAX,
+                got: buf.len(),
+            })?;
+    if buf.len() < at + vec_len + 8 {
+        return Err(FormatError::Truncated {
+            need: at + vec_len + 8,
+            got: buf.len(),
+        });
+    }
+    let vectors = buf[at..at + vec_len].to_vec();
+    at += vec_len;
+    let layer_sum = u64_at(at);
+    let graph_len = graph_region_len(
+        layer_sum,
+        cur_vec_num,
+        level0_stride(vertex_l0_size, mmax0),
+        levelx_stride(vertex_lx_size, mmax),
+    );
+    if buf.len() < at + graph_len {
+        return Err(FormatError::Truncated {
+            need: at + graph_len,
+            got: buf.len(),
+        });
+    }
+    let graph = buf[at..at + graph_len].to_vec();
+    at += graph_len;
+    let labels = decode_labels(&buf[at..])?;
+    Ok(HnswChunkExt {
+        m,
+        ef_construction,
+        cur_vec_num,
+        mmax0,
+        mmax,
+        max_layer,
+        enterpoint,
+        store_meta,
+        vectors,
+        graph,
+        labels,
+    })
+}
+
 /// Assembles a whole plain-store chunk file: header, vector region, graph
 /// region, labels.
 ///

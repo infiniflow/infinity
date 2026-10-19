@@ -32,6 +32,76 @@ type VectorRows = Vec<(u32, Vec<f32>)>;
 
 /// An HNSW graph read back from the C++ mirror, so a query can walk the graph
 /// that is on disk (plan #70). `labels[i]` is the row id of node `i`.
+/// Decoded parts of one HNSW chunk.
+struct HnswChunkParts {
+    m: u64,
+    ef: u64,
+    n: usize,
+    dims: usize,
+    max_layer: usize,
+    enterpoint: Option<usize>,
+    store_meta: Vec<u8>,
+    records: Vec<u8>,
+    vertices: Vec<knn_format::HnswGraphVertex>,
+    labels: Vec<u32>,
+    options: HnswOptions,
+}
+
+fn align_up8(n: usize) -> usize {
+    n.div_ceil(8) * 8
+}
+
+/// Bytes of the vec-store meta inside the chunk header.
+fn hnsw_store_meta_len(
+    dims: usize,
+    metric: infinity_index::vector::Metric,
+    encoding: infinity_index::vector::HnswEncoding,
+) -> usize {
+    use infinity_index::vector::{HnswEncoding, Metric};
+    match encoding {
+        HnswEncoding::Plain => 8,
+        HnswEncoding::Lvq => {
+            8 + 8 * dims
+                + match metric {
+                    Metric::L2 => 0,
+                    Metric::Cos => 8,
+                    Metric::Ip => 16,
+                }
+        }
+        HnswEncoding::Rabitq => {
+            let d = align_up8(dims);
+            8 + 4 * d * d + 4 * d
+        }
+    }
+}
+
+/// Bytes per vector in the chunk's vector region.
+fn hnsw_record_size(dims: usize, encoding: infinity_index::vector::HnswEncoding) -> usize {
+    use infinity_index::vector::HnswEncoding;
+    match encoding {
+        HnswEncoding::Plain => dims * 4,
+        HnswEncoding::Lvq => 16 + dims,
+        HnswEncoding::Rabitq => 16 + align_up8(dims) / 8,
+    }
+}
+
+/// HNSW build options read from the catalog (`IndexHnsw`).
+struct HnswOptions {
+    metric: infinity_index::vector::Metric,
+    encoding: infinity_index::vector::HnswEncoding,
+    lsg: Option<infinity_index::lsg::LsgConfig>,
+}
+
+impl Default for HnswOptions {
+    fn default() -> Self {
+        Self {
+            metric: infinity_index::vector::Metric::L2,
+            encoding: infinity_index::vector::HnswEncoding::Plain,
+            lsg: None,
+        }
+    }
+}
+
 pub struct LoadedVectorIndex {
     pub index: HnswHandler,
     pub labels: Vec<u32>,
@@ -1468,7 +1538,12 @@ impl Engine {
     /// C++ layout (§9.2): 56-byte header, plain vector region, graph region, then
     /// the `u32` label array. Byte-identity with a C++-built index is not
     /// required — the offsets are explicit, so the C++ loader reads it.
-    fn cpp_hnsw_chunk(&self, table: &str, column: &str) -> Result<(usize, Vec<u8>)> {
+    fn cpp_hnsw_chunk(
+        &self,
+        table: &str,
+        column: &str,
+        options: &HnswOptions,
+    ) -> Result<(usize, Vec<u8>)> {
         let vectors = self.cpp_column_vectors(table, column)?;
         if vectors.is_empty() {
             return Err(Error::Invalid(format!(
@@ -1476,13 +1551,61 @@ impl Engine {
             )));
         }
         let dim = vectors[0].1.len();
-        let mut index = HnswIndex::new(dim, 16, 200, 200);
+        let mut index =
+            HnswIndex::with_encoding(dim, 16, 200, 200, options.metric, options.encoding);
+        // Train LVQ/LS mean/RaBitQ centroid and the LSG averages on the whole
+        // column, then build the graph with the trained store.
+        let rows: Vec<Vec<f32>> = vectors.iter().map(|(_, v)| v.clone()).collect();
+        index.train_store(&rows, options.lsg);
         let mut labels = Vec::with_capacity(vectors.len());
         for (label, v) in &vectors {
             index.add(v);
             labels.push(*label);
         }
         Ok(encode_hnsw_chunk_from(&index, &labels))
+    }
+
+    /// The HNSW options of `index_name` (`metric`, `encode`, `build_type`,
+    /// `lsg_config`).
+    fn hnsw_options(&self, table: &str, index_name: &str) -> HnswOptions {
+        let short = table.rsplit('.').next().unwrap_or(table);
+        let Some(im) = self
+            .storage
+            .catalog
+            .list_indexes()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|im| im.name == index_name && (im.table == table || im.table == short))
+        else {
+            return HnswOptions::default();
+        };
+        let opt = |name: &str| {
+            im.options
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.clone())
+        };
+        let metric =
+            infinity_index::vector::Metric::parse(&opt("metric").unwrap_or_else(|| "l2".into()));
+        let encoding =
+            infinity_index::vector::HnswEncoding::parse(&opt("encode").unwrap_or_default());
+        let lsg = if opt("build_type")
+            .map(|v| v.eq_ignore_ascii_case("lsg"))
+            .unwrap_or(false)
+        {
+            Some(
+                opt("lsg_config")
+                    .and_then(|v| infinity_index::lsg::LsgConfig::parse(&v))
+                    .unwrap_or_default(),
+            )
+        } else {
+            None
+        };
+        HnswOptions {
+            metric,
+            encoding,
+            lsg,
+        }
     }
 
     /// Writes `table`'s index as a C++ HNSW chunk file under
@@ -1578,7 +1701,7 @@ impl Engine {
         };
         let (count, chunk) = match from_memory {
             Some(v) => v,
-            None => self.cpp_hnsw_chunk(&table, &column)?,
+            None => self.cpp_hnsw_chunk(&table, &column, &self.hnsw_options(&table, index_name))?,
         };
         let db_id = self.database_id_of(&table);
         let dir = self
@@ -1836,60 +1959,152 @@ impl Engine {
     /// Reads back a mirror written by [`Self::write_cpp_hnsw_index`], returning
     /// `(row id, vector)` pairs **without** consulting the index metadata.
     pub fn read_cpp_hnsw_index(&self, table: &str, index_name: &str) -> Result<VectorRows> {
-        let (_, labels, vectors, _) = self.read_cpp_hnsw_parts(table, index_name)?;
-        Ok(labels.into_iter().zip(vectors).collect())
+        let table = self.qualified_table(table);
+        let path = self.cpp_hnsw_chunk_path(&table, index_name)?;
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
+        let parts = self
+            .read_hnsw_chunk_parts(&table, index_name, &bytes)
+            .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
+        let index = HnswIndex::from_chunk_parts(
+            parts.dims,
+            parts.m.max(1) as usize,
+            (parts.ef as usize).max(64),
+            parts.options.metric,
+            parts.options.encoding,
+            &parts.store_meta,
+            &parts.records,
+            parts.n,
+            Vec::new(),
+            Vec::new(),
+            None,
+            0,
+        )
+        .ok_or_else(|| Error::Invalid("bad HNSW store".to_string()))?;
+        Ok((0..parts.n)
+            .zip(parts.labels)
+            .map(|(i, label)| (label, index.vector(i)))
+            .collect())
     }
 
     /// The decoded pieces of an HNSW chunk: header, one row id per vector (in
     /// node order), the vectors themselves, and the graph.
     #[allow(clippy::type_complexity)]
-    fn read_cpp_hnsw_parts(
+    /// Decodes one HNSW chunk with the encoding/metric recorded in the
+    /// catalog. The store meta length and the record size follow from those
+    /// options and the dimension stored in the meta.
+    fn read_hnsw_chunk_parts(
         &self,
         table: &str,
         index_name: &str,
-    ) -> Result<(
-        knn_format::HnswHeader,
-        Vec<u32>,
-        Vec<Vec<f32>>,
-        Vec<knn_format::HnswGraphVertex>,
-    )> {
-        let table = self.qualified_table(table);
-        let path = self.cpp_hnsw_chunk_path(&table, index_name)?;
-        let bytes = std::fs::read(&path)
-            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
-        let chunk = knn_format::decode_hnsw_chunk(
-            &bytes,
-            4,
+        bytes: &[u8],
+    ) -> Option<HnswChunkParts> {
+        let options = self.hnsw_options(table, index_name);
+        if bytes.len() < 32 {
+            return None;
+        }
+        let u64_at = |at: usize| -> Option<u64> {
+            bytes
+                .get(at..at + 8)
+                .and_then(|b| b.try_into().ok())
+                .map(u64::from_le_bytes)
+        };
+        let m = u64_at(0)?;
+        let ef = u64_at(8)?;
+        let n = u64_at(16)? as usize;
+        let dims = u64_at(24)? as usize;
+        let meta_len = hnsw_store_meta_len(dims, options.metric, options.encoding);
+        let record_size = hnsw_record_size(dims, options.encoding);
+        let chunk = knn_format::decode_hnsw_chunk_ext(
+            bytes,
+            meta_len,
+            record_size,
             knn_format::VERTEX_L0_SIZE,
             knn_format::VERTEX_LX_SIZE,
         )
-        .map_err(|e| Error::Invalid(format!("bad HNSW chunk: {e}")))?;
-        let dim = chunk.header.dim as usize;
-        let mut vectors = Vec::with_capacity(chunk.header.cur_vec_num as usize);
-        for i in 0..chunk.header.cur_vec_num as usize {
-            let at = i * dim * 4;
-            vectors.push(
-                chunk.vectors[at..at + dim * 4]
-                    .chunks_exact(4)
-                    .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
-                    .collect(),
-            );
-        }
+        .ok()?;
         let vertices = knn_format::decode_graph_region(
             &chunk.graph,
-            chunk.header.cur_vec_num as usize,
-            chunk.header.mmax0,
-            chunk.header.mmax,
+            chunk.cur_vec_num as usize,
+            chunk.mmax0,
+            chunk.mmax,
         )
-        .map_err(|e| Error::Invalid(format!("bad HNSW graph: {e}")))?;
-        Ok((chunk.header, chunk.labels, vectors, vertices))
+        .ok()?;
+        Some(HnswChunkParts {
+            m,
+            ef,
+            n,
+            dims,
+            max_layer: chunk.max_layer.max(0) as usize,
+            enterpoint: (chunk.enterpoint >= 0).then_some(chunk.enterpoint as usize),
+            store_meta: chunk.store_meta,
+            records: chunk.vectors,
+            vertices,
+            labels: chunk.labels,
+            options,
+        })
+    }
+
+    fn assemble_loaded_index(parts: HnswChunkParts, chunk_id: u64) -> Option<LoadedVectorIndex> {
+        if parts.n == 0 {
+            return None;
+        }
+        let levels: Vec<usize> = parts
+            .vertices
+            .iter()
+            .map(|v| v.layer_count.max(0) as usize)
+            .collect();
+        let mut links: Vec<Vec<Vec<usize>>> = vec![Vec::new()];
+        for (node, v) in parts.vertices.iter().enumerate() {
+            while links[0].len() <= node {
+                links[0].push(Vec::new());
+            }
+            links[0][node] = v.neighbors_l0.iter().map(|&x| x as usize).collect();
+            for (l, nbrs) in v.upper.iter().enumerate() {
+                let layer = l + 1;
+                while links.len() <= layer {
+                    links.push(Vec::new());
+                }
+                while links[layer].len() <= node {
+                    links[layer].push(Vec::new());
+                }
+                links[layer][node] = nbrs.iter().map(|&x| x as usize).collect();
+            }
+        }
+        let entry = parts.enterpoint.map(|e| e.min(parts.n.saturating_sub(1)));
+        let index = HnswIndex::from_chunk_parts(
+            parts.dims,
+            parts.m.max(1) as usize,
+            (parts.ef as usize).max(64),
+            parts.options.metric,
+            parts.options.encoding,
+            &parts.store_meta,
+            &parts.records,
+            parts.n,
+            levels,
+            links,
+            entry,
+            parts.max_layer,
+        )?;
+        Some(LoadedVectorIndex {
+            index: HnswHandler::from_index(index),
+            labels: parts.labels,
+            chunk_id,
+        })
     }
 
     /// Loads `index_name`'s persisted HNSW graph into an in-memory index, so
     /// `SEARCH MATCH VECTOR` can walk the graph that is on disk (plan #70).
     pub fn load_vector_index(&self, table: &str, index_name: &str) -> Result<LoadedVectorIndex> {
-        let (header, labels, vectors, vertices) = self.read_cpp_hnsw_parts(table, index_name)?;
-        Self::assemble_loaded_index(header, labels, vectors, vertices)
+        let table = self.qualified_table(table);
+        let path = self.cpp_hnsw_chunk_path(&table, index_name)?;
+        let bytes = std::fs::read(&path)
+            .map_err(|_| Error::NotFound(format!("no HNSW mirror at {}", path.display())))?;
+        let parts = self
+            .read_hnsw_chunk_parts(&table, index_name, &bytes)
+            .ok_or_else(|| Error::Invalid("bad HNSW chunk".to_string()))?;
+        Self::assemble_loaded_index(parts, 0)
+            .ok_or_else(|| Error::Invalid("HNSW mirror has no vectors".to_string()))
     }
 
     /// Every sealed HNSW chunk of `index_name`, oldest first. The reference
@@ -1920,92 +2135,14 @@ impl Engine {
             let Ok(bytes) = std::fs::read(&path) else {
                 continue;
             };
-            let Ok(chunk) = knn_format::decode_hnsw_chunk(
-                &bytes,
-                4,
-                knn_format::VERTEX_L0_SIZE,
-                knn_format::VERTEX_LX_SIZE,
-            ) else {
+            let Some(parts) = self.read_hnsw_chunk_parts(&table, index_name, &bytes) else {
                 continue;
             };
-            let dim = chunk.header.dim as usize;
-            let mut vectors = Vec::with_capacity(chunk.header.cur_vec_num as usize);
-            for i in 0..chunk.header.cur_vec_num as usize {
-                let at = i * dim * 4;
-                if at + dim * 4 > chunk.vectors.len() {
-                    break;
-                }
-                vectors.push(
-                    chunk.vectors[at..at + dim * 4]
-                        .chunks_exact(4)
-                        .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
-                        .collect(),
-                );
-            }
-            let Ok(vertices) = knn_format::decode_graph_region(
-                &chunk.graph,
-                chunk.header.cur_vec_num as usize,
-                chunk.header.mmax0,
-                chunk.header.mmax,
-            ) else {
-                continue;
-            };
-            if let Ok(mut loaded) =
-                Self::assemble_loaded_index(chunk.header, chunk.labels.clone(), vectors, vertices)
-            {
-                loaded.chunk_id = chunk_id;
+            if let Some(loaded) = Self::assemble_loaded_index(parts, chunk_id) {
                 out.push(loaded);
             }
         }
         out
-    }
-
-    fn assemble_loaded_index(
-        header: knn_format::HnswHeader,
-        labels: Vec<u32>,
-        vectors: Vec<Vec<f32>>,
-        vertices: Vec<knn_format::HnswGraphVertex>,
-    ) -> Result<LoadedVectorIndex> {
-        let levels: Vec<usize> = vertices
-            .iter()
-            .map(|v| v.layer_count.max(0) as usize)
-            .collect();
-        let mut links: Vec<Vec<Vec<usize>>> = vec![Vec::new()];
-        for (node, v) in vertices.iter().enumerate() {
-            while links[0].len() <= node {
-                links[0].push(Vec::new());
-            }
-            links[0][node] = v.neighbors_l0.iter().map(|&x| x as usize).collect();
-            for (l, nbrs) in v.upper.iter().enumerate() {
-                let layer = l + 1;
-                while links.len() <= layer {
-                    links.push(Vec::new());
-                }
-                while links[layer].len() <= node {
-                    links[layer].push(Vec::new());
-                }
-                links[layer][node] = nbrs.iter().map(|&x| x as usize).collect();
-            }
-        }
-        if vectors.is_empty() {
-            return Err(Error::Invalid("HNSW mirror has no vectors".to_string()));
-        }
-        let entry = Some((header.enterpoint.max(0) as usize).min(vectors.len() - 1));
-        let index = HnswIndex::from_parts(
-            header.dim as usize,
-            header.m.max(1) as usize,
-            (header.ef_construction as usize).max(64),
-            vectors,
-            levels,
-            links,
-            entry,
-            header.max_layer.max(0) as usize,
-        );
-        Ok(LoadedVectorIndex {
-            index: HnswHandler::from_index(index),
-            labels,
-            chunk_id: 0,
-        })
     }
 
     /// Builds a C++ IVF `chunk_0.idx` body (plain storage, `kPlain`) for
@@ -2225,21 +2362,17 @@ impl Engine {
     }
 }
 
-/// Serializes an existing graph as a C++ HNSW chunk (header, plain vector
-/// region, graph region, `u32` labels).
+/// Serializes an existing graph as a C++ HNSW chunk (vec-store meta, graph
+/// region, `u32` labels). The vector region depends on the encoding: plain
+/// f32 vectors, LVQ i8 codes or RaBitQ 1-bit codes.
 fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>) {
-    let dim = index.dims();
     let m = index.m() as u64;
     let (mmax0, mmax) = knn_format::get_mmax(m);
-    let mut header = knn_format::HnswHeader::plain(m, 200, index.len() as u64, dim as u64);
-    header.max_layer = index.max_level() as i32;
-    header.enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
-    let mut vector_region = Vec::with_capacity(index.len() * dim * 4);
-    for n in 0..index.len() {
-        for x in index.vector(n) {
-            vector_region.extend_from_slice(&x.to_le_bytes());
-        }
-    }
+    let ef_construction = 200u64.max(m);
+    let max_layer = index.max_level() as i32;
+    let enterpoint = index.entry_point().map(|e| e as i32).unwrap_or(0);
+    let store_meta = index.store_meta_bytes();
+    let vector_region = index.store_records_bytes();
     // Neighbour counts must not exceed the level's limit.
     let vertices: Vec<knn_format::HnswGraphVertex> = (0..index.len())
         .map(|n| {
@@ -2268,7 +2401,19 @@ fn encode_hnsw_chunk_from(index: &HnswIndex, labels: &[u32]) -> (usize, Vec<u8>)
         })
         .collect();
     let graph = knn_format::encode_graph_region(&vertices, mmax0, mmax);
-    let chunk = knn_format::encode_hnsw_chunk(&header, &vector_region, &graph, labels);
+    let chunk = knn_format::encode_hnsw_chunk_ext(
+        m,
+        ef_construction,
+        index.len() as u64,
+        mmax0,
+        mmax,
+        max_layer,
+        enterpoint,
+        &store_meta,
+        &vector_region,
+        &graph,
+        labels,
+    );
     (index.len(), chunk)
 }
 

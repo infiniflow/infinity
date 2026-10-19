@@ -6194,8 +6194,22 @@ impl Engine {
                     };
                     let m = opt("M").unwrap_or(16);
                     let efc = opt("EF_CONSTRUCTION").unwrap_or(200);
+                    let opt = |name: &str| {
+                        im.options
+                            .iter()
+                            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                            .map(|(_, v)| v.clone())
+                    };
+                    let metric = infinity_index::vector::Metric::parse(
+                        &opt("metric").unwrap_or_else(|| "l2".into()),
+                    );
+                    let encoding = infinity_index::vector::HnswEncoding::parse(
+                        &opt("encode").unwrap_or_default(),
+                    );
                     entry.hnsw_mem.entry(im.column.clone()).or_insert_with(|| {
-                        Arc::new(Mutex::new(hnsw_mem::HnswIndexInMem::new(dims, m, efc)))
+                        Arc::new(Mutex::new(hnsw_mem::HnswIndexInMem::new_with(
+                            dims, m, efc, metric, encoding,
+                        )))
                     });
                 }
             }
@@ -11838,6 +11852,127 @@ mod tests {
                 assert_eq!(rows, &vec![vec!["6".to_string()], vec!["4".to_string()]]);
             }
             other => panic!("{other:?}"),
+        }
+    }
+
+    /// `InitAbstractIndexT` picks the distance from `metric`; the mirror's
+    /// graph answers self-queries for l2, cosine and inner product.
+    #[test]
+    fn hnsw_metric_variants_answer_self_queries() {
+        // Inner product is maximised by the largest-norm row, not the row
+        // itself; l2/cosine are maximised by the row.
+        for (metric, target) in [("l2", 42), ("cosine", 42), ("ip", 199)] {
+            let dir = tempdir().unwrap();
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE hm (id INT, v EMBEDDING(FLOAT,4));")
+                .unwrap();
+            let mut sql = String::from("INSERT INTO hm VALUES ");
+            for i in 0..200 {
+                sql.push_str(&format!("({i}, [{i}.0,{}.0,{}.0,1.0])", i + 1, i + 2));
+                if i < 199 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute(&format!(
+                "CREATE INDEX hm_i ON hm (v) USING HNSW WITH (metric='{metric}');"
+            ))
+            .unwrap();
+            e.flush().unwrap();
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM hm SEARCH MATCH VECTOR \
+                     (v, [{target}.0,{}.0,{}.0,1.0], 'float', '{metric}', 1);",
+                    target + 1,
+                    target + 2
+                ),
+            );
+            assert_eq!(got, vec![vec![target.to_string()]], "metric {metric}");
+        }
+    }
+
+    /// C++ `test_lsg_build_ut.cpp::test1`: an LSG-built HNSW keeps >= 95%
+    /// recall@1 for self-queries.
+    #[test]
+    fn lsg_hnsw_keeps_self_query_recall() {
+        let dim = 16usize;
+        let n = 128usize;
+        let vector = |i: usize| -> String {
+            let parts: Vec<String> = (0..dim)
+                .map(|j| {
+                    let v = ((i * 31 + j * 17 + (i * j) % 13) % 100) as f32 / 10.0;
+                    format!("{v}")
+                })
+                .collect();
+            format!("[{}]", parts.join(","))
+        };
+        let dir = tempdir().unwrap();
+        let e = Engine::open(dir.path()).unwrap();
+        e.execute("CREATE TABLE lg (id INT, v EMBEDDING(FLOAT,16));")
+            .unwrap();
+        let mut sql = String::from("INSERT INTO lg VALUES ");
+        for i in 0..n {
+            sql.push_str(&format!("({i}, {})", vector(i)));
+            if i + 1 < n {
+                sql.push(',');
+            }
+        }
+        sql.push(';');
+        e.execute(&sql).unwrap();
+        e.execute(
+            "CREATE INDEX lg_i ON lg (v) USING HNSW WITH \
+             (metric='l2', build_type='lsg', lsg_config='sample_ratio=0.5,ls_k=10,alpha=1.0');",
+        )
+        .unwrap();
+        e.flush().unwrap();
+        let mut hits = 0;
+        for i in 0..n {
+            let got = rows(
+                &e,
+                &format!(
+                    "SELECT id FROM lg SEARCH MATCH VECTOR (v, {}, 'float', 'l2', 1);",
+                    vector(i)
+                ),
+            );
+            if got == vec![vec![i.to_string()]] {
+                hits += 1;
+            }
+        }
+        let recall = hits as f64 / n as f64;
+        assert!(recall >= 0.95, "LSG recall@1 = {recall}");
+    }
+
+    /// C++ `InitAbstractIndexT`: the HNSW mirror stores plain, LVQ or RaBitQ
+    /// vectors per the `encode` option and answers the same top-1.
+    #[test]
+    fn hnsw_encodings_answer_vector_search() {
+        for encode in ["plain", "lvq", "rabitq"] {
+            let dir = tempdir().unwrap();
+            let e = Engine::open(dir.path()).unwrap();
+            e.execute("CREATE TABLE he (id INT, v EMBEDDING(FLOAT,4));")
+                .unwrap();
+            let mut sql = String::from("INSERT INTO he VALUES ");
+            for i in 0..200 {
+                sql.push_str(&format!("({i}, [{i}.0,{}.0,{}.0,1.0])", i + 1, i + 2));
+                if i < 199 {
+                    sql.push(',');
+                }
+            }
+            sql.push(';');
+            e.execute(&sql).unwrap();
+            e.execute(&format!(
+                "CREATE INDEX he_i ON he (v) USING HNSW WITH (metric='l2', encode='{encode}');"
+            ))
+            .unwrap();
+            e.flush().unwrap();
+            let rows = rows(
+                &e,
+                "SELECT id FROM he SEARCH MATCH VECTOR \
+                 (v, [42.0,43.0,44.0,1.0], 'float', 'l2', 1);",
+            );
+            assert_eq!(rows, vec![vec!["42".to_string()]], "encode {encode}");
         }
     }
 

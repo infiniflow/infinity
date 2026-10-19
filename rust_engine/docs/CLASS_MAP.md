@@ -28,6 +28,10 @@
 | `BlockMaxWandIterator`（`blockmax_wand_iterator_impl.cpp`） | `wand::BlockMaxWandIterator` | `Next`→`run`（pivot/NextShallow/block-max 剪枝） | ✅ |
 | `HnswIndexInMem`（`hnsw_alg.cppm`） | `hnsw_mem::HnswIndexInMem` | `Add`→`insert`、`Search`→`search`、`MemUsage` | ✅ |
 | `HnswHandler`（`hnsw_handler.cppm`） | `infinity_index::hnsw_handler::HnswHandler` | `Make`→`new`/`from_index`、`InsertVecs`→`insert_vecs`（按序，调度器设计变更）、`SearchIndex`→`search_index`（`KnnSearchOption.ef`→`ef`）、`MemUsage`→`mem_usage`、`GetDocNum`→`len` | ✅ |
+| `LVQVecStoreMeta` / `LVQVecStoreInner` + `LVQ{L2,Cos,IP}Dist` + 缓存（`lvq_vec_store.cppm`、`dist_func_{l2,cos,ip}.cppm`） | `infinity_index::lvq::{LvqStore, LvqData, LvqQuery, Metric}` | `CompressTo`→`compress`（mean 中心化 + i8 标量量化 + scale/bias）、`MakeQuery`→`make_query`、L2/Cos/IP 距离与 local/global cache、`Optimize`→`build/train`（重算 mean）、meta/records 按 C++ 布局读写；`HnswIndex::with_encoding(Lvq)` 使用 | ✅ |
+| `RabitqVecStoreMeta` / `Inner` + `Rabitq{L2,Cos,IP}Dist`（`rabitq_vec_store.cppm`、`dist_func_{l2,cos,ip}.cppm`） | `infinity_index::rabitq::{RabitqStore, RabitqData, RabitqQuery, Metric}` | Givens 随机正交矩阵、旋转质心、1-bit 符号码、MSQ u8 查询、`RecoverIpDistance`/`RecoverL2DistanceSqr`、三指标恢复公式、meta/records 布局；`HnswIndex::with_encoding(Rabitq)` 使用 | ✅ |
+| `HnswLSGBuilder` / `LSGConfig` / `LSGDistWrapper`（`hnsw_lsg_builder.cppm`、`dist_func_lsg_wrapper.cppm`、`index_hnsw.cppm`） | `infinity_index::lsg::{LsgConfig, LsgIndex}` | 按 `sample_ratio` 采样、每行对样本的前 `ls_k` 距离均值、`d / sqrt(avg_i*avg_j)^alpha`、`lsg_config` 解析；构图期作为 HNSW 距离包装 | ✅ |
+| `InitAbstractIndexT`（`hnsw_handler_impl.cpp`） | `HnswIndex::with_encoding` + `HnswIndexInMem::new_with` | `encode` ∈ plain/lvq/rabitq、`build_type` ∈ plain/lsg、`metric` ∈ l2/ip/cosine 组合选择存储与距离；chunk 的 vec-store meta 按选择写读 | ✅ |
 | `MemoryIndexer`（`memory_indexer.cppm`） | 执行器 `MemoryIndexer` | `Insert`→`insert`（含预算检查）、`MemUsed`→`mem_used`、`GetDocCount`→`doc_count`、`Reset`；删除只去掉 live 标记（postings 保留到压实） | ✅ |
 | `ColumnIndexReader`（`column_index_reader.cppm`） | 执行器 `ColumnIndexReader` | 每段 `IndexSegmentReader`→`fulltext_segment::SegmentIndexReader`；`GetIndexReader(term)`→`postings`、`GetColumnLength`→`doc_len`、跨段 `doc_count`/`total_len`/`contains` | ✅ |
 | `EMVBIndex::GetQueryResult` / `EMVBSearch`（`emvb_search_impl.cpp`） | `infinity_index::emvb::{EmvbView, EmvbSearchOptions}` | 三阶段：`find_candidate_docs`→centroid 候选、`compute_hit_frequency`、`second_stage_filtering`、`compute_topk_documents_selected`（残差 PQ 精排）；`PLAID_*` 默认值 | ✅ |
@@ -57,7 +61,6 @@
 | `TaskScheduler` / `FragmentContext` / `BlockingQueue` | Tokio `mpsc` + `JoinSet` + 按边并发管线 | §4.4 D4（用户已批准） |
 | 倒排 `fst` 打包/读取 | `fst` crate 数据路径 + 自实现 C++ 尾块 CRC-32/IEEE | §4.2（已批准；校验和不兼容，数据路径复用） |
 | SIMD 距离核 / 压缩 / mmap | `simsimd`/`faer`、`lz4_flex`、`memmap2` | §3.4（仅底层原语，控制流仍自研） |
-| HNSW 的 `LVQ*VecStore` / `RaBitQ*` / `HnswLSGBuilder`（`knn_hnsw/data_store`、`hnsw_lsg_builder.cppm`） | 无；HNSW 使用 plain 向量存储 | 这些模板变体只能由 C++ 单测/benchmark 直接实例化，SQL `CREATE INDEX … USING HNSW` 不解析压缩/构图选项；正确性路径统一为 plain `KnnHnsw`，故不移植 |
 | 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `inverted_format` 的 postings/positions 编解码；`fulltext_segment` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
 | `DataFileWorker` / `VirtualStore` / `PersistenceManager`（`storage/io`、`storage/buffer`） | `std::fs` + `infinity_storage::s3::S3Client` + WAL | 本地/对象存储的选择在 CLI 启动时完成（`storage_type=minio` 时先 restore 再按 S3 同步）；C++ 的文件 worker/虚拟存储层合并为这两条路径 |
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
@@ -101,6 +104,9 @@
 | `invertedindex/column_inverter_ut.cpp`（tf/positions/length） | `MemoryIndexer` | `memory_indexer_records_tf_positions_and_length`、`memory_indexer_delete_keeps_the_postings` |
 | `knn/emvb`（候选/精排） | `emvb::EmvbView` / `EmvbPqIndex::prefilter` | `ranks_the_document_whose_centroid_matches_the_query`、`threshold_first_falls_back_to_the_closest_centroid`、`prefilter_keeps_the_exact_maxsim_winner` |
 | `planner/optimizer/regex_literal_extractor_ut.cpp` | `regex_literal::extract_regex_literal_runs` | `extracts_only_mandatory_runs`（备选/量词/内联标志/`\Q..\E`/`\C`/fold）、`sparsegram_analyzer_names`、`gram_floor_follows_the_script` |
+| `knn/hnsw/test_lvq_ut.cpp` | `lvq::LvqStore` | `reconstruction_error_is_below_two_percent`（2% 重建误差）、`distances_track_the_plain_metric`、`save_and_load_roundtrip` |
+| `knn/hnsw/test_rabitq_ut.cpp` | `rabitq::RabitqStore` | `orthogonal_matrix_is_orthonormal`、`centroid_is_the_rotated_mean`、`save_and_load_roundtrip`、`l2_estimator_keeps_the_true_neighbour` |
+| `knn/hnsw/test_lsg_build_ut.cpp` | `lsg::LsgIndex` + `HnswIndex` | `avg_is_at_least_the_exhaustive_topk_mean`、`lsg_hnsw_keeps_self_query_recall`（recall@1 ≥ 0.95） |
 | `bg_task/*_ut.cpp` 的索引生命周期 | `dump_hnsw_segments` / `optimize_indexes` / `cleanup` | `hnsw_checkpoint_dumps_only_the_memory_segment`、`mem_index_capacity_dumps_the_hnsw_segment_after_the_batch`、`cleanup_keeps_incremental_hnsw_chunks_until_a_merge_covers_the_table` |
 
 ### 未移植单测（Rust 类已存在）

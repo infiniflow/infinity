@@ -4,6 +4,7 @@
 //! executor merges it with every sealed `chunk_n.idx`.
 
 use infinity_index::hnsw_handler::{HnswHandler, KnnSearchOption};
+use infinity_index::vector::{HnswEncoding, HnswIndex, Metric};
 
 pub(crate) struct HnswIndexInMem {
     pub dims: usize,
@@ -13,10 +14,25 @@ pub(crate) struct HnswIndexInMem {
 }
 
 impl HnswIndexInMem {
-    pub fn new(dims: usize, m: usize, ef_construction: usize) -> Self {
+    /// `InitAbstractIndexT`: the memory segment uses the index's encoding and
+    /// metric (plain / LVQ / RaBitQ, l2 / ip / cosine).
+    pub fn new_with(
+        dims: usize,
+        m: usize,
+        ef_construction: usize,
+        metric: Metric,
+        encoding: HnswEncoding,
+    ) -> Self {
         Self {
             dims,
-            handler: HnswHandler::new(dims, m, ef_construction, 64),
+            handler: HnswHandler::from_index(HnswIndex::with_encoding(
+                dims,
+                m,
+                ef_construction,
+                64,
+                metric,
+                encoding,
+            )),
             rows: Vec::new(),
         }
     }

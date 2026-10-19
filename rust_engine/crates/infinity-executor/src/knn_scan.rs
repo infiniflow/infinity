@@ -116,9 +116,6 @@ impl Engine {
             }
             return Some(candidates);
         }
-        if q.metric != "l2" {
-            return None;
-        }
         let segments = {
             let tables = self.tables.lock().unwrap();
             tables
