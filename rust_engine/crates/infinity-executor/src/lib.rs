@@ -9512,239 +9512,37 @@ impl Engine {
             }
             best
         })();
-        let mut scored: Vec<(usize, f64, f64)> = Vec::new();
-        for (seq, row) in &rows {
-            // The WHERE predicate filters candidates *before* top-N ranking.
-            if let Some(p) = pred {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            if let Some(p) = &in_filter {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            if let Some(p) = &search_filter {
-                if !p.eval_predicate(row) {
-                    continue;
-                }
-            }
-            if let Some(cands) = &vector_candidates {
-                if !cands.contains(seq) {
-                    continue;
-                }
-            }
-            // Sparse: score with the BMP block-max index (the reference's
-            // `bmp_alg.cppm:SearchKnn`) instead of a per-row dot product.
-            let bmp_dot = if is_sparse && !bit_sparse {
-                bmp_scores.get(seq).copied()
-            } else {
-                None
-            };
-            if let Some(dot) = bmp_dot {
-                scored.push((*seq, dot, -dot));
-                continue;
-            }
-            if let Some(Value::Str(v)) = row.get(col_idx) {
-                if is_tensor {
-                    if let Some(score) = mv_scores.get(seq) {
-                        scored.push((*seq, *score, -*score));
-                        continue;
-                    }
-                    let qtext = format!("[{}]", query_items.join(","));
-                    let qtext = match type_dim(&types[col_idx]) {
-                        Some(d) => reshape_tensor(&qtext, d),
-                        None => qtext,
-                    };
-                    let q = parse_tensor_leaves(&qtext);
-                    // The column's declared element type and the query's
-                    // declared element type both drive the rounding precision.
-                    let col_elem =
-                        tensor_elem_type(types.get(col_idx).map(String::as_str).unwrap_or(""));
-                    let qry_elem = match arg_str(m.args.get(1)) {
-                        None => ElemType::Float32,
-                        Some(s) => elem_type_named(&s).ok_or_else(|| {
-                            Error::Invalid(format!("invalid tensor data type '{s}'"))
-                        })?,
-                    };
-                    let score = tensor_score(
-                        &q,
-                        v,
-                        col_elem,
-                        qry_elem,
-                        types
-                            .get(col_idx)
-                            .map(|t| t.to_ascii_uppercase().starts_with("TENSORARRAY"))
-                            .unwrap_or(false),
-                    );
-                    scored.push((*seq, score, -score));
-                } else if is_sparse {
-                    // A `bit` sparse vector holds bare indices; its inner product
-                    // is the number of shared positions.
-                    let dot = if bit_sparse {
-                        let qidx: Vec<i64> = query_items
-                            .iter()
-                            .filter_map(|x| x.trim().parse::<i64>().ok())
-                            .collect();
-                        let ridx: Vec<i64> = v
-                            .trim()
-                            .trim_start_matches('[')
-                            .trim_end_matches(']')
-                            .split(',')
-                            .filter_map(|x| x.trim().parse::<i64>().ok())
-                            .collect();
-                        qidx.iter().filter(|i| ridx.contains(i)).count() as f64
-                    } else {
-                        let (qv, rv) = (parse_sparse(&query_items), parse_sparse_str(v));
-                        sparse_dot(&qv, &rv)
-                    };
-                    scored.push((*seq, dot, -dot));
-                } else {
-                    // A `bit` embedding column stores a bit string, so both the
-                    // query and the stored value are read as 0/1 positions.
-                    let bit_col = types.get(col_idx).map(|t| is_bit_type(t)).unwrap_or(false);
-                    let mut qv: Vec<f64> = query_items
-                        .iter()
-                        .filter_map(|x| x.parse::<f64>().ok())
-                        .collect();
-                    // The SDK packs a bit query into bytes (LSB first); expand
-                    // it to one bit per position unless it is already un-packed.
-                    if bit_col {
-                        let decl = types.get(col_idx).map(String::as_str).unwrap_or("");
-                        let dim = type_dim(decl).unwrap_or(0);
-                        let multi = decl.to_ascii_uppercase().starts_with("MULTIVECTOR");
-                        // Un-packed bits already line up on `dim` boundaries;
-                        // only a byte-packed query needs expanding.
-                        if dim > 0
-                            && !qv.len().is_multiple_of(dim)
-                            && (qv.len() * 8).is_multiple_of(dim)
-                        {
-                            let mut bits = Vec::with_capacity(qv.len() * 8);
-                            for b in &qv {
-                                let byte = *b as u8;
-                                for k in 0..8 {
-                                    bits.push(((byte >> k) & 1) as f64);
-                                }
-                            }
-                            // A multivector query packs several `dim`-sized rows.
-                            if !multi {
-                                bits.truncate(dim);
-                            }
-                            qv = bits;
-                        } else {
-                            qv = qv
-                                .into_iter()
-                                .map(|x| if x != 0.0 { 1.0 } else { 0.0 })
-                                .collect();
-                        }
-                    }
-                    if qv.is_empty() {
-                        continue;
-                    }
-                    // a MULTIVECTOR holds several vectors; the row scores by the
-                    // best-matching sub-vector
-                    let multivector = types
-                        .get(col_idx)
-                        .map(|t| t.to_ascii_uppercase().starts_with("MULTIVECTOR"))
-                        .unwrap_or(false);
-                    if multivector {
-                        // MAXSIM: split both sides into `dim`-sized rows and sum,
-                        // over the query rows, the best similarity to a stored row.
-                        let dim = type_dim(types.get(col_idx).map(String::as_str).unwrap_or(""))
-                            .unwrap_or(qv.len())
-                            .max(1);
-                        // A bit multivector stores one bit string per row.
-                        let doc_rows = if tensor_elem_type(
-                            types.get(col_idx).map(String::as_str).unwrap_or(""),
-                        ) == ElemType::Bit
-                        {
-                            parse_bit_leaves(v)
-                        } else {
-                            parse_tensor_leaves(v)
-                        };
-                        if doc_rows.is_empty() || doc_rows.iter().all(|r| r.is_empty()) {
-                            continue;
-                        }
-                        let qrows: Vec<&[f64]> = qv.chunks(dim).collect();
-                        let (mut total, mut total_dist) = (0.0f64, 0.0f64);
-                        for qr in qrows {
-                            let mut best: Option<(f64, f64)> = None;
-                            for dr in &doc_rows {
-                                if dr.len() != qr.len() {
-                                    continue;
-                                }
-                                let (sim, dist) = vector_score(qr, dr, &metric);
-                                if best.map(|(b, _)| sim > b).unwrap_or(true) {
-                                    best = Some((sim, dist));
-                                }
-                            }
-                            if let Some((sim, dist)) = best {
-                                total += sim;
-                                total_dist += dist;
-                            }
-                        }
-                        // MAXSIM distance is the sum of the best per-row
-                        // distances; the similarity is its `1/(1+d)` form.
-                        scored.push((*seq, total, total_dist));
-                        continue;
-                    }
-                    let rv: Vec<f64> = if bit_col {
-                        parse_bit_leaves(v).into_iter().flatten().collect()
-                    } else {
-                        parse_vec_str(v)
-                    };
-                    if rv.len() != qv.len() {
-                        continue;
-                    }
-                    let (sim, dist) = vector_score(&qv, &rv, &metric);
-                    scored.push((*seq, sim, dist));
-                }
-            }
-        }
-        if let Some(shared) = &cache {
-            let qv: Vec<f64> = query_items
-                .iter()
-                .filter_map(|x| x.parse::<f64>().ok())
-                .collect();
-            let guard = shared.read().unwrap();
-            if !qv.is_empty() && qv.len() == guard.dims {
-                for (seq, v) in &guard.rows {
-                    if !guard.live.contains(seq) {
-                        continue;
-                    }
-                    if let Some(cands) = &vector_candidates {
-                        if !cands.contains(seq) {
-                            continue;
-                        }
-                    }
-                    let (sim, dist) = vector_score(&qv, v, &metric);
-                    scored.push((*seq, sim, dist));
-                }
-            }
-        }
-        let use_sim = is_sparse || is_tensor || matches!(metric.as_str(), "cosine" | "ip");
-        scored.sort_by(|a, b| {
-            let (x, y) = if use_sim { (b.1, a.1) } else { (a.2, b.2) };
-            x.partial_cmp(&y)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.0.cmp(&b.0))
-        });
-        if let Some(th) = threshold {
-            // For a distance metric the threshold is an upper bound; for a
-            // similarity metric it is a lower bound.
-            let is_dist = !is_sparse && !is_tensor && matches!(metric.as_str(), "l2" | "hamming");
-            scored.retain(|(_, sim, dist)| {
-                if is_dist {
-                    *dist <= th
-                } else if use_sim {
-                    *sim >= th
-                } else {
-                    *dist >= th
-                }
-            });
-        }
-        scored.truncate(topn);
+        // C++ `PhysicalKnnScan`: exact scoring/ranking of the scanned rows
+        // (filters live in the filter-scan base; the index probe above is
+        // `KnnCandidateScan`).
+        let keep = |row: &[Value]| {
+            pred.is_none_or(|p| p.eval_predicate(row))
+                && in_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+                && search_filter.as_ref().is_none_or(|p| p.eval_predicate(row))
+        };
+        let column_decl = types
+            .get(col_idx)
+            .map(|t| t.to_ascii_uppercase())
+            .unwrap_or_default();
+        let query_elem_arg = arg_str(m.args.get(1));
+        let scan = knn_scan::PhysicalKnnScan {
+            column_index: col_idx,
+            column_type: &column_decl,
+            is_sparse,
+            is_tensor,
+            is_bit_sparse: bit_sparse,
+            query_items: &query_items,
+            query_elem_type: query_elem_arg.as_deref(),
+            topn,
+            metric: &metric,
+            threshold,
+            rows: &rows,
+            cache: cache.as_ref(),
+            vector_candidates,
+        };
+        let state = scan.finish(scan.execute(&keep, &bmp_scores, &mv_scores)?);
+        let use_sim = state.use_sim;
+        let scored = state.scored;
 
         let wanted: Vec<u64> = scored.iter().map(|(seq, _, _)| *seq as u64).collect();
         let mut by_id: HashMap<usize, Vec<Value>> = self

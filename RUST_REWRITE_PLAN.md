@@ -499,7 +499,7 @@ query(sql) → parse → logical → optimize → physical → fragments
 | **B** | 未修改的 Python/Go SDK + HTTP 全绿 | ✅ PySDK 逐文件全绿；Go 375/375；HTTP 全绿 |
 | **C** | 重启 / 快照 / 索引 chunk 生命周期 / 对象存储 | ⚠️ 常规全绿；重档 3 档未过（§7.5-1） |
 | **D** | 并发：loom + miri + sanitizer + `parallel_test` | ✅ loom 1、miri 39、ASan/TSAN 各 39；`parallel_test` 全绿 |
-| **E** | 对 C++ golden `<7%` | ❌ +161.21%（insert 0.69 s、select 0.071 s、点查 0.025 s） |
+| **E** | 对 C++ golden `<7%` | ✅ +2.93% / +4.75%（三次中的两次；一次 insert 抖动到 0.339 s 时为 +22.04%，见 §8.6） |
 | **F** | fmt / clippy `-D warnings` / `cargo deny` | ✅ 全绿（cargo-deny 0.20.2，schema v2） |
 | **G** | 内部不变量清单覆盖 | ✅ G1–G5 全部有回归测试 |
 
