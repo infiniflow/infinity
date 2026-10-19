@@ -64,12 +64,13 @@
 | 倒排 `PostingByteSlice` / `SkiplistReader` / `SkiplistWriter` | `inverted_format` 的 postings/positions 编解码；`fulltext_segment` 合并段 | 磁盘字节布局已对齐；skiplist 容器仅 C++ 构建期优化，读路径按同样的 postings 列表解码，类边界不单独移植 |
 | `DataFileWorker` / `VirtualStore` / `PersistenceManager`（`storage/io`、`storage/buffer`） | `std::fs` + `infinity_storage::s3::S3Client` + WAL | 本地/对象存储的选择在 CLI 启动时完成（`storage_type=minio` 时先 restore 再按 S3 同步）；C++ 的文件 worker/虚拟存储层合并为这两条路径 |
 | `TableIndexMeta` / `SegmentIndexMeta` / `ChunkIndexMeta`（`table_index_meta.cppm` 等） | `infinity_catalog` 的索引元数据 + `cpp_blocks` 的 `chunk_{n}.idx` 目录 | 持久化键空间与 chunk 目录布局已对齐；C++ 的模块类树未逐类拆分，索引生命周期由 `dump/optimize/cleanup` 方法承担 |
+| `TableMeta` / `SegmentMeta`（`catalog/meta/*.cppm`）+ `BlockIndex` | `infinity-executor` 的 `TableEntry`（运行时聚合） | 上游 PR #2722 删除了 `TableEntry` / `SegmentEntry` / `BlockManager`；Rust 把它们过去承担的运行时状态（写入代次、行 ID 分配、索引注册表、块快照）聚合为一个进程内结构，持久化元数据仍由 `infinity_catalog` + `BlockIndex` 按 C++ 布局承担 |
 
 ## 尚未一一对应（待补，按优先级）
 
 | C++ | 当前 Rust | 差距 |
 |---|---|---|
-| `PLAID`（`IndexType::kPLAID`） | 无 | 实现不在本仓库（第三方库 + `plaid_index_file_worker`），不属于类级移植范围 |
+| `PlaidQuantizer` / `PlaidGlobalCentroids` / `PlaidIndex` / `PlaidIndexInMem` / `PlaidIndexDiskMerger`（`storage/knn_index/plaid/*`） | 无（`MATCH TENSOR` 走全量 MaxSim，SQL 结果相同但未使用索引） | **在仓库内**的 2/4-bit 残差量化 + IVF + MaxSim 索引（约 5.5k 行，含 `plaid_index_file_worker`）；需按类移植，`test_plaid_ut.cpp` 16 例随类移植 |
 
 ## 维护规则
 
